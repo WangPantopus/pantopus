@@ -226,7 +226,7 @@ public struct ReportUserSheet: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .accessibilityAddTraits(.isHeader)
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(ReportReason.allCases.enumerated()), id: \.element) { index, reason in
                     ReportReasonRow(
                         reason: reason,
@@ -316,7 +316,7 @@ private struct ReportReasonRow: View {
     let onTap: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Button(action: onTap) {
                 HStack(spacing: Spacing.s3) {
                     Text(reason.label)

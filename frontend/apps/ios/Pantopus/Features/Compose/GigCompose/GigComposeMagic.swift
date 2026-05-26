@@ -151,7 +151,7 @@ extension GigComposeEngagementMode {
 
 struct ComposeIdentityChip: View {
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.user, size: 11, color: Theme.Color.personal)
             Text("PERSONAL · YOU")
                 .font(.system(size: 10.5, weight: .bold))
@@ -159,7 +159,7 @@ struct ComposeIdentityChip: View {
                 .foregroundStyle(Theme.Color.personal)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.personalBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         .accessibilityIdentifier("composeGigIdentityChip")
@@ -199,7 +199,7 @@ private struct MagicDescribeCard: View {
     let isParsed: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             header
             TextEditor(text: $text)
                 .font(.system(size: 14.5))
@@ -238,9 +238,9 @@ private struct MagicDescribeCard: View {
             Text("Magic Task")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Theme.Color.magic)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if isParsed {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Circle().fill(Theme.Color.success).frame(width: 6, height: 6)
                     Text("PARSED")
                         .font(.system(size: 10, weight: .bold))
@@ -267,7 +267,7 @@ private struct MagicDescribeCard: View {
                             .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Text("\(text.count) / \(GigComposeLimits.describeMax)")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextMuted)
@@ -299,7 +299,7 @@ private struct DetectedArchetypePill: View {
                     .font(.system(size: 13.5, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Button(action: onChange) {
                 Text("Change")
                     .font(.system(size: 12, weight: .semibold))
@@ -329,7 +329,7 @@ private struct ModulePromptsCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             HStack {
                 Text("TASK DETAILS")
                     .font(.system(size: 10.5, weight: .semibold))
@@ -378,7 +378,7 @@ private struct ModulePromptRow: View {
                     .foregroundStyle(prompt.isFilled ? Theme.Color.appText : Theme.Color.appTextSecondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if prompt.isFilled {
                 Icon(.check, size: 14, strokeWidth: 2.6, color: Theme.Color.success)
             } else {
@@ -386,7 +386,7 @@ private struct ModulePromptRow: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.warning)
                     .padding(.horizontal, Spacing.s2)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Spacing.s1)
                     .background(Theme.Color.warning.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
             }
@@ -412,7 +412,7 @@ private struct EngagementModeControl: View {
                 ForEach(GigComposeEngagementMode.allCases, id: \.self) { option in
                     let active = option == selected
                     Button { onSelect(option) } label: {
-                        VStack(spacing: 4) {
+                        VStack(spacing: Spacing.s1) {
                             Icon(
                                 option.icon,
                                 size: 16,
@@ -490,7 +490,7 @@ private struct BackToMagicBanner: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.arrowLeft, size: 15, color: Theme.Color.magic)
             }
             .padding(Spacing.s3)

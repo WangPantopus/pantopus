@@ -78,10 +78,10 @@ fun PersonaCard(
                 .border(1.dp, pillar.color.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .semantics { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Avatar(initials = initials, pillar = pillar, verified = verified)
         Column(
@@ -90,7 +90,7 @@ fun PersonaCard(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Text(
                     text = name,

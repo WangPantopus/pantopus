@@ -205,7 +205,7 @@ public struct StatsTabsBody: View {
     }
 
     private var tabStrip: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(ProfileTab.allCases) { tab in
                 Button {
                     selectedTab = tab

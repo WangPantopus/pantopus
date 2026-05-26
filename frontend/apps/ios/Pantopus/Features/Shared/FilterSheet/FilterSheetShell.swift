@@ -62,7 +62,7 @@ public struct FilterSheetShell: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s6) {

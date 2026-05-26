@@ -337,7 +337,7 @@ private struct PackageHeader: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             StatusChip(
                 projection.chipText,
@@ -361,7 +361,7 @@ private struct DetailGrid: View {
     let projection: PackageRowProjection
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             row(label: "Courier", value: projection.courier.label)
             if let tracking = pkg.trackingNumber, !tracking.isEmpty {
                 divider

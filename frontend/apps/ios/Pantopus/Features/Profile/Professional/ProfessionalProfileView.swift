@@ -120,7 +120,7 @@ public struct ProfessionalProfileView: View {
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.business)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text("Business")
                     .pantopusTextStyle(.overline)
                     .foregroundStyle(Theme.Color.appTextInverse)
@@ -233,7 +233,7 @@ public struct ProfessionalProfileView: View {
 
     private func visibilitySection(_ content: ProfessionalProfileContent) -> some View {
         proSection("Visibility") {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(content.visibility.enumerated()), id: \.element.id) { index, row in
                     VisRow(row: row) { viewModel.setVisibility(row.id, isOn: $0) }
                     if index < content.visibility.count - 1 {
@@ -346,7 +346,7 @@ private struct ProTextFieldSpec {
 @MainActor
 struct ProfessionalProfileSkeleton: View {
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             // Top bar stand-in.
             HStack {
                 Icon(.chevronLeft, size: 22, color: Theme.Color.appTextMuted)

@@ -155,7 +155,7 @@ struct CommentRow: View {
                 }
                 .padding(.leading, Spacing.s1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.vertical, 2)
     }

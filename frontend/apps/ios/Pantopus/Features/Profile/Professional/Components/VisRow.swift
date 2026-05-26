@@ -28,7 +28,7 @@ struct VisRow: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Toggle("", isOn: Binding(get: { row.isOn }, set: { onToggle($0) }))
                     .labelsHidden()
                     .tint(Theme.Color.primary600)
@@ -58,7 +58,7 @@ struct VisRow: View {
 }
 
 #Preview {
-    VStack(spacing: 0) {
+    VStack(spacing: Spacing.s0) {
         VisRow(
             row: ProVisibilityRow(
                 id: "1",

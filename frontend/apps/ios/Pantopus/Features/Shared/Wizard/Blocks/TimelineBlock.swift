@@ -34,7 +34,7 @@ public struct TimelineBlock: View {
     public var body: some View {
         let currentIndex = stages.firstIndex { $0.id == currentStageId } ?? 0
         VStack(spacing: Spacing.s2) {
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 ForEach(Array(stages.enumerated()), id: \.element.id) { index, _ in
                     StageDot(state: stateFor(index: index, currentIndex: currentIndex))
                     if index != stages.count - 1 {
@@ -48,7 +48,7 @@ public struct TimelineBlock: View {
                     }
                 }
             }
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 ForEach(Array(stages.enumerated()), id: \.element.id) { index, stage in
                     Text(stage.label)
                         .pantopusTextStyle(.caption)

@@ -243,7 +243,7 @@ private fun Badges(badges: List<String>) {
                         .clip(RoundedCornerShape(Radii.pill))
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurface)
-                        .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
             )
         }
     }

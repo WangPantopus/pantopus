@@ -266,7 +266,7 @@ private struct MailHeaderCard: View {
                         .lineLimit(1)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if let time = content.createdAtLabel {
                 Text(time)
                     .font(.system(size: 11, weight: .medium))
@@ -292,7 +292,7 @@ private struct MailHeaderCard: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(alignment: .center, spacing: Spacing.s1) {
                 CategoryBadge(category: content.category)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             Text(content.title)
                 .font(.system(size: 24, weight: .bold))
@@ -369,7 +369,7 @@ private struct MetaPill: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
@@ -379,7 +379,7 @@ private struct CategoryBadge: View {
     let category: MailItemCategory
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(category.icon, size: 11, color: category.accent)
             Text(category.label)
                 .font(.system(size: 10, weight: .bold))
@@ -401,7 +401,7 @@ private struct KeyFactsCard: View {
     let rows: [MailDetailKeyFact]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             Text("KEY FACTS")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.5)
@@ -427,7 +427,7 @@ private struct KeyFactsCard: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.Color.appText)
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                 }
                 .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, Spacing.s2)
@@ -539,7 +539,7 @@ private struct ActionsRow: View {
         action: @escaping @MainActor () -> Void = {}
     ) -> some View {
         Button(action: { action() }) {
-            VStack(spacing: 4) {
+            VStack(spacing: Spacing.s1) {
                 Icon(icon, size: 17, color: Theme.Color.appTextStrong)
                 Text(label)
                     .font(.system(size: 10.5, weight: .semibold))
@@ -564,7 +564,7 @@ private struct LoadingLayout: View {
     let onBack: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             MailItemDetailTopBar(
                 config: MailTopBarConfig(
                     eyebrow: nil,
@@ -591,7 +591,7 @@ private struct ErrorLayout: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             MailItemDetailTopBar(
                 config: MailTopBarConfig(
                     eyebrow: nil,

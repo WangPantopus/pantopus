@@ -35,7 +35,7 @@ public struct KeyFactsPanel: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { offset, row in
                 KeyFactRowView(row: row)
                 if offset < rows.count - 1 {
@@ -59,7 +59,7 @@ private struct KeyFactRowView: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .frame(minWidth: 96, alignment: .leading)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if row.isCode {
                 Text(row.value)
                     .pantopusTextStyle(.small)

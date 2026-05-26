@@ -97,7 +97,7 @@ private struct CounterOfferSheet: View {
                     .accessibilityIdentifier("counter-message")
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             HStack(spacing: Spacing.s2) {
                 Button {

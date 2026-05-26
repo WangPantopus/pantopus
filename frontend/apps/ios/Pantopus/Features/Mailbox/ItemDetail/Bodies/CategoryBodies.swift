@@ -221,7 +221,7 @@ private struct CourierMark: View {
                 .fill(Theme.Color.error)
                 .frame(height: 3)
                 .offset(y: 5)
-            VStack(spacing: 4) {
+            VStack(spacing: Spacing.s1) {
                 Text(carrierInitials)
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextInverse)
@@ -330,7 +330,7 @@ private struct PackageHandoffCard: View {
     var body: some View {
         PackageCard {
             SectionHeader("Carrier handoff")
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
                     HStack(alignment: .top, spacing: Spacing.s3) {
                         Icon(step.icon, size: 14, color: Theme.Color.primary600)
@@ -444,7 +444,7 @@ private struct PorchPhotoIllustration: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextInverse)
                 .padding(.horizontal, Spacing.s2)
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.s1)
                 .background(Theme.Color.appText.opacity(0.55))
                 .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
                 .padding(Spacing.s3)
@@ -462,7 +462,7 @@ private struct PorchPhotoIllustration: View {
                         .foregroundStyle(Theme.Color.appTextInverse)
                 }
                 .padding(.horizontal, Spacing.s2)
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.s1)
                 .background(Theme.Color.success)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)

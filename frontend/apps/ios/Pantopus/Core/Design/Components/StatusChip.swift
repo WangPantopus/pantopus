@@ -43,7 +43,7 @@ public struct StatusChip: View {
                 .foregroundStyle(foreground)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         .accessibilityLabel("\(text), \(a11yVariant)")

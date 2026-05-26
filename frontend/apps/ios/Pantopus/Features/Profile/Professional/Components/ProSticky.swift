@@ -99,7 +99,7 @@ struct ProSticky: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(Theme.Color.warning)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s2)
         .padding(.vertical, Spacing.s2)

@@ -79,7 +79,7 @@ public struct MailItemDetailShell<
 
     public var body: some View {
         ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 MailItemDetailTopBar(config: topBar)
                 ScrollView {
                     VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -219,7 +219,7 @@ public struct MailItemDetailTopBar: View {
     @ViewBuilder private var backButton: some View {
         if let onBack = config.onBack {
             Button(action: { onBack() }) {
-                HStack(spacing: 0) {
+                HStack(spacing: Spacing.s0) {
                     Icon(.chevronLeft, size: 22, color: Theme.Color.primary600)
                     Text("Mailbox")
                         .font(.system(size: 15, weight: .regular))
@@ -410,7 +410,7 @@ public struct AttachmentsRowView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(spacing: Spacing.s1) {
                 Text(content.title.uppercased())
                     .font(.system(size: 11, weight: .bold))
@@ -464,7 +464,7 @@ private struct AttachmentRow: View {
                             .lineLimit(1)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.download, size: 14, color: Theme.Color.appTextStrong)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(Theme.Color.appSurfaceSunken))

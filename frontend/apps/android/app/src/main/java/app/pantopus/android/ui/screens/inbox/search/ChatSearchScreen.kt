@@ -102,7 +102,7 @@ internal fun ChatSearchResultRow(
                     .fillMaxWidth()
                     .heightIn(min = 56.dp)
                     .background(PantopusColors.appSurface)
-                    .padding(horizontal = Spacing.s4, vertical = 12.dp),
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {

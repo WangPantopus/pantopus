@@ -127,7 +127,7 @@ public struct MailboxItemDetailShell<CategoryBodyView: View>: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             AccentStrip(category: category)
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             ScrollView {
@@ -194,7 +194,7 @@ public struct TrustPill: View {
                 .foregroundStyle(trust.foreground)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(trust.background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
         .accessibilityLabel("\(trust.label) sender")
@@ -265,7 +265,7 @@ public struct CertifiedStamp: View {
             .pantopusTextStyle(.overline)
             .foregroundStyle(Theme.Color.primary600)
             .padding(.horizontal, Spacing.s2)
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.s1)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.sm)
                     .stroke(Theme.Color.primary600, lineWidth: 1.5)
@@ -332,7 +332,7 @@ public struct StickyCTAShelf: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             HStack(spacing: Spacing.s3) {
                 if let ghostTitle = content.ghostTitle {

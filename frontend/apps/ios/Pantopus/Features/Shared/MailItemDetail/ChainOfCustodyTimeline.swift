@@ -120,7 +120,7 @@ public struct ChainOfCustodyTimeline: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             header
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             timelineBody
@@ -148,7 +148,7 @@ public struct ChainOfCustodyTimeline: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             statusPill
         }
         .padding(.horizontal, Spacing.s3)

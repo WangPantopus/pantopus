@@ -57,19 +57,19 @@ public struct IdentitySwitcherSheet: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             handle
             Text("Identity switcher")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 4)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, Spacing.s1)
+                .padding(.bottom, Spacing.s1)
                 .accessibilityAddTraits(.isHeader)
             Text("Pick the face you want active in feeds, composer, and chat.")
                 .font(.system(size: 12.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.s4)
                 .padding(.bottom, 14)
             ScrollView {
                 VStack(spacing: 10) {
@@ -84,8 +84,8 @@ public struct IdentitySwitcherSheet: View {
                         .accessibilityAddTraits(card.isActive ? [.isButton, .isSelected] : .isButton)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.bottom, Spacing.s6)
             }
         }
         .background(Theme.Color.appSurface)
@@ -96,14 +96,14 @@ public struct IdentitySwitcherSheet: View {
         Capsule()
             .fill(Theme.Color.appBorder)
             .frame(width: 40, height: 4)
-            .padding(.top, 8)
-            .padding(.bottom, 12)
+            .padding(.top, Spacing.s2)
+            .padding(.bottom, Spacing.s3)
             .frame(maxWidth: .infinity)
             .accessibilityHidden(true)
     }
 
     private func cardBody(_ card: IdentitySwitcherCard) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.s3) {
             ZStack {
                 Circle()
                     .fill(card.kind.accentBg)
@@ -137,7 +137,7 @@ public struct IdentitySwitcherSheet: View {
                         .lineLimit(2)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
         }
         .padding(14)

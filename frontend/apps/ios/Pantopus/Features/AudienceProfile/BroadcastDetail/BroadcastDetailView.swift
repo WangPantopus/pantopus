@@ -41,7 +41,7 @@ public struct BroadcastDetailView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             content
         }
@@ -52,7 +52,7 @@ public struct BroadcastDetailView: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button(action: onBack) {
                 Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
                     .frame(width: 44, height: 44)
@@ -98,7 +98,7 @@ public struct BroadcastDetailView: View {
                 .padding(.bottom, Spacing.s4)
             }
             .accessibilityIdentifier("broadcastDetailContent")
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .safeAreaInset(edge: .bottom, spacing: Spacing.s0) {
                 stickyFooter
             }
         case let .error(message): errorFrame(message: message)
@@ -157,7 +157,7 @@ public struct BroadcastDetailView: View {
     // MARK: - Hero
 
     private func heroCard(_ hero: BroadcastDetailHero) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 HStack(spacing: Spacing.s2) {
                     visibilityChip(hero)
@@ -286,7 +286,7 @@ public struct BroadcastDetailView: View {
 
     private func tierStackedBar(_ breakdown: BroadcastTierBreakdown) -> some View {
         GeometryReader { geo in
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 if breakdown.total <= 0 {
                     Rectangle()
                         .fill(Theme.Color.appBorder)
@@ -323,7 +323,7 @@ public struct BroadcastDetailView: View {
                     Text(segment.name)
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.Color.appTextStrong)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     Text("\(segment.count)")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
@@ -360,7 +360,7 @@ public struct BroadcastDetailView: View {
             if loaded.replies.isEmpty {
                 emptyRepliesCard
             } else {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     ForEach(Array(loaded.replies.enumerated()), id: \.element.id) { offset, reply in
                         replyRow(reply)
                         if offset < loaded.replies.count - 1 {
@@ -415,7 +415,7 @@ public struct BroadcastDetailView: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
                     tierChip(name: reply.tierName, rank: reply.tierRank)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     Text(reply.timeAgo)
                         .font(.system(size: 10.5))
                         .foregroundStyle(Theme.Color.appTextMuted)

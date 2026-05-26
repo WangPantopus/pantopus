@@ -552,7 +552,7 @@ private fun AngleSlot(
                 modifier =
                     Modifier
                         .align(Alignment.TopStart)
-                        .padding(4.dp)
+                        .padding(Spacing.s1)
                         .size(16.dp)
                         .clip(CircleShape)
                         .background(PantopusColors.success),
@@ -835,7 +835,7 @@ private fun IdentityChip() {
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
                 .testTag("listingComposeIdentityChip"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(icon = PantopusIcon.User, contentDescription = null, size = 11.dp, tint = PantopusColors.personal)
         Text(
@@ -863,7 +863,7 @@ private fun SnapPhotoStrip(photos: List<ListingComposePhoto>) {
                         .background(PantopusColors.successLight)
                         .padding(horizontal = Spacing.s2, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 11.dp, tint = PantopusColors.success)
                 Text("Good lighting", style = PantopusTextStyle.overline, color = PantopusColors.success)
@@ -1139,7 +1139,7 @@ private fun SuggestedConditionControl(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         SectionLabel("Condition")
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), modifier = Modifier.fillMaxWidth()) {
             ListingComposeCondition.entries.forEach { condition ->
                 val selected = state.form.condition == condition
                 Text(
@@ -1924,7 +1924,7 @@ private fun SuggestedPriceReadOnly(amount: String) {
 private fun StaticConditionControl(selected: ListingComposeCondition) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         SectionLabel("Condition")
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), modifier = Modifier.fillMaxWidth()) {
             ListingComposeCondition.entries.forEach { condition ->
                 val active = selected == condition
                 Text(

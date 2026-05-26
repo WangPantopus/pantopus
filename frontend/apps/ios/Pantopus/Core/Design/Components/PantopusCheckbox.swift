@@ -48,7 +48,7 @@ public struct PantopusCheckbox: View {
                         .foregroundStyle(Theme.Color.appText)
                         .multilineTextAlignment(.leading)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())

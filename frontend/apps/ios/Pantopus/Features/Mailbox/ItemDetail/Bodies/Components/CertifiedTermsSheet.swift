@@ -71,7 +71,7 @@ public struct CertifiedTermsSheet: View {
                 }
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s4)
         .background(Theme.Color.appBg)

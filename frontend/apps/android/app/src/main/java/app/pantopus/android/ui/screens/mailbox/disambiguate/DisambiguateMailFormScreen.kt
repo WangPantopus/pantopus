@@ -226,7 +226,7 @@ private fun ConfidencePill(confidence: Double) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "AI confidence $percent percent" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),

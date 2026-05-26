@@ -117,7 +117,7 @@ struct HubSetupBanner: View {
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             Button(action: onStart) {
                 Text(content.ctaTitle)
@@ -277,7 +277,7 @@ struct HubTodayCard: View {
                     }
                     HStack(spacing: 6) {
                         if let aqi = summary.aqiLabel {
-                            HStack(spacing: 4) {
+                            HStack(spacing: Spacing.s1) {
                                 Text("AQI")
                                     .pantopusTextStyle(.caption)
                                     .foregroundStyle(Theme.Color.appTextSecondary)
@@ -297,7 +297,7 @@ struct HubTodayCard: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
             }
             .padding(.horizontal, Spacing.s3)
@@ -461,7 +461,7 @@ private struct DiscoveryCard: View {
     let item: DiscoveryCardContent
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ZStack {
                 LinearGradient(
                     colors: [item.tint.backgroundColor, item.tint.color],
@@ -488,7 +488,7 @@ private struct DiscoveryCard: View {
             }
             .frame(height: 80)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text(item.title)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
@@ -497,7 +497,7 @@ private struct DiscoveryCard: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(2)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text(item.category.uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.3)
@@ -569,7 +569,7 @@ private struct JumpBackCard: View {
                     .multilineTextAlignment(.leading)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             if let fraction = item.progressFraction {
                 VStack(alignment: .leading, spacing: 5) {
@@ -627,7 +627,7 @@ struct HubRecentActivity: View {
                 .accessibilityIdentifier("hubRecentActivity.seeAll")
             }
             .padding(.horizontal, Spacing.s4)
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                     HStack(spacing: Spacing.s2) {
                         ZStack {
@@ -705,7 +705,7 @@ struct HubFloatingProgress: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Button(action: onContinue) {
                 Text("Continue")
                     .font(.system(size: 12, weight: .bold))
@@ -807,7 +807,7 @@ struct HubSkeleton: View {
                 Shimmer(width: 44, height: 11)
             }
             .padding(.horizontal, Spacing.s4)
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(0..<3, id: \.self) { index in
                     HStack(spacing: Spacing.s2) {
                         Shimmer(width: 30, height: 30, cornerRadius: Radii.sm)

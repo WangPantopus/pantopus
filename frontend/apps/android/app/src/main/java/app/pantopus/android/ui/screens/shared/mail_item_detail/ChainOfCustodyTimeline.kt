@@ -193,7 +193,7 @@ private fun EventRow(event: ChainOfCustodyEvent) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Text(
                     text = event.label,

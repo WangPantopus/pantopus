@@ -34,7 +34,7 @@ struct DisambiguateMailFormView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             FormShell(
                 title: "Who is this for?",
                 rightActionLabel: "",
@@ -89,7 +89,7 @@ struct DisambiguateMailFormView: View {
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .lineLimit(3)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 ConfidencePill(confidence: viewModel.confidence)
             }
         }
@@ -137,7 +137,7 @@ struct DisambiguateMailFormView: View {
     }
 
     private var stickyCTA: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             PrimaryButton(
                 title: "Confirm recipient",
@@ -238,7 +238,7 @@ private struct ConfidencePill: View {
                 .foregroundStyle(palette.foreground)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(palette.background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
         .accessibilityLabel("AI confidence \(percent) percent")

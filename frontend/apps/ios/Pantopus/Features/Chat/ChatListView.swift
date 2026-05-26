@@ -31,7 +31,7 @@ public struct ChatListView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ChatListTopBar(onCompose: onCompose)
             ChatListSearchBar(skeleton: viewModel.state.isLoading) {
                 onOpenSearch()
@@ -61,7 +61,7 @@ public struct ChatListView: View {
 
     private var loadingFrame: some View {
         ScrollView {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(0..<6, id: \.self) { _ in ChatListSkeletonRow() }
             }
         }
@@ -84,7 +84,7 @@ public struct ChatListView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 260)
             Button(action: onCompose) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(.edit2, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
                     Text("New message")
                         .font(.system(size: 14, weight: .bold))
@@ -97,7 +97,7 @@ public struct ChatListView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("chatListNewMessage")
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 Icon(.shieldCheck, size: 13, color: Theme.Color.primary600)
                 Text("Only verified neighbors can DM you")
                     .font(.system(size: 11.5, weight: .medium))
@@ -122,7 +122,7 @@ public struct ChatListView: View {
 
     private func populatedFrame(_ rows: [ConversationRowContent]) -> some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: Spacing.s0) {
                 ForEach(rows) { row in
                     ConversationRow(content: row) { onOpenConversation(row) }
                 }
@@ -187,7 +187,7 @@ private struct ChatListTopBar: View {
             .accessibilityLabel("New message")
             .accessibilityIdentifier("chatListComposeButton")
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.s4)
         .padding(.vertical, 10)
         .background(Theme.Color.appSurface)
     }
@@ -221,8 +221,8 @@ private struct ChatListSearchBar: View {
                 .accessibilityIdentifier("chatListSearchButton")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s1)
         .background(Theme.Color.appSurface)
     }
 }
@@ -236,23 +236,23 @@ private struct ChatListFilterTabs: View {
     let onSelect: @MainActor (ChatFilter) -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             if skeleton {
                 ForEach(0..<4, id: \.self) { _ in
                     Shimmer(width: 48, height: 14, cornerRadius: Radii.xs)
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 12)
+                        .padding(.trailing, Spacing.s6)
+                        .padding(.bottom, Spacing.s3)
                 }
             } else {
                 ForEach(ChatFilter.allCases, id: \.rawValue) { filter in
                     tabButton(filter: filter)
-                        .padding(.trailing, 24)
+                        .padding(.trailing, Spacing.s6)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
-        .padding(.leading, 16)
-        .padding(.top, 12)
+        .padding(.leading, Spacing.s4)
+        .padding(.top, Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -275,7 +275,7 @@ private struct ChatListFilterTabs: View {
                         .clipShape(Capsule())
                 }
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, Spacing.s3)
             .overlay(alignment: .bottom) {
                 if filter == active {
                     Rectangle()
@@ -296,16 +296,16 @@ private struct ChatListFilterTabs: View {
 
 private struct ChatListSkeletonRow: View {
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             Shimmer(width: 44, height: 44, cornerRadius: 22)
             VStack(alignment: .leading, spacing: 7) {
                 Shimmer(width: 140, height: 12, cornerRadius: Radii.xs)
                 Shimmer(width: 220, height: 10, cornerRadius: Radii.xs)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Shimmer(width: 26, height: 9, cornerRadius: Radii.xs)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.s4)
         .padding(.vertical, 14)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)

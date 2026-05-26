@@ -183,7 +183,7 @@ fun MapListHybridShell(
             modifier =
                 Modifier
                     .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(top = 8.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = Spacing.s2, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .testTag("mapListHybridTopPill"),
@@ -338,7 +338,7 @@ fun MapListHybridSheetGrabber(modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 4.dp),
+                .padding(top = Spacing.s2, bottom = Spacing.s1),
         contentAlignment = Alignment.Center,
     ) {
         Box(

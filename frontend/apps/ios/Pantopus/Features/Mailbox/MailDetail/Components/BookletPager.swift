@@ -94,7 +94,7 @@ public struct BookletPager: View {
                 .accessibilityLabel("Previous page")
                 .accessibilityIdentifier("bookletPager_prev")
                 VStack(alignment: .center, spacing: 1) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Text("Page \(currentIndex + 1)")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Theme.Color.appText)
@@ -168,7 +168,7 @@ public struct BookletPager: View {
     // MARK: - Grid mode
 
     private var gridMode: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(alignment: .center, spacing: Spacing.s2) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("ALL PAGES")
@@ -180,12 +180,12 @@ public struct BookletPager: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text("\(pageCount) pages")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .padding(.horizontal, Spacing.s2)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Spacing.s1)
                     .background(Theme.Color.appSurfaceSunken)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
             }
@@ -323,21 +323,21 @@ private struct ThumbnailCell: View {
                         lineWidth: isCurrent ? 2.5 : 1
                     )
             )
-            VStack(alignment: .trailing, spacing: 0) {
+            VStack(alignment: .trailing, spacing: Spacing.s0) {
                 if isCurrent {
                     Icon(.eye, size: 10, color: Theme.Color.appTextInverse)
                         .frame(width: 18, height: 18)
                         .background(Theme.Color.primary600)
                         .clipShape(Circle())
-                        .padding(4)
+                        .padding(Spacing.s1)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text("\(page)")
                     .font(.system(size: 10, weight: .bold, design: .serif))
                     .italic()
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 4)
+                    .padding(.horizontal, Spacing.s1)
+                    .padding(.bottom, Spacing.s1)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }

@@ -28,7 +28,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             content
         }
@@ -58,7 +58,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             Spacer()
             Spacer().frame(width: 36, height: 36)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 52)
         .background(Theme.Color.appBg)
         .overlay(alignment: .bottom) {
@@ -79,22 +79,22 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
 
     private var loadingFrame: some View {
         ScrollView {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(0..<3, id: \.self) { _ in
                     Shimmer(height: 11, cornerRadius: Radii.xs)
                         .frame(maxWidth: 100)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, Spacing.s4)
                         .padding(.top, 18)
-                    VStack(spacing: 0) {
+                    VStack(spacing: Spacing.s0) {
                         ForEach(0..<3, id: \.self) { row in
                             Shimmer(height: 14, cornerRadius: Radii.xs)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 16)
+                                .padding(.horizontal, Spacing.s4)
+                                .padding(.vertical, Spacing.s4)
                             if row < 2 {
                                 Rectangle()
                                     .fill(Theme.Color.appBorder.opacity(0.5))
                                     .frame(height: 1)
-                                    .padding(.leading, 16)
+                                    .padding(.leading, Spacing.s4)
                             }
                         }
                     }
@@ -104,8 +104,8 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                             .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.top, Spacing.s2)
                 }
             }
         }
@@ -114,7 +114,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
 
     private func loadedFrame(_ groups: [GroupedListGroup]) -> some View {
         ScrollView {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(groups) { group in
                     let destructiveRows = group.rows.filter(\.destructive)
                     let regularRows = group.rows.filter { !$0.destructive }
@@ -122,7 +122,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                         groupCard(group, rows: regularRows)
                     }
                     ForEach(destructiveRows) { row in
-                        VStack(spacing: 0) {
+                        VStack(spacing: Spacing.s0) {
                             renderRow(row, isLastInCard: true)
                         }
                         .background(Theme.Color.appSurface)
@@ -131,7 +131,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                                 .stroke(Theme.Color.appBorder, lineWidth: 1)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, Spacing.s3)
                         .padding(.top, 18)
                         .accessibilityIdentifier("groupedListDestructive_\(row.id)")
                     }
@@ -141,14 +141,14 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Theme.Color.appTextMuted)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, Spacing.s4)
                         .padding(.top, 18)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, Spacing.s1)
                         .frame(maxWidth: .infinity)
                         .accessibilityIdentifier("groupedListFooter")
                 }
             }
-            .padding(.bottom, 24)
+            .padding(.bottom, Spacing.s6)
         }
         .accessibilityIdentifier("groupedListContent")
     }
@@ -160,20 +160,20 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .kerning(0.9)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.s4)
                 .padding(.top, 18)
-                .padding(.bottom, 8)
+                .padding(.bottom, Spacing.s2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("groupedListOverline_\(group.id)")
         }
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 renderRow(row, isLastInCard: index == rows.count - 1)
                 if index < rows.count - 1 {
                     Rectangle()
                         .fill(Theme.Color.appBorder.opacity(0.6))
                         .frame(height: 1)
-                        .padding(.leading, 16)
+                        .padding(.leading, Spacing.s4)
                 }
             }
         }
@@ -183,13 +183,13 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         if let helper = group.helper {
             Text(helper)
                 .font(.system(size: 11.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, Spacing.s2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("groupedListHelper_\(group.id)")
         }
@@ -198,7 +198,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     @ViewBuilder
     private func renderRow(_ row: GroupedListRow, isLastInCard _: Bool) -> some View {
         let activeControl = optimisticOverrides[row.id] ?? row.control
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.label)
                     .font(.system(size: 15, weight: .medium))
@@ -213,10 +213,10 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                         .padding(.top, 6)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             rightControl(rowId: row.id, control: activeControl)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.s4)
         .padding(.vertical, 14)
         .frame(minHeight: 48)
         .contentShape(Rectangle())
@@ -244,7 +244,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             radio(isSelected: isSelected)
                 .accessibilityIdentifier("groupedListRadio_\(rowId)")
         case let .chipStatus(label, tone, includesChevron):
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 chipView(label: label, tone: tone)
                     .accessibilityIdentifier("groupedListChip_\(rowId)")
                 if includesChevron {
@@ -281,7 +281,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             .font(.system(size: 10.5, weight: .bold))
             .foregroundStyle(fg)
             .kerning(0.4)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Spacing.s2)
             .padding(.vertical, 3)
             .background(bg)
             .clipShape(Capsule())
@@ -291,7 +291,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     private func sliderControl(rowId: String, stops: [String], index: Int) -> some View {
         let count = max(stops.count, 2)
         let active = index.clamped(to: 0...(count - 1))
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule()

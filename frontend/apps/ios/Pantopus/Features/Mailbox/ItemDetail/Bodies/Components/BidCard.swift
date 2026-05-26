@@ -21,7 +21,7 @@ public struct BidCard: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             amountRow
                 .padding(Spacing.s3)
             Rectangle()
@@ -44,11 +44,11 @@ public struct BidCard: View {
 
     private var amountRow: some View {
         HStack(alignment: .top, spacing: Spacing.s3) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text("BID AMOUNT")
                     .pantopusTextStyle(.overline)
                     .foregroundStyle(Theme.Color.handyman)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
                     Text("$\(bid.amount)")
                         .font(.system(size: 34, weight: .heavy))
                         .foregroundStyle(Theme.Color.appTextStrong)
@@ -63,7 +63,7 @@ public struct BidCard: View {
                         .foregroundStyle(Theme.Color.appText)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             expiryPill
         }
         .accessibilityElement(children: .combine)
@@ -79,7 +79,7 @@ public struct BidCard: View {
                 .font(.system(size: 10, weight: .heavy))
                 .foregroundStyle(tint)
                 .padding(.horizontal, Spacing.s2)
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.s1)
                 .background(bg)
                 .overlay(
                     RoundedRectangle(cornerRadius: Radii.pill)

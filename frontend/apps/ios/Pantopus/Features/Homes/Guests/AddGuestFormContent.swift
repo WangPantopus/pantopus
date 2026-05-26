@@ -119,7 +119,7 @@ private struct HomeContextStrip: View {
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Text("GUEST PASS")
                 .pantopusTextStyle(.overline)
                 .foregroundStyle(Theme.Color.home)

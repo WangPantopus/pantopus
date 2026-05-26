@@ -513,7 +513,7 @@ private fun MetaPill(
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurfaceSunken)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -542,7 +542,7 @@ private fun CategoryBadge(category: MailItemCategory) {
                 .background(category.rowBackground)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,
@@ -771,7 +771,7 @@ private fun SecondaryTile(
                 .semantics { contentDescription = label }
                 .testTag("mailDetail_action_$id"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = icon,

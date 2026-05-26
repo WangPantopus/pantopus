@@ -333,7 +333,7 @@ private fun AccountTypePicker(
                     shape = RoundedCornerShape(Radii.md),
                 ).padding(Spacing.s1)
                 .testTag(SignUpScreenTags.ACCOUNT_TYPE),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s0),
     ) {
         SignUpAccountTypeChoice.values().forEach { choice ->
             val isSelected = choice == selection

@@ -191,9 +191,9 @@ public struct MapListHybridShell<
     // MARK: - Bottom sheet
 
     private func bottomSheet(height: CGFloat, containerHeight: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
+            Spacer(minLength: Spacing.s0)
+            VStack(spacing: Spacing.s0) {
                 MapListHybridSheetGrabber()
                 sheetHeader()
                     .accessibilityIdentifier("mapListHybridSheetHeader")
@@ -258,8 +258,8 @@ public struct MapListHybridSheetGrabber: View {
         Capsule()
             .fill(Theme.Color.appBorderStrong)
             .frame(width: 40, height: 4)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+            .padding(.top, Spacing.s2)
+            .padding(.bottom, Spacing.s1)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             .accessibilityHidden(true)

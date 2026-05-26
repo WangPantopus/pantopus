@@ -217,7 +217,7 @@ private fun EmptyFrame(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.Pencil,
@@ -243,7 +243,7 @@ private fun EmptyFrame(
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.MapPin,

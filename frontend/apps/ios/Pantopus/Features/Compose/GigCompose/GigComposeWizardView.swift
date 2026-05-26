@@ -240,7 +240,7 @@ private struct PhotoSlotsRow: View {
                                     Icon(.camera, size: 22, color: Theme.Color.primary600)
                                 )
                             Icon(.x, size: 14, color: Theme.Color.appText)
-                                .padding(4)
+                                .padding(Spacing.s1)
                         }
                     }
                     .buttonStyle(.plain)
@@ -258,7 +258,7 @@ private struct PhotoSlotsRow: View {
                     .accessibilityIdentifier("composeGig_addPhoto")
                     .accessibilityLabel("Add photo")
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
         }
     }

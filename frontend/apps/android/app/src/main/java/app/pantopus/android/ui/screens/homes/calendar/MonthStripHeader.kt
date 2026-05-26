@@ -88,7 +88,7 @@ fun MonthStripHeader(
                     start = Spacing.s4,
                     end = Spacing.s4,
                     top = 10.dp,
-                    bottom = 12.dp,
+                    bottom = Spacing.s3,
                 )
                 .testTag("homeCalendar_monthStrip"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -120,7 +120,7 @@ private fun MonthRow(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             modifier = Modifier.testTag("homeCalendar_monthLabel"),
         ) {
             Text(
@@ -143,7 +143,7 @@ private fun MonthRow(
             tag = "homeCalendar_prevMonth",
             onClick = onPrev,
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(NoneModifier.width(Spacing.s1))
         ChevronButton(
             icon = PantopusIcon.ChevronRight,
             contentDescription = "Next month",
@@ -189,7 +189,7 @@ private fun WeekRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         days.forEach { day ->
             val highlighted = isHighlighted(day, selectedIsoDate, todayIsoDate)

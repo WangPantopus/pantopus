@@ -309,7 +309,7 @@ private fun EventHeader(
             if (location.isNotEmpty()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.MapPin,
@@ -333,12 +333,12 @@ private fun EventHeader(
 private fun CategoryPill(category: CalendarEventCategory) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(category.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,

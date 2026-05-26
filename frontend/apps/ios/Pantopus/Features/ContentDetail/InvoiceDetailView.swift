@@ -62,7 +62,7 @@ public struct InvoiceDetailView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("invoiceDetailDismiss")
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .presentationDetents([.fraction(0.4)])
     }
 }

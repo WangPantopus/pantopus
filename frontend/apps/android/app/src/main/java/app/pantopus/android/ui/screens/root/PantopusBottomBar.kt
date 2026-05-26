@@ -129,7 +129,7 @@ private fun TabItem(
                 tint = tint,
             )
             if (route is PantopusRoute.Inbox && badge > 0) {
-                InboxBadge(count = badge, modifier = Modifier.padding(start = 12.dp))
+                InboxBadge(count = badge, modifier = Modifier.padding(start = Spacing.s3))
             }
         }
         Spacer(Modifier.size(Spacing.s1))

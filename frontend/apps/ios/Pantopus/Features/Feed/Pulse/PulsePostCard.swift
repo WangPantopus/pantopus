@@ -143,7 +143,7 @@ public struct PulsePostCard: View {
     }
 
     private func attendeeStrip(_ strip: PulseAttendeeStrip) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle()
                 .fill(Theme.Color.appBorderSubtle)
                 .frame(height: 1)
@@ -168,7 +168,7 @@ public struct PulsePostCard: View {
                 Spacer(minLength: Spacing.s1)
                 if let onRSVP {
                     Button(action: onRSVP) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             Icon(
                                 strip.userIsGoing ? .check : .plusCircle,
                                 size: 10,
@@ -179,7 +179,7 @@ public struct PulsePostCard: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(Theme.Color.business)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, Spacing.s3)
                         .frame(height: 26)
                         .background(Theme.Color.businessBg)
                         .clipShape(Capsule())
@@ -199,7 +199,7 @@ public struct PulsePostCard: View {
                 reactionPill(reaction)
             }
             Spacer()
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.send, size: 12, color: Theme.Color.appTextSecondary)
                 Text("Reply")
                     .font(.system(size: 11.5, weight: .medium))
@@ -225,7 +225,7 @@ public struct PulsePostCard: View {
     }
 
     private func reactionLabel(_ reaction: PulseReaction, active: Bool) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(reaction.icon, size: 12, color: active ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
             HStack(spacing: 3) {
                 if !reaction.label.isEmpty {
@@ -258,14 +258,14 @@ public struct PulseIntentChip: View {
     }
 
     public var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(intent.icon, size: 10, strokeWidth: 2.5, color: foreground)
             Text(intent.cardChipLabel.uppercased())
                 .font(.system(size: 10, weight: .bold))
                 .tracking(0.4)
                 .foregroundStyle(foreground)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Spacing.s2)
         .padding(.vertical, 2)
         .background(background)
         .clipShape(Capsule())

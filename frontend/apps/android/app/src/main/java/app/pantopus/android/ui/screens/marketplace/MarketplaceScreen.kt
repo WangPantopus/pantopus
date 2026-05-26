@@ -125,7 +125,7 @@ private fun MarketTopBar(onBack: (() -> Unit)?) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)
+                .padding(start = Spacing.s4, end = Spacing.s2, top = Spacing.s3, bottom = Spacing.s1)
                 .testTag("marketplaceTopBar"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -166,7 +166,7 @@ private fun MarketSearchBar(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(horizontal = 14.dp)
@@ -239,9 +239,9 @@ internal fun MarketCategoryChips(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag("marketplaceChipRow"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MarketplaceCategory.entries.forEach { category ->
@@ -306,7 +306,7 @@ internal fun LoadingFrame() {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize().testTag("marketplaceLoading"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 110.dp),
+        contentPadding = PaddingValues(start = Spacing.s4, end = Spacing.s4, top = Spacing.s1, bottom = 110.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -323,7 +323,7 @@ internal fun EmptyFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(Spacing.s6)
                 .testTag("marketplaceEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -372,7 +372,7 @@ internal fun EmptyFrame(
                     .heightIn(min = 44.dp)
                     .testTag("marketplaceEmptySnap"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.Camera,
@@ -410,7 +410,7 @@ private fun RadiusHintPill(radiusMiles: Double) {
                 .padding(horizontal = 14.dp, vertical = 10.dp)
                 .testTag("marketplaceEmptyRadiusPill"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.MapPin,
@@ -445,7 +445,7 @@ internal fun PopulatedFrame(
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize().testTag("marketplaceGrid"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 110.dp),
+        contentPadding = PaddingValues(start = Spacing.s4, end = Spacing.s4, top = Spacing.s1, bottom = 110.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -472,7 +472,7 @@ private fun ListingCard(
     ) {
         ListingImage(content = content)
         Column(
-            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp),
+            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = Spacing.s2, bottom = 10.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
@@ -574,7 +574,7 @@ private fun ListingSkeletonCard() {
                     .background(PantopusColors.appSurfaceSunken),
         )
         Column(
-            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp),
+            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = Spacing.s2, bottom = 10.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             ShimmerBar(fillFraction = 0.92f, height = 9.dp)
@@ -611,7 +611,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(Spacing.s6)
                 .testTag("marketplaceError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

@@ -55,7 +55,7 @@ fun VerifiedBadge(
 @Preview(showBackground = true, widthDp = 200, heightDp = 60)
 @Composable
 private fun VerifiedBadgePreview() {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.background(Color.White)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.background(Color.White)) {
         VerifiedBadge()
         VerifiedBadge(size = 20.dp)
         VerifiedBadge(size = 28.dp)

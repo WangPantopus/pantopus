@@ -29,7 +29,7 @@ public struct CeremonialMailWizardView: View {
         WizardShell(model: viewModel) {
             stepBody
             if let error = viewModel.submitError {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(.alertCircle, size: 14, color: Theme.Color.error)
                     Text(error)
                         .font(.system(size: 12, weight: .medium))
@@ -89,7 +89,7 @@ public struct CeremonialMailWizardView: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .kerning(0.6)
                 .padding(.top, 6)
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.s2) {
                 ForEach(CeremonialMailIntent.allCases) { intent in
                     intentRow(intent)
                 }
@@ -98,7 +98,7 @@ public struct CeremonialMailWizardView: View {
     }
 
     private var recipientSearchField: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
             Text("WHO")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -115,7 +115,7 @@ public struct CeremonialMailWizardView: View {
                     ProgressView().scaleEffect(0.7)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 44)
             .background(Theme.Color.appSurface)
             .overlay(
@@ -127,7 +127,7 @@ public struct CeremonialMailWizardView: View {
     }
 
     private var recipientResults: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(viewModel.recipientResults.enumerated()), id: \.element.id) { index, recipient in
                 Button {
                     viewModel.selectRecipient(recipient)
@@ -148,13 +148,13 @@ public struct CeremonialMailWizardView: View {
                         Spacer()
                         Icon(.chevronRight, size: 14, color: Theme.Color.appTextSecondary)
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Spacing.s3)
                     .padding(.vertical, 10)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("ceremonialRecipient_\(recipient.userId)")
                 if index < viewModel.recipientResults.count - 1 {
-                    Rectangle().fill(Theme.Color.appBorder).frame(height: 1).padding(.leading, 12)
+                    Rectangle().fill(Theme.Color.appBorder).frame(height: 1).padding(.leading, Spacing.s3)
                 }
             }
         }
@@ -167,7 +167,7 @@ public struct CeremonialMailWizardView: View {
     }
 
     private func selectedRecipientCard(_ recipient: MailRecipientDTO) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             ZStack {
                 Circle().fill(Theme.Color.successBg).frame(width: 40, height: 40)
                 Icon(.check, size: 18, color: Theme.Color.success)
@@ -184,7 +184,7 @@ public struct CeremonialMailWizardView: View {
             }
             Spacer()
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.successBg.opacity(0.4))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -199,7 +199,7 @@ public struct CeremonialMailWizardView: View {
         return Button {
             viewModel.selectIntent(intent)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     Circle()
                         .stroke(isSelected ? Theme.Color.primary600 : Theme.Color.appBorderStrong, lineWidth: 2)
@@ -219,7 +219,7 @@ public struct CeremonialMailWizardView: View {
                 }
                 Spacer()
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -323,7 +323,7 @@ public struct CeremonialMailWizardView: View {
             }
         }
         .tint(Theme.Color.primary600)
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -381,7 +381,7 @@ public struct CeremonialMailWizardView: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .kerning(0.6)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     ForEach(options, id: \.0) { id, label in
                         let isActive = id == selected
                         Button {
@@ -390,7 +390,7 @@ public struct CeremonialMailWizardView: View {
                             Text(label)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(isActive ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
-                                .padding(.horizontal, 12)
+                                .padding(.horizontal, Spacing.s3)
                                 .frame(height: 32)
                                 .background(isActive ? Theme.Color.primary600 : Theme.Color.appSurface)
                                 .overlay(
@@ -420,8 +420,8 @@ public struct CeremonialMailWizardView: View {
                     Text("Dear friend,")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.Color.appTextMuted)
-                        .padding(.top, 8)
-                        .padding(.leading, 4)
+                        .padding(.top, Spacing.s2)
+                        .padding(.leading, Spacing.s1)
                 }
                 TextEditor(text: Binding(
                     get: { viewModel.bodyText },
@@ -431,7 +431,7 @@ public struct CeremonialMailWizardView: View {
                 .scrollContentBackground(.hidden)
                 .accessibilityIdentifier("ceremonialBodyEditor")
             }
-            .padding(8)
+            .padding(Spacing.s2)
             .background(Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -482,7 +482,7 @@ public struct CeremonialMailWizardView: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         case let .error(message):
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 voiceChip(label: message, icon: .alertCircle, accent: false)
                 Button("Try again") { viewModel.clearVoicePostscript() }
                     .font(.system(size: 12, weight: .semibold))
@@ -492,13 +492,13 @@ public struct CeremonialMailWizardView: View {
     }
 
     private func voiceChip(label: String, icon: PantopusIcon, accent: Bool) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(icon, size: 14, color: accent ? Theme.Color.appTextInverse : Theme.Color.primary600)
             Text(label)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(accent ? Theme.Color.appTextInverse : Theme.Color.primary700)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 36)
         .background(accent ? Theme.Color.primary600 : Theme.Color.primary50)
         .clipShape(Capsule())
@@ -515,7 +515,7 @@ public struct CeremonialMailWizardView: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .kerning(0.6)
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.s2) {
                 ForEach(CeremonialMailSendTiming.allCases) { timing in
                     sendTimingRow(timing)
                 }
@@ -563,7 +563,7 @@ public struct CeremonialMailWizardView: View {
         return Button {
             viewModel.selectSendTiming(timing)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     Circle()
                         .stroke(isActive ? Theme.Color.primary600 : Theme.Color.appBorderStrong, lineWidth: 2)
@@ -582,7 +582,7 @@ public struct CeremonialMailWizardView: View {
                 }
                 Spacer()
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .background(isActive ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)

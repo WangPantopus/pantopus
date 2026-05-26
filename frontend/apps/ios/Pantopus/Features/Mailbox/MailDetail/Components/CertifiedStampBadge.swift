@@ -33,7 +33,7 @@ public struct CertifiedStampBadge: View {
                 .foregroundStyle(stampForeground)
                 .padding(.top, 2)
             barcodeStrip
-                .padding(.top, 4)
+                .padding(.top, Spacing.s1)
             Text(displayTracking)
                 .font(.system(size: 8, weight: .semibold, design: .monospaced))
                 .tracking(0.5)

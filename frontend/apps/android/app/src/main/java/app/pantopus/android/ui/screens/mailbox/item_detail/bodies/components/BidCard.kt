@@ -74,10 +74,10 @@ private fun AmountRow(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             Text("BID AMOUNT", style = PantopusTextStyle.overline, color = PantopusColors.handyman)
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 Text(
                     "$${bid.amount}",
                     fontSize = 34.sp,
@@ -88,7 +88,7 @@ private fun AmountRow(
                     "· ${bid.unit}",
                     style = PantopusTextStyle.small,
                     color = PantopusColors.handyman,
-                    modifier = Modifier.padding(bottom = 4.dp),
+                    modifier = Modifier.padding(bottom = Spacing.s1),
                 )
             }
             Row(
@@ -127,7 +127,7 @@ private fun ExpiryPill(
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(background)
                 .border(1.dp, tint.copy(alpha = 0.4f), RoundedCornerShape(Radii.pill))
-                .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
     )
 }
 

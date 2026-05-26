@@ -86,7 +86,7 @@ public struct TasksMapView: View {
     // MARK: - Floating pill
 
     private var floatingPill: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button { onBack?() } label: {
                 Icon(.chevronLeft, size: 18, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
@@ -96,12 +96,12 @@ public struct TasksMapView: View {
             .accessibilityIdentifier("tasksMapBack")
             .opacity(onBack == nil ? 0 : 1)
             .disabled(onBack == nil)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Text("Tasks map")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Button { showFilterSheet = true } label: {
                 Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
@@ -111,7 +111,7 @@ public struct TasksMapView: View {
             .accessibilityIdentifier("tasksMapFilters")
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(.ultraThinMaterial)
         .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(Capsule())
@@ -139,7 +139,7 @@ public struct TasksMapView: View {
                                 .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, Spacing.s3)
                         .frame(height: 28)
                         .background(active ? category.color : Color.white.opacity(0.96))
                         .overlay(Capsule().stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1))
@@ -158,7 +158,7 @@ public struct TasksMapView: View {
     // MARK: - Control stack (Post-task FAB above locate / layers)
 
     private var controlStack: some View {
-        VStack(alignment: .trailing, spacing: 8) {
+        VStack(alignment: .trailing, spacing: Spacing.s2) {
             postTaskFAB
             controlButton(icon: .mapPin, label: "Locate me", identifier: "tasksMapLocate") {
                 recenterToken += 1
@@ -231,7 +231,7 @@ public struct TasksMapView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Text("Sort:")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.Color.appTextSecondary)
@@ -245,8 +245,8 @@ public struct TasksMapView: View {
             .accessibilityIdentifier("tasksMapSort")
         }
         .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.top, Spacing.s1)
+        .padding(.bottom, Spacing.s3)
     }
 
     private var headerCount: Int {
@@ -279,15 +279,15 @@ public struct TasksMapView: View {
                         .redacted(reason: .placeholder)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.bottom, Spacing.s3)
         }
         .accessibilityIdentifier("tasksMapLoading")
         .accessibilityLabel("Loading tasks")
     }
 
     private func railBody(_ items: [TaskMapItem]) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(items) { item in
@@ -297,17 +297,17 @@ public struct TasksMapView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.bottom, Spacing.s3)
             }
             .accessibilityIdentifier("tasksMapRail")
             PaginationDots(total: min(items.count, 3), index: 0)
-                .padding(.bottom, 12)
+                .padding(.bottom, Spacing.s3)
         }
     }
 
     private var emptyBody: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Theme.Color.primary50)
@@ -318,7 +318,7 @@ public struct TasksMapView: View {
                 Icon(.mapPin, size: 24, color: Theme.Color.primary600)
             }
             .frame(width: 56, height: 56)
-            .padding(.bottom, 12)
+            .padding(.bottom, Spacing.s3)
             .accessibilityHidden(true)
             Text("No tasks in this area yet")
                 .font(.system(size: 15, weight: .bold))
@@ -330,7 +330,7 @@ public struct TasksMapView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 248)
                 .padding(.bottom, 14)
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 Button { onCompose(viewModel.activeCategory) } label: {
                     HStack(spacing: 6) {
                         Icon(.plus, size: 14, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
@@ -361,10 +361,10 @@ public struct TasksMapView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("tasksMapWiden")
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, 28)
-        .padding(.top, 12)
+        .padding(.top, Spacing.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityIdentifier("tasksMapEmpty")
     }
@@ -380,7 +380,7 @@ public struct TasksMapView: View {
                 Text("Try again")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.s4)
                     .frame(height: 38)
                     .background(Theme.Color.primary600)
                     .clipShape(Capsule())
@@ -388,8 +388,8 @@ public struct TasksMapView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("tasksMapRetry")
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 4)
+        .padding(.horizontal, Spacing.s6)
+        .padding(.top, Spacing.s1)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityIdentifier("tasksMapError")
     }
@@ -428,20 +428,20 @@ private struct TaskRailCard: View {
                     Icon(taskCategoryGlyph(item.category), size: 22, color: .white)
                 }
                 .frame(width: 48, height: 48)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(item.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.s2) {
                         Text(item.price)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Theme.Color.primary600)
                         Text("· \(item.distanceLabel)")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(Theme.Color.appTextSecondary)
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                         if item.bidCount > 0 {
                             Text("\(item.bidCount) \(item.bidCount == 1 ? "bid" : "bids")")
                                 .font(.system(size: 9, weight: .bold))
@@ -454,7 +454,7 @@ private struct TaskRailCard: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .frame(width: 240, alignment: .leading)
             .background(Theme.Color.appSurface)
             .overlay(

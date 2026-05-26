@@ -76,21 +76,21 @@ public struct CeremonialMailOpenView: View {
     // MARK: - Loading / error
 
     private var loadingFrame: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             generalTopBar
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.s3) {
                 Shimmer(height: 220, cornerRadius: 18)
                 Shimmer(height: 180, cornerRadius: 18)
                 Shimmer(height: 56, cornerRadius: 14)
             }
-            .padding(16)
+            .padding(Spacing.s4)
             Spacer()
         }
         .accessibilityIdentifier("ceremonialMailOpenLoading")
     }
 
     private func errorFrame(message: String) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             generalTopBar
             EmptyState(
                 icon: .alertCircle,
@@ -121,7 +121,7 @@ public struct CeremonialMailOpenView: View {
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 52)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -265,7 +265,7 @@ private struct PorchFrame: View {
             }
             .ignoresSafeArea()
 
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 topChrome
                 Spacer()
                 eyebrow
@@ -277,9 +277,9 @@ private struct PorchFrame: View {
                 skipAffordance
                 pantopusFooter
                     .padding(.top, 14)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, Spacing.s3)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, Spacing.s6)
         }
         .foregroundColor(Color.white.opacity(0.92))
     }
@@ -297,7 +297,7 @@ private struct PorchFrame: View {
             .accessibilityLabel("Close")
             .accessibilityIdentifier("ceremonialMail_close")
         }
-        .padding(.top, 16)
+        .padding(.top, Spacing.s4)
     }
 
     private var eyebrow: some View {
@@ -305,7 +305,7 @@ private struct PorchFrame: View {
             .font(.system(size: 11, weight: .semibold))
             .tracking(1.6)
             .foregroundStyle(Color.white.opacity(0.85))
-            .padding(.bottom, 4)
+            .padding(.bottom, Spacing.s1)
     }
 
     private var titleStack: some View {
@@ -314,7 +314,7 @@ private struct PorchFrame: View {
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.white.opacity(phase == .sealed ? 1.0 : 0.6))
             .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
-            .padding(.bottom, 32)
+            .padding(.bottom, Spacing.s8)
     }
 
     private var envelopeHero: some View {
@@ -384,13 +384,13 @@ private struct PorchFrame: View {
                     .frame(width: 196, height: 96)
                     .offset(y: -42)
                     .overlay(
-                        VStack(spacing: 8) {
+                        VStack(spacing: Spacing.s2) {
                             ForEach(0..<4, id: \.self) { _ in
                                 Rectangle()
                                     .fill(Color(red: 60 / 255, green: 40 / 255, blue: 20 / 255).opacity(0.25))
                                     .frame(height: 1)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.horizontal, 16)
+                                    .padding(.horizontal, Spacing.s4)
                             }
                         }
                         .frame(width: 196, height: 96)
@@ -466,7 +466,7 @@ private struct PorchFrame: View {
     private var openCTA: some View {
         if phase == .sealed {
             Button(action: onTapOpen) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Text("Open envelope")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(Color(red: 42 / 255, green: 31 / 255, blue: 10 / 255))
@@ -563,10 +563,10 @@ private struct ReadingFrame: View {
                     )
                 )
                 .ignoresSafeArea()
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 readingTopBar
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: Spacing.s0) {
                         senderRow
                         ornament
                         salutation
@@ -579,7 +579,7 @@ private struct ReadingFrame: View {
                         endOrnament
                     }
                     .padding(.horizontal, 22)
-                    .padding(.top, 16)
+                    .padding(.top, Spacing.s4)
                     .padding(.bottom, 110)
                     .opacity(opacity)
                     .offset(y: slideOffset)
@@ -596,7 +596,7 @@ private struct ReadingFrame: View {
     }
 
     private var readingTopBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Button(action: onClose) {
                 Icon(.x, size: 14, color: letter.ink.color)
                     .frame(width: 30, height: 30)
@@ -638,7 +638,7 @@ private struct ReadingFrame: View {
                 .accessibilityLabel("Archive letter")
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 44)
         .background(letter.stationery.paperColor.opacity(0.55))
         .overlay(alignment: .bottom) {
@@ -736,7 +736,7 @@ private struct ReadingFrame: View {
     }
 
     private var bodyParagraphs: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
             ForEach(Array(letter.bodyParagraphs.enumerated()), id: \.offset) { _, paragraph in
                 Text(paragraph)
                     .font(.system(size: 15, design: .serif))
@@ -756,17 +756,17 @@ private struct ReadingFrame: View {
                 .font(.custom("Snell Roundhand", size: 28))
                 .foregroundStyle(letter.seal.color)
         }
-        .padding(.top, 8)
+        .padding(.top, Spacing.s2)
     }
 
     private var voicePostscript: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("· VOICE POSTSCRIPT ·")
                 .font(.system(size: 9, weight: .bold))
                 .tracking(1.6)
                 .foregroundStyle(letter.seal.color)
             Button(action: onToggleVoice) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Circle()
                         .fill(letter.ink.color)
                         .frame(width: 30, height: 30)
@@ -810,12 +810,12 @@ private struct ReadingFrame: View {
             Rectangle()
                 .fill(letter.ink.color.opacity(0.2))
                 .frame(height: 1)
-                .padding(.horizontal, 0)
+                .padding(.horizontal, Spacing.s0)
         }
     }
 
     private var endOrnament: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Spacer()
             Rectangle().fill(letter.seal.color.opacity(0.55)).frame(width: 24, height: 1)
             Circle()
@@ -829,7 +829,7 @@ private struct ReadingFrame: View {
     }
 
     private var stickyBottomBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Button(action: onReply) {
                 HStack(spacing: 7) {
                     Icon(.send, size: 14, color: .white)
@@ -852,7 +852,7 @@ private struct ReadingFrame: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(letter.ink.color)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.s4)
                 .frame(height: 46)
                 .background(Color.white.opacity(0.65))
                 .overlay(Capsule().stroke(letter.ink.color.opacity(0.13), lineWidth: 1))
@@ -871,8 +871,8 @@ private struct ReadingFrame: View {
             .accessibilityIdentifier("ceremonialMailOutcome_archive")
             .accessibilityLabel("Archive letter")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s3)
         .padding(.bottom, 14)
         .background(
             LinearGradient(
@@ -901,15 +901,15 @@ private struct ReplyHandoffFrame: View {
     var body: some View {
         ZStack {
             letter.stationery.paperColor.ignoresSafeArea()
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 topBar
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: Spacing.s4) {
                         letterPreview
                         composeSurface
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.top, Spacing.s4)
                     .padding(.bottom, 60)
                 }
                 .scrollIndicators(.hidden)
@@ -928,7 +928,7 @@ private struct ReplyHandoffFrame: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Button(action: onBack) {
                 Icon(.chevronLeft, size: 14, color: letter.ink.color)
                     .frame(width: 30, height: 30)
@@ -949,7 +949,7 @@ private struct ReplyHandoffFrame: View {
                 Text("Continue →")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Spacing.s3)
                     .frame(height: 30)
                     .background(Theme.Color.primary600)
                     .clipShape(Capsule())
@@ -957,7 +957,7 @@ private struct ReplyHandoffFrame: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("ceremonialMailReply_continue")
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 44)
         .background(letter.stationery.paperColor.opacity(0.55))
         .overlay(alignment: .bottom) {
@@ -966,9 +966,9 @@ private struct ReplyHandoffFrame: View {
     }
 
     private var letterPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Circle()
                         .fill(
                             LinearGradient(
@@ -1019,8 +1019,8 @@ private struct ReplyHandoffFrame: View {
     }
 
     private var composeSurface: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(spacing: Spacing.s2) {
                 Text("PAPER")
                     .font(.system(size: 9, weight: .bold))
                     .tracking(1.4)
@@ -1039,7 +1039,7 @@ private struct ReplyHandoffFrame: View {
             Text("Dear \(letter.sender.displayName.split(separator: " ").first.map(String.init) ?? letter.sender.displayName),")
                 .font(.system(size: 18, weight: .medium, design: .serif))
                 .italic()
-                .padding(.top, 4)
+                .padding(.top, Spacing.s1)
             Text("Begin your reply…")
                 .font(.system(size: 15, design: .serif))
                 .foregroundStyle(letter.ink.color.opacity(0.5))
@@ -1053,7 +1053,7 @@ private struct ReplyHandoffFrame: View {
                     .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                     .foregroundStyle(letter.ink.color.opacity(0.65))
             }
-            .padding(.top, 8)
+            .padding(.top, Spacing.s2)
             .overlay(alignment: .top) {
                 Rectangle().fill(letter.ink.color.opacity(0.1)).frame(height: 1)
             }

@@ -210,7 +210,7 @@ private fun BrandTile(
             SubcomposeAsyncImage(
                 model = brandLogoUrl,
                 contentDescription = null,
-                modifier = Modifier.padding(4.dp),
+                modifier = Modifier.padding(Spacing.s1),
                 error = { BrandInitials(brandName) },
             )
         } else {

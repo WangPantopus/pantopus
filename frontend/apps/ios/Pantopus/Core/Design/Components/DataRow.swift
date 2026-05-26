@@ -130,7 +130,7 @@ private struct DataRowIdentifier: ViewModifier {
 }
 
 #Preview("Data rows") {
-    VStack(spacing: 0) {
+    VStack(spacing: Spacing.s0) {
         DataRow(label: "Year built", value: "1998", mono: true)
         Divider().background(Theme.Color.appBorderSubtle)
         DataRow(label: "Square footage", value: "2,140 sq ft", sub: "Heated area", mono: true)

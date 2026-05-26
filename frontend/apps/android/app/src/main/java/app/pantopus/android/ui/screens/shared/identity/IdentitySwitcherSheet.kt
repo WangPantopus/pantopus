@@ -83,7 +83,7 @@ fun IdentitySwitcherSheetBody(
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
+                .padding(bottom = Spacing.s6),
     ) {
         Text(
             text = "Identity switcher",
@@ -92,18 +92,18 @@ fun IdentitySwitcherSheetBody(
             color = PantopusColors.appText,
             modifier =
                 Modifier
-                    .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)
+                    .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s1, bottom = Spacing.s1)
                     .semantics { heading() },
         )
         Text(
             text = "Pick the face you want active in feeds, composer, and chat.",
             fontSize = 12.5.sp,
             color = PantopusColors.appTextSecondary,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
+            modifier = Modifier.padding(start = Spacing.s4, end = Spacing.s4, bottom = 14.dp),
         )
         Column(
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = Spacing.s4),
         ) {
             cards.forEach { card ->
                 SwitcherCardBody(card = card, onTap = { onSelect(card) })
@@ -132,7 +132,7 @@ private fun SwitcherCardBody(
                 .padding(14.dp)
                 .testTag("identitySwitcherCard_${card.kind.key}"),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =

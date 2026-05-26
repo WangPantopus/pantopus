@@ -75,7 +75,7 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             header
             Divider().background(Theme.Color.appBorderSubtle)
             if let filters {
@@ -176,7 +176,7 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
 
     private var recentSection: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 if !recentQueries.isEmpty {
                     Text("Recent")
                         .pantopusTextStyle(.overline)
@@ -192,7 +192,7 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
                                 Text(entry)
                                     .pantopusTextStyle(.body)
                                     .foregroundStyle(Theme.Color.appText)
-                                Spacer(minLength: 0)
+                                Spacer(minLength: Spacing.s0)
                             }
                             .padding(.horizontal, Spacing.s4)
                             .frame(minHeight: 44)
@@ -237,7 +237,7 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
 
     private var resultsSection: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: Spacing.s0) {
                 ForEach(results, id: \.self) { result in
                     row(result)
                 }

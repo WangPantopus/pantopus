@@ -318,7 +318,7 @@ private struct DocumentHeaderCard: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s4)
         .background(Theme.Color.appSurface)
@@ -342,14 +342,14 @@ private struct CategoryChipBadge: View {
     let category: DocumentCategory
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(category.icon, size: 12, color: category.foreground)
             Text(category.label)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(category.foreground)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(category.background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
         .accessibilityLabel("Category \(category.label)")
@@ -364,7 +364,7 @@ private struct PreviewPane: View {
     let onOpenExternally: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ZStack {
                 Theme.Color.appSurfaceSunken
                 content
@@ -502,7 +502,7 @@ private struct MetadataGrid: View {
     let projection: DocumentRowProjection
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             row(label: "Uploaded by", value: uploadedByLabel)
             divider
             row(label: "Uploaded", value: uploadedLabel)
@@ -592,7 +592,7 @@ private struct TagsRow: View {
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appText)
                             .padding(.horizontal, Spacing.s2)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, Spacing.s1)
                             .background(Theme.Color.appSurface)
                             .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
                             .overlay(
@@ -649,9 +649,9 @@ private struct StickyActionFooter: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 FooterButton(
                     icon: .externalLink,
                     label: "Open",
@@ -701,7 +701,7 @@ private struct FooterButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
+            VStack(spacing: Spacing.s1) {
                 Icon(icon, size: 18, color: tint)
                 Text(label)
                     .pantopusTextStyle(.caption)

@@ -30,7 +30,7 @@ public struct MarketplaceView: View {
 
     public var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 topBar
                 searchBar
                 categoryChipRow
@@ -191,7 +191,7 @@ public struct MarketplaceView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 260)
             Button(action: onCompose) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(.camera, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
                     Text("Snap & sell")
                         .font(.system(size: 14, weight: .bold))
@@ -214,7 +214,7 @@ public struct MarketplaceView: View {
     }
 
     private func radiusHint(_ miles: Double) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.mapPin, size: 13, color: Theme.Color.appTextMuted)
             Group {
                 Text("Showing within ")
@@ -306,7 +306,7 @@ private struct ListingCard: View {
     let content: MarketplaceCardContent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             ListingImage(content: content)
                 .frame(maxWidth: .infinity)
                 .frame(height: 104)
@@ -326,7 +326,7 @@ private struct ListingCard: View {
                     .lineLimit(1)
             }
             .padding(.horizontal, 10)
-            .padding(.top, 8)
+            .padding(.top, Spacing.s2)
             .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity)
@@ -395,7 +395,7 @@ private struct ListingSkeletonCard: View {
                 Shimmer(width: 70, height: 8, cornerRadius: Radii.xs)
             }
             .padding(.horizontal, 10)
-            .padding(.top, 8)
+            .padding(.top, Spacing.s2)
             .padding(.bottom, 10)
         }
         .background(Theme.Color.appSurface)

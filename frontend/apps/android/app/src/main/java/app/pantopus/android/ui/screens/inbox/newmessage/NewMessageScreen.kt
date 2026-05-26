@@ -129,7 +129,7 @@ private fun TopBar(onCancel: () -> Unit) {
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -139,7 +139,7 @@ private fun TopBar(onCancel: () -> Unit) {
                 color = PantopusColors.primary600,
                 modifier =
                     Modifier
-                        .padding(horizontal = 8.dp)
+                        .padding(horizontal = Spacing.s2)
                         .heightIn(min = 36.dp)
                         .clickable(onClick = onCancel)
                         .testTag("newMessageCancel"),
@@ -184,12 +184,12 @@ private fun SearchBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                     .clip(RoundedCornerShape(Radii.md))
                     .background(PantopusColors.appSurfaceSunken)
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                    .padding(horizontal = Spacing.s3, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.Search,
@@ -260,7 +260,7 @@ private fun LoadingFrame() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag("newMessageLoading"),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -276,7 +276,7 @@ private fun SectionSkeleton() {
         Box(
             modifier =
                 Modifier
-                    .padding(start = 4.dp)
+                    .padding(start = Spacing.s1)
                     .height(11.dp)
                     .size(width = 100.dp, height = 11.dp)
                     .clip(RoundedCornerShape(Radii.xs))
@@ -349,7 +349,7 @@ private fun EmptyFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 32.dp)
+                .padding(horizontal = Spacing.s8, vertical = Spacing.s8)
                 .testTag("newMessageEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -400,10 +400,10 @@ private fun EmptyFrame(
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                     .clickable(onClick = onInvite)
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = Spacing.s5, vertical = Spacing.s3)
                     .testTag("newMessageInvite"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.UserPlus,
@@ -431,7 +431,7 @@ private fun HintChip(label: String) {
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Search,
@@ -462,7 +462,7 @@ private fun LoadedFrame(
             Modifier
                 .fillMaxSize()
                 .testTag("newMessageContent"),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(horizontal = Spacing.s4, vertical = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         items(items = sections, key = { it.id.key }) { section ->
@@ -477,7 +477,7 @@ private fun SearchEmptyState() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(top = 40.dp)
+                .padding(top = Spacing.s10)
                 .testTag("newMessageNoMatches"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
@@ -523,10 +523,10 @@ private fun SectionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 10.dp)
+                    .padding(start = Spacing.s1, end = Spacing.s1, top = Spacing.s1, bottom = 10.dp)
                     .testTag("newMessageSection_${section.id.key}"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             Text(
                 text = section.label.uppercase(),
@@ -605,7 +605,7 @@ private fun ContactRow(
             row.locality?.let { locality ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.MapPin,
@@ -625,7 +625,7 @@ private fun ContactRow(
             row.sub?.let { sub ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     row.subIcon?.let { icon ->
                         PantopusIconImage(
@@ -709,7 +709,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(Spacing.s6)
                 .testTag("newMessageError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

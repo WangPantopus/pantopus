@@ -31,7 +31,7 @@ public struct FeedView: View {
 
     public var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 topBar
                 FeedChipRow(
                     chips: PulseIntent.allCases.map { FeedChipItem(id: $0.rawValue, label: $0.label) },
@@ -122,7 +122,7 @@ public struct FeedView: View {
             Button {
                 onCompose(viewModel.activeIntent)
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(.pencil, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
                     Text("Create post")
                         .font(.system(size: 14, weight: .bold))
@@ -136,7 +136,7 @@ public struct FeedView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("pulseEmptyCreatePost")
             if let scope = empty.scopeLabel, !scope.isEmpty {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(.mapPin, size: 13, color: Theme.Color.appTextMuted)
                     Group {
                         Text("Showing posts within ")

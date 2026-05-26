@@ -57,7 +57,7 @@ struct VerifyEmailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(spacing: Spacing.s5) {
                     Spacer(minLength: Spacing.s10)

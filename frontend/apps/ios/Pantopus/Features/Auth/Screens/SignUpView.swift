@@ -301,7 +301,7 @@ private struct AccountTypePicker: View {
     @Binding var selection: SignUpAccountTypeChoice
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(SignUpAccountTypeChoice.allCases) { choice in
                 Button {
                     selection = choice
@@ -391,7 +391,7 @@ private struct TermsCheckbox: View {
                     .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
         }
         .buttonStyle(.plain)
@@ -432,7 +432,7 @@ struct ErrorBanner: View {
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.error)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Button(action: onDismiss) {
                 Icon(.x, size: 16, color: Theme.Color.error)
             }

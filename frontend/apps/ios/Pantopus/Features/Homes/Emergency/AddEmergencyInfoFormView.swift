@@ -262,7 +262,7 @@ private struct CategoryTile: View {
                     .foregroundStyle(Theme.Color.appText)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 if isSelected {
                     Icon(.check, size: 14, color: Theme.Color.primary600)
                 }
@@ -333,7 +333,7 @@ private struct MemberPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack {
                 Text("Verified by")
                     .pantopusTextStyle(.h3)
@@ -347,7 +347,7 @@ private struct MemberPickerSheet: View {
             .padding(Spacing.s4)
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: Spacing.s0) {
                     if selected != nil {
                         Button(action: onClear) {
                             HStack {

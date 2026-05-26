@@ -40,7 +40,7 @@ public struct ChatConversationView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ChatConversationHeader(
                 mode: mode,
                 counterparty: viewModel.counterparty,
@@ -177,7 +177,7 @@ public struct ChatConversationView: View {
     // MARK: - Frames
 
     private var loadingFrame: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Spacer()
             ProgressView()
                 .progressViewStyle(.circular)
@@ -226,7 +226,7 @@ public struct ChatConversationView: View {
             verifiedEncryptionPill
             Spacer()
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, Spacing.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("chatConversationEmpty")
     }
@@ -235,7 +235,7 @@ public struct ChatConversationView: View {
         ScrollView {
             VStack(spacing: 18) {
                 FanAutoWelcomeCard()
-                VStack(spacing: 12) {
+                VStack(spacing: Spacing.s3) {
                     Text("Start a conversation")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
@@ -253,17 +253,17 @@ public struct ChatConversationView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+                .padding(.top, Spacing.s2)
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
-            .padding(.bottom, 16)
+            .padding(.bottom, Spacing.s4)
         }
         .accessibilityIdentifier("chatConversationFanEmpty")
     }
 
     private var quickChipsRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             ForEach(viewModel.emptyChips) { chip in
                 Button {
                     viewModel.composerText = chip.label
@@ -296,8 +296,8 @@ public struct ChatConversationView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
         .background(Theme.Color.appSurfaceMuted)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
@@ -315,7 +315,7 @@ extension ChatConversationView {
             VStack(alignment: .leading, spacing: 10) {
                 aiWelcomeCard
                 aiPrivacyRow
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
@@ -336,7 +336,7 @@ extension ChatConversationView {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             LazyVGrid(
                 columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
@@ -376,7 +376,7 @@ extension ChatConversationView {
     private func populatedFrame(_ rows: [ChatTimelineRow]) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: Spacing.s0) {
                     if viewModel.canLoadOlder {
                         Color.clear
                             .frame(height: 1)
@@ -384,7 +384,7 @@ extension ChatConversationView {
                     }
                     if mode == .fanThread {
                         FanAutoWelcomeCard()
-                            .padding(.bottom, 12)
+                            .padding(.bottom, Spacing.s3)
                     }
                     ForEach(rows) { row in
                         timelineRowView(row)
@@ -392,7 +392,7 @@ extension ChatConversationView {
                     Color.clear.frame(height: 4)
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 12)
+                .padding(.top, Spacing.s3)
             }
             .refreshable { await viewModel.refresh() }
             .accessibilityIdentifier("chatConversationContent")
@@ -455,7 +455,7 @@ extension ChatConversationView {
             .buttonStyle(.plain)
             Spacer()
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, Spacing.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("chatConversationError")
     }
@@ -480,20 +480,20 @@ private struct FanMembershipStripe: View {
     let onManage: @MainActor () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 4) {
+        HStack(spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.crown, size: 10, strokeWidth: 2.6, color: Theme.Color.warning)
                 Text(entitlement.currentTier.uppercased())
                     .font(.system(size: 9.5, weight: .bold))
                     .tracking(0.4)
                     .foregroundStyle(Theme.Color.warning)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, Spacing.s1)
             .background(Theme.Color.warningBg)
             .clipShape(Capsule())
 
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.calendar, size: 11, color: Theme.Color.appTextMuted)
                 Text("renews ")
                     .font(.system(size: 11))
@@ -502,7 +502,7 @@ private struct FanMembershipStripe: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Button(action: onManage) {
                 HStack(spacing: 3) {
                     Text("Manage")
@@ -516,7 +516,7 @@ private struct FanMembershipStripe: View {
             .accessibilityIdentifier("chatFanManageMembership")
         }
         .padding(.leading, 14)
-        .padding(.trailing, 8)
+        .padding(.trailing, Spacing.s2)
         .frame(height: 44)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -531,8 +531,8 @@ private struct FanQuotaGate: View {
     let onUpgrade: @MainActor () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 4) {
+        HStack(spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.messageSquare, size: 11, strokeWidth: 2.4, color: gateColor)
                 Text("\(entitlement.messagesLeft)")
                     .font(.system(size: 11, weight: .heavy))
@@ -553,7 +553,7 @@ private struct FanQuotaGate: View {
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .lineLimit(1)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Button(action: onUpgrade) {
                 HStack(spacing: 3) {
                     Text("Upgrade")
@@ -567,7 +567,7 @@ private struct FanQuotaGate: View {
             .accessibilityIdentifier("chatFanQuotaUpgrade")
         }
         .padding(.leading, 14)
-        .padding(.trailing, 8)
+        .padding(.trailing, Spacing.s2)
         .frame(height: 50)
         .background(entitlement.canReply ? Theme.Color.appSurface : Theme.Color.warningBg)
         .overlay(alignment: .top) {
@@ -583,8 +583,8 @@ private struct FanQuotaGate: View {
 
 private struct FanAutoWelcomeCard: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.sparkles, size: 9, strokeWidth: 2.8, color: Theme.Color.business)
                 Text("AUTO-WELCOME · FREE")
                     .font(.system(size: 9.5, weight: .bold))
@@ -611,7 +611,7 @@ private struct FanAutoWelcomeCard: View {
                 .italic()
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
@@ -643,7 +643,7 @@ private struct FanQuotaHero: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.Color.primary600)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .padding(.vertical, 6)
         .background(Theme.Color.infoBg)
         .overlay(
@@ -680,7 +680,7 @@ private struct FanOpeners: View {
     ]
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             ForEach(openers, id: \.id) { opener in
                 Button {
                     onSelect(opener.title)
@@ -701,10 +701,10 @@ private struct FanOpeners: View {
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
                         }
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                         Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Spacing.s3)
                     .frame(minHeight: 50)
                     .background(Theme.Color.appSurface)
                     .overlay(
@@ -732,8 +732,8 @@ struct FanTierUpgradePromptSheet: View {
     let entitlement: ChatFanEntitlement
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            HStack(spacing: Spacing.s3) {
                 Icon(.lock, size: 20, color: Theme.Color.primary600)
                     .frame(width: 44, height: 44)
                     .background(Theme.Color.primary50)
@@ -766,9 +766,9 @@ struct FanTierUpgradePromptSheet: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("chatFanUpgradeConfirm")
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 24)
+        .padding(.horizontal, Spacing.s5)
+        .padding(.top, Spacing.s3)
+        .padding(.bottom, Spacing.s6)
         .background(Theme.Color.appSurface)
         .accessibilityIdentifier("chatFanUpgradePromptSheet")
     }
@@ -835,7 +835,7 @@ private struct ChatConversationHeader: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             trailingActions
         }
         .padding(.horizontal, 10)
@@ -888,13 +888,13 @@ private struct ChatConversationHeader: View {
 
     @ViewBuilder private var trailingActions: some View {
         if mode == .fanThread {
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 Icon(.externalLink, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                 Icon(.moreHorizontal, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
             }
             .accessibilityHidden(true)
         } else if mode == .creatorThread {
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 Icon(.user, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                 Icon(.moreHorizontal, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
             }
@@ -902,14 +902,14 @@ private struct ChatConversationHeader: View {
         } else {
             switch counterparty {
             case .person:
-                HStack(spacing: 0) {
+                HStack(spacing: Spacing.s0) {
                     Icon(.phone, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                     Icon(.video, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                     Icon(.moreVertical, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                 }
                 .accessibilityHidden(true)
             case .ai:
-                HStack(spacing: 0) {
+                HStack(spacing: Spacing.s0) {
                     Icon(.history, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                     Icon(.moreVertical, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                 }
@@ -1021,11 +1021,11 @@ private struct ChatCreatorAudienceStrip: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 16, strokeWidth: 2.4, color: Theme.Color.business)
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.vertical, Spacing.s2)
             .background(Theme.Color.businessBg)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .overlay(
@@ -1034,7 +1034,7 @@ private struct ChatCreatorAudienceStrip: View {
             )
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .padding(.top, 10)
         .accessibilityLabel("Open audience profile")
         .accessibilityIdentifier("chatCreatorAudienceStrip")
@@ -1073,7 +1073,7 @@ private struct ChatCreatorQuotaMeter: View {
                 }
             }
             .frame(height: 4)
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.refreshCw, size: 10, strokeWidth: 2.4, color: Theme.Color.appTextMuted)
                 Text(quota.resetCopy)
                     .font(.system(size: 10))
@@ -1248,7 +1248,7 @@ private struct ChatBroadcastReferenceCard: View {
                 .frame(width: 30, height: 30)
                 .background(Theme.Color.businessBg)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text("Broadcast referenced")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.4)
@@ -1266,9 +1266,9 @@ private struct ChatBroadcastReferenceCard: View {
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.appTextStrong)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
@@ -1289,7 +1289,7 @@ private struct ChatBubbleRow: View {
     let onRetry: @MainActor () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Spacing.s2) {
             if content.side == .outgoing {
                 Spacer(minLength: 44)
                 bubbleStack
@@ -1308,7 +1308,7 @@ private struct ChatBubbleRow: View {
     }
 
     private var bubbleStack: some View {
-        VStack(alignment: alignment, spacing: 0) {
+        VStack(alignment: alignment, spacing: Spacing.s0) {
             switch content.body {
             case let .text(text):
                 bubbleContainer { textBody(text) }
@@ -1391,7 +1391,7 @@ private struct ChatBubbleRow: View {
     }
 
     private func attachmentBody(filename: String, sizeLabel: String?) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.file, size: 18, color: Theme.Color.primary600)
             VStack(alignment: .leading, spacing: 1) {
                 Text(filename)
@@ -1410,7 +1410,7 @@ private struct ChatBubbleRow: View {
     private func systemLinkPill(label: String, sub: String, accent: ChatBubbleContent.SystemLinkAccent) -> some View {
         let fg = accentForeground(accent)
         let bg = accentBackground(accent)
-        return HStack(spacing: 8) {
+        return HStack(spacing: Spacing.s2) {
             Icon(.info, size: 12, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
                 .frame(width: 24, height: 24)
                 .background(fg)
@@ -1426,8 +1426,8 @@ private struct ChatBubbleRow: View {
             }
             Icon(.chevronRight, size: 13, strokeWidth: 2.4, color: fg)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
         .background(bg)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
@@ -1439,7 +1439,7 @@ private struct ChatBubbleRow: View {
 
     private func lockedPaywallOverlay(tier: String) -> some View {
         VStack {
-            Spacer(minLength: 12)
+            Spacer(minLength: Spacing.s3)
             Button(action: onLockedAction) {
                 HStack(spacing: 6) {
                     Icon(.lock, size: 12, strokeWidth: 2.6, color: Theme.Color.primary600)
@@ -1481,17 +1481,17 @@ private struct ChatBubbleRow: View {
                 .foregroundStyle(Theme.Color.warning)
         }
         .padding(.horizontal, 9)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.warningBg)
         .clipShape(Capsule())
-        .padding(.top, 4)
+        .padding(.top, Spacing.s1)
         .accessibilityIdentifier("chatPaidSupportFooter_\(content.id)")
     }
 
     // MARK: - AI reply
 
     private func aiReplyBubble(text: String, estimate: ChatEstimate?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             aiTag
             Text(text)
                 .font(.system(size: 14))
@@ -1509,7 +1509,7 @@ private struct ChatBubbleRow: View {
     }
 
     private var aiTag: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.bot, size: 9, strokeWidth: 3, color: Theme.Color.magic)
             Text("PANTOPUS AI")
                 .font(.system(size: 9.5, weight: .bold))
@@ -1532,7 +1532,7 @@ private struct ChatBubbleRow: View {
     }
 
     private func stampView(_ raw: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             if content.side == .outgoing, content.deliveryState == .read {
                 ChatReadReceipt(timestamp: raw)
             } else {
@@ -1565,7 +1565,7 @@ private struct ChatBubbleRow: View {
             }
         }
         .padding(.top, 2)
-        .padding(.bottom, 12)
+        .padding(.bottom, Spacing.s3)
         .frame(maxWidth: .infinity, alignment: alignmentToFrameAlignment)
     }
 
@@ -1651,7 +1651,7 @@ private struct PhotoBubblePlaceholder: View {
                         .offset(y: CGFloat(index % 3) * 7)
                 }
             }
-            .padding(.leading, 8)
+            .padding(.leading, Spacing.s2)
             .accessibilityHidden(true)
             Text("Photo")
                 .font(.system(size: 10, weight: .semibold))
@@ -1660,7 +1660,7 @@ private struct PhotoBubblePlaceholder: View {
                 .padding(.vertical, 2)
                 .background(Theme.Color.appSurface.opacity(0.72), in: Capsule())
                 .padding(.leading, 10)
-                .padding(.bottom, 8)
+                .padding(.bottom, Spacing.s2)
         }
     }
 }
@@ -1669,7 +1669,7 @@ private struct ChatReadReceipt: View {
     let timestamp: String
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Text("Read \(timestamp)")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -1691,7 +1691,7 @@ private struct ChatTypingIndicator: View {
     @State private var isAnimating = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Spacing.s2) {
             ChatMiniAvatar(initials: initials)
             HStack(spacing: 3) {
                 ForEach(0..<3, id: \.self) { i in
@@ -1707,7 +1707,7 @@ private struct ChatTypingIndicator: View {
                         )
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .padding(.vertical, 10)
             .background(Theme.Color.appSurfaceSunken)
             .overlay(
@@ -1730,7 +1730,7 @@ private struct ChatTypingIndicator: View {
             Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.top, 8)
+        .padding(.top, Spacing.s2)
         .padding(.bottom, 6)
         .onAppear {
             isAnimating = true
@@ -1748,12 +1748,12 @@ private struct AttachmentStripView: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 ForEach(attachments) { attachment in
                     AttachmentTile(attachment: attachment, onRemove: onRemove)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .padding(.top, 10)
             .padding(.bottom, 6)
         }
@@ -1810,7 +1810,7 @@ private struct AttachmentTile: View {
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .lineLimit(1)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, Spacing.s1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Color.appSurface)
@@ -1832,7 +1832,7 @@ private struct ChatComposer: View {
     let onSend: @MainActor () -> Void
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .bottom, spacing: Spacing.s2) {
             Button(action: onAttach) {
                 Icon(.plus, size: 18, strokeWidth: 2.4, color: Theme.Color.appTextStrong)
                     .frame(width: 36, height: 36)
@@ -1843,7 +1843,7 @@ private struct ChatComposer: View {
             .accessibilityLabel("Attach")
             .accessibilityIdentifier("chatComposerAttach")
 
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: Spacing.s2) {
                 TextField(placeholder, text: $text, axis: .vertical)
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.Color.appText)
@@ -1859,7 +1859,7 @@ private struct ChatComposer: View {
                 .accessibilityIdentifier("chatComposerEmoji")
             }
             .padding(.leading, 14)
-            .padding(.trailing, 4)
+            .padding(.trailing, Spacing.s1)
             .padding(.vertical, 2)
             .frame(minHeight: 36)
             .background(Theme.Color.appSurfaceSunken)
@@ -1899,9 +1899,9 @@ private struct ChatComposer: View {
             .accessibilityLabel("Send")
             .accessibilityIdentifier("chatComposerSend")
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .padding(.top, 10)
-        .padding(.bottom, 24)
+        .padding(.bottom, Spacing.s6)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)

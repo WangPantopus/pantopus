@@ -29,7 +29,7 @@ public struct ReviewSummaryBlock: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 HStack(alignment: .firstTextBaseline) {
                     Text(row.label)

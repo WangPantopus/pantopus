@@ -168,7 +168,7 @@ private fun MemberFooter(onOpenMembership: (String) -> Unit) {
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
                 .clickable { onOpenMembership(footer.personaId) }
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = Spacing.s4, vertical = 10.dp)
                 .heightIn(min = 48.dp)
                 .testTag("audienceProfileMemberFooter")
                 .semantics {
@@ -176,7 +176,7 @@ private fun MemberFooter(onOpenMembership: (String) -> Unit) {
                         "You're a member of ${footer.personaName}, ${footer.tierName} tier. Manage membership."
                 },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Crown,
@@ -226,7 +226,7 @@ private fun TopBar(
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -287,9 +287,9 @@ internal fun LoadingFrame() {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("audienceProfileLoading"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Shimmer(width = 360.dp, height = 90.dp, cornerRadius = 16.dp)
         Shimmer(width = 360.dp, height = 44.dp, cornerRadius = 22.dp)
@@ -307,7 +307,7 @@ internal fun EmptyFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("audienceProfileEmpty"),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -319,7 +319,7 @@ internal fun EmptyFrame(
                     .clip(RoundedCornerShape(Radii.xl))
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                    .padding(20.dp),
+                    .padding(Spacing.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -378,7 +378,7 @@ internal fun EmptyFrame(
                     strokeWidth = 2f,
                     tint = PantopusColors.primary700,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(Spacing.s2))
                 Text(
                     text = "Tell people you're here",
                     fontSize = 14.sp,
@@ -402,7 +402,7 @@ private fun OnboardingCard() {
                 .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
                 .padding(14.dp)
                 .testTag("audienceProfileOnboardingCard"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Text(text = "Start in three steps", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         OnboardingStep(number = 1, title = "Set up payments", subtitle = "Turn on tiers so supporters can join.")
@@ -445,7 +445,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("audienceProfileError"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -457,20 +457,20 @@ private fun ErrorFrame(
             strokeWidth = 2f,
             tint = PantopusColors.error,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.s3))
         Text(
             text = "Couldn't load Public Profile",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = message,
             fontSize = 13.5.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.s4))
         PrimaryButton(
             title = "Try again",
             onClick = onRetry,
@@ -582,10 +582,10 @@ private fun HeaderCard(header: AudienceHeaderContent) {
                 .fillMaxWidth()
                 .height(38.dp)
                 .background(PantopusColors.appSurfaceMuted)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = Spacing.s4)
                 .testTag("audienceProfileHeader"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.RadioTower,
@@ -632,7 +632,7 @@ private fun TabStrip(
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
             horizontalArrangement = Arrangement.spacedBy(22.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -651,7 +651,7 @@ private fun TabStrip(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isActive) PantopusColors.primary700 else PantopusColors.appTextSecondary,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
+                        modifier = Modifier.padding(top = 10.dp, bottom = Spacing.s2),
                     )
                     Box(
                         modifier =
@@ -685,9 +685,9 @@ private fun UpdatesTab(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("audienceProfileUpdatesList"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         FollowerStackCard(header = header, breakdown = breakdown, followers = followers)
         ComposerCard(
@@ -707,7 +707,7 @@ private fun UpdatesTab(
                 UpdateCard(card = card, onOpen = { onOpenBroadcast(card) })
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(Spacing.s6))
     }
 }
 
@@ -731,7 +731,7 @@ private fun FollowerStackCard(
                         "Follower stack, ${header.followerCount} followers, ${header.newThisWeek} new in the past 7 days"
                 },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Text(
@@ -744,7 +744,7 @@ private fun FollowerStackCard(
             FollowerAvatarStack(followers = followers)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 breakdown.segments.take(3).forEach { segment ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                         Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(tierColor(segment.rank)))
                         Text(
                             text = "${segment.name} ${segment.count}",
@@ -998,7 +998,7 @@ private fun ComposerCard(
                         .clip(RoundedCornerShape(999.dp))
                         .background(if (canSubmit) PantopusColors.primary600 else PantopusColors.appBorderStrong)
                         .clickable(enabled = canSubmit) { onSubmit() }
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = Spacing.s4)
                         .height(38.dp)
                         .testTag("audienceProfileComposerSubmit"),
                 contentAlignment = Alignment.Center,
@@ -1040,7 +1040,7 @@ private fun VisibilityPicker(
                     .padding(horizontal = 10.dp, vertical = 5.dp)
                     .testTag("audienceProfileVisibilityPicker"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             Text(
                 text = "Visible to ${visibility.title}",
@@ -1080,9 +1080,9 @@ private fun EmptyUpdatesCard(onCompose: () -> Unit) {
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.xl))
-                .padding(horizontal = 20.dp, vertical = 28.dp),
+                .padding(horizontal = Spacing.s5, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
@@ -1154,11 +1154,11 @@ private fun UpdateCard(
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .clickable(onClick = onOpen)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("updateCard_${card.id}"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Text(text = card.timeAgo, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
             Text(text = "·", fontSize = 11.sp, color = PantopusColors.appTextMuted)
             VisibilityChip(card)
@@ -1271,9 +1271,9 @@ private fun FollowersTab(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("audienceProfileFollowersList"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         AnalyticsRow(state.cells)
         TierStackedBar(state.breakdown)
@@ -1287,11 +1287,11 @@ private fun FollowersTab(
                 EmptyFollowersCard()
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 state.followers.forEach { follower -> FollowerRow(follower, onOpen = { actions.onOpenFollower(follower) }) }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(Spacing.s6))
     }
 }
 
@@ -1307,11 +1307,11 @@ private fun FollowerSearchField(
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = Spacing.s3)
                 .height(40.dp)
                 .testTag("followerSearchField"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Search,
@@ -1383,7 +1383,7 @@ private fun FollowerSortChipRow(
                 .horizontalScroll(rememberScrollState())
                 .testTag("followerSortChipRow")
                 .semantics { contentDescription = "Sort followers" },
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FollowerSort.entries.forEach { sort ->
@@ -1401,12 +1401,12 @@ private fun FollowerSortChipRow(
                             shape = RoundedCornerShape(Radii.pill),
                         )
                         .clickable { onSelect(sort) }
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.s3)
                         .heightIn(min = 28.dp)
                         .wrapContentSize(Alignment.Center)
                         .testTag("followerSortChip_${sort.key}"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 if (isActive) {
                     PantopusIconImage(
@@ -1435,10 +1435,10 @@ private fun EmptyFollowerSearchCard() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("followerSearchEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Search,
@@ -1463,7 +1463,7 @@ private fun EmptyFollowerSearchCard() {
 
 @Composable
 private fun AnalyticsRow(cells: List<AnalyticsCellContent>) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         cells.forEach { cell ->
             Column(
                 modifier =
@@ -1506,7 +1506,7 @@ private fun TierStackedBar(breakdown: TierBreakdownContent) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("tierStackedBar"),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -1538,9 +1538,9 @@ private fun TierStackedBar(breakdown: TierBreakdownContent) {
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3), verticalAlignment = Alignment.CenterVertically) {
             breakdown.segments.forEach { seg ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     Box(
                         modifier =
                             Modifier
@@ -1567,7 +1567,7 @@ private fun TierChipRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         chips.forEach { chip ->
             val isActive = selectedTier == chip.rank
@@ -1611,10 +1611,10 @@ private fun FollowerRow(
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
                 .clickable(onClick = onOpen)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("followerRow_${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier = Modifier.size(40.dp).clip(CircleShape).background(PantopusColors.primary50),
@@ -1664,9 +1664,9 @@ private fun FollowerRow(
 @Composable
 private fun EmptyFollowersCard() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s5),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.User,
@@ -1713,8 +1713,8 @@ private fun ThreadsTab(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             if (threads.isEmpty()) {
                 EmptyThreadsCard()
@@ -1724,7 +1724,7 @@ private fun ThreadsTab(
                 ViewAllMessagesCTA(onClick = onOpenCreatorInbox)
                 visibleThreads.forEach { ThreadRow(it, onOpen = { onOpenThread(it) }) }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(Spacing.s6))
         }
     }
 }
@@ -1748,7 +1748,7 @@ private fun ThreadsFilterStrip(
                 Modifier
                     .fillMaxWidth()
                     .horizontalScroll(scroll)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1807,10 +1807,10 @@ private fun FilteredEmptyThreadsCard() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("audienceProfileThreadsFilteredEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Inbox,
@@ -1845,11 +1845,11 @@ private fun ViewAllMessagesCTA(onClick: () -> Unit) {
                 .border(1.dp, PantopusColors.primary100, RoundedCornerShape(8.dp))
                 .clickable(onClick = onClick)
                 .heightIn(min = 44.dp)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = Spacing.s3, vertical = 10.dp)
                 .testTag("audienceProfileViewAllMessages")
                 .semantics { contentDescription = "View all messages in Creator Inbox" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Inbox,
@@ -1888,10 +1888,10 @@ private fun ThreadRow(
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
                 .clickable(onClick = onOpen)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("threadRow_${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
             Box(
@@ -1912,7 +1912,7 @@ private fun ThreadRow(
                             .align(Alignment.TopEnd)
                             .clip(RoundedCornerShape(999.dp))
                             .background(PantopusColors.error)
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = Spacing.s1)
                             .widthIn(min = 16.dp)
                             .height(16.dp),
                     contentAlignment = Alignment.Center,
@@ -1965,9 +1965,9 @@ private fun ThreadRow(
 @Composable
 private fun EmptyThreadsCard() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s5),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Inbox,

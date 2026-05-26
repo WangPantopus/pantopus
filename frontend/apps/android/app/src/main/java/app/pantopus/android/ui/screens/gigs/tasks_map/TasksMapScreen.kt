@@ -156,7 +156,7 @@ internal fun TasksMapTopPill(
                 .background(Color.White.copy(alpha = 0.96f))
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.pill))
-                .padding(start = 6.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
+                .padding(start = 6.dp, end = Spacing.s2, top = Spacing.s2, bottom = Spacing.s2)
                 .fillMaxWidth()
                 .testTag("tasksMapPill"),
         verticalAlignment = Alignment.CenterVertically,
@@ -238,7 +238,7 @@ internal fun TasksMapCategoryChips(
                         )
                         .shadow(elevation = 4.dp, shape = RoundedCornerShape(Radii.pill))
                         .clickable { onSelect(category) }
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.s3)
                         .height(28.dp)
                         .testTag("tasksMapCategoryChip_${category.key}"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -272,7 +272,7 @@ internal fun TasksMapControls(
 ) {
     Column(
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         // Post-task FAB — extended pill, stacked above the controls.
         Row(
@@ -358,7 +358,7 @@ internal fun TasksMapSheetHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 12.dp),
+                .padding(start = 18.dp, end = 18.dp, top = Spacing.s1, bottom = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -373,7 +373,7 @@ internal fun TasksMapSheetHeader(
             Row(
                 modifier = Modifier.clickable { expanded = true }.testTag("tasksMapSort"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Text(
                     text = "Sort:",
@@ -442,7 +442,7 @@ private fun TasksMapRail(
                 Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                    .padding(start = Spacing.s4, end = Spacing.s4, bottom = Spacing.s3)
                     .testTag("tasksMapRail"),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -477,7 +477,7 @@ internal fun TaskRailCard(
                     shape = RoundedCornerShape(14.dp),
                 )
                 .clickable(onClick = onTap)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("tasksMapCard_${item.id}"),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -508,9 +508,9 @@ internal fun TaskRailCard(
                 lineHeight = 17.sp,
             )
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 Text(
                     text = item.price,
@@ -552,7 +552,7 @@ private fun TasksMapPaginationDots(
     index: Int,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s3),
         horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -576,7 +576,7 @@ private fun TasksMapLoadingRail() {
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                .padding(start = Spacing.s4, end = Spacing.s4, bottom = Spacing.s3)
                 .testTag("tasksMapLoading"),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -588,7 +588,7 @@ private fun TasksMapLoadingRail() {
                         .clip(RoundedCornerShape(14.dp))
                         .background(PantopusColors.appSurface)
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
-                        .padding(12.dp),
+                        .padding(Spacing.s3),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -634,7 +634,7 @@ internal fun TasksMapEmptyHero(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 28.dp, vertical = 12.dp)
+                .padding(horizontal = 28.dp, vertical = Spacing.s3)
                 .testTag("tasksMapEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -654,7 +654,7 @@ internal fun TasksMapEmptyHero(
                 tint = PantopusColors.primary600,
             )
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.s3))
         Text(
             text = "No tasks in this area yet",
             fontSize = 15.sp,
@@ -672,7 +672,7 @@ internal fun TasksMapEmptyHero(
         )
         Spacer(modifier = Modifier.height(14.dp))
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
@@ -741,7 +741,7 @@ private fun TasksMapErrorBody(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s6, vertical = Spacing.s1)
                 .testTag("tasksMapError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -764,7 +764,7 @@ private fun TasksMapErrorBody(
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onRetry)
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = Spacing.s4)
                     .height(38.dp)
                     .testTag("tasksMapRetry"),
             contentAlignment = Alignment.Center,

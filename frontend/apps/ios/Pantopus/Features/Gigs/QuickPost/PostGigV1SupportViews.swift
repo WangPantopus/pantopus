@@ -30,7 +30,7 @@ struct PostGigV1ErrorBanner: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2 + 2)

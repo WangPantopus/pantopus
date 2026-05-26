@@ -31,7 +31,7 @@ public struct BidderStack: View {
     }
 
     public var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(Array(bidders.enumerated()), id: \.offset) { index, bidder in
                 tile(initials: bidder.initials, tone: bidder.tone, isFirst: index == 0)
             }

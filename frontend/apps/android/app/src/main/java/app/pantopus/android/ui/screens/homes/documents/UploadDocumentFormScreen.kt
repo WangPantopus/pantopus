@@ -514,7 +514,7 @@ private fun TagChip(
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         Text(
             text = tag,

@@ -19,7 +19,7 @@ public struct TokenAcceptView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             content
         }
@@ -39,7 +39,7 @@ public struct TokenAcceptView: View {
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 52)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -70,7 +70,7 @@ public struct TokenAcceptView: View {
     // MARK: - Offer body
 
     private func offerBody(_ offer: TokenAcceptOffer, submitting: Bool) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
                     headerCard(offer)
@@ -82,9 +82,9 @@ public struct TokenAcceptView: View {
                     if let expiry = offer.expiry {
                         expiryCard(text: expiry)
                     }
-                    Spacer(minLength: 32)
+                    Spacer(minLength: Spacing.s8)
                 }
-                .padding(16)
+                .padding(Spacing.s4)
             }
             stickyCTAs(offer: offer, submitting: submitting)
         }
@@ -92,7 +92,7 @@ public struct TokenAcceptView: View {
     }
 
     private func headerCard(_ offer: TokenAcceptOffer) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             inviteTypeChip(offer.inviteType)
             Text(offer.sender)
                 .font(.system(size: 16, weight: .semibold))
@@ -112,14 +112,14 @@ public struct TokenAcceptView: View {
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary700)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, Spacing.s1)
             .background(Theme.Color.primary50)
             .clipShape(Capsule())
             .accessibilityIdentifier("tokenAcceptIdentityChip")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+        .padding(Spacing.s4)
         .background(Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -134,7 +134,7 @@ public struct TokenAcceptView: View {
             .font(.system(size: 10, weight: .bold))
             .foregroundStyle(badge.fg)
             .kerning(0.8)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Spacing.s2)
             .padding(.vertical, 3)
             .background(badge.bg)
             .clipShape(Capsule())
@@ -142,7 +142,7 @@ public struct TokenAcceptView: View {
     }
 
     private func roleCard(_ offer: TokenAcceptOffer) -> some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: Spacing.s3) {
             ZStack {
                 Circle().fill(Theme.Color.primary50).frame(width: 40, height: 40)
                 Icon(.userPlus, size: 20, color: Theme.Color.primary600)
@@ -169,13 +169,13 @@ public struct TokenAcceptView: View {
     }
 
     private func benefitsCard(_ offer: TokenAcceptOffer) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("WHAT YOU GET")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .kerning(0.6)
             ForEach(offer.benefits, id: \.self) { benefit in
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: Spacing.s2) {
                     Icon(.check, size: 14, color: Theme.Color.success)
                         .padding(.top, 2)
                     Text(benefit)
@@ -205,14 +205,14 @@ public struct TokenAcceptView: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.primary50)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityIdentifier("tokenAcceptSafetyBand")
     }
 
     private func expiryCard(text: String) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.alertCircle, size: 14, color: Theme.Color.warning)
             Text(text)
                 .font(.system(size: 12, weight: .medium))
@@ -226,9 +226,9 @@ public struct TokenAcceptView: View {
     }
 
     private func stickyCTAs(offer: TokenAcceptOffer, submitting: Bool) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 Button {
                     Task { await viewModel.decline() }
                 } label: {
@@ -263,7 +263,7 @@ public struct TokenAcceptView: View {
                 .accessibilityIdentifier("tokenAcceptAccept")
                 .disabled(submitting)
             }
-            .padding(16)
+            .padding(Spacing.s4)
             .background(Theme.Color.appSurface)
         }
     }
@@ -272,12 +272,12 @@ public struct TokenAcceptView: View {
 
     private var loadingFrame: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.s3) {
                 Shimmer(height: 130, cornerRadius: 14)
                 Shimmer(height: 80, cornerRadius: 12)
                 Shimmer(height: 120, cornerRadius: 12)
             }
-            .padding(16)
+            .padding(Spacing.s4)
         }
         .accessibilityIdentifier("tokenAcceptLoading")
     }
@@ -296,7 +296,7 @@ public struct TokenAcceptView: View {
                 .font(.system(size: 13.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, Spacing.s8)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -304,7 +304,7 @@ public struct TokenAcceptView: View {
     }
 
     private var declinedFrame: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.x, size: 32, color: Theme.Color.appTextSecondary)
             Text("Invitation declined")
@@ -314,14 +314,14 @@ public struct TokenAcceptView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, Spacing.s8)
             Spacer()
         }
         .accessibilityIdentifier("tokenAcceptDeclined")
     }
 
     private func expiredFrame(message: String) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.alertCircle, size: 36, color: Theme.Color.warning)
             Text("Link no longer valid")
@@ -331,14 +331,14 @@ public struct TokenAcceptView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, Spacing.s8)
             Spacer()
         }
         .accessibilityIdentifier("tokenAcceptExpiredFrame")
     }
 
     private func errorFrame(message: String) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.alertCircle, size: 36, color: Theme.Color.error)
             Text("Couldn't load this invite")
@@ -354,7 +354,7 @@ public struct TokenAcceptView: View {
                 Text("Try again")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.s4)
                     .frame(height: 36)
                     .background(Theme.Color.primary600)
                     .clipShape(Capsule())

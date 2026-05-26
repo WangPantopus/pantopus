@@ -171,7 +171,7 @@ fun ExploreMapScreen(
             modifier =
                 Modifier
                     .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(top = 8.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = Spacing.s2, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(),
         )
@@ -181,7 +181,7 @@ fun ExploreMapScreen(
             modifier =
                 Modifier
                     .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(top = 64.dp)
+                    .padding(top = Spacing.s16)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(),
         )
@@ -487,7 +487,7 @@ private fun ExploreFloatingPill(
                 .background(PantopusColors.appSurface.copy(alpha = 0.96f))
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.pill))
-                .padding(horizontal = 4.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s1, vertical = Spacing.s1)
                 .testTag("exploreFloatingPill"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -641,9 +641,9 @@ private fun ExploreTypeSegment(
                     .height(28.dp)
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(if (active) PantopusColors.appText else Color.Transparent)
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             if (kind != null) {
                 Box(
@@ -680,7 +680,7 @@ private fun ExploreMapControls(
             modifier
                 .padding(end = 14.dp, bottom = animatedBottom)
                 .testTag("exploreMapControls"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         ExploreMapControlButton(icon = PantopusIcon.MapPin, label = "Locate me", onClick = onLocate, testTag = "exploreControl_locate")
         ExploreMapControlButton(icon = PantopusIcon.Map, label = "Fit all pins", onClick = onFitAll, testTag = "exploreControl_fitAll")
@@ -839,7 +839,7 @@ private fun resolveStop(
 @Composable
 private fun ExploreDragHandle() {
     Box(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s1),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -865,7 +865,7 @@ private fun ExploreSheetHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 12.dp),
+                .padding(start = 18.dp, end = 18.dp, top = Spacing.s1, bottom = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -879,7 +879,7 @@ private fun ExploreSheetHeader(
                     .testTag("exploreSheetCount"),
         )
         if (activeFilterCount > 0) {
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(Spacing.s2))
             ActiveFilterChip(count = activeFilterCount, testTag = "exploreSheetFilterCount")
         }
         Spacer(modifier = Modifier.weight(1f))
@@ -897,7 +897,7 @@ private fun ExploreSheetHeader(
                             role = Role.Button
                         },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Text(
                     text = "Sort:",
@@ -981,19 +981,19 @@ private fun ExploreCollapsedBody(onExpand: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurfaceSunken)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .clickable(onClick = onExpand)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                 .testTag("exploreSheetCollapsedPrompt")
                 .semantics {
                     contentDescription = "Drag up to see the list"
                     role = Role.Button
                 },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronUp,
@@ -1032,7 +1032,7 @@ private fun ExploreStandardBody(
                 Modifier
                     .fillMaxWidth()
                     .testTag("exploreSheetRail"),
-            contentPadding = PaddingValues(horizontal = 16.dp),
+            contentPadding = PaddingValues(horizontal = Spacing.s4),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(items = entities.take(12), key = { it.id }) { entity ->
@@ -1078,7 +1078,7 @@ internal fun ExploreEntityCard(
                 )
                 .shadow(elevation = 2.dp, shape = RoundedCornerShape(14.dp))
                 .clickable(onClick = onTap)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("exploreCard_${entity.id}")
                 .semantics {
                     contentDescription = "${entity.kind.singularLabel}: ${entity.title}"
@@ -1101,9 +1101,9 @@ internal fun ExploreEntityCard(
                 modifier = Modifier.padding(top = 3.dp),
             )
             Row(
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 Text(
                     text = "${entity.metaLead} · ${entity.distanceLabel}",
@@ -1135,13 +1135,13 @@ private fun ExploreEntityRow(
                 .fillMaxWidth()
                 .background(if (selected) entity.kind.color.copy(alpha = 0.06f) else PantopusColors.appSurface)
                 .clickable(onClick = onTap)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag("exploreRow_${entity.id}")
                 .semantics {
                     contentDescription = "${entity.kind.singularLabel}: ${entity.title}"
                     role = Role.Button
                 },
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ExploreEntityTile(entity.kind, size = 44.dp, iconSize = 20.dp)
@@ -1168,9 +1168,9 @@ private fun ExploreEntityRow(
                 modifier = Modifier.padding(top = 2.dp),
             )
             Row(
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 Text(
                     text = entity.metaLead,
@@ -1289,7 +1289,7 @@ internal fun ExploreEmptyBody(
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = Spacing.s3),
         )
         Text(
             text =
@@ -1303,7 +1303,7 @@ internal fun ExploreEmptyBody(
         )
         Row(
             modifier = Modifier.padding(top = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             ExploreActionPill(
                 title = "Clear filters",
@@ -1370,7 +1370,7 @@ internal fun ExploreSheetError(
     onRetry: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s6),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -1394,7 +1394,7 @@ internal fun ExploreSheetError(
 internal fun ExploreSkeletonRail() {
     LazyRow(
         modifier = Modifier.fillMaxWidth().testTag("exploreSkeletonRail"),
-        contentPadding = PaddingValues(horizontal = 16.dp),
+        contentPadding = PaddingValues(horizontal = Spacing.s4),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(4) {
@@ -1405,7 +1405,7 @@ internal fun ExploreSkeletonRail() {
                         .clip(RoundedCornerShape(14.dp))
                         .background(PantopusColors.appSurface)
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
-                        .padding(12.dp),
+                        .padding(Spacing.s3),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1426,7 +1426,7 @@ private fun ExplorePaginationDots(
     index: Int,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3),
         horizontalArrangement = Arrangement.spacedBy(5.dp, alignment = Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -197,7 +197,7 @@ private struct WhyWeAskSection: View {
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     Icon(
                         isExpanded ? .chevronUp : .chevronDown,
                         size: 16,
@@ -218,7 +218,7 @@ private struct WhyWeAskSection: View {
                 )
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextStrong)
-                .padding(.leading, 40)
+                .padding(.leading, Spacing.s10)
                 .accessibilityIdentifier("claimOwnershipWhyWeAskDetail")
             }
         }

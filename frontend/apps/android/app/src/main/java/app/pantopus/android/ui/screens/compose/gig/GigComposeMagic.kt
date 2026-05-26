@@ -171,10 +171,10 @@ internal fun ComposeIdentityChip() {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.personalBg)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .testTag("composeGigIdentityChip"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(icon = PantopusIcon.User, contentDescription = null, size = 11.dp, tint = PantopusColors.personal)
         Text("PERSONAL · YOU", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.personal)
@@ -220,7 +220,7 @@ private fun MagicDescribeCard(
             Text("Magic Task", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PantopusColors.magic)
             Spacer(Modifier.weight(1f))
             if (isParsed) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.success))
                     Text("PARSED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PantopusColors.success)
                 }
@@ -310,7 +310,7 @@ private fun DetectedArchetypePill(
                 Modifier
                     .clip(RoundedCornerShape(Radii.sm))
                     .clickable(role = Role.Button, onClick = onChange)
-                    .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                     .testTag("composeGigChangeArchetype"),
         )
     }
@@ -397,7 +397,7 @@ private fun ModulePromptRow(prompt: GigModulePrompt) {
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.warning.copy(alpha = 0.12f))
-                        .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
             )
         }
     }
@@ -435,7 +435,7 @@ private fun EngagementModeControl(
                             .testTag("composeGigEngagement_${option.name}")
                             .semantics { contentDescription = "${option.label}, ${option.subcopy}" },
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = option.icon,

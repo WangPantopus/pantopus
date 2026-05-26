@@ -127,7 +127,7 @@ private struct BusinessProfileHero: View {
     let onShare: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             // Flat violet wash — explicit "gradient OFF" per spec.
             ZStack(alignment: .topTrailing) {
                 Theme.Color.businessBg
@@ -207,7 +207,7 @@ private struct IdentityCard: View {
                     }
                 }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
 
             if !header.categoryChips.isEmpty {
@@ -286,7 +286,7 @@ private struct BusinessProfileBody: View {
     }
 
     private var tabStrip: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(BusinessProfileTab.allCases) { tab in
                 Button {
                     selectedTab = tab
@@ -345,7 +345,7 @@ private struct BusinessProfileBody: View {
 
             if !content.contact.isEmpty {
                 BusinessSection(title: "Contact") {
-                    VStack(spacing: 0) {
+                    VStack(spacing: Spacing.s0) {
                         ForEach(Array(content.contact.enumerated()), id: \.element.id) { idx, row in
                             ContactRowView(row: row) { url in onOpenWebsite(url) }
                             if idx != content.contact.count - 1 {
@@ -444,7 +444,7 @@ private struct HoursTable: View {
     let rows: [BusinessHoursRow]
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
                 HStack {
                     Text(row.dayLabel)
@@ -478,7 +478,7 @@ private struct AddressBlock: View {
     let address: BusinessAddress
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             mapPreview
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(address.lines, id: \.self) { line in
@@ -738,7 +738,7 @@ private struct LoadingLayout: View {
     let onBack: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
@@ -773,7 +773,7 @@ private struct NotFoundLayout: View {
     let onRetry: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             EmptyState(
                 icon: .building2,
@@ -797,7 +797,7 @@ private struct ErrorLayout: View {
     let onRetry: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             EmptyState(
                 icon: .alertCircle,

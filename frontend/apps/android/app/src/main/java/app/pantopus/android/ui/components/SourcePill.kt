@@ -55,7 +55,7 @@ fun SourcePill(
             modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(tone.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "$text, ${tone.a11yWord}" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),

@@ -223,7 +223,7 @@ private fun CategoryBadge(category: MailItemCategory) {
                 .background(category.rowBackground)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,
@@ -444,7 +444,7 @@ private fun SecondaryTile(
                 .padding(vertical = 10.dp)
                 .semantics { contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = icon,

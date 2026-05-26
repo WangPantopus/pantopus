@@ -43,7 +43,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: Vi
 
     public var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 if let searchBar = dataSource.searchBar {
                     SearchBarRow(config: searchBar)
                     Divider().background(Theme.Color.appBorderSubtle)
@@ -177,7 +177,7 @@ private struct TopBarActionBadge: View {
         Text("\(count)")
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(Theme.Color.appTextInverse)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Spacing.s1)
             .frame(minWidth: 16, minHeight: 16)
             .background(Theme.Color.primary600)
             .clipShape(Capsule())
@@ -406,7 +406,7 @@ private struct LoadedList: View {
                     .listRowBackground(Color.clear)
             }
         case .card:
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
                     RowView(row: row, cardContext: .grouped(isLast: index == section.rows.count - 1))
                     if index < section.rows.count - 1 {
@@ -576,7 +576,7 @@ private struct ListingContextHeader: View {
     let config: ListingContextConfig
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             card
             if config.offerCount != nil || config.sortLabel != nil {
                 sortStrip
@@ -589,7 +589,7 @@ private struct ListingContextHeader: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(alignment: .center, spacing: Spacing.s3) {
                 thumbnail
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
                     HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
                         Text(config.title)
                             .pantopusTextStyle(.body)
@@ -745,7 +745,7 @@ private struct ListingContextHeader: View {
     }
 
     private func sortLabelView(_ label: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.arrowsRepeat, size: 12, color: Theme.Color.appTextSecondary)
             Text(label)
                 .pantopusTextStyle(.caption)
@@ -938,7 +938,7 @@ struct RowView: View {
                     metaTail: row.metaTail,
                     splitWith: row.splitWith
                 )
-                .padding(.top, 4)
+                .padding(.top, Spacing.s1)
             }
         }
     }
@@ -1013,7 +1013,7 @@ struct RowView: View {
                 ChipPill(chip: chip)
             }
             if row.highlight == .unread {
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Circle()
                     .fill(Theme.Color.primary600)
                     .frame(width: 8, height: 8)
@@ -1223,7 +1223,7 @@ private struct TrailingView: View {
         case .none:
             EmptyView()
         case let .amountWithChip(amount, chipText, chipVariant, chipIcon):
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: Spacing.s1) {
                 Text(amount)
                     .pantopusTextStyle(.body)
                     .fontWeight(.bold)
@@ -1322,7 +1322,7 @@ private struct ChipRowView: View {
                     .foregroundStyle(Theme.Color.appTextMuted)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if let splitWith {
                 SplitStackTail(data: splitWith)
             } else if let timeMeta {
@@ -1507,7 +1507,7 @@ private struct FooterStack: View {
     let footer: RowFooter
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Divider().background(Theme.Color.appBorder)
                 .padding(.bottom, Spacing.s2)
             HStack(spacing: Spacing.s1) {
@@ -1533,13 +1533,13 @@ private struct EngagementStrip: View {
     let engagement: RowEngagement
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Divider().background(Theme.Color.appBorder)
                 .padding(.top, Spacing.s2)
                 .padding(.bottom, Spacing.s2)
             HStack(spacing: Spacing.s4) {
                 ForEach(engagement.items) { item in
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Icon(item.icon, size: 13, color: Theme.Color.appTextSecondary)
                         Text(item.label)
                             .pantopusTextStyle(.caption)
@@ -1549,7 +1549,7 @@ private struct EngagementStrip: View {
                 Spacer(minLength: Spacing.s1)
                 if let cta = engagement.cta {
                     Button(action: cta.handler) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             if let icon = cta.icon {
                                 Icon(icon, size: 12, color: Theme.Color.primary600)
                             }

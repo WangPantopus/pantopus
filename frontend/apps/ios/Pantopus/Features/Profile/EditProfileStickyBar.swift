@@ -25,7 +25,7 @@ struct EditProfileFieldLabel: View {
                 Circle()
                     .fill(Theme.Color.warning)
                     .frame(width: 6, height: 6)
-                    .padding(.leading, 4)
+                    .padding(.leading, Spacing.s1)
                     .accessibilityHidden(true)
             }
         }

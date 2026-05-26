@@ -221,7 +221,7 @@ fun TrustPill(
             modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(trust.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "${trust.label} sender" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -302,7 +302,7 @@ fun CertifiedStamp(modifier: Modifier = Modifier) {
                     PantopusColors.primary600,
                     RoundedCornerShape(Radii.sm),
                 )
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "Certified" },
     ) {
         Text(

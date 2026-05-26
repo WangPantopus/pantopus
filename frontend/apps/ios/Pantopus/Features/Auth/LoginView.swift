@@ -19,7 +19,7 @@ struct LoginView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     Spacer(minLength: Spacing.s10)
                     BrandLockup()
                         .padding(.bottom, Spacing.s10)

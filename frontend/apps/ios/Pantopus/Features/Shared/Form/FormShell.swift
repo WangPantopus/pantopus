@@ -113,7 +113,7 @@ public struct FormShell<Content: View>: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             FormTopBar(
                 title: title,
                 subtitle: subtitle,

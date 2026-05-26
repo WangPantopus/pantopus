@@ -229,7 +229,7 @@ private struct AddHomeAutocompleteDropdown: View {
     let onAddManually: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(spacing: Spacing.s1) {
                 Icon(.search, size: 10, color: Theme.Color.appTextMuted)
                 Text("\(results.count) matches")

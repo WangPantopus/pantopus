@@ -177,7 +177,7 @@ private struct LoadingLayout: View {
     let onBack: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ContentDetailTopBar(title: "Post", onBack: onBack, action: nil)
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 Shimmer(width: 220, height: 22, cornerRadius: Radii.sm)
@@ -203,7 +203,7 @@ private struct ErrorLayout: View {
     let onRetry: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ContentDetailTopBar(title: "Post", onBack: onBack, action: nil)
             EmptyState(
                 icon: .alertCircle,

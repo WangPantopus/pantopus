@@ -34,7 +34,7 @@ public struct ComposeBroadcastView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             scrollBody
         }
@@ -56,7 +56,7 @@ public struct ComposeBroadcastView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button(action: onClose) {
                 Icon(.x, size: 22, color: Theme.Color.appText)
                     .frame(width: 44, height: 44)
@@ -65,7 +65,7 @@ public struct ComposeBroadcastView: View {
             .accessibilityLabel("Close")
             .accessibilityIdentifier("composeBroadcastClose")
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             VStack(spacing: 1) {
                 Text("Compose broadcast")
@@ -77,7 +77,7 @@ public struct ComposeBroadcastView: View {
                 }
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             Button(
                 action: { viewModel.saveDraft() },
@@ -130,7 +130,7 @@ public struct ComposeBroadcastView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .overlay { if viewModel.isSending { sendingOverlay } }
-        .safeAreaInset(edge: .bottom, spacing: 0) { stickyActions }
+        .safeAreaInset(edge: .bottom, spacing: Spacing.s0) { stickyActions }
         .accessibilityIdentifier("composeBroadcastScroll")
     }
 
@@ -179,7 +179,7 @@ public struct ComposeBroadcastView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
             }
             .padding(Spacing.s3)
@@ -207,7 +207,7 @@ public struct ComposeBroadcastView: View {
         if viewModel.hasRecentBroadcasts {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 sectionHeader(title: "Last \(viewModel.recentBroadcasts.count) broadcasts")
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     ForEach(Array(viewModel.recentBroadcasts.enumerated()), id: \.element.id) { offset, broadcast in
                         recentBroadcastRow(broadcast)
                         if offset < viewModel.recentBroadcasts.count - 1 {
@@ -248,7 +248,7 @@ public struct ComposeBroadcastView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 recentTierChip(broadcast.audience)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.moreHorizontal, size: 14, color: Theme.Color.appTextMuted)
             }
             HStack(alignment: .top, spacing: Spacing.s2) {
@@ -290,7 +290,7 @@ public struct ComposeBroadcastView: View {
             statItem(icon: .heart, value: broadcast.reactions)
             statDivider
             statItem(icon: .messageCircle, value: broadcast.replies)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 12, color: Theme.Color.appTextMuted)
         }
     }
@@ -360,7 +360,7 @@ public struct ComposeBroadcastView: View {
     }
 
     private var emptyAnalyticsStrip: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(Array(["Reach", "Read", "React.", "Replies"].enumerated()), id: \.offset) { offset, label in
                 VStack(spacing: 2) {
                     Text("—")
@@ -489,7 +489,7 @@ public struct ComposeBroadcastView: View {
     // MARK: - Audience sheet
 
     private var audienceSheet: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             Text("Who can see this?")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
@@ -506,7 +506,7 @@ public struct ComposeBroadcastView: View {
                         .padding(.leading, Spacing.s4)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .presentationDetents([.medium])
@@ -536,7 +536,7 @@ public struct ComposeBroadcastView: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 if isSelected {
                     Icon(.check, size: 18, color: Theme.Color.primary600)
                 }

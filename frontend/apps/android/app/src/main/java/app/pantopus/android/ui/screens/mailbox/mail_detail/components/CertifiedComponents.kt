@@ -92,7 +92,7 @@ fun CertifiedStampBadge(
             color = StampInk,
         )
         Row(
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = Spacing.s1),
             horizontalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             // Same bar widths as iOS / web for a consistent stamp profile.
@@ -221,8 +221,8 @@ private fun SenderRow(
                 Text(text = it, fontSize = 11.5.sp, color = PantopusColors.appTextSecondary)
             }
             Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Pill(
                     icon = PantopusIcon.Landmark,
@@ -335,8 +335,8 @@ private fun CarrierRow(carrier: MailCarrierInfo) {
                 )
             }
             Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 if (carrier.signatureRequired) {
                     Pill(

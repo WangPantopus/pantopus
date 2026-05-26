@@ -172,7 +172,7 @@ public struct ExploreMapView: View {
     // MARK: - Floating pill (back · Explore · Filter)
 
     private var floatingPill: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button {
                 onBack?()
             } label: {
@@ -184,15 +184,15 @@ public struct ExploreMapView: View {
             .accessibilityLabel("Back")
             .opacity(onBack == nil ? 0 : 1)
             .disabled(onBack == nil)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Text("Explore")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             filterButton
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(.ultraThinMaterial)
         .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(Capsule())
@@ -217,7 +217,7 @@ public struct ExploreMapView: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Theme.Color.appTextInverse)
                         .frame(minWidth: 16, minHeight: 16)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, Spacing.s1)
                         .background(Theme.Color.primary600)
                         .clipShape(Capsule())
                 }
@@ -261,7 +261,7 @@ public struct ExploreMapView: View {
         return Button {
             viewModel.selectKind(kind)
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 if let kind {
                     Group {
                         if kind.isSquarePin {
@@ -290,7 +290,7 @@ public struct ExploreMapView: View {
     // MARK: - Map controls
 
     private func mapControls(bottomInset: CGFloat) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             mapControlButton(icon: .mapPin, label: "Locate me") {
                 recenter(on: viewModel.userCoordinate)
             }
@@ -324,14 +324,14 @@ public struct ExploreMapView: View {
     // MARK: - Bottom sheet
 
     private func bottomSheet(height: CGFloat, screenHeight: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
+            Spacer(minLength: Spacing.s0)
+            VStack(spacing: Spacing.s0) {
                 Capsule()
                     .fill(Theme.Color.appBorderStrong)
                     .frame(width: 40, height: 4)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+                    .padding(.top, Spacing.s2)
+                    .padding(.bottom, Spacing.s1)
                     .accessibilityHidden(true)
                 sheetHeader
                 sheetBody
@@ -383,7 +383,7 @@ public struct ExploreMapView: View {
                 .accessibilityIdentifier("exploreSheetCount")
             if viewModel.filters.activeCount > 0 {
                 ExploreActiveFilterChip(count: viewModel.filters.activeCount)
-                    .padding(.leading, 4)
+                    .padding(.leading, Spacing.s1)
             }
             Spacer()
             Menu {
@@ -399,7 +399,7 @@ public struct ExploreMapView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Text("Sort:")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.Color.appTextSecondary)
@@ -413,8 +413,8 @@ public struct ExploreMapView: View {
             .accessibilityIdentifier("exploreSheetSort")
         }
         .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.top, Spacing.s1)
+        .padding(.bottom, Spacing.s3)
     }
 
     private var headerCountLabel: String {
@@ -457,7 +457,7 @@ public struct ExploreMapView: View {
                 Text("Try again")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.s4)
                     .frame(height: 44)
                     .background(Theme.Color.primary600)
                     .clipShape(Capsule())
@@ -470,19 +470,19 @@ public struct ExploreMapView: View {
     }
 
     private var collapsedBody: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.chevronUp, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
             Text("Drag up to see the list")
                 .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 36)
         .background(Theme.Color.appSurfaceSunken)
         .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(Capsule())
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.bottom, Spacing.s3)
         .accessibilityIdentifier("exploreCollapsedPrompt")
         .onTapGesture {
             withAnimation(.interpolatingSpring(stiffness: 320, damping: 30)) {
@@ -492,7 +492,7 @@ public struct ExploreMapView: View {
     }
 
     private func standardBody(_ loaded: ExploreMapLoaded) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(loaded.entities.prefix(12)) { entity in
@@ -505,17 +505,17 @@ public struct ExploreMapView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.s4)
             }
             .accessibilityIdentifier("exploreSheetRail")
             ExplorePaginationDots(total: min(loaded.entities.count, 4), index: 0)
-                .padding(.vertical, 12)
+                .padding(.vertical, Spacing.s3)
         }
     }
 
     private func expandedBody(_ loaded: ExploreMapLoaded) -> some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: Spacing.s0) {
                 ForEach(loaded.entities) { entity in
                     ExploreEntityRow(
                         entity: entity,
@@ -534,7 +534,7 @@ public struct ExploreMapView: View {
     // MARK: - Empty hero (designed empty frame)
 
     private var emptyBody: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Theme.Color.primary50)
@@ -546,7 +546,7 @@ public struct ExploreMapView: View {
                 Icon(.compass, size: 24, color: Theme.Color.primary600)
             }
             .accessibilityHidden(true)
-            .padding(.bottom, 12)
+            .padding(.bottom, Spacing.s3)
 
             Text("No activity in this area yet")
                 .font(.system(size: 15, weight: .bold))
@@ -561,7 +561,7 @@ public struct ExploreMapView: View {
                 .frame(maxWidth: 264)
                 .padding(.bottom, 14)
 
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 Button {
                     viewModel.clearFilters()
                 } label: {
@@ -770,19 +770,19 @@ private struct ExploreEntityCard: View {
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.s2) {
                         Text("\(entity.metaLead) · \(entity.distanceLabel)")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                             .lineLimit(1)
                         if let badge = entity.badge {
-                            Spacer(minLength: 0)
+                            Spacer(minLength: Spacing.s0)
                             ExploreBadgeChip(badge: badge)
                         }
                     }
                 }
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .frame(width: 240, alignment: .leading)
             .background(Theme.Color.appSurface)
             .overlay(
@@ -804,7 +804,7 @@ private struct ExploreEntityRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     RoundedRectangle(cornerRadius: entity.kind.isSquarePin ? 8 : 10, style: .continuous)
                         .fill(
@@ -829,7 +829,7 @@ private struct ExploreEntityRow: View {
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.s2) {
                         Text(entity.metaLead)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Theme.Color.appTextStrong)
@@ -838,10 +838,10 @@ private struct ExploreEntityRow: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
             .background(selected ? entity.kind.color.opacity(0.06) : Theme.Color.appSurface)
             .overlay(
                 Rectangle()
@@ -880,7 +880,7 @@ private struct ExploreSkeletonRail: View {
                                 .frame(width: 90, height: 10)
                         }
                     }
-                    .padding(12)
+                    .padding(Spacing.s3)
                     .frame(width: 240, alignment: .leading)
                     .background(Theme.Color.appSurface)
                     .overlay(
@@ -890,7 +890,7 @@ private struct ExploreSkeletonRail: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.s4)
         }
         .accessibilityIdentifier("exploreSkeletonRail")
         .accessibilityLabel("Loading nearby activity")

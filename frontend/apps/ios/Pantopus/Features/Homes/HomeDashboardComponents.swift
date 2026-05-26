@@ -145,7 +145,7 @@ struct BrandNewHomeSection: View {
                         }
                     }
 
-                    VStack(spacing: 0) {
+                    VStack(spacing: Spacing.s0) {
                         ForEach(brandNew.onboardingSteps) { step in
                             OnboardingStepRow(step: step) { onStep(step.actionId) }
                             if step.id != brandNew.onboardingSteps.last?.id {
@@ -218,7 +218,7 @@ struct HomeOverviewSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             DashboardCard(title: "Upcoming", action: "See all", accent: Theme.Color.warning) {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     ForEach(content.overview.upcoming) { item in
                         TimelineRow(item: item)
                         if item.id != content.overview.upcoming.last?.id {
@@ -231,7 +231,7 @@ struct HomeOverviewSection: View {
             }
 
             DashboardCard(title: "Recent activity", action: "See all") {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     ForEach(content.overview.activity) { item in
                         ActivityRow(item: item)
                         if item.id != content.overview.activity.last?.id {

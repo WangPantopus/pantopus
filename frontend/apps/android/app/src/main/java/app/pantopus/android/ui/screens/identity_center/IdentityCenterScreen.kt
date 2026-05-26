@@ -132,7 +132,7 @@ private fun TopBar(
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -196,16 +196,16 @@ internal fun LoadingFrame() {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = 16.dp)
+                .padding(vertical = Spacing.s4)
                 .testTag("identityCenterLoading"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         repeat(4) {
             Shimmer(
                 width = 360.dp,
                 height = 110.dp,
                 cornerRadius = 16.dp,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = Spacing.s4),
             )
         }
     }
@@ -234,7 +234,7 @@ internal fun LoadedFrame(
         RowsCard(rows = loaded.privacyRows, idPrefix = "privacy", onRowTap = onRowTap)
         SectionOverline("Identities")
         RowsCard(rows = loaded.disclosureRows, idPrefix = "disclosure", onRowTap = onRowTap)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(Spacing.s6))
     }
 }
 
@@ -246,7 +246,7 @@ private fun IdentityCards(
     Column(
         modifier =
             Modifier
-                .padding(horizontal = 12.dp, vertical = 0.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s0)
                 .padding(top = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -294,7 +294,7 @@ private fun IdentityCardRow(
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -418,7 +418,7 @@ private fun BridgesCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = Spacing.s3)
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
@@ -428,13 +428,13 @@ private fun BridgesCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(Spacing.s4),
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     Text(
                         text = row.label,
@@ -466,7 +466,7 @@ private fun BridgesCard(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp)
+                            .padding(start = Spacing.s4)
                             .height(1.dp)
                             .background(PantopusColors.appBorder.copy(alpha = 0.6f)),
                 )
@@ -485,7 +485,7 @@ private fun RowsCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = Spacing.s3)
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
@@ -496,10 +496,10 @@ private fun RowsCard(
                     Modifier
                         .fillMaxWidth()
                         .clickable { onRowTap(row.label) }
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .padding(horizontal = Spacing.s4, vertical = 14.dp)
                         .testTag("${idPrefix}Row_${row.id}"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
             ) {
                 Box(
                     modifier = Modifier.size(24.dp),
@@ -552,7 +552,7 @@ private fun RowsCard(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp)
+                            .padding(start = Spacing.s4)
                             .height(1.dp)
                             .background(PantopusColors.appBorder.copy(alpha = 0.6f)),
                 )
@@ -572,8 +572,8 @@ private fun SectionOverline(text: String) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(top = 18.dp, bottom = 8.dp),
+                .padding(horizontal = Spacing.s4)
+                .padding(top = 18.dp, bottom = Spacing.s2),
     )
 }
 
@@ -586,7 +586,7 @@ internal fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("identityCenterError"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -598,20 +598,20 @@ internal fun ErrorFrame(
             strokeWidth = 2f,
             tint = PantopusColors.error,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.s3))
         Text(
             text = "Couldn't load Profiles & Privacy",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = message,
             fontSize = 13.5.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.s4))
         PrimaryButton(
             title = "Try again",
             onClick = onRetry,

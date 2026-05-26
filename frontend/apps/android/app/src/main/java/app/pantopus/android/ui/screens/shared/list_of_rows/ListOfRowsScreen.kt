@@ -712,7 +712,7 @@ private fun ListingContextSortStrip(
 private fun SortLabelContent(sortLabel: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ArrowsRepeat,
@@ -1508,7 +1508,7 @@ private fun TrailingView(
             }
         }
         is RowTrailing.AmountWithChip ->
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 Text(
                     text = trailing.amount,
                     style = PantopusTextStyle.body,
@@ -1914,7 +1914,7 @@ private fun EngagementStrip(engagement: RowEngagement) {
             engagement.items.forEach { item ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = item.icon,
@@ -1940,7 +1940,7 @@ private fun EngagementStrip(engagement: RowEngagement) {
                             .testTag("rowEngagementCTA")
                             .semantics { contentDescription = cta.accessibilityLabel },
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     if (cta.icon != null) {
                         PantopusIconImage(
@@ -2043,7 +2043,7 @@ private fun TopBarActionButton(action: TopBarAction) {
                             .sizeIn(minWidth = 16.dp, minHeight = 16.dp)
                             .clip(CircleShape)
                             .background(PantopusColors.primary600)
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = Spacing.s1)
                             .testTag("listOfRowsTopBarActionBadge"),
                     contentAlignment = Alignment.Center,
                 ) {

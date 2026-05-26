@@ -267,7 +267,7 @@ fun SeverityChip(severity: EmergencySeverity) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(severity.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .testTag("severityChip_${severity.id}")
                 .semantics { contentDescription = "Severity ${severity.label}" },
         verticalAlignment = Alignment.CenterVertically,

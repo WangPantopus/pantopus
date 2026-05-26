@@ -121,7 +121,7 @@ private fun TopBar(
                 Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -201,9 +201,9 @@ internal fun LoadingFrame() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("creatorInboxLoading"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Shimmer(width = 320.dp, height = 36.dp, cornerRadius = 6.dp)
         Shimmer(width = 320.dp, height = 44.dp, cornerRadius = 22.dp)
@@ -220,7 +220,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("creatorInboxError"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -232,7 +232,7 @@ private fun ErrorFrame(
             strokeWidth = 2f,
             tint = PantopusColors.error,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.s3))
         Text(
             text = "Couldn't load your inbox",
             fontSize = 18.sp,
@@ -240,13 +240,13 @@ private fun ErrorFrame(
             color = PantopusColors.appText,
             modifier = Modifier.semantics { heading() },
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = message,
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.s4))
         PrimaryButton(
             title = "Try again",
             onClick = onRetry,
@@ -286,7 +286,7 @@ private fun CountsBanner(
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurfaceMuted)
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = Spacing.s4, vertical = 10.dp)
                 .testTag("creatorInboxCounts")
                 .semantics {
                     contentDescription =
@@ -379,7 +379,7 @@ private fun FilterStrip(
                 Modifier
                     .fillMaxWidth()
                     .horizontalScroll(scroll)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -448,7 +448,7 @@ private fun ThreadList(
             Modifier
                 .fillMaxSize()
                 .testTag("creatorInboxList"),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(horizontal = Spacing.s4, vertical = Spacing.s3),
     ) {
         itemsIndexed(items = rows, key = { _, row -> row.id }) { index, row ->
             ThreadCard(
@@ -468,7 +468,7 @@ private fun FilteredEmpty() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("creatorInboxFilteredEmpty"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -480,7 +480,7 @@ private fun FilteredEmpty() {
             strokeWidth = 2f,
             tint = PantopusColors.appTextMuted,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = "No threads in this view",
             fontSize = 14.sp,
@@ -514,13 +514,13 @@ private fun ThreadCard(
                 .border(width = 1.dp, color = PantopusColors.appBorder, shape = shape)
                 .clickable(onClick = onTap)
                 .heightIn(min = 56.dp)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag("creatorInboxRow_${row.id}")
                 .semantics { contentDescription = rowAccessibility(row) },
     ) {
         Row(
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Avatar(row = row)
@@ -607,7 +607,7 @@ private fun UnreadDot(visible: Boolean) {
         Box(
             modifier =
                 Modifier
-                    .padding(top = 8.dp)
+                    .padding(top = Spacing.s2)
                     .size(8.dp)
                     .clip(CircleShape)
                     .background(PantopusColors.primary600),
@@ -628,7 +628,7 @@ private fun ThreadDivider(show: Boolean) {
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = Spacing.s4)
                         .height(1.dp)
                         .background(PantopusColors.appBorderSubtle),
             )
@@ -788,7 +788,7 @@ private fun EmptyFrame(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp, vertical = 32.dp)
+                .padding(horizontal = 28.dp, vertical = Spacing.s8)
                 .testTag("creatorInboxEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -816,7 +816,7 @@ private fun EmptyFrame(
             color = PantopusColors.appText,
             modifier = Modifier.semantics { heading() },
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text =
                 "Your fans haven't reached out. DMs usually start after a broadcast, " +
@@ -834,7 +834,7 @@ private fun EmptyFrame(
             cta = "Compose",
             onClick = onBroadcast,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         EmptyPromptRow(
             id = "unlock",
             icon = PantopusIcon.Shield,
@@ -843,7 +843,7 @@ private fun EmptyFrame(
             cta = "Settings",
             onClick = onSettings,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         EmptyPromptRow(
             id = "tip",
             icon = PantopusIcon.HandCoins,
@@ -894,7 +894,7 @@ private fun EmptyPromptRow(
                 .padding(horizontal = 14.dp, vertical = 11.dp)
                 .testTag("creatorInboxPrompt_$id"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =

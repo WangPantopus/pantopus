@@ -21,12 +21,12 @@ public struct ConversationRow: View {
 
     public var body: some View {
         Button(action: onTap) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: Spacing.s3) {
                 avatar
                 middle
                 trailing
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.s4)
             .padding(.vertical, 14)
             .background(rowBackground)
             .overlay(alignment: .leading) {
@@ -92,7 +92,7 @@ public struct ConversationRow: View {
                     Icon(.star, size: 11, color: Theme.Color.appTextMuted)
                         .accessibilityHidden(true)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             Text(content.preview)
                 .font(.system(size: 12.5, weight: content.unread > 0 ? .medium : .regular))

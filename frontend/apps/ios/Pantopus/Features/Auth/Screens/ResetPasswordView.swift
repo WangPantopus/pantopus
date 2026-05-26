@@ -39,7 +39,7 @@ struct ResetPasswordView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ResetPasswordTopBar(onClose: onClose)
             switch viewModel.phase {
             case .form:
@@ -134,7 +134,7 @@ struct ResetPasswordView: View {
                 .accessibilityIdentifier("resetPasswordSubmitButton")
                 .accessibilityLabel(viewModel.isLoading ? "Resetting password" : "Set password")
 
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, Spacing.s5)
             .padding(.bottom, Spacing.s5)

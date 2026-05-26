@@ -197,7 +197,7 @@ private fun TierChip(label: String) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "$label tier" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -230,7 +230,7 @@ private fun VerifiedNeighborChip() {
                 .testTag("publicProfileVerifiedNeighborChip")
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.homeBg)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "Verified neighbor" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),

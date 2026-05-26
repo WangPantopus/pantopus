@@ -472,7 +472,7 @@ private fun RadioControl(
                 HorizontalDivider(
                     color = PantopusColors.appBorderSubtle,
                     thickness = 1.dp,
-                    modifier = Modifier.padding(start = 32.dp),
+                    modifier = Modifier.padding(start = Spacing.s8),
                 )
             }
         }
@@ -548,7 +548,7 @@ private fun MultiSelectControl(
                 HorizontalDivider(
                     color = PantopusColors.appBorderSubtle,
                     thickness = 1.dp,
-                    modifier = Modifier.padding(start = 32.dp),
+                    modifier = Modifier.padding(start = Spacing.s8),
                 )
             }
         }

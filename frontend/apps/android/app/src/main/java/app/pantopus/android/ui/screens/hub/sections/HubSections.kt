@@ -433,7 +433,7 @@ fun HubTodayCard(
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 summary.aqiLabel?.let { aqi ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                         Text("AQI", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
                         Text(
                             aqi,
@@ -695,7 +695,7 @@ private fun DiscoveryCard(
         }
         Column(
             modifier = Modifier.padding(Spacing.s2),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             Text(
                 item.title,

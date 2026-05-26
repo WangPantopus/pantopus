@@ -101,7 +101,7 @@ private struct LoadingShell: View {
     let onClose: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             HStack {
                 Button {
                     onClose()
@@ -140,7 +140,7 @@ private struct ErrorShell: View {
     let onRetry: @MainActor () async -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             HStack {
                 Button {
                     onClose()

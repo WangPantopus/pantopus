@@ -159,7 +159,7 @@ private struct CategoryChip: View {
                     .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 if isSelected {
                     Icon(.check, size: 14, color: Theme.Color.primary600)
                 }
@@ -305,7 +305,7 @@ private struct RecurrenceGroup: View {
 
     var body: some View {
         FormFieldGroup("Repeat") {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(AddEventRecurrence.allCases, id: \.self) { option in
                     PickerRow(
                         label: option.label,
@@ -333,7 +333,7 @@ private struct AttendeesGroup: View {
             if viewModel.attendees.isEmpty {
                 EmptyAttendeesRow()
             } else {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     ForEach(viewModel.attendees) { attendee in
                         AttendeeRow(
                             attendee: attendee,
@@ -439,7 +439,7 @@ private struct ReminderGroup: View {
 
     var body: some View {
         FormFieldGroup("Reminder") {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(AddEventReminder.allCases, id: \.self) { option in
                     PickerRow(
                         label: option.label,

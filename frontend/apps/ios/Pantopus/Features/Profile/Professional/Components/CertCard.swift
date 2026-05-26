@@ -42,7 +42,7 @@ struct CertCard: View {
                 }
                 .padding(.top, 2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             overflowMenu
         }
         .padding(Spacing.s3)
@@ -101,7 +101,7 @@ struct AddCertButton: View {
                     .pantopusTextStyle(.small)
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.business)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text("PDF · JPG")
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextMuted)

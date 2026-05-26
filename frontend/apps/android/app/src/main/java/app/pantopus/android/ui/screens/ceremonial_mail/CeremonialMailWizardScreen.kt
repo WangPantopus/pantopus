@@ -126,7 +126,7 @@ private fun ErrorBanner(message: String) {
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .testTag("ceremonialSubmitError"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.AlertCircle,
@@ -151,7 +151,7 @@ internal fun DecideStep(
     onSelectRecipient: (MailRecipientDto) -> Unit,
     onSelectIntent: (CeremonialMailIntent) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Text(text = "Who are you writing to?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
             text =
@@ -196,7 +196,7 @@ internal fun DecideStep(
                             Modifier
                                 .fillMaxWidth()
                                 .clickable { onSelectRecipient(recipient) }
-                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                                .padding(horizontal = Spacing.s3, vertical = 10.dp)
                                 .testTag("ceremonialRecipient_${recipient.userId}"),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -228,7 +228,7 @@ internal fun DecideStep(
                         )
                     }
                     if (index < results.lastIndex) {
-                        HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(start = 12.dp))
+                        HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(start = Spacing.s3))
                     }
                 }
             }
@@ -237,7 +237,7 @@ internal fun DecideStep(
             SelectedRecipientCard(selected)
         }
         Overline("WHY")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             CeremonialMailIntent.values().forEach { intent ->
                 IntentRow(intent = intent, isSelected = form.intent == intent, onSelect = onSelectIntent)
             }
@@ -254,10 +254,10 @@ private fun SelectedRecipientCard(recipient: MailRecipientDto) {
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.successBg.copy(alpha = 0.4f))
                 .border(1.dp, PantopusColors.success, RoundedCornerShape(10.dp))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("ceremonialSelectedRecipient"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier = Modifier.size(40.dp).clip(CircleShape).background(PantopusColors.successBg),
@@ -303,10 +303,10 @@ private fun IntentRow(
                     shape = RoundedCornerShape(10.dp),
                 )
                 .clickable { onSelect(intent) }
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("ceremonialIntent_${intent.wire}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
@@ -357,7 +357,7 @@ internal fun VerifyStep(
     onAddressConfirmed: (Boolean) -> Unit,
     onReturnAddressShared: (Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Text(text = "Address it", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
             text = "Pantopus verifies physical addresses. By sending, you're confirming this exact recipient. There's no undo.",
@@ -420,10 +420,10 @@ private fun AckRow(
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(text = title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
@@ -456,7 +456,7 @@ internal fun ComposeStep(
     onRecordVoice: () -> Unit,
     onClearVoice: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Text(text = "Write it", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
             text = "Pick a stationery + ink, write your note, optionally add a voice postscript.",
@@ -525,7 +525,7 @@ private fun PickerRow(
         Overline(title)
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             options.forEach { (wire, label) ->
                 val isActive = wire == selected
@@ -540,7 +540,7 @@ private fun PickerRow(
                                 RoundedCornerShape(999.dp),
                             )
                             .clickable { onSelect(wire) }
-                            .padding(horizontal = 12.dp)
+                            .padding(horizontal = Spacing.s3)
                             .height(32.dp)
                             .testTag("${testTag}_$wire"),
                     contentAlignment = Alignment.Center,
@@ -580,7 +580,7 @@ private fun VoicePostscriptControl(
             VoiceChip(label = "Uploading…", icon = PantopusIcon.Send, accent = true, testTag = "ceremonialVoiceUploading")
         is VoicePostscriptStatus.Uploaded ->
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 VoiceChip(
@@ -598,7 +598,7 @@ private fun VoicePostscriptControl(
                 )
             }
         is VoicePostscriptStatus.Error ->
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 VoiceChip(
                     label = status.message,
                     icon = PantopusIcon.AlertCircle,
@@ -630,11 +630,11 @@ private fun VoiceChip(
                 .clip(RoundedCornerShape(999.dp))
                 .background(if (accent) PantopusColors.primary600 else PantopusColors.primary50)
                 .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = Spacing.s3)
                 .height(36.dp)
                 .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = icon,
@@ -661,7 +661,7 @@ internal fun CommitStep(
     voiceUploaded: Boolean,
     onSelectTiming: (CeremonialMailSendTiming) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Text(text = "Seal and send", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
             text = "Take one more look — you can't edit a letter after it's delivered. Pick a wax seal, then send.",
@@ -687,7 +687,7 @@ internal fun CommitStep(
             if (voiceUploaded) ReviewLine("Voice postscript", "Attached")
         }
         Overline("WHEN TO DELIVER")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             CeremonialMailSendTiming.values().forEach { timing ->
                 TimingRow(timing = timing, isActive = form.sendTiming == timing, onSelect = onSelectTiming)
             }
@@ -730,10 +730,10 @@ private fun TimingRow(
                     RoundedCornerShape(10.dp),
                 )
                 .clickable { onSelect(timing) }
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("ceremonialTiming_${timing.wire}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
@@ -761,9 +761,9 @@ private fun TimingRow(
 @Composable
 private fun SuccessStep() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).testTag("ceremonialSuccess"),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s4).testTag("ceremonialSuccess"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier = Modifier.size(96.dp).clip(CircleShape).background(PantopusColors.successBg),
@@ -788,6 +788,6 @@ private fun SuccessStep() {
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
     }
 }

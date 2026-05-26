@@ -429,7 +429,7 @@ fun AIElfStripView(content: AIElfStripContent) {
                     modifier =
                         Modifier
                             .clickable(onClick = content.onRedo)
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .padding(horizontal = Spacing.s1, vertical = 2.dp)
                             .testTag("mailItemDetail_aiElfRedo"),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -537,7 +537,7 @@ fun AttachmentsRowView(content: AttachmentsRowContent) {
                     .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                     .semantics { heading() },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             Text(
                 text = content.title.uppercase(),

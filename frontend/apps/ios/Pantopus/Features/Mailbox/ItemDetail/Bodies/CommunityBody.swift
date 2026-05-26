@@ -172,7 +172,7 @@ private struct CommunityBodyBadgeCard: View {
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextStrong)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
             }
         }

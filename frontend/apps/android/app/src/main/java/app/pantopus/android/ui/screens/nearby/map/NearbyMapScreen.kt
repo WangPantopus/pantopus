@@ -169,7 +169,7 @@ fun NearbyMapScreen(
             modifier =
                 Modifier
                     .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(top = 8.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = Spacing.s2, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(),
         )
@@ -434,7 +434,7 @@ private fun FloatingTopPill(
                 .background(Color.White.copy(alpha = 0.96f))
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.pill))
-                .padding(start = 6.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
+                .padding(start = 6.dp, end = Spacing.s2, top = Spacing.s2, bottom = Spacing.s2)
                 .testTag("nearbyFloatingPill"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -456,7 +456,7 @@ private fun FloatingTopPill(
                 )
             }
         } else {
-            Spacer(modifier = Modifier.width(32.dp))
+            Spacer(modifier = Modifier.width(Spacing.s8))
         }
         Text(
             text = "Gigs",
@@ -515,7 +515,7 @@ private fun CategoryDotChips(
                         )
                         .shadow(elevation = 4.dp, shape = RoundedCornerShape(Radii.pill))
                         .clickable { onSelect(category) }
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.s3)
                         .heightIn(min = 28.dp)
                         .testTag("nearbyCategoryChip_${category.key}"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -557,7 +557,7 @@ private fun MapControls(
             modifier
                 .padding(end = 14.dp, bottom = animatedBottom)
                 .testTag("nearbyMapControls"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         MapControlButton(icon = PantopusIcon.MapPin, label = "Locate me", onClick = onLocate)
         MapControlButton(icon = PantopusIcon.Map, label = "Layers", onClick = onLayers)
@@ -716,7 +716,7 @@ private fun resolveStop(
 @Composable
 private fun DragHandle() {
     Box(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s1),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -741,7 +741,7 @@ private fun SheetHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 12.dp),
+                .padding(start = 18.dp, end = 18.dp, top = Spacing.s1, bottom = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -756,7 +756,7 @@ private fun SheetHeader(
             Row(
                 modifier = Modifier.clickable { expanded = true }.testTag("nearbySheetSort"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Text(
                     text = "Sort:",
@@ -815,7 +815,7 @@ private fun SheetError(
     onRetry: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s6),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -831,7 +831,7 @@ private fun SheetError(
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onRetry)
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = Spacing.s4)
                     .heightIn(min = 38.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -851,15 +851,15 @@ private fun CollapsedBody(onExpand: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurfaceSunken)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .clickable(onClick = onExpand)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                 .testTag("nearbySheetCollapsedPrompt"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronUp,
@@ -898,7 +898,7 @@ private fun StandardBody(
                 Modifier
                     .fillMaxWidth()
                     .testTag("nearbySheetRail"),
-            contentPadding = PaddingValues(horizontal = 16.dp),
+            contentPadding = PaddingValues(horizontal = Spacing.s4),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(items = entities.take(12), key = { it.id }) { entity ->
@@ -917,7 +917,7 @@ private fun ExpandedBody(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("nearbySheetList"),
-        contentPadding = PaddingValues(bottom = 16.dp),
+        contentPadding = PaddingValues(bottom = Spacing.s4),
     ) {
         items(items = entities, key = { it.id }) { entity ->
             NearbyEntityRow(entity = entity, selected = entity.id == selectedId, onTap = { onTap(entity) })
@@ -944,7 +944,7 @@ private fun NearbyEntityCard(
                 )
                 .shadow(elevation = 2.dp, shape = RoundedCornerShape(14.dp))
                 .clickable(onClick = onTap)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("nearbyCard_${entity.id}"),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -979,7 +979,7 @@ private fun NearbyEntityCard(
                 lineHeight = 17.sp,
             )
             Row(
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -1033,9 +1033,9 @@ private fun NearbyEntityRow(
                 .fillMaxWidth()
                 .background(if (selected) entity.category.color.copy(alpha = 0.06f) else PantopusColors.appSurface)
                 .clickable(onClick = onTap)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag("nearbyRow_${entity.id}"),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
@@ -1095,9 +1095,9 @@ private fun NearbyEntityRow(
                 modifier = Modifier.padding(top = 2.dp),
             )
             Row(
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 if (entity.price != null) {
                     Text(
@@ -1134,7 +1134,7 @@ private fun PaginationDots(
     index: Int,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3),
         horizontalArrangement = Arrangement.spacedBy(5.dp, alignment = Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {

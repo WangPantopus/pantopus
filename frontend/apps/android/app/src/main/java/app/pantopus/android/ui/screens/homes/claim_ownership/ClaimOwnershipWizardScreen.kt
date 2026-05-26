@@ -370,7 +370,7 @@ private fun WhyWeAskSection() {
                 color = PantopusColors.appTextStrong,
                 modifier =
                     Modifier
-                        .padding(start = 40.dp)
+                        .padding(start = Spacing.s10)
                         .testTag("claimOwnershipWhyWeAskDetail"),
             )
         }

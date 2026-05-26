@@ -193,7 +193,7 @@ private struct MemoryFactsCard: View {
     let onOpenThread: (@MainActor () -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             Text("The story behind it")
                 .pantopusTextStyle(.overline)
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -252,7 +252,7 @@ private struct MemoryFactsCard: View {
                         .foregroundStyle(Theme.Color.primary600)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, Spacing.s3)
@@ -326,7 +326,7 @@ private struct MemoryVaultCard: View {
                 .foregroundStyle(crumb.isCurrent ? Theme.Color.appText : Theme.Color.appTextStrong)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(crumb.isCurrent ? Theme.Color.appSurface : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
         .overlay(
@@ -336,7 +336,7 @@ private struct MemoryVaultCard: View {
     }
 
     private var stats: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(Array(vault.stats.enumerated()), id: \.element.id) { index, stat in
                 if index > 0 {
                     Rectangle().fill(Theme.Color.appBorderSubtle).frame(width: 1, height: 28)

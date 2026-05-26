@@ -88,7 +88,7 @@ fun PrivacyHandshakeScreen(
 private fun LoadingBody() {
     Column(
         modifier = Modifier.fillMaxWidth().testTag("privacyHandshakeLoading"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Shimmer(width = 360.dp, height = 72.dp, cornerRadius = 14.dp)
         Shimmer(width = 360.dp, height = 44.dp, cornerRadius = 10.dp)
@@ -126,7 +126,7 @@ private fun ErrorBody(
                     .clip(RoundedCornerShape(999.dp))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onRetry)
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = Spacing.s4)
                     .height(36.dp)
                     .testTag("privacyHandshakeRetry"),
             contentAlignment = Alignment.Center,
@@ -148,7 +148,7 @@ internal fun ReadyBody(
     onAcknowledgeUsername: (Boolean) -> Unit = {},
     onSelectTier: (Int) -> Unit = {},
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
         PersonaPreview(content.persona)
         when (val step = content.step) {
             HandshakeStep.HandleEntry ->
@@ -184,7 +184,7 @@ private fun PersonaPreview(persona: HandshakePersonaPreview) {
                 .padding(14.dp)
                 .testTag("privacyHandshakePersona"),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
@@ -217,7 +217,7 @@ private fun PersonaPreview(persona: HandshakePersonaPreview) {
                     fontSize = 12.sp,
                     color = PantopusColors.appTextSecondary,
                     maxLines = 3,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.s1),
                 )
             }
         }
@@ -231,7 +231,7 @@ private fun HandleStepBody(
     onHandleChange: (String) -> Unit,
     onAcknowledgeUsername: (Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Text(
             text = "Choose your fan handle",
             fontSize = 16.sp,
@@ -339,7 +339,7 @@ private fun PlatformTrustNote() {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.primary50)
-                .padding(12.dp),
+                .padding(Spacing.s3),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -373,7 +373,7 @@ private fun TierStepBody(
     handleValue: String,
     onSelectTier: (Int) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Text(
             text = "Pick a tier",
             fontSize = 16.sp,
@@ -416,7 +416,7 @@ private fun TierRow(
                 .clickable(onClick = onSelect)
                 .padding(14.dp)
                 .testTag("privacyHandshakeTier_${tier.rank}"),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         verticalAlignment = Alignment.Top,
     ) {
         Box(
@@ -468,7 +468,7 @@ private fun HandleEchoCard(handleValue: String) {
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.UserPlus,
@@ -494,9 +494,9 @@ private fun HandleEchoCard(handleValue: String) {
 @Composable
 private fun OpensCheckoutBody() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp).testTag("privacyHandshakeCheckout"),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s10).testTag("privacyHandshakeCheckout"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         CircularProgressIndicator(color = PantopusColors.primary600, strokeWidth = 3.dp)
         Text(
@@ -516,9 +516,9 @@ private fun OpensCheckoutBody() {
 @Composable
 private fun CompletedFreeBody(persona: HandshakePersonaPreview) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp).testTag("privacyHandshakeSuccess"),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s6).testTag("privacyHandshakeSuccess"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier = Modifier.size(64.dp).clip(CircleShape).background(PantopusColors.successBg),
@@ -549,9 +549,9 @@ private fun CompletedFreeBody(persona: HandshakePersonaPreview) {
 @Composable
 private fun AlreadyMemberBody(persona: HandshakePersonaPreview) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp).testTag("privacyHandshakeAlreadyMember"),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s6).testTag("privacyHandshakeAlreadyMember"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier = Modifier.size(64.dp).clip(CircleShape).background(PantopusColors.primary50),

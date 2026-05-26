@@ -36,7 +36,7 @@ struct TodayDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             TodayTopBar(dateLabel: topBarDate, onBack: onBack, onShare: onShare, onMore: onMore)
             content
         }
@@ -147,7 +147,7 @@ private struct TodayTopBar: View {
             .accessibilityLabel("Back")
             .accessibilityIdentifier("todayBackButton")
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             VStack(spacing: 2) {
                 Text("Today")
@@ -163,7 +163,7 @@ private struct TodayTopBar: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             Button(action: onShare) {
                 Icon(.share, size: 22, color: Theme.Color.appText)
@@ -267,7 +267,7 @@ private struct TodayRibbon: View {
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextStrong)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -337,7 +337,7 @@ private struct TodaySectionCard<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(spacing: Spacing.s1) {
                 if let accent {
                     Circle().fill(accent.foreground).frame(width: 6, height: 6)
@@ -463,7 +463,7 @@ private struct SignalsList: View {
     let signals: [TodaySignal]
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(signals.enumerated()), id: \.element.id) { index, signal in
                 if index > 0 {
                     Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
@@ -556,7 +556,7 @@ private struct AroundList: View {
                     Text(item.text)
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextStrong)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                 }
                 .accessibilityElement(children: .combine)
             }

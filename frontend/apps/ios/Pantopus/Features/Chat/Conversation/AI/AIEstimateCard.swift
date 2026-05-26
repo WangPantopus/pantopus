@@ -19,7 +19,7 @@ public struct AIEstimateCard: View {
 
     public var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 Text(estimate.amount)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.Color.magic)
@@ -30,7 +30,7 @@ public struct AIEstimateCard: View {
             Rectangle()
                 .fill(Theme.Color.magicBorder)
                 .frame(width: 1, height: 28)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 Text("Confidence")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
@@ -38,10 +38,10 @@ public struct AIEstimateCard: View {
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(Theme.Color.magicBg)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)

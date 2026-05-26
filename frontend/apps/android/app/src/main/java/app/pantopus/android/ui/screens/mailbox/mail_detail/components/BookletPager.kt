@@ -213,7 +213,7 @@ private fun PageIndicator(
                     color = PantopusColors.appText,
                     modifier = Modifier.testTag("bookletPager_pageLabel"),
                 )
-                Spacer(Modifier.width(4.dp))
+                Spacer(NoneModifier.width(Spacing.s1))
                 Text(
                     text = "of $totalPages",
                     fontSize = 13.sp,
@@ -240,7 +240,7 @@ private fun PageIndicator(
                         .testTag("bookletPager_toggleGrid")
                         .semantics { contentDescription = "View all pages" },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.FileType,
@@ -357,7 +357,7 @@ private fun GridMode(
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurfaceSunken)
-                        .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appTextStrong,
@@ -394,7 +394,7 @@ private fun GridMode(
                         .testTag("bookletPager_togglePage")
                         .semantics { contentDescription = "Back to reader" },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronLeft,
@@ -476,7 +476,7 @@ private fun ThumbnailCell(
             Box(
                 modifier =
                     Modifier
-                        .padding(4.dp)
+                        .padding(Spacing.s1)
                         .size(18.dp)
                         .clip(CircleShape)
                         .background(PantopusColors.primary600)
@@ -496,7 +496,7 @@ private fun ThumbnailCell(
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = Spacing.s1),
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             fontStyle = FontStyle.Italic,

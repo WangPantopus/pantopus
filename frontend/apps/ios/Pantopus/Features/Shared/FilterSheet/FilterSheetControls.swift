@@ -100,7 +100,7 @@ struct FilterRadioControl: View {
     let onChange: @MainActor (String?) -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(options) { option in
                 let isOn = selectedId == option.id
                 Button {
@@ -111,7 +111,7 @@ struct FilterRadioControl: View {
                         Text(option.label)
                             .font(.system(size: 15, weight: isOn ? .semibold : .regular))
                             .foregroundStyle(Theme.Color.appText)
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                     }
                     .padding(.vertical, Spacing.s3)
                     .frame(minHeight: 44)
@@ -126,7 +126,7 @@ struct FilterRadioControl: View {
                     Rectangle()
                         .fill(Theme.Color.appBorderSubtle)
                         .frame(height: 1)
-                        .padding(.leading, 32)
+                        .padding(.leading, Spacing.s8)
                 }
             }
         }
@@ -159,7 +159,7 @@ struct FilterMultiSelectControl: View {
     let onChange: @MainActor (Set<String>) -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(options) { option in
                 let isOn = selectedIds.contains(option.id)
                 Button {
@@ -172,7 +172,7 @@ struct FilterMultiSelectControl: View {
                         Text(option.label)
                             .font(.system(size: 15, weight: .regular))
                             .foregroundStyle(Theme.Color.appText)
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                     }
                     .padding(.vertical, Spacing.s3)
                     .frame(minHeight: 44)
@@ -187,7 +187,7 @@ struct FilterMultiSelectControl: View {
                     Rectangle()
                         .fill(Theme.Color.appBorderSubtle)
                         .frame(height: 1)
-                        .padding(.leading, 32)
+                        .padding(.leading, Spacing.s8)
                 }
             }
         }
@@ -222,7 +222,7 @@ struct FilterToggleControl: View {
     let onChange: @MainActor (Set<String>) -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(options) { option in
                 let isOn = selectedIds.contains(option.id)
                 Toggle(

@@ -22,7 +22,7 @@ struct ForgotPasswordView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForgotPasswordTopBar(onBack: onBack)
             switch viewModel.phase {
             case .form:
@@ -92,7 +92,7 @@ struct ForgotPasswordView: View {
                 .accessibilityIdentifier("forgotPasswordSubmitButton")
                 .accessibilityLabel(viewModel.isLoading ? "Sending reset link" : "Send reset link")
 
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, Spacing.s5)
             .padding(.bottom, Spacing.s5)

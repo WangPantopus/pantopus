@@ -143,8 +143,8 @@ private fun EditPersonaShell(
 @Composable
 private fun LoadingFrame() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("editPersonaLoading"),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).testTag("editPersonaLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
         Shimmer(width = 360.dp, height = 120.dp, cornerRadius = 12.dp)
         Shimmer(width = 360.dp, height = 160.dp, cornerRadius = 12.dp)
@@ -159,9 +159,9 @@ private fun ErrorFrame(
     onRetry: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 40.dp).testTag("editPersonaError"),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s10).testTag("editPersonaError"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.AlertCircle,
@@ -196,8 +196,8 @@ private fun EditPersonaEditor(
     var analyticsOn by remember(content.personaId) { mutableStateOf(content.analyticsOn) }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("editPersonaContent"),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).testTag("editPersonaContent"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
         when (variant) {
             EditPersonaVariant.Live -> LiveHero(content)
@@ -225,7 +225,7 @@ private fun PersonaSection(
     overline: String,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(
             text = overline.uppercase(),
             fontSize = 10.5.sp,
@@ -275,16 +275,16 @@ private fun LiveHero(content: EditPersonaContent) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.primary600)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .semantics {
                     contentDescription =
                         "${content.displayName}, live persona. ${content.followers} followers, " +
                         "${content.posts} posts in 30 days, ${content.rating} average rating."
                 }
                 .testTag("editPersonaLiveHero"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             Box(
                 modifier =
                     Modifier
@@ -326,7 +326,7 @@ private fun LiveHero(content: EditPersonaContent) {
                         .padding(horizontal = 7.dp, vertical = 3.dp),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             StatTile(content.followers, "Followers", Modifier.weight(1f))
             StatTile(content.posts, "Posts · 30d", Modifier.weight(1f))
             StatTile(content.rating, "Avg rating", Modifier.weight(1f))
@@ -345,7 +345,7 @@ private fun StatTile(
             modifier
                 .clip(RoundedCornerShape(8.dp))
                 .background(PantopusColors.appTextInverse.copy(alpha = 0.14f))
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s2),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
         Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
@@ -371,11 +371,11 @@ private fun SetupHero(
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.primary50)
                 .border(1.dp, PantopusColors.primary200, RoundedCornerShape(12.dp))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("editPersonaSetupHero"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             Box(
                 modifier =
                     Modifier
@@ -418,7 +418,7 @@ private fun SetupHero(
                         .padding(horizontal = 7.dp, vertical = 3.dp),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             repeat(stepsTotal.coerceAtLeast(1)) { index ->
                 Box(
                     modifier =
@@ -430,7 +430,7 @@ private fun SetupHero(
                 )
             }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             content.checklist.forEach { ChecklistRow(it) }
         }
     }
@@ -440,7 +440,7 @@ private fun SetupHero(
 private fun ChecklistRow(step: PersonaChecklistStep) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         modifier =
             Modifier.semantics {
                 contentDescription =
@@ -499,7 +499,7 @@ private fun stepColor(step: PersonaChecklistStep): Color =
 @Composable
 private fun IdentitySection(content: EditPersonaContent) {
     PersonaSection("Identity") {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
             Column {
                 PLabel("Handle", required = true, hint = "lowercase · 3–24 chars")
                 HandleField(handle = content.handle, status = content.handleStatus)
@@ -507,7 +507,7 @@ private fun IdentitySection(content: EditPersonaContent) {
                     Row(
                         modifier = Modifier.padding(top = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                     ) {
                         PantopusIconImage(
                             icon = PantopusIcon.CheckCircle,
@@ -532,7 +532,7 @@ private fun IdentitySection(content: EditPersonaContent) {
                     fontSize = 11.sp,
                     color = PantopusColors.appTextMuted,
                     textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.s1),
                 )
             }
         }
@@ -558,10 +558,10 @@ private fun HandleField(
                 .clip(RoundedCornerShape(8.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.5.dp, borderColor, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = Spacing.s3)
                 .testTag("editPersonaHandle"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         Text(
             text = "@",
@@ -613,7 +613,7 @@ private fun TextDisplay(
                 .clip(RoundedCornerShape(8.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                 .testTag(testTag),
     )
 }
@@ -625,7 +625,7 @@ private enum class PersonaPolicyKind { Allow, Off }
 @Composable
 private fun PolicySection(content: EditPersonaContent) {
     PersonaSection("Category policy") {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             PolicyRow(
                 kind = PersonaPolicyKind.Allow,
                 title = "Allowed on this persona",
@@ -644,7 +644,7 @@ private fun PolicySection(content: EditPersonaContent) {
                     fontSize = 11.sp,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                     color = PantopusColors.appTextSecondary,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.s1),
                 )
             }
         }
@@ -670,11 +670,11 @@ private fun PolicyRow(
                     if (isAllow) PantopusColors.successLight else PantopusColors.appBorder,
                     RoundedCornerShape(12.dp),
                 )
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaPolicyRow_${if (isAllow) "allow" else "off"}"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Box(
                 modifier =
                     Modifier
@@ -726,7 +726,7 @@ private fun CatChip(
                     if (isAllow) PantopusColors.primary200 else PantopusColors.appBorder,
                     RoundedCornerShape(999.dp),
                 )
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = Spacing.s3, vertical = 6.dp)
                 .semantics { contentDescription = if (isAllow) chip.label else "${chip.label}, off-topic" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -747,7 +747,7 @@ private fun CatChip(
 @Composable
 private fun TiersSection(content: EditPersonaContent) {
     PersonaSection("Tiers") {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             StripeConnectCard(content.stripe)
             content.tiers.forEach { TierCardView(it) }
             AddTierRow(disabled = !content.canAddTier)
@@ -769,11 +769,11 @@ private fun TierCardView(tier: PersonaTierCard) {
                     if (tier.isFresh) PantopusColors.primary200 else PantopusColors.appBorder,
                     RoundedCornerShape(12.dp),
                 )
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaTier_${tier.id}"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Box(
                 modifier =
                     Modifier
@@ -802,7 +802,7 @@ private fun TierCardView(tier: PersonaTierCard) {
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                     Text(text = tier.name, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
                     TierPrice(tier)
                 }
@@ -819,9 +819,9 @@ private fun TierCardView(tier: PersonaTierCard) {
             }
         }
         if (tier.perks.isNotEmpty()) {
-            Column(modifier = Modifier.padding(start = 46.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.padding(start = 46.dp), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 tier.perks.forEach { perk ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                         PantopusIconImage(
                             icon = PantopusIcon.Check,
                             contentDescription = null,
@@ -906,7 +906,7 @@ private fun AddTierRow(disabled: Boolean) {
                 .testTag("editPersonaAddTier")
                 .semantics { contentDescription = "Add paid tier, up to 4" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.PlusCircle,
@@ -945,10 +945,10 @@ private fun StripeConnectedCard(account: String) {
                 .clip(RoundedCornerShape(8.dp))
                 .background(PantopusColors.successBg)
                 .border(1.dp, PantopusColors.successLight, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaStripeConnected"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         StripeBadge()
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -958,7 +958,7 @@ private fun StripeConnectedCard(account: String) {
                 fontWeight = FontWeight.SemiBold,
                 color = PantopusColors.appText,
             )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 PantopusIconImage(
                     icon = PantopusIcon.CheckCircle,
                     contentDescription = null,
@@ -987,11 +987,11 @@ private fun StripeNotConnectedCard() {
                 .clip(RoundedCornerShape(8.dp))
                 .background(PantopusColors.primary50)
                 .border(1.dp, PantopusColors.primary200, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaStripeCard"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             StripeBadge()
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
@@ -1064,7 +1064,7 @@ private fun BroadcastSection(
     range: String,
 ) {
     PersonaSection("Broadcast") {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
             Column {
                 PLabel("Posts per week", hint = "hard cap, not a target")
                 CapSelector(selection = cap, onSelect = onSelectCap)
@@ -1088,7 +1088,7 @@ private fun CapSelector(
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(8.dp))
                 .padding(3.dp)
                 .testTag("editPersonaCapSelector"),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s0),
     ) {
         PersonaCapOption.entries.forEach { option ->
             val isOn = option == selection
@@ -1127,9 +1127,9 @@ private fun QuietHoursRow(
                 .clip(RoundedCornerShape(8.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Clock,
@@ -1181,12 +1181,12 @@ private fun ShareCard(
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("editPersonaShareCard"),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         QrStamp(isPublic)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Text(
                 text = (if (isPublic) "Public link · scan to follow" else "Private preview · only you").uppercase(),
                 fontSize = 10.5.sp,
@@ -1206,7 +1206,7 @@ private fun ShareCard(
                         .clip(RoundedCornerShape(6.dp))
                         .background(PantopusColors.appSurfaceMuted)
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = Spacing.s2, vertical = 6.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ShareButton(PantopusIcon.Copy, "Copy", isPublic, "editPersonaShareCopy", Modifier.weight(1f))
@@ -1307,11 +1307,11 @@ private fun AnalyticsSection(
                     .clip(RoundedCornerShape(12.dp))
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                     .testTag("editPersonaAnalyticsRow"),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                 Box(
                     modifier =
                         Modifier
@@ -1374,7 +1374,7 @@ private fun ScopeChip(label: String) {
                 .border(1.dp, PantopusColors.primary200, RoundedCornerShape(999.dp))
                 .padding(horizontal = 9.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Check,
@@ -1406,9 +1406,9 @@ private fun StickyBar(
 @Composable
 private fun LiveStickyBar() {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(PantopusColors.success))
         Text(text = "Live · saved 2m ago", fontSize = 11.5.sp, color = PantopusColors.appTextSecondary)
@@ -1419,7 +1419,7 @@ private fun LiveStickyBar() {
                     .height(42.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable {}
-                    .padding(horizontal = 12.dp)
+                    .padding(horizontal = Spacing.s3)
                     .testTag("editPersonaPreview")
                     .semantics { contentDescription = "Preview" },
             verticalAlignment = Alignment.CenterVertically,
@@ -1440,7 +1440,7 @@ private fun LiveStickyBar() {
                     .height(42.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(PantopusColors.appBorder)
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = Spacing.s5)
                     .testTag("editPersonaSave")
                     .semantics { contentDescription = "Save, no changes" },
             contentAlignment = Alignment.Center,
@@ -1453,8 +1453,8 @@ private fun LiveStickyBar() {
 @Composable
 private fun SetupStickyBar(onDiscard: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(
             modifier =
@@ -1463,9 +1463,9 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
                     .clip(RoundedCornerShape(8.dp))
                     .background(PantopusColors.primary50)
                     .border(1.dp, PantopusColors.primary200, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = Spacing.s2, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.Info,
@@ -1481,14 +1481,14 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
                 color = PantopusColors.primary700,
             )
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Row(
                 modifier =
                     Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .background(PantopusColors.warningBg)
                         .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(999.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -1502,7 +1502,7 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
                         .height(42.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .clickable(onClick = onDiscard)
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.s3)
                         .testTag("editPersonaDiscard")
                         .semantics { contentDescription = "Discard draft" },
                 contentAlignment = Alignment.Center,
@@ -1516,7 +1516,7 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
                         .clip(RoundedCornerShape(12.dp))
                         .background(PantopusColors.primary600)
                         .clickable {}
-                        .padding(horizontal = 20.dp)
+                        .padding(horizontal = Spacing.s5)
                         .testTag("editPersonaSaveDraft")
                         .semantics { contentDescription = "Save draft" },
                 verticalAlignment = Alignment.CenterVertically,

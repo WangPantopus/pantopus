@@ -112,8 +112,8 @@ private fun OfferSheetContent(onSubmit: (Double?, String) -> Unit) {
     var amountField by remember { mutableStateOf(TextFieldValue("")) }
     var messageField by remember { mutableStateOf(TextFieldValue("")) }
     Column(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s5),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Text(text = "Make an offer", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
@@ -138,7 +138,7 @@ private fun OfferSheetContent(onSubmit: (Double?, String) -> Unit) {
             maxLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Spacing.s1))
         val canSubmit = messageField.text.isNotEmpty()
         Box(
             modifier =
@@ -154,6 +154,6 @@ private fun OfferSheetContent(onSubmit: (Double?, String) -> Unit) {
         ) {
             Text(text = "Send", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
         }
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(Spacing.s5))
     }
 }

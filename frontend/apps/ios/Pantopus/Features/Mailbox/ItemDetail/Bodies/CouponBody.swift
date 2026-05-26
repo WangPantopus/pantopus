@@ -217,7 +217,7 @@ private struct RedeemedRibbon: View {
     let expiresAt: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(spacing: Spacing.s2) {
                 Icon(.checkCircle, size: 18, color: Theme.Color.appTextInverse)
                 Text("Redeemed")

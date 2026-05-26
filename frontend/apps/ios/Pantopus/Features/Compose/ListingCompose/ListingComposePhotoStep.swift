@@ -38,7 +38,7 @@ private struct ListingComposeCameraStep: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 92)
                 .padding(.bottom, 190)
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 topRail
                 CapturedAnglesTray(
                     photos: viewModel.form.photos,
@@ -296,7 +296,7 @@ private struct SofaSilhouette: View {
                     .fill(Color(red: 0.36, green: 0.47, blue: 0.40).opacity(0.7))
                     .frame(width: 42, height: 118)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Spacing.s1)
             Ellipse()
                 .fill(.black.opacity(0.28))
                 .frame(height: 20)
@@ -404,7 +404,7 @@ private struct AngleSlot: View {
                     .frame(width: 16, height: 16)
                     .overlay(Icon(.check, size: 9, color: .white))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(4)
+                    .padding(Spacing.s1)
             } else {
                 Text(label)
                     .font(.system(size: 10, weight: .bold))

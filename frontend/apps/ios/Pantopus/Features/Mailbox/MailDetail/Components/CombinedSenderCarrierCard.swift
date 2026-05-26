@@ -65,7 +65,7 @@ public struct CombinedSenderCarrierCard: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             header
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             senderRow
@@ -122,7 +122,7 @@ public struct CombinedSenderCarrierCard: View {
                         .font(.system(size: 11.5))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     pill(
                         icon: .landmark,
                         text: trust.label,
@@ -136,9 +136,9 @@ public struct CombinedSenderCarrierCard: View {
                         foreground: Theme.Color.success
                     )
                 }
-                .padding(.top, 4)
+                .padding(.top, Spacing.s1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if onOpenSenderProfile != nil, senderUserId != nil {
                 Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
             }
@@ -176,7 +176,7 @@ public struct CombinedSenderCarrierCard: View {
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     if carrier.signatureRequired {
                         pill(
                             icon: .pencil,
@@ -194,9 +194,9 @@ public struct CombinedSenderCarrierCard: View {
                         )
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, Spacing.s1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)

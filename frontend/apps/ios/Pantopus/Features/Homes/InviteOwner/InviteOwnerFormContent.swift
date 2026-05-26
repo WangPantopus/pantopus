@@ -114,7 +114,7 @@ private struct HomeContextStrip: View {
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Text("OWNER INVITE")
                 .pantopusTextStyle(.overline)
                 .foregroundStyle(Theme.Color.primary700)

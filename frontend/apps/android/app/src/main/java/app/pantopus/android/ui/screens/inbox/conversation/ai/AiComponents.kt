@@ -112,7 +112,7 @@ internal fun AiEstimateCard(
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.magicBg)
                 .border(1.dp, PantopusColors.magicBorder, RoundedCornerShape(Radii.lg))
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .padding(horizontal = 10.dp, vertical = Spacing.s2)
                 .semantics {
                     contentDescription =
                         "Estimate ${estimate.amount}, ${estimate.basis}, confidence ${estimate.confidence}"

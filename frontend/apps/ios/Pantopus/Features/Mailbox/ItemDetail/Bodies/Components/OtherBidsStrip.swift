@@ -74,13 +74,13 @@ private struct OtherBidCompactCard: View {
                 Text("$\(bid.amount)")
                     .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(Theme.Color.appText)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             Text(bid.who)
                 .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appText)
                 .lineLimit(1)
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.star, size: 9, color: Theme.Color.warning)
                 Text("\(String(format: "%.1f", bid.rating)) · \(bid.jobs) jobs")
                     .pantopusTextStyle(.caption)

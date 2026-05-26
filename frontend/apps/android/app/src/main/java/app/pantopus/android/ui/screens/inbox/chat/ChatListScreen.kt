@@ -98,7 +98,7 @@ private fun TopBar(onCompose: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 4.dp),
+                .padding(start = Spacing.s4, end = Spacing.s2, top = 10.dp, bottom = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -132,7 +132,7 @@ private fun SearchBar(
     skeleton: Boolean,
     onTap: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(horizontal = 16.dp, vertical = 4.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(horizontal = Spacing.s4, vertical = Spacing.s1)) {
         if (skeleton) {
             Shimmer(width = 328.dp, height = 44.dp, cornerRadius = Radii.md, modifier = Modifier.fillMaxWidth())
         } else {
@@ -178,7 +178,7 @@ internal fun FilterTabs(
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .padding(start = 16.dp, top = 12.dp),
+                .padding(start = Spacing.s4, top = Spacing.s3),
     ) {
         Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
             if (skeleton) {
@@ -220,7 +220,7 @@ private fun FilterTab(
         modifier =
             Modifier
                 .clickable(onClick = onClick)
-                .padding(bottom = 12.dp)
+                .padding(bottom = Spacing.s3)
                 .testTag("chatListFilter_${filter.key}"),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -253,7 +253,7 @@ private fun FilterTab(
             Box(
                 modifier =
                     Modifier
-                        .padding(top = 8.dp)
+                        .padding(top = Spacing.s2)
                         .height(2.dp)
                         .background(PantopusColors.primary600)
                         .fillMaxWidth(),
@@ -279,9 +279,9 @@ private fun SkeletonRow() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = Spacing.s4, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Shimmer(width = 44.dp, height = 44.dp, cornerRadius = 22.dp)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -343,7 +343,7 @@ internal fun EmptyFrame(onCompose: () -> Unit) {
                     .testTag("chatListNewMessage"),
             contentAlignment = Alignment.Center,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 PantopusIconImage(
                     icon = PantopusIcon.Edit2,
                     contentDescription = null,
@@ -368,7 +368,7 @@ internal fun EmptyFrame(onCompose: () -> Unit) {
                     .padding(horizontal = 14.dp, vertical = 10.dp)
                     .testTag("chatListVerifiedFloor"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.ShieldCheck,

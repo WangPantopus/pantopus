@@ -188,7 +188,7 @@ public struct MailboxMapView: View {
     // MARK: - Floating pill
 
     private var floatingPill: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button { onBack?() } label: {
                 Icon(.chevronLeft, size: 18, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
@@ -198,18 +198,18 @@ public struct MailboxMapView: View {
             .accessibilityIdentifier("mailboxMapBack")
             .opacity(onBack == nil ? 0 : 1)
             .disabled(onBack == nil)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             HStack(spacing: 2) {
                 Text("Mailbox map")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
                 Icon(.chevronDown, size: 14, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Color.clear.frame(width: 32, height: 32)
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(.ultraThinMaterial)
         .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(Capsule())
@@ -251,7 +251,7 @@ public struct MailboxMapView: View {
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 28)
             .background(active ? accent : Color.white.opacity(0.96))
             .overlay(Capsule().stroke(active ? Color.clear : Theme.Color.appBorder, lineWidth: 1))
@@ -279,9 +279,9 @@ public struct MailboxMapView: View {
     }
 
     private func bottomSheet(geo: GeometryProxy, @ViewBuilder body: () -> some View) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
+            Spacer(minLength: Spacing.s0)
+            VStack(spacing: Spacing.s0) {
                 MapListHybridSheetGrabber()
                 sheetHeader
                 body()
@@ -325,14 +325,14 @@ public struct MailboxMapView: View {
             Spacer()
             if let spot = headerDirectionsSpot {
                 Button { openDirections(to: spot) } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Icon(.navigation, size: 14, strokeWidth: 2.2, color: Theme.Color.primary700)
                         Text("Directions")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Theme.Color.primary700)
                     }
                     .frame(minHeight: 32)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, Spacing.s2)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("mailboxMapHeaderDirections")
@@ -340,8 +340,8 @@ public struct MailboxMapView: View {
             }
         }
         .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.top, Spacing.s1)
+        .padding(.bottom, Spacing.s3)
         .accessibilityIdentifier("mailboxMapSheetHeader")
     }
 
@@ -361,7 +361,7 @@ public struct MailboxMapView: View {
     }
 
     private func standardRail(_ spots: [MailboxSpot]) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(Array(spots.enumerated()), id: \.element.id) { index, spot in
@@ -373,17 +373,17 @@ public struct MailboxMapView: View {
                         )
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.s4)
             }
             .accessibilityIdentifier("mailboxMapRail")
             MailboxPaginationDots(total: min(spots.count, 4), index: 0)
-                .padding(.vertical, 12)
+                .padding(.vertical, Spacing.s3)
         }
     }
 
     private func expandedList(_ spots: [MailboxSpot]) -> some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: Spacing.s0) {
                 ForEach(spots) { spot in
                     MailboxSpotRow(
                         spot: spot,
@@ -403,26 +403,26 @@ public struct MailboxMapView: View {
                 viewModel.setDetent(.standard)
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 Icon(.chevronUp, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
                 Text("Drag up to see the list")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 36)
             .background(Theme.Color.appSurfaceSunken)
             .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.bottom, Spacing.s3)
         .accessibilityIdentifier("mailboxMapCollapsedPrompt")
     }
 
     private var emptyRailNote: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             Text("No spots match this filter")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextStrong)
@@ -435,7 +435,7 @@ public struct MailboxMapView: View {
             .accessibilityIdentifier("mailboxMapShowAll")
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 8)
+        .padding(.top, Spacing.s2)
         .accessibilityIdentifier("mailboxMapEmptyNote")
     }
 
@@ -452,7 +452,7 @@ public struct MailboxMapView: View {
                     .redacted(reason: .placeholder)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.s4)
         }
         .accessibilityIdentifier("mailboxMapLoading")
         .accessibilityLabel("Loading mailbox spots")
@@ -469,7 +469,7 @@ public struct MailboxMapView: View {
                 Text("Try again")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.s4)
                     .frame(height: 38)
                     .background(Theme.Color.primary600)
                     .clipShape(Capsule())
@@ -484,19 +484,19 @@ public struct MailboxMapView: View {
     // MARK: - Detail panel (selected)
 
     private func detailPanel(spot: MailboxSpot, geo: GeometryProxy) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
+            Spacer(minLength: Spacing.s0)
+            VStack(spacing: Spacing.s0) {
                 detailTopBar
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: Spacing.s0) {
                         detailIdentity(spot)
-                        detailStatusChips(spot).padding(.top, 12)
+                        detailStatusChips(spot).padding(.top, Spacing.s3)
                         detailServices(spot)
                         detailHours(spot)
                     }
                     .padding(.horizontal, 18)
-                    .padding(.top, 12)
+                    .padding(.top, Spacing.s3)
                     .padding(.bottom, 14)
                 }
                 detailActionBar(spot)
@@ -513,7 +513,7 @@ public struct MailboxMapView: View {
     private var detailTopBar: some View {
         HStack {
             Button { backToList() } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.chevronLeft, size: 14, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
                     Text("Back to list")
                         .font(.system(size: 12, weight: .semibold))
@@ -525,7 +525,7 @@ public struct MailboxMapView: View {
             Spacer()
         }
         .padding(.horizontal, 18)
-        .padding(.top, 8)
+        .padding(.top, Spacing.s2)
     }
 
     private func detailIdentity(_ spot: MailboxSpot) -> some View {
@@ -539,7 +539,7 @@ public struct MailboxMapView: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
     }
 
@@ -547,20 +547,20 @@ public struct MailboxMapView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 openChip(spot)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             HStack(spacing: 6) {
                 metaChip(icon: .mapPin, text: spot.walkLabel)
                 if let last = spot.lastPickupLabel {
                     metaChip(icon: .clock, text: last)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
         }
     }
 
     private func openChip(_ spot: MailboxSpot) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Circle()
                 .fill(spot.isOpen ? Theme.Color.success : Theme.Color.error)
                 .frame(width: 6, height: 6)
@@ -568,20 +568,20 @@ public struct MailboxMapView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(spot.isOpen ? Theme.Color.success : Theme.Color.error)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Spacing.s2)
         .padding(.vertical, 2)
         .background(spot.isOpen ? Theme.Color.successBg : Theme.Color.errorBg)
         .clipShape(Capsule())
     }
 
     private func metaChip(icon: PantopusIcon, text: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(icon, size: 11, strokeWidth: 2.2, color: Theme.Color.appTextStrong)
             Text(text)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextStrong)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Spacing.s2)
         .padding(.vertical, 2)
         .background(Theme.Color.appSurfaceMuted)
         .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
@@ -592,11 +592,11 @@ public struct MailboxMapView: View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Services")
             LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                columns: [GridItem(.flexible(), spacing: Spacing.s2), GridItem(.flexible(), spacing: Spacing.s2)],
                 spacing: 8
             ) {
                 ForEach(spot.services) { service in
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.s2) {
                         Icon(service.icon, size: 13, strokeWidth: 2.2, color: Theme.Color.primary700)
                             .frame(width: 24, height: 24)
                             .background(Theme.Color.primary50)
@@ -605,7 +605,7 @@ public struct MailboxMapView: View {
                             .font(.system(size: 11.5, weight: .semibold))
                             .foregroundStyle(Theme.Color.appTextStrong)
                             .lineLimit(1)
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 9)
@@ -654,7 +654,7 @@ public struct MailboxMapView: View {
     }
 
     private func detailActionBar(_ spot: MailboxSpot) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Button { openDirections(to: spot) } label: {
                 HStack(spacing: 7) {
                     Icon(.navigation, size: 16, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
@@ -674,7 +674,7 @@ public struct MailboxMapView: View {
         }
         .padding(.horizontal, 14)
         .padding(.top, 10)
-        .padding(.bottom, 16)
+        .padding(.bottom, Spacing.s4)
         .background(Theme.Color.appSurface)
         .overlay(
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1),
@@ -908,7 +908,7 @@ private struct MailboxServiceChipRow: View {
     let maxCount: Int
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             ForEach(Array(services.prefix(maxCount)), id: \.self) { service in
                 Text(service.chipLabel)
                     .font(.system(size: 9.5, weight: .bold))
@@ -959,7 +959,7 @@ private struct MailboxSpotCard: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Button(action: onDirections) {
                     Icon(.navigation, size: 16, strokeWidth: 2.2, color: active ? Theme.Color.appTextInverse : Theme.Color.primary700)
                         .frame(width: 36, height: 36)
@@ -1003,7 +1003,7 @@ private struct MailboxSpotRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 MailboxKindTile(kind: spot.kind, size: 44, radius: 10)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(spot.name)
@@ -1024,7 +1024,7 @@ private struct MailboxSpotRow: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Button(action: onDirections) {
                     Icon(.navigation, size: 16, strokeWidth: 2.2, color: Theme.Color.primary700)
                         .frame(width: 36, height: 36)
@@ -1039,8 +1039,8 @@ private struct MailboxSpotRow: View {
                 .accessibilityLabel("Directions to \(spot.name)")
                 .accessibilityIdentifier("mailboxMapRowDirections_\(spot.id)")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
             .background(Theme.Color.appSurface)
             .overlay(
                 Rectangle().fill(Theme.Color.appBorder.opacity(0.5)).frame(height: 1),

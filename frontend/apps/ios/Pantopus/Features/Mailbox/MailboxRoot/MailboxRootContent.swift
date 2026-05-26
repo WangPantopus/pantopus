@@ -16,7 +16,7 @@ struct MailboxRootHeader: View {
     let viewModel: MailboxRootViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             drawerRow
             tabBar
         }
@@ -50,7 +50,7 @@ struct MailboxRootHeader: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(viewModel.mailTabs) { tab in
                 MailboxTabSegment(
                     id: tab.rawValue,

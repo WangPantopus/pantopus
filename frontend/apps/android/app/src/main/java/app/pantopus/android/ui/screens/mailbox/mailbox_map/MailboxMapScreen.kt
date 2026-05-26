@@ -521,7 +521,7 @@ private fun MailboxMapTopPill(onBack: () -> Unit) {
                 .background(Color.White.copy(alpha = 0.96f))
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.pill))
-                .padding(start = 6.dp, end = 8.dp, top = Spacing.s2, bottom = Spacing.s2)
+                .padding(start = 6.dp, end = Spacing.s2, top = Spacing.s2, bottom = Spacing.s2)
                 .testTag("mailboxMapPill"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -562,7 +562,7 @@ private fun MailboxMapTopPill(onBack: () -> Unit) {
                 tint = PantopusColors.appTextSecondary,
             )
         }
-        Spacer(modifier = Modifier.width(32.dp))
+        Spacer(modifier = Modifier.width(Spacing.s8))
     }
 }
 

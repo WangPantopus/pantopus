@@ -30,7 +30,7 @@ struct LinkCard: View {
                     .foregroundStyle(secondaryColor)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.gripVertical, size: 14, color: Theme.Color.appTextMuted)
                 .accessibilityHidden(true)
         }
@@ -113,7 +113,7 @@ struct AddLinkRow: View {
                     .pantopusTextStyle(.small)
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.business)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text("up to 6")
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextMuted)

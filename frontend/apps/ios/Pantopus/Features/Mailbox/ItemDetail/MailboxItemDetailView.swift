@@ -270,7 +270,7 @@ private struct LoadingLayout: View {
     let onBack: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 4)
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             VStack(spacing: Spacing.s3) {
@@ -292,7 +292,7 @@ private struct ErrorLayout: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.error).frame(height: 4)
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             EmptyState(

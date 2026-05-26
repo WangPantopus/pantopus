@@ -341,7 +341,7 @@ internal fun NeighborHeroCard(hero: NeighborHero) {
             if (!hero.locality.isNullOrEmpty()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                     modifier = Modifier.padding(top = 2.dp),
                 ) {
                     PantopusIconImage(
@@ -416,11 +416,11 @@ private fun NeighborIdentityChip(identity: NeighborIdentity) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(identity.background)
-                .padding(horizontal = 9.dp, vertical = 4.dp)
+                .padding(horizontal = 9.dp, vertical = Spacing.s1)
                 .semantics { contentDescription = identity.label }
                 .testTag("publicProfileNeighborIdentityChip"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ShieldCheck,
@@ -443,7 +443,7 @@ private fun NeighborKickerChip(text: String) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurfaceSunken)
-                .padding(horizontal = 9.dp, vertical = 4.dp)
+                .padding(horizontal = 9.dp, vertical = Spacing.s1)
                 .testTag("publicProfileNeighborKicker"),
     )
 }
@@ -815,7 +815,7 @@ internal fun NeighborReportBlockRow(
         Row(
             modifier = Modifier.clickable(onClick = onReport).testTag("publicProfileNeighborReport"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             PantopusIconImage(icon = PantopusIcon.Flag, contentDescription = null, size = 11.dp, tint = PantopusColors.appTextMuted)
             Text("Report", fontSize = 11.sp, color = PantopusColors.appTextMuted)
@@ -823,7 +823,7 @@ internal fun NeighborReportBlockRow(
         Row(
             modifier = Modifier.clickable(onClick = onBlock).testTag("publicProfileNeighborBlock"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             PantopusIconImage(icon = PantopusIcon.Ban, contentDescription = null, size = 11.dp, tint = PantopusColors.appTextMuted)
             Text("Block", fontSize = 11.sp, color = PantopusColors.appTextMuted)

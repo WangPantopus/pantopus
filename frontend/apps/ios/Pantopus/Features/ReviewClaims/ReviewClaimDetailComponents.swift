@@ -20,7 +20,7 @@ struct ReviewClaimEvidenceList: View {
                 Text("No documents uploaded yet")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.Color.warning)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(Spacing.s3)
             .background(Theme.Color.warningBg)
@@ -61,7 +61,7 @@ private struct ReviewClaimEvidenceRow: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if let urlString = item.fileURL, let url = URL(string: urlString) {
                 Link(destination: url) {
                     Text("View")
@@ -203,7 +203,7 @@ struct ReviewClaimNoteCaptureSheet: View {
                 Text(title)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Button(action: onCancel) {
                     Icon(.x, size: 22, color: Theme.Color.appTextSecondary)
                 }

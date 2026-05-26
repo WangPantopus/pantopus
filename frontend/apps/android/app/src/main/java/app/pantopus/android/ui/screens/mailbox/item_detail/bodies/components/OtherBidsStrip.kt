@@ -113,7 +113,7 @@ private fun CompactCard(bid: GigDetailDto.OtherBid) {
             Text("$${bid.amount}", fontSize = 18.sp, fontWeight = FontWeight.Black, color = PantopusColors.appText)
         }
         Text(bid.who, style = PantopusTextStyle.small, color = PantopusColors.appText)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             PantopusIconImage(
                 icon = PantopusIcon.Star,
                 contentDescription = null,

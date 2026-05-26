@@ -237,7 +237,7 @@ private struct BookletPaperPageScaffold: View {
                 line(width: 0.94)
                 line(width: 0.62)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             HStack {
                 Spacer()
                 Capsule()

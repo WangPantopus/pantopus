@@ -238,7 +238,7 @@ private fun CourierMark(carrier: String) {
         contentAlignment = Alignment.Center,
     ) {
         Box(modifier = Modifier.fillMaxWidth().heightIn(min = 3.dp).background(PantopusColors.error))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(carrierInitials(carrier), style = PantopusTextStyle.caption, color = PantopusColors.appTextInverse)
             Text("PRIORITY", style = PantopusTextStyle.overline, color = PantopusColors.appTextInverse.copy(alpha = 0.85f))
         }
@@ -434,7 +434,7 @@ private fun PorchPhotoIllustration(photo: PackageDeliveryPhoto) {
                     .padding(Spacing.s3)
                     .clip(RoundedCornerShape(Radii.xs))
                     .background(PantopusColors.appText.copy(alpha = 0.55f))
-                    .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
         )
         Row(
             modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.s3),
@@ -451,7 +451,7 @@ private fun PorchPhotoIllustration(photo: PackageDeliveryPhoto) {
                         .padding(Spacing.s3)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.success)
-                        .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {

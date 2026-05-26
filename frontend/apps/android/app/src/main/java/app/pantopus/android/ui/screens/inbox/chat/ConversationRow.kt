@@ -51,7 +51,7 @@ fun ConversationRow(
                     if (content.pinned) PantopusColors.primary50.copy(alpha = 0.5f) else PantopusColors.appSurface,
                 )
                 .clickable(onClick = onTap)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
                 .semantics(mergeDescendants = true) {
                     contentDescription = buildA11yLabel(content)
                 }
@@ -70,7 +70,7 @@ fun ConversationRow(
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Avatar(content)
             Middle(content, modifier = Modifier.weight(1f))
