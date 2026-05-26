@@ -862,9 +862,9 @@ private struct ChatConversationHeader: View {
 
     @ViewBuilder private var avatar: some View {
         if mode == .aiAssistant {
-            ChatAIAvatar(size: 32)
+            ChatAIAvatar(size: 36)
         } else if mode == .fanThread {
-            ChatFanPersonaAvatar(initials: fanInitials, size: 32)
+            ChatFanPersonaAvatar(initials: fanInitials, size: 36)
         } else if mode == .creatorThread {
             switch counterparty {
             case let .person(_, initials, _, verified, online):
@@ -872,7 +872,7 @@ private struct ChatConversationHeader: View {
                     initials: initials,
                     verified: verified,
                     online: online,
-                    size: 32,
+                    size: 36,
                     ringColor: creatorTierColor(rank: creatorContext.fanTierRank)
                 )
             case let .group(name, _):
@@ -880,20 +880,20 @@ private struct ChatConversationHeader: View {
                     initials: groupInitials(name),
                     verified: false,
                     online: false,
-                    size: 32,
+                    size: 36,
                     ringColor: creatorTierColor(rank: creatorContext.fanTierRank)
                 )
             case .ai:
-                ChatAIAvatar(size: 32)
+                ChatAIAvatar(size: 36)
             }
         } else {
             switch counterparty {
             case let .person(_, initials, _, verified, online):
-                ChatPersonAvatar(initials: initials, verified: verified, online: online, size: 32)
+                ChatPersonAvatar(initials: initials, verified: verified, online: online, size: 36)
             case let .group(name, _):
-                ChatPersonAvatar(initials: groupInitials(name), verified: false, online: false, size: 32)
+                ChatPersonAvatar(initials: groupInitials(name), verified: false, online: false, size: 36)
             case .ai:
-                ChatAIAvatar(size: 32)
+                ChatAIAvatar(size: 36)
             }
         }
     }
@@ -1870,7 +1870,7 @@ private struct ChatComposer: View {
                 .accessibilityLabel("Emoji")
                 .accessibilityIdentifier("chatComposerEmoji")
             }
-            .padding(.leading, 14)
+            .padding(.leading, Spacing.s3)
             .padding(.trailing, Spacing.s1)
             .padding(.vertical, 2)
             .frame(minHeight: 36)
@@ -1912,7 +1912,7 @@ private struct ChatComposer: View {
             .accessibilityIdentifier("chatComposerSend")
         }
         .padding(.horizontal, Spacing.s3)
-        .padding(.top, 10)
+        .padding(.top, Spacing.s2)
         .padding(.bottom, Spacing.s6)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .top) {

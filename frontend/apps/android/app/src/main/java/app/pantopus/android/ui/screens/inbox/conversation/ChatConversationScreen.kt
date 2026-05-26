@@ -662,14 +662,14 @@ private fun HeaderAvatar(
     tierRank: Int? = null,
 ) {
     when {
-        isAi -> ChatAiAvatar(size = 32.dp)
-        isFanThread -> FanPersonaAvatar(initials = fanInitials(counterparty), size = 32.dp)
+        isAi -> ChatAiAvatar(size = 36.dp)
+        isFanThread -> FanPersonaAvatar(initials = fanInitials(counterparty), size = 36.dp)
         counterparty is ChatCounterparty.Person ->
             PersonAvatar(
                 initials = counterparty.initials,
                 verified = counterparty.verified,
                 online = counterparty.online,
-                size = 32.dp,
+                size = 36.dp,
                 ringColor = tierRank?.let(::creatorTierColor),
             )
         counterparty is ChatCounterparty.Group ->
@@ -677,10 +677,10 @@ private fun HeaderAvatar(
                 initials = counterparty.displayName.initials(),
                 verified = false,
                 online = false,
-                size = 32.dp,
+                size = 36.dp,
                 ringColor = tierRank?.let(::creatorTierColor),
             )
-        else -> ChatAiAvatar(size = 32.dp)
+        else -> ChatAiAvatar(size = 36.dp)
     }
 }
 
@@ -2147,7 +2147,7 @@ internal fun Composer(
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurfaceSunken)
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
-                        .padding(start = 14.dp, end = Spacing.s1, top = 2.dp, bottom = 2.dp),
+                        .padding(start = Spacing.s3, end = Spacing.s1, top = 2.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
