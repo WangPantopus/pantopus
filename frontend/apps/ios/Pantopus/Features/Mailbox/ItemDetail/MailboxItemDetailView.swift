@@ -193,7 +193,7 @@ struct MailboxItemDetailView: View {
             nil
         case .coupon:
             MailboxCTAShelfContent(
-                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet ✓" : "Add to wallet",
+                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet" : "Add to wallet",
                 ghostTitle: "Save for later",
                 primaryLoading: viewModel.ctaFlags.primaryLoading,
                 ghostLoading: viewModel.ctaFlags.ghostLoading,
@@ -210,7 +210,7 @@ struct MailboxItemDetailView: View {
         case .certified:
             MailboxCTAShelfContent(
                 primaryTitle: viewModel.ctaFlags.primaryCompleted
-                    ? "Signed ✓"
+                    ? "Signed"
                     : "Sign for delivery",
                 ghostTitle: "View terms",
                 primaryLoading: viewModel.ctaFlags.primaryLoading,

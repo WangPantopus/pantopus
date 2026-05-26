@@ -201,7 +201,7 @@ private fun ctaContent(
         MailItemCategory.Coupon ->
             MailboxCTAShelfContent(
                 primaryTitle =
-                    if (flags.primaryCompleted) "Added to wallet ✓" else "Add to wallet",
+                    if (flags.primaryCompleted) "Added to wallet" else "Add to wallet",
                 ghostTitle = "Save for later",
                 primaryLoading = flags.primaryLoading,
                 ghostLoading = flags.ghostLoading,
@@ -218,7 +218,7 @@ private fun ctaContent(
         MailItemCategory.Certified ->
             MailboxCTAShelfContent(
                 primaryTitle =
-                    if (flags.primaryCompleted) "Signed ✓" else "Sign for delivery",
+                    if (flags.primaryCompleted) "Signed" else "Sign for delivery",
                 ghostTitle = "View terms",
                 primaryLoading = flags.primaryLoading,
                 ghostLoading = flags.ghostLoading,

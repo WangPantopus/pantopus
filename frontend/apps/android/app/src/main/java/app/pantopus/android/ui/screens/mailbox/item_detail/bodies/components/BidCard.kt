@@ -113,7 +113,7 @@ private fun ExpiryPill(
     bid: GigDetailDto.Bid,
     isAccepted: Boolean,
 ) {
-    val text = if (isAccepted) "✓ Locked in" else bid.expires
+    val text = if (isAccepted) "Locked in" else bid.expires
     if (text.isEmpty()) return
     val tint: Color = if (isAccepted) PantopusColors.success else PantopusColors.handyman
     val background: Color = if (isAccepted) PantopusColors.successBg else PantopusColors.appSurface

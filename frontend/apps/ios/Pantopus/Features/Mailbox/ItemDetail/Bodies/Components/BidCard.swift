@@ -71,7 +71,7 @@ public struct BidCard: View {
     }
 
     @ViewBuilder private var expiryPill: some View {
-        let text = isAccepted ? "✓ Locked in" : bid.expires
+        let text = isAccepted ? "Locked in" : bid.expires
         let tint = isAccepted ? Theme.Color.success : Theme.Color.handyman
         let bg = isAccepted ? Theme.Color.successBg : Theme.Color.appSurface
         if !text.isEmpty {
