@@ -49,6 +49,7 @@ import app.pantopus.android.ui.screens.shared.form.FORM_COMMIT_BUTTON_TAG
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormShell
+import app.pantopus.android.ui.screens.shared.form.formShakeOnChange
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -78,6 +79,7 @@ fun EditProfileScreen(
     val shouldDismiss by viewModel.shouldDismiss.collectAsStateWithLifecycle()
     val email by viewModel.email.collectAsStateWithLifecycle()
     val emailVerified by viewModel.emailVerified.collectAsStateWithLifecycle()
+    val shakeTrigger by viewModel.shakeTrigger.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         Analytics.track(AnalyticsEvent.ScreenEditProfileViewed)
@@ -123,6 +125,7 @@ fun EditProfileScreen(
                             dirtyFieldCount = viewModel.dirtyFieldCount,
                             isSaving = isSaving,
                         ),
+                    shakeTrigger = shakeTrigger,
                     onClose = onBack,
                     onCommit = viewModel::save,
                     onDiscard = viewModel::discardChanges,
@@ -189,159 +192,178 @@ internal fun EditProfileLoaded(
     onCommit: () -> Unit,
     onDiscard: () -> Unit,
     onUpdate: (EditProfileField, String) -> Unit,
+    shakeTrigger: Int = 0,
 ) {
-    FormShell(
-        title = "Edit profile",
-        rightActionLabel = "Save",
-        isValid = state.isValid,
-        isDirty = state.isDirty,
-        isSaving = state.isSaving,
-        onClose = onClose,
-        onCommit = onCommit,
-        stickyBottom = {
-            EditProfileStickyBar(
-                dirtyCount = state.dirtyFieldCount,
-                isValid = state.isValid,
-                isSaving = state.isSaving,
-                onDiscard = onDiscard,
-                onSave = onCommit,
-            )
-        },
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .formShakeOnChange(trigger = shakeTrigger)
+                .testTag("editProfileShake"),
     ) {
-        FormFieldGroup("About") {
-            // Note: the design also calls for an avatar upload (tap to
-            // replace). `updateProfileSchema` exposes no avatar field,
-            // so the affordance is intentionally omitted until the
-            // backend accepts an avatar key on PATCH /api/users/profile.
-            TextRow(
-                field = EditProfileField.FirstName,
-                label = "First name",
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.MiddleName,
-                label = "Middle name (optional)",
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.LastName,
-                label = "Last name",
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.Tagline,
-                label = "Tagline (optional)",
-                placeholder = "A short headline",
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            BioField(fields = state.fields, onUpdate = onUpdate)
+        FormShell(
+            title = "Edit profile",
+            rightActionLabel = "Save",
+            isValid = state.isValid,
+            isDirty = state.isDirty,
+            isSaving = state.isSaving,
+            onClose = onClose,
+            onCommit = onCommit,
+            stickyBottom = {
+                EditProfileStickyBar(
+                    dirtyCount = state.dirtyFieldCount,
+                    isValid = state.isValid,
+                    isSaving = state.isSaving,
+                    onDiscard = onDiscard,
+                    onSave = onCommit,
+                )
+            },
+        ) {
+            EditProfileSections(fields = state.fields, email = state.email, emailVerified = state.emailVerified, onUpdate = onUpdate)
         }
-        FormFieldGroup("Contact") {
-            // Note: the design allows editing email when `verified ==
-            // false`. `updateProfileSchema` exposes no `email` key, so
-            // the field is read-only until the backend adds it.
-            ReadOnlyEmailRow(email = state.email, verified = state.emailVerified)
-            TextRow(
-                field = EditProfileField.PhoneNumber,
-                label = "Phone (optional)",
-                placeholder = "+15555550123",
-                keyboardType = KeyboardType.Phone,
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            DateOfBirthField(fields = state.fields, onUpdate = onUpdate)
-        }
-        FormFieldGroup("Address") {
-            TextRow(
-                field = EditProfileField.Address,
-                label = "Street",
-                placeholder = "123 Main St",
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.City,
-                label = "City",
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    TextRow(
-                        field = EditProfileField.State,
-                        label = "State",
-                        fields = state.fields,
-                        onUpdate = onUpdate,
-                    )
-                }
-                Box(modifier = Modifier.weight(1f)) {
-                    TextRow(
-                        field = EditProfileField.Zipcode,
-                        label = "Zip",
-                        fields = state.fields,
-                        onUpdate = onUpdate,
-                    )
-                }
+    }
+}
+
+@Composable
+private fun EditProfileSections(
+    fields: Map<EditProfileField, FormFieldState>,
+    email: String,
+    emailVerified: Boolean,
+    onUpdate: (EditProfileField, String) -> Unit,
+) {
+    FormFieldGroup("About") {
+        // Note: the design also calls for an avatar upload (tap to
+        // replace). `updateProfileSchema` exposes no avatar field,
+        // so the affordance is intentionally omitted until the
+        // backend accepts an avatar key on PATCH /api/users/profile.
+        TextRow(
+            field = EditProfileField.FirstName,
+            label = "First name",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.MiddleName,
+            label = "Middle name (optional)",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.LastName,
+            label = "Last name",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.Tagline,
+            label = "Tagline (optional)",
+            placeholder = "A short headline",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        BioField(fields = fields, onUpdate = onUpdate)
+    }
+    FormFieldGroup("Contact") {
+        // Note: the design allows editing email when `verified ==
+        // false`. `updateProfileSchema` exposes no `email` key, so
+        // the field is read-only until the backend adds it.
+        ReadOnlyEmailRow(email = email, verified = emailVerified)
+        TextRow(
+            field = EditProfileField.PhoneNumber,
+            label = "Phone (optional)",
+            placeholder = "+15555550123",
+            keyboardType = KeyboardType.Phone,
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        DateOfBirthField(fields = fields, onUpdate = onUpdate)
+    }
+    FormFieldGroup("Address") {
+        TextRow(
+            field = EditProfileField.Address,
+            label = "Street",
+            placeholder = "123 Main St",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.City,
+            label = "City",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                TextRow(
+                    field = EditProfileField.State,
+                    label = "State",
+                    fields = fields,
+                    onUpdate = onUpdate,
+                )
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                TextRow(
+                    field = EditProfileField.Zipcode,
+                    label = "Zip",
+                    fields = fields,
+                    onUpdate = onUpdate,
+                )
             }
         }
-        FormFieldGroup("Social") {
-            TextRow(
-                field = EditProfileField.Website,
-                label = "Website",
-                placeholder = "https://example.com",
-                keyboardType = KeyboardType.Uri,
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.Linkedin,
-                label = "LinkedIn",
-                placeholder = "https://linkedin.com/in/…",
-                keyboardType = KeyboardType.Uri,
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.Twitter,
-                label = "Twitter / X",
-                placeholder = "https://x.com/…",
-                keyboardType = KeyboardType.Uri,
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.Instagram,
-                label = "Instagram",
-                placeholder = "https://instagram.com/…",
-                keyboardType = KeyboardType.Uri,
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-            TextRow(
-                field = EditProfileField.Facebook,
-                label = "Facebook",
-                placeholder = "https://facebook.com/…",
-                keyboardType = KeyboardType.Uri,
-                fields = state.fields,
-                onUpdate = onUpdate,
-            )
-        }
-        FormFieldGroup("Visibility") {
-            // Note: the design splits visibility into a
-            // `profile_visibility_public` boolean and a
-            // `show_in_neighbor_discovery` toggle. The schema only
-            // exposes the 3-way `profileVisibility` enum today, so we
-            // render the segmented picker and omit the toggle until
-            // the backend adds it.
-            VisibilityPicker(fields = state.fields, onUpdate = onUpdate)
-        }
+    }
+    FormFieldGroup("Social") {
+        TextRow(
+            field = EditProfileField.Website,
+            label = "Website",
+            placeholder = "https://example.com",
+            keyboardType = KeyboardType.Uri,
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.Linkedin,
+            label = "LinkedIn",
+            placeholder = "https://linkedin.com/in/…",
+            keyboardType = KeyboardType.Uri,
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.Twitter,
+            label = "Twitter / X",
+            placeholder = "https://x.com/…",
+            keyboardType = KeyboardType.Uri,
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.Instagram,
+            label = "Instagram",
+            placeholder = "https://instagram.com/…",
+            keyboardType = KeyboardType.Uri,
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        TextRow(
+            field = EditProfileField.Facebook,
+            label = "Facebook",
+            placeholder = "https://facebook.com/…",
+            keyboardType = KeyboardType.Uri,
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+    }
+    FormFieldGroup("Visibility") {
+        // Note: the design splits visibility into a
+        // `profile_visibility_public` boolean and a
+        // `show_in_neighbor_discovery` toggle. The schema only
+        // exposes the 3-way `profileVisibility` enum today, so we
+        // render the segmented picker and omit the toggle until
+        // the backend adds it.
+        VisibilityPicker(fields = fields, onUpdate = onUpdate)
     }
 }
 

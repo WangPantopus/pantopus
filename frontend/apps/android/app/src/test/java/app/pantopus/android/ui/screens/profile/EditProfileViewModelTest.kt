@@ -161,15 +161,46 @@ class EditProfileViewModelTest {
             assertNull(vm.fields.value[EditProfileField.Bio]?.error)
         }
 
+    @Test fun taglineMaxLengthIs255() =
+        runTest {
+            val vm = loaded()
+            vm.update(EditProfileField.Tagline, "a".repeat(256))
+            assertNotNull(vm.fields.value[EditProfileField.Tagline]?.error)
+            vm.update(EditProfileField.Tagline, "a".repeat(255))
+            assertNull(vm.fields.value[EditProfileField.Tagline]?.error)
+        }
+
     @Test fun addressOptionalLengthBounds() =
         runTest {
             val vm = loaded()
+            // Min 5 — "1234" is too short.
             vm.update(EditProfileField.Address, "1234")
             assertNotNull(vm.fields.value[EditProfileField.Address]?.error)
+            // Empty is allowed (optional).
             vm.update(EditProfileField.Address, "")
             assertNull(vm.fields.value[EditProfileField.Address]?.error)
+            // 256 chars is one over the max.
+            vm.update(EditProfileField.Address, "a".repeat(256))
+            assertNotNull(vm.fields.value[EditProfileField.Address]?.error)
             vm.update(EditProfileField.Address, "456 Oak Ave")
             assertNull(vm.fields.value[EditProfileField.Address]?.error)
+        }
+
+    @Test fun cityStateZipBounds() =
+        runTest {
+            val vm = loaded()
+            vm.update(EditProfileField.City, "A")
+            assertNotNull(vm.fields.value[EditProfileField.City]?.error)
+            vm.update(EditProfileField.State, "O")
+            assertNotNull(vm.fields.value[EditProfileField.State]?.error)
+            vm.update(EditProfileField.Zipcode, "ab")
+            assertNotNull(vm.fields.value[EditProfileField.Zipcode]?.error)
+            vm.update(EditProfileField.City, "Seattle")
+            vm.update(EditProfileField.State, "WA")
+            vm.update(EditProfileField.Zipcode, "98101")
+            assertNull(vm.fields.value[EditProfileField.City]?.error)
+            assertNull(vm.fields.value[EditProfileField.State]?.error)
+            assertNull(vm.fields.value[EditProfileField.Zipcode]?.error)
         }
 
     @Test fun socialUrlValidator() =
@@ -308,6 +339,16 @@ class EditProfileViewModelTest {
             vm.save()
             assertNull(captured.captured.address)
             assertEquals("still here", captured.captured.bio)
+        }
+
+    @Test fun buildRequestOnlyIncludesDirtyFields() =
+        runTest {
+            val vm = loaded()
+            vm.update(EditProfileField.Bio, "New bio")
+            assertEquals(1, vm.dirtyFieldCount)
+            assertTrue(vm.fields.value[EditProfileField.Bio]?.isDirty == true)
+            assertFalse(vm.fields.value[EditProfileField.FirstName]?.isDirty == true)
+            assertFalse(vm.fields.value[EditProfileField.LastName]?.isDirty == true)
         }
 
     @Test fun dirtyFieldCountTracksChangedFields() =
