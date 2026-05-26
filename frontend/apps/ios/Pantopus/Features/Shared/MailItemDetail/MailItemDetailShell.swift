@@ -365,10 +365,10 @@ public struct AIElfStripView: View {
             )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
+            RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(Theme.Color.primary100, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
     }
 }
 
@@ -438,10 +438,10 @@ public struct AttachmentsRowView: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
+            RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
     }
 }
 

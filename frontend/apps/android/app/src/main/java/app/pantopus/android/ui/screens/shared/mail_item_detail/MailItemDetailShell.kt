@@ -364,7 +364,7 @@ fun AIElfStripView(content: AIElfStripContent) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(PantopusColors.primary50, PantopusColors.primary100),
@@ -373,7 +373,7 @@ fun AIElfStripView(content: AIElfStripContent) {
                 .border(
                     width = 1.dp,
                     color = PantopusColors.primary100,
-                    shape = RoundedCornerShape(Radii.lg),
+                    shape = RoundedCornerShape(Radii.xl),
                 )
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("mailItemDetail_aiElf"),
@@ -521,12 +521,12 @@ fun AttachmentsRowView(content: AttachmentsRowContent) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(
                     width = 1.dp,
                     color = PantopusColors.appBorder,
-                    shape = RoundedCornerShape(Radii.lg),
+                    shape = RoundedCornerShape(Radii.xl),
                 )
                 .testTag("mailItemDetail_attachments"),
     ) {

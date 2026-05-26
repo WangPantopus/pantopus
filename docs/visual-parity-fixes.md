@@ -755,3 +755,139 @@ P7.9.f.2 follows: audits the 8 A17 mail-detail body variants
 Memory / Package) against the per-variant designs. The shared
 `mail_item_detail` shell + per-variant body composables are the
 target.
+
+---
+
+## P7.9.f.2 — A17 mail-detail body variants (8 archetypes)
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope (second half of P7.9.f)
+
+| A17 variant | Design HTML | iOS body | Android body |
+|---|---|---|---|
+| A17.1 Generic | `mobile_Mailbox_root_archetype/A17.1 Mail item (generic).html` + `mail-detail.jsx` | `MailItemDetailShell` (shared) + `GenericBody` projection | `MailItemDetailShell.kt` (shared) + `Generic` rendering |
+| A17.2 Booklet | `A17.2 Booklet.html` + `booklet.jsx` | `Bodies/BookletBody.swift` + `BookletPageSwiper.swift` | `bodies/BookletBody.kt` + `components/BookletPageSwiper.kt` |
+| A17.3 Certified | `A17.3 Certified mail.html` + `certified.jsx` | `Bodies/CertifiedBody.swift` + `CertifiedConfirmGate.swift` + `CertifiedTermsSheet.swift` | `bodies/CertifiedBody.kt` + `components/Certified*.kt` |
+| A17.4 Community | `A17.4 Community mail.html` + `community.jsx` | `Bodies/CommunityBody.swift` + `PostSummaryCard.swift` | `bodies/CommunityBody.kt` + `components/PostSummaryCard.kt` |
+| A17.5 Coupon | `A17.5 Coupon.html` + `coupon.jsx` | `Bodies/CouponBody.swift` + `CouponHero.swift` + `BarcodeView.swift` | `bodies/CouponBody.kt` + `components/CouponHero.kt` + `BarcodeView.kt` |
+| A17.6 Gig mail | `A17.6 Gig mail.html` + `gig.jsx` | `Bodies/GigBody.swift` + `BidCard.swift` + `BidderProfileCard.swift` + `OtherBidsStrip.swift` | `bodies/GigBody.kt` + `components/{BidCard,GigCard,BidderProfileCard,OtherBidsStrip}.kt` |
+| A17.7 Memory | `A17.7 Memory.html` + `memory.jsx` | `Bodies/MemoryBody.swift` + `PolaroidFrame.swift` + `StationeryCard.swift` | `bodies/MemoryBody.kt` + `components/{PolaroidFrame,StationeryCard}.kt` |
+| A17.8 Package | `A17.8 Package.html` + `package.jsx` | (renders inside `MailItemDetailShell` body slot via `CategoryBodies.swift`) | (renders inside `MailboxItemDetailShell.kt` via `CategoryBodies.kt`) |
+
+### Methodology
+
+Rendered the 8 A17 design HTMLs at 1600×1400 (deviceScaleFactor 2) via
+Playwright with locally-vendored React/Babel/Lucide. 24 PNGs captured
+(2 frames × 8 variants + 8 overviews). Diffed CSS dimensions in
+`mail-detail.jsx` (the shared shell) + each variant JSX
+(`booklet.jsx`, `certified.jsx`, …) against `Radii.*` references in
+the iOS + Android shared shell (`MailItemDetailShell`) + per-variant
+body files.
+
+### Resolvable token mismatches — FIXED
+
+#### 1. `AIElfStripView` outer corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (`mail-detail.jsx` `ElfStrip` block, L137-198) | `Card { borderRadius: 16 }` — the AI-extracted-info gradient strip | n/a |
+| iOS `Features/Shared/MailItemDetail/MailItemDetailShell.swift:368, 371` (`AIElfStripView`) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+| Android `ui/screens/shared/mail_item_detail/MailItemDetailShell.kt:367, 376` (`AIElfStripView`) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+
+#### 2. `AttachmentsRowView` outer corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (`mail-detail.jsx` `AttachmentsCard` block, L289+) | `Card { borderRadius: 16 }` — the attachments list card | n/a |
+| iOS `Features/Shared/MailItemDetail/MailItemDetailShell.swift:441, 444` (`AttachmentsRowView`) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+| Android `ui/screens/shared/mail_item_detail/MailItemDetailShell.kt:524, 529` (`AttachmentsRowView`) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+
+Both fixes target **shared composables in the mail-item-detail shell**,
+so they cascade across all 8 A17 variants (generic, Booklet, Certified,
+Community, Coupon, Gig mail, Memory, Package) and the Mailbox map's
+pin-detail sheet (which also reuses these views).
+
+### Surfaced for design review (NOT fixed)
+
+The 8 A17 variants share a striking design pattern: **every variant's
+"main body card" outer + the major sub-cards (sender, key facts,
+attachments, hero) target `borderRadius: 16`** (= `Radii.xl`), while
+**action buttons consistently use `borderRadius: 14`** (off-scale,
+between 12 and 16). The `14` pattern appears 8× across:
+
+- Generic: primary action button
+- Booklet: action buttons (page-view CTAs)
+- Certified: action row primary
+- Community: RSVP "going" state button (open state uses `12`)
+- Coupon: primary claim button + similar-coupon mini cards
+- Gig: bidder avatar `48×48, borderRadius: 14`
+- Memory: Save-to-Vault primary
+- Package: Notify/Log primary
+
+This is a deliberate design choice (the design extraction calls it
+"the action-button radius") that is **2pt off the canonical ramp**.
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Per-variant primary action button | `borderRadius: 14, padding: 14×16, height: ~44` (recurring 8×) | iOS/Android use shared `ActionChip` or per-body `Radii.lg` (12) | 2pt drift across all 8 variants. Same pattern as Marketplace listing card (P7.9.c §A) — design has a recurring off-scale `14` for one specific element class. Either accept the 2pt drift, or design adds a `Radii.lg2` (=14) token. |
+| B | Per-variant secondary action chip | `borderRadius: 12, padding: 10×4` (recurring 8×) | iOS+Android use `Radii.lg` (12) | ✓ matches |
+| C | Sender-card avatar | `borderRadius: 12, 44×44` (`mail-detail.jsx`) | iOS uses `RoundedRectangle(Radii.lg)` ✓; Android matches | ✓ matches |
+| D | Booklet page indicator strip | `borderRadius: 14` (off-scale) | Not directly inspected | 14 off-scale. |
+| E | Booklet thumbnail grid tile | `borderRadius: 6` (= `Radii.sm`) | Likely `Radii.sm` in `BookletPageSwiper` | Probably matches. |
+| F | Certified stamp badge | `borderRadius: 4, rotated -12°` (= `Radii.xs`) | iOS `CertifiedStamp.swift` uses `Radii.sm` (=6) — 2pt drift | 2pt over design (sm=6 vs design 4). Could resolve to `Radii.xs` (=4) cleanly but the design also rotates by -12° while design spec said -1.5° in the JSX — the rotation discrepancy is bigger than the radius. Surface as a design-review item. |
+| G | Coupon ticket hero | `borderRadius: 18` (off-scale) | iOS `CouponHero` likely uses literal `18` | 18 off-scale. |
+| H | Coupon notch cutouts | `borderRadius: 50%, 20×20` | iOS+Android use `Circle` | ✓ matches |
+| I | Community date chip / mini map / weather box | `borderRadius: 10` (off-scale, 3× in this variant) | Likely literals in code | Off-scale 10. |
+| J | Gig bid card outer | `borderRadius: 16, border: 1.5px` (= `Radii.xl`) | iOS `BidCard.swift` likely `Radii.lg` — needs check | Possible drift; not auto-checked in this audit. |
+| K | Gig stats grid + profile/photo cards | `borderRadius: 10` (off-scale) | Likely literals | Off-scale 10. |
+| L | Memory polaroid outer | `borderRadius: 16` (= `Radii.xl`) | iOS `PolaroidFrame.swift` uses `Radii.xl` ✓ | ✓ matches |
+| M | Memory stationery card | `borderRadius: 16` (= `Radii.xl`) | iOS `StationeryCard.swift` uses `Radii.xl` ✓ | ✓ matches |
+| N | Package status hero / contents card | `borderRadius: 16` (= `Radii.xl`) | iOS likely matches | Probably matches. |
+| O | Package courier mark badge / tracking copy button | `borderRadius: 10` (off-scale, 2× in this variant) | Likely literals | Off-scale 10. |
+| P | Package item qty box | `borderRadius: 5` (off-scale — between `Radii.xs`=4 and `Radii.sm`=6) | Likely literal 5 | Off-scale. |
+
+### Snapshot tests
+
+Re-record needed for:
+- iOS `PantopusTests/Features/Mailbox/ItemDetail/MailboxItemDetailShellTests` (AI elf strip + attachments card radii)
+- iOS `PantopusTests/Features/Mailbox/MailboxMap/MailboxMapSnapshotTests` (Mailbox map pin-detail reuses the shared views)
+- Android equivalents on `MailItemDetailShellSnapshotTest`, all per-variant snapshot tests (`Booklet*`, `Certified*`, `Community*`, `Coupon*`, `GigMail*`, `Memory*`, `Package*`), and `MailboxMapSnapshotTest`
+
+The cascade is wide because both fixes target shared composables. Deferred — no simulator/emulator. CI will fail snapshot verification until baselines are re-recorded.
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (token swaps `Radii.lg` → `Radii.xl` — both existing canonical tokens).
+- Android — token swap from one canonical token to another. No new tokens introduced.
+
+Files modified (8 lines across 2 files):
+- iOS: `Features/Shared/MailItemDetail/MailItemDetailShell.swift` (4 lines: 2× AIElfStrip outer, 2× AttachmentsRow outer)
+- Android: `ui/screens/shared/mail_item_detail/MailItemDetailShell.kt` (4 lines: same)
+
+### Audit summary
+
+P7.9.f.2 found **two clean token-resolvable fixes in the shared shell**
+that cascade across all 8 A17 variants. The shell's two shared
+composables (`AIElfStripView` + `AttachmentsRowView`) were both using
+`Radii.lg` (=12) where the design's `mail-detail.jsx` consistently
+specifies `borderRadius: 16` (= `Radii.xl`). Same shell-cascade
+mechanism as P7.9.b's `FeedSkeletonCard`.
+
+Notable structural pattern: **the entire A17 family uses `borderRadius:
+14` for primary action buttons** as a deliberate visual choice that
+falls off the canonical ramp (between 12 and 16). This is the same
+"design uses 14 systematically" pattern surfaced in P7.9.c (Marketplace
+listing card), P7.9.d (map cards), and P7.9.e (chat bubbles' 18 + post
+detail's 14). It's beginning to look like an unspoken design-system
+convention for "soft cards / action chips" that the canonical ramp
+doesn't capture.
+
+**Recommendation:** the cumulative finding across P7.9.c → P7.9.f.2
+strongly suggests the design system should consider extending the
+Radii ramp with `Radii.lg2` (=14) and possibly `Radii.xl_5` (=18, for
+Chat bubbles and Coupon ticket hero), since these aren't one-off design
+quirks — they appear systematically across Marketplace, Map cards, Chat
+bubbles, Discover cards, A17 action buttons, and Coupon hero. The
+current literal-shim pattern is consistent but tokens-only discipline
+suffers.
