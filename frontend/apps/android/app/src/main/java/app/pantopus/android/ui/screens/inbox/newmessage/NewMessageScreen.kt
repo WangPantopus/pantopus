@@ -396,9 +396,9 @@ private fun EmptyFrame(
         Row(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(Radii.md))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                     .clickable(onClick = onInvite)
                     .padding(horizontal = Spacing.s5, vertical = Spacing.s3)
                     .testTag("newMessageInvite"),

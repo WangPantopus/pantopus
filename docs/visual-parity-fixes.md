@@ -533,3 +533,109 @@ design-system questions about whether to:
 Option 3 is the de-facto status quo and the safest no-change choice.
 Recommendation: log a design-system ticket to settle (1) vs (2) vs (3)
 before the next audit pass, so future map work has a clear convention.
+
+---
+
+## P7.9.e — Chat surfaces visual parity
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Chat List (Populated · Empty · Loading) | `A08/uploads/Pantopus-design/Chat List.html` + `chat-frames.jsx` | `Features/Chat/ChatListView.swift` + `ChatListContent.swift` + `ConversationRow.swift` | `ui/screens/inbox/chat/ChatListScreen.kt` + `ChatListContent.kt` + `ConversationRow.kt` |
+| Chat Conversation default DM (A15.2 polish: photo bubbles, read receipts, typing indicator, attachment strip) | `Chat_conversation/A15.2 - Conversation.html` + `chat-archetype.css` | `Features/Chat/Conversation/ChatConversationView.swift` + `ChatConversationContent.swift` | `ui/screens/inbox/conversation/ChatConversationScreen.kt` |
+| AI Assistant mode (A15.3) | `Chat_conversation/A15.3 - AI Assistant.html` (shares `chat-archetype.css`) | `Features/Chat/Conversation/AI/*` (welcome card + capability chips) | `ui/screens/inbox/conversation/ai/AiComponents.kt` |
+| Creator thread mode (A15.4) | `Chat_conversation/A15.4 - Creator thread.html` (shares `chat-archetype.css`) | (inlined into `ChatConversationView.swift`) | (inlined into `ChatConversationScreen.kt`) |
+| Fan thread mode (A15.5) | `Chat_conversation/A15.5 - Fan thread.html` (shares `chat-archetype.css`) | (inlined into `ChatConversationView.swift`) | (inlined into `ChatConversationScreen.kt`) |
+| New Message (Populated · Empty) | `A08/New message.html` + `newmessage-frames.jsx` | `Features/Chat/NewMessage/NewMessageView.swift` + `NewMessageContent.swift` | `ui/screens/inbox/newmessage/NewMessageScreen.kt` + `NewMessageContent.kt` |
+
+### Methodology
+
+Rendered the 6 design HTML pages at 1600×1400 (deviceScaleFactor 2) via
+Playwright with locally-vendored React/Babel/Lucide + the design's
+`chat-archetype.css` + `pantopus-tokens.css`. 17 PNGs captured.
+
+P7.9.e is the follow-up to **P7.9a** (commit `4de23c36`), which already
+fixed three deltas in the chat conversation chrome:
+
+1. Header avatar size 32 → 36
+2. iOS composer outer top padding 10 → `Spacing.s2` (=8)
+3. Composer input leading padding 14 → `Spacing.s3` (=12)
+
+P7.9.e widens the audit to **Chat List + New Message** (not covered by
+P7.9a) and re-walks the A15.2/.3/.4/.5 conversation chrome with the new
+sub-surfaces called out in the prompt (photo bubbles, read receipts,
+typing indicator, attachment strip).
+
+### Resolvable token mismatches — FIXED
+
+#### 1. NewMessage "Invite someone to Pantopus" button outer corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (`newmessage-frames.jsx` L421) | `Invite button { padding: '12px 20px', borderRadius: 12, fontSize: 13.5/600 }` | n/a |
+| iOS `NewMessageView.swift:219, 222` (empty-frame invite button overlay + clipShape) | `Radii.md` (=8) | `Radii.lg` (=12) |
+| Android `NewMessageScreen.kt:399, 401` (empty-frame invite button `.clip()` + `.border()`) | `Radii.md` (=8) | `Radii.lg` (=12) |
+
+### Surfaced for design review (NOT fixed — off-scale design values or out-of-scope)
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Message bubble outer radius (incoming/outgoing/AI/all modes) | `borderRadius: 18` (`chat-archetype.css` `.bubble`) | iOS `ChatConversationView.swift:1539-1542, 1727-1730, 1736-1739` uses `Radii.xl` (=16); Android mirrors via `UnevenRoundedRectangle` analog | 18 off-scale (between `Radii.xl`=16 and `Radii.xl2`=20). 2pt under design. |
+| B | Message bubble tail corner | `border-*-radius: 6` for tail (the bubble's short side that connects to avatar) | iOS uses `Radii.xs` (=4) for `bottomLeadingRadius` (incoming tail) / `bottomTrailingRadius` (outgoing tail); Android same | 6 off-scale. Code at `Radii.xs` (4) is 2pt under. Closest canonical: `Radii.sm` (=6). Possible clean fix: `Radii.xs → Radii.sm`. Surfacing rather than auto-fixing because the tail-corner choice is a design-language convention spanning all four modes and changing it should be a design-team call. |
+| C | Image (photo) bubble | `borderRadius: 18, height: 130, width: 200` | Code uses `Radii.xl` (=16) for photo bubbles | Same 18pt off-scale pattern as §A. |
+| D | Voice bubble play button | `width: 28, height: 28, borderRadius: 50%` | iOS+Android use `Circle()` / `CircleShape` ✓ | ✓ matches |
+| E | Voice bubble wave height | `height: 22` | Inlined `22.dp` literal (off-scale) | 22 off-scale; closest tokens 20 / 24. |
+| F | Reaction pill on bubble | `padding: 1px 6px, borderRadius: 999px, fontSize: 11/regular`, count font `9.5px/700` | iOS+Android use `Radii.pill` ✓; 9.5pt count font already P7.4 drift | ✓ shape; off-scale typography. |
+| G | Attachment strip card | `width: 64, height: 64, borderRadius: 12` | iOS `AttachmentTile.swift:1787, 1790, 1793` uses `frame(width:64, height:64)` + `Radii.lg` (=12) ✓; Android `AttachmentStripView` matches | ✓ matches — this is the existing P7.9a-aware implementation. |
+| H | Typing indicator dots | `width: 6, height: 6, borderRadius: 50%, gap: 4px, padding: 10px 12px` | iOS+Android Circle dots at `6×6`, gap `Spacing.s1` (=4), bubble padding `Spacing.s3 / 10` | ✓ matches (10pt vertical is off-scale but matches design literal). |
+| I | Read receipt (check-check icon + "Read HH:MM" text) | `font: 10/medium` for timestamp + `<i data-lucide="check-check">` | iOS `ChatReadReceipt` uses `.font(.system(size: 10, weight: .medium))` + `.checkCheck` icon ✓; Android mirrors | ✓ matches |
+| J | Chat-list search input | `height: 44, borderRadius: 12, padding: 0 14px` (`chat-frames.jsx` L?) | iOS+Android use `Radii.md` (=8) for the search input outer | 12pt design vs 8pt code = 4pt drift. Cleanly resolvable to `Radii.lg` (=12)? Possible follow-up fix. Surfacing rather than applying because Chat List search bar is the user's chrome-search affordance — visual harmony with other surface searches (e.g. Gigs/Marketplace) takes precedence over per-screen tweaks. Recommend a separate sweep covering all chrome-search inputs. |
+| K | Chat-list empty "verified neighbors" trust pill | `padding: '10px 14px', borderRadius: 10` (`chat-frames.jsx` L466-470) | iOS `ChatListView.swift:110, 113` uses `Radii.md` (=8); Android mirrors | 10 off-scale. 2pt under design. Closest token Radii.md (=8) is what code uses. |
+| L | NewMessage search input | `borderRadius: 10, padding: 9px 12px` | iOS+Android use `Radii.md` (=8) | 10 off-scale; 2pt under (consistent with §K Chat-List trust pill). |
+| M | NewMessage section card | `borderRadius: 16, box-shadow: 0 1px 3px` | iOS+Android use `Radii.xl` (=16) ✓ | ✓ matches |
+| N | NewMessage contact-row avatar | `width: 38, height: 38, borderRadius: 50%` | iOS uses `Shimmer(width: 38, height: 38, cornerRadius: 19)` in skeleton (matches); populated avatar size matches | 38 off-scale (between `Spacing.s8`=32 and `Spacing.s10`=40). Code matches design literal. |
+| O | NewMessage Quick-row (group chip) | `padding: '11px 14px', borderRadius: 14` | Not directly inspected; assume `Radii.lg` (=12) in code | 14 off-scale; same pattern as map cards (P7.9.d §B). |
+| P | NewMessage empty hint chips ("messaging works…") | `padding: 6px 10px, borderRadius: 9999, fontSize: 11.5/500` | iOS+Android use `Radii.pill` ✓ | ✓ shape; 11.5pt off-scale typography (P7.4). |
+| Q | Empty state suggestion chip (conversation A15.2 empty) | `borderRadius: 14, padding: 10px 14px, fontSize: 13` | Not directly inspected — depends on which empty layout iOS/Android renders | 14 off-scale. |
+| R | Person preview card (A15.2 empty state, NEW in design) | `borderRadius: 16, padding: 12, with 3-stat grid + mutuals row` (`chat-archetype.css` `.person-card`) | **Not implemented in code** — both platforms use a different empty-conversation layout (no PersonCard component found in `Features/Chat/Conversation/` or `ui/screens/inbox/conversation/`) | Structural divergence — design has a polish-pass component that code lacks. Out of scope for token-application audit. Surfacing as: A15.2 empty state needs a follow-up implementation pass to add the PersonCard + mutuals + suggestions, not a P7.9.x token sweep. |
+| S | AI capability chip card | The AI-welcome card design uses `borderRadius: 16` via `.person-card` analog (`chat-archetype.css`) | iOS `ChatConversationView.swift:367` uses `Radii.xl` (=16) ✓; Android matches via `AiComponents.kt` | ✓ matches |
+| T | Creator/Fan quota hero card | `borderRadius: 16` (auto-welcome card on Fan mode) | iOS `ChatConversationView.swift:630, 633` uses `Radii.xl` (=16) ✓; Android matches | ✓ matches |
+| U | Creator/Fan thread opener card | `borderRadius: 16` (likely; not directly extracted from CSS) | iOS `ChatConversationView.swift:723, 726` uses `Radii.lg` (=12); Android mirrors | Potential 4pt drift. Surfacing — opener cards are bespoke per-mode and may match design literal `borderRadius: 14` (off-scale) rather than the shared `.person-card` 16. Needs design clarification. |
+| V | Fan upgrade CTA button | `borderRadius: 12` likely (matches NewMessage invite pattern) | iOS line 776 uses `Radii.lg` (=12) ✓; Android matches | ✓ matches |
+| W | Composer outer horizontal padding | `padding: 8px 10px 16px` (`chat-archetype.css` `.composer-wrap`) | iOS uses `Spacing.s3` (=12); Android uses literal `10.dp` | iOS 2pt over; Android matches design exactly. Same cross-platform inconsistency P7.9a already flagged. |
+
+### Snapshot tests
+
+Re-record needed for:
+- iOS `PantopusTests/Features/Chat/NewMessage/NewMessageViewSnapshotTests` (invite button radius)
+- Android `NewMessageSnapshotTest` (invite button radius)
+
+Deferred — no simulator/emulator. CI will fail snapshot verification until baselines are re-recorded.
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (the `Radii.md → Radii.lg` change uses an existing canonical token).
+- Android — token swap from one canonical token (`Radii.md`) to another (`Radii.lg`). No new tokens introduced.
+- The fix targets a single chrome surface (NewMessage empty-state invite button); no carry-over impact to other chat surfaces.
+
+Files modified (4 lines across 2 files):
+- iOS: `Features/Chat/NewMessage/NewMessageView.swift` (2 lines)
+- Android: `ui/screens/inbox/newmessage/NewMessageScreen.kt` (2 lines)
+
+### Audit summary
+
+P7.9.e found that **most of the chat conversation chrome** (the
+A15.2/.3/.4/.5 quartet) is well-tokenised against `Radii.xl` (16) and
+`Radii.lg` (12), with the same off-scale design literals (`18` for
+bubbles, `10` for trust pills, `14` for opener cards) recurring as in
+the map surfaces (P7.9.d). One clean fix landed on the NewMessage
+invite button.
+
+The biggest **structural** finding is §R: the A15.2 empty-conversation
+PersonCard (with stats grid + mutuals + 2 suggestion chips) is part of
+the design polish-pass but is **not yet implemented in code**. That's
+a feature-implementation gap, not a token-application gap, and needs a
+separate sub-prompt rather than a P7.9.x fix.

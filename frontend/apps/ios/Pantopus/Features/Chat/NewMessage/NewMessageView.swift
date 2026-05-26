@@ -216,10 +216,10 @@ public struct NewMessageView: View {
                 .padding(.vertical, Spacing.s3)
                 .background(Theme.Color.appSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                         .stroke(Theme.Color.appBorder, lineWidth: 1)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("newMessageInvite")
