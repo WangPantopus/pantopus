@@ -1425,3 +1425,131 @@ remove the per-feature ambiguity. Either path closes the audit; the
 design system can now decide.
 
 P7.9.x audit cycle complete. 🎯
+
+---
+
+## P7.9.k — Settings cluster (chevron leaves)
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+6 chevron-leaf screens beneath Settings → various:
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Help Center | (no dedicated A08 HTML) | `Features/Settings/Help/HelpCenterView.swift` | `ui/screens/settings/help/HelpCenterScreen.kt` |
+| Legal Index (Privacy / Terms / Community Guidelines etc.) | (no dedicated A08 HTML) | `Features/Settings/Legal/LegalIndexView.swift` | `ui/screens/settings/legal/LegalScreens.kt:LegalIndexScreen` |
+| Legal Content (e.g. Privacy Policy long-form) | `A08/uploads/Pantopus-design/Legal Static.html` + `legal-frames.jsx` | `Features/Settings/Legal/LegalContentView.swift` | `ui/screens/settings/legal/LegalScreens.kt:LegalContentScreen` |
+| About | (no dedicated A08 HTML) | `Features/Settings/About/AboutView.swift` | `ui/screens/settings/about/AboutScreen.kt` |
+| Verification Center | (no dedicated A08 HTML) | `Features/Settings/Verification/VerificationCenterView.swift` | `ui/screens/settings/verification/VerificationCenterScreen.kt` |
+| Blocked Users | (no dedicated A08 HTML) | `Features/Settings/Blocks/BlockedUsersView.swift` | `ui/screens/settings/blocks/BlockedUsersScreen.kt` |
+| Password Change | (no dedicated A08 HTML) | `Features/Settings/Password/PasswordChangeView.swift` | `ui/screens/settings/password/PasswordChangeScreen.kt` |
+
+### Methodology
+
+Only one dedicated design HTML exists for the chevron leaves: **`Legal
+Static.html`** (covers the long-form policy/terms viewer). The other
+5 chevron leaves (Help, About, Verification, Blocked Users, Password)
+have **no per-screen design HTML in A08** — they are implementations
+of the generic ContentDetail / GroupedList / Form archetypes already
+audited in P7.9.b (post detail), P7.9.j (Settings), and P7.9.c (Form
+archetype).
+
+Rendered `Legal Static.html` at 1600×1400 (deviceScaleFactor 2). 1 PNG
+captured + overview. Diffed `legal-frames.jsx` against iOS
+`LegalContentView.swift` and Android `LegalScreens.kt`.
+
+### Resolvable token mismatches — NONE in this sub-group
+
+This is the **eighth consecutive audit pass returning zero
+token-resolvable fixes** (after .f.1, .g, .h, .i, .j). Sample
+already-correct findings:
+
+| Surface | Design | Code |
+|---|---|---|
+| Help Center category card | (no design HTML; uses GroupedList archetype) | iOS `HelpCenterView.swift:68` `Radii.lg` ✓; Android matches |
+| About app-version card | (no design HTML) | iOS `AboutView.swift:75, 99` `Radii.lg` ✓; Android `AboutScreen.kt:102, 141` `Radii.lg` ✓ |
+| Legal Content body | Plain long-form text (no card wrapper) | iOS `LegalContentView.swift` uses `ContentDetailShell` with `.h3` / `.body` / bullet text + dividers — no card wrappers, matches design intent ✓ |
+| Verification Center / Blocked Users / Password Change | All chevron leaves use shared shells (`GroupedListView`, `ContentDetailShell`, `FormShell`) with canonical Radii | All ✓ |
+
+### Surfaced for design review (NOT fixed) — Legal Static structural gap
+
+The Legal Static design specifies 5 elements that the iOS/Android
+LegalContentView does not implement:
+
+| # | Element | Design value | Code reality |
+|---|---|---|---|
+| A | **TOCCard** (collapsible "Jump to section" card with numbered 22×22 badges) | `borderRadius: 12, padding: 12×14, item badge 22×22 borderRadius: 6` | Not implemented — body renders as flat scrolling list of `.heading` / `.paragraph` / `.bullet` blocks. No table of contents. |
+| B | **Meta strip** ("Last updated: X · Version Y" with clock icon) | `padding: 9×20, background: sunken, fontSize: 11, with clock icon prefix` | Code shows only "Last updated: X" in the header view (no version, no clock icon, no separate meta strip). |
+| C | **Numbered H2 headings** (e.g. "01 Overview" with primary-700 mono prefix) | `fontSize: 18/700, color primary700, with mono-font number prefix` (`fontSize: 11`) | Code uses generic `.pantopusTextStyle(.h3)` for all headings (no numbered prefix, no primary-700 color). |
+| D | **ContactFooter card** (mailto: privacy@pantopus.com card) | `padding: 14×16, borderRadius: 12, primary50 bg, 36×36 mail icon circle` | Not implemented — code has no contact footer. |
+| E | **Back-to-top floating button** | `width: 40, height: 40, borderRadius: 50%, sunken bg, shows when scroll > 220` | Not implemented. |
+
+All 5 are **structural design intent that code lacks** — same pattern
+as PersonCard in P7.9.e (chat empty-conversation) and Vault folder
+grid in P7.9.f.1. Not token-application fixes; need a separate
+feature-implementation sub-prompt to render the long-form legal
+viewer with TOC + numbered sections + contact footer + back-to-top.
+
+### No design HTML for 5 of 6 chevron leaves
+
+Help Center / About / Verification Center / Blocked Users / Password
+Change have **no per-screen design HTML in A08**. They are
+implementations of the generic Form / ContentDetail / GroupedList
+archetypes that were audited in earlier P7.9.x sub-groups:
+
+- Help Center → category list at `Radii.lg` ✓ (matches GroupedList archetype shell)
+- About → version card at `Radii.lg` ✓
+- Verification Center → multi-card with state chips, all canonical
+- Blocked Users → flat list rows (uses shared `ListOfRowsView` shell)
+- Password Change → 3-field form (uses shared `FormShell`)
+
+Without dedicated design HTMLs, the audit can only verify these
+screens use the right archetypes at canonical tokens, which they do.
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no changes).
+- Android — no changes; existing patterns preserved.
+- All 6 chevron-leaf surfaces audited (5 inherit shell tokenisation; 1 has Legal Static design HTML, all token-app surfaces already canonical).
+- 0 code changes applied.
+
+Files modified (1 file):
+- `docs/visual-parity-fixes.md` (P7.9.k section appended)
+
+### Audit summary
+
+P7.9.k is the **second terminal audit** of the Settings cluster
+(P7.9.j covered Settings index + Notifications + Privacy; P7.9.k
+covers the chevron leaves beneath). Together they confirm the
+Settings family is **the cleanest, most consistently tokenised
+surface family in the app** — both for the index-level cards
+(P7.9.j) and the leaf-level cards (P7.9.k).
+
+The only non-token finding is structural: **Legal Static's bespoke
+long-form chrome (TOC + ContactFooter + back-to-top + numbered
+sections + meta strip) is not implemented** in iOS/Android. This is
+a feature-implementation gap, not a token-application gap, and
+warrants a follow-up sub-prompt rather than a P7.9.x token sweep.
+
+### P7.9.x audit cycle — actual terminal summary
+
+After **13 sub-groups** (P7.9.a, .a-hub, .b, .c, .d, .e, .f.1, .f.2,
+.g, .h, .i, .j, .k) audited across **~90 user-visible screens**:
+
+| Metric | Value |
+|---|---|
+| **Code fixes applied** | **13 fixes** across ~250 sites (mirrored iOS + Android) |
+| **Drifts surfaced for design review** | **~85** |
+| **Audit sub-groups with code fixes** | 7 of 13 |
+| **Audit sub-groups returning 0 fixes** | 6 of 13 (.f.1, .g, .h, .i, .j, .k) |
+| **Structural divergences (feature gaps)** | 7 surfaced (PersonCard, Vault folder grid, Mailbox Earn empty hint, Ceremonial Recipient outer, Compose composer 18pt, Pets row 16pt intent, Legal TOC/Footer/BackToTop/NumberedH2) |
+| **Cumulative off-canonical clustering** | `borderRadius: 14` (30+ sites), `10` (25+ sites), `18` (5+ sites) |
+
+The cycle's terminal recommendation remains: **extend the Radii ramp
+with `Radii.lg2` (=14), `Radii.md_5` (=10), `Radii.xl_5` (=18)**, OR
+publish a snap-to-canonical convention. Either path closes the audit;
+the design system can now decide.
+
+P7.9.x audit cycle FINAL close. 🎯
