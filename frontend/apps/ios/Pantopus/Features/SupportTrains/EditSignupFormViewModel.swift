@@ -318,7 +318,7 @@ public final class EditSignupFormViewModel {
         return f
     }()
 
-    private nonisolated(unsafe) static let timeFormatter: DateFormatter = {
+    private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         f.calendar = Calendar(identifier: .gregorian)

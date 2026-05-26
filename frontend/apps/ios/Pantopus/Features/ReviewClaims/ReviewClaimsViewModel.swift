@@ -85,14 +85,14 @@ public final class ReviewClaimsViewModel: ListOfRowsDataSource {
     }
 
     private let api: APIClient
-    private let onOpenClaim: @MainActor (String) -> Void
+    private let onOpenClaim: @MainActor @Sendable (String) -> Void
     private var rowsCache: [AdminClaimBucket: [AdminClaimDTO]] = [:]
     private var counts: AdminClaimCountsResponse?
     private var oldestAgeSeconds: Int?
 
     init(
         api: APIClient = .shared,
-        onOpenClaim: @escaping @MainActor (String) -> Void = { _ in }
+        onOpenClaim: @escaping @MainActor @Sendable (String) -> Void = { _ in }
     ) {
         self.api = api
         self.onOpenClaim = onOpenClaim

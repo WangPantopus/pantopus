@@ -143,7 +143,7 @@ final class PollsListViewModel: ListOfRowsDataSource {
     private let api: APIClient
     private let onOpenPoll: @Sendable (String) -> Void
     private let onStartPoll: @Sendable () -> Void
-    /// Inject a stable "now" for tests; production uses `Date.init`.
+    /// Inject a stable "now" for tests; production uses `Date()`.
     private let now: @Sendable () -> Date
 
     init(
@@ -152,7 +152,7 @@ final class PollsListViewModel: ListOfRowsDataSource {
         api: APIClient = .shared,
         onOpenPoll: @escaping @Sendable (String) -> Void = { _ in },
         onStartPoll: @escaping @Sendable () -> Void = {},
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.viewerId = viewerId

@@ -38,6 +38,10 @@ public struct ListingComposeWizardView: View {
         _viewModel = State(initialValue: ListingComposeWizardViewModel(mode: mode))
     }
 
+    public init(onOpenListingDetail: @escaping (String) -> Void) {
+        self.init(mode: .create, onOpenListingDetail: onOpenListingDetail)
+    }
+
     public var body: some View {
         WizardShell(model: viewModel) {
             if viewModel.isLoadingExisting {

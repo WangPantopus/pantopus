@@ -78,7 +78,7 @@ final class StartPollFormViewModel {
         homeId: String,
         api: APIClient = .shared,
         kind: StartPollKind = .singleChoice,
-        now: @escaping @Sendable () -> Date = Date.init,
+        now: @escaping @Sendable () -> Date = { Date() },
         idGenerator: @escaping @Sendable () -> String = { UUID().uuidString }
     ) {
         self.homeId = homeId

@@ -9,8 +9,8 @@
 //  rejected the same field flips. We map those three values to chip
 //  variants below.
 //
-//  Row taps emit `onOpenClaim(claimId)`; the host (HubTabRoot) routes
-//  to a placeholder until a claim-status detail screen is designed.
+//  Row taps emit `onOpenClaim(claimId)`; the host routes to the status
+//  waiting frame until a richer claim timeline lands.
 //
 
 import Foundation

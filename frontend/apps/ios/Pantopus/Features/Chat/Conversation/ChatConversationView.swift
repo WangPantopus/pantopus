@@ -39,6 +39,21 @@ public struct ChatConversationView: View {
         self.onBack = onBack
     }
 
+    public init(
+        viewModel: ChatConversationViewModel,
+        mode: ChatConversationMode = .dm,
+        creatorContext: ChatCreatorThreadContext? = nil,
+        onBack: @escaping @MainActor () -> Void
+    ) {
+        self.init(
+            viewModel: viewModel,
+            mode: mode,
+            creatorContext: creatorContext,
+            onOpenAudienceProfile: {},
+            onBack: onBack
+        )
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             ChatConversationHeader(

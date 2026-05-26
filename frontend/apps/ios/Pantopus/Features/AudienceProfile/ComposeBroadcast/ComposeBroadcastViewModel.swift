@@ -193,8 +193,8 @@ public final class ComposeBroadcastViewModel {
         if case .error = phase { phase = .idle }
     }
 
-    private static func message(for error: Error) -> String {
-        if let localized = error as? LocalizedError, let description = localized.errorDescription {
+    private static func message(for error: any Error) -> String {
+        if let localized = error as? any LocalizedError, let description = localized.errorDescription {
             return description
         }
         return "Couldn't send broadcast. Try again."

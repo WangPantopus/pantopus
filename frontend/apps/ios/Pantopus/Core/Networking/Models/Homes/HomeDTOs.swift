@@ -433,7 +433,9 @@ public struct CheckAddressResponse: Decodable, Sendable, Hashable {
 public struct JSONEncodable: Encodable, Sendable {
     private let encodeClosure: @Sendable (any Encoder) throws -> Void
     public init(_ wrapped: some Encodable & Sendable) {
-        encodeClosure = wrapped.encode
+        encodeClosure = { encoder in
+            try wrapped.encode(to: encoder)
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {

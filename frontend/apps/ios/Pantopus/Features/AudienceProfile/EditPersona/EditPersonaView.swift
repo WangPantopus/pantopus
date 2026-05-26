@@ -19,7 +19,7 @@ import SwiftUI
 /// Connect, Copy/Share, Add tier). Keeping `action:` a reference rather than
 /// an inline `{}` keeps SwiftLint's closure rules satisfied while these
 /// stay non-wired in the no-backend build.
-private let personaNoOp: () -> Void = {}
+@MainActor private let personaNoOp: @Sendable () -> Void = {}
 
 public struct EditPersonaView: View {
     @State private var viewModel: EditPersonaViewModel
@@ -1083,7 +1083,7 @@ private struct PersonaShareCardView: View {
 
     private var qrStamp: some View {
         ZStack {
-            ForEach(qrFinders, id: \.self) { point in
+            ForEach(Array(qrFinders.enumerated()), id: \.offset) { _, point in
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .stroke(qrColor, lineWidth: 2)
                     .frame(width: 16, height: 16)

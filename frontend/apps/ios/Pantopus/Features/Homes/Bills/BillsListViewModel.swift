@@ -156,7 +156,7 @@ final class BillsListViewModel: ListOfRowsDataSource {
     private let api: APIClient
     private let onOpenBill: @Sendable (String) -> Void
     private let onAddBill: @Sendable () -> Void
-    /// Inject a stable "now" for tests; production uses `Date.init`.
+    /// Inject a stable "now" for tests; production uses `Date()`.
     private let now: @Sendable () -> Date
 
     init(
@@ -164,7 +164,7 @@ final class BillsListViewModel: ListOfRowsDataSource {
         api: APIClient = .shared,
         onOpenBill: @escaping @Sendable (String) -> Void = { _ in },
         onAddBill: @escaping @Sendable () -> Void = {},
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api

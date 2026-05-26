@@ -107,26 +107,34 @@ public enum ChatSearchText {
     }
 
     /// Render `text` as an `AttributedString` with every case-insensitive
-    /// occurrence of `query` bolded and tinted. Pairs colour WITH weight
-    /// so the highlight reads without relying on colour alone. Built by
-    /// segment concatenation to avoid `String.Index` → attributed-index
-    /// conversion pitfalls.
+    /// occurrence of `query` emphasized. Built as escaped inline Markdown
+    /// so Swift 6 strict concurrency does not emit key-path Sendable
+    /// warnings for direct `AttributedString` attribute writes.
     public static func highlighted(_ text: String, query: String) -> AttributedString {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return AttributedString(text) }
 
-        var emphasis = AttributeContainer()
-        emphasis.foregroundColor = Theme.Color.primary700
-        emphasis.inlinePresentationIntent = .stronglyEmphasized
-
-        var result = AttributedString("")
+        var markdown = ""
         var remainder = Substring(text)
         while let range = remainder.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) {
-            result.append(AttributedString(String(remainder[remainder.startIndex..<range.lowerBound])))
-            result.append(AttributedString(String(remainder[range]), attributes: emphasis))
+            markdown += escapedMarkdown(String(remainder[remainder.startIndex..<range.lowerBound]))
+            markdown += "**\(escapedMarkdown(String(remainder[range])))**"
             remainder = remainder[range.upperBound...]
         }
-        result.append(AttributedString(String(remainder)))
-        return result
+        markdown += escapedMarkdown(String(remainder))
+        return (try? AttributedString(
+            markdown: markdown,
+            options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(text)
+    }
+
+    private static func escapedMarkdown(_ text: String) -> String {
+        let special = "\\`*_{}[]<>()#+-.!|"
+        return text.reduce(into: "") { result, character in
+            if special.contains(character) {
+                result.append("\\")
+            }
+            result.append(character)
+        }
     }
 }

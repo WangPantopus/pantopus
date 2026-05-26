@@ -186,7 +186,7 @@ public struct UpdateHomeEventRequest: Encodable, Sendable {
         self.alertsEnabled = alertsEnabled
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         if let eventType { try c.encode(eventType, forKey: .eventType) }
         if let title { try c.encode(title, forKey: .title) }

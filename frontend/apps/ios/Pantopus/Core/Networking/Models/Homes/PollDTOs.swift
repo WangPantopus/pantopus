@@ -56,7 +56,7 @@ public struct PollDTO: Decodable, Sendable, Hashable, Identifiable {
         case myVote = "my_vote"
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         homeId = try c.decode(String.self, forKey: .homeId)
@@ -139,7 +139,7 @@ public struct PollOptionDTO: Decodable, Sendable, Hashable, Identifiable {
         self.label = label
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         if let single = try? decoder.singleValueContainer().decode(String.self) {
             id = single
             label = single
@@ -167,7 +167,7 @@ public struct PollOptionDTO: Decodable, Sendable, Hashable, Identifiable {
 struct PollVoteValue: Decodable {
     let key: String
 
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         if let str = try? decoder.singleValueContainer().decode(String.self) {
             key = str
             return
@@ -246,7 +246,7 @@ public struct CreatePollRequest: Encodable, Sendable {
         self.visibility = visibility
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(title, forKey: .title)
         if let description, !description.isEmpty {
@@ -287,7 +287,7 @@ public struct UpdatePollRequest: Encodable, Sendable {
         self.visibility = visibility
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         if let title { try c.encode(title, forKey: .title) }
         if let description { try c.encode(description, forKey: .description) }
@@ -332,7 +332,7 @@ public struct PollVoteDTO: Decodable, Sendable, Hashable, Identifiable {
         case selectedOptions = "selected_options"
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(String.self, forKey: .id)
         pollId = try c.decodeIfPresent(String.self, forKey: .pollId)

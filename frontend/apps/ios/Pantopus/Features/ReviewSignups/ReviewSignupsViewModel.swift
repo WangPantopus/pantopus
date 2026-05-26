@@ -416,13 +416,13 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         return f
     }()
 
-    private nonisolated(unsafe) static let timeFormatter: DateFormatter = {
+    private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "h:mm a"
         return f
     }()
 
-    private nonisolated(unsafe) static let dateFormatter: DateFormatter = {
+    private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEE MMM d"
         return f

@@ -166,6 +166,18 @@ public final class AddEmergencyInfoFormViewModel {
         rebuildAggregate()
     }
 
+    convenience init(
+        homeId: String,
+        onCreated: @escaping (HomeEmergencyDTO) -> Void
+    ) {
+        self.init(
+            homeId: homeId,
+            mode: .create,
+            api: .shared,
+            onCreated: onCreated
+        )
+    }
+
     // MARK: - Labels
 
     public var screenTitle: String {

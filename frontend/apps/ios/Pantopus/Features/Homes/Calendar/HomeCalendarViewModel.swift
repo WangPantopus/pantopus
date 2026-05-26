@@ -320,7 +320,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         now: Date,
         calendar: Calendar,
         selectedIsoDate: String?,
-        onTap: @escaping @MainActor (String) -> Void
+        onTap: @escaping @MainActor @Sendable (String) -> Void
     ) -> [RowSection] {
         var cal = calendar
         cal.timeZone = calendar.timeZone
@@ -405,7 +405,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     public static func row(
         for event: ParsedEvent,
         calendar: Calendar,
-        onTap: @escaping @MainActor (String) -> Void
+        onTap: @escaping @MainActor @Sendable (String) -> Void
     ) -> RowModel {
         let category = CalendarEventCategory.from(eventType: event.dto.eventType)
         let timeLabel = formatTime(start: event.start, endIso: event.dto.endAt, calendar: calendar)

@@ -44,6 +44,22 @@ public struct GigBody: View {
         self.onCompareBids = onCompareBids
     }
 
+    public init(
+        gig: GigDetailDTO,
+        onAccept: @escaping @MainActor () -> Void
+    ) {
+        self.init(
+            gig: gig,
+            onAccept: onAccept,
+            onCounter: {},
+            onDecline: {},
+            onOpenThread: {},
+            onOpenGig: {},
+            onViewProfile: {},
+            onCompareBids: {}
+        )
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             if gig.isAccepted {

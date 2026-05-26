@@ -34,13 +34,13 @@ final class EventDetailViewModel {
     private let homeId: String
     private let eventId: String
     private let api: APIClient
-    private let onDeleted: @Sendable () -> Void
+    private let onDeleted: @MainActor @Sendable () -> Void
 
     init(
         homeId: String,
         eventId: String,
         api: APIClient = .shared,
-        onDeleted: @escaping @Sendable () -> Void = {}
+        onDeleted: @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.homeId = homeId
         self.eventId = eventId
@@ -106,23 +106,21 @@ final class EventDetailViewModel {
 
 struct EventDetailView: View {
     @State private var viewModel: EventDetailViewModel
-    private let onBack: @MainActor () -> Void
-    private let onEdit: @MainActor (CalendarEventDTO) -> Void
+    private let onBack: @MainActor @Sendable () -> Void
+    private let onEdit: @MainActor @Sendable (CalendarEventDTO) -> Void
 
     init(
         homeId: String,
         eventId: String,
         api: APIClient = .shared,
-        onBack: @escaping @MainActor () -> Void,
-        onEdit: @escaping @MainActor (CalendarEventDTO) -> Void
+        onBack: @escaping @MainActor @Sendable () -> Void,
+        onEdit: @escaping @MainActor @Sendable (CalendarEventDTO) -> Void
     ) {
         _viewModel = State(initialValue: EventDetailViewModel(
             homeId: homeId,
             eventId: eventId,
             api: api
-        ) {
-            Task { @MainActor in onBack() }
-        })
+        ) { onBack() })
         self.onBack = onBack
         self.onEdit = onEdit
     }

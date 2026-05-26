@@ -59,7 +59,7 @@ public struct BillDTO: Decodable, Sendable, Hashable, Identifiable {
         case details
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         homeId = try container.decode(String.self, forKey: .homeId)
@@ -188,7 +188,7 @@ public struct CreateBillRequest: Encodable, Sendable {
         self.details = details
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(billType, forKey: .billType)
         if let providerName { try c.encode(providerName, forKey: .providerName) }
@@ -234,7 +234,7 @@ public struct UpdateBillRequest: Encodable, Sendable {
         self.details = details
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         if let status { try c.encode(status, forKey: .status) }
         if let paidAt { try c.encode(paidAt, forKey: .paidAt) }
@@ -275,7 +275,7 @@ public struct BillSplitDTO: Decodable, Sendable, Hashable, Identifiable {
         case amount, status, user
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         billId = try container.decode(String.self, forKey: .billId)

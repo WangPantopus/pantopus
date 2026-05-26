@@ -387,7 +387,7 @@ private struct TermsCheckbox: View {
                         }
                     }
                     .frame(width: 20, height: 20)
-                Text(termsText)
+                termsText
                     .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .multilineTextAlignment(.leading)
@@ -400,17 +400,16 @@ private struct TermsCheckbox: View {
             : "Not agreed to terms and privacy")
     }
 
-    private var termsText: AttributedString {
-        var result = AttributedString("I agree to the Terms and Privacy Policy.")
-        if let range = result.range(of: "Terms") {
-            result[range].foregroundColor = Theme.Color.primary600
-            result[range].underlineStyle = .single
-        }
-        if let range = result.range(of: "Privacy Policy") {
-            result[range].foregroundColor = Theme.Color.primary600
-            result[range].underlineStyle = .single
-        }
-        return result
+    private var termsText: Text {
+        Text("I agree to the ")
+            + Text("Terms")
+            .foregroundColor(Theme.Color.primary600)
+            .underline()
+            + Text(" and ")
+            + Text("Privacy Policy")
+            .foregroundColor(Theme.Color.primary600)
+            .underline()
+            + Text(".")
     }
 }
 

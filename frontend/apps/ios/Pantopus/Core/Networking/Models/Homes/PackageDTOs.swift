@@ -50,7 +50,7 @@ public struct PackageDTO: Decodable, Sendable, Hashable, Identifiable {
         case visibility
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         homeId = try c.decode(String.self, forKey: .homeId)
@@ -151,7 +151,7 @@ public struct CreatePackageRequest: Encodable, Sendable {
         self.expectedAt = expectedAt
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         if let carrier { try c.encode(carrier, forKey: .carrier) }
         if let trackingNumber { try c.encode(trackingNumber, forKey: .trackingNumber) }
@@ -209,7 +209,7 @@ public struct UpdatePackageRequest: Encodable, Sendable {
         self.expectedAt = expectedAt
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         if let status { try c.encode(status, forKey: .status) }
         if let deliveredAt { try c.encode(deliveredAt, forKey: .deliveredAt) }

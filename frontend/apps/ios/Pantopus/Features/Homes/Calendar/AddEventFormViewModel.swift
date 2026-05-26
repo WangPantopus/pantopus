@@ -302,7 +302,7 @@ final class AddEventFormViewModel {
         pendingEvent = .updated(eventId: eventId)
     }
 
-    func recordCommitError(_ error: Error, isUpdate: Bool) {
+    func recordCommitError(_ error: any Error, isUpdate: Bool) {
         let fallback = isUpdate ? "Couldn't update this event." : "Couldn't add this event."
         toast = ToastMessage(
             text: (error as? APIError)?.errorDescription ?? fallback,

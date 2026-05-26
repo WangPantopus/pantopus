@@ -62,6 +62,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
 public struct InboxTabRoot: View {
     @Environment(AuthManager.self) private var auth
     @State private var path = RouteStack<InboxRoute>()
+    @State private var router = DeepLinkRouter.shared
     /// P6.6 — "Invite to Pantopus" opens the system share sheet with the
     /// store link prefilled.
     @State private var systemSheet: SystemSheetRequest?
@@ -82,6 +83,15 @@ public struct InboxTabRoot: View {
                 destination(for: route)
                     .toolbar(.hidden, for: .navigationBar)
             }
+        }
+        .onChange(of: router.pending) { _, pending in
+            consumeDeepLinkIfNeeded(pending: pending)
+        }
+        .onAppear {
+            consumeDeepLinkIfNeeded(pending: router.pending)
+        }
+        .task {
+            consumeDeepLinkIfNeeded(pending: router.pending)
         }
         .sheet(item: $systemSheet) { request in request.makeView() }
     }
@@ -128,6 +138,24 @@ public struct InboxTabRoot: View {
             verified: result.verified,
             scrollToMessageId: result.matchedMessageId
         )
+    }
+
+    private func consumeDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {
+        guard let pending else { return }
+        switch pending {
+        case let .conversation(id):
+            path.append(.conversation(InboxConversationDestination(
+                mode: .room(id: id),
+                kind: .dm,
+                displayName: "Conversation",
+                initials: "C",
+                identityKind: nil,
+                verified: false
+            )))
+            _ = router.consume()
+        default:
+            break
+        }
     }
 
     @ViewBuilder
