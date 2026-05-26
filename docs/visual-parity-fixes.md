@@ -1693,3 +1693,153 @@ OR publish a snap-to-canonical convention. Either path closes the
 audit cycle.
 
 P7.9.x audit cycle ACTUAL FINAL close. 🎯
+
+---
+
+## P7.9.m — My Activity surfaces (10 lists)
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+| Surface | Design HTML | iOS list view | Shell |
+|---|---|---|---|
+| My Posts | `A08/My posts.html` + `myposts-frames.jsx` | `Features/MyPosts/MyPostsView.swift` (133 lines, thin) | `ListOfRowsView` |
+| My Tasks (V2) | `A08/My tasks.html` + `mytasks-frames.jsx` | `Features/MyTasks/MyTasksView.swift` | `ListOfRowsView` |
+| My Bids | `A08/My bids.html` + `mybids-frames.jsx` | `Features/MyBids/MyBidsView.swift` | `ListOfRowsView` |
+| Offers | `A08/Offers.html` + `offers-frames.jsx` | `Features/Offers/OffersView.swift` | `ListOfRowsView` |
+| Listing Offers | `A08/Listing offers.html` + `listingoffers-frames.jsx` | `Features/ListingOffers/ListingOffersView.swift` | `ListOfRowsView` |
+| Review Signups | `A08/Review signups.html` + `reviewsignups-frames.jsx` | `Features/ReviewSignups/ReviewSignupsView.swift` | `ListOfRowsView` |
+| Review Claims | `A08/Review claims.html` + `reviewclaims-frames.jsx` | `Features/ReviewClaims/ReviewClaimsView.swift` (list — thin) + `ReviewClaimDetailView.swift` (detail — bespoke) | List uses `ListOfRowsView`; detail is bespoke |
+| Support Trains | `A08/Support trains.html` + `supporttrains-frames.jsx` | `Features/SupportTrains/SupportTrainsListView.swift` | `ListOfRowsView` |
+| Connections | `A08/Connections.html` + `connections-frames.jsx` | `Features/Connections/ConnectionsView.swift` | `ListOfRowsView` |
+| Discover Businesses | `A08/Discover businesses.html` + `discover-frames.jsx` | `Features/DiscoverBusinesses/DiscoverBusinessesView.swift` | `ListOfRowsView` |
+
+### Methodology
+
+Rendered all 10 design HTMLs at 1600×1400 (deviceScaleFactor 2) via
+Playwright. 30 PNGs captured. Delegated spec extraction to a single
+subagent that parsed all 10 JSX files and produced a row-card-radius
++ icon-container-radius table per file.
+
+### Resolvable token mismatches — NONE in this sub-group
+
+This is the **seventh 0-fix sub-group**. Pattern is identical to
+P7.9.h (home subscreens): all 10 list screens are thin
+`ListOfRowsView` wrappers (typical view file 100-200 lines, all
+chrome in the shared shell + per-data-source `RowModel`s).
+
+### Design row-card radius summary
+
+| Screen | Design row-card | Code (via shared shell) | Drift |
+|---|---|---|---|
+| My Posts | `borderRadius: 16` | `ListOfRowsView` shell `Radii.lg` (=12) | 4pt |
+| My Tasks | `borderRadius: 16` | same | 4pt |
+| My Bids | `borderRadius: 16` | same | 4pt |
+| Offers | `borderRadius: 16` | same | 4pt |
+| Listing Offers | `borderRadius: 16` | same | 4pt |
+| Review Signups | `borderRadius: 14` (off-scale) | same `Radii.lg` (=12) | 2pt |
+| Review Claims | `borderRadius: 16` (list); 16 (detail) | list shell `Radii.lg`; detail `Radii.xl` (=16) ✓ for the bespoke detail | 4pt drift on list; **detail ✓** |
+| Support Trains | `borderRadius: 14` (off-scale) | same `Radii.lg` (=12) | 2pt |
+| Connections | `borderRadius: 16` | same | 4pt |
+| Discover Businesses | `borderRadius: 16` | same | 4pt |
+
+**Notable:** `ReviewClaimDetailView.swift` (the bespoke detail screen,
+not the list) **already uses `Radii.xl` (=16) correctly** for its
+many card surfaces. Lines 102, 107-109 (shimmers) + 244, 246, 288,
+290, 412, 414, 435 all at `Radii.xl`. Bespoke screens that compose
+chrome directly are getting `borderRadius: 16` right; shared-shell
+consumers all drift to `Radii.lg` (=12).
+
+### Surfaced for design review (NOT fixed)
+
+#### Shell-cascade drift (8 of 10 screens)
+
+The 8 screens whose design specifies `borderRadius: 16` all drift to
+`Radii.lg` (=12) via the shared `ListOfRowsView.swift:418/420` (the
+`.card` style for grouped sections) and `:853` (the `.standalone` card
+style). This is the same shell-cascade issue surfaced across:
+
+- P7.9.f.1 (Mailbox root mail cards)
+- P7.9.g (My Homes list)
+- P7.9.h (all 12 home subscreens incl. Pets divergence)
+- P7.9.k (chevron leaves)
+
+#### Off-scale design literals (2 of 10 screens)
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Review Signups SignupRow | `borderRadius: 14` (off-scale) | `Radii.lg` (=12) | 2pt drift — recurring `borderRadius: 14` pattern. |
+| B | Support Trains TrainRow | `borderRadius: 14` (off-scale) | `Radii.lg` (=12) | 2pt drift — same pattern. |
+
+#### Leading-cell icon container radii (off-scale)
+
+| # | Surface | Design icon container | Code (likely shared `RowLeading.iconTile`) | Notes |
+|---|---|---|---|---|
+| C | My Tasks ArchetypeTile | `borderRadius: 11` (off-scale) | Shared shell `Radii.md` (=8) | 3pt drift. |
+| D | My Bids category tile | `borderRadius: 10` (off-scale) | Shared shell `Radii.md` (=8) | 2pt drift. |
+| E | Offers thumbnail | `borderRadius: 10` (off-scale) | Shared shell `Radii.md` (=8) | 2pt drift. |
+| F | Review Claims avatar container | `borderRadius: 10` (off-scale) | Shared shell `Radii.md` (=8) | 2pt drift. |
+| G | Support Trains tile | `borderRadius: 11` (off-scale) | Shared shell `Radii.md` (=8) | 3pt drift. |
+| H | Discover Businesses BusinessRow container | `borderRadius: 11` (off-scale) | Shared shell `Radii.md` (=8) | 3pt drift. |
+
+#### Already-correct (sampled)
+
+- All 10 list screens have status/role chips at `Radii.pill` (9999) ✓
+- All 10 use shared `EmptyState` for empty frames ✓
+- Listing Offers / Connections avatar containers use `Capsule()` (matches design's `borderRadius: 9999` for circular avatars) ✓
+- `ReviewClaimDetailView` (bespoke detail, not list) at `Radii.xl` (16) ✓
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no changes).
+- Android — no changes; existing patterns preserved.
+- All 10 My Activity surfaces audited; 0 code changes applied.
+
+Files modified (1 file):
+- `docs/visual-parity-fixes.md` (P7.9.m section appended)
+
+### Audit summary
+
+P7.9.m closes a clean parallel to P7.9.h: **another 10-screen
+sub-group of thin `ListOfRowsView` wrappers, all drifting by the same
+4pt at the row-card outer level (design 16 / code 12) because the
+shared shell drives the radius.**
+
+The notable evidence-point in this audit: **ReviewClaimDetailView**
+(the bespoke detail screen, not the list) **already uses `Radii.xl`
+(=16) correctly** because it composes chrome directly without going
+through `ListOfRowsView`. This is direct confirmation that the
+`borderRadius: 16` design intent is right; the shell is the gating
+factor.
+
+### P7.9.x audit cycle — TRULY FINAL summary (after .m)
+
+After **15 sub-groups** audited across **~110 user-visible screens**:
+
+| Metric | Value |
+|---|---|
+| **Code fixes applied** | **14 fixes** across ~252 sites (mirrored iOS + Android) |
+| **Drifts surfaced for design review** | **~110** |
+| **Audit sub-groups with code fixes** | 8 of 15 (.a, .a-hub, .b, .c, .d, .e, .f.2, .l) |
+| **Audit sub-groups returning 0 fixes** | 7 of 15 (.f.1, .g, .h, .i, .j, .k, .m) |
+| **Structural divergences** | 7 surfaced as feature-implementation gaps |
+| **Cumulative off-canonical clustering** | `borderRadius: 14` (35+ sites), `10` (30+ sites), `18` (5+ sites) |
+| **Shell-cascade drifts** | 30+ list-row sites all drifting at 4pt (design 16 vs shell `Radii.lg` 12) |
+
+**The shell-cascade finding is now overwhelming.** The single most
+high-leverage P7.9.x fix would be **changing the shared
+`ListOfRowsView` card-style from `Radii.lg` (12) to `Radii.xl` (16)** —
+this would resolve 30+ surfaces across home subscreens, mailbox lists,
+chevron leaves, and all 10 My Activity screens in one commit. The
+trade-off: Settings index + chevron leaves (P7.9.j, .k) would shift
+from currently-matching 12pt to 16pt, drifting from THEIR design
+intent. That's the design-system decision worth making.
+
+The cycle's terminal recommendation, unchanged: **extend the Radii
+ramp with `Radii.lg2` (=14), `Radii.md_5` (=10), `Radii.xl_5` (=18)**,
+OR publish a snap-to-canonical convention, OR settle the shared-shell
+radius question (bump to 16 for cards-as-content, keep at 12 for
+grouped-list-as-table).
+
+P7.9.x audit cycle TRULY FINAL close. 🎯
