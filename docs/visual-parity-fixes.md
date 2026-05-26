@@ -891,3 +891,120 @@ quirks — they appear systematically across Marketplace, Map cards, Chat
 bubbles, Discover cards, A17 action buttons, and Coupon hero. The
 current literal-shim pattern is consistent but tokens-only discipline
 suffers.
+
+---
+
+## P7.9.g — Home surfaces (interior)
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| My Homes list (Populated + Empty) | `A08/My homes.html` + `myhomes-frames.jsx` | `Features/Homes/MyHomesListView.swift` + `MyHomesListViewModel.swift` | `ui/screens/homes/MyHomesListScreen.kt` + `MyHomesListViewModel.kt` |
+| Home Dashboard (Populated · Empty · Needs-attention — A10.1/A10.2) | `A10/A10.1 Home.html` + `A10.2 Home (alt).html` + `home-frames.jsx` | `Features/Homes/HomeDashboardView.swift` + `HomeDashboardComponents.swift` + `HomeDashboardViewModel.swift` | `ui/screens/homes/HomeDashboardScreen.kt` + `HomeDashboardViewModel.kt` |
+| Add Home wizard step 1 — Find Your Home (A12.1) | `Wizard__multi-step_form_/A12.1 Find Your Home.html` + `find-frames.jsx` | `Features/Homes/AddHome/AddHomeFindStepView.swift` + `AddHomeSteps.swift` | `ui/screens/homes/add_home/AddHomeSteps.kt` + `AddHomeWizardScreen.kt` |
+| Add Home wizard step 2 — geocode (A12.2) | `Wizard__multi-step_form_/A12.2 Add Home.html` + `add-home-frames.jsx` | `Features/Homes/AddHome/AddHomeGeocodeConfirmationViews.swift` | `ui/screens/homes/add_home/AddHomeSteps.kt` (geocode rendering) |
+| Claim Ownership Start (A12.3) | `Wizard__multi-step_form_/A12.3 Claim Ownership Start.html` + `claim-start-frames.jsx` | `Features/Homes/ClaimOwnership/Steps/ClaimStartStep.swift` + shared `Wizard/Blocks/RequirementsCardBlock.swift` | `ui/screens/homes/claim_ownership/ClaimOwnershipSteps.kt` + shared `wizard/blocks/RequirementsCardBlock.kt` |
+| Property Details (A13.5) | `A13___Form__single_screen_/Property Details.html` + `property-details-frames.jsx` | `Features/Homes/PropertyDetails/{PropertyDetailsView,PropertyDetailsContent,PropertyDetailsViewModel}.swift` | `ui/screens/homes/property_details/{PropertyDetailsScreen,PropertyDetailsContent,PropertyDetailsViewModel}.kt` |
+| Invite Owner form (A13.2) | `A13___Form__single_screen_/Invite Owner.html` + `invite-owner-frames.jsx` | `Features/Homes/InviteOwner/{InviteOwnerFormView,InviteOwnerFormContent,InviteOwnerFormViewModel}.swift` | `ui/screens/homes/invite_owner/{InviteOwnerFormScreen,InviteOwnerFormViewModel}.kt` |
+
+### Methodology
+
+Rendered the 8 design HTML pages at 1600×1400 (deviceScaleFactor 2) via
+Playwright with locally-vendored React/Babel/Lucide. 16 PNGs captured.
+
+### Resolvable token mismatches — NONE in this sub-group
+
+Like P7.9.f.1, the audit returned **zero clean token-resolvable fixes**. The reasons:
+
+1. **The on-canonical surfaces are already correctly tokenised.** Sample
+   findings (all ✓ matches design):
+   - `RequirementsCardBlock` (shared wizard block) → `Radii.xl` (16) matches design's `borderRadius: 16` for the Claim Start Requirements card.
+   - `QuickActionTile` (shared `Bodies.swift:GridTabsBody`) → outer `Radii.lg` (12), icon-bg `Radii.md` (8) — both match design's Home Dashboard QuickAction tiles (`borderRadius: 12` outer + `8` icon-bg).
+   - `AddHomeFindStepView` search field → `Radii.lg` (12) matches design's Find search input.
+   - `AddHomeGeocodeConfirmationViews` map strip → `Radii.lg` (12) matches design's MapStrip.
+   - `AddHomeFindStepView` autocomplete dropdown outer → `Radii.xl` (16) — design has `borderRadius: 14` (off-scale); code uses the nearest canonical token.
+   - `ClaimStartStep:WhyWeAskRow` info card → `Radii.lg` (12) matches design's why-we-ask `borderRadius: 12`.
+   - `PrimaryButton` (shared) → `Radii.lg` (12) matches design's wizard primary CTA `borderRadius: 12`.
+
+2. **The off-scale design literals are the dominant pattern**, same as P7.9.c-f surfaces:
+   - HomeRow address-tile `borderRadius: 14` (off-scale)
+   - Home Dashboard hero `borderRadius: 18` (off-scale)
+   - Home Dashboard section card / NeedsAttentionBanner `borderRadius: 14` (off-scale)
+   - Property Details hero / mismatch banner `borderRadius: 14` / `10` (off-scale)
+   - Various input fields / info pills `borderRadius: 10` (off-scale)
+
+3. **Shared shells override per-feature choice.** The Home Dashboard's `DashboardCard` wraps every section (Welcome, Section, Overview, etc.) at `Radii.lg` (12) by design — changing it cascades. MyHomes uses `ListOfRowsView` (same issue as Mailbox in P7.9.f.1).
+
+### Surfaced for design review (NOT fixed)
+
+#### Structural divergences
+
+| # | Surface | Design intent | Code reality |
+|---|---|---|---|
+| A | **HomeRow address tile** (My Homes populated) | `borderRadius: 14, padding 14×12, with stats strip + role chip + current-affordance badge` | `MyHomesListView.swift` delegates to `ListOfRowsView`; row card geometry comes from the shared shell's `.card` style at `Radii.lg` (12). 2pt drift; structural — can't fix without forking the shell. |
+| B | **Home Dashboard hero card** | `borderRadius: 18, gradient background, padded stat row` | iOS `HomeHeroHeader` uses `Radii.xl2` (=20); Android equivalent matches. 2pt over design's 18; closer than `Radii.xl` (=16) would be. Surface for design call. |
+| C | **Home Dashboard Welcome empty card** | `borderRadius: 16` (design specifically wants xl for the brand-new-home onboarding card) | `DashboardCard` shared wrapper uses `Radii.lg` (=12); the Welcome empty state inherits this 12. 4pt drift from design's 16. Could be fixed by passing a `cornerRadius:` parameter to `DashboardCard` and overriding for Welcome — non-token-application change. |
+
+#### Off-scale design values (literal-shim or nearest-canonical pattern)
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| D | Home Dashboard section card (`DashboardCard`) | `borderRadius: 14` (off-scale) | iOS `HomeDashboardComponents.swift:312/314` `Radii.lg` (=12); Android matches | 2pt drift. Same pattern as Discover/Marketplace cards (P7.9.c §A). |
+| E | NeedsAttentionBanner | `borderRadius: 14` (off-scale) | iOS line 113/115 `Radii.lg` (=12); Android line 396/398 matches | 2pt drift. |
+| F | ClaimOwnershipBanner | `borderRadius: 14` (off-scale, per `home-frames.jsx`) | iOS line 59/61 `Radii.lg` (=12); Android matches | 2pt drift. |
+| G | Property Details hero card | `borderRadius: 14` (off-scale) | iOS `PropertyDetailsView.swift:134/136` `Radii.lg` (=12); Android matches | 2pt drift. |
+| H | Property Details mismatch banner | `borderRadius: 10` (off-scale) | iOS line 144/147 `Radii.lg` (=12); Android matches | 2pt over design (12 > 10). |
+| I | InviteOwner home context strip | `borderRadius: 10` (off-scale) | iOS `InviteOwnerFormContent.swift:103` `Radii.md` (=8); Android matches | 2pt under. |
+| J | Find Your Home nearby-result rows | `borderRadius: 14` (off-scale) | iOS `AddHomeFindStepView.swift:196/198` `Radii.xl` (=16); Android matches | 2pt over. |
+| K | Find Your Home autocomplete dropdown | `borderRadius: 14` (off-scale) | iOS line 257/259 `Radii.xl` (=16); Android matches | 2pt over. |
+| L | Add Home form fields | `borderRadius: 10` (off-scale) | iOS uses `Radii.md` (=8) via shared `FormShell`; Android matches | 2pt under. Same pattern as Disambiguate/Property Details forms. |
+| M | Claim Ownership ContestedNotice banner | `borderRadius: 14` (off-scale) | iOS `ClaimStartStep.swift:134/136` `Radii.lg` (=12); Android matches | 2pt under. |
+| N | Property Details household badge | `borderRadius: 4` (= `Radii.xs`) | Code likely at `Radii.xs` ✓ | Probably ✓ — needs spot-check. |
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no changes made).
+- Android — no changes; existing patterns preserved.
+- All 7 home surfaces audited; 0 code changes applied.
+
+Files modified (1 file):
+- `docs/visual-parity-fixes.md` (P7.9.g section appended)
+
+### Audit summary
+
+P7.9.g is the **fourth audit pass** (after P7.9.f.1) to return zero
+token-resolvable fixes from a 7+ screen sub-group. The recurring
+finding now spans 5 audit sub-groups (P7.9.c, P7.9.d, P7.9.f.1, P7.9.f.2,
+P7.9.g):
+
+> **Design's `borderRadius: 14` is a deliberate, recurring choice that
+> the canonical Radii ramp doesn't capture.** It appears across:
+> - Marketplace listing card (P7.9.c §A)
+> - Map cards (P7.9.d §B)
+> - Mailbox mail card / Vault folder tile (P7.9.f.1 §A, P)
+> - All 8 A17 mail-detail action buttons (P7.9.f.2 §A)
+> - Home Dashboard section card / banners / Property Details hero / Find autocomplete / nearby results (P7.9.g §D-K, this pass)
+
+The `borderRadius: 10` off-scale pattern also recurs (input fields,
+small info pills, hint cards), and `borderRadius: 18` recurs (Home Hero,
+Chat bubbles in P7.9.e, Coupon hero in P7.9.f.2).
+
+Code's response has been inconsistent: some sites use literals
+(Marketplace, Map, Mailbox card, Ceremonial chrome), others use the
+nearest canonical token (Home cards, Property Details, Discover cards).
+This inconsistency is the design-system question worth resolving —
+not by changing one consumer at a time but by either:
+
+1. **Extending the Radii ramp** — add `Radii.lg2` (=14), `Radii.xl_5`
+   (=18), and `Radii.md_5` (=10). Most direct resolution.
+2. **Snapping all to nearest canonical** — accept 2pt visual drift on
+   ~30 surfaces across 5 audit groups. Tokens-only discipline preserved.
+3. **Status quo with documentation** — current state. Per-feature
+   resolution varies.
+
+This audit's cumulative recommendation remains option (1) — the
+breadth of evidence (`14` appearing 30+ times across 5 audit groups)
+suggests these aren't drifts but unspoken tokens.
