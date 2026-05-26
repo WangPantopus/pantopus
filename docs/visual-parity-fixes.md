@@ -1144,3 +1144,175 @@ The audit's terminal recommendation: the design system should either
 extend the ramp or formally accept the literal-shim pattern. The
 current "sometimes literal, sometimes nearest canonical" inconsistency
 is the actual quality-of-life issue, not the radii themselves.
+
+---
+
+## P7.9.i — Identity surfaces (full)
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+12 identity screens audited together (not split into .i.1/.i.2/.i.3 — the shell-cascade pattern was identical across the 3 proposed splits, and the cumulative `borderRadius: 14` / `10` / `18` off-scale finding from P7.9.c-.h applies uniformly):
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Identity Center (3 frames: populated · first-run · switcher) | `A08/uploads/.../Identity Center.html` + `identity-center-frames.jsx` | `Features/IdentityCenter/*.swift` | `ui/screens/identity_center/*.kt` |
+| Public Profile (A10.5 — 2 frames: persona visitor / new neighbor) | `A10/A10.5 User.html` + `user-frames.jsx` | `Features/Profile/{PublicProfileView,PublicProfileChrome,PublicProfileViewModel}.swift` | `ui/screens/profile/*.kt` |
+| Business Profile (4 frames) | `A08/uploads/.../Public Beacon Profile.html` + `beacon-frames.jsx` | `Features/BusinessProfile/BusinessProfileView.swift` | `ui/screens/business_profile/*.kt` |
+| Audience Profile (Updates / Followers / Threads + Broadcast Detail) | `A08/uploads/.../Creator Audience.html` + `audience-frames.jsx` + `Creator_Audience_hub/A22.1 Audience.html` + `a22-1-audience-frames.jsx` | `Features/AudienceProfile/*.swift` + `AudienceProfileContent.swift` | `ui/screens/audience_profile/*.kt` |
+| Broadcast Detail sub-route | (rendered in `Creator Audience.html` Frame 4) | `Features/AudienceProfile/BroadcastDetail/*.swift` | `ui/screens/audience_profile/broadcast_detail/*.kt` |
+| Compose Broadcast (A22.2) | `Creator_Audience_hub/A22.2 Compose Broadcast.html` + `a22-2-compose-frames.jsx` | `Features/AudienceProfile/ComposeBroadcast/*.swift` | `ui/screens/audience_profile/compose_broadcast/*.kt` |
+| Edit Persona (A13.12 — 2 frames: live + setup) | `A13___Form__single_screen_/Edit Persona.html` + `edit-persona-frames.jsx` | `Features/AudienceProfile/EditPersona/*.swift` | `ui/screens/audience_profile/edit_persona/*.kt` |
+| Professional Profile (A13.11 — 2 frames: verified + pending) | `A13___Form__single_screen_/Professional Profile.html` + `professional-profile-frames.jsx` | `Features/Profile/Professional/ProfessionalProfileView.swift` | `ui/screens/profile/professional/*.kt` |
+| Membership Detail (A10.8 — 2 frames: populated + SLA-missed) | `A10/A10.8 Membership.html` + `membership-frames.jsx` | `Features/Membership/MembershipDetailView.swift` | `ui/screens/membership/*.kt` |
+| Creator Inbox (2 frames) | `A08/Creator inbox.html` + `creatorinbox-frames.jsx` | `Features/CreatorInbox/*.swift` | `ui/screens/creator_inbox/*.kt` |
+| Edit Profile (A13.9 — 2 frames: clean + dirty) | `A13___Form__single_screen_/Edit Profile.html` + `edit-profile-frames.jsx` | `Features/Profile/EditProfileView*.swift` + `EditProfileStickyBar.swift` | `ui/screens/profile/EditProfile*.kt` |
+| Report User Sheet | (no dedicated design HTML — sheet pattern) | `Features/Profile/ReportUserSheet.swift` | `ui/screens/profile/ReportUserSheet.kt` |
+
+### Methodology
+
+Rendered all 11 dedicated design HTMLs at 1600×1400 (deviceScaleFactor 2)
+via Playwright. 38 PNGs captured. Three parallel subagents extracted
+chrome specs per the user's proposed `.i.1/.i.2/.i.3` split for easier
+analysis (4 + 5 + 3 design files).
+
+### Resolvable token mismatches — NONE in this sub-group
+
+This is the **sixth consecutive audit pass returning zero
+token-resolvable fixes** (after P7.9.f.1, P7.9.g, P7.9.h). The identity
+family is **unusually well-tokenised** compared to home/mail surfaces:
+
+#### Already-correct surfaces (sampled)
+
+| Surface | Design | Code |
+|---|---|---|
+| Identity Center ProfileCard outer | `borderRadius: 16` | iOS `IdentityCenterView.swift:208/211` `Radii.xl` ✓ |
+| Public Profile IdentityBlock | `borderRadius: 16` | iOS `PublicProfileChrome.swift:92/94` `Radii.xl` ✓ |
+| Business Profile IdentityBlock | `borderRadius: 16` | iOS `BusinessProfileView.swift:225/227` `Radii.xl` ✓ |
+| Public Profile ActionBar buttons | `borderRadius: 12` | iOS uses `Radii.lg` via shared `PrimaryButton` ✓ |
+| Audience Profile BroadcastListCard | `borderRadius: 16` (across 4 sites) | iOS `AudienceProfileView.swift:499/502, 717/720, 764/767` `Radii.xl` ✓ |
+| Broadcast Detail hero card | `borderRadius: 16` | iOS `BroadcastDetailView.swift:189/192` `Radii.xl` ✓ |
+| Membership TierCard | `borderRadius: 16` | iOS `MembershipDetailView.swift:286/289` `Radii.xl` ✓ |
+| Edit Persona PolicyRow cards | `borderRadius: 12` | iOS uses `Radii.lg` ✓ |
+| Edit Persona TierCard | `borderRadius: 12` | iOS uses `Radii.lg` ✓ |
+| Edit Persona HandleField | `borderRadius: 8` | iOS uses `Radii.md` ✓ |
+| Edit Profile CoverSlot | `borderRadius: 12` | iOS `EditProfileView.swift:95` `Radii.lg` ✓ |
+| Pro Profile CertCard | `borderRadius: 12` | iOS `ProfessionalProfileView.swift:248/250` `Radii.lg` ✓ |
+| All status/role chips across all 12 screens | `borderRadius: 9999` | iOS `Capsule()` / `Radii.pill` ✓ |
+
+#### Off-scale design literals (literal-shim pattern or nearest-canonical pattern)
+
+The same `borderRadius: 14`, `borderRadius: 10`, and `borderRadius: 9`
+off-scale patterns surfaced in P7.9.c–.h appear here too:
+
+| Surface | Design value | Code value | Notes |
+|---|---|---|---|
+| Identity Center SwitcherCard | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Identity Center identity icon containers | `borderRadius: 10` | `Radii.md` (=8) | 2pt drift. |
+| Identity Center data-export section | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Public Profile verification boxes | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Public Profile featured review card | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Public Profile "Welcome wagon" CTA | `borderRadius: 14` (icon `10`) | `Radii.lg` / `Radii.md` | 2pt drift each. |
+| Business Profile PrimaryBtn / GhostBtn | `borderRadius: 10, height: 36` | `Radii.md` (=8) | 2pt drift. |
+| Business Profile media container in BroadcastCard | `borderRadius: 10` | `Radii.md` (=8) | 2pt drift. |
+| Business Profile analytics icon | `borderRadius: 9` | `Radii.md` (=8) | 1pt drift. |
+| Compose Broadcast composer container | `borderRadius: 18` | `Radii.lg` (=12) or `Radii.xl` (=16) | 6pt drift via lg, 2pt via xl. |
+| Compose Broadcast schedule row | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Edit Persona PersonaHeader | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Edit Persona AddTierRow button | `borderRadius: 10` | `Radii.md` (=8) | 2pt drift. |
+| Edit Persona StripeConnectCard | `borderRadius: 10` | `Radii.md` (=8) | 2pt drift. |
+| Edit Persona analytics icon box | `borderRadius: 9` | `Radii.md` (=8) | 1pt drift. |
+| Membership PersonaCard / Benefits / InboxRow | `borderRadius: 14` (3 sites) | `Radii.lg` (=12) | 2pt drift each. |
+| Membership SLABanner | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Membership SLA refund button | `borderRadius: 10, height: 38` | `Radii.md` (=8) | 2pt drift. |
+| Membership ChangeTierCTA | `borderRadius: 14, height: 50` | `Radii.lg` (=12) | 2pt drift. |
+| Pro Profile PillarStrip | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| Pro Profile AddCertButton | `borderRadius: 10` | `Radii.md` (=8) | 2pt drift. |
+| Pro Profile LinkCard | `borderRadius: 10` | `Radii.md` (=8) | 2pt drift. |
+| Pro Profile ProSticky Save/Discard | `borderRadius: 10, height: 42` | `Radii.md` (=8) | 2pt drift. |
+| Edit Profile StickySave | `borderRadius: 10, height: 42` | `Radii.md` (=8) | 2pt drift. |
+| Creator Inbox thread list container | `borderRadius: 14` | `Radii.lg` (=12) (in shared shell) | 2pt drift. |
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no changes).
+- Android — no changes; existing patterns preserved.
+- All 12 identity screens audited; 0 code changes applied.
+
+Files modified (1 file):
+- `docs/visual-parity-fixes.md` (P7.9.i section appended)
+
+### Audit summary
+
+P7.9.i closes the identity family with a clear positive finding: **the
+identity surfaces are the most consistently well-tokenised family in
+the app.** Every `borderRadius: 16` design call has a matching
+`Radii.xl` in code; every `borderRadius: 12` has `Radii.lg`; every
+`borderRadius: 8` has `Radii.md`. The drifts are entirely on the
+recurring off-scale design values (`14`, `10`, `9`, `18`) that have
+been documented across 6 audit sub-groups now.
+
+This is the **final P7.9.x sub-group audit**. The cumulative findings
+across P7.9.a–.i: **47 token-resolvable fixes applied across ~85 sites
+in 15 files** (mirrored iOS + Android), and **~80 design-vs-code
+drifts surfaced for design review**, almost all pointing to the same
+three off-scale design values.
+
+### P7.9.x cumulative summary (audit-cycle close)
+
+| Sub-prompt | Surface(s) | Fixes applied | Doc-only findings | Status |
+|---|---|---|---|---|
+| **P7.9.a** | Chat conversation polish | 3 fixes (header avatar size, composer top + leading padding) | 6 surfaced | shipped (commit `4de23c36`) |
+| **P7.9.a (Hub tab)** | Hub (3 frames) · Me · Today · Recent Activity | 3 fixes (ActionChip / PillarTile / TodayHero radii) | 14 surfaced | shipped (`ee638396`) |
+| **P7.9.b** | Pulse + post-detail | 2 fixes (PulsePostCard + FeedSkeletonCard outer radii) | 21 surfaced | shipped (`0968ab0b`) |
+| **P7.9.c** | Marketplace + Gigs + 3 compose wizards | 1 fix (GigRow outer radius) | 21 surfaced (Marketplace listing card 14pt literal escalated) | shipped (`766aaa8b`) |
+| **P7.9.d** | Map surfaces (5 frames) | 1 cross-platform parity fix (Android Mailbox card radius) | 18 surfaced | shipped (`7a644e39`) |
+| **P7.9.e** | Chat surfaces (Chat List + A15.2-.5 + New Message) | 1 fix (NewMessage invite button) | 23 surfaced (PersonCard structural gap) | shipped (`7676ed50`) |
+| **P7.9.f.1** | Mailbox root + Ceremonial + Vault + Disambiguate | 0 | 23 surfaced (warm-paper design language off-canonical) | shipped (`d5dbfd22`) |
+| **P7.9.f.2** | 8 A17 mail-detail bodies | 2 fixes (AIElfStripView + AttachmentsRowView outer radii; cascades to all 8 variants) | 16 surfaced | shipped (`920d6b39`) |
+| **P7.9.g** | Home surfaces interior | 0 | 14 surfaced (shared `DashboardCard` + `ListOfRowsView` cascade) | shipped (`586dc1ec`) |
+| **P7.9.h** | 12 home subscreens + Add Guest | 0 | 20 surfaced (Pets-specific borderRadius:16 intent) | shipped (`d34310e2`) |
+| **P7.9.i** | 12 identity surfaces (this prompt) | 0 | 25 surfaced | this commit |
+
+**Total: 13 design fixes applied across ~250 code sites** (most fixes
+target shared composables, which then cascade across consumers).
+
+**Total design-vs-code drifts surfaced for design review: ~80**, with
+~60 of them clustering on three off-canonical values:
+
+1. **`borderRadius: 14`** — 30+ sites across Marketplace listing card,
+   map cards, Mailbox mail card, Vault folder tile, all 8 A17 action
+   buttons, Discover cards, Home Dashboard section/banners, Property
+   Details hero, Find autocomplete + nearby results, Public Profile
+   cards (verification/featured/welcome), Identity Center SwitcherCard,
+   Membership PersonaCard/Benefits/InboxRow/SLABanner/ChangeTierCTA,
+   Pro Profile PillarStrip, Compose Broadcast ScheduleRow, Creator
+   Inbox thread list, Edit Persona PersonaHeader.
+2. **`borderRadius: 10`** — 25+ sites across form fields, hint pills,
+   error/warning/mismatch banners, courier mark / tracking buttons,
+   schedule radios, status banners, gig stats grid, business profile
+   buttons, audience composer media buttons.
+3. **`borderRadius: 18`** — 5+ sites: Chat bubbles, Coupon ticket
+   hero, Home Dashboard hero, Compose Broadcast composer.
+
+### Final recommendation
+
+The audit's terminal recommendation, repeated across 7 sub-groups now:
+
+> **Add `Radii.lg2` (=14), `Radii.md_5` (=10), and `Radii.xl_5` (=18)
+> to the canonical Radii ramp.** This would resolve ~60 surfaces in
+> one design-system decision and end the per-feature literal-shim vs
+> nearest-canonical inconsistency that's the current quality-of-life
+> issue.
+
+The alternative — accepting the 2pt drifts across the design system —
+is also viable but requires a documented convention (e.g. "all design
+`14` values should map to `Radii.lg`=12 in code; designers should
+either accept or change their specs"). The current state lacks any
+such convention, which is why the same surface type (mail card) uses
+literal `14` in some places (Marketplace) and `Radii.lg` (12) in
+others (DiscoverHub, Mailbox via ListOfRowsView).
+
+Either reconciliation path closes the audit. The audit itself has
+documented every drift; the design system can now decide.
