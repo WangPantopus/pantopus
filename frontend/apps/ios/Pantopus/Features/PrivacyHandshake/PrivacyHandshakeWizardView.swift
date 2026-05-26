@@ -266,13 +266,13 @@ public struct PrivacyHandshakeWizardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(
                         isSelected ? Theme.Color.primary600 : Theme.Color.appBorder,
                         lineWidth: isSelected ? 2 : 1
                     )
             )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("privacyHandshakeTier_\(tier.rank)")

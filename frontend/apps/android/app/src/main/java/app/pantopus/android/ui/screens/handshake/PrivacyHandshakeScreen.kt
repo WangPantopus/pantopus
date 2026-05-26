@@ -408,12 +408,12 @@ private fun TierRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(if (isSelected) PantopusColors.primary50 else PantopusColors.appSurface)
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
                     color = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorder,
-                    shape = RoundedCornerShape(Radii.lg),
+                    shape = RoundedCornerShape(Radii.xl),
                 )
                 .clickable(onClick = onSelect)
                 .padding(14.dp)

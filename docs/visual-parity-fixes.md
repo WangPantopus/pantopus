@@ -1553,3 +1553,143 @@ publish a snap-to-canonical convention. Either path closes the audit;
 the design system can now decide.
 
 P7.9.x audit cycle FINAL close. 🎯
+
+---
+
+## P7.9.l — Auth + transactional states
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope (11 transactional surfaces across 6 design HTMLs)
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Auth (Log in / Sign up / Forgot / Reset / Verify email / Input error — 6 frames) | `A08/uploads/.../Auth.html` + `auth-frames.jsx` | `Features/Auth/*.swift` (LoginView, SignUpView, ForgotPasswordView, ResetPasswordView, VerifyEmailView) | `ui/screens/auth/*.kt` |
+| Privacy Handshake (Handle / Tier / Stripe / Already-following — 4 steps) | `A08/uploads/.../Privacy Handshake.html` + `handshake-frames.jsx` | `Features/PrivacyHandshake/{PrivacyHandshakeWizardView,PrivacyHandshakeContent,PrivacyHandshakeViewModel}.swift` | `ui/screens/handshake/{PrivacyHandshakeScreen,Content,ViewModel}.kt` |
+| Token Accept (Home invite / Business seat / Guest pass — 3 invite types) | `A08/uploads/.../Token Accept.html` + `token-accept-frames.jsx` | `Features/TokenAccept/{TokenAcceptView,TokenAcceptContent,TokenAcceptViewModel}.swift` | `ui/screens/token_accept/*.kt` |
+| Status Waiting (Post-submit / Persistent waiting / Verify email — 3 variants) | `A08/uploads/.../Status Waiting.html` + `status-frames.jsx` | `Features/Status/{StatusWaitingView,StatusWaitingContent}.swift` | `ui/screens/status/*.kt` |
+| Notifications (Populated + Empty) | `A08/Notifications.html` + `notifications-frames.jsx` | `Features/Notifications/*.swift` | `ui/screens/notifications/*.kt` |
+| Support Train wizard (A12.11 — 2 frames) | `Wizard__multi-step_form_/A12.11 Start a Support Train.html` + `support-train-frames.jsx` | `Features/SupportTrains/*.swift` | `ui/screens/support_trains/*.kt` |
+
+### Methodology
+
+Rendered all 6 design HTMLs at 1600×1400 (deviceScaleFactor 2) via
+Playwright. 26 PNGs captured (Auth has 6 frames, Privacy Handshake 4,
+Token Accept 3, Status Waiting 3, Notifications 2, Support Train 2 +
+overviews). Delegated spec extraction to a single subagent that
+parsed all 6 JSX files in one pass.
+
+### Resolvable token mismatches — FIXED
+
+#### 1. Privacy Handshake `TierCard` outer corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (`handshake-frames.jsx` Frame 2 TierCard) | `Card { borderRadius: 16, padding: 14, border: 1px solid (2px when selected) }` | n/a |
+| iOS `PrivacyHandshakeWizardView.swift:269, 275` (TierRow selector card) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+| Android `PrivacyHandshakeScreen.kt:411, 416` (TierRow Row) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+
+The TierCard is the 3-tier (Bronze / Silver / Gold) Stripe-pricing
+selector shown in step 2 of the Privacy Handshake wizard. Design
+specifies `borderRadius: 16` to match the "Welcome" + "ProfileCard"
+identity-pillar treatment family — Bronze/Silver/Gold tier cards
+visually echo the persona cards that introduced them.
+
+### Surfaced for design review (NOT fixed)
+
+#### Already-correct (sampled)
+
+| Surface | Design | Code |
+|---|---|---|
+| Auth input field | `borderRadius: 8, height: 44` | iOS `AInput` matches via `Radii.md` + 44pt height; Android matches ✓ |
+| Auth PrimaryCTA / GhostButton | `borderRadius: 12, height: 48` (primary) / `44` (ghost) | iOS `PrimaryButton` shared component uses `Radii.lg` ✓; Android matches |
+| Privacy Handshake handle input + Stripe field placeholders | `borderRadius: 8, height: 44` | iOS+Android `Radii.md` ✓ |
+| Privacy Handshake explainer card / handle echo card | `borderRadius: 12` (explainer); `borderRadius: 8` (handle-echo) | iOS+Android `Radii.lg` / `Radii.md` ✓ |
+| Privacy Handshake icon-badge in explainer | `borderRadius: 6` | iOS+Android `Radii.sm` ✓ |
+| Status Waiting action-row card / "What happens next" card | `borderRadius: 12` | iOS `StatusWaitingView.swift:148/151, 175/178` `Radii.lg` ✓; Android matches |
+| Status Waiting timeline block outer | `borderRadius: 12` | iOS+Android shared `TimelineBlock` `Radii.lg` ✓ |
+| Support Train reason-picker / message-field / visibility-row / step-rail cards | `borderRadius: 12` | iOS+Android shared `Wizard/Blocks/*` `Radii.lg` ✓ |
+| All status/role/decision chips | `borderRadius: 9999` | Both platforms `Capsule()` / `Radii.pill` ✓ |
+| All sticky-dock primary CTAs | `borderRadius: 12` | Shared `PrimaryButton` at `Radii.lg` ✓ |
+
+#### Off-scale literals (literal-shim or nearest-canonical pattern)
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Auth error banner / Verify-email info card | `borderRadius: 10` | `Radii.md` (=8) | 2pt drift — recurring P7.4-P7.h `borderRadius: 10` pattern. |
+| B | Auth password strength meter bars | `borderRadius: 3` | Not directly inspected; likely `Radii.xs` (=4) | 1pt drift. |
+| C | Privacy Handshake persona preview card | `borderRadius: 14` | Likely `Radii.lg` (=12) | 2pt drift — same as cumulative `borderRadius: 14` pattern. |
+| D | Privacy Handshake Stripe shimmer placeholder | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| E | Privacy Handshake status-success / action-rows wrapper | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| F | Token Accept preview card (hero) | `borderRadius: 18` | `Radii.lg` (=12) or unimplemented | 6pt drift — recurring `borderRadius: 18` pattern. |
+| G | Token Accept benefits card | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| H | Token Accept business avatar (square-rounded variant) | `borderRadius: 14` | Likely `Radii.lg` (=12) | 2pt drift. |
+| I | Status Waiting inner timeline box | `borderRadius: 14` | Shared shell `Radii.lg` (=12) | 2pt drift. |
+| J | Status Waiting hero card (if structurally present) | `borderRadius: 16` (canonical, but code may not wrap in a single card) | Code lays elements out as plain VStack — no single hero card outer | Structural (no single card wrapper) — surface only. |
+| K | Notifications notification-row outer | `borderRadius: 16` | Likely shared shell — needs separate audit | If a list-of-rows shell drives this, the `Radii.lg` (=12) shell-cascade applies. |
+| L | Support Train recipient card | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| M | Support Train invite-recipient (non-member) card | `borderRadius: 14` | `Radii.lg` (=12) | 2pt drift. |
+| N | Wizard progress bar segments | `borderRadius: 3` (off-scale) | Likely shared shell uses `Radii.xs` (=4) | 1pt drift — minor. |
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (the `Radii.lg → Radii.xl` swap uses an existing canonical token).
+- Android — token swap from one canonical token to another. No new tokens introduced.
+- Snapshot re-records needed for:
+  - iOS `PantopusTests/Features/PrivacyHandshake/PrivacyHandshakeWizardSnapshotTests` (TierRow radius change)
+  - Android `PrivacyHandshakeSnapshotTest` equivalent
+
+Deferred — no simulator/emulator. CI will fail snapshot verification until baselines are re-recorded.
+
+Files modified (4 lines across 2 files):
+- iOS: `Features/PrivacyHandshake/PrivacyHandshakeWizardView.swift` (2 lines)
+- Android: `ui/screens/handshake/PrivacyHandshakeScreen.kt` (2 lines)
+
+### Audit summary
+
+P7.9.l is the **first audit pass after the P7.9.x cycle "FINAL close"
+declaration in P7.9.k** to find an actual token-resolvable fix. The
+TierCard radius fix is small (4pt, 1 surface × 2 platforms) but it's a
+**clean canonical-to-canonical swap** (`Radii.lg → Radii.xl`), which
+the design system has been signaling for all Bronze/Silver/Gold tier
+selectors across Audience / Membership / Privacy Handshake surfaces.
+
+The other 14 surfaces in this audit fall into the now-familiar
+patterns:
+
+- **Auth chrome (sample 1)** is well-tokenised: input fields at
+  `Radii.md` (8), buttons at `Radii.lg` (12), banners at `Radii.md` (8)
+  matching design's deliberate off-canonical `10` for hint pills (2pt
+  drift, same as P7.9.h).
+- **Privacy Handshake / Token Accept / Status / Support Train chrome**
+  follows the same shared-wizard-blocks pattern audited in P7.9.c
+  (`Form` archetype) and P7.9.g (Add Home / Claim Ownership): all
+  primary controls at `Radii.lg` (=12), all icon tiles at `Radii.md`
+  (=8), all chips at `Radii.pill`. Drifts cluster on the now-familiar
+  `borderRadius: 14` / `10` / `18` off-scale values that the design
+  system uses systematically.
+- **Notifications** is rendered via `ListOfRowsView` — same
+  shared-shell pattern as Mailbox / Vault / 12 home subscreens. Design
+  says `borderRadius: 16` for notification rows; shell renders at
+  `Radii.lg` (=12). Out of scope per same reasoning as P7.9.h §A-L.
+
+### P7.9.x audit cycle — ACTUAL FINAL summary
+
+After **14 sub-groups** (P7.9.a, .a-hub, .b, .c, .d, .e, .f.1, .f.2,
+.g, .h, .i, .j, .k, .l) audited across **~100 user-visible screens**:
+
+| Metric | Value |
+|---|---|
+| **Code fixes applied** | **14 fixes** across ~252 sites (mirrored iOS + Android) |
+| **Drifts surfaced for design review** | **~100** |
+| **Audit sub-groups with code fixes** | 8 of 14 (.a, .a-hub, .b, .c, .d, .e, .f.2, .l) |
+| **Audit sub-groups returning 0 fixes** | 6 of 14 (.f.1, .g, .h, .i, .j, .k) |
+| **Structural divergences** | 7 surfaced (PersonCard, Vault folder grid, Mailbox Earn empty hint, Ceremonial Recipient outer, Compose composer 18pt, Pets row 16pt intent, Legal TOC/Footer/BackToTop) |
+| **Cumulative off-canonical clustering** | `borderRadius: 14` (35+ sites), `10` (25+ sites), `18` (5+ sites) |
+
+The cycle's terminal recommendation, unchanged: **extend the Radii
+ramp with `Radii.lg2` (=14), `Radii.md_5` (=10), `Radii.xl_5` (=18)**,
+OR publish a snap-to-canonical convention. Either path closes the
+audit cycle.
+
+P7.9.x audit cycle ACTUAL FINAL close. 🎯
