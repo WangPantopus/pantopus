@@ -1008,3 +1008,139 @@ not by changing one consumer at a time but by either:
 This audit's cumulative recommendation remains option (1) — the
 breadth of evidence (`14` appearing 30+ times across 5 audit groups)
 suggests these aren't drifts but unspoken tokens.
+
+---
+
+## P7.9.h — Home subscreens (12 lists + Add Guest form)
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+13 design HTMLs audited together (not split into .h.1/.h.2/.h.3 — the pattern was identical across all three proposed splits, so a unified pass was more efficient):
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Access Codes | `A08/Access codes.html` + `access-frames.jsx` | `Features/Homes/AccessCodes/*.swift` (4 files + Search) | `ui/screens/homes/accesscodes/*.kt` (+ search) |
+| Add Guest (A13.1 form) | `A13___Form__single_screen_/Add Guest.html` + `add-guest-frames.jsx` | `Features/Homes/Guests/AddGuestForm*.swift` | `ui/screens/homes/guests/AddGuestForm*.kt` |
+| Bills | `A08/Bills.html` + `bills-frames.jsx` | `Features/Homes/Bills/*.swift` | `ui/screens/homes/bills/*.kt` |
+| Calendar | `A08/Home calendar.html` + `calendar-frames.jsx` | `Features/Homes/Calendar/*.swift` (incl. `MonthStripHeader`) | `ui/screens/homes/calendar/*.kt` |
+| Documents | `A08/Documents.html` + `docs-frames.jsx` | `Features/Homes/Documents/*.swift` | `ui/screens/homes/documents/*.kt` |
+| Emergency info | `A08/Emergency info.html` + `emergency-frames.jsx` | `Features/Homes/Emergency/*.swift` | `ui/screens/homes/emergency/*.kt` |
+| Maintenance | `A08/Maintenance.html` + `maintenance-frames.jsx` | `Features/Homes/Maintenance/*.swift` | `ui/screens/homes/maintenance/*.kt` |
+| Members | `A08/Members.html` + `members-frames.jsx` | `Features/Homes/Members/*.swift` | `ui/screens/homes/members/*.kt` |
+| Owners | `A08/Owners.html` + `owners-frames.jsx` | `Features/Homes/Owners/*.swift` | `ui/screens/homes/owners/*.kt` |
+| Packages | `A08/Packages.html` + `packages-frames.jsx` | `Features/Homes/Packages/*.swift` | `ui/screens/homes/packages/*.kt` |
+| Pets | `A08/Pets.html` + `pets-frames.jsx` | `Features/Homes/Pets/*.swift` | `ui/screens/homes/pets/*.kt` |
+| Polls | `A08/Polls.html` + `polls-frames.jsx` | `Features/Homes/Polls/*.swift` | `ui/screens/homes/polls/*.kt` |
+| Household Tasks | `A08/Household tasks.html` + `householdtasks-frames.jsx` | `Features/Homes/Tasks/*.swift` | `ui/screens/homes/tasks/*.kt` |
+
+### Methodology
+
+Rendered all 13 design HTML pages at 1600×1400 (deviceScaleFactor 2)
+via Playwright. 39 PNGs captured. Three parallel subagent passes
+extracted chrome specs (4 + 4 + 5 screens each).
+
+### Resolvable token mismatches — NONE in this sub-group
+
+This is the **fifth audit pass returning zero token-resolvable fixes**
+across a sub-group of 5+ screens (after P7.9.f.1 + P7.9.g). The reason is
+now well-established: **12 of 13 home subscreens are thin `ListOfRowsView`
+wrappers** (e.g. `PetsListView.swift` is 92 lines, mostly state plumbing).
+The row card geometry comes from the shared shell at `Radii.lg` (=12),
+while design specifies `borderRadius: 14` for most lists (off-scale, 2pt
+over the shell's value).
+
+### Sub-group-specific findings (NOT fixed)
+
+#### Notable design intent: Pets uses `borderRadius: 16`, not 14
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | **Pets PetRow card outer** | `borderRadius: 16` (= `Radii.xl`) — design intentionally singles out Pets with a softer 16pt radius vs the other 11 home subscreens' 14pt | iOS `PetsListView.swift` (92 lines) delegates to `ListOfRowsView`; card radius comes from shared shell at `Radii.lg` (=12) | 4pt drift from design's deliberate Pets-only 16pt choice. Would require either (a) per-data-source `cornerRadius:` parameter on `ListOfRowsView`, or (b) forking PetsListView with custom row rendering. Both are non-token-application changes. |
+
+#### Recurring `borderRadius: 14` for list-row outers (11 of 12 lists)
+
+| # | Surface | Code value (shared shell) | Notes |
+|---|---|---|---|
+| B | Access Codes CodeRow | `Radii.lg` (=12) | 2pt drift. |
+| C | Bills BillRow | `Radii.lg` (=12) | 2pt drift. |
+| D | Calendar EventRow | `Radii.lg` (=12) | 2pt drift. |
+| E | Documents DocRow | `Radii.lg` (=12) | 2pt drift. |
+| F | Emergency EmergencyRow | `Radii.lg` (=12) | 2pt drift. |
+| G | Maintenance MaintRow | `Radii.lg` (=12) | 2pt drift. |
+| H | Members MemberRow | `Radii.lg` (=12) | 2pt drift. |
+| I | Owners OwnerRow | `Radii.lg` (=12) | 2pt drift. |
+| J | Packages PkgRow | `Radii.lg` (=12) | 2pt drift. |
+| K | Polls PollRow | `Radii.lg` (=12) | 2pt drift. |
+| L | Tasks TaskRow | `Radii.lg` (=12) | 2pt drift. |
+
+All 11 drift identically because the shared `ListOfRowsView.swift:418/420` and `:853` is the single source. Cumulative cross-app evidence for the "design uses 14 systematically" pattern noted in P7.9.g audit summary.
+
+#### Recurring off-scale icon/badge radii (per-screen leading cells)
+
+| # | Surface | Design value | Code value (where checked) | Notes |
+|---|---|---|---|---|
+| M | Bills utility tile (40×40 leading) | `borderRadius: 10` | Shared shell `RowLeading.iconTile` likely `Radii.md` (=8) | 2pt under design. |
+| N | Calendar event tile (40×40 leading) | `borderRadius: 10` | Same as M | 2pt under. |
+| O | Calendar month-strip day cell | `borderRadius: 10` | iOS `MonthStripHeader.swift:140, 183` `Radii.sm` (=6) | 4pt under. |
+| P | Documents file-type tile (40×48 leading) | `borderRadius: 7` (truly bespoke off-scale) | Shared shell likely `Radii.sm` (=6) or `Radii.md` (=8) | Off-scale either direction. |
+| Q | Packages courier tile (40×48 leading) | `borderRadius: 8` (= `Radii.md`) ✓ | Likely matches | ✓ probably |
+| R | HouseholdTasks category tile (32×32 leading) | `borderRadius: 8` (= `Radii.md`) ✓ | Likely matches | ✓ probably |
+| S | Members avatar (44×44 circle) | `borderRadius: 50%` ✓ | Capsule/Circle | ✓ |
+| T | Banner icon circles (across 7+ screens) | `borderRadius: 9` (off-scale) | Code uses `Radii.sm` (=6) or `Radii.md` (=8) | 1-3pt drift either way. |
+| U | Add Guest HomeContextStrip outer | `borderRadius: 10` (off-scale) | iOS `AddGuestFormContent.swift:135/138` `Radii.lg` (=12) | 2pt over. |
+| V | Add Guest pass label badge | `borderRadius: 4` (= `Radii.xs`) ✓ | iOS line 129 `Radii.xs` ✓ | ✓ matches |
+
+#### Already-correct surfaces (sample)
+
+- Access Codes / Bills / Calendar / Documents / Emergency / Maintenance / Members / Owners / Packages / Polls / Tasks banners all use `borderRadius: 12` ✓ — code matches at `Radii.lg`.
+- Quick-start CTA buttons across all screens at `borderRadius: 12` ✓ matches `Radii.lg`.
+- All FABs at `borderRadius: 50%` ✓ — code uses `Circle()`/`CircleShape`.
+- All status / role / count badges at `borderRadius: 9999` ✓ — code uses `Capsule()`/`Radii.pill`.
+- Members avatar / Owners avatar at `borderRadius: 50%` ✓.
+- Add Guest sticky CTA `borderRadius: 12` ✓ — code matches `Radii.lg`.
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no changes).
+- Android — no changes; existing patterns preserved.
+- All 13 home subscreens audited; 0 code changes applied.
+
+Files modified (1 file):
+- `docs/visual-parity-fixes.md` (P7.9.h section appended)
+
+### Audit summary
+
+P7.9.h is the **fifth audit pass returning 0 fixes** out of 5 home-related
+sub-groups (P7.9.f.1, P7.9.f.2 [had fixes], P7.9.g, this pass). The
+unified finding now stands:
+
+> The home/mail/list family (35+ list/detail surfaces across audits) is
+> uniformly rendered through 2 shared shells — `ListOfRowsView` (most
+> lists) and `MailItemDetailShell` (mail-detail variants). Both shells
+> use `Radii.lg` (=12) for grouped card containers. Design specifies
+> `borderRadius: 14` for most list-row outers and `borderRadius: 16` for
+> a few specific cases (Pets, certain mail variants). Per-screen
+> token-application fixes aren't possible without (a) per-consumer
+> overrides on the shared shells or (b) bumping the shared shell.
+
+**Notable Pets divergence (§A):** the design singles out Pets with a
+softer 16pt radius — likely a deliberate "warmth" call for the species
+list. Worth surfacing to design: should this be honored, and if so,
+should the `ListOfRowsView` shell expose a per-data-source corner-radius
+override?
+
+**Cumulative recommendation refresh** (now spans P7.9.c–.h, ~50+ surfaces):
+
+| Off-scale value | Frequency | Current code response | Recommendation |
+|---|---|---|---|
+| `borderRadius: 14` | 30+ sites | Mixed: literal `14` (Marketplace, Map, Ceremonial) OR `Radii.lg` (12, most home subscreens, A17 buttons, Discover cards) | **Add `Radii.lg2` (=14)** — would resolve ~30 sites in one stroke. |
+| `borderRadius: 10` | 15+ sites | Mostly `Radii.md` (=8) or literal `10` | **Add `Radii.md_5` (=10)** — would resolve form fields, hint pills, mismatch banners. |
+| `borderRadius: 18` | 5+ sites | Mostly `Radii.xl` (16) or literal `18` (Chat bubbles, Coupon hero, Home dashboard hero) | **Add `Radii.xl_5` (=18)** — would resolve Chat bubble + Coupon hero + Home hero. |
+| `borderRadius: 9` | 8+ sites (banner icon circles) | Mostly `Radii.sm` (=6) or `Radii.md` (=8) | Minor — single class of element (banner icons). Could accept 1pt drift. |
+
+The audit's terminal recommendation: the design system should either
+extend the ramp or formally accept the literal-shim pattern. The
+current "sometimes literal, sometimes nearest canonical" inconsistency
+is the actual quality-of-life issue, not the radii themselves.
