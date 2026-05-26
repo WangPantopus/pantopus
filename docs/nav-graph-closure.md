@@ -165,7 +165,7 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `myTasks` | R | 2 | |
 | `composeTask` | R | 4 | |
 | `myPosts` | R | 2 | |
-| `editPost(postId:)` | R | 1 | |
+| `editPost(postId:)` | R | 2 | MyPosts per-row edit + PulsePostDetail edit affordance |
 | `connections` | R | 2 | |
 | `supportTrains` | R | 2 | |
 | `startSupportTrain` | R | 1 | |

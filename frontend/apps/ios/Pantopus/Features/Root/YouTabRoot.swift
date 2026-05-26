@@ -1680,9 +1680,13 @@ public struct YouTabRoot: View {
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,
+                currentUserId: currentUserId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onOpenProfile: { userId in
                     Task { @MainActor in path.append(.publicProfile(userId: userId)) }
+                },
+                onEdit: { id in
+                    Task { @MainActor in path.append(.editPost(postId: id)) }
                 }
             )
         case let .composePost(intent):
