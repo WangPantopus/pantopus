@@ -31,7 +31,7 @@ final class WizardShellIdentitySnapshotTests: XCTestCase {
     func test_wizardIdentity_accentColors_areDistinct() {
         // Sanity check that every identity surfaces its own accent — caller
         // code that branches on identity depends on these being unique.
-        let accents = Set(WizardIdentity.allCases.map { $0.accent.description })
+        let accents = Set(WizardIdentity.allCases.map(\.accent.description))
         XCTAssertEqual(accents.count, WizardIdentity.allCases.count)
     }
 

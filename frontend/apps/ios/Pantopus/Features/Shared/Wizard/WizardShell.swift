@@ -75,9 +75,9 @@ public struct WizardShell<Content: View>: View {
             totalSteps: segmentCount,
             fillColor: identity.accent
         )
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, Spacing.s2)
-            .background(Theme.Color.appSurface)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.appSurface)
     }
 
     private func stickyCTA(chrome: WizardChrome) -> some View {
