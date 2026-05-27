@@ -42,6 +42,7 @@ public struct HaloCircle: View {
     private let tone: HaloCircleTone
     private let icon: PantopusIcon?
     private let isPulsing: Bool
+    private let reduceMotionOverride: Bool?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsePhase = false
@@ -51,14 +52,30 @@ public struct HaloCircle: View {
         icon: PantopusIcon? = nil,
         isPulsing: Bool = false
     ) {
+        self.init(
+            tone: tone,
+            icon: icon,
+            isPulsing: isPulsing,
+            reduceMotionOverride: nil
+        )
+    }
+
+    init(
+        tone: HaloCircleTone,
+        icon: PantopusIcon? = nil,
+        isPulsing: Bool = false,
+        reduceMotionOverride: Bool?
+    ) {
         self.tone = tone
         self.icon = icon
         self.isPulsing = isPulsing
+        self.reduceMotionOverride = reduceMotionOverride
     }
 
     public var body: some View {
         let resolvedIcon = icon ?? tone.defaultIcon
-        let glowEnabled = isPulsing && !reduceMotion
+        let motionReduced = reduceMotionOverride ?? reduceMotion
+        let glowEnabled = isPulsing && !motionReduced
 
         ZStack {
             if isPulsing {

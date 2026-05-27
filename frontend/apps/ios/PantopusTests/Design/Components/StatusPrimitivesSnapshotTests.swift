@@ -58,10 +58,8 @@ final class StatusPrimitivesSnapshotTests: XCTestCase {
     /// collapses to a static layer. We assert the view still builds with
     /// the override applied; visual verification lives in #Preview.
     func testHaloCirclePulsingRespectsReduceMotion() {
-        let reduceMotion = UITraitCollection(accessibilityContrast: .normal)
-        assertRenders("HaloCircle pulsing + reduce-motion", traitCollection: reduceMotion) {
-            HaloCircle(tone: .info, isPulsing: true)
-                .environment(\.accessibilityReduceMotion, true)
+        assertRenders("HaloCircle pulsing + reduce-motion") {
+            HaloCircle(tone: .info, isPulsing: true, reduceMotionOverride: true)
         }
     }
 
