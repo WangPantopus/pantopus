@@ -54,6 +54,18 @@ object DeepLinkRouter {
          */
         data class HomeOwnersTransfer(val id: String) : Destination
 
+        /**
+         * `pantopus://homes/:id/verify-landlord` — opens the A12.5 /
+         * A12.6 wizard.
+         */
+        data class VerifyLandlord(val id: String) : Destination
+
+        /**
+         * `pantopus://homes/:id/verify-postcard` — opens the A12.7
+         * sibling status screen directly.
+         */
+        data class PostcardVerification(val id: String) : Destination
+
         data class Conversation(val id: String) : Destination
 
         data class User(val id: String) : Destination
@@ -180,12 +192,22 @@ object DeepLinkRouter {
                 val id = segments.getOrNull(1)
                 if (id.isNullOrBlank()) return Destination.Unknown(raw)
                 val trailing = segments.drop(2)
-                when {
-                    trailing.firstOrNull() == "dashboard" -> Destination.HomeDashboard(id)
-                    trailing.firstOrNull() == "members" && tabQuery == "requests" ->
-                        Destination.HomeMemberRequests(id)
-                    trailing.firstOrNull() == "owners" && trailing.getOrNull(1) == "transfer" ->
-                        Destination.HomeOwnersTransfer(id)
+                when (trailing.firstOrNull()) {
+                    "dashboard" -> Destination.HomeDashboard(id)
+                    "members" ->
+                        if (tabQuery == "requests") {
+                            Destination.HomeMemberRequests(id)
+                        } else {
+                            Destination.HomeDetail(id)
+                        }
+                    "owners" ->
+                        if (trailing.getOrNull(1) == "transfer") {
+                            Destination.HomeOwnersTransfer(id)
+                        } else {
+                            Destination.HomeDetail(id)
+                        }
+                    "verify-landlord", "verify_landlord" -> Destination.VerifyLandlord(id)
+                    "verify-postcard", "verify_postcard" -> Destination.PostcardVerification(id)
                     else -> Destination.HomeDetail(id)
                 }
             }

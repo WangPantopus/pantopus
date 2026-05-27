@@ -287,4 +287,38 @@ class DeepLinkRouterTest {
         val pending = DeepLinkRouter.consume()
         assertEquals(DeepLinkRouter.Destination.Gig("g_99"), pending)
     }
+
+    // MARK: - Verify-landlord routes (P2.1 / A12.5–A12.7)
+
+    @Test
+    fun verify_landlord_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyLandlord("h_42"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_42/verify-landlord"),
+        )
+    }
+
+    @Test
+    fun verify_landlord_underscore_shape() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyLandlord("h_42"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_42/verify_landlord"),
+        )
+    }
+
+    @Test
+    fun postcard_verification_deep_link() {
+        assertEquals(
+            DeepLinkRouter.Destination.PostcardVerification("h_42"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_42/verify-postcard"),
+        )
+    }
+
+    @Test
+    fun verify_landlord_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyLandlord("h_42"),
+            DeepLinkRouter.resolveString("https://pantopus.app/homes/h_42/verify-landlord"),
+        )
+    }
 }
