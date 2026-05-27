@@ -67,6 +67,7 @@ public struct SettingsView: View {
             },
             onBack: onClose
         )
+        .accessibilityIdentifier("settings")
     }
 
     @ViewBuilder private func destination(for route: SettingsStackRoute) -> some View {

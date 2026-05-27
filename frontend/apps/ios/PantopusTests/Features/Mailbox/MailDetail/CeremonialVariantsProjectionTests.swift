@@ -77,7 +77,7 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
         XCTAssertNil(content.packageDetail)
     }
 
-    func testCouponPayloadMissingHeadlineLeavesNil() async {
+    func testCouponPayloadMissingHeadlineLeavesNil() throws {
         let body = """
         {
           "mail": {
@@ -93,13 +93,8 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded")
-            return
-        }
+        let response = try JSONDecoder().decode(MailDetailResponse.self, from: Data(body.utf8))
+        let content = MailDetailViewModel.project(detail: response.mail)
         XCTAssertNil(content.couponDetail)
     }
 

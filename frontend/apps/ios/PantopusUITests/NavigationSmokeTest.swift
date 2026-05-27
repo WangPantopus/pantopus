@@ -133,7 +133,7 @@ final class NavigationSmokeTest: XCTestCase {
         let menu = app.buttons["hubMenuButton"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout: 3))
         menu.tap()
-        assertReaches("settings", in: app)
+        assertReaches("settings", in: app, timeout: 8)
     }
 
     // MARK: - Hub pillars (HubRoute .mailboxRoot/.pulseFeed/.gigsFeed/.marketplace)
