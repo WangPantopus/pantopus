@@ -58,6 +58,8 @@ object WizardShellTags {
     const val STEP_READOUT = "wizardStepReadout"
 }
 
+private const val DISABLED_CTA_ALPHA = 0.5f
+
 /**
  * Generic wizard chrome — top bar (X/back + title + N/M readout),
  * segmented progress bar, scrolling content, and a sticky bottom CTA row
@@ -284,7 +286,7 @@ private fun WizardPrimaryCta(
             modifier
                 .fillMaxWidth()
                 .heightIn(min = 44.dp)
-                .alpha(if (isEnabled) 1f else 0.5f)
+                .alpha(if (isEnabled) 1f else DISABLED_CTA_ALPHA)
                 .pantopusShadow(shadow, shape = shape)
                 .clip(shape)
                 .background(tint)
