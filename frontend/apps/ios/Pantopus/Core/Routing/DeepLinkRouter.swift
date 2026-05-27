@@ -6,7 +6,7 @@
 //  destination so SwiftUI views (or coordinators) can react.
 //
 
-// swiftlint:disable cyclomatic_complexity
+// swiftlint:disable cyclomatic_complexity function_body_length
 
 import Foundation
 import Logging

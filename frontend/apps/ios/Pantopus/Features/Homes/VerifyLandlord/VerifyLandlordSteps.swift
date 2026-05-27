@@ -104,7 +104,9 @@ public struct VerifyLandlordValidationErrors: Sendable, Equatable {
         return parts.joined(separator: " · ")
     }
 
-    public var isEmpty: Bool { count == 0 }
+    public var isEmpty: Bool {
+        [ownerName, contactName, email, lease, pmName, pmEmail].compactMap { $0 }.isEmpty
+    }
 }
 
 /// The full A12.6 form state. Held inside the wizard VM and projected

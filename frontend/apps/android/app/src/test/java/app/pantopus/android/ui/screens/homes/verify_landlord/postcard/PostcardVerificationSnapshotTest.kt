@@ -53,8 +53,7 @@ class PostcardVerificationSnapshotTest {
         override val expectedCode: String = DEFAULT_EXPECTED_CODE
     }
 
-    private fun vm(homeId: String): TestVm =
-        TestVm(SavedStateHandle(mapOf(POSTCARD_VERIFICATION_HOME_ID_KEY to homeId)))
+    private fun vm(homeId: String): TestVm = TestVm(SavedStateHandle(mapOf(POSTCARD_VERIFICATION_HOME_ID_KEY to homeId)))
 
     @Test
     fun postcard_in_transit() {

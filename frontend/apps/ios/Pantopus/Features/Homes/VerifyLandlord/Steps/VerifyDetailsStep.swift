@@ -15,6 +15,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 struct VerifyDetailsStep: View {
     @Bindable var viewModel: VerifyLandlordWizardViewModel
 
@@ -187,8 +189,8 @@ private struct VerifyLandlordCard<Content: View>: View {
 private struct VerifyLandlordSectionHeader: View {
     let overline: String
     let title: String
-    var subtitle: String? = nil
-    var trailing: AnyView? = nil
+    var subtitle: String?
+    var trailing: AnyView?
 
     var body: some View {
         HStack(alignment: .bottom, spacing: Spacing.s3) {
@@ -239,8 +241,8 @@ private struct VerifyLandlordField: View {
     let icon: PantopusIcon
     var keyboard: UIKeyboardType = .default
     var optional: Bool = false
-    var hint: String? = nil
-    var error: String? = nil
+    var hint: String?
+    var error: String?
     let onChange: (String) -> Void
 
     @FocusState private var isFocused: Bool

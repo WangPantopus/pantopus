@@ -126,7 +126,7 @@ open class VerifyLandlordWizardViewModel
 
         fun setEmail(value: String) = updateForm { it.copy(email = value) }
 
-        fun setPhone(value: String) = updateForm({ it.copy(phone = value) }, revalidate = false)
+        fun setPhone(value: String) = updateForm(revalidate = false) { it.copy(phone = value) }
 
         fun setLease(lease: VerifyLandlordLeaseFile?) = updateForm { it.copy(lease = lease) }
 
@@ -143,7 +143,7 @@ open class VerifyLandlordWizardViewModel
 
         fun setPMEmail(value: String) = updateForm { it.copy(pmEmail = value) }
 
-        fun setPMPhone(value: String) = updateForm({ it.copy(pmPhone = value) }, revalidate = false)
+        fun setPMPhone(value: String) = updateForm(revalidate = false) { it.copy(pmPhone = value) }
 
         /**
          * Used by previews / sample-data toggles + the dashboard
@@ -237,8 +237,8 @@ open class VerifyLandlordWizardViewModel
         // MARK: - Helpers
 
         private inline fun updateForm(
-            crossinline transform: (VerifyLandlordForm) -> VerifyLandlordForm,
             revalidate: Boolean = true,
+            crossinline transform: (VerifyLandlordForm) -> VerifyLandlordForm,
         ) {
             _state.update { current ->
                 val nextForm = transform(current.form)

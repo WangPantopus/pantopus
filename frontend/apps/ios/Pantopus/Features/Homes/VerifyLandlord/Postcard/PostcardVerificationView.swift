@@ -15,6 +15,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 @MainActor
 public struct PostcardVerificationView: View {
     @State private var viewModel: PostcardVerificationViewModel
@@ -37,49 +39,65 @@ public struct PostcardVerificationView: View {
     }
 
     public var body: some View {
-        VStack(spacing: Spacing.s0) {
-            PostcardTopBar(onBack: { viewModel.dismissTapped() })
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.s5) {
-                    Postcard(
-                        recipientName: viewModel.content.recipientName,
-                        street: viewModel.content.street,
-                        cityZip: viewModel.content.cityZip,
-                        delivered: viewModel.stage == .delivered
-                    )
-                    .frame(maxWidth: .infinity, alignment: .center)
-
-                    PostcardHero(
-                        stage: viewModel.stage,
-                        deliveredOn: viewModel.content.deliveredOn
-                    )
-
-                    PostcardStatusTimeline(
-                        stage: viewModel.stage,
-                        content: viewModel.content
-                    )
-
-                    PostcardCodeArea(viewModel: viewModel)
-
-                    if viewModel.stage == .delivered {
-                        DeliveredSecondaryRow(onResend: { viewModel.resendPostcard() })
-                    } else {
-                        InTransitHelpBlock(
-                            resendOn: viewModel.content.resendAvailableOn,
-                            onResend: { viewModel.resendPostcard() }
-                        )
-                    }
-                }
-                .padding(Spacing.s4)
-                .padding(.bottom, Spacing.s10)
+        rootContent
+            .background(Theme.Color.appBg)
+            .onChange(of: viewModel.pendingEvent) { _, event in
+                handle(event)
             }
+            .accessibilityIdentifier("postcardVerification")
+    }
+
+    private var rootContent: some View {
+        VStack(spacing: Spacing.s0) {
+            PostcardTopBar { viewModel.dismissTapped() }
+            scrollContent
             stickyDock
         }
-        .background(Theme.Color.appBg)
-        .onChange(of: viewModel.pendingEvent) { _, event in
-            handle(event)
+    }
+
+    private var scrollContent: some View {
+        ScrollView {
+            contentStack
+                .padding(Spacing.s4)
+                .padding(.bottom, Spacing.s10)
         }
-        .accessibilityIdentifier("postcardVerification")
+    }
+
+    private var contentStack: some View {
+        VStack(alignment: .leading, spacing: Spacing.s5) {
+            postcardPreview
+            PostcardHero(
+                stage: viewModel.stage,
+                deliveredOn: viewModel.content.deliveredOn
+            )
+            PostcardStatusTimeline(
+                stage: viewModel.stage,
+                content: viewModel.content
+            )
+            PostcardCodeArea(viewModel: viewModel)
+            secondaryActionBlock
+        }
+    }
+
+    private var postcardPreview: some View {
+        Postcard(
+            recipientName: viewModel.content.recipientName,
+            street: viewModel.content.street,
+            cityZip: viewModel.content.cityZip,
+            delivered: viewModel.stage == .delivered
+        )
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private var secondaryActionBlock: some View {
+        if viewModel.stage == .delivered {
+            DeliveredSecondaryRow { viewModel.resendPostcard() }
+        } else {
+            InTransitHelpBlock(
+                resendOn: viewModel.content.resendAvailableOn
+            ) { viewModel.resendPostcard() }
+        }
     }
 
     private var stickyDock: some View {
@@ -245,22 +263,13 @@ private struct PostcardStatusTimeline: View {
 
     var body: some View {
         VStack(spacing: Spacing.s3) {
-            HStack {
-                Text("USPS TRACKING")
-                    .pantopusTextStyle(.overline)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                Spacer()
-                Text(content.trackingNumber)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Theme.Color.appTextMuted)
-            }
-            HStack(alignment: .top, spacing: Spacing.s0) {
-                stageColumn(stage: 0, label: "Mailed", date: content.mailedOn, icon: .send)
-                connector(after: 0)
-                stageColumn(stage: 1, label: "In transit", date: content.inTransitOn, icon: .send)
-                connector(after: 1)
-                stageColumn(stage: 2, label: "Delivered", date: content.deliveredOn, icon: .mailbox)
-            }
+            trackingHeader
+            PostcardStageTrack(
+                currentIndex: currentIndex,
+                mailedOn: content.mailedOn,
+                inTransitOn: content.inTransitOn,
+                deliveredOn: content.deliveredOn
+            )
         }
         .padding(Spacing.s4)
         .background(Theme.Color.appSurface)
@@ -270,13 +279,20 @@ private struct PostcardStatusTimeline: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "Postcard tracking. " +
-                "Mailed \(content.mailedOn). " +
-                (content.inTransitOn.map { "In transit \($0). " } ?? "") +
-                (content.deliveredOn.map { "Delivered \($0)." } ?? "Not yet delivered.")
-        )
+        .accessibilityLabel(accessibilityLabelText)
         .accessibilityIdentifier("postcardStatusTimeline")
+    }
+
+    private var trackingHeader: some View {
+        HStack {
+            Text("USPS TRACKING")
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Spacer()
+            Text(content.trackingNumber)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Theme.Color.appTextMuted)
+        }
     }
 
     private var currentIndex: Int {
@@ -287,56 +303,129 @@ private struct PostcardStatusTimeline: View {
         }
     }
 
-    private func stageColumn(
-        stage stageIndex: Int,
-        label: String,
-        date: String?,
-        icon: PantopusIcon
-    ) -> some View {
-        let isDone = stageIndex < currentIndex
-        let isCurrent = stageIndex == currentIndex
-        let isComplete = isDone || (isCurrent && currentIndex == 2)
-        return VStack(spacing: Spacing.s2) {
-            ZStack {
-                Circle()
-                    .fill(circleFill(isComplete: isComplete, isCurrent: isCurrent))
-                    .frame(width: 36, height: 36)
-                if isCurrent && currentIndex < 2 {
-                    Circle()
-                        .stroke(Theme.Color.warning, lineWidth: 2)
-                        .frame(width: 42, height: 42)
-                }
-                Icon(
-                    icon,
-                    size: 16,
-                    strokeWidth: 2,
-                    color: isComplete ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
-                )
-            }
-            VStack(spacing: 1) {
-                Text(label)
-                    .pantopusTextStyle(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(isComplete ? Theme.Color.appText : Theme.Color.appTextMuted)
-                Text(date ?? "—")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(isComplete ? Theme.Color.appTextSecondary : Theme.Color.appTextMuted)
-            }
+    private var accessibilityLabelText: String {
+        "Postcard tracking. " +
+            "Mailed \(content.mailedOn). " +
+            (content.inTransitOn.map { "In transit \($0). " } ?? "") +
+            (content.deliveredOn.map { "Delivered \($0)." } ?? "Not yet delivered.")
+    }
+}
+
+private struct PostcardStageTrack: View {
+    let currentIndex: Int
+    let mailedOn: String
+    let inTransitOn: String?
+    let deliveredOn: String?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.s0) {
+            PostcardStageColumn(
+                stageIndex: 0,
+                currentIndex: currentIndex,
+                label: "Mailed",
+                date: mailedOn,
+                icon: .send
+            )
+            PostcardTimelineConnector(stageIndex: 0, currentIndex: currentIndex)
+            PostcardStageColumn(
+                stageIndex: 1,
+                currentIndex: currentIndex,
+                label: "In transit",
+                date: inTransitOn,
+                icon: .send
+            )
+            PostcardTimelineConnector(stageIndex: 1, currentIndex: currentIndex)
+            PostcardStageColumn(
+                stageIndex: 2,
+                currentIndex: currentIndex,
+                label: "Delivered",
+                date: deliveredOn,
+                icon: .mailbox
+            )
+        }
+    }
+}
+
+private struct PostcardStageColumn: View {
+    let stageIndex: Int
+    let currentIndex: Int
+    let label: String
+    let date: String?
+    let icon: PantopusIcon
+
+    var body: some View {
+        VStack(spacing: Spacing.s2) {
+            iconCircle
+            labelStack
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func circleFill(isComplete: Bool, isCurrent: Bool) -> Color {
+    private var iconCircle: some View {
+        ZStack {
+            Circle()
+                .fill(circleFill)
+                .frame(width: 36, height: 36)
+            currentRing
+            Icon(
+                icon,
+                size: 16,
+                strokeWidth: 2,
+                color: iconColor
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var currentRing: some View {
+        if isCurrent && currentIndex < 2 {
+            Circle()
+                .stroke(Theme.Color.warning, lineWidth: 2)
+                .frame(width: 42, height: 42)
+        }
+    }
+
+    private var labelStack: some View {
+        VStack(spacing: 1) {
+            Text(label)
+                .pantopusTextStyle(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(isComplete ? Theme.Color.appText : Theme.Color.appTextMuted)
+            Text(date ?? "—")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(isComplete ? Theme.Color.appTextSecondary : Theme.Color.appTextMuted)
+        }
+    }
+
+    private var isDone: Bool {
+        stageIndex < currentIndex
+    }
+
+    private var isCurrent: Bool {
+        stageIndex == currentIndex
+    }
+
+    private var isComplete: Bool {
+        isDone || (isCurrent && currentIndex == 2)
+    }
+
+    private var circleFill: Color {
         if isComplete && !isCurrent { return Theme.Color.success }
         if isCurrent && currentIndex < 2 { return Theme.Color.warning }
         if isCurrent && currentIndex == 2 { return Theme.Color.success }
         return Theme.Color.appSurfaceSunken
     }
 
-    @ViewBuilder
-    private func connector(after stageIndex: Int) -> some View {
-        let isDone = stageIndex < currentIndex
-        let isCurrent = stageIndex == currentIndex && currentIndex < 2
+    private var iconColor: Color {
+        isComplete ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
+    }
+}
+
+private struct PostcardTimelineConnector: View {
+    let stageIndex: Int
+    let currentIndex: Int
+
+    var body: some View {
         ZStack(alignment: .center) {
             Rectangle()
                 .fill(Theme.Color.appSurfaceSunken)
@@ -352,6 +441,14 @@ private struct PostcardStatusTimeline: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 17)
+    }
+
+    private var isDone: Bool {
+        stageIndex < currentIndex
+    }
+
+    private var isCurrent: Bool {
+        stageIndex == currentIndex && currentIndex < 2
     }
 }
 
@@ -432,7 +529,7 @@ private struct DeliveredSecondaryRow: View {
             Rectangle()
                 .fill(Theme.Color.appBorder)
                 .frame(width: 1, height: 12)
-            Button(action: {}) {
+            Button(action: {}, label: {
                 HStack(spacing: 4) {
                     Icon(.camera, size: 12, color: Theme.Color.appTextSecondary)
                     Text("Scan code")
@@ -441,7 +538,7 @@ private struct DeliveredSecondaryRow: View {
                 }
                 .padding(.horizontal, Spacing.s1)
                 .padding(.vertical, 4)
-            }
+            })
             .accessibilityIdentifier("postcardScanCTA")
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -497,13 +594,13 @@ private struct HelpRow: View {
     let icon: PantopusIcon
     let title: String
     let subcopy: String
-    var trailingMeta: String? = nil
+    var trailingMeta: String?
     let disabled: Bool
     let onTap: () -> Void
     let identifier: String
 
     var body: some View {
-        Button(action: { if !disabled { onTap() } }) {
+        Button(action: { if !disabled { onTap() } }, label: {
             HStack(spacing: Spacing.s3) {
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                     .fill(Theme.Color.appSurfaceSunken)
@@ -532,7 +629,7 @@ private struct HelpRow: View {
             }
             .padding(Spacing.s3)
             .opacity(disabled ? 0.5 : 1)
-        }
+        })
         .buttonStyle(.plain)
         .disabled(disabled)
         .accessibilityIdentifier(identifier)

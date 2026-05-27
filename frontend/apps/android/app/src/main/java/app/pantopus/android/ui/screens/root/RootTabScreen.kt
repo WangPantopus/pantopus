@@ -103,10 +103,6 @@ import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
-import app.pantopus.android.ui.screens.homes.verify_landlord.VERIFY_LANDLORD_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.verify_landlord.VerifyLandlordWizardScreen
-import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.POSTCARD_VERIFICATION_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.PostcardVerificationScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_DOC_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_HOME_ID_KEY
@@ -162,6 +158,10 @@ import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KE
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
 import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
+import app.pantopus.android.ui.screens.homes.verify_landlord.VERIFY_LANDLORD_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.verify_landlord.VerifyLandlordWizardScreen
+import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.POSTCARD_VERIFICATION_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.PostcardVerificationScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
