@@ -138,6 +138,10 @@ public extension Theme.Color {
     static let appTextInverse = SwiftUI.Color("Neutral/AppTextInverse", bundle: Theme.bundle)
     /// Hover state — `#f3f4f6`.
     static let appHover = SwiftUI.Color("Neutral/AppHover", bundle: Theme.bundle)
+    /// Paper cream — `#FDF8EE`. Off-white warm stock used for postcard
+    /// and other physical-paper artefacts (verification cards, postcard
+    /// hero, archival document previews).
+    static let paperCream = SwiftUI.Color("Neutral/PaperCream", bundle: Theme.bundle)
 
     // MARK: - Category accents
 
