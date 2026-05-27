@@ -77,10 +77,17 @@ public extension Theme.Color {
     static let home = SwiftUI.Color("Identity/Home", bundle: Theme.bundle)
     /// Home identity background — `#DCFCE7`.
     static let homeBg = SwiftUI.Color("Identity/HomeBg", bundle: Theme.bundle)
+    /// Home identity dark — `#15803D`. Tailwind green-700; the dark stop for
+    /// home-tinted ceremonial banners (A21.2 local profile,
+    /// P2 ceremonial unboxing).
+    static let homeDark = SwiftUI.Color("Identity/HomeDark", bundle: Theme.bundle)
     /// Business identity pillar — `#7C3AED`.
     static let business = SwiftUI.Color("Identity/Business", bundle: Theme.bundle)
     /// Business identity background — `#F3E8FF`.
     static let businessBg = SwiftUI.Color("Identity/BusinessBg", bundle: Theme.bundle)
+    /// Business identity dark — `#5B21B6`. Tailwind violet-700; the dark stop
+    /// for business-tinted ceremonial banners.
+    static let businessDark = SwiftUI.Color("Identity/BusinessDark", bundle: Theme.bundle)
 
     /// T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
     /// on My tasks V2 rows and the Magic ingest FAB on Mailbox-A17 root.
