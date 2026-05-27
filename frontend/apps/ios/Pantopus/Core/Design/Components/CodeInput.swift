@@ -97,7 +97,7 @@ public struct CodeInput: View {
     /// <6 → 6 transition. Internal so the test target can exercise the
     /// auto-advance / backspace / completion-once contract without
     /// driving the keyboard through XCUITest.
-    internal func applyInput(_ raw: String) {
+    func applyInput(_ raw: String) {
         let filtered = String(raw.uppercased().prefix(6))
         let oldCount = value.count
         guard filtered != value else { return }

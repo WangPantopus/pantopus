@@ -40,7 +40,9 @@ public struct PasswordStrength: Sendable, Equatable {
         [hasMinLength, hasMixedCase, hasNumber, hasSymbol].lazy.filter { $0 }.count
     }
 
-    public var isStrong: Bool { rulesMet == 4 && !breached }
+    public var isStrong: Bool {
+        rulesMet == 4 && !breached
+    }
 
     public static func evaluate(_ password: String, breached: Bool = false) -> PasswordStrength {
         let hasUpper = password.contains { $0.isUppercase }

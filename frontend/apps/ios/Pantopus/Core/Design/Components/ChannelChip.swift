@@ -20,7 +20,9 @@ public enum ChannelGlyph: String, Sendable, CaseIterable {
     case e = "E"
     case s = "S"
 
-    public var letter: String { rawValue }
+    public var letter: String {
+        rawValue
+    }
 
     public var fullName: String {
         switch self {
@@ -61,7 +63,7 @@ public struct ChannelChip: View {
     /// Test seam — mirrors the locked-state guard inside `body` so the
     /// "locked chip swallows taps" contract can be unit-tested without
     /// driving a real touch through XCUITest.
-    internal func handleTap() {
+    func handleTap() {
         guard state != .locked else { return }
         onTap?()
     }

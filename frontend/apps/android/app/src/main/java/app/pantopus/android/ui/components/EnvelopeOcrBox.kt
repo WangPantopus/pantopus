@@ -17,8 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -188,4 +188,3 @@ private fun fillColor(tone: EnvelopeOcrTone): Color =
         EnvelopeOcrTone.Clean -> PantopusColors.primary600.copy(alpha = 0.08f)
         EnvelopeOcrTone.Unclear -> PantopusColors.warning.copy(alpha = 0.12f)
     }
-

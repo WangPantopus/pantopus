@@ -5,6 +5,7 @@ package app.pantopus.android.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -68,7 +70,6 @@ fun ChannelChip(
     onTap: (() -> Unit)? = null,
     chipTestTag: String? = null,
 ) {
-    val tappable = state != ChannelState.Locked && onTap != null
     val shape = RoundedCornerShape(Radii.sm)
     Box(
         modifier =
@@ -77,9 +78,8 @@ fun ChannelChip(
                 .clip(shape)
                 .background(fillColor(state))
                 .border(width = 1.dp, color = borderColor(state), shape = shape)
-                .then(
-                    if (tappable) Modifier.clickable { onTap?.invoke() } else Modifier,
-                ).semantics {
+                .channelTapTarget(state = state, onTap = onTap)
+                .semantics {
                     contentDescription = "${glyph.fullName} notifications"
                     stateDescription =
                         when (state) {
@@ -105,6 +105,19 @@ fun ChannelChip(
         }
     }
 }
+
+private fun Modifier.channelTapTarget(
+    state: ChannelState,
+    onTap: (() -> Unit)?,
+): Modifier =
+    when {
+        state == ChannelState.Locked ->
+            pointerInput(Unit) {
+                detectTapGestures(onTap = {})
+            }
+        onTap != null -> clickable { onTap() }
+        else -> this
+    }
 
 /**
  * Three-chip row layout (P / E / S) — the standard A14.5 notifications
@@ -189,4 +202,3 @@ private fun foregroundColor(state: ChannelState): Color =
         ChannelState.Off -> PantopusColors.appTextMuted
         ChannelState.Locked -> PantopusColors.primary700
     }
-

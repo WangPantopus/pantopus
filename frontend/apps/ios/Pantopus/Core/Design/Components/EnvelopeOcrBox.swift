@@ -56,7 +56,6 @@ public struct EnvelopeOcrBox: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    @ViewBuilder
     private var shape: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
