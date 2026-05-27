@@ -19,6 +19,17 @@ public enum HubRoute: Hashable {
     case mailboxVault
     case addHome
     case claimOwnership(homeId: String)
+    /// A12.5 / A12.6 — Verify landlord wizard. Pushed when the
+    /// dashboard's ownership claim resolves to the "verify via
+    /// landlord" branch (rental detected, owner-claim path not
+    /// applicable) or from a `pantopus://homes/:id/verify-landlord`
+    /// deep link.
+    case verifyLandlord(homeId: String)
+    /// A12.7 — Sibling postcard verification status screen. Pushed
+    /// when the verify-landlord wizard's submit succeeds, or directly
+    /// from `pantopus://homes/:id/verify-postcard` for users who want
+    /// to track their postcard later.
+    case postcardVerification(homeId: String)
     case homeDashboard(homeId: String)
     /// Pets sub-screen for a specific home (T5.2.1).
     case homePets(homeId: String)
@@ -343,6 +354,12 @@ public struct HubTabRoot: View {
         case let .homeMemberRequests(id):
             path.append(.homeMembers(homeId: id))
             _ = router.consume()
+        case let .verifyLandlord(id):
+            path.append(.verifyLandlord(homeId: id))
+            _ = router.consume()
+        case let .postcardVerification(id):
+            path.append(.postcardVerification(homeId: id))
+            _ = router.consume()
         case .notifications:
             path.append(.notifications)
             _ = router.consume()
@@ -542,7 +559,23 @@ public struct HubTabRoot: View {
         case let .homeDashboard(homeId):
             HomeDashboardView(
                 homeId: homeId,
-                onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
+                onClaimOwnership: {
+                    // The ownership-claim flow branches on whether the
+                    // resident is the owner or a renter. Until the
+                    // backend wires that decision into the claim
+                    // start endpoint, we key off the sample-data
+                    // homeId pattern so QA can hit either path. Both
+                    // branches start identically from the dashboard
+                    // banner.
+                    Task { @MainActor in
+                        if homeId.localizedCaseInsensitiveContains("renter")
+                            || homeId.localizedCaseInsensitiveContains("verify-landlord") {
+                            push(.verifyLandlord(homeId: homeId))
+                        } else {
+                            push(.claimOwnership(homeId: homeId))
+                        }
+                    }
+                },
                 onOpenClaimsList: { Task { @MainActor in push(.myClaims) } },
                 onOpenBills: { Task { @MainActor in push(.homeBills(homeId: homeId)) } },
                 onOpenPolls: { Task { @MainActor in push(.homePolls(homeId: homeId)) } },
@@ -981,6 +1014,33 @@ public struct HubTabRoot: View {
                         return false
                     }
                     path.append(.myClaims)
+                }
+            )
+        case let .verifyLandlord(homeId):
+            VerifyLandlordWizardView(
+                homeId: homeId,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenPostcardVerification: { resolvedHomeId in
+                    // Replace the wizard with the postcard tracker so
+                    // Back returns to the home dashboard, not the
+                    // wizard.
+                    path.removeAll { route in
+                        if case .verifyLandlord = route { return true }
+                        return false
+                    }
+                    path.append(.postcardVerification(homeId: resolvedHomeId))
+                }
+            )
+        case let .postcardVerification(homeId):
+            PostcardVerificationView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onVerified: { _ in
+                    // Pop the tracker — the underlying home dashboard
+                    // refreshes its verification status on next visit.
+                    if !path.isEmpty { path.removeLast() }
                 }
             )
         case let .mailItemDetail(mailId):
