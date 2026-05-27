@@ -287,6 +287,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     /// Lucide `bot` token and can swap to a real vector later.
     case bot
 
+    // A13.4 Transfer ownership — Face ID confirmation glyph (`scan-face`),
+    // sticky-CTA bidirectional arrow (`arrow-right-left`), and the diff-
+    // direction "After" caret (`arrow-down`).
+    case scanFace = "scan-face"
+    case arrowRightLeft = "arrow-right-left"
+    case arrowDown = "arrow-down"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -507,6 +514,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // A15.3 AI Assistant. SF Symbols has no robot glyph; `bot` falls
         // back to `sparkles`, the house AI/magic glyph.
         case .bot: "sparkles"
+        // A13.4 Transfer ownership. SF Symbols ships a true `faceid` glyph;
+        // `arrow.left.arrow.right` matches Lucide's left/right swap arrows;
+        // `arrow.down` is a direct match.
+        case .scanFace: "faceid"
+        case .arrowRightLeft: "arrow.left.arrow.right"
+        case .arrowDown: "arrow.down"
         }
     }
 }

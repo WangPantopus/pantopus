@@ -29,6 +29,10 @@ final class DeepLinkRouter {
         case homeDetail(id: String)
         case homeDashboard(id: String)
         case homeMemberRequests(id: String)
+        /// `pantopus://homes/:id/owners/transfer` — A13.4 Transfer Ownership
+        /// form. Lands on the populated state; the form owns the Face ID
+        /// bottom sheet.
+        case homeOwnersTransfer(id: String)
         case conversation(id: String)
         case user(id: String)
         case connections
@@ -143,6 +147,9 @@ final class DeepLinkRouter {
             }
             if trailing.first == "members" && tabQuery == "requests" {
                 return .homeMemberRequests(id: id)
+            }
+            if trailing.first == "owners" && trailing.dropFirst().first == "transfer" {
+                return .homeOwnersTransfer(id: id)
             }
             return .homeDetail(id: id)
         case "chat", "message", "messages", "conversation":

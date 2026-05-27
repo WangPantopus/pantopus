@@ -118,6 +118,20 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .homeDetail(id: "h_1"))
     }
 
+    func testHomeOwnersTransferRoute() throws {
+        try DeepLinkRouter.shared.handle(
+            url: XCTUnwrap(URL(string: "pantopus://homes/h_1/owners/transfer"))
+        )
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .homeOwnersTransfer(id: "h_1"))
+    }
+
+    func testHomeOwnersTransferRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(
+            url: XCTUnwrap(URL(string: "https://pantopus.app/homes/h_2/owners/transfer"))
+        )
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .homeOwnersTransfer(id: "h_2"))
+    }
+
     func testChatRouteUsesConversationCase() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://chat/room_1")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .conversation(id: "room_1"))

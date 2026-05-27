@@ -208,6 +208,11 @@ public enum HubRoute: Hashable {
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
     case addGuest(homeId: String)
+    /// A13.4 — Transfer ownership form. Pushed from the Owners list
+    /// "Transfer" action and from `pantopus://homes/:id/owners/transfer`
+    /// deep links. The form owns its own Face ID bottom-sheet confirm so
+    /// no extra modal is wired here.
+    case transferOwnership(homeId: String)
     /// A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
     /// opened from the Gigs feed's list/map toggle. Carries the active
     /// category so the map renders the same filtered window.
@@ -342,6 +347,13 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case let .homeMemberRequests(id):
             path.append(.homeMembers(homeId: id))
+            _ = router.consume()
+        case let .homeOwnersTransfer(id):
+            // Push the home's dashboard underneath so a back-tap from the
+            // transfer form lands somewhere useful rather than at the
+            // empty Hub root.
+            path.append(.homeDashboard(homeId: id))
+            path.append(.transferOwnership(homeId: id))
             _ = router.consume()
         case .notifications:
             path.append(.notifications)
@@ -1499,6 +1511,10 @@ public struct HubTabRoot: View {
             // route case remains concrete for debug/deep-link parity.
             AddGuestFormView(
                 viewModel: AddGuestFormViewModel(homeId: homeId)
+            )
+        case let .transferOwnership(homeId):
+            TransferOwnershipView(
+                viewModel: TransferOwnershipViewModel(homeId: homeId)
             )
         case let .tasksMap(categoryKey):
             TasksMapView(

@@ -158,6 +158,22 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun home_owners_transfer_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeOwnersTransfer("h_1"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_1/owners/transfer"),
+        )
+    }
+
+    @Test
+    fun home_owners_transfer_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeOwnersTransfer("h_2"),
+            DeepLinkRouter.resolveString("https://pantopus.app/homes/h_2/owners/transfer"),
+        )
+    }
+
+    @Test
     fun chat_route_uses_conversation_case() {
         assertEquals(
             DeepLinkRouter.Destination.Conversation("c_1"),
