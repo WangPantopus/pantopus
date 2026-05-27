@@ -49,15 +49,18 @@ public struct SettingsView: View {
     }
 
     public var body: some View {
-        NavigationStack(path: $path) {
+        currentView
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.Color.appBg)
+            .accessibilityIdentifier("settings")
+    }
+
+    @ViewBuilder private var currentView: some View {
+        if let route = path.last {
+            destination(for: route)
+        } else {
             indexView
-                .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(for: SettingsStackRoute.self) { route in
-                    destination(for: route)
-                        .toolbar(.hidden, for: .navigationBar)
-                }
         }
-        .accessibilityIdentifier("settings")
     }
 
     private var indexView: some View {

@@ -95,8 +95,8 @@ struct HubView: View {
                             ringProgress: content.ringProgress,
                             unreadCount: 0
                         ),
-                        onBellTap: {},
-                        onMenuTap: {}
+                        onBellTap: { onNavigate(.openNotifications) },
+                        onMenuTap: { onNavigate(.openMenu) }
                     )
                     HubFirstRunHero(content: content) { onNavigate(.startVerification) }
                     HubPillarGrid(tiles: content.pillars) { onNavigate(.pillar($0)) }
