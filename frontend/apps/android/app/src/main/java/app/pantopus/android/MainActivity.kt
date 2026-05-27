@@ -9,10 +9,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.push.PushTokenSyncer
+import app.pantopus.android.ui.components.ToastController
+import app.pantopus.android.ui.components.ToastHost
 import app.pantopus.android.ui.navigation.PantopusNavHost
 import app.pantopus.android.ui.theme.PantopusTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -29,6 +34,14 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var pushTokenSyncer: PushTokenSyncer
+
+    /**
+     * App-wide [ToastController]. Survives configuration changes via the
+     * Activity instance. Feature view-models can grab the same instance
+     * via the Hilt-provided `ToastControllerEntryPoint` (or be passed it
+     * directly through a singleton DI binding once we DI-wire it).
+     */
+    private val toastController = ToastController()
 
     /**
      * Runtime POST_NOTIFICATIONS launcher (Android 13+). Mirrors iOS's
@@ -56,7 +69,10 @@ class MainActivity : ComponentActivity() {
         forwardDeepLink(intent)
         setContent {
             PantopusTheme {
-                PantopusNavHost()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    PantopusNavHost()
+                    ToastHost(controller = toastController)
+                }
             }
         }
         // Mirror iOS AppDelegate.requestNotificationPermission():

@@ -51,6 +51,9 @@ import app.pantopus.android.ui.components.ChipPicker
 import app.pantopus.android.ui.components.ChipPickerStyle
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
+import app.pantopus.android.ui.components.Toast
+import app.pantopus.android.ui.components.ToastKind
+import app.pantopus.android.ui.components.ToastMessage
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormShell
 import app.pantopus.android.ui.theme.PantopusColors
@@ -405,20 +408,14 @@ internal fun AddGuestToastView(
     toast: GuestToast,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(if (toast.isError) PantopusColors.error else PantopusColors.success)
-                .testTag("addGuestToast")
-                .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
-    ) {
-        Text(
-            text = toast.text,
-            style = PantopusTextStyle.small,
-            color = PantopusColors.appTextInverse,
-        )
-    }
+    Toast(
+        message =
+            ToastMessage(
+                text = toast.text,
+                kind = if (toast.isError) ToastKind.Error else ToastKind.Success,
+            ),
+        modifier = modifier.testTag("addGuestToast"),
+    )
 }
 
 @Composable

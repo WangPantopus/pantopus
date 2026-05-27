@@ -25,8 +25,6 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
 import app.pantopus.android.ui.theme.PantopusIcon
-import app.pantopus.android.ui.util.EmergencyCardContent
-import app.pantopus.android.ui.util.EmergencyCardPdf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
