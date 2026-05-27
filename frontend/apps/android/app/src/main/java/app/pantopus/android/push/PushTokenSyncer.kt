@@ -7,7 +7,6 @@ import app.pantopus.android.data.notifications.NotificationsRepository
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.tasks.await

@@ -2,15 +2,18 @@
 
 package app.pantopus.android.push
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import app.pantopus.android.MainActivity
 import app.pantopus.android.R
 import com.google.firebase.messaging.RemoteMessage
@@ -144,8 +147,8 @@ class NotificationDispatcher
         private fun postNotification(routing: Routing) {
             ensureChannel(routing.channel)
             val contentIntent = buildContentIntent(routing.deepLink)
-            // TODO: replace `ic_launcher` with a dedicated monochrome
-            // notification icon (`ic_notification`) before public launch.
+            // Replace `ic_launcher` with a dedicated monochrome notification
+            // icon (`ic_notification`) before public launch.
             // Status-bar icons must be white-on-transparent per Android
             // 5+; the launcher icon renders as a flat silhouette here.
             val notification =
@@ -163,6 +166,14 @@ class NotificationDispatcher
             // POST_NOTIFICATIONS is requested at runtime in MainActivity.
             // If it's still denied, drop silently — `nm.notify` would
             // throw SecurityException on Android 13+.
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                Timber.d("POST_NOTIFICATIONS denied — skipping system post")
+                return
+            }
             if (!nm.areNotificationsEnabled()) {
                 Timber.d("Notifications disabled — skipping system post")
                 return
