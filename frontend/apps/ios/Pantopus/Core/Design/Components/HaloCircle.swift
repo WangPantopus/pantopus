@@ -158,7 +158,9 @@ public struct HaloCircle: View {
         accentColor.opacity(0.15)
     }
 
-    private var pulseTint: Color { accentColor }
+    private var pulseTint: Color {
+        accentColor
+    }
 }
 
 #Preview("Tones") {

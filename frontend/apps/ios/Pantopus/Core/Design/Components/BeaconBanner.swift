@@ -53,7 +53,7 @@ public struct BeaconBanner<Trailing: View>: View {
     private var backgroundGradient: some View {
         LinearGradient(
             colors: [darkColor, baseColor],
-            startPoint: UnitPoint(x: 0.171, y: 0),  // 140° start
+            startPoint: UnitPoint(x: 0.171, y: 0), // 140° start
             endPoint: UnitPoint(x: 0.829, y: 1)
         )
     }
