@@ -12,18 +12,25 @@ import SwiftUI
 /// Reusable wizard scaffold. Feature screens supply a `WizardModel` and a
 /// content view; everything else (chrome, progress, CTA, close-confirm)
 /// is handled here.
+///
+/// Pass `identity` to repaint the progress rail and the primary CTA in
+/// a non-default pillar (`.home`, `.business`, `.warm`). Default is
+/// `.personal` so legacy call sites render identically.
 @MainActor
 public struct WizardShell<Content: View>: View {
     private let model: any WizardModel
+    private let identity: WizardIdentity
     private let content: Content
 
     @State private var showsDiscard = false
 
     public init(
         model: any WizardModel,
+        identity: WizardIdentity = .personal,
         @ViewBuilder content: () -> Content
     ) {
         self.model = model
+        self.identity = identity
         self.content = content()
     }
 
@@ -63,10 +70,14 @@ public struct WizardShell<Content: View>: View {
             1
         }
         let filled = Int((Double(segmentCount) * fraction).rounded())
-        SegmentedProgressBar(currentStep: filled, totalSteps: segmentCount)
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, Spacing.s2)
-            .background(Theme.Color.appSurface)
+        SegmentedProgressBar(
+            currentStep: filled,
+            totalSteps: segmentCount,
+            fillColor: identity.accent
+        )
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.appSurface)
     }
 
     private func stickyCTA(chrome: WizardChrome) -> some View {
@@ -79,10 +90,12 @@ public struct WizardShell<Content: View>: View {
                     }
                     .accessibilityIdentifier(secondary.identifier)
                 }
-                PrimaryButton(
+                WizardPrimaryCTA(
                     title: chrome.isSubmitting ? "Working…" : chrome.primaryCTALabel,
                     isLoading: chrome.isSubmitting,
-                    isEnabled: chrome.primaryCTAEnabled
+                    isEnabled: chrome.primaryCTAEnabled,
+                    tint: identity.accent,
+                    shadow: identity.ctaShadow
                 ) {
                     await MainActor.run { model.primaryTapped() }
                 }
@@ -161,5 +174,45 @@ private struct WizardTopBar: View {
         case .close: "Close"
         case .back: "Back"
         }
+    }
+}
+
+/// Primary CTA used by the wizard sticky row. Mirrors the geometry and
+/// loading/disabled behaviour of `PrimaryButton` but takes an explicit
+/// `tint` + `shadow` so the wizard can paint the button in the current
+/// identity pillar (sky / home / business / warm-amber).
+@MainActor
+private struct WizardPrimaryCTA: View {
+    let title: String
+    let isLoading: Bool
+    let isEnabled: Bool
+    let tint: Color
+    let shadow: PantopusShadow
+    let action: () async -> Void
+
+    var body: some View {
+        Button {
+            Task { await action() }
+        } label: {
+            ZStack {
+                Text(title)
+                    .pantopusTextStyle(.body)
+                    .opacity(isLoading ? 0 : 1)
+                if isLoading {
+                    ProgressView().tint(Theme.Color.appTextInverse)
+                }
+            }
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, Spacing.s4)
+            .background(tint)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .pantopusShadow(shadow)
+            .opacity(isEnabled ? 1 : 0.5)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled || isLoading)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
     }
 }
