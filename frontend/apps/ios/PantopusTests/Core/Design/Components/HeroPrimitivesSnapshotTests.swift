@@ -37,8 +37,11 @@ final class HeroPrimitivesSnapshotTests: XCTestCase {
         host.view.layoutIfNeeded()
         XCTAssertNotNil(host.view, "\(label) failed to build", file: file, line: line)
         XCTAssertGreaterThan(
-            host.view.bounds.width, 0,
-            "\(label) collapsed to zero width", file: file, line: line
+            host.view.bounds.width,
+            0,
+            "\(label) collapsed to zero width",
+            file: file,
+            line: line
         )
     }
 
@@ -51,10 +54,18 @@ final class HeroPrimitivesSnapshotTests: XCTestCase {
                 amount: "847.50",
                 currencyCode: "USD",
                 split: [
-                    .init(icon: .clock, overline: "Pending", value: "$186.00",
-                          note: "3 tasks · clears by Dec 4"),
-                    .init(icon: .arrowUpRight, overline: "This month",
-                          value: "$1,284.50", note: "8 tasks · ▲22% vs Oct")
+                    .init(
+                        icon: .clock,
+                        overline: "Pending",
+                        value: "$186.00",
+                        note: "3 tasks · clears by Dec 4"
+                    ),
+                    .init(
+                        icon: .arrowUpRight,
+                        overline: "This month",
+                        value: "$1,284.50",
+                        note: "8 tasks · ▲22% vs Oct"
+                    )
                 ]
             )
         }
@@ -67,8 +78,12 @@ final class HeroPrimitivesSnapshotTests: XCTestCase {
                 amount: "847.50",
                 currencyCode: "USD",
                 split: [
-                    .init(icon: .clock, overline: "Pending", value: "$186.00",
-                          note: "3 tasks · clears by Dec 4")
+                    .init(
+                        icon: .clock,
+                        overline: "Pending",
+                        value: "$186.00",
+                        note: "3 tasks · clears by Dec 4"
+                    )
                 ],
                 tone: .holdTone,
                 holdHeadline: "Withdrawals paused",

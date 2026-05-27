@@ -248,10 +248,18 @@ public struct BalanceHero: View {
             amount: "847.50",
             currencyCode: "USD",
             split: [
-                .init(icon: .clock, overline: "Pending", value: "$186.00",
-                      note: "3 tasks · clears by Dec 4"),
-                .init(icon: .arrowUpRight, overline: "This month",
-                      value: "$1,284.50", note: "8 tasks · ▲22% vs Oct")
+                .init(
+                    icon: .clock,
+                    overline: "Pending",
+                    value: "$186.00",
+                    note: "3 tasks · clears by Dec 4"
+                ),
+                .init(
+                    icon: .arrowUpRight,
+                    overline: "This month",
+                    value: "$1,284.50",
+                    note: "8 tasks · ▲22% vs Oct"
+                )
             ]
         )
 
@@ -260,10 +268,18 @@ public struct BalanceHero: View {
             amount: "847.50",
             currencyCode: "USD",
             split: [
-                .init(icon: .clock, overline: "Pending", value: "$186.00",
-                      note: "3 tasks · clears by Dec 4"),
-                .init(icon: .arrowUpRight, overline: "This month",
-                      value: "$1,284.50", note: "8 tasks · ▲22% vs Oct")
+                .init(
+                    icon: .clock,
+                    overline: "Pending",
+                    value: "$186.00",
+                    note: "3 tasks · clears by Dec 4"
+                ),
+                .init(
+                    icon: .arrowUpRight,
+                    overline: "This month",
+                    value: "$1,284.50",
+                    note: "8 tasks · ▲22% vs Oct"
+                )
             ],
             tone: .holdTone,
             holdHeadline: "Withdrawals paused",
