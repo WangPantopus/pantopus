@@ -1,10 +1,10 @@
 package app.pantopus.android.ui.screens.shared.wizard
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusElevation
 import app.pantopus.android.ui.theme.PantopusElevations
-import androidx.compose.ui.unit.dp
 
 /**
  * Identity pillar applied to a [WizardShell]. Drives the progress rail
