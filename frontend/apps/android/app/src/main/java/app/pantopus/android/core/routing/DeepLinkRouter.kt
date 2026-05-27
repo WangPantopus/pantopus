@@ -35,6 +35,16 @@ object DeepLinkRouter {
 
         data class SupportTrain(val id: String) : Destination
 
+        /**
+         * `pantopus://support-trains/:id/manage` — organizer-only
+         * review queue for a Support Train. Distinct from
+         * [SupportTrain], which now lands on the participant detail
+         * (A10.9). Owners reach the queue via the detail screen's
+         * dock overflow; this deep link is the "land directly on the
+         * queue" entry for organizer shortcuts.
+         */
+        data class SupportTrainManage(val id: String) : Destination
+
         data class Post(val id: String) : Destination
 
         data class Gig(val id: String) : Destination
@@ -155,7 +165,11 @@ object DeepLinkRouter {
             "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub
             "support-trains", "support_train" -> {
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.SupportTrain(id)
+                when {
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    segments.getOrNull(2) == "manage" -> Destination.SupportTrainManage(id)
+                    else -> Destination.SupportTrain(id)
+                }
             }
             "post", "posts" -> {
                 val id = segments.getOrNull(1)
