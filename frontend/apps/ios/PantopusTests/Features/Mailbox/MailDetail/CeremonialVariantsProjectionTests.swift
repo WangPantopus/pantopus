@@ -14,22 +14,14 @@ import XCTest
 
 @MainActor
 final class CeremonialVariantsProjectionTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        SequencedURLProtocol.reset()
-    }
-
-    private func makeAPI() -> APIClient {
-        APIClient(
-            environment: .current,
-            session: SequencedURLProtocol.makeSession(),
-            retryPolicy: .none
-        )
+    private func projectContent(from body: String) throws -> MailDetailContent {
+        let response = try JSONDecoder().decode(MailDetailResponse.self, from: Data(body.utf8))
+        return MailDetailViewModel.project(detail: response.mail)
     }
 
     // MARK: - Coupon
 
-    func testCouponProjectionDecodesHeadline() async {
+    func testCouponProjectionDecodesHeadline() throws {
         let body = """
         {
           "mail": {
@@ -61,13 +53,7 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)")
-            return
-        }
+        let content = try projectContent(from: body)
         XCTAssertEqual(content.category, .coupon)
         XCTAssertNotNil(content.couponDetail)
         XCTAssertEqual(content.couponDetail?.headline, "25% OFF")
@@ -93,14 +79,13 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        let response = try JSONDecoder().decode(MailDetailResponse.self, from: Data(body.utf8))
-        let content = MailDetailViewModel.project(detail: response.mail)
+        let content = try projectContent(from: body)
         XCTAssertNil(content.couponDetail)
     }
 
     // MARK: - Gig
 
-    func testGigProjectionDecodesBidPostBidder() async {
+    func testGigProjectionDecodesBidPostBidder() throws {
         let body = """
         {
           "mail": {
@@ -124,13 +109,7 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)")
-            return
-        }
+        let content = try projectContent(from: body)
         XCTAssertEqual(content.category, .gig)
         XCTAssertNotNil(content.gigDetail)
         XCTAssertEqual(content.gigDetail?.bid.amount, 65)
@@ -140,7 +119,7 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
 
     // MARK: - Memory
 
-    func testMemoryProjectionDecodesKeepsake() async {
+    func testMemoryProjectionDecodesKeepsake() throws {
         let body = """
         {
           "mail": {
@@ -166,20 +145,14 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)")
-            return
-        }
+        let content = try projectContent(from: body)
         XCTAssertEqual(content.category, .memory)
         XCTAssertNotNil(content.memoryDetail)
         XCTAssertEqual(content.memoryDetail?.title, "One year ago, you found Pepper.")
         XCTAssertFalse(content.memoryDetail?.isSaved ?? true)
     }
 
-    func testMemoryMissingPresentationBlocksLeavesNil() async {
+    func testMemoryMissingPresentationBlocksLeavesNil() throws {
         let body = """
         {
           "mail": {
@@ -195,19 +168,13 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded")
-            return
-        }
+        let content = try projectContent(from: body)
         XCTAssertNil(content.memoryDetail)
     }
 
     // MARK: - Package
 
-    func testPackageProjectionDecodesCarrierAndTracking() async {
+    func testPackageProjectionDecodesCarrierAndTracking() throws {
         let body = """
         {
           "mail": {
@@ -228,13 +195,7 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)")
-            return
-        }
+        let content = try projectContent(from: body)
         XCTAssertEqual(content.category, .package)
         XCTAssertNotNil(content.packageDetail)
         XCTAssertEqual(content.packageDetail?.carrier, "USPS Priority Mail")
@@ -244,7 +205,7 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
         XCTAssertFalse(content.packageDetail?.trackingSteps.isEmpty ?? true)
     }
 
-    func testPackagePayloadWithoutCarrierLeavesNil() async {
+    func testPackagePayloadWithoutCarrierLeavesNil() throws {
         let body = """
         {
           "mail": {
@@ -260,19 +221,13 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded")
-            return
-        }
+        let content = try projectContent(from: body)
         XCTAssertNil(content.packageDetail)
     }
 
     // MARK: - Cross-category guards
 
-    func testNonGigCategoryNeverDecodesGig() async {
+    func testNonGigCategoryNeverDecodesGig() throws {
         let body = """
         {
           "mail": {
@@ -292,13 +247,7 @@ final class CeremonialVariantsProjectionTests: XCTestCase {
           }
         }
         """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
-        await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            XCTFail("Expected loaded")
-            return
-        }
+        let content = try projectContent(from: body)
         XCTAssertNil(content.gigDetail)
     }
 }

@@ -42,6 +42,8 @@ struct HubTopBar: View {
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
                 .accessibilityLabel("Notifications")
                 .accessibilityIdentifier("hubBellButton")
                 if content.unreadCount > 0 {
@@ -57,6 +59,8 @@ struct HubTopBar: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
+            .frame(width: 36, height: 36)
+            .contentShape(Rectangle())
             .accessibilityLabel("Menu")
             .accessibilityIdentifier("hubMenuButton")
         }
