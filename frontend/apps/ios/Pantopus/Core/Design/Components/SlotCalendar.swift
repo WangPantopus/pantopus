@@ -197,7 +197,7 @@ private struct CellStyle {
     static func of(_ state: SlotCalendarState) -> CellStyle {
         switch state {
         case .past:
-            return CellStyle(
+            CellStyle(
                 background: Theme.Color.appSurface,
                 foreground: Theme.Color.appTextMuted,
                 border: .clear,
@@ -208,7 +208,7 @@ private struct CellStyle {
                 shadowYOffset: 0
             )
         case .today:
-            return CellStyle(
+            CellStyle(
                 background: Theme.Color.primary600,
                 foreground: Theme.Color.appTextInverse,
                 border: Theme.Color.primary600,
@@ -219,7 +219,7 @@ private struct CellStyle {
                 shadowYOffset: 2
             )
         case .filled:
-            return CellStyle(
+            CellStyle(
                 background: Theme.Color.homeBg,
                 foreground: Theme.Color.home,
                 border: Theme.Color.home,
@@ -230,7 +230,7 @@ private struct CellStyle {
                 shadowYOffset: 0
             )
         case .open:
-            return CellStyle(
+            CellStyle(
                 background: Theme.Color.appSurface,
                 foreground: Theme.Color.appText,
                 border: Theme.Color.primary300,
@@ -241,7 +241,7 @@ private struct CellStyle {
                 shadowYOffset: 0
             )
         case .mine:
-            return CellStyle(
+            CellStyle(
                 background: Theme.Color.primary50,
                 foreground: Theme.Color.primary700,
                 border: Theme.Color.primary600,

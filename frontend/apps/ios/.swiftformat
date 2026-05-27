@@ -23,7 +23,7 @@
 --voidtype void
 --someany enabled
 
---exclude build,DerivedData,.build,Pantopus.xcodeproj,fastlane
+--exclude build,DerivedData,.build,Pantopus.xcodeproj,fastlane,SourcePackages
 
 --disable andOperator
 --disable wrapMultilineStatementBraces
