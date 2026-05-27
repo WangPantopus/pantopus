@@ -11,12 +11,20 @@
 import XCTest
 
 final class A11yLabelAudit: XCTestCase {
+    private var launchedApp: XCUIApplication?
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
+    override func tearDownWithError() throws {
+        launchedApp?.terminateAfterSkippedLaunch()
+        launchedApp = nil
+    }
+
     private func launch() -> XCUIApplication? {
         let app = XCUIApplication()
+        launchedApp = app
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
         app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
