@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Campaign
@@ -465,6 +466,11 @@ enum class PantopusIcon(
     // for Lucide `bot`. iOS has no robot SF Symbol and falls back to
     // `sparkles`.
     Bot("bot"),
+
+    // A13.13 Manage train — Organize row glyphs. `bar-chart-3` paints the
+    // Analytics row's icon tile; `calendar-cog` paints the Edit-dates row.
+    BarChart3("bar-chart-3"),
+    CalendarCog("calendar-cog"),
     ;
 
     companion object {
@@ -753,6 +759,13 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Warehouse -> IconSource.Material(Icons.Filled.Warehouse)
         // A15.3 AI Assistant — Material's robot-assistant glyph.
         PantopusIcon.Bot -> IconSource.Material(Icons.Filled.SmartToy)
+        // A13.13 Manage train. Material ships `BarChart` for analytics
+        // (vertical-bars glyph); `calendar-cog` reuses `EditCalendar`
+        // (the gear-on-calendar Material glyph already mapped for
+        // `calendar-clock`) since Material doesn't ship a separate
+        // calendar-cog glyph.
+        PantopusIcon.BarChart3 -> IconSource.Material(Icons.Filled.BarChart)
+        PantopusIcon.CalendarCog -> IconSource.Material(Icons.Filled.EditCalendar)
     }
 
 /**

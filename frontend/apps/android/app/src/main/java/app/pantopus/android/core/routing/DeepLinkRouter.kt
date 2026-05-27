@@ -35,6 +35,9 @@ object DeepLinkRouter {
 
         data class SupportTrain(val id: String) : Destination
 
+        /** `pantopus://support-trains/:id/manage` — A13.13 organizer surface. */
+        data class ManageTrain(val id: String) : Destination
+
         data class Post(val id: String) : Destination
 
         data class Gig(val id: String) : Destination
@@ -155,7 +158,14 @@ object DeepLinkRouter {
             "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub
             "support-trains", "support_train" -> {
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.SupportTrain(id)
+                if (id.isNullOrBlank()) {
+                    Destination.Unknown(raw)
+                } else if (segments.getOrNull(2) == "manage") {
+                    // `/support-trains/:id/manage` → A13.13 organizer surface.
+                    Destination.ManageTrain(id)
+                } else {
+                    Destination.SupportTrain(id)
+                }
             }
             "post", "posts" -> {
                 val id = segments.getOrNull(1)

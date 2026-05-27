@@ -23,6 +23,9 @@ final class DeepLinkRouter {
         case home
         case notifications
         case supportTrain(id: String)
+        /// `pantopus://support-trains/:id/manage` — A13.13 organizer
+        /// surface. Reached from the A10.9 detail dock overflow.
+        case manageTrain(id: String)
         case post(id: String)
         case gig(id: String)
         case listing(id: String)
@@ -124,8 +127,12 @@ final class DeepLinkRouter {
         case "notifications":
             return .notifications
         case "support-trains", "support_train":
-            if let id = segments.dropFirst().first { return .supportTrain(id: id) }
-            return .unknown(url)
+            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            // `/support-trains/:id/manage` → A13.13 organizer surface.
+            if segments.dropFirst(2).first == "manage" {
+                return .manageTrain(id: id)
+            }
+            return .supportTrain(id: id)
         case "post", "posts":
             if let id = segments.dropFirst().first { return .post(id: id) }
             return .unknown(url)

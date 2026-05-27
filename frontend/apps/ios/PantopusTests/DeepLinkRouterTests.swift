@@ -84,6 +84,17 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrain(id: "st_1"))
     }
 
+    func testManageTrainRoute() throws {
+        // `pantopus://support-trains/:id/manage` — A13.13 organizer surface.
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://support-trains/st_1/manage")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .manageTrain(id: "st_1"))
+    }
+
+    func testManageTrainRouteHttpsForm() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/support-trains/st_1/manage")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .manageTrain(id: "st_1"))
+    }
+
     func testGigRoute() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://gig/g_42")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .gig(id: "g_42"))

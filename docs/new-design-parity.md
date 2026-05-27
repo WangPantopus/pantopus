@@ -302,9 +302,9 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
   - **`StickySave`** — two modes: **dirty** ("3 unsaved · Discard outline + Save primary") · **setup** ("Save draft outline + Publish · 4 to go primary"). The "X to go" hint inside the publish button is the design's signature — verify it renders.
 
 ### A13.13 — Manage train (`/support-trains/[id]/manage.tsx`)
-- **iOS:** **MISSING** — `SupportTrains/` has `EditSignupFormView.swift` (one signup) but no manage screen.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD**
+- **iOS:** `Features/SupportTrains/Manage/ManageTrainView.swift` + `ManageTrainViewModel.swift` + `Components/{TrainContextStrip, StatCellRow, SendUpdateForm, OrganizeSection, CloseTrainSheet}.swift` (P4.3).
+- **Android:** `ui/screens/support_trains/manage/ManageTrainScreen.kt` + `ManageTrainViewModel.kt` + `components/{TrainContextStrip, StatCellRow, SendUpdateForm, OrganizeSection, CloseTrainSheet}.kt` (P4.3).
+- **Status:** **BUILT** (P4.3) — snapshot baselines pending follow-up commit; wired from `pantopus://support-trains/:id/manage` + new `.manageTrain(trainId:)` route. The A10.9 dock-overflow entry point lands when A10.9 ships.
 - **Designed frames:** active train mid-edit (Murphy meal train · day 12/21 · 18 slots filled · draft note typed · audience: all helpers · push on · `Send update` CTA enabled) · closing sheet (close confirmation bottom sheet · summary stats · optional thank-you note · destructive "Close & thank" red CTA)
 - **Required slots:**
   - **`TrainContextStrip`** — title (`Murphy meal train`) + days-progress (12/21) + audience meta.

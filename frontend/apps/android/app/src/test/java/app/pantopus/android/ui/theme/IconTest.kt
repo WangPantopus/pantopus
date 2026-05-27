@@ -219,6 +219,9 @@ class IconTest {
             "warehouse",
             // A15.3 — AI Assistant avatar/reply glyph.
             "bot",
+            // A13.13 — Manage train Organize row glyphs.
+            "bar-chart-3",
+            "calendar-cog",
         )
 
     @Test

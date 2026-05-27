@@ -228,6 +228,7 @@ import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
 import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
+import app.pantopus.android.ui.screens.support_trains.manage.ManageTrainScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
@@ -699,6 +700,16 @@ private object ChildRoutes {
 
     fun editSignup(reservationId: String): String = "support-trains/reservations/${java.net.URLEncoder.encode(reservationId, "UTF-8")}/edit"
 
+    /** P4.3 / A13.13 Manage train (organizer surface). `:id` is the
+     *  Support Train UUID. Pushed from the A10.9 detail dock overflow
+     *  when the viewer is the organizer and from the
+     *  `pantopus://support-trains/:id/manage` deep link. Keep in sync
+     *  with `ManageTrainViewModel.TRAIN_ID_KEY`. */
+    const val MANAGE_TRAIN_ID_KEY = "supportTrainId"
+    const val MANAGE_TRAIN = "support-trains/{$MANAGE_TRAIN_ID_KEY}/manage"
+
+    fun manageTrain(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/manage"
+
     /** P1.1 — Admin Review-claims queue. Gated by [SettingsRoute.ReviewClaims]. */
     const val REVIEW_CLAIMS = "admin/review-claims"
 
@@ -1150,6 +1161,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 // until then the route lists the user's support trains so
                 // the deep link still resolves to something useful.
                 navController.navigate(ChildRoutes.SUPPORT_TRAINS)
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.ManageTrain -> {
+                // `pantopus://support-trains/:id/manage` → A13.13 organizer
+                // surface. Drop the user on the Support Trains list first so
+                // a back-tap pops to a known surface, then push manage.
+                navController.navigate(ChildRoutes.SUPPORT_TRAINS)
+                navController.navigate(ChildRoutes.manageTrain(pending.id))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Gig -> {
@@ -2916,6 +2935,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 EditSignupFormScreen(
                     onClose = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.MANAGE_TRAIN,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.MANAGE_TRAIN_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                ManageTrainScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenAnalytics = { id ->
+                        navController.navigate(ChildRoutes.placeholder("Train analytics · $id"))
+                    },
+                    onEditDates = { id ->
+                        navController.navigate(ChildRoutes.placeholder("Edit dates · $id"))
+                    },
+                    onInviteHelpers = { id ->
+                        navController.navigate(ChildRoutes.placeholder("Invite helpers · $id"))
+                    },
                 )
             }
             composable(ChildRoutes.REVIEW_CLAIMS) {

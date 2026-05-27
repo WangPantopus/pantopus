@@ -102,6 +102,20 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun manage_train_route() {
+        // P4.3 / A13.13 — `/support-trains/:id/manage` routes to the
+        // organizer-only manage surface.
+        assertEquals(
+            DeepLinkRouter.Destination.ManageTrain("st_1"),
+            DeepLinkRouter.resolveString("pantopus://support-trains/st_1/manage"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.ManageTrain("st_2"),
+            DeepLinkRouter.resolveString("https://pantopus.app/support-trains/st_2/manage"),
+        )
+    }
+
+    @Test
     fun gig_route() {
         assertEquals(
             DeepLinkRouter.Destination.Gig("g_1"),
