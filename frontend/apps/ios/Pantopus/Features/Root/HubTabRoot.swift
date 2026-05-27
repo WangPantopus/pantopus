@@ -219,6 +219,10 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A10.10 — Wallet (earnings-side surface). Reached from the
+    /// Settings → "Payments & payouts" row and the
+    /// `pantopus://wallet` deep link.
+    case wallet
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -354,6 +358,9 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case .discoverHub:
             path.append(.discoverHub)
+            _ = router.consume()
+        case .wallet:
+            path.append(.wallet)
             _ = router.consume()
         case let .supportTrain(id):
             // pantopus://support-trains/:id deep links land on the
@@ -1441,6 +1448,15 @@ public struct HubTabRoot: View {
                         push(.reviewClaims)
                     }
                 },
+                onOpenWallet: {
+                    // Same close-then-push pattern as reviewClaims: the
+                    // wallet is a top-level destination, not a sub-route
+                    // of Settings, so back from it returns to the Hub.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.wallet)
+                    }
+                },
                 onSignedOut: { Task { @MainActor in pop() } }
             )
         case .editProfile:
@@ -1540,6 +1556,16 @@ public struct HubTabRoot: View {
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case .wallet:
+            WalletView(
+                onBack: pop,
+                onOpenHistory: { Task { @MainActor in push(.placeholder(label: "Wallet history")) } },
+                onWithdraw: { Task { @MainActor in push(.placeholder(label: "Withdraw")) } },
+                onManagePayout: { Task { @MainActor in push(.placeholder(label: "Manage payout method")) } },
+                onReverifyPayout: { Task { @MainActor in push(.placeholder(label: "Re-verify bank")) } },
+                onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } },
+                onSeeAllActivity: { Task { @MainActor in push(.placeholder(label: "All activity")) } }
+            )
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

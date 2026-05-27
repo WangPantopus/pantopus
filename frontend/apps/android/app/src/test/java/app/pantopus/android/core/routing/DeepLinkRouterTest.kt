@@ -90,6 +90,15 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun wallet_routes_to_wallet() {
+        assertEquals(DeepLinkRouter.Destination.Wallet, DeepLinkRouter.resolveString("pantopus://wallet"))
+        assertEquals(
+            DeepLinkRouter.Destination.Wallet,
+            DeepLinkRouter.resolveString("https://pantopus.app/wallet"),
+        )
+    }
+
+    @Test
     fun support_train_route() {
         assertEquals(
             DeepLinkRouter.Destination.SupportTrain("st_1"),

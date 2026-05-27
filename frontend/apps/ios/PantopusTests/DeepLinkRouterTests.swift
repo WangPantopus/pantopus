@@ -138,6 +138,18 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .notifications)
     }
 
+    // MARK: - A10.10 P3.2 — wallet deep link
+
+    func testWalletRouteCustomScheme() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://wallet")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .wallet)
+    }
+
+    func testWalletRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/wallet")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .wallet)
+    }
+
     // MARK: - T6.1c P5 — auth deep links
 
     func testResetPasswordCustomScheme() throws {
