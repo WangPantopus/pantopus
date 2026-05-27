@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "MatchingDeclarationName")
+@file:Suppress("MagicNumber", "MatchingDeclarationName", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.components
 
