@@ -199,8 +199,9 @@ final class VerifyLandlordWizardViewModel: WizardModel {
         pendingEvent = nil
     }
 
-    // MARK: - Variant switching (used by previews / sample data
-    // toggles + the dashboard fast-track decision tree)
+    // MARK: - Variant switching
+
+    // Used by previews / sample data toggles + the dashboard fast-track decision tree.
 
     func setVariant(_ variant: VerifyLandlordVariant) {
         guard variant != startContent.variant else { return }
