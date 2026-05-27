@@ -25,6 +25,7 @@ public struct MailboxRootView: View {
         ListOfRowsView(dataSource: viewModel) {
             MailboxRootHeader(viewModel: viewModel)
         }
+        .accessibilityIdentifier("mailboxRoot")
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .onAppear { Analytics.track(.screenMailboxRootViewed) }
     }

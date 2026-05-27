@@ -53,14 +53,15 @@ public struct CouponDetailDTO: Sendable, Hashable {
     /// payload is missing the bare-minimum field set (`headline`).
     public static func decode(from value: JSONValue?) -> CouponDetailDTO? {
         guard let dict = value?.dictValue else { return nil }
-        let headline = dict["headline"]?.stringValue ?? dict["title"]?.stringValue
-        guard let resolvedHeadline = headline, !resolvedHeadline.isEmpty else {
+        guard let headline = dict["headline"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !headline.isEmpty
+        else {
             return nil
         }
         return CouponDetailDTO(
             brandLogoURL: dict["brand_logo_url"]?.stringValue.flatMap(URL.init(string:)),
             brandName: dict["brand_name"]?.stringValue,
-            headline: resolvedHeadline,
+            headline: headline,
             subcopy: dict["subcopy"]?.stringValue,
             code: dict["code"]?.stringValue,
             expiresAt: dict["expires_at"]?.stringValue,
