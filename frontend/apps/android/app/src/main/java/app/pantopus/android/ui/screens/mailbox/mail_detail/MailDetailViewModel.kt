@@ -10,6 +10,11 @@ import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
+import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.MemoryDetailDto
+import app.pantopus.android.ui.screens.mailbox.item_detail.PackageBodyContent
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.decodePackageDetail
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
@@ -75,6 +80,10 @@ data class MailDetailContent(
     val bookletDetail: BookletDetailDto? = null,
     val certifiedDetail: CertifiedDetailDto? = null,
     val communityDetail: CommunityDetailDto? = null,
+    val couponDetail: CouponDetailDto? = null,
+    val gigDetail: GigDetailDto? = null,
+    val memoryDetail: MemoryDetailDto? = null,
+    val packageDetail: PackageBodyContent? = null,
 ) {
     /** Build a typed key-facts row list for the shell's KeyFacts slot. */
     fun keyFacts(): List<MailDetailKeyFact> =
@@ -134,6 +143,14 @@ class MailDetailViewModel
 
         private val _rsvpInFlight = MutableStateFlow(false)
         val rsvpInFlight: StateFlow<Boolean> = _rsvpInFlight.asStateFlow()
+
+        /** Coupon redeem mutation in-flight; disables the redeem CTA. */
+        private val _couponRedeemInFlight = MutableStateFlow(false)
+        val couponRedeemInFlight: StateFlow<Boolean> = _couponRedeemInFlight.asStateFlow()
+
+        /** Gig accept-bid mutation in-flight; disables the action row. */
+        private val _gigBidInFlight = MutableStateFlow(false)
+        val gigBidInFlight: StateFlow<Boolean> = _gigBidInFlight.asStateFlow()
 
         /** T6.5e (P19.5) — Save-to-vault picker visibility. */
         private val _showsSaveToVaultPicker = MutableStateFlow(false)
@@ -274,6 +291,74 @@ class MailDetailViewModel
             _showsSaveToVaultPicker.value = false
         }
 
+        // ── Ceremonial variant mutations (A17.5–A17.8) ───────────
+
+        /**
+         * A17.5 — Mark a coupon redeemed. Backend redemption is not yet
+         * wired; the projection flips locally so the variant body swaps
+         * into the redeemed-ribbon state. Mirrors acknowledge so
+         * subsequent backend wiring can drop in.
+         */
+        fun redeemCoupon() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            if (current.content.category != MailItemCategory.Coupon) return
+            if (current.content.couponDetail == null) return
+            if (_couponRedeemInFlight.value) return
+            _couponRedeemInFlight.value = true
+            _state.value = MailDetailUiState.Loaded(current.content.copy(isAcknowledged = true))
+            _toast.value = "Redeemed"
+            _couponRedeemInFlight.value = false
+        }
+
+        /**
+         * A17.6 — Accept the incoming bid on a gig. Backend acceptance
+         * is not yet wired through the mail-detail endpoint; the
+         * projection flips locally so the gig variant swaps into its
+         * accepted body (next-steps timeline + Open thread CTA).
+         */
+        fun acceptGigBid() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val gig = current.content.gigDetail ?: return
+            if (current.content.category != MailItemCategory.Gig) return
+            if (_gigBidInFlight.value) return
+            _gigBidInFlight.value = true
+            _state.value = MailDetailUiState.Loaded(current.content.copy(gigDetail = gig.accepted()))
+            _toast.value = "Bid accepted"
+            _gigBidInFlight.value = false
+        }
+
+        /**
+         * A17.7 — Save the memory keepsake to the user's default
+         * memories vault folder. Falls through to the picker if no
+         * folders are cached yet; once cached, prefers a folder whose
+         * label contains "memor" before defaulting to the first folder.
+         */
+        fun saveMemoryToVault() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val memory = current.content.memoryDetail ?: return
+            if (current.content.category != MailItemCategory.Memory) return
+            if (memory.isSaved) return
+            if (_saveToVaultInFlight.value) return
+            // Optimistic flip so the saved banner + vault card take over
+            // without waiting for the network round-trip.
+            _state.value =
+                MailDetailUiState.Loaded(
+                    current.content.copy(memoryDetail = memory.copy(isSaved = true)),
+                )
+            if (_saveToVaultFolders.value.isEmpty()) {
+                openSaveToVaultPicker()
+                return
+            }
+            val memoryFolder =
+                _saveToVaultFolders.value.firstOrNull { it.label.lowercase().contains("memor") }
+            val folderId = (memoryFolder ?: _saveToVaultFolders.value.firstOrNull())?.id
+            if (folderId == null) {
+                openSaveToVaultPicker()
+                return
+            }
+            saveToVault(folderId)
+        }
+
         /** POST the current mail to the supplied vault folder. */
         fun saveToVault(folderId: String) {
             if (_saveToVaultInFlight.value) return
@@ -350,6 +435,33 @@ class MailDetailViewModel
                     } else {
                         null
                     }
+                // A17.5–A17.8 — ceremonial variant payloads. Each is
+                // defensive: null unless the JSON carries its minimum
+                // field set, so the dispatcher still routes to A17.1.
+                val couponDetail =
+                    if (category == MailItemCategory.Coupon) {
+                        CouponDetailDto.decodeFromObjectPayload(detail.`object`)
+                    } else {
+                        null
+                    }
+                val gigDetail =
+                    if (category == MailItemCategory.Gig) {
+                        GigDetailDto.decodeFromObjectPayload(detail.`object`)
+                    } else {
+                        null
+                    }
+                val memoryDetail =
+                    if (category == MailItemCategory.Memory) {
+                        MemoryDetailDto.decodeFromObjectPayload(detail.`object`)
+                    } else {
+                        null
+                    }
+                val packageDetail =
+                    if (category == MailItemCategory.Package) {
+                        decodePackageDetail(detail.`object`)
+                    } else {
+                        null
+                    }
                 val resolvedAck = ackStatus || (certifiedDetail?.isAcknowledged == true)
                 val readStatusLabel = if (detail.viewed || resolvedAck) "Read" else "Unread"
                 return MailDetailContent(
@@ -378,6 +490,10 @@ class MailDetailViewModel
                     bookletDetail = bookletDetail,
                     certifiedDetail = certifiedDetail,
                     communityDetail = communityDetail,
+                    couponDetail = couponDetail,
+                    gigDetail = gigDetail,
+                    memoryDetail = memoryDetail,
+                    packageDetail = packageDetail,
                 )
             }
 

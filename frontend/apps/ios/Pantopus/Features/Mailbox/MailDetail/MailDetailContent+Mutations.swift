@@ -9,33 +9,7 @@ extension MailDetailContent {
     /// Return a copy of `content` with `isAcknowledged` flipped to the
     /// supplied value. Used by the optimistic acknowledge mutation.
     static func replacingAck(_ content: MailDetailContent, with value: Bool) -> MailDetailContent {
-        MailDetailContent(
-            mailId: content.mailId,
-            category: content.category,
-            trust: content.trust,
-            detailTrust: content.detailTrust,
-            senderDisplayName: content.senderDisplayName,
-            senderMeta: content.senderMeta,
-            senderTypeLabel: content.senderTypeLabel,
-            carrierLine: content.carrierLine,
-            senderInitials: content.senderInitials,
-            senderUserId: content.senderUserId,
-            title: content.title,
-            excerpt: content.excerpt,
-            referenceLabel: content.referenceLabel,
-            createdAtLabel: content.createdAtLabel,
-            expiresAtLabel: content.expiresAtLabel,
-            readStatusLabel: value ? "Read" : content.readStatusLabel,
-            bodyParagraphs: content.bodyParagraphs,
-            attachments: content.attachments,
-            aiSummary: content.aiSummary,
-            ackRequired: content.ackRequired,
-            isAcknowledged: value,
-            isArchived: content.isArchived,
-            bookletDetail: content.bookletDetail,
-            certifiedDetail: content.certifiedDetail,
-            communityDetail: content.communityDetail
-        )
+        rebuild(content, readStatusLabel: value ? "Read" : content.readStatusLabel, isAcknowledged: value)
     }
 
     /// Return a copy of `content` with the community detail's RSVP
@@ -62,7 +36,44 @@ extension MailDetailContent {
             pulseThread: community.pulseThread,
             rsvp: status
         )
-        return MailDetailContent(
+        return rebuild(content, communityDetail: updatedCommunity)
+    }
+
+    /// Return a copy of `content` with the gig detail flipped to its
+    /// accepted state. Used by the optimistic `acceptGigBid` mutation.
+    static func replacingGigAccepted(
+        _ content: MailDetailContent,
+        with gig: GigDetailDTO
+    ) -> MailDetailContent {
+        rebuild(content, gigDetail: gig)
+    }
+
+    /// Return a copy of `content` with the memory detail's `isSaved`
+    /// flag flipped. Used by the optimistic `saveMemoryToVault` flow.
+    static func replacingMemorySaved(
+        _ content: MailDetailContent,
+        with value: Bool
+    ) -> MailDetailContent {
+        guard let memory = content.memoryDetail else { return content }
+        return rebuild(content, memoryDetail: memory.withSaved(value))
+    }
+
+    /// Shared rebuilder so the per-field mutations stay one line each.
+    /// Every parameter defaults to "keep the existing field"; pass only
+    /// the field(s) you intend to flip.
+    private static func rebuild(
+        _ content: MailDetailContent,
+        readStatusLabel: String? = nil,
+        isAcknowledged: Bool? = nil,
+        bookletDetail: BookletDetailDTO?? = nil,
+        certifiedDetail: CertifiedDetailDTO?? = nil,
+        communityDetail: CommunityDetailDTO?? = nil,
+        couponDetail: CouponDetailDTO?? = nil,
+        gigDetail: GigDetailDTO?? = nil,
+        memoryDetail: MemoryDetailDTO?? = nil,
+        packageDetail: PackageBodyContent?? = nil
+    ) -> MailDetailContent {
+        MailDetailContent(
             mailId: content.mailId,
             category: content.category,
             trust: content.trust,
@@ -78,16 +89,20 @@ extension MailDetailContent {
             referenceLabel: content.referenceLabel,
             createdAtLabel: content.createdAtLabel,
             expiresAtLabel: content.expiresAtLabel,
-            readStatusLabel: content.readStatusLabel,
+            readStatusLabel: readStatusLabel ?? content.readStatusLabel,
             bodyParagraphs: content.bodyParagraphs,
             attachments: content.attachments,
             aiSummary: content.aiSummary,
             ackRequired: content.ackRequired,
-            isAcknowledged: content.isAcknowledged,
+            isAcknowledged: isAcknowledged ?? content.isAcknowledged,
             isArchived: content.isArchived,
-            bookletDetail: content.bookletDetail,
-            certifiedDetail: content.certifiedDetail,
-            communityDetail: updatedCommunity
+            bookletDetail: bookletDetail ?? content.bookletDetail,
+            certifiedDetail: certifiedDetail ?? content.certifiedDetail,
+            communityDetail: communityDetail ?? content.communityDetail,
+            couponDetail: couponDetail ?? content.couponDetail,
+            gigDetail: gigDetail ?? content.gigDetail,
+            memoryDetail: memoryDetail ?? content.memoryDetail,
+            packageDetail: packageDetail ?? content.packageDetail
         )
     }
 }

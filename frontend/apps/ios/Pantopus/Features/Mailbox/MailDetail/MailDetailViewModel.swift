@@ -80,6 +80,30 @@ public struct MailDetailContent: Sendable {
     /// event details + attendees strip + pulse thread cross-link.
     public let communityDetail: CommunityDetailDTO?
 
+    /// Decoded coupon payload — set when `category == .coupon` and the
+    /// detail response's `object` JSON carries a coupon headline. The
+    /// Coupon variant view (A17.5) consumes this through the barcode +
+    /// fine-print + redemption-state CTA layout.
+    public let couponDetail: CouponDetailDTO?
+
+    /// Decoded gig payload — set when `category == .gig` and the detail
+    /// response's `object` JSON carries the bidder + bid + post triple.
+    /// The Gig variant view (A17.6) consumes this through the bidder
+    /// card / post summary / bid card / other-bids strip.
+    public let gigDetail: GigDetailDTO?
+
+    /// Decoded memory payload — set when `category == .memory` and the
+    /// detail response's `object` JSON carries the keepsake metadata.
+    /// The Memory variant view (A17.7) consumes this through the
+    /// polaroid / note / facts grid / vault breadcrumb.
+    public let memoryDetail: MemoryDetailDTO?
+
+    /// Decoded package payload — projected from the detail response's
+    /// `object` JSON into the `PackageBodyContent` the A17.8 variant
+    /// view consumes (carrier track-pill, delivery status timeline,
+    /// proof photo, handoff scans, contents).
+    public let packageDetail: PackageBodyContent?
+
     public init(
         mailId: String,
         category: MailItemCategory,
@@ -105,7 +129,11 @@ public struct MailDetailContent: Sendable {
         isArchived: Bool = false,
         bookletDetail: BookletDetailDTO? = nil,
         certifiedDetail: CertifiedDetailDTO? = nil,
-        communityDetail: CommunityDetailDTO? = nil
+        communityDetail: CommunityDetailDTO? = nil,
+        couponDetail: CouponDetailDTO? = nil,
+        gigDetail: GigDetailDTO? = nil,
+        memoryDetail: MemoryDetailDTO? = nil,
+        packageDetail: PackageBodyContent? = nil
     ) {
         self.mailId = mailId
         self.category = category
@@ -132,6 +160,10 @@ public struct MailDetailContent: Sendable {
         self.bookletDetail = bookletDetail
         self.certifiedDetail = certifiedDetail
         self.communityDetail = communityDetail
+        self.couponDetail = couponDetail
+        self.gigDetail = gigDetail
+        self.memoryDetail = memoryDetail
+        self.packageDetail = packageDetail
     }
 
     /// Build a `KeyFactRow` list from the projected fields. Variants
@@ -179,6 +211,10 @@ public final class MailDetailViewModel {
     public private(set) var ackInFlight: Bool = false
     /// Community RSVP mutation is in-flight; disables the chip row.
     public private(set) var rsvpInFlight: Bool = false
+    /// Coupon redeem mutation is in-flight; disables the redeem CTA.
+    public private(set) var couponRedeemInFlight: Bool = false
+    /// Gig accept-bid mutation is in-flight; disables the action row.
+    public private(set) var gigBidInFlight: Bool = false
     /// T6.5e — Save-to-vault picker visibility. The view binds a
     /// confirmation dialog to this flag; tapping a folder calls
     /// `saveToVault(folderId:)`.
@@ -289,6 +325,71 @@ public final class MailDetailViewModel {
         }
     }
 
+    // MARK: - Ceremonial variant mutations (A17.5–A17.8)
+
+    /// A17.5 — Mark a coupon redeemed. Backend redemption is not yet
+    /// wired; the projection flips locally so the barcode card collapses
+    /// and the redeemed ribbon takes its place. Mirrors the acknowledge
+    /// shape so subsequent backend wiring can drop in without a UI churn.
+    public func redeemCoupon() async {
+        guard case let .loaded(content) = state,
+              content.category == .coupon,
+              content.couponDetail != nil,
+              !couponRedeemInFlight else { return }
+        couponRedeemInFlight = true
+        defer { couponRedeemInFlight = false }
+        // Treat redemption as a one-way acknowledgement until backend
+        // exposes a typed coupon redemption endpoint. The optimistic
+        // ack flips both `isAcknowledged` and the read-status label.
+        let optimistic = MailDetailContent.replacingAck(content, with: true)
+        state = .loaded(optimistic)
+        toast = "Redeemed"
+    }
+
+    /// A17.6 — Accept the incoming bid on a gig. Backend acceptance is
+    /// not yet wired through the mail detail endpoint; the projection
+    /// flips locally so the gig variant swaps into its accepted body
+    /// (next-steps timeline + Open thread CTA). Mirrors acknowledge.
+    public func acceptGigBid() async {
+        guard case let .loaded(content) = state,
+              content.category == .gig,
+              let gig = content.gigDetail,
+              !gigBidInFlight else { return }
+        gigBidInFlight = true
+        defer { gigBidInFlight = false }
+        let optimistic = MailDetailContent.replacingGigAccepted(content, with: gig.accepted())
+        state = .loaded(optimistic)
+        toast = "Bid accepted"
+    }
+
+    /// A17.7 — Save the memory keepsake straight to the user's default
+    /// memories vault folder, bypassing the picker. If we have no
+    /// cached folders yet, fall through to the picker so the user can
+    /// choose; once they're cached we prefer the "Memories" folder when
+    /// one exists, falling back to the first folder.
+    public func saveMemoryToVault() async {
+        guard case let .loaded(content) = state,
+              content.category == .memory,
+              let memory = content.memoryDetail,
+              !memory.isSaved,
+              !saveToVaultInFlight else { return }
+        // Optimistic flip so the saved banner + vault card take over the
+        // body without waiting for the network round-trip.
+        let optimistic = MailDetailContent.replacingMemorySaved(content, with: true)
+        state = .loaded(optimistic)
+        if saveToVaultFolders.isEmpty {
+            await openSaveToVaultPicker()
+            return
+        }
+        let memoryFolder = saveToVaultFolders.first { $0.label.lowercased().contains("memor") }
+        let folderId = (memoryFolder ?? saveToVaultFolders.first)?.id
+        guard let folderId else {
+            await openSaveToVaultPicker()
+            return
+        }
+        await saveToVault(folderId: folderId)
+    }
+
     // MARK: - Save to vault (T6.5e / P19.5)
 
     /// Open the save-to-vault picker. Fetches folders on the first
@@ -388,6 +489,20 @@ public final class MailDetailViewModel {
         let communityDetail = category == .community
             ? CommunityDetailDTO.decode(from: detail.object)
             : nil
+        // A17.5–A17.8 — ceremonial variant payloads. Each decoder is
+        // defensive: nil unless the JSON carries its minimum field set.
+        let couponDetail = category == .coupon
+            ? CouponDetailDTO.decode(from: detail.object)
+            : nil
+        let gigDetail = category == .gig
+            ? GigDetailDTO.decode(from: detail.object)
+            : nil
+        let memoryDetail = category == .memory
+            ? MemoryDetailDTO.decode(from: detail.object)
+            : nil
+        let packageDetail = category == .package
+            ? PackageBodyContent.decode(from: detail.object)
+            : nil
         // Certified mail flips the acknowledgement state from its decoded
         // payload too — backend can ship the chain with `is_acknowledged`
         // set even before `ack_status` on the item row updates.
@@ -422,7 +537,11 @@ public final class MailDetailViewModel {
             isArchived: item.archived,
             bookletDetail: bookletDetail,
             certifiedDetail: certifiedDetail,
-            communityDetail: communityDetail
+            communityDetail: communityDetail,
+            couponDetail: couponDetail,
+            gigDetail: gigDetail,
+            memoryDetail: memoryDetail,
+            packageDetail: packageDetail
         )
     }
 
