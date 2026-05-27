@@ -110,7 +110,7 @@ public struct BalanceHero: View {
         .accessibilityLabel("\(overline): \(amount) \(currencyCode)")
     }
 
-    @ViewBuilder private var arcs: some View {
+    private var arcs: some View {
         ZStack {
             ForEach([90.0, 60.0, 30.0], id: \.self) { radius in
                 Circle()
@@ -122,7 +122,7 @@ public struct BalanceHero: View {
         .allowsHitTesting(false)
     }
 
-    @ViewBuilder private var topRow: some View {
+    private var topRow: some View {
         HStack(alignment: .center) {
             Text(overline)
                 .font(.system(size: 10.5, weight: .bold))
@@ -134,7 +134,7 @@ public struct BalanceHero: View {
         }
     }
 
-    @ViewBuilder private var currencyChip: some View {
+    private var currencyChip: some View {
         HStack(spacing: Spacing.s1) {
             Icon(.shieldCheck, size: 10, strokeWidth: 2.5, color: .white)
             Text(currencyCode)
@@ -149,7 +149,7 @@ public struct BalanceHero: View {
         .clipShape(Capsule())
     }
 
-    @ViewBuilder private var amountRow: some View {
+    private var amountRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
             Text("$")
                 .font(.system(size: 22, weight: .bold))
@@ -162,7 +162,7 @@ public struct BalanceHero: View {
         }
     }
 
-    @ViewBuilder private var splitStrip: some View {
+    private var splitStrip: some View {
         HStack(alignment: .top, spacing: Spacing.s0) {
             ForEach(Array(split.enumerated()), id: \.offset) { index, cell in
                 splitCellView(cell)
@@ -185,7 +185,7 @@ public struct BalanceHero: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
-    @ViewBuilder private func splitCellView(_ cell: SplitCell) -> some View {
+    private func splitCellView(_ cell: SplitCell) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: Spacing.s1) {
                 if let icon = cell.icon {
@@ -212,7 +212,7 @@ public struct BalanceHero: View {
         }
     }
 
-    @ViewBuilder private var holdBanner: some View {
+    private var holdBanner: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.alertTriangle, size: 14, strokeWidth: 2.4, color: Theme.Color.warningLight)
             VStack(alignment: .leading, spacing: 1) {

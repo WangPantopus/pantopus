@@ -99,8 +99,8 @@ private struct PaperSheet<Overlay: View>: View {
             ForEach(0..<6, id: \.self) { index in
                 Capsule()
                     .fill(isHeading[index]
-                          ? Theme.Color.appTextStrong.opacity(0.85)
-                          : Theme.Color.appBorderStrong)
+                        ? Theme.Color.appTextStrong.opacity(0.85)
+                        : Theme.Color.appBorderStrong)
                     .frame(height: isHeading[index] ? 5 : 3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(width: nil)

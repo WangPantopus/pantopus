@@ -94,7 +94,9 @@ public struct ConfettiSpray: View {
 /// Wholly self-contained so snapshot tests are byte-stable across runs.
 private struct SeededRandom {
     private var state: UInt64
-    init(seed: UInt64) { self.state = seed | 1 }
+    init(seed: UInt64) {
+        state = seed | 1
+    }
 
     /// Returns a uniform `Double` in `[0, 1)`. The top 31 bits of the
     /// LCG state are mapped onto the range by dividing by `2^31` so the

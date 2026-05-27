@@ -62,7 +62,7 @@ public struct Postcard: View {
         return "\(status) to \(recipientName), \(street), \(cityZip)"
     }
 
-    @ViewBuilder private var cardBody: some View {
+    private var cardBody: some View {
         Theme.Color.paperCream
             .overlay(alignment: .topTrailing) { postageMarks.padding(Spacing.s3) }
             .overlay { centerDivider }
@@ -70,7 +70,7 @@ public struct Postcard: View {
     }
 
     /// Three faded "stamp" rectangles in the top-right.
-    @ViewBuilder private var postageMarks: some View {
+    private var postageMarks: some View {
         HStack(spacing: Spacing.s1) {
             ForEach(0..<3, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -97,7 +97,7 @@ public struct Postcard: View {
 
     /// Recipient address block in a handwriting-flavour serif italic,
     /// pinned to the bottom-right of the address half.
-    @ViewBuilder private var recipientBlock: some View {
+    private var recipientBlock: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(recipientName)
                 .font(.system(size: 14, weight: .semibold, design: .serif).italic())
@@ -115,7 +115,7 @@ public struct Postcard: View {
     /// Cancellation stamp — red 3-stroke border around block letters.
     /// Rotation + opacity are applied at the call site so the static
     /// shape can be snapshot-tested directly.
-    @ViewBuilder private var deliveredStamp: some View {
+    private var deliveredStamp: some View {
         Text("DELIVERED")
             .font(.system(size: 18, weight: .heavy, design: .serif))
             .tracking(2)
