@@ -20,6 +20,10 @@ public enum YouRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map (physical postal venues), reached from the root.
     case mailboxMap
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     case mailItemDetail(mailId: String)
     /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
     case mailboxSearch
@@ -775,11 +779,17 @@ public struct YouTabRoot: View {
                     },
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
+                    onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
                     onBrowseGigs: { path.append(.gigsFeed) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { Task { @MainActor in pop() } }
+        case let .mailDay(variant):
+            MailDayView(
+                viewModel: MailDayViewModel(variant: variant),
+                onClose: { Task { @MainActor in pop() } }
+            )
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(

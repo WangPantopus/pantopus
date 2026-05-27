@@ -189,6 +189,8 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
@@ -1052,6 +1054,16 @@ private object ChildRoutes {
     /** A.x — Mailbox map. */
     const val MAILBOX_MAP = "mailbox/map"
 
+    /**
+     * A13.16 — My Mail Day editor. `{variant}` accepts "populated" (default)
+     * or "empty" to switch between the mid-afternoon triage view and the
+     * "nothing new today" hero. The Mailbox root header CTA pushes
+     * "populated"; the deep link `pantopus://mailbox/mailday` lands here too.
+     */
+    const val MAIL_DAY = "mailbox/mailday/{variant}"
+
+    fun mailDay(variant: String = "populated"): String = "mailbox/mailday/$variant"
+
     /** A.x — Membership detail for a persona. */
     const val MEMBERSHIP_DETAIL_PERSONA_ID_KEY = "personaId"
     const val MEMBERSHIP_DETAIL = "personas/{$MEMBERSHIP_DETAIL_PERSONA_ID_KEY}/membership"
@@ -1174,6 +1186,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.User -> {
                 navController.navigate(ChildRoutes.publicProfile(pending.id))
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.MailDay -> {
+                // Push mailbox root first so Back walks back through the
+                // drawer view, then push the day editor on top.
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.mailDay())
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.ResetPassword,
@@ -3017,12 +3036,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
                     onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
+                    onOpenMailDay = { navController.navigate(ChildRoutes.mailDay()) },
                     onBrowseGigs = { navController.navigate(ChildRoutes.GIGS_FEED) },
                     onBack = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.MAILBOX_MAP) {
                 MailboxMapScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.MAIL_DAY,
+                arguments = listOf(navArgument(MAIL_DAY_VARIANT_KEY) { type = NavType.StringType }),
+            ) {
+                MailDayScreen(
+                    onClose = { navController.popBackStack() },
+                    onScan = { /* Out of scope per A13.16 — scanner integration */ },
+                    onSeeHistory = { /* Out of scope */ },
+                    onOpenNudge = { /* Out of scope */ },
+                )
             }
             composable(
                 route = ChildRoutes.MEMBERSHIP_DETAIL,

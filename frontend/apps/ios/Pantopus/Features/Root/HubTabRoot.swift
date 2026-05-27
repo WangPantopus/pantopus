@@ -219,6 +219,10 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -364,6 +368,13 @@ public struct HubTabRoot: View {
             if !id.isEmpty {
                 path.append(.reviewSignups(supportTrainId: id))
             }
+            _ = router.consume()
+        case .mailDay:
+            // pantopus://mailbox/mailday lands on the Mailbox root first
+            // so Back walks back through the drawer view, then pushes
+            // the day editor on top.
+            path.append(.mailboxRoot)
+            path.append(.mailDay(variant: .populated))
             _ = router.consume()
         default:
             break
@@ -1535,11 +1546,17 @@ public struct HubTabRoot: View {
                     },
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
+                    onOpenMailDay: { push(.mailDay(variant: .populated)) },
                     onBrowseGigs: { push(.gigsFeed) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case let .mailDay(variant):
+            MailDayView(
+                viewModel: MailDayViewModel(variant: variant),
+                onClose: { pop() }
+            )
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

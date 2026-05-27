@@ -205,6 +205,30 @@ final class DeepLinkRouterTests: XCTestCase {
         }
     }
 
+    // MARK: - A13.16 My Mail Day
+
+    func testMailDayCustomScheme() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://mailbox/mailday"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .mailDay)
+    }
+
+    func testMailDayHTTPSHost() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/mailbox/mailday"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .mailDay)
+    }
+
+    func testMailboxRootWithoutSubrouteFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://mailbox"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case .unknown = DeepLinkRouter.shared.pending {
+            // ok — bare `pantopus://mailbox` is not a typed destination today.
+        } else {
+            XCTFail("Expected .unknown for bare /mailbox")
+        }
+    }
+
     // MARK: - Path entry point (notification payload `link` field)
 
     func testHandlePathBoxesAbsolutePathIntoRouter() {

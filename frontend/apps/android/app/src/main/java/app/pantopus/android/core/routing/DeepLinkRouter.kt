@@ -68,6 +68,13 @@ object DeepLinkRouter {
          */
         data class VerifyEmail(val token: String, val email: String?) : Destination
 
+        /**
+         * `pantopus://mailbox/mailday` — the A13.16 My Mail Day editor.
+         * Routed via the mailbox stack so Back returns to the mailbox
+         * root.
+         */
+        data object MailDay : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -191,6 +198,12 @@ object DeepLinkRouter {
             "invite" -> {
                 val token = segments.getOrNull(1)
                 if (token.isNullOrBlank()) Destination.Unknown(raw) else Destination.Invite(token)
+            }
+            "mailbox" -> {
+                // `pantopus://mailbox/mailday` — only the mail-day sub-route
+                // is wired today. Bare `pantopus://mailbox` falls through to
+                // the existing tab-level routing.
+                if (segments.getOrNull(1) == "mailday") Destination.MailDay else Destination.Unknown(raw)
             }
             "auth" -> {
                 when (segments.getOrNull(1)) {

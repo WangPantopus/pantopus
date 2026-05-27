@@ -43,6 +43,10 @@ final class DeepLinkRouter {
         /// (the link from the resend / signup flow carries `&email=` so
         /// the screen can render the recipient).
         case verifyEmail(token: String, email: String?)
+        /// `pantopus://mailbox/mailday` — the A13.16 My Mail Day editor.
+        /// Routed via the mailbox stack so Back returns to the mailbox
+        /// root.
+        case mailDay
         case unknown(URL)
     }
 
@@ -158,6 +162,14 @@ final class DeepLinkRouter {
         case "invite":
             if let token = segments.dropFirst().first, !token.isEmpty {
                 return .invite(token: token)
+            }
+            return .unknown(url)
+        case "mailbox":
+            // `pantopus://mailbox/mailday` — only the mail-day sub-route
+            // is wired today. Bare `pantopus://mailbox` falls through to
+            // the existing tab-level routing.
+            if segments.dropFirst().first == "mailday" {
+                return .mailDay
             }
             return .unknown(url)
         case "auth":
