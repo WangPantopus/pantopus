@@ -33,6 +33,9 @@ final class DeepLinkRouter {
         case user(id: String)
         case connections
         case discoverHub
+        /// `pantopus://businesses/new` — open the A12.10 Create Business
+        /// wizard inside the active tab's nav stack.
+        case createBusiness
         case invite(token: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
@@ -145,6 +148,15 @@ final class DeepLinkRouter {
                 return .homeMemberRequests(id: id)
             }
             return .homeDetail(id: id)
+        case "businesses", "business":
+            // `pantopus://businesses/new` opens the Create Business wizard.
+            // Other `businesses/:id` paths are owned by the businessProfile
+            // route which lives behind a different host today; fall through
+            // to `.unknown` so they don't silently mis-route.
+            if segments.dropFirst().first == "new" {
+                return .createBusiness
+            }
+            return .unknown(url)
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)

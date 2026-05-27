@@ -68,6 +68,12 @@ object DeepLinkRouter {
          */
         data class VerifyEmail(val token: String, val email: String?) : Destination
 
+        /**
+         * `pantopus://businesses/new` — open the A12.10 Create Business
+         * wizard inside the active tab's nav stack.
+         */
+        data object CreateBusiness : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -178,6 +184,15 @@ object DeepLinkRouter {
                     trailing.firstOrNull() == "members" && tabQuery == "requests" ->
                         Destination.HomeMemberRequests(id)
                     else -> Destination.HomeDetail(id)
+                }
+            }
+            "businesses", "business" -> {
+                // `pantopus://businesses/new` opens the Create Business wizard.
+                // Other `businesses/:id` paths are not yet routed here.
+                if (segments.getOrNull(1) == "new") {
+                    Destination.CreateBusiness
+                } else {
+                    Destination.Unknown(raw)
                 }
             }
             "chat", "message", "messages", "conversation" -> {

@@ -44,6 +44,7 @@ import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINES
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
+import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
@@ -242,6 +243,9 @@ private object ChildRoutes {
 
     /** P6.6 — "Register a business · coming soon" waitlist surface. */
     const val BUSINESS_WAITLIST = "businesses/waitlist"
+
+    /** A12.10 — Create Business wizard route. */
+    const val CREATE_BUSINESS = "businesses/new"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
@@ -1132,6 +1136,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.DISCOVER_HUB)
                 DeepLinkRouter.consume()
             }
+            DeepLinkRouter.Destination.CreateBusiness -> {
+                navController.navigate(ChildRoutes.CREATE_BUSINESS)
+                DeepLinkRouter.consume()
+            }
             is DeepLinkRouter.Destination.Post -> {
                 navController.navigate(ChildRoutes.pulsePost(pending.id))
                 DeepLinkRouter.consume()
@@ -1355,8 +1363,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.MY_BUSINESSES) {
                 MyBusinessesScreen(
                     onOpenBusiness = { _ -> navController.navigate(ChildRoutes.placeholder("Business dashboard")) },
-                    onRegister = { navController.navigate(ChildRoutes.BUSINESS_WAITLIST) },
+                    onRegister = { navController.navigate(ChildRoutes.CREATE_BUSINESS) },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.CREATE_BUSINESS) {
+                CreateBusinessWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenBusiness = { _ ->
+                        navController.popBackStack(ChildRoutes.CREATE_BUSINESS, inclusive = true)
+                        navController.navigate(ChildRoutes.placeholder("Business dashboard"))
+                    },
                 )
             }
             composable(

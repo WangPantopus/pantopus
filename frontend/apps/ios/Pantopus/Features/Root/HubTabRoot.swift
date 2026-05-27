@@ -74,6 +74,10 @@ public enum HubRoute: Hashable {
     /// surface that previously routed to a `Business: <name>`
     /// placeholder.
     case businessProfile(businessId: String)
+    /// A12.10 — Create Business wizard. Reached from the My Businesses
+    /// FAB / empty-state CTA and from the `pantopus://businesses/new`
+    /// deep link.
+    case createBusiness
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
     case homeBills(homeId: String)
@@ -354,6 +358,9 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case .discoverHub:
             path.append(.discoverHub)
+            _ = router.consume()
+        case .createBusiness:
+            path.append(.createBusiness)
             _ = router.consume()
         case let .supportTrain(id):
             // pantopus://support-trains/:id deep links land on the
@@ -1023,6 +1030,19 @@ public struct HubTabRoot: View {
                     )
                 },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
+            )
+        case .createBusiness:
+            CreateBusinessWizardView(
+                onClose: { Task { @MainActor in pop() } },
+                onOpenBusiness: { businessId in
+                    // Replace the wizard with the business profile so Back
+                    // returns to wherever the wizard was launched from.
+                    path.removeAll { route in
+                        if case .createBusiness = route { return true }
+                        return false
+                    }
+                    path.append(.businessProfile(businessId: businessId))
+                }
             )
         case let .pulsePost(postId):
             PulsePostDetailView(

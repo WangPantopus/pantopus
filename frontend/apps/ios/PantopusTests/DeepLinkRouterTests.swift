@@ -138,6 +138,16 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .notifications)
     }
 
+    func testCreateBusinessRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://businesses/new")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .createBusiness)
+    }
+
+    func testCreateBusinessHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/businesses/new")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .createBusiness)
+    }
+
     // MARK: - T6.1c P5 — auth deep links
 
     func testResetPasswordCustomScheme() throws {
