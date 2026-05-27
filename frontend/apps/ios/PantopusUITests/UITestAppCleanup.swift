@@ -11,6 +11,6 @@ extension XCUIApplication {
     func terminateAfterSkippedLaunch() {
         guard state != .notRunning else { return }
         terminate()
-        _ = wait(for: .notRunning, timeout: 2)
+        _ = wait(for: .notRunning, timeout: 5)
     }
 }
