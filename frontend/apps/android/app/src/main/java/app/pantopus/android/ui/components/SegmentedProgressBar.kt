@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -26,12 +27,17 @@ import app.pantopus.android.ui.theme.Spacing
  *
  * @param currentStep 1-indexed position. Clamped to `0..totalSteps`.
  * @param totalSteps Total segments; must be > 0.
+ * @param fillColor Colour used for filled segments. Defaults to
+ *     [PantopusColors.primary600] so existing call sites render
+ *     identically; `WizardShell` passes `identity.accent` to paint
+ *     home / business / warm-amber variants.
  */
 @Composable
 fun SegmentedProgressBar(
     currentStep: Int,
     totalSteps: Int,
     modifier: Modifier = Modifier,
+    fillColor: Color = PantopusColors.primary600,
 ) {
     val total = totalSteps.coerceAtLeast(1)
     val done = currentStep.coerceIn(0, total)
@@ -51,7 +57,7 @@ fun SegmentedProgressBar(
                         .height(6.dp)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(
-                            if (index < done) PantopusColors.primary600 else PantopusColors.appSurfaceSunken,
+                            if (index < done) fillColor else PantopusColors.appSurfaceSunken,
                         ),
             )
         }

@@ -68,6 +68,22 @@ object PantopusColors {
      */
     val businessDark = Color(0xFF5B21B6)
 
+    /**
+     * Warm-amber identity pillar — `#B45309`. The "porch tone" accent for
+     * support-train and other warm-tinted wizards (A12.11). Tailwind
+     * amber-700; pairs with [warmAmberBg] for chips, selected-state
+     * backgrounds, and the wizard progress rail / CTA when
+     * `WizardIdentity == Warm`.
+     */
+    val warmAmber = Color(0xFFB45309)
+
+    /**
+     * Warm-amber identity background — `#FEF3C7`. Tailwind amber-100; the
+     * soft fill paired with [warmAmber] (identity chips, active rows,
+     * dashed callouts in the support-train wizard).
+     */
+    val warmAmberBg = Color(0xFFFEF3C7)
+
     // T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
     // on My tasks V2 rows and the Magic ingest FAB on Mailbox-A17 root.
     // Distinct from the primary sky so users can tell automated chrome

@@ -83,8 +83,8 @@ public struct BeaconBanner<Trailing: View>: View {
 
     private var trailingSlot: some View {
         trailing()
-            .padding(.top, 12)
-            .padding(.horizontal, 16)
+            .padding(.top, Spacing.s3)
+            .padding(.horizontal, Spacing.s4)
     }
 
     // MARK: - Palette
@@ -122,8 +122,8 @@ public struct BeaconBanner<Trailing: View>: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextInverse)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, Spacing.s1)
         .background(Color.black.opacity(0.25))
         .clipShape(Capsule())
     }

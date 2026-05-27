@@ -89,6 +89,17 @@ public extension Theme.Color {
     /// for business-tinted ceremonial banners.
     static let businessDark = SwiftUI.Color("Identity/BusinessDark", bundle: Theme.bundle)
 
+    /// Warm-amber identity pillar — `#B45309`. The "porch tone" accent
+    /// for support-train and other warm-tinted wizards (A12.11). Tailwind
+    /// amber-700; pairs with `warmAmberBg` for chips, selected-state
+    /// backgrounds, and the wizard progress rail / CTA when
+    /// `WizardIdentity == .warm`.
+    static let warmAmber = SwiftUI.Color("Identity/WarmAmber", bundle: Theme.bundle)
+    /// Warm-amber identity background — `#FEF3C7`. Tailwind amber-100; the
+    /// soft fill paired with `warmAmber` (identity chips, active rows,
+    /// dashed callouts in the support-train wizard).
+    static let warmAmberBg = SwiftUI.Color("Identity/WarmAmberBg", bundle: Theme.bundle)
+
     /// T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
     /// on My tasks V2 rows and the Magic ingest FAB on Mailbox-A17 root.
     /// Distinct from the primary sky so users can tell automated chrome
