@@ -229,10 +229,10 @@ import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearch
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
+import app.pantopus.android.ui.components.InviteLinks
+import app.pantopus.android.ui.components.composeEmail
+import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.theme.PantopusIcon
-import app.pantopus.android.ui.util.InviteLinks
-import app.pantopus.android.ui.util.composeEmail
-import app.pantopus.android.ui.util.shareText
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {

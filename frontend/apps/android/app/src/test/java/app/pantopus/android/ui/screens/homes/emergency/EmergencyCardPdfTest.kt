@@ -1,6 +1,6 @@
 @file:Suppress("PackageNaming")
 
-package app.pantopus.android.ui.util
+package app.pantopus.android.ui.screens.homes.emergency
 
 import app.pantopus.android.data.api.models.homes.HomeEmergencyDto
 import org.junit.Assert.assertEquals

@@ -11,7 +11,6 @@
 
 package app.pantopus.android.ui.screens.shared.list_of_rows
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -77,6 +76,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.AvatarWithIdentityRing
+import app.pantopus.android.ui.components.BidderStack
+import app.pantopus.android.ui.components.CompactButton
+import app.pantopus.android.ui.components.CompactButtonSize
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
@@ -1265,7 +1267,8 @@ private fun LeadingView(leading: RowLeading) {
             }
         is RowLeading.AvatarWithBadge -> AvatarWithBadgeView(leading)
         is RowLeading.Thumbnail -> ThumbnailView(leading)
-        is RowLeading.BidderStack -> BidderStackView(leading)
+        is RowLeading.BidderStack ->
+            BidderStack(bidders = leading.bidders, overflow = leading.overflow)
         is RowLeading.MagicArchetypeTile -> MagicArchetypeTileView(leading)
     }
 }
@@ -1402,73 +1405,9 @@ private fun ThumbnailView(leading: RowLeading.Thumbnail) {
     }
 }
 
-@Composable
-private fun BidderStackView(leading: RowLeading.BidderStack) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        leading.bidders.forEachIndexed { index, bidder ->
-            val tileSize = 22.dp
-            val offset = if (index == 0) 0.dp else (-8).dp
-            Box(
-                modifier =
-                    Modifier
-                        .offset(x = offset)
-                        .size(tileSize)
-                        .clip(CircleShape)
-                        .background(toneBackground(bidder.tone))
-                        .border(2.dp, PantopusColors.appSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = bidder.initials.take(2).uppercase(),
-                    color = toneForeground(bidder.tone),
-                    fontSize = (tileSize.value * 0.36f).sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-        if (leading.overflow > 0) {
-            val tileSize = 22.dp
-            val offset = if (leading.bidders.isEmpty()) 0.dp else (-8).dp
-            Box(
-                modifier =
-                    Modifier
-                        .offset(x = offset)
-                        .size(tileSize)
-                        .clip(CircleShape)
-                        .background(PantopusColors.appSurfaceSunken)
-                        .border(2.dp, PantopusColors.appSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "+${leading.overflow}",
-                    color = PantopusColors.appTextStrong,
-                    fontSize = (tileSize.value * 0.36f).sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-    }
-}
-
-private fun toneBackground(tone: BidderTone): Color =
-    when (tone) {
-        BidderTone.Sky -> PantopusColors.primary200
-        BidderTone.Teal -> PantopusColors.successLight
-        BidderTone.Amber -> PantopusColors.warningLight
-        BidderTone.Rose -> PantopusColors.errorLight
-        BidderTone.Violet -> PantopusColors.businessBg
-        BidderTone.Slate -> PantopusColors.appSurfaceSunken
-    }
-
-private fun toneForeground(tone: BidderTone): Color =
-    when (tone) {
-        BidderTone.Sky -> PantopusColors.primary800
-        BidderTone.Teal -> PantopusColors.success
-        BidderTone.Amber -> PantopusColors.warning
-        BidderTone.Rose -> PantopusColors.error
-        BidderTone.Violet -> PantopusColors.business
-        BidderTone.Slate -> PantopusColors.appTextStrong
-    }
+// BidderStack leading + InlineBidderStack moved to
+// `app.pantopus.android.ui.components.BidderStack`. Both render sites
+// call into the shared component directly; per-tone palette lives there.
 
 // ─── Trailing view ─────────────────────────────────────────────
 
@@ -1624,7 +1563,7 @@ private fun ChipRowView(
         modifier = Modifier.fillMaxWidth(),
     ) {
         if (bidderStack != null && (bidderStack.bidders.isNotEmpty() || bidderStack.overflow > 0)) {
-            InlineBidderStack(bidderStack)
+            BidderStack(bidders = bidderStack.bidders, overflow = bidderStack.overflow)
             Spacer(Modifier.width(Spacing.s1))
         }
         chips.forEach { chip -> ChipPill(chip) }
@@ -1653,7 +1592,8 @@ private fun ChipRowView(
 /**
  * Right-edge "Split N ways" caption + 18dp overlapping avatars,
  * rendered on Bills rows when the bill is split between household
- * members. Tone palette shared with [InlineBidderStack] so a future
+ * members. Tone palette shared with the shared
+ * [app.pantopus.android.ui.components.BidderStack] component so a future
  * feature can mix the two without re-keying the colors.
  */
 @Composable
@@ -1762,53 +1702,8 @@ private fun splitToneForeground(tone: BidderTone): Color =
         BidderTone.Slate -> PantopusColors.appTextSecondary
     }
 
-@Composable
-private fun InlineBidderStack(data: BidderStackData) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        data.bidders.forEachIndexed { index, bidder ->
-            val tileSize = 22.dp
-            val offset = if (index == 0) 0.dp else (-8).dp
-            Box(
-                modifier =
-                    Modifier
-                        .offset(x = offset)
-                        .size(tileSize)
-                        .clip(CircleShape)
-                        .background(toneBackground(bidder.tone))
-                        .border(2.dp, PantopusColors.appSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = bidder.initials.take(2).uppercase(),
-                    color = toneForeground(bidder.tone),
-                    fontSize = (tileSize.value * 0.36f).sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-        if (data.overflow > 0) {
-            val tileSize = 22.dp
-            val offset = if (data.bidders.isEmpty()) 0.dp else (-8).dp
-            Box(
-                modifier =
-                    Modifier
-                        .offset(x = offset)
-                        .size(tileSize)
-                        .clip(CircleShape)
-                        .background(PantopusColors.appSurfaceSunken)
-                        .border(2.dp, PantopusColors.appSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "+${data.overflow}",
-                    color = PantopusColors.appTextStrong,
-                    fontSize = (tileSize.value * 0.36f).sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-    }
-}
+// InlineBidderStack moved to ui.components.BidderStack; both render
+// sites call into the shared component above.
 
 @Composable
 private fun ChipPill(chip: RowChip) {
@@ -2193,73 +2088,6 @@ private fun fabTintColor(tint: FabTint): Color =
         FabTint.Business -> PantopusColors.business
     }
 
-// ─── Compact button ────────────────────────────────────────────
-
-/** Size variant for [CompactButton]. */
-enum class CompactButtonSize {
-    /** 34dp height — in-card row footer button. */
-    Footer,
-
-    /** 30dp primary / 28dp ghost — inline row-trailing pill. */
-    InlineAction,
-}
-
-/**
- * Compact in-row action button. See `CompactButton.swift` for parity.
- */
-@Composable
-fun CompactButton(
-    title: String,
-    variant: CompactButtonVariant,
-    size: CompactButtonSize,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: PantopusIcon? = null,
-) {
-    val height: Int =
-        when {
-            size == CompactButtonSize.Footer -> 34
-            variant == CompactButtonVariant.Ghost -> 28
-            else -> 30
-        }
-    val background =
-        when (variant) {
-            CompactButtonVariant.Primary -> PantopusColors.primary600
-            CompactButtonVariant.Ghost -> PantopusColors.appSurface
-            CompactButtonVariant.Destructive -> PantopusColors.appSurface
-        }
-    val foreground =
-        when (variant) {
-            CompactButtonVariant.Primary -> PantopusColors.appTextInverse
-            CompactButtonVariant.Ghost -> PantopusColors.appTextStrong
-            CompactButtonVariant.Destructive -> PantopusColors.error
-        }
-    val borderStroke =
-        if (variant == CompactButtonVariant.Primary) null else BorderStroke(1.dp, PantopusColors.appBorder)
-
-    val rowMod =
-        modifier
-            .height(height.dp)
-            .clip(RoundedCornerShape(Radii.md))
-            .background(background)
-            .let { m -> borderStroke?.let { m.border(it, RoundedCornerShape(Radii.md)) } ?: m }
-            .clickable(onClick = onClick)
-            .padding(horizontal = Spacing.s3)
-            .semantics { contentDescription = title }
-
-    Row(
-        modifier = rowMod,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1, Alignment.CenterHorizontally),
-    ) {
-        if (icon != null) {
-            PantopusIconImage(
-                icon = icon,
-                contentDescription = null,
-                size = 13.dp,
-                tint = foreground,
-            )
-        }
-        Text(text = title, style = PantopusTextStyle.caption, color = foreground)
-    }
-}
+// CompactButton + CompactButtonSize moved to
+// `app.pantopus.android.ui.components.CompactButton`. Call sites in this
+// file import from there.

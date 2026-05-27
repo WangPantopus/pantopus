@@ -1,6 +1,6 @@
-@file:Suppress("MagicNumber")
+@file:Suppress("MagicNumber", "PackageNaming")
 
-package app.pantopus.android.ui.util
+package app.pantopus.android.ui.screens.homes.emergency
 
 import android.content.Context
 import android.graphics.Color
@@ -11,7 +11,6 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.core.content.FileProvider
 import app.pantopus.android.data.api.models.homes.HomeEmergencyDto
-import app.pantopus.android.ui.screens.homes.emergency.EmergencyCategory
 import java.io.File
 import java.io.FileOutputStream
 import java.text.DateFormat
