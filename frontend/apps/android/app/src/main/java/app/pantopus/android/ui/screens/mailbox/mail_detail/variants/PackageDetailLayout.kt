@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -145,16 +144,18 @@ private fun makeAIElf(packageDetail: PackageBodyContent): AIElfStripContent {
                     "Pantopus matched the carrier's proof photo to your verified address.",
                     listOf(
                         AIElfBullet(
+                            id = "proof-photo",
                             icon = PantopusIcon.Camera,
                             label = "Proof photo verified",
                             text = packageDetail.deliveryPhoto?.location,
                         ),
                         AIElfBullet(
+                            id = "gps-match",
                             icon = PantopusIcon.MapPin,
                             label = "GPS match",
                             text = packageDetail.deliveryPhoto?.verificationLabel ?: "verified",
                         ),
-                        AIElfBullet(icon = PantopusIcon.ShieldCheck, label = "No signature required"),
+                        AIElfBullet(id = "signature", icon = PantopusIcon.ShieldCheck, label = "No signature required"),
                     ),
                 )
             PackageDeliveryStatus.OutForDelivery ->
@@ -162,9 +163,14 @@ private fun makeAIElf(packageDetail: PackageBodyContent): AIElfStripContent {
                     "Out for delivery today",
                     packageDetail.statusDetail,
                     listOf(
-                        AIElfBullet(icon = PantopusIcon.Package, label = "Carrier is moving", text = "we'll ping when scanned"),
-                        AIElfBullet(icon = PantopusIcon.Clock, label = packageDetail.etaLine ?: "ETA pending"),
-                        AIElfBullet(icon = PantopusIcon.ShieldCheck, label = "Delivery photo expected"),
+                        AIElfBullet(
+                            id = "carrier-moving",
+                            icon = PantopusIcon.Package,
+                            label = "Carrier is moving",
+                            text = "we'll ping when scanned",
+                        ),
+                        AIElfBullet(id = "eta", icon = PantopusIcon.Clock, label = packageDetail.etaLine ?: "ETA pending"),
+                        AIElfBullet(id = "photo", icon = PantopusIcon.ShieldCheck, label = "Delivery photo expected"),
                     ),
                 )
             else ->
@@ -172,8 +178,13 @@ private fun makeAIElf(packageDetail: PackageBodyContent): AIElfStripContent {
                     "Pantopus is watching this delivery",
                     "We'll surface scans and the ETA window as soon as the carrier hands off.",
                     listOf(
-                        AIElfBullet(icon = PantopusIcon.ArrowRight, label = "In transit", text = packageDetail.statusDetail),
-                        AIElfBullet(icon = PantopusIcon.Clock, label = packageDetail.etaLine ?: "ETA pending"),
+                        AIElfBullet(
+                            id = "status",
+                            icon = PantopusIcon.ArrowRight,
+                            label = "In transit",
+                            text = packageDetail.statusDetail,
+                        ),
+                        AIElfBullet(id = "eta", icon = PantopusIcon.Clock, label = packageDetail.etaLine ?: "ETA pending"),
                     ),
                 )
         }

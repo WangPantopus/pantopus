@@ -71,7 +71,7 @@ extension PackageBodyContent {
             ("out_for_delivery", "Out for delivery"),
             ("delivered", "Delivered")
         ]
-        let currentIndex: Int = switch status {
+        let currentIndex = switch status {
         case .shipped: 0
         case .inTransit: 1
         case .outForDelivery: 2

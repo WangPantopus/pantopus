@@ -14,6 +14,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemSampleData
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.BookletDetailLayout
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GenericMailDetailLayout
 import app.pantopus.android.ui.theme.PantopusColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

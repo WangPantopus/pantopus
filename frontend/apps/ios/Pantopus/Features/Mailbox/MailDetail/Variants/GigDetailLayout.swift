@@ -88,8 +88,10 @@ struct GigDetailLayout: View {
                 AIElfBullet(icon: .shieldCheck, label: "Funds escrowed", text: "released after the job")
             ]
         } else {
+            let otherBidCount = gig.otherBids.count
             headline = "Pantopus read this bid for you"
-            summary = "Compare against the \(gig.otherBids.count) other bid\(gig.otherBids.count == 1 ? "" : "s") on the same gig before you accept."
+            summary = "Compare against the \(otherBidCount) other bid\(otherBidCount == 1 ? "" : "s") " +
+                "on the same gig before you accept."
             bullets = [
                 AIElfBullet(icon: .info, label: "$\(gig.bid.amount) \(gig.bid.unit)", text: nil),
                 AIElfBullet(icon: .calendarClock, label: gig.bid.eta, text: nil),

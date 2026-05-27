@@ -141,9 +141,24 @@ private fun makeAIElf(gig: GigDetailDto): AIElfStripContent {
             summary = "Pantopus opened the thread, set a calendar reminder, and queued next-step nudges.",
             bullets =
                 listOf(
-                    AIElfBullet(icon = PantopusIcon.CalendarClock, label = "Calendar reminder set", text = gig.bid.eta),
-                    AIElfBullet(icon = PantopusIcon.MessageCircle, label = "Thread joined", text = "you can chat now"),
-                    AIElfBullet(icon = PantopusIcon.ShieldCheck, label = "Funds escrowed", text = "released after the job"),
+                    AIElfBullet(
+                        id = "calendar",
+                        icon = PantopusIcon.CalendarClock,
+                        label = "Calendar reminder set",
+                        text = gig.bid.eta,
+                    ),
+                    AIElfBullet(
+                        id = "thread",
+                        icon = PantopusIcon.MessageCircle,
+                        label = "Thread joined",
+                        text = "you can chat now",
+                    ),
+                    AIElfBullet(
+                        id = "escrow",
+                        icon = PantopusIcon.ShieldCheck,
+                        label = "Funds escrowed",
+                        text = "released after the job",
+                    ),
                 ),
         )
     } else {
@@ -154,9 +169,9 @@ private fun makeAIElf(gig: GigDetailDto): AIElfStripContent {
                 "Compare against the $otherCount other bid${if (otherCount == 1) "" else "s"} on the same gig before you accept.",
             bullets =
                 listOf(
-                    AIElfBullet(icon = PantopusIcon.Info, label = "$${gig.bid.amount} ${gig.bid.unit}"),
-                    AIElfBullet(icon = PantopusIcon.CalendarClock, label = gig.bid.eta),
-                    AIElfBullet(icon = PantopusIcon.Clock, label = gig.bid.expires),
+                    AIElfBullet(id = "amount", icon = PantopusIcon.Info, label = "$${gig.bid.amount} ${gig.bid.unit}"),
+                    AIElfBullet(id = "eta", icon = PantopusIcon.CalendarClock, label = gig.bid.eta),
+                    AIElfBullet(id = "expires", icon = PantopusIcon.Clock, label = gig.bid.expires),
                 ),
         )
     }

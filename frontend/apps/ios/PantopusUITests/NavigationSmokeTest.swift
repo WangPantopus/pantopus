@@ -133,8 +133,7 @@ final class NavigationSmokeTest: XCTestCase {
         let menu = app.buttons["hubMenuButton"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout: 3))
         menu.tap()
-        // Settings hosts a GroupedListView shell.
-        assertReaches("groupedList", in: app)
+        assertReaches("settings", in: app)
     }
 
     // MARK: - Hub pillars (HubRoute .mailboxRoot/.pulseFeed/.gigsFeed/.marketplace)
@@ -188,9 +187,7 @@ final class NavigationSmokeTest: XCTestCase {
             throw XCTSkip("Mail pillar not rendered in current Hub seed.")
         }
         mailPillar.tap()
-        // Mailbox root surfaces its drawer rows; assert at least one drawer
-        // tab bar / drawer row is present.
-        assertReaches("mailboxRootTabBar", in: app)
+        assertReaches("mailboxRoot", in: app)
     }
 
     // MARK: - Hub Today card (HubRoute .todayDetail)
@@ -220,7 +217,7 @@ final class NavigationSmokeTest: XCTestCase {
             throw XCTSkip("Posts action tile not rendered (non-personal identity seeded).")
         }
         tile.tap()
-        assertReaches("listOfRowsContainer", in: app)
+        assertReaches("my-posts", in: app)
     }
 
     func testYou_actionTileBidsPushesMyBids() throws {
@@ -233,7 +230,7 @@ final class NavigationSmokeTest: XCTestCase {
             throw XCTSkip("Bids action tile not rendered.")
         }
         tile.tap()
-        assertReaches("listOfRowsContainer", in: app)
+        assertReaches("my-bids", in: app)
     }
 
     func testYou_actionTileGigsPushesMyTasks() throws {
@@ -246,7 +243,7 @@ final class NavigationSmokeTest: XCTestCase {
             throw XCTSkip("Gigs action tile not rendered.")
         }
         tile.tap()
-        assertReaches("listOfRowsContainer", in: app)
+        assertReaches("my-tasks", in: app)
     }
 
     func testYou_actionTileOffersPushesOffers() throws {
@@ -259,7 +256,7 @@ final class NavigationSmokeTest: XCTestCase {
             throw XCTSkip("Offers action tile not rendered.")
         }
         tile.tap()
-        assertReaches("listOfRowsContainer", in: app)
+        assertReaches("offers", in: app)
     }
 
     func testYou_actionTileListingsPushesMyListings() throws {
@@ -298,7 +295,7 @@ final class NavigationSmokeTest: XCTestCase {
             throw XCTSkip("Support trains action tile not rendered.")
         }
         tile.tap()
-        assertReaches("listOfRowsContainer", in: app)
+        assertReaches("supportTrains", in: app)
     }
 
     // MARK: - You section rows (YouRoute .identityCenter/.audienceProfile/.creatorInbox/.myHomes/.myBusinesses)
@@ -392,7 +389,7 @@ final class NavigationSmokeTest: XCTestCase {
             throw XCTSkip("Help section row not rendered.")
         }
         row.tap()
-        assertReaches("groupedList", in: app)
+        assertReaches("helpCenter", in: app)
     }
 
     // MARK: - Inbox routes (InboxRoute .compose + .search)

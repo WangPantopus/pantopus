@@ -131,8 +131,9 @@ private fun makeAIElf(memory: MemoryDetailDto): AIElfStripContent {
         headline = elf.headline,
         summary = elf.summary,
         bullets =
-            elf.bullets.map { bullet ->
+            elf.bullets.mapIndexed { index, bullet ->
                 AIElfBullet(
+                    id = "memory-elf-$index",
                     icon = glyph(bullet.glyph),
                     label = bullet.label,
                     text = bullet.text,

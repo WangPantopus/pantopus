@@ -13,14 +13,14 @@ import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.MemoryDetailDto
-import app.pantopus.android.ui.screens.mailbox.item_detail.PackageBodyContent
-import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.decodePackageDetail
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
+import app.pantopus.android.ui.screens.mailbox.item_detail.PackageBodyContent
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.decodePackageDetail
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailDetailTrust
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -334,29 +334,32 @@ class MailDetailViewModel
          * label contains "memor" before defaulting to the first folder.
          */
         fun saveMemoryToVault() {
-            val current = _state.value as? MailDetailUiState.Loaded ?: return
-            val memory = current.content.memoryDetail ?: return
-            if (current.content.category != MailItemCategory.Memory) return
-            if (memory.isSaved) return
-            if (_saveToVaultInFlight.value) return
+            val (content, memory) = currentUnsavedMemoryContent() ?: return
             // Optimistic flip so the saved banner + vault card take over
             // without waiting for the network round-trip.
             _state.value =
                 MailDetailUiState.Loaded(
-                    current.content.copy(memoryDetail = memory.copy(isSaved = true)),
+                    content.copy(memoryDetail = memory.copy(isSaved = true)),
                 )
-            if (_saveToVaultFolders.value.isEmpty()) {
-                openSaveToVaultPicker()
-                return
-            }
-            val memoryFolder =
-                _saveToVaultFolders.value.firstOrNull { it.label.lowercase().contains("memor") }
-            val folderId = (memoryFolder ?: _saveToVaultFolders.value.firstOrNull())?.id
+            val folderId = preferredMemoryFolderId()
             if (folderId == null) {
                 openSaveToVaultPicker()
-                return
+            } else {
+                saveToVault(folderId)
             }
-            saveToVault(folderId)
+        }
+
+        private fun currentUnsavedMemoryContent(): Pair<MailDetailContent, MemoryDetailDto>? {
+            val content = (_state.value as? MailDetailUiState.Loaded)?.content ?: return null
+            val memory = content.memoryDetail ?: return null
+            if (content.category != MailItemCategory.Memory || memory.isSaved || _saveToVaultInFlight.value) return null
+            return content to memory
+        }
+
+        private fun preferredMemoryFolderId(): String? {
+            val folders = _saveToVaultFolders.value
+            val memoryFolder = folders.firstOrNull { it.label.lowercase().contains("memor") }
+            return (memoryFolder ?: folders.firstOrNull())?.id
         }
 
         /** POST the current mail to the supplied vault folder. */
@@ -405,64 +408,11 @@ class MailDetailViewModel
                 val excerpt = detail.previewText
                 val createdAtLabel = formatLongDate(detail.createdAt)
                 val expiresAtLabel = formatLongDate(detail.expiresAt)
-                val bodyParagraphs =
-                    detail.content
-                        ?.takeIf { it.isNotEmpty() }
-                        ?.split("\n\n")
-                        ?.map { it.trim() }
-                        ?.filter { it.isNotEmpty() }
-                        ?: emptyList()
+                val bodyParagraphs = bodyParagraphs(detail.content)
                 val ackRequired = detail.ackRequired == true
                 val ackStatus = detail.ackStatus?.lowercase() == "acknowledged"
-                // T6.5c–d — decode the per-variant payloads from
-                // `mail.object`. Each decoder returns null unless the
-                // payload carries its required shape.
-                val bookletDetail =
-                    if (category == MailItemCategory.Booklet) {
-                        BookletDetailDto.decodeFromObjectPayload(detail.`object`)
-                    } else {
-                        null
-                    }
-                val certifiedDetail =
-                    if (category == MailItemCategory.Certified) {
-                        CertifiedDetailDto.decodeFromObjectPayload(detail.`object`)
-                    } else {
-                        null
-                    }
-                val communityDetail =
-                    if (category == MailItemCategory.Community) {
-                        CommunityDetailDto.decodeFromObjectPayload(detail.`object`)
-                    } else {
-                        null
-                    }
-                // A17.5–A17.8 — ceremonial variant payloads. Each is
-                // defensive: null unless the JSON carries its minimum
-                // field set, so the dispatcher still routes to A17.1.
-                val couponDetail =
-                    if (category == MailItemCategory.Coupon) {
-                        CouponDetailDto.decodeFromObjectPayload(detail.`object`)
-                    } else {
-                        null
-                    }
-                val gigDetail =
-                    if (category == MailItemCategory.Gig) {
-                        GigDetailDto.decodeFromObjectPayload(detail.`object`)
-                    } else {
-                        null
-                    }
-                val memoryDetail =
-                    if (category == MailItemCategory.Memory) {
-                        MemoryDetailDto.decodeFromObjectPayload(detail.`object`)
-                    } else {
-                        null
-                    }
-                val packageDetail =
-                    if (category == MailItemCategory.Package) {
-                        decodePackageDetail(detail.`object`)
-                    } else {
-                        null
-                    }
-                val resolvedAck = ackStatus || (certifiedDetail?.isAcknowledged == true)
+                val variants = decodeVariantDetails(category = category, payload = detail.`object`)
+                val resolvedAck = ackStatus || (variants.certified?.isAcknowledged == true)
                 val readStatusLabel = if (detail.viewed || resolvedAck) "Read" else "Unread"
                 return MailDetailContent(
                     mailId = detail.id,
@@ -487,15 +437,82 @@ class MailDetailViewModel
                     ackRequired = ackRequired,
                     isAcknowledged = resolvedAck,
                     isArchived = detail.archived,
-                    bookletDetail = bookletDetail,
-                    certifiedDetail = certifiedDetail,
-                    communityDetail = communityDetail,
-                    couponDetail = couponDetail,
-                    gigDetail = gigDetail,
-                    memoryDetail = memoryDetail,
-                    packageDetail = packageDetail,
+                    bookletDetail = variants.booklet,
+                    certifiedDetail = variants.certified,
+                    communityDetail = variants.community,
+                    couponDetail = variants.coupon,
+                    gigDetail = variants.gig,
+                    memoryDetail = variants.memory,
+                    packageDetail = variants.packageDetail,
                 )
             }
+
+            private data class VariantDetails(
+                val booklet: BookletDetailDto?,
+                val certified: CertifiedDetailDto?,
+                val community: CommunityDetailDto?,
+                val coupon: CouponDetailDto?,
+                val gig: GigDetailDto?,
+                val memory: MemoryDetailDto?,
+                val packageDetail: PackageBodyContent?,
+            )
+
+            private fun bodyParagraphs(content: String?): List<String> =
+                content
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.split("\n\n")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    ?: emptyList()
+
+            private fun decodeVariantDetails(
+                category: MailItemCategory,
+                payload: Map<String, Any?>?,
+            ): VariantDetails =
+                VariantDetails(
+                    booklet =
+                        if (category == MailItemCategory.Booklet) {
+                            BookletDetailDto.decodeFromObjectPayload(payload)
+                        } else {
+                            null
+                        },
+                    certified =
+                        if (category == MailItemCategory.Certified) {
+                            CertifiedDetailDto.decodeFromObjectPayload(payload)
+                        } else {
+                            null
+                        },
+                    community =
+                        if (category == MailItemCategory.Community) {
+                            CommunityDetailDto.decodeFromObjectPayload(payload)
+                        } else {
+                            null
+                        },
+                    coupon =
+                        if (category == MailItemCategory.Coupon) {
+                            CouponDetailDto.decodeFromObjectPayload(payload)
+                        } else {
+                            null
+                        },
+                    gig =
+                        if (category == MailItemCategory.Gig) {
+                            GigDetailDto.decodeFromObjectPayload(payload)
+                        } else {
+                            null
+                        },
+                    memory =
+                        if (category == MailItemCategory.Memory) {
+                            MemoryDetailDto.decodeFromObjectPayload(payload)
+                        } else {
+                            null
+                        },
+                    packageDetail =
+                        if (category == MailItemCategory.Package) {
+                            decodePackageDetail(payload)
+                        } else {
+                            null
+                        },
+                )
 
             @JvmStatic
             fun makeInitials(name: String): String {

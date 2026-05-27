@@ -57,6 +57,7 @@ public struct SettingsView: View {
                         .toolbar(.hidden, for: .navigationBar)
                 }
         }
+        .accessibilityIdentifier("settings")
     }
 
     private var indexView: some View {

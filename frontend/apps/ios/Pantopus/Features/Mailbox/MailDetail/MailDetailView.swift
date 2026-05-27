@@ -9,7 +9,7 @@
 
 import SwiftUI
 
-// swiftlint:disable multiple_closures_with_trailing_closure trailing_closure
+// swiftlint:disable trailing_closure
 
 public struct MailDetailView: View {
     @State private var viewModel: MailDetailViewModel
@@ -78,117 +78,145 @@ public struct MailDetailView: View {
 
     @ViewBuilder
     private func loaded(_ content: MailDetailContent) -> some View {
-        // Dispatch to ceremonial variant layouts when the projected
-        // content carries decoded variant payloads. Each variant sits on
-        // the shared `MailItemDetailShell` and overrides only the slots
-        // its design diverges on; A17.1 (`GenericMailDetailLayout`) is
-        // the bespoke fall-through for categories without a decoded
-        // ceremonial payload.
         switch content.category {
         case .booklet:
-            if let booklet = content.bookletDetail {
-                BookletDetailLayout(
-                    content: content,
-                    booklet: booklet,
-                    ackInFlight: viewModel.ackInFlight,
-                    onBack: { onBack() },
-                    onAcknowledge: { Task { await viewModel.acknowledge() } },
-                    onOpenSenderProfile: onOpenSenderProfile,
-                    onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
-                )
-            } else {
-                generic(content)
-            }
+            booklet(content)
         case .certified:
-            if let certified = content.certifiedDetail {
-                CertifiedDetailLayout(
-                    content: content,
-                    certified: certified,
-                    ackInFlight: viewModel.ackInFlight,
-                    onBack: { onBack() },
-                    onAcknowledge: { Task { await viewModel.acknowledge() } },
-                    onOpenSenderProfile: onOpenSenderProfile,
-                    onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
-                )
-            } else {
-                generic(content)
-            }
+            certified(content)
         case .community:
-            if let community = content.communityDetail {
-                CommunityDetailLayout(
-                    content: content,
-                    community: community,
-                    rsvpInFlight: viewModel.rsvpInFlight,
-                    onBack: { onBack() },
-                    onRsvp: { status in Task { await viewModel.setRsvp(status) } },
-                    onOpenSenderProfile: onOpenSenderProfile,
-                    onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
-                )
-            } else {
-                generic(content)
-            }
+            community(content)
         case .coupon:
-            if let coupon = content.couponDetail {
-                CouponDetailLayout(
-                    content: content,
-                    coupon: coupon,
-                    redeemInFlight: viewModel.couponRedeemInFlight,
-                    onBack: { onBack() },
-                    onRedeem: { Task { await viewModel.redeemCoupon() } },
-                    onOpenSenderProfile: onOpenSenderProfile,
-                    onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
-                )
-            } else {
-                generic(content)
-            }
+            coupon(content)
         case .gig:
-            if let gig = content.gigDetail {
-                GigDetailLayout(
-                    content: content,
-                    gig: gig,
-                    bidInFlight: viewModel.gigBidInFlight,
-                    onBack: { onBack() },
-                    onAccept: { Task { await viewModel.acceptGigBid() } },
-                    onOpenSenderProfile: onOpenSenderProfile,
-                    onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
-                )
-            } else {
-                generic(content)
-            }
+            gig(content)
         case .memory:
-            if let memory = content.memoryDetail {
-                MemoryDetailLayout(
-                    content: content,
-                    memory: memory,
-                    saveInFlight: viewModel.saveToVaultInFlight,
-                    onBack: { onBack() },
-                    onSaveMemory: { Task { await viewModel.saveMemoryToVault() } },
-                    onOpenSenderProfile: onOpenSenderProfile,
-                    onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
-                )
-            } else {
-                generic(content)
-            }
+            memory(content)
         case .package:
-            if let package = content.packageDetail {
-                PackageDetailLayout(
-                    content: content,
-                    package: package,
-                    ackInFlight: viewModel.ackInFlight,
-                    onBack: { onBack() },
-                    onAcknowledgeDelivery: { Task { await viewModel.acknowledge() } },
-                    onOpenSenderProfile: onOpenSenderProfile,
-                    onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
-                )
-            } else {
-                generic(content)
-            }
+            package(content)
         default:
             generic(content)
         }
     }
 
     @ViewBuilder
+    private func booklet(_ content: MailDetailContent) -> some View {
+        if let booklet = content.bookletDetail {
+            BookletDetailLayout(
+                content: content,
+                booklet: booklet,
+                ackInFlight: viewModel.ackInFlight,
+                onBack: { onBack() },
+                onAcknowledge: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func certified(_ content: MailDetailContent) -> some View {
+        if let certified = content.certifiedDetail {
+            CertifiedDetailLayout(
+                content: content,
+                certified: certified,
+                ackInFlight: viewModel.ackInFlight,
+                onBack: { onBack() },
+                onAcknowledge: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func community(_ content: MailDetailContent) -> some View {
+        if let community = content.communityDetail {
+            CommunityDetailLayout(
+                content: content,
+                community: community,
+                rsvpInFlight: viewModel.rsvpInFlight,
+                onBack: { onBack() },
+                onRsvp: { status in Task { await viewModel.setRsvp(status) } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func coupon(_ content: MailDetailContent) -> some View {
+        if let coupon = content.couponDetail {
+            CouponDetailLayout(
+                content: content,
+                coupon: coupon,
+                redeemInFlight: viewModel.couponRedeemInFlight,
+                onBack: { onBack() },
+                onRedeem: { Task { await viewModel.redeemCoupon() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func gig(_ content: MailDetailContent) -> some View {
+        if let gig = content.gigDetail {
+            GigDetailLayout(
+                content: content,
+                gig: gig,
+                bidInFlight: viewModel.gigBidInFlight,
+                onBack: { onBack() },
+                onAccept: { Task { await viewModel.acceptGigBid() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func memory(_ content: MailDetailContent) -> some View {
+        if let memory = content.memoryDetail {
+            MemoryDetailLayout(
+                content: content,
+                memory: memory,
+                saveInFlight: viewModel.saveToVaultInFlight,
+                onBack: { onBack() },
+                onSaveMemory: { Task { await viewModel.saveMemoryToVault() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func package(_ content: MailDetailContent) -> some View {
+        if let package = content.packageDetail {
+            PackageDetailLayout(
+                content: content,
+                package: package,
+                ackInFlight: viewModel.ackInFlight,
+                onBack: { onBack() },
+                onAcknowledgeDelivery: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
     private func generic(_ content: MailDetailContent) -> some View {
         GenericMailDetailLayout(
             content: content,

@@ -266,7 +266,6 @@ private fun LoadedLayout(
     }
 }
 
-
 @Composable
 private fun LoadingLayout(onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().testTag("mailDetail_loading")) {

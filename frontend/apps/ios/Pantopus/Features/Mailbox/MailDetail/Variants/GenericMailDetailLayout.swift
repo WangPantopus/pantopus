@@ -11,7 +11,7 @@
 
 import SwiftUI
 
-// swiftlint:disable file_length multiple_closures_with_trailing_closure
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 @MainActor
 struct GenericMailDetailLayout: View {

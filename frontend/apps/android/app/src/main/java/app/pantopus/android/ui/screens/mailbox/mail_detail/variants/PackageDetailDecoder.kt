@@ -81,7 +81,6 @@ private fun decodeTimeline(
                     else -> TimelineStepState.Upcoming
                 }
             TimelineStep(
-                id = (map["id"] as? String) ?: "tracking-$index",
                 title = title,
                 subtitle = (map["subtitle"] as? String) ?: "",
                 state = state,
@@ -92,10 +91,10 @@ private fun decodeTimeline(
     // renders its canonical shape when the backend omits the array.
     val labels =
         listOf(
-            "shipped" to "Shipped",
-            "in_transit" to "In transit",
-            "out_for_delivery" to "Out for delivery",
-            "delivered" to "Delivered",
+            "Shipped",
+            "In transit",
+            "Out for delivery",
+            "Delivered",
         )
     val currentIndex =
         when (fallback) {
@@ -104,14 +103,14 @@ private fun decodeTimeline(
             PackageDeliveryStatus.OutForDelivery -> 2
             PackageDeliveryStatus.Delivered -> 3
         }
-    return labels.mapIndexed { index, (id, title) ->
+    return labels.mapIndexed { index, title ->
         val state =
             when {
                 index < currentIndex -> TimelineStepState.Done
                 index == currentIndex -> TimelineStepState.Current
                 else -> TimelineStepState.Upcoming
             }
-        TimelineStep(id = id, title = title, subtitle = "", state = state)
+        TimelineStep(title = title, subtitle = "", state = state)
     }
 }
 
