@@ -13,9 +13,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
-import app.pantopus.android.ui.screens.shared.list_of_rows.Bidder
-import app.pantopus.android.ui.screens.shared.list_of_rows.BidderTone
-import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Rule
 import org.junit.Test
@@ -29,12 +26,9 @@ class ComponentsSnapshotTest {
     @get:Rule
     val paparazzi =
         Paparazzi(
-            // Bumped from 2400 → 3200 after adding the four T2-port
-            // sections (BidderStack, CompactButton footer/inline, Toast).
-            // Regenerate the baseline with `./gradlew paparazziRecord`.
             deviceConfig =
                 DeviceConfig.PIXEL_5.copy(
-                    screenHeight = 3200,
+                    screenHeight = 2400,
                     softButtons = false,
                 ),
         )
@@ -153,76 +147,11 @@ private fun ComponentGallery() {
         androidx.compose.foundation.layout.Box(modifier = Modifier.padding(16.dp)) {
             Text("(rendered in gallery screen)")
         }
-
-        Text("BidderStack (3 + 9)")
-        BidderStack(
-            bidders =
-                listOf(
-                    Bidder("1", "AR", BidderTone.Violet),
-                    Bidder("2", "MT", BidderTone.Amber),
-                    Bidder("3", "JP", BidderTone.Teal),
-                ),
-            overflow = 9,
-        )
-
-        Text("CompactButton (footer)")
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement =
-                androidx.compose.foundation.layout.Arrangement
-                    .spacedBy(8.dp),
-        ) {
-            CompactButton(
-                title = "Withdraw",
-                variant = CompactButtonVariant.Destructive,
-                size = CompactButtonSize.Footer,
-                onClick = {},
-                icon = PantopusIcon.X,
-            )
-            CompactButton(
-                title = "Edit bid",
-                variant = CompactButtonVariant.Primary,
-                size = CompactButtonSize.Footer,
-                onClick = {},
-                icon = PantopusIcon.Check,
-            )
-        }
-
-        Text("CompactButton (inline)")
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement =
-                androidx.compose.foundation.layout.Arrangement
-                    .spacedBy(8.dp),
-        ) {
-            CompactButton(
-                title = "Accept",
-                variant = CompactButtonVariant.Primary,
-                size = CompactButtonSize.InlineAction,
-                onClick = {},
-            )
-            CompactButton(
-                title = "Ignore",
-                variant = CompactButtonVariant.Ghost,
-                size = CompactButtonSize.InlineAction,
-                onClick = {},
-            )
-        }
-
-        Text("Toast (four kinds)")
-        androidx.compose.foundation.layout.Column(
-            verticalArrangement =
-                androidx.compose.foundation.layout.Arrangement
-                    .spacedBy(8.dp),
-        ) {
-            ToastView(message = ToastMessage("Bid submitted.", ToastKind.Success))
-            ToastView(message = ToastMessage("Check your address.", ToastKind.Warning))
-            ToastView(message = ToastMessage("Could not send.", ToastKind.Error))
-            ToastView(message = ToastMessage("Edits discarded.", ToastKind.Info))
-        }
     }
 }
 
 @Suppress("unused")
-@Preview(showBackground = true, widthDp = 360, heightDp = 3200)
+@Preview(showBackground = true, widthDp = 360, heightDp = 2400)
 @Composable
 private fun ComponentGalleryPreview() {
     ComponentGallery()

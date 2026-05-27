@@ -1405,10 +1405,6 @@ private fun ThumbnailView(leading: RowLeading.Thumbnail) {
     }
 }
 
-// BidderStack leading + InlineBidderStack moved to
-// `app.pantopus.android.ui.components.BidderStack`. Both render sites
-// call into the shared component directly; per-tone palette lives there.
-
 // ─── Trailing view ─────────────────────────────────────────────
 
 @Composable
@@ -1563,7 +1559,7 @@ private fun ChipRowView(
         modifier = Modifier.fillMaxWidth(),
     ) {
         if (bidderStack != null && (bidderStack.bidders.isNotEmpty() || bidderStack.overflow > 0)) {
-            BidderStack(bidders = bidderStack.bidders, overflow = bidderStack.overflow)
+            InlineBidderStack(bidderStack)
             Spacer(Modifier.width(Spacing.s1))
         }
         chips.forEach { chip -> ChipPill(chip) }
@@ -1592,8 +1588,7 @@ private fun ChipRowView(
 /**
  * Right-edge "Split N ways" caption + 18dp overlapping avatars,
  * rendered on Bills rows when the bill is split between household
- * members. Tone palette shared with the shared
- * [app.pantopus.android.ui.components.BidderStack] component so a future
+ * members. Tone palette shared with [InlineBidderStack] so a future
  * feature can mix the two without re-keying the colors.
  */
 @Composable
@@ -1702,8 +1697,14 @@ private fun splitToneForeground(tone: BidderTone): Color =
         BidderTone.Slate -> PantopusColors.appTextSecondary
     }
 
-// InlineBidderStack moved to ui.components.BidderStack; both render
-// sites call into the shared component above.
+@Composable
+private fun InlineBidderStack(data: BidderStackData) {
+    // Same geometry as RowLeading.BidderStack — defer to the canonical
+    // [app.pantopus.android.ui.components.BidderStack]. Lives on the
+    // chip line instead of the leading slot, but the component is the
+    // same primitive in both spots.
+    BidderStack(bidders = data.bidders, overflow = data.overflow)
+}
 
 @Composable
 private fun ChipPill(chip: RowChip) {
@@ -2089,5 +2090,5 @@ private fun fabTintColor(tint: FabTint): Color =
     }
 
 // CompactButton + CompactButtonSize moved to
-// `app.pantopus.android.ui.components.CompactButton`. Call sites in this
-// file import from there.
+// app.pantopus.android.ui.components.CompactButton — the canonical port
+// of `Core/Design/Components/CompactButton.swift`. Imported above.

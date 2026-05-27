@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "MatchingDeclarationName", "LongParameterList", "TooManyFunctions")
+@file:Suppress("MatchingDeclarationName", "TooManyFunctions")
 
 package app.pantopus.android.ui.components
 
@@ -7,80 +7,207 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContract
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.activity.result.contract.ActivityResultContracts.PickContact
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.core.content.FileProvider
-import androidx.core.net.toUri
-import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
-import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusTextStyle
-import app.pantopus.android.ui.theme.Radii
-import app.pantopus.android.ui.theme.Spacing
-import java.io.File
 
-// ─── Invite copy / links ─────────────────────────────────────────
-//
-// Single source of truth for the invite message + download link shared
-// by "Invite to Pantopus" and the post-contact-pick invite. Mirrors iOS
-// `InviteLinks`. Swap [DOWNLOAD_URL] for the real Play Store smart-link
-// when it ships — every invite surface reads from here.
+/**
+ * P6.6 — system surfaces port of iOS `Core/Design/Components/SystemSheets.swift`.
+ *
+ * iOS leans on `UIActivityViewController` (share) +
+ * `MFMailComposeViewController` (mail) + `CNContactPickerViewController`
+ * (contact picker). The Android equivalents are intent-based:
+ *   - share  → `Intent.ACTION_SEND` chooser
+ *   - mail   → `Intent.ACTION_SENDTO` with `mailto:` URI (falls back to
+ *              plain share when no mail app is installed)
+ *   - picker → `ActivityResultContracts.PickContact` (no runtime
+ *              permission needed; selection runs out-of-process and only
+ *              the picked contact is returned to us, matching iOS).
+ *
+ * The shape of the public API (`MailDraft`, `PickedContact`,
+ * `SystemSheetRequest`, `InviteLinks`) mirrors iOS so feature code can be
+ * mechanically translated.
+ */
 
+// MARK: - Invite copy / links ────────────────────────────────────────────
+
+/**
+ * Single source of truth for the invite message + download link shared by
+ * every "Invite to Pantopus" / "Find people" surface. Swap
+ * [DOWNLOAD_URL] for the real Play Store / App Store smart-link when it
+ * ships.
+ */
 object InviteLinks {
-    const val DOWNLOAD_URL: String = "https://pantopus.app"
+    const val DOWNLOAD_URL = "https://pantopus.app"
 
-    val downloadUri: Uri get() = DOWNLOAD_URL.toUri()
-
-    const val INVITE_MESSAGE: String =
+    const val INVITE_MESSAGE =
         "Join me on Pantopus — your neighborhood for trusted home help, " +
             "local gigs, and your whole household in one place. $DOWNLOAD_URL"
 }
 
-// ─── Share sheet (Intent.ACTION_SEND) ────────────────────────────
-//
-// Android's native share is an Intent, not a Compose sheet. Iframe-style
-// wrap so call sites don't reach into Intent themselves. Mirrors iOS
-// `SystemShareSheet` semantics: hand items + optional URL → open the
-// system chooser.
+// MARK: - Mail compose ───────────────────────────────────────────────────
 
-/** Fire the system share sheet for plain text (ACTION_SEND). */
+/**
+ * Draft payload for the system mail composer. Carries a [mailtoUri]
+ * fallback for devices with no configured Mail account.
+ */
+data class MailDraft(
+    val subject: String,
+    val body: String,
+    val recipients: List<String> = emptyList(),
+) {
+    /**
+     * `mailto:…` string for [Intent.ACTION_SENDTO]. Recipients are
+     * comma-joined per RFC 6068. Pure string so unit tests don't need the
+     * Android URI runtime.
+     */
+    val mailtoUriString: String
+        get() {
+            val to = recipients.joinToString(",") { percentEncode(it) }
+            val query =
+                buildString {
+                    append("?subject=").append(percentEncode(subject))
+                    append("&body=").append(percentEncode(body))
+                }
+            return "mailto:$to$query"
+        }
+
+    /** [mailtoUriString] wrapped in a [Uri] for `Intent.ACTION_SENDTO`. */
+    val mailtoUri: Uri get() = Uri.parse(mailtoUriString)
+}
+
+/**
+ * RFC 3986 percent-encoding that matches `Uri.encode(s)` byte-for-byte
+ * for the characters that appear in subject / body / email fields.
+ * Kept pure-Kotlin so it stays unit-testable on the JVM.
+ */
+internal fun percentEncode(value: String): String =
+    java.net.URLEncoder
+        .encode(value, Charsets.UTF_8.name())
+        // URLEncoder uses application/x-www-form-urlencoded; convert
+        // back to RFC 3986 (`Uri.encode` flavour) by undoing the
+        // form-encoding quirks.
+        .replace("+", "%20")
+        .replace("*", "%2A")
+        .replace("%7E", "~")
+
+// MARK: - Contact picker ─────────────────────────────────────────────────
+
+/** A contact the user selected from the system picker. */
+data class PickedContact(
+    val name: String,
+    val phone: String?,
+    val email: String?,
+)
+
+/**
+ * Activity-result launcher that opens the system contacts picker and
+ * delivers a [PickedContact] (or `null` if the user backed out).
+ *
+ * Compose-friendly wrapper around `ActivityResultContracts.PickContact`.
+ * No `READ_CONTACTS` permission needed — the picker runs out-of-process
+ * and only returns the chosen contact.
+ *
+ * ```kotlin
+ * val picker = rememberContactPicker { contact ->
+ *     contact?.let(viewModel::onContactPicked)
+ * }
+ * Button(onClick = { picker.launch(null) }) { Text("Find people") }
+ * ```
+ */
+@Composable
+fun rememberContactPicker(onPicked: (PickedContact?) -> Unit = {}): ManagedActivityResultLauncher<Void?, Uri?> {
+    val context = LocalContext.current
+    return rememberLauncherForActivityResult(PickContact()) { uri ->
+        if (uri == null) {
+            onPicked(null)
+        } else {
+            onPicked(readContact(context, uri))
+        }
+    }
+}
+
+private fun readContact(
+    context: Context,
+    uri: Uri,
+): PickedContact? {
+    val projection =
+        arrayOf(
+            ContactsContract.Contacts.DISPLAY_NAME,
+            ContactsContract.Contacts._ID,
+        )
+    context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+        if (!cursor.moveToFirst()) return null
+        val name = cursor.getString(0).orEmpty()
+        val contactId = cursor.getString(1).orEmpty()
+        val phone = readPhone(context, contactId)
+        val email = readEmail(context, contactId)
+        return PickedContact(name = name, phone = phone, email = email)
+    }
+    return null
+}
+
+private fun readPhone(
+    context: Context,
+    contactId: String,
+): String? {
+    val phoneProjection = arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER)
+    val selection = ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?"
+    context.contentResolver
+        .query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            phoneProjection,
+            selection,
+            arrayOf(contactId),
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) return cursor.getString(0)
+        }
+    return null
+}
+
+private fun readEmail(
+    context: Context,
+    contactId: String,
+): String? {
+    val emailProjection = arrayOf(ContactsContract.CommonDataKinds.Email.ADDRESS)
+    val selection = ContactsContract.CommonDataKinds.Email.CONTACT_ID + " = ?"
+    context.contentResolver
+        .query(
+            ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+            emailProjection,
+            selection,
+            arrayOf(contactId),
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) return cursor.getString(0)
+        }
+    return null
+}
+
+// MARK: - Share + mail invocations ───────────────────────────────────────
+
+/** Fire the system share sheet for plain text ([Intent.ACTION_SEND]). */
 fun Context.shareText(
     text: String,
-    chooserTitle: String = "Share",
+    chooserTitle: String = DEFAULT_SHARE_TITLE,
 ) {
     val intent =
         Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
+            type = TEXT_PLAIN
             putExtra(Intent.EXTRA_TEXT, text)
         }
     startActivity(Intent.createChooser(intent, chooserTitle))
 }
 
-/** Fire the system share sheet for a content:// file (ACTION_SEND). */
+/** Fire the system share sheet for a `content://` file. */
 fun Context.shareFile(
     uri: Uri,
     mimeType: String,
-    chooserTitle: String = "Share",
+    chooserTitle: String = DEFAULT_SHARE_TITLE,
 ) {
     val intent =
         Intent(Intent.ACTION_SEND).apply {
@@ -91,341 +218,87 @@ fun Context.shareFile(
     startActivity(Intent.createChooser(intent, chooserTitle))
 }
 
-/** Resolve a cached [File] to a `content://` URI via the app FileProvider. */
-fun fileProviderUri(context: Context, file: File): Uri =
-    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-
-// ─── Mail compose (Intent.ACTION_SENDTO mailto:) ─────────────────
-//
-// iOS uses `MFMailComposeViewController` with a `mailto:` fallback. On
-// Android the only first-party mail compose path IS `mailto:` — the
-// `ACTION_SENDTO` intent with a `mailto:` URI resolves to the user's
-// chosen mail app. Mirrors iOS `MailDraft` shape; falls back to plain
-// share when no mail app is configured (Pixel emulators in CI).
-
-/**
- * Draft payload for a `mailto:` intent. Recipients / subject / body are
- * URL-encoded into the URI per RFC 6068.
- */
-data class MailDraft(
-    val subject: String,
-    val body: String,
-    val recipients: List<String> = emptyList(),
-) {
-    /** RFC 6068 `mailto:` URI used to launch the system mail picker. */
-    val mailtoUri: Uri
-        get() {
-            val to = recipients.joinToString(",") { Uri.encode(it) }
-            val s = Uri.encode(subject)
-            val b = Uri.encode(body)
-            return "mailto:$to?subject=$s&body=$b".toUri()
-        }
+/** Fire the invite share sheet (text + landing link). */
+fun Context.shareInvite() {
+    shareText(InviteLinks.INVITE_MESSAGE, chooserTitle = "Invite to Pantopus")
 }
 
 /**
- * Open the system mail composer (ACTION_SENDTO `mailto:`). Falls back
- * to a plain-text share when no mail app is configured.
+ * Open the system mail composer with the provided draft. Falls back to
+ * [shareText] (subject + body) when no mail app is configured.
+ */
+fun Context.composeMail(draft: MailDraft) {
+    val intent = Intent(Intent.ACTION_SENDTO, draft.mailtoUri)
+    try {
+        startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        shareText("${draft.subject}\n\n${draft.body}")
+    }
+}
+
+/**
+ * Legacy positional overload kept so existing call sites (`composeEmail(
+ * subject, body, recipient)`) don't need a refactor while the codebase
+ * migrates to [MailDraft].
  */
 fun Context.composeEmail(
     subject: String,
     body: String,
     recipient: String? = null,
 ) {
-    val draft = MailDraft(
-        subject = subject,
-        body = body,
-        recipients = if (recipient != null) listOf(recipient) else emptyList(),
-    )
-    try {
-        startActivity(Intent(Intent.ACTION_SENDTO, draft.mailtoUri))
-    } catch (_: ActivityNotFoundException) {
-        shareText("$subject\n\n$body")
-    }
-}
-
-// ─── Contacts picker (ActivityResult contract) ───────────────────
-//
-// Android exposes contact selection via the system ActivityResult
-// contract — no Compose sheet to render. We wrap it so the result
-// resolves to the same [PickedContact] shape iOS uses, and a default
-// "after-pick" flow that falls through to [shareText] for invite.
-
-/** Mirrors iOS `PickedContact`. */
-data class PickedContact(
-    val name: String,
-    val phone: String?,
-    val email: String?,
-)
-
-/**
- * `ActivityResultContract` that opens the system contact picker. The
- * launcher result is a `Uri?` pointing at `content://com.android.contacts/...`;
- * resolve to a [PickedContact] via [resolveContact].
- */
-class PickContactContract : ActivityResultContract<Unit, Uri?>() {
-    override fun createIntent(context: Context, input: Unit): Intent =
-        Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI)
-
-    override fun parseResult(resultCode: Int, intent: Intent?): Uri? = intent?.data
-}
-
-/**
- * Resolve a contact URI returned by the picker into a [PickedContact].
- * Reads the DISPLAY_NAME column + the first PHONE / EMAIL row. Returns
- * `null` when the URI is malformed or the contact has no name.
- */
-fun resolveContact(context: Context, contactUri: Uri): PickedContact? {
-    val resolver = context.contentResolver
-    var name: String? = null
-    var contactId: String? = null
-    resolver
-        .query(
-            contactUri,
-            arrayOf(
-                ContactsContract.Contacts._ID,
-                ContactsContract.Contacts.DISPLAY_NAME,
-            ),
-            null,
-            null,
-            null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                contactId = cursor.getString(0)
-                name = cursor.getString(1)
-            }
-        }
-    val id = contactId
-    val resolvedName = name
-    if (id.isNullOrBlank() || resolvedName.isNullOrBlank()) return null
-
-    val phone = firstField(
-        context,
-        id,
-        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-        ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
-        ContactsContract.CommonDataKinds.Phone.NUMBER,
-    )
-    val email = firstField(
-        context,
-        id,
-        ContactsContract.CommonDataKinds.Email.CONTENT_URI,
-        ContactsContract.CommonDataKinds.Email.CONTACT_ID,
-        ContactsContract.CommonDataKinds.Email.ADDRESS,
-    )
-    return PickedContact(name = resolvedName, phone = phone, email = email)
-}
-
-private fun firstField(
-    context: Context,
-    contactId: String,
-    contentUri: Uri,
-    contactIdColumn: String,
-    valueColumn: String,
-): String? =
-    context.contentResolver
-        .query(contentUri, arrayOf(valueColumn), "$contactIdColumn = ?", arrayOf(contactId), null)
-        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-
-/**
- * Composable wrapper that registers a contact picker launcher + auto-
- * resolves the result. Mirrors iOS `findPeopleSheet(isPresented:)`'s
- * pick→invite chain when the caller follows up with [shareText] in the
- * contact callback.
- */
-@Composable
-fun rememberContactPicker(
-    onPicked: (PickedContact?) -> Unit,
-): ActivityResultLauncher<Unit> {
-    val context = LocalContext.current
-    val callback = remember(onPicked) {
-        { uri: Uri? ->
-            val resolved = uri?.let { resolveContact(context, it) }
-            onPicked(resolved)
-        }
-    }
-    return rememberLauncherForActivityResult(contract = PickContactContract()) { uri ->
-        callback(uri)
-    }
-}
-
-// ─── Compose-native bottom sheets ────────────────────────────────
-//
-// Action / confirmation / picker sheets are Compose-native because
-// they're the on-platform analog of iOS `.confirmationDialog` / `.sheet`
-// surfaces. Each is a thin slot wrapper over Material3 `ModalBottomSheet`
-// so feature code never touches `SheetState` directly.
-
-/** One option in an [ActionSheet]. Mirrors iOS `confirmationDialog` buttons. */
-data class ActionSheetOption(
-    val label: String,
-    val isDestructive: Boolean = false,
-    val onSelect: () -> Unit,
-)
-
-/**
- * Action sheet — a vertical stack of tappable options. Use for
- * "Edit / Share / Delete" surfaces and any short list of mutually
- * exclusive actions.
- *
- * @param title Optional sheet title.
- * @param options Buttons rendered top-to-bottom.
- * @param onDismiss Called when the user taps outside or back-gestures.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ActionSheet(
-    title: String?,
-    options: List<ActionSheetOption>,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    sheetState: SheetState = rememberModalBottomSheetState(),
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = PantopusColors.appSurface,
-        modifier = modifier.testTag(ACTION_SHEET_TEST_TAG),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            if (title != null) {
-                Text(
-                    text = title,
-                    style = PantopusTextStyle.h3,
-                    color = PantopusColors.appText,
-                )
-            }
-            options.forEach { option ->
-                ActionRow(option)
-            }
-        }
-    }
-}
-
-/**
- * Confirmation sheet — title + body + two CTAs (confirm / cancel).
- * Use for "Are you sure you want to delete X" surfaces.
- *
- * @param title Headline copy.
- * @param confirmLabel Confirm CTA label.
- * @param onConfirm Confirm tap.
- * @param onDismiss Tap-outside or cancel tap.
- * @param body Optional supporting copy.
- * @param cancelLabel Cancel CTA label. Defaults to "Cancel".
- * @param isDestructive Render the confirm CTA in destructive paint.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ConfirmationSheet(
-    title: String,
-    confirmLabel: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    body: String? = null,
-    cancelLabel: String = "Cancel",
-    isDestructive: Boolean = false,
-    sheetState: SheetState = rememberModalBottomSheetState(),
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = PantopusColors.appSurface,
-        modifier = modifier.testTag(CONFIRMATION_SHEET_TEST_TAG),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-        ) {
-            Text(text = title, style = PantopusTextStyle.h3, color = PantopusColors.appText)
-            if (body != null) {
-                Text(text = body, style = PantopusTextStyle.body, color = PantopusColors.appTextSecondary)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
-                CompactButton(
-                    title = cancelLabel,
-                    variant = CompactButtonVariant.Ghost,
-                    size = CompactButtonSize.Footer,
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                CompactButton(
-                    title = confirmLabel,
-                    variant =
-                        if (isDestructive) CompactButtonVariant.Destructive else CompactButtonVariant.Primary,
-                    size = CompactButtonSize.Footer,
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-/**
- * Picker sheet — generic slot wrapper for any selection UI (date,
- * category, etc.) where the body composable owns rendering.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PickerSheet(
-    title: String,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    sheetState: SheetState = rememberModalBottomSheetState(),
-    content: @Composable () -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = PantopusColors.appSurface,
-        modifier = modifier.testTag(PICKER_SHEET_TEST_TAG),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-        ) {
-            Text(text = title, style = PantopusTextStyle.h3, color = PantopusColors.appText)
-            content()
-        }
-    }
-}
-
-@Composable
-private fun ActionRow(option: ActionSheetOption) {
-    val color =
-        if (option.isDestructive) PantopusColors.error else PantopusColors.appText
-    Text(
-        text = option.label,
-        style = PantopusTextStyle.body,
-        color = color,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
-                .clickable(onClick = option.onSelect)
-                .background(PantopusColors.appSurface)
-                .padding(vertical = Spacing.s3, horizontal = Spacing.s2)
-                .testTag("action-sheet-option-${option.label}"),
-    )
-}
-
-internal const val ACTION_SHEET_TEST_TAG = "system-sheet-action"
-internal const val CONFIRMATION_SHEET_TEST_TAG = "system-sheet-confirmation"
-internal const val PICKER_SHEET_TEST_TAG = "system-sheet-picker"
-
-@Preview(showBackground = true, widthDp = 360, heightDp = 200)
-@Composable
-private fun SystemSheetsPreviewLabel() {
-    Column(modifier = Modifier.padding(Spacing.s4)) {
-        Text(
-            text = "ActionSheet / ConfirmationSheet / PickerSheet — modal previews are inert",
-            style = PantopusTextStyle.caption,
+    val draft =
+        MailDraft(
+            subject = subject,
+            body = body,
+            recipients = recipient?.let { listOf(it) }.orEmpty(),
         )
+    composeMail(draft)
+}
+
+// MARK: - SystemSheetRequest (share / mail) ──────────────────────────────
+
+/**
+ * A single request payload covering the two iOS-style sheet surfaces.
+ * Mirrors iOS `SystemSheetRequest` so feature view-models can model
+ * "what would I show next" without owning the dispatch path.
+ *
+ * On Android there's no equivalent of iOS's `.sheet(item:)` modifier
+ * driving a single sheet for both — we just dispatch via [launchOn].
+ */
+sealed interface SystemSheetRequest {
+    data class Share(
+        val text: String,
+        val title: String = DEFAULT_SHARE_TITLE,
+    ) : SystemSheetRequest
+
+    data class ShareFile(
+        val uri: Uri,
+        val mimeType: String,
+        val title: String = DEFAULT_SHARE_TITLE,
+    ) : SystemSheetRequest
+
+    data class Mail(
+        val draft: MailDraft,
+    ) : SystemSheetRequest
+}
+
+/** Helper composable that remembers a context-bound dispatcher. */
+@Composable
+fun rememberSystemSheetDispatcher(): (SystemSheetRequest) -> Unit {
+    val context = LocalContext.current
+    return remember(context) {
+        { request -> request.launchOn(context) }
     }
 }
+
+/** Dispatch this request to the platform. */
+fun SystemSheetRequest.launchOn(context: Context) {
+    when (this) {
+        is SystemSheetRequest.Share -> context.shareText(text, title)
+        is SystemSheetRequest.ShareFile -> context.shareFile(uri, mimeType, title)
+        is SystemSheetRequest.Mail -> context.composeMail(draft)
+    }
+}
+
+private const val TEXT_PLAIN = "text/plain"
+private const val DEFAULT_SHARE_TITLE = "Share"

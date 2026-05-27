@@ -17,11 +17,14 @@ import java.text.DateFormat
 import java.util.Date
 
 /**
- * P6.6 — builds + renders the "Print emergency card" A4 PDF.
- * [content] is a pure projection (unit-tested); [render] draws the page and
- * returns a shareable content:// URI via the app FileProvider.
+ * P6.6 — builds + renders the "Print emergency card" A4 PDF. Mirrors
+ * `Core/Design/Components/EmergencyCardPDF.swift` pixel-for-pixel: same
+ * A4 geometry (595 × 842 pt), same 48 pt margins, same green kicker +
+ * heading paint, same heading / item title / item detail font sizes.
  *
- * Geometry is in PDF points (A4 = 595 × 842), not Compose dp.
+ * [content] is a pure projection (unit-tested); [render] draws the page
+ * and returns a shareable `content://` URI via the app FileProvider.
+ * Geometry is in PDF points, not Compose dp.
  */
 data class EmergencyCardContent(
     val homeLabel: String,

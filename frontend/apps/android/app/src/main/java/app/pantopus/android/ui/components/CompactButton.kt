@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "MatchingDeclarationName", "LongParameterList")
+@file:Suppress("MagicNumber", "MatchingDeclarationName", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.components
 
@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -33,39 +36,28 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**
- * Geometry variant for [CompactButton]. Mirrors iOS `CompactButtonSize`.
+ * Geometry variant for [CompactButton]. Mirrors `CompactButton.swift`'s
+ * `CompactButtonSize`.
  *
- * - [Footer] — 34dp tall, in-card row footer. Stretches to fill its flex
- *   cell (use `Modifier.weight(1f)` in a Row, or `Modifier.fillMaxWidth()`).
- * - [InlineAction] — 30dp primary / 28dp ghost. Compact pill used next to
- *   a row's metadata (Accept / Ignore on Connections, etc.).
+ * - [Footer] — 34dp height, full width inside its flex cell. Used for
+ *   in-card row footers (My bids / My tasks / Offers / Review claims).
+ * - [InlineAction] — 30dp primary / 28dp ghost. Used for inline pill
+ *   actions next to row metadata (Connections Accept / Ignore).
  */
-enum class CompactButtonSize {
-    Footer,
-    InlineAction,
-}
+enum class CompactButtonSize { Footer, InlineAction }
 
 /**
- * Compact in-row action button. Mirrors `Core/Design/Components/CompactButton.swift`
- * pixel-for-pixel: 34dp footer / 28-30dp inline, 12dp horizontal padding,
- * 13dp leading icon, caption type ramp, Radii.md corners.
+ * Small-density button with optional leading icon. Mirrors iOS
+ * `CompactButton.swift` — variant palette matches [PantopusButton] but the
+ * geometry is intentionally compact so the button fits inside list rows
+ * where a 44dp primary CTA would overwhelm the row.
  *
- * The variant palette (Primary / Ghost / Destructive) mirrors `PantopusButton`'s
- * but the type exists because feature code wants to request a *size*, not a
- * substituted style.
- *
- * Token-only: all colors come from [PantopusColors], all spacing from
- * [Spacing], all radii from [Radii].
- *
- * @param title Button label. Also used as the spoken accessibility label
- *     so screen readers don't need a separate string.
- * @param variant Color palette. Primary fills the surface; Ghost and
- *     Destructive paint a border instead.
- * @param size Geometry. See [CompactButtonSize].
- * @param onClick Click handler.
- * @param modifier Caller modifier. Footer-sized callers typically pass
- *     `Modifier.weight(1f)` or `Modifier.fillMaxWidth()` here.
- * @param icon Optional leading icon (13dp glyph).
+ * @param title Label rendered in caption type. Also becomes the
+ *     accessibility label for parity with iOS.
+ * @param variant Palette role: primary (filled sky), ghost (surface +
+ *     border), destructive (surface + border + red text).
+ * @param size Geometry pick — see [CompactButtonSize].
+ * @param icon Optional leading glyph at 13dp, tinted to match foreground.
  */
 @Composable
 fun CompactButton(
@@ -76,30 +68,36 @@ fun CompactButton(
     modifier: Modifier = Modifier,
     icon: PantopusIcon? = null,
 ) {
-    val height = resolvedHeightDp(size, variant).dp
-    val background = backgroundFor(variant)
-    val foreground = foregroundFor(variant)
-    val border: BorderStroke? =
-        if (variant == CompactButtonVariant.Primary) {
-            null
-        } else {
-            BorderStroke(1.dp, PantopusColors.appBorder)
+    val heightDp =
+        when {
+            size == CompactButtonSize.Footer -> 34.dp
+            variant == CompactButtonVariant.Ghost -> 28.dp
+            else -> 30.dp
         }
-    val shape = RoundedCornerShape(Radii.md)
+    val background = compactBackground(variant)
+    val foreground = compactForeground(variant)
+    val border: BorderStroke? =
+        when (variant) {
+            CompactButtonVariant.Primary -> null
+            CompactButtonVariant.Ghost, CompactButtonVariant.Destructive ->
+                BorderStroke(1.dp, PantopusColors.appBorder)
+        }
+    val baseShape = RoundedCornerShape(Radii.md)
+    val rowModifier =
+        modifier
+            .height(heightDp)
+            .clip(baseShape)
+            .background(background)
+            .let { m -> if (border != null) m.border(border, baseShape) else m }
+            .clickable(onClick = onClick)
+            .padding(horizontal = Spacing.s3)
+            .semantics {
+                contentDescription = title
+                role = Role.Button
+            }.testTag("compactButton")
 
     Row(
-        modifier =
-            modifier
-                .height(height)
-                .clip(shape)
-                .background(background)
-                .let { m -> border?.let { m.border(it, shape) } ?: m }
-                .clickable(onClick = onClick)
-                .padding(horizontal = Spacing.s3)
-                .semantics {
-                    contentDescription = title
-                    role = Role.Button
-                },
+        modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1, Alignment.CenterHorizontally),
     ) {
@@ -115,61 +113,49 @@ fun CompactButton(
     }
 }
 
-internal fun resolvedHeightDp(size: CompactButtonSize, variant: CompactButtonVariant): Int =
-    when {
-        size == CompactButtonSize.Footer -> 34
-        // Secondary inline pill (Ghost variant) is 28dp; primary inline is 30dp.
-        variant == CompactButtonVariant.Ghost -> 28
-        else -> 30
-    }
-
-private fun backgroundFor(variant: CompactButtonVariant): Color =
+private fun compactBackground(variant: CompactButtonVariant): Color =
     when (variant) {
         CompactButtonVariant.Primary -> PantopusColors.primary600
         CompactButtonVariant.Ghost -> PantopusColors.appSurface
         CompactButtonVariant.Destructive -> PantopusColors.appSurface
     }
 
-private fun foregroundFor(variant: CompactButtonVariant): Color =
+private fun compactForeground(variant: CompactButtonVariant): Color =
     when (variant) {
         CompactButtonVariant.Primary -> PantopusColors.appTextInverse
         CompactButtonVariant.Ghost -> PantopusColors.appTextStrong
         CompactButtonVariant.Destructive -> PantopusColors.error
     }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 200)
+@Preview(showBackground = true, widthDp = 360, heightDp = 220)
 @Composable
-private fun CompactButtonPreviewFooter() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+private fun CompactButtonPreview() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .padding(Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        CompactButton(
-            title = "Withdraw",
-            variant = CompactButtonVariant.Destructive,
-            size = CompactButtonSize.Footer,
-            onClick = {},
-            icon = PantopusIcon.X,
-            modifier = Modifier.weight(1f),
-        )
-        CompactButton(
-            title = "Edit bid",
-            variant = CompactButtonVariant.Primary,
-            size = CompactButtonSize.Footer,
-            onClick = {},
-            icon = PantopusIcon.Check,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Preview(showBackground = true, widthDp = 160, heightDp = 120)
-@Composable
-private fun CompactButtonPreviewInline() {
-    androidx.compose.foundation.layout.Column(
-        modifier = Modifier.padding(Spacing.s4),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                CompactButton(
+                    title = "Withdraw",
+                    variant = CompactButtonVariant.Destructive,
+                    size = CompactButtonSize.Footer,
+                    onClick = {},
+                    icon = PantopusIcon.X,
+                )
+                CompactButton(
+                    title = "Edit bid",
+                    variant = CompactButtonVariant.Primary,
+                    size = CompactButtonSize.Footer,
+                    onClick = {},
+                    icon = PantopusIcon.Check,
+                )
+            }
+        }
         CompactButton(
             title = "Accept",
             variant = CompactButtonVariant.Primary,
