@@ -34,6 +34,12 @@ final class DeepLinkRouter {
         case connections
         case discoverHub
         case invite(token: String)
+        /// P4.2 — A13.10 Edit Business Page (owner-only).
+        /// `pantopus://businesses/:id/page-editor`.
+        case editBusinessPage(businessId: String)
+        /// Public business profile reached from a share / push.
+        /// `pantopus://businesses/:id`.
+        case businessProfile(businessId: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
         /// token; the caller invokes `AuthManager.resetPassword` on submit.
@@ -145,6 +151,13 @@ final class DeepLinkRouter {
                 return .homeMemberRequests(id: id)
             }
             return .homeDetail(id: id)
+        case "businesses", "business":
+            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            let trailing = Array(segments.dropFirst(2))
+            if trailing.first == "page-editor" || trailing.first == "page_editor" {
+                return .editBusinessPage(businessId: id)
+            }
+            return .businessProfile(businessId: id)
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
