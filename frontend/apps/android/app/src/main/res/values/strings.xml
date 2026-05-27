@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pantopus</string>
+
+    <!-- FCM notification channels (Android 8+). Each category gets its own
+         channel so users can mute one without losing the others, matching
+         the per-type preference toggles the backend already supports. -->
+    <string name="notif_channel_chat">Chats</string>
+    <string name="notif_channel_mail">Mail</string>
+    <string name="notif_channel_gig_bid">Gig bids</string>
+    <string name="notif_channel_system">System</string>
 </resources>

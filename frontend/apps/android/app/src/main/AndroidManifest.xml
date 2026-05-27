@@ -90,6 +90,18 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- FCM bridge — mirrors the iOS AppDelegate push-notification
+             half. Handles token rotation (onNewToken) and incoming
+             payloads (onMessageReceived), delegating to
+             NotificationDispatcher for routing. -->
+        <service
+            android:name=".push.PantopusMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>
