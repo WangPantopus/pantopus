@@ -52,8 +52,21 @@ object PantopusColors {
     val personalBg = Color(0xFFDBEAFE)
     val home = Color(0xFF16A34A)
     val homeBg = Color(0xFFDCFCE7)
+
+    /**
+     * Home identity dark — `#15803D`. Tailwind green-700; dark stop for
+     * home-tinted ceremonial banners (A21.2 local profile, P2 ceremonial
+     * unboxing).
+     */
+    val homeDark = Color(0xFF15803D)
     val business = Color(0xFF7C3AED)
     val businessBg = Color(0xFFF3E8FF)
+
+    /**
+     * Business identity dark — `#5B21B6`. Tailwind violet-700; dark stop
+     * for business-tinted ceremonial banners.
+     */
+    val businessDark = Color(0xFF5B21B6)
 
     // T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
     // on My tasks V2 rows and the Magic ingest FAB on Mailbox-A17 root.
