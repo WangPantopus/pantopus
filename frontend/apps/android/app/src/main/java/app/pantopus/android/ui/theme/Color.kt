@@ -87,13 +87,6 @@ object PantopusColors {
     val appTextInverse = Color(0xFFFFFFFF)
     val appHover = Color(0xFFF3F4F6)
 
-    /**
-     * Paper cream — `#FDF8EE`. Off-white warm stock used for postcard
-     * and other physical-paper artefacts (verification cards, postcard
-     * hero, archival document previews).
-     */
-    val paperCream = Color(0xFFFDF8EE)
-
     // Category accents
     val handyman = Color(0xFFF97316)
     val cleaning = Color(0xFF27AE60)

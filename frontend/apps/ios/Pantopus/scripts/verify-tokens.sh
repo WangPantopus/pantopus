@@ -40,7 +40,6 @@ status=0
 # a design call, not a CI rule. Keep this list short — every addition
 # is a hex-literal escape hatch.
 HEX_EXEMPT=(
-  "Core/Design/Components/ConfettiSpray.swift"
   "Core/Design/Components/Shimmer.swift"
   "Features/CeremonialMailOpen/CeremonialMailOpenContent.swift"
   "Features/CeremonialMailOpen/CeremonialMailOpenView.swift"
