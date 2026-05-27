@@ -8,6 +8,10 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.paparazzi)
     alias(libs.plugins.play.publisher)
+    // Processes `app/google-services.json` and emits the Firebase init
+    // config used by FirebaseMessaging. The committed JSON is a clearly-
+    // marked placeholder — see the TODO at the top of that file.
+    alias(libs.plugins.google.services)
 }
 
 // Load local env from .env (not committed). Falls back to sensible defaults.
@@ -184,6 +188,16 @@ dependencies {
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
 
+    // Firebase Cloud Messaging — declared via BoM so the messaging
+    // artifact picks up a compatible version automatically. Adding more
+    // firebase-* deps in the future should NOT carry a version.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    // `FirebaseMessaging.getInstance().token` returns a Task<String>;
+    // kotlinx-coroutines-play-services already in the catalog adapts it
+    // into a suspend `.await()`.
+    implementation(libs.kotlinx.coroutines.play.services)
+
     // Logging + crash reporting
     implementation(libs.timber)
     implementation(libs.sentry.android)
@@ -198,6 +212,7 @@ dependencies {
     testImplementation(libs.mockwebserver)
 
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.mockk.android)

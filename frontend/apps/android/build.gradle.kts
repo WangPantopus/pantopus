@@ -13,6 +13,9 @@ plugins {
     // apply it. Configuration lives in `app/build.gradle.kts` under
     // the `play { … }` block.
     alias(libs.plugins.play.publisher) apply false
+    // FCM: google-services processes `app/google-services.json` and emits
+    // the Firebase init config. Applied by `:app`.
+    alias(libs.plugins.google.services) apply false
 }
 
 // Apply detekt + ktlint to every subproject.

@@ -35,6 +35,10 @@ stripe = "21.2.0"
 mapsCompose = "6.2.1"
 playServicesMaps = "19.0.0"
 
+# Firebase (FCM push notifications)
+firebaseBom = "33.7.0"
+googleServices = "4.4.2"
+
 # Observability
 timber = "5.0.1"
 sentry = "7.18.0"
@@ -42,6 +46,7 @@ sentry = "7.18.0"
 # Testing
 junit = "4.13.2"
 androidxJunit = "1.2.1"
+androidxTestRules = "1.6.1"
 espresso = "3.6.1"
 mockk = "1.13.13"
 turbine = "1.2.0"
@@ -121,6 +126,12 @@ stripe-android = { group = "com.stripe", name = "stripe-android", version.ref = 
 maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
 
+# Firebase (FCM push notifications). The BoM pins compatible versions for
+# every firebase-* artifact — declare each artifact without a version so
+# the BoM is the single source of truth.
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
+
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
@@ -132,6 +143,7 @@ sentry-android-okhttp = { group = "io.sentry", name = "sentry-android-okhttp", v
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidxTestRules" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
@@ -170,3 +182,4 @@ detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 paparazzi = { id = "app.cash.paparazzi", version.ref = "paparazzi" }
 play-publisher = { id = "com.github.triplet.play", version = "3.10.1" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
