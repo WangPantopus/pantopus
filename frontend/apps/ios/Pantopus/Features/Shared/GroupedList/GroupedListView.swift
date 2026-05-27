@@ -32,6 +32,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             topBar
             content
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.Color.appBg)
         .task { await dataSource.load() }
         .accessibilityIdentifier("groupedList")

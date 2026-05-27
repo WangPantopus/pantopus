@@ -38,10 +38,16 @@ struct HubTopBar: View {
             // Bell + menu — design uses 36pt buttons with 20pt icons.
             ZStack(alignment: .topTrailing) {
                 Button(action: onBellTap) {
-                    Icon(.bell, size: 20, color: Theme.Color.appText)
-                        .frame(width: 36, height: 36)
+                    ZStack {
+                        Color.clear
+                        Icon(.bell, size: 20, color: Theme.Color.appText)
+                    }
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
                 .accessibilityLabel("Notifications")
                 .accessibilityIdentifier("hubBellButton")
                 if content.unreadCount > 0 {
@@ -53,10 +59,16 @@ struct HubTopBar: View {
                 }
             }
             Button(action: onMenuTap) {
-                Icon(.menu, size: 20, color: Theme.Color.appText)
-                    .frame(width: 36, height: 36)
+                ZStack {
+                    Color.clear
+                    Icon(.menu, size: 20, color: Theme.Color.appText)
+                }
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .frame(width: 36, height: 36)
+            .contentShape(Rectangle())
             .accessibilityLabel("Menu")
             .accessibilityIdentifier("hubMenuButton")
         }

@@ -132,7 +132,7 @@ final class NavigationSmokeTest: XCTestCase {
         tabButton("hub", in: app).tap()
         let menu = app.buttons["hubMenuButton"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout: 3))
-        menu.tap()
+        menu.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).tap()
         assertReaches("settings", in: app, timeout: 8)
     }
 
