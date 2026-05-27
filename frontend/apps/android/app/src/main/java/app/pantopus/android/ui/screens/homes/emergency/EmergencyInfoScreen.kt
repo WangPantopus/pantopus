@@ -15,10 +15,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.api.models.homes.HomeEmergencyDto
+import app.pantopus.android.ui.components.shareFile
+import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
-import app.pantopus.android.ui.util.EmergencyCardPdf
-import app.pantopus.android.ui.util.shareFile
-import app.pantopus.android.ui.util.shareText
 
 /**
  * T6.4b / P17 — Concrete Emergency info list screen wired to

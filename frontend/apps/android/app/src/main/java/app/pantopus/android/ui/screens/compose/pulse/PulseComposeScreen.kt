@@ -55,6 +55,9 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.components.Toast
+import app.pantopus.android.ui.components.ToastKind
+import app.pantopus.android.ui.components.ToastMessage
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormShell
@@ -230,21 +233,14 @@ internal fun PulseComposeToastView(
     payload: PulseComposeToast,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(
-                    if (payload.isError) PantopusColors.error else PantopusColors.success,
-                ).padding(horizontal = Spacing.s4, vertical = Spacing.s2)
-                .testTag("composePulseToast"),
-    ) {
-        Text(
-            text = payload.text,
-            style = PantopusTextStyle.small,
-            color = PantopusColors.appTextInverse,
-        )
-    }
+    Toast(
+        message =
+            ToastMessage(
+                text = payload.text,
+                kind = if (payload.isError) ToastKind.Error else ToastKind.Success,
+            ),
+        modifier = modifier.testTag("composePulseToast"),
+    )
 }
 
 /** Pure-data snapshot the body composable renders against. */
