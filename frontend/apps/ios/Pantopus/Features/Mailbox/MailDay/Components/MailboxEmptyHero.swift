@@ -198,40 +198,40 @@ struct MailboxIllustration: View {
         }
     }
 
-    /// `#F3F4F6` — `appSurfaceSunken` is the design-token equivalent of
+    /// `0xF3F4F6` — `appSurfaceSunken` is the design-token equivalent of
     /// the gradient's top stop, but the gradient itself is bespoke. We
     /// keep the two stops here so the gradient stays a single literal.
     private var bodyTop: Color {
         Color(red: 0xF3 / 255.0, green: 0xF4 / 255.0, blue: 0xF6 / 255.0)
     }
 
-    /// `#D1D5DB` — `appBorderStrong`-adjacent. Bottom stop of the body.
+    /// `0xD1D5DB` — `appBorderStrong`-adjacent. Bottom stop of the body.
     private var bodyBottom: Color {
         Color(red: 0xD1 / 255.0, green: 0xD5 / 255.0, blue: 0xDB / 255.0)
     }
 
-    /// `#9CA3AF` — `appTextMuted`-adjacent. Hairline border around the body.
+    /// `0x9CA3AF` — `appTextMuted`-adjacent. Hairline border around the body.
     private var bodyBorder: Color {
         Color(red: 0x9C / 255.0, green: 0xA3 / 255.0, blue: 0xAF / 255.0)
     }
 
-    /// `#374151` — `appTextStrong`-adjacent. Dark slot.
+    /// `0x374151` — `appTextStrong`-adjacent. Dark slot.
     private var slotDark: Color {
         Color(red: 0x37 / 255.0, green: 0x41 / 255.0, blue: 0x51 / 255.0)
     }
 
-    /// `#A78BFA` — lavender shelf. No token (the design's only lavender
+    /// `0xA78BFA` — lavender shelf. No token (the design's only lavender
     /// surface).
     private var shelfLavender: Color {
         Color(red: 0xA7 / 255.0, green: 0x8B / 255.0, blue: 0xFA / 255.0)
     }
 
-    /// `#FBBF24` — sparkle amber.
+    /// `0xFBBF24` — sparkle amber.
     private var sparkleAmber: Color {
         Color(red: 0xFB / 255.0, green: 0xBF / 255.0, blue: 0x24 / 255.0)
     }
 
-    /// `#FDE68A` — softer sparkle highlight.
+    /// `0xFDE68A` — softer sparkle highlight.
     private var sparkleLightAmber: Color {
         Color(red: 0xFD / 255.0, green: 0xE6 / 255.0, blue: 0x8A / 255.0)
     }
@@ -336,9 +336,10 @@ struct SetupNudgeStack: View {
             ForEach(Array(nudges.enumerated()), id: \.element.id) { index, nudge in
                 NudgeRow(
                     nudge: nudge,
-                    isLast: index == nudges.count - 1,
-                    onTap: { onTap(nudge) }
-                )
+                    isLast: index == nudges.count - 1
+                ) {
+                    onTap(nudge)
+                }
             }
         }
         .background(Theme.Color.appSurface)

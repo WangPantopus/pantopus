@@ -62,12 +62,13 @@ public struct MailDayView: View {
         case .loading:
             shell(
                 isPopulated: false,
-                stickyBottom: nil,
-                body: { loadingBody }
+                body: { loadingBody },
+                stickyBottom: nil
             )
         case let .populated(content):
             shell(
                 isPopulated: true,
+                body: { populatedBody(content: content) },
                 stickyBottom: {
                     AnyView(
                         FinishDayBar(
@@ -79,20 +80,19 @@ public struct MailDayView: View {
                             remaining: viewModel.remaining
                         )
                     )
-                },
-                body: { populatedBody(content: content) }
+                }
             )
         case let .empty(content):
             shell(
                 isPopulated: false,
-                stickyBottom: nil,
-                body: { emptyBody(content: content) }
+                body: { emptyBody(content: content) },
+                stickyBottom: nil
             )
         case let .error(message):
             shell(
                 isPopulated: false,
-                stickyBottom: nil,
-                body: { errorBody(message: message) }
+                body: { errorBody(message: message) },
+                stickyBottom: nil
             )
         }
     }
@@ -101,8 +101,8 @@ public struct MailDayView: View {
 
     private func shell(
         isPopulated _: Bool,
-        stickyBottom: (() -> AnyView)?,
-        @ViewBuilder body: () -> some View
+        @ViewBuilder body: () -> some View,
+        stickyBottom: (() -> AnyView)?
     ) -> some View {
         FormShell(
             title: "My Mail Day",
@@ -119,7 +119,6 @@ public struct MailDayView: View {
 
     // MARK: - Populated body
 
-    @ViewBuilder
     private func populatedBody(content: MailDayContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             DayHeader(
@@ -142,7 +141,6 @@ public struct MailDayView: View {
         .padding(.bottom, 120)
     }
 
-    @ViewBuilder
     private func needsACallSection(items: [UnreviewedMailDayItem]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             sectionOverline(title: "Needs a call", count: items.count)
@@ -158,7 +156,6 @@ public struct MailDayView: View {
         }
     }
 
-    @ViewBuilder
     private func reviewedSection(items: [ReviewedMailDayItem]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             sectionOverline(title: "Reviewed today", count: items.count)
@@ -166,9 +163,10 @@ public struct MailDayView: View {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     ReviewedRow(
                         item: item,
-                        isLast: index == items.count - 1,
-                        onUndo: { /* Undo individual — out of scope */ }
-                    )
+                        isLast: index == items.count - 1
+                    ) {
+                        // Undo individual — out of scope
+                    }
                 }
             }
             .background(Theme.Color.appSurface)
@@ -183,16 +181,19 @@ public struct MailDayView: View {
     }
 
     private var undoAllButton: some View {
-        Button(action: { /* Undo all — out of scope */ }) {
-            HStack(spacing: Spacing.s1) {
-                Icon(.arrowsRepeat, size: 12, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
-                Text("Undo all from today")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+        Button(
+            action: { /* Undo all — out of scope */ },
+            label: {
+                HStack(spacing: Spacing.s1) {
+                    Icon(.arrowsRepeat, size: 12, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+                    Text("Undo all from today")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-        }
+        )
         .buttonStyle(.plain)
         .accessibilityLabel("Undo all from today")
         .accessibilityIdentifier("mailDayUndoAll")
@@ -214,14 +215,14 @@ public struct MailDayView: View {
 
     // MARK: - Empty body
 
-    @ViewBuilder
     private func emptyBody(content: MailDayContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             MailboxEmptyHero(
                 streakDays: content.streakDays,
-                lastScanLabel: content.lastScanLabel,
-                onScan: { viewModel.requestScan() }
-            )
+                lastScanLabel: content.lastScanLabel
+            ) {
+                viewModel.requestScan()
+            }
             if let recap = content.yesterdayRecap {
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     sectionOverline(title: "Yesterday's recap", count: recap.segments.count)
@@ -351,29 +352,32 @@ struct FinishDayBar: View {
     }
 
     private var primaryCTA: some View {
-        Button(action: { /* commit — out of scope */ }) {
-            HStack(spacing: 6) {
-                Icon(
-                    isEnabled ? .mailbox : .lock,
-                    size: 16,
-                    strokeWidth: 2.4,
-                    color: isEnabled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
+        Button(
+            action: { /* commit — out of scope */ },
+            label: {
+                HStack(spacing: 6) {
+                    Icon(
+                        isEnabled ? .mailbox : .lock,
+                        size: 16,
+                        strokeWidth: 2.4,
+                        color: isEnabled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
+                    )
+                    Text(ctaLabel)
+                        .font(.system(size: 14.5, weight: .semibold))
+                        .foregroundStyle(isEnabled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(isEnabled ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                .shadow(
+                    color: isEnabled ? Theme.Color.primary600.opacity(0.28) : .clear,
+                    radius: isEnabled ? 12 : 0,
+                    x: 0,
+                    y: isEnabled ? 6 : 0
                 )
-                Text(ctaLabel)
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundStyle(isEnabled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(isEnabled ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .shadow(
-                color: isEnabled ? Theme.Color.primary600.opacity(0.28) : .clear,
-                radius: isEnabled ? 12 : 0,
-                x: 0,
-                y: isEnabled ? 6 : 0
-            )
-        }
+        )
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .accessibilityLabel(ctaLabel)

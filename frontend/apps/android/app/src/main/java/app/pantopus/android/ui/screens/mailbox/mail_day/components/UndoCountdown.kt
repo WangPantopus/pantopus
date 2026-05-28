@@ -68,7 +68,7 @@ fun UndoCountdown(
 }
 
 /**
- * `#92400E` — amber-800. Documented per-component exception (no token
- * for this dark amber today; matches the iOS UndoCountdown.swift tone).
+ * Amber-800 tone (0xFF92400E). Documented per-component exception (no
+ * token for this dark amber today; matches the iOS UndoCountdown.swift).
  */
 private val UndoForeground = Color(0xFF92400E)

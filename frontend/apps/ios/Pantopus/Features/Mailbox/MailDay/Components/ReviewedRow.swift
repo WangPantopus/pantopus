@@ -16,9 +16,17 @@ struct ReviewedRow: View {
     let isLast: Bool
     let onUndo: () -> Void
 
-    private var isJunked: Bool { item.action == .junked }
-    private var isReturned: Bool { item.action == .returned }
-    private var dimThumb: Bool { isJunked || isReturned }
+    private var isJunked: Bool {
+        item.action == .junked
+    }
+
+    private var isReturned: Bool {
+        item.action == .returned
+    }
+
+    private var dimThumb: Bool {
+        isJunked || isReturned
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -45,7 +53,6 @@ struct ReviewedRow: View {
         .accessibilityIdentifier("mailDayReviewed.\(item.id)")
     }
 
-    @ViewBuilder
     private var labelLine: some View {
         Text(item.label)
             .font(.system(size: 12.5, weight: .semibold))
@@ -54,7 +61,6 @@ struct ReviewedRow: View {
             .lineLimit(1)
     }
 
-    @ViewBuilder
     private var metaLine: some View {
         HStack(spacing: Spacing.s1) {
             Icon(actionIcon, size: 10, strokeWidth: 2.4, color: actionIconColor)
@@ -113,11 +119,11 @@ struct ReviewedRow: View {
     private var accessibilityLabel: String {
         switch item.action {
         case .routed:
-            return "\(item.label). Routed to \(item.routedTo ?? "—"), \(item.whenLabel)."
+            "\(item.label). Routed to \(item.routedTo ?? "—"), \(item.whenLabel)."
         case .junked:
-            return "\(item.label). Junked, \(item.whenLabel)."
+            "\(item.label). Junked, \(item.whenLabel)."
         case .returned:
-            return "\(item.label). Returned to sender, \(item.whenLabel)."
+            "\(item.label). Returned to sender, \(item.whenLabel)."
         }
     }
 }

@@ -1710,10 +1710,9 @@ public struct HubTabRoot: View {
         case .mailboxMap:
             MailboxMapView { pop() }
         case let .mailDay(variant):
-            MailDayView(
-                viewModel: MailDayViewModel(variant: variant),
-                onClose: { pop() }
-            )
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                pop()
+            }
         case .wallet:
             WalletView(
                 onBack: pop,

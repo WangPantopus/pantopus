@@ -16,7 +16,9 @@ struct DayHeader: View {
     let done: Int
     let total: Int
 
-    private var remaining: Int { total - done }
+    private var remaining: Int {
+        total - done
+    }
 
     var body: some View {
         HStack(spacing: Spacing.s3) {

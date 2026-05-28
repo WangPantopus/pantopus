@@ -39,7 +39,7 @@ struct UndoCountdown: View {
         .accessibilityIdentifier("mailDayUndoCountdown")
     }
 
-    /// `#92400E` — amber-800. The design uses this dark-amber for the
+    /// `0x92400E` — amber-800. The design uses this dark-amber for the
     /// timer's text + glyph so the warning chip reads as urgent. Not in
     /// the token set — documented as a per-feature exception (matches
     /// the access-codes lockbox tone).

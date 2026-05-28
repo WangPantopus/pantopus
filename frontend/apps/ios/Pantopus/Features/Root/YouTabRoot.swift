@@ -789,10 +789,9 @@ public struct YouTabRoot: View {
         case .mailboxMap:
             MailboxMapView { Task { @MainActor in pop() } }
         case let .mailDay(variant):
-            MailDayView(
-                viewModel: MailDayViewModel(variant: variant),
-                onClose: { Task { @MainActor in pop() } }
-            )
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                Task { @MainActor in pop() }
+            }
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(

@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.mergeDescendants
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -509,7 +508,7 @@ private val PostcardSkyMid = Color(0xFF0EA5E9)
 private val PostcardSkyDark = Color(0xFF0369A1)
 private val PostcardHorizon = Color(0xFF0C4A6E)
 private val PostcardSun = Color(0xFFFDE68A)
-private val BillBorder = Color(0xB3D1D5DB) // alpha-blended #D1D5DB @ 0.7
+private val BillBorder = Color(0xB3D1D5DB) // alpha-blended 0xD1D5DB @ 0.7
 private val BillLogo = Color(0xD90284C7) // primary600 @ 0.85
 private val BillWindow = Color(0xFFE0E7FF)
 private val BillWindowBorder = Color(0x666366F1) // 0x6366F1 @ 0.4
