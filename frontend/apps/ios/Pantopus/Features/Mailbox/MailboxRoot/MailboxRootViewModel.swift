@@ -167,6 +167,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     private let onOpenMail: (String) -> Void
     private let onOpenSearch: @MainActor () -> Void
     private let onOpenMap: @MainActor () -> Void
+    let onOpenMailDay: @MainActor () -> Void
     private let onBrowseGigs: @MainActor () -> Void
     /// A14.8 — settings-menu entry for the Vacation hold screen. The
     /// Mailbox root top bar surfaces a `…` overflow that opens a menu
@@ -183,6 +184,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenMail: @escaping (String) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
         onOpenMap: @escaping @MainActor () -> Void = {},
+        onOpenMailDay: @escaping @MainActor () -> Void = {},
         onBrowseGigs: @escaping @MainActor () -> Void = {},
         onOpenVacationHold: @escaping @MainActor () -> Void = {},
         dataProvider: @escaping (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
@@ -194,6 +196,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         self.onOpenMail = onOpenMail
         self.onOpenSearch = onOpenSearch
         self.onOpenMap = onOpenMap
+        self.onOpenMailDay = onOpenMailDay
         self.onBrowseGigs = onBrowseGigs
         onOpenVacationHoldHandler = onOpenVacationHold
         self.dataProvider = dataProvider

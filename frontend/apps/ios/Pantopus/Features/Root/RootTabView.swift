@@ -110,8 +110,10 @@ public struct RootTabView: View {
         case .feed, .post, .supportTrain, .supportTrainManage, .user,
              .connections, .discoverHub,
              .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests,
+             .homeOwnersTransfer,
              .verifyLandlord, .postcardVerification,
-             .notifications, .createBusiness, .vacationHold, .wallet:
+             .notifications, .createBusiness, .businessProfile, .editBusinessPage,
+             .vacationHold, .wallet, .mailDay:
             model.selected = .hub
         case .conversation:
             model.selected = .inbox

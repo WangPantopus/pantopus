@@ -291,8 +291,8 @@ private struct FlowingChips: View {
     let items: [String]
 
     var body: some View {
-        // Naive horizontal flow — wraps on overflow via FlowLayout.
-        FlowLayout(spacing: Spacing.s2) {
+        // Naive horizontal flow wraps on overflow via StatsTabsFlowLayout.
+        StatsTabsFlowLayout(spacing: Spacing.s2) {
             ForEach(items, id: \.self) { item in
                 Text(item)
                     .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
@@ -308,7 +308,7 @@ private struct FlowingChips: View {
 
 /// Minimal flow layout — wraps children to the next row when they
 /// overflow. Used for the skills chip row.
-private struct FlowLayout: Layout {
+private struct StatsTabsFlowLayout: Layout {
     let spacing: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {

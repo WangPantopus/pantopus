@@ -42,6 +42,7 @@ fun MailboxRootScreen(
     onOpenMail: (String) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenMap: () -> Unit = {},
+    onOpenMailDay: () -> Unit = {},
     onBrowseGigs: () -> Unit = {},
     onOpenVacationHold: () -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -98,6 +99,7 @@ fun MailboxRootScreen(
                 tabBadge = viewModel::tabBadge,
                 onSelectDrawer = viewModel::selectDrawer,
                 onSelectTab = viewModel::selectTab,
+                onOpenMailDay = onOpenMailDay,
             )
         },
         extraTopBarAction = {

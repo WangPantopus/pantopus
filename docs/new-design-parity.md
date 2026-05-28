@@ -302,9 +302,9 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
   - **`StickySave`** — two modes: **dirty** ("3 unsaved · Discard outline + Save primary") · **setup** ("Save draft outline + Publish · 4 to go primary"). The "X to go" hint inside the publish button is the design's signature — verify it renders.
 
 ### A13.13 — Manage train (`/support-trains/[id]/manage.tsx`)
-- **iOS:** **MISSING** — `SupportTrains/` has `EditSignupFormView.swift` (one signup) but no manage screen.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD**
+- **iOS:** `Features/SupportTrains/Manage/ManageTrainView.swift` + `ManageTrainViewModel.swift` + `Components/{TrainContextStrip, StatCellRow, SendUpdateForm, OrganizeSection, CloseTrainSheet}.swift` (P4.3).
+- **Android:** `ui/screens/support_trains/manage/ManageTrainScreen.kt` + `ManageTrainViewModel.kt` + `components/{TrainContextStrip, StatCellRow, SendUpdateForm, OrganizeSection, CloseTrainSheet}.kt` (P4.3).
+- **Status:** **BUILT** (P4.3) — snapshot baselines pending follow-up commit; wired from `pantopus://support-trains/:id/manage` + new `.manageTrain(trainId:)` route; A10.9 detail dock-overflow's `onOpenManage` callback now pushes the Manage Train route (replacing the pre-P4.3 review-signups stub).
 - **Designed frames:** active train mid-edit (Murphy meal train · day 12/21 · 18 slots filled · draft note typed · audience: all helpers · push on · `Send update` CTA enabled) · closing sheet (close confirmation bottom sheet · summary stats · optional thank-you note · destructive "Close & thank" red CTA)
 - **Required slots:**
   - **`TrainContextStrip`** — title (`Murphy meal train`) + days-progress (12/21) + audience meta.
@@ -350,9 +350,9 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
   - **`StickyConfirm`** — `Confirm recipient` primary (active in strong match, disabled with hint in unclear).
 
 ### A13.16 — My Mail Day (`/mailbox/mailday.tsx`)
-- **iOS:** **MISSING** — no `Mailbox/MailDay/` folder.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD**
+- **iOS:** `Features/Mailbox/MailDay/MailDayView.swift` (+ `MailDayViewModel.swift`, `MailDayContent.swift`, `MailDaySampleData.swift`, `Components/{DayHeader, ScanMoreCard, UnreviewedItem, ReviewedRow, UndoCountdown, MailboxEmptyHero}.swift`). Pushed via `YouRoute.mailDay(variant:)` / `HubRoute.mailDay(variant:)`. Deep link: `pantopus://mailbox/mailday`.
+- **Android:** `ui/screens/mailbox/mail_day/MailDayScreen.kt` (+ `MailDayViewModel.kt`, `MailDayContent.kt`, `MailDaySampleData.kt`, `components/{DayHeader, ScanMoreCard, UnreviewedItem, ReviewedRow, UndoCountdown, MailboxEmptyHero}.kt`). Pushed via `ChildRoutes.MAIL_DAY` (`mailbox/mailday/{variant}`).
+- **Status:** **BUILT** (P4.4)
 - **Designed frames:** mid-afternoon (8-piece stack · 6 routed · 2 pending · AI-suggested recipients with confidence % · Reviewed list compact · 5-second undo on latest) · empty (mailbox illustration with "0" face · 12-day streak chip · `Scan today's stack` primary · yesterday recap + setup nudges)
 - **Required slots:**
   - **`DayHeader`** — date + streak chip + `ProgressRing` (56pt SwiftUI shape — done/total).

@@ -20,6 +20,10 @@ public enum YouRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map (physical postal venues), reached from the root.
     case mailboxMap
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     case mailItemDetail(mailId: String)
     /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
     case mailboxSearch
@@ -78,6 +82,10 @@ public enum YouRoute: Hashable {
     /// action with the seed DTO baked in so the form can prefill
     /// without a re-fetch.
     case editSignup(reservation: SupportTrainReservationDTO)
+    /// A13.13 / P4.3 — Manage train (organizer surface). Pushed from
+    /// the A10.9 detail dock overflow when the viewer is the organizer
+    /// and from the `pantopus://support-trains/:id/manage` deep link.
+    case manageTrain(trainId: String)
     /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
     /// Activity-section row pushes here; tapping a row drills into the
     /// home dashboard via `homeDashboard(homeId:)`.
@@ -90,6 +98,10 @@ public enum YouRoute: Hashable {
     case myBusinesses
     /// Public business profile reached from My businesses.
     case businessProfile(businessId: String)
+    /// P4.2 — A13.10 Edit Business Page (owner-only). Pushed from the
+    /// `BusinessProfileView` overflow when the viewer owns the business
+    /// and from the `pantopus://businesses/:id/page-editor` deep link.
+    case editBusinessPage(businessId: String)
     /// P6.6 — "Register a business · coming soon" waitlist surface. The
     /// full registration wizard is a future Phase 9 item.
     case businessWaitlist
@@ -781,12 +793,17 @@ public struct YouTabRoot: View {
                     },
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
+                    onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
                     onBrowseGigs: { path.append(.gigsFeed) },
                     onOpenVacationHold: { path.append(.vacationHold) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { Task { @MainActor in pop() } }
+        case let .mailDay(variant):
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                Task { @MainActor in pop() }
+            }
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(
@@ -1255,6 +1272,20 @@ public struct YouTabRoot: View {
             EditSignupFormView(reservation: reservation) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .manageTrain(trainId):
+            ManageTrainView(
+                viewModel: ManageTrainViewModel(trainId: trainId),
+                onClose: { Task { @MainActor in pop() } },
+                onOpenAnalytics: { id in
+                    Task { @MainActor in path.append(.placeholder(label: "Train analytics · \(id)")) }
+                },
+                onEditDates: { id in
+                    Task { @MainActor in path.append(.placeholder(label: "Edit dates · \(id)")) }
+                },
+                onInviteHelpers: { id in
+                    Task { @MainActor in path.append(.placeholder(label: "Invite helpers · \(id)")) }
+                }
+            )
         case .identityCenter:
             IdentityCenterView(
                 onBack: { Task { @MainActor in pop() } },
@@ -1903,7 +1934,21 @@ public struct YouTabRoot: View {
                 onOpenReport: {
                     Task { @MainActor in path.append(.placeholder(label: "Report business")) }
                 },
-                onOpenWebsite: { url in openURL(url) }
+                onOpenWebsite: { url in openURL(url) },
+                onEdit: {
+                    Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) }
+                }
+            )
+        case let .editBusinessPage(businessId):
+            EditBusinessPageView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onPreview: {
+                    // Bounce the owner to the live profile they're editing.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(
