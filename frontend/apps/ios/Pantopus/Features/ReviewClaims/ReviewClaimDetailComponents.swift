@@ -681,7 +681,7 @@ struct ChallengeComposerSheet: View {
         .padding(.bottom, Spacing.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.Color.appSurface)
-        .presentationDetents([.fraction(0.78), .large])
+        .presentationDetents([.fraction(0.78)])
         .presentationDragIndicator(.hidden)
         .accessibilityIdentifier("reviewClaimDetail_challengeComposer")
     }
@@ -761,8 +761,8 @@ struct ChallengeComposerSheet: View {
 
     private var visibilityCard: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            visibilityRow(icon: .eye, text: "Sent to \(claimantFirstName) + \(coOwnerCount) co-owners")
-            visibilityRow(icon: .clock, text: "14-day window to respond")
+            visibilityRow(icon: .eye, text: "Sent to claimant + \(coOwnerCount) co-owners")
+            visibilityRow(icon: .clock, text: "14-day window")
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, 10)

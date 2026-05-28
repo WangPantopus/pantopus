@@ -53,8 +53,8 @@ sealed interface ReviewClaimDetailUiState {
 /**
  * P1.1 — Admin claim-detail view-model. Reads `claimId` from
  * [SavedStateHandle], loads the full claim payload (claimant + home +
- * evidence) and exposes [review] for the Approve / Reject /
- * Request-more-info actions.
+ * evidence) and exposes [review] for the Accept / Challenge / Reject
+ * actions. `Challenge` keeps the legacy backend wire value.
  */
 @HiltViewModel
 class ReviewClaimDetailViewModel

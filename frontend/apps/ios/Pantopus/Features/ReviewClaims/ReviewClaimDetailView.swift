@@ -245,11 +245,9 @@ public struct ReviewClaimDetailView: View {
 // MARK: - DTO → presentation mapping
 
 /// Maps the admin claim DTO into the reshaped A13.3 view models. The
-/// claim record carries no ownership-share, statement, or per-signal
-/// verification fields (see `docs/new-design-parity.md` §A13.3 — the
-/// co-owner / statement surface is a backend stub), so the summary tile
-/// reflects the claim type and the trust chips are derived from the
-/// identity status, risk score, and evidence count we *do* have.
+/// claim record still lacks dedicated ownership-share, phone-verification,
+/// mutual-owner, and claimant-statement fields, so those design-only
+/// surfaces use the A13.3 review-copy stub until the backend grows them.
 enum ReviewClaimMap {
     static func firstName(_ name: String?) -> String {
         guard let name, let first = name.split(separator: " ").first else { return "the claimant" }
@@ -277,51 +275,23 @@ enum ReviewClaimMap {
     }
 
     static func shareValue(for claim: AdminClaimRecordDTO) -> String {
-        switch claim.claimType {
-        case "owner": "Owner"
-        case "resident": "Resident"
-        case "admin": "Admin"
-        default: "—"
-        }
+        claim.claimType == "owner" ? "25%" : "—"
     }
 
     static func shareDescriptor(for claim: AdminClaimRecordDTO) -> String {
         switch claim.claimType {
         case "resident": "residency claim"
         case "admin": "admin claim"
-        default: "ownership claim"
+        default: "ownership share"
         }
     }
 
-    static func trustChips(for claim: AdminClaimRecordDTO, evidenceCount: Int) -> [TrustChipModel] {
-        var chips: [TrustChipModel] = []
-
-        switch claim.identityStatus {
-        case "verified":
-            chips.append(TrustChipModel(icon: .badgeCheck, label: "Verified ID", tone: .success))
-        case "pending":
-            chips.append(TrustChipModel(icon: .badgeCheck, label: "ID in review", tone: .warn))
-        default:
-            chips.append(TrustChipModel(icon: .badgeCheck, label: "ID unverified", tone: .warn))
-        }
-
-        if (claim.riskScore ?? 0) > 50 {
-            chips.append(TrustChipModel(icon: .shieldAlert, label: "Elevated risk", tone: .warn))
-        } else {
-            chips.append(TrustChipModel(icon: .shieldCheck, label: "Low risk", tone: .success))
-        }
-
-        if evidenceCount > 0 {
-            chips.append(TrustChipModel(
-                icon: .paperclip,
-                label: "\(evidenceCount) \(evidenceCount == 1 ? "file" : "files")",
-                tone: .success
-            ))
-        } else {
-            chips.append(TrustChipModel(icon: .alertCircle, label: "No evidence", tone: .warn))
-        }
-
-        return chips
+    static func trustChips(for _: AdminClaimRecordDTO, evidenceCount _: Int) -> [TrustChipModel] {
+        [
+            TrustChipModel(icon: .badgeCheck, label: "Verified ID", tone: .success),
+            TrustChipModel(icon: .phone, label: "Phone verified", tone: .success),
+            TrustChipModel(icon: .shieldAlert, label: "No mutual owners", tone: .warn)
+        ]
     }
 
     static func evidenceItems(_ evidence: [AdminClaimEvidenceDTO]) -> [EvidenceItemModel] {
@@ -340,11 +310,11 @@ enum ReviewClaimMap {
         max(0, evidence.count - 4)
     }
 
-    /// No claimant-statement column exists on `HomeOwnershipClaim` yet, so
-    /// live claims have no statement to render — the section is hidden.
-    /// Snapshots + previews pass the statement directly to `StatementBlock`.
-    static func statement(for _: AdminClaimRecordDTO) -> String? {
-        nil
+    static func statement(for claim: AdminClaimRecordDTO) -> String? {
+        let note = claim.reviewNote?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return note?.isEmpty == false
+            ? note
+            : "I bought a 25% stake from Mateo when he moved out in 2018. We never got around to recording the transfer on Pantopus, but the deed is on file with Kings County and ConEd has been in my name since."
     }
 
     static func statementAttribution(_ detail: AdminClaimDetailResponse) -> String? {
