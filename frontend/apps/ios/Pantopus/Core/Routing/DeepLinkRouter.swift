@@ -23,13 +23,11 @@ final class DeepLinkRouter {
         case home
         case notifications
         case supportTrain(id: String)
-        /// `pantopus://support-trains/:id/manage` — organizer-only
-        /// review queue for a Support Train. Distinct from
-        /// `supportTrain(id:)`, which now lands on the participant
-        /// detail (A10.9). Owners reach the queue via the dock
-        /// overflow on the detail screen; this deep link is the
-        /// "land directly on the queue" entry point for organizer
-        /// shortcuts and back-of-house notifications.
+        /// `pantopus://support-trains/:id/manage` — A13.13 organizer
+        /// surface. Reached from the A10.9 detail dock overflow when
+        /// the viewer is the organizer, and from back-of-house
+        /// shortcut links. Distinct from `supportTrain(id:)`, which
+        /// lands on the participant detail (A10.9).
         case supportTrainManage(id: String)
         case post(id: String)
         case gig(id: String)
@@ -37,6 +35,10 @@ final class DeepLinkRouter {
         case homeDetail(id: String)
         case homeDashboard(id: String)
         case homeMemberRequests(id: String)
+        /// `pantopus://homes/:id/owners/transfer` — A13.4 Transfer Ownership
+        /// form. Lands on the populated state; the form owns the Face ID
+        /// bottom sheet.
+        case homeOwnersTransfer(id: String)
         /// `pantopus://homes/:id/verify-landlord` — opens A12.5 / A12.6.
         case verifyLandlord(id: String)
         /// `pantopus://homes/:id/verify-postcard` — opens the A12.7
@@ -50,6 +52,12 @@ final class DeepLinkRouter {
         /// wizard inside the active tab's nav stack.
         case createBusiness
         case invite(token: String)
+        /// P4.2 — A13.10 Edit Business Page (owner-only).
+        /// `pantopus://businesses/:id/page-editor`.
+        case editBusinessPage(businessId: String)
+        /// Public business profile reached from a share / push.
+        /// `pantopus://businesses/:id`.
+        case businessProfile(businessId: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
         /// token; the caller invokes `AuthManager.resetPassword` on submit.
@@ -134,8 +142,8 @@ final class DeepLinkRouter {
             return .notifications
         case "support-trains", "support_train":
             guard let id = segments.dropFirst().first else { return .unknown(url) }
-            let trailing = segments.dropFirst(2).first ?? ""
-            if trailing == "manage" {
+            // `/support-trains/:id/manage` → A13.13 organizer surface.
+            if segments.dropFirst(2).first == "manage" {
                 return .supportTrainManage(id: id)
             }
             return .supportTrain(id: id)
@@ -152,13 +160,17 @@ final class DeepLinkRouter {
             return homeDestination(url: url, segments: segments, tabQuery: tabQuery)
         case "businesses", "business":
             // `pantopus://businesses/new` opens the Create Business wizard.
-            // Other `businesses/:id` paths are owned by the businessProfile
-            // route which lives behind a different host today; fall through
-            // to `.unknown` so they don't silently mis-route.
-            if segments.dropFirst().first == "new" {
+            // `pantopus://businesses/:id/page-editor` opens A13.10 (owner-only).
+            // `pantopus://businesses/:id` opens the public business profile.
+            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            if id == "new" {
                 return .createBusiness
             }
-            return .unknown(url)
+            let trailing = Array(segments.dropFirst(2))
+            if trailing.first == "page-editor" || trailing.first == "page_editor" {
+                return .editBusinessPage(businessId: id)
+            }
+            return .businessProfile(businessId: id)
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
@@ -218,6 +230,9 @@ final class DeepLinkRouter {
         }
         if trailing.first == "members" && tabQuery == "requests" {
             return .homeMemberRequests(id: id)
+        }
+        if trailing.first == "owners" && trailing.dropFirst().first == "transfer" {
+            return .homeOwnersTransfer(id: id)
         }
         if trailing.first == "verify-landlord" || trailing.first == "verify_landlord" {
             return .verifyLandlord(id: id)
