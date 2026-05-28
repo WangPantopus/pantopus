@@ -6,7 +6,7 @@
 //  detail screen. Pure value types so the view-model can be fed
 //  deterministic stub data (`SupportTrainDetailSampleData`) and every
 //  state snapshots reproducibly. Colour is expressed as a semantic
-//  `SupportTrainKind`; the view layer maps it onto `Theme.Color` so
+//  `SupportTrainDetailKind`; the view layer maps it onto `Theme.Color` so
 //  the model stays free of SwiftUI types.
 //
 //  Two designed variants share this model:
@@ -21,7 +21,7 @@ import Foundation
 /// tile + the `RecipientCard` avatar gradient. Mirrors the
 /// `SupportTrainType` enum that the list feeds project so a future
 /// backend round-trip lights up the same accent without re-mapping.
-public enum SupportTrainKind: String, Sendable, Hashable {
+public enum SupportTrainDetailKind: String, Sendable, Hashable {
     case meals
     case rides
     case childcare
@@ -112,7 +112,7 @@ public struct ContributorBubble: Equatable, Sendable, Identifiable {
 /// to render the icon tile, title + dates strip, status pill, the
 /// progress bar with sky gradient, and the contributor strip.
 public struct TypeDatesCardContent: Equatable, Sendable {
-    public let kind: SupportTrainKind
+    public let kind: SupportTrainDetailKind
     public let title: String
     public let dateRange: String
     public let daysLeft: Int
@@ -123,7 +123,9 @@ public struct TypeDatesCardContent: Equatable, Sendable {
     public let contributors: [ContributorBubble]
     public let extraCount: Int
 
-    public var isFullyCovered: Bool { slotsFilled >= slotsTotal && slotsTotal > 0 }
+    public var isFullyCovered: Bool {
+        slotsFilled >= slotsTotal && slotsTotal > 0
+    }
 
     /// 0…100, rounded. `0` when total is zero (defensive).
     public var percentCovered: Int {
@@ -132,7 +134,7 @@ public struct TypeDatesCardContent: Equatable, Sendable {
     }
 
     public init(
-        kind: SupportTrainKind,
+        kind: SupportTrainDetailKind,
         title: String,
         dateRange: String,
         daysLeft: Int,
@@ -276,7 +278,9 @@ public struct SupportTrainDetailContent: Equatable, Sendable {
         }
     }
 
-    public var isFullyCovered: Bool { typeDates.isFullyCovered }
+    public var isFullyCovered: Bool {
+        typeDates.isFullyCovered
+    }
 
     public init(
         trainId: String,

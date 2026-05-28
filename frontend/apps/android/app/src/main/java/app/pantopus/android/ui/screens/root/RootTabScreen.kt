@@ -227,6 +227,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
+import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailActions
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailScreen
 import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
@@ -698,8 +699,7 @@ private object ChildRoutes {
     const val SUPPORT_TRAIN_DETAIL_ID_KEY = "supportTrainDetailId"
     const val SUPPORT_TRAIN_DETAIL = "support-trains/{$SUPPORT_TRAIN_DETAIL_ID_KEY}"
 
-    fun supportTrainDetail(trainId: String): String =
-        "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}"
+    fun supportTrainDetail(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}"
 
     /** P3.7 Edit Signup form. `:reservationId` is the reservation UUID;
      *  the seed DTO is staged in
@@ -2915,35 +2915,38 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) { entry ->
                 val trainId = entry.arguments?.getString(ChildRoutes.SUPPORT_TRAIN_DETAIL_ID_KEY).orEmpty()
                 SupportTrainDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenManage = {
-                        navController.navigate(ChildRoutes.reviewSignups(trainId))
-                    },
-                    onShare = {
-                        appContext.shareText(
-                            "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
-                            "Share train",
-                        )
-                    },
-                    onSignUp = {
-                        // Slot-claim sheet lands with the
-                        // editor surface in a P3.7 follow-up — surface
-                        // the affordance via a placeholder for now so
-                        // the dock CTA remains testable.
-                        navController.navigate(ChildRoutes.placeholder("Claim a slot"))
-                    },
-                    onEditSlot = {
-                        navController.navigate(ChildRoutes.placeholder("Edit your slot"))
-                    },
-                    onSendCard = {
-                        navController.navigate(ChildRoutes.placeholder("Send a card"))
-                    },
-                    onJoinAsBackup = {
-                        navController.navigate(ChildRoutes.placeholder("Join as backup"))
-                    },
-                    onMessageHost = {
-                        navController.navigate(ChildRoutes.placeholder("Message host"))
-                    },
+                    actions =
+                        SupportTrainDetailActions(
+                            onBack = { navController.popBackStack() },
+                            onOpenManage = {
+                                navController.navigate(ChildRoutes.reviewSignups(trainId))
+                            },
+                            onShare = {
+                                appContext.shareText(
+                                    "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                    "Share train",
+                                )
+                            },
+                            onSignUp = {
+                                // Slot-claim sheet lands with the
+                                // editor surface in a P3.7 follow-up — surface
+                                // the affordance via a placeholder for now so
+                                // the dock CTA remains testable.
+                                navController.navigate(ChildRoutes.placeholder("Claim a slot"))
+                            },
+                            onEditSlot = {
+                                navController.navigate(ChildRoutes.placeholder("Edit your slot"))
+                            },
+                            onSendCard = {
+                                navController.navigate(ChildRoutes.placeholder("Send a card"))
+                            },
+                            onJoinAsBackup = {
+                                navController.navigate(ChildRoutes.placeholder("Join as backup"))
+                            },
+                            onMessageHost = {
+                                navController.navigate(ChildRoutes.placeholder("Message host"))
+                            },
+                        ),
                 )
             }
             composable(

@@ -62,7 +62,7 @@ final class SupportTrainDetailViewModelTests: XCTestCase {
     }
 
     func testCustomResolverReturningNilSurfacesError() async {
-        let vm = SupportTrainDetailViewModel(trainId: "missing", resolver: { _ in nil })
+        let vm = SupportTrainDetailViewModel(trainId: "missing") { _ in nil }
         await vm.load()
         guard case let .error(message) = vm.state else {
             return XCTFail("Expected error, got \(vm.state)")
@@ -81,10 +81,10 @@ final class SupportTrainDetailViewModelTests: XCTestCase {
 
     func testRefreshReloadsViaResolver() async {
         var hits = 0
-        let vm = SupportTrainDetailViewModel(trainId: "any", resolver: { _ in
+        let vm = SupportTrainDetailViewModel(trainId: "any") { _ in
             hits += 1
             return SupportTrainDetailSampleData.populated
-        })
+        }
         await vm.load()
         await vm.refresh()
         XCTAssertEqual(hits, 2)

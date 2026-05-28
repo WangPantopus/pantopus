@@ -138,32 +138,38 @@ public struct SlotRow: View {
     private var trailing: some View {
         switch (content.state, content.mine) {
         case (.open, _):
-            Button(action: { onSignUp?() }) {
-                Text("Sign up")
-                    .font(.system(size: 11.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, Spacing.s3)
-                    .frame(height: 30)
-                    .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-            }
+            Button(
+                action: { onSignUp?() },
+                label: {
+                    Text("Sign up")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .padding(.horizontal, Spacing.s3)
+                        .frame(height: 30)
+                        .background(Theme.Color.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+            )
             .buttonStyle(.plain)
             .accessibilityLabel("Sign up for \(content.dayLabel) \(content.dateLabel)")
             .accessibilityIdentifier("supportTrainSlotRowSignUp-\(content.id)")
         case (.covered, true):
-            Button(action: { onEdit?() }) {
-                Text("Edit")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.primary700)
-                    .padding(.horizontal, Spacing.s2)
-                    .frame(height: 30)
-                    .background(Theme.Color.appSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                            .stroke(Theme.Color.appBorder, lineWidth: 1)
-                    )
-            }
+            Button(
+                action: { onEdit?() },
+                label: {
+                    Text("Edit")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.primary700)
+                        .padding(.horizontal, Spacing.s2)
+                        .frame(height: 30)
+                        .background(Theme.Color.appSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                                .stroke(Theme.Color.appBorder, lineWidth: 1)
+                        )
+                }
+            )
             .buttonStyle(.plain)
             .accessibilityLabel("Edit your slot")
             .accessibilityIdentifier("supportTrainSlotRowEdit-\(content.id)")

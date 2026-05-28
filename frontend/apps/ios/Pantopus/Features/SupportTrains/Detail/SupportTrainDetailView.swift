@@ -74,7 +74,7 @@ public struct SupportTrainDetailView: View {
 
     private func loadedBody(_ content: SupportTrainDetailContent) -> some View {
         VStack(spacing: Spacing.s0) {
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(alignment: .leading, spacing: Spacing.s0) {
                     if let banner = content.celebrationBanner {
                         CelebrationBanner(content: banner)
@@ -97,8 +97,8 @@ public struct SupportTrainDetailView: View {
                             ForEach(section.rows) { row in
                                 SlotRow(
                                     content: row,
-                                    onSignUp: row.state == .open ? { onSignUp?() } : nil,
-                                    onEdit: row.mine ? { onEditSlot?(row) } : nil
+                                    onSignUp: signUpAction(for: row),
+                                    onEdit: editAction(for: row)
                                 )
                             }
                         }
@@ -116,6 +116,16 @@ public struct SupportTrainDetailView: View {
 
             dock(content.dock)
         }
+    }
+
+    private func signUpAction(for row: SlotRowContent) -> (@MainActor () -> Void)? {
+        guard row.state == .open else { return nil }
+        return { onSignUp?() }
+    }
+
+    private func editAction(for row: SlotRowContent) -> (@MainActor () -> Void)? {
+        guard row.mine else { return nil }
+        return { onEditSlot?(row) }
     }
 
     private func overline(_ label: String, action: String? = nil) -> some View {
@@ -149,7 +159,7 @@ public struct SupportTrainDetailView: View {
 
     private func calendarCard(days: [SlotCalendarDay]) -> some View {
         VStack {
-            SlotCalendar(days: days, onSelectDate: { _ in onSignUp?() })
+            SlotCalendar(days: days) { _ in onSignUp?() }
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .center)
@@ -162,14 +172,13 @@ public struct SupportTrainDetailView: View {
         .pantopusShadow(.sm)
     }
 
-    @ViewBuilder
     private func dock(_ dock: SupportTrainDock) -> some View {
         VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             Group {
                 switch dock {
                 case let .signUp(label):
-                    PrimarySignUpCTA(label: label, onTap: { onSignUp?() })
+                    PrimarySignUpCTA(label: label) { onSignUp?() }
                 case .sendCardAndBackup:
                     SplitCoveredDock(onSendCard: onSendCard, onJoinAsBackup: onJoinAsBackup)
                 }
@@ -283,7 +292,7 @@ private struct CelebrationBanner: View {
             ZStack {
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                     .fill(Theme.Color.success)
-                Icon(.partyPopper, size: 18, color: Theme.Color.appTextInverse, strokeWidth: 2.2)
+                Icon(.partyPopper, size: 18, strokeWidth: 2.2, color: Theme.Color.appTextInverse)
             }
             .frame(width: 36, height: 36)
             .accessibilityHidden(true)
@@ -410,39 +419,45 @@ private struct SplitCoveredDock: View {
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Button(action: { onSendCard?() }) {
-                HStack(spacing: Spacing.s1) {
-                    Icon(.mail, size: 14, color: Theme.Color.appText)
-                    Text("Send a card")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
+            Button(
+                action: { onSendCard?() },
+                label: {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(.mail, size: 14, color: Theme.Color.appText)
+                        Text("Send a card")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appText)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Theme.Color.appSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(Theme.Color.appSurface)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .stroke(Theme.Color.appBorder, lineWidth: 1)
-                )
-            }
+            )
             .buttonStyle(.plain)
             .accessibilityLabel("Send a card")
             .accessibilityIdentifier("supportTrainSendCardCTA")
 
-            Button(action: { onJoinAsBackup?() }) {
-                HStack(spacing: Spacing.s1) {
-                    Icon(.userPlus, size: 14, color: Theme.Color.appTextInverse)
-                    Text("Join as backup")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.Color.appTextInverse)
+            Button(
+                action: { onJoinAsBackup?() },
+                label: {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(.userPlus, size: 14, color: Theme.Color.appTextInverse)
+                        Text("Join as backup")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextInverse)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Theme.Color.primary600)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    .pantopusShadow(.primary)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(Theme.Color.primary600)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                .pantopusShadow(.primary)
-            }
+            )
             .buttonStyle(.plain)
             .accessibilityLabel("Join as backup")
             .accessibilityIdentifier("supportTrainJoinBackupCTA")
@@ -454,28 +469,24 @@ private struct SplitCoveredDock: View {
 
 #Preview("Populated") {
     SupportTrainDetailView(
-        viewModel: SupportTrainDetailViewModel(content: SupportTrainDetailSampleData.populated),
-        onBack: {}
+        viewModel: SupportTrainDetailViewModel(content: SupportTrainDetailSampleData.populated)
     )
 }
 
 #Preview("Fully covered") {
     SupportTrainDetailView(
-        viewModel: SupportTrainDetailViewModel(content: SupportTrainDetailSampleData.fullyCovered),
-        onBack: {}
+        viewModel: SupportTrainDetailViewModel(content: SupportTrainDetailSampleData.fullyCovered)
     )
 }
 
 #Preview("Loading") {
     SupportTrainDetailView(
-        viewModel: SupportTrainDetailViewModel(seedState: .loading),
-        onBack: {}
+        viewModel: SupportTrainDetailViewModel(seedState: .loading)
     )
 }
 
 #Preview("Error") {
     SupportTrainDetailView(
-        viewModel: SupportTrainDetailViewModel(seedState: .error(message: "Network unavailable.")),
-        onBack: {}
+        viewModel: SupportTrainDetailViewModel(seedState: .error(message: "Network unavailable."))
     )
 }

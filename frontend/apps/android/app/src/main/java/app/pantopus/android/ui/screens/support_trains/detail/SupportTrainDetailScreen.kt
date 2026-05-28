@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions")
+@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.support_trains.detail
 
@@ -64,14 +64,7 @@ import app.pantopus.android.ui.theme.pantopusShadow
  */
 @Composable
 fun SupportTrainDetailScreen(
-    onBack: () -> Unit,
-    onOpenManage: () -> Unit = {},
-    onShare: () -> Unit = {},
-    onSignUp: () -> Unit = {},
-    onEditSlot: (SlotRowContent) -> Unit = {},
-    onSendCard: () -> Unit = {},
-    onJoinAsBackup: () -> Unit = {},
-    onMessageHost: () -> Unit = {},
+    actions: SupportTrainDetailActions = SupportTrainDetailActions(),
     isOrganizer: Boolean = false,
     viewModel: SupportTrainDetailViewModel = hiltViewModel(),
 ) {
@@ -81,17 +74,21 @@ fun SupportTrainDetailScreen(
     SupportTrainDetailContentLayout(
         state = state,
         isOrganizer = isOrganizer,
-        onBack = onBack,
-        onOpenManage = onOpenManage,
-        onShare = onShare,
-        onSignUp = onSignUp,
-        onEditSlot = onEditSlot,
-        onSendCard = onSendCard,
-        onJoinAsBackup = onJoinAsBackup,
-        onMessageHost = onMessageHost,
+        actions = actions,
         onRetry = { viewModel.refresh() },
     )
 }
+
+data class SupportTrainDetailActions(
+    val onBack: () -> Unit = {},
+    val onOpenManage: () -> Unit = {},
+    val onShare: () -> Unit = {},
+    val onSignUp: () -> Unit = {},
+    val onEditSlot: (SlotRowContent) -> Unit = {},
+    val onSendCard: () -> Unit = {},
+    val onJoinAsBackup: () -> Unit = {},
+    val onMessageHost: () -> Unit = {},
+)
 
 /**
  * Stateless layout. Used by previews + Paparazzi snapshot baselines —
@@ -101,14 +98,7 @@ fun SupportTrainDetailScreen(
 internal fun SupportTrainDetailContentLayout(
     state: SupportTrainDetailUiState,
     isOrganizer: Boolean = false,
-    onBack: () -> Unit = {},
-    onOpenManage: () -> Unit = {},
-    onShare: () -> Unit = {},
-    onSignUp: () -> Unit = {},
-    onEditSlot: (SlotRowContent) -> Unit = {},
-    onSendCard: () -> Unit = {},
-    onJoinAsBackup: () -> Unit = {},
-    onMessageHost: () -> Unit = {},
+    actions: SupportTrainDetailActions = SupportTrainDetailActions(),
     onRetry: () -> Unit = {},
 ) {
     Column(
@@ -120,21 +110,21 @@ internal fun SupportTrainDetailContentLayout(
     ) {
         TopBar(
             isOrganizer = isOrganizer,
-            onBack = onBack,
-            onShare = onShare,
-            onOpenManage = onOpenManage,
-            onMessageHost = onMessageHost,
+            onBack = actions.onBack,
+            onShare = actions.onShare,
+            onOpenManage = actions.onOpenManage,
+            onMessageHost = actions.onMessageHost,
         )
         when (state) {
             SupportTrainDetailUiState.Loading -> LoadingShell()
             is SupportTrainDetailUiState.Loaded ->
                 LoadedBody(
                     content = state.content,
-                    onSignUp = onSignUp,
-                    onEditSlot = onEditSlot,
-                    onSendCard = onSendCard,
-                    onJoinAsBackup = onJoinAsBackup,
-                    onMessageHost = onMessageHost,
+                    onSignUp = actions.onSignUp,
+                    onEditSlot = actions.onEditSlot,
+                    onSendCard = actions.onSendCard,
+                    onJoinAsBackup = actions.onJoinAsBackup,
+                    onMessageHost = actions.onMessageHost,
                 )
             is SupportTrainDetailUiState.Error ->
                 EmptyState(
@@ -320,7 +310,12 @@ private fun LoadedBody(
                         SlotRow(
                             content = row,
                             onSignUp = if (row.state == SlotRowState.Open) onSignUp else null,
-                            onEdit = if (row.mine) { { onEditSlot(row) } } else null,
+                            onEdit =
+                                if (row.mine) {
+                                    { onEditSlot(row) }
+                                } else {
+                                    null
+                                },
                         )
                     }
                 }

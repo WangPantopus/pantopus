@@ -62,7 +62,7 @@ public struct TypeDatesCard: View {
         ZStack {
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                 .fill(Theme.Color.homeBg)
-            Icon(kindIcon, size: 19, color: Theme.Color.homeDark, strokeWidth: 2)
+            Icon(kindIcon, size: 19, strokeWidth: 2, color: Theme.Color.homeDark)
         }
         .frame(width: 38, height: 38)
         .accessibilityHidden(true)

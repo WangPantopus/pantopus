@@ -79,7 +79,7 @@ public struct RecipientCard: View {
             if content.verified {
                 ZStack {
                     Circle().fill(verifiedDiscColor)
-                    Icon(.check, size: 8, color: Theme.Color.appTextInverse, strokeWidth: 4)
+                    Icon(.check, size: 8, strokeWidth: 4, color: Theme.Color.appTextInverse)
                 }
                 .frame(width: 16, height: 16)
                 .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
@@ -91,7 +91,7 @@ public struct RecipientCard: View {
 
     private var identityChip: some View {
         HStack(spacing: Spacing.s1) {
-            Icon(identityChipIcon, size: 10, color: identityChipForeground, strokeWidth: 2.5)
+            Icon(identityChipIcon, size: 10, strokeWidth: 2.5, color: identityChipForeground)
             Text(identityChipLabel)
                 .font(.system(size: 9.5, weight: .bold))
                 .textCase(.uppercase)

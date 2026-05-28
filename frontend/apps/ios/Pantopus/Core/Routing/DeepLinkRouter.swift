@@ -114,15 +114,7 @@ final class DeepLinkRouter {
         // home-member-requests entry routes correctly.
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let tabQuery = comps?.queryItems?.first { $0.name == "tab" }?.value
-        // Auth deep links carry `token` / `token_hash` (Supabase's two
-        // recovery-link param names) and an optional `email`. Auth-callback
-        // emails sometimes encode params in the fragment instead of the
-        // query string, so parse both.
-        let tokenQuery = comps?.queryItems?.first { $0.name == "token" || $0.name == "token_hash" }?.value
-            ?? fragmentParam(url.fragment, name: "token")
-            ?? fragmentParam(url.fragment, name: "token_hash")
-        let emailQuery = comps?.queryItems?.first { $0.name == "email" }?.value
-            ?? fragmentParam(url.fragment, name: "email")
+        let auth = authParams(from: comps, fragment: url.fragment)
 
         switch firstSegment {
         case "feed":
@@ -178,25 +170,36 @@ final class DeepLinkRouter {
             let sub = segments.dropFirst().first ?? ""
             switch sub {
             case "reset-password", "reset_password":
-                guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
+                guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
                 return .resetPassword(token: token)
             case "verify-email", "verify_email":
-                guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
-                return .verifyEmail(token: token, email: emailQuery)
+                guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
+                return .verifyEmail(token: token, email: auth.email)
             default:
                 return .unknown(url)
             }
         case "reset-password", "reset_password":
             // Tolerate the bare `/reset-password?token=…` shape that the
             // backend's older recovery template emits (no `/auth/` prefix).
-            guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
+            guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
             return .resetPassword(token: token)
         case "verify-email", "verify_email":
-            guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
-            return .verifyEmail(token: token, email: emailQuery)
+            guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
+            return .verifyEmail(token: token, email: auth.email)
         default:
             return .unknown(url)
         }
+    }
+
+    /// Auth deep links may carry `token` / `token_hash` and optional `email`
+    /// in either the query string or fragment.
+    private func authParams(from comps: URLComponents?, fragment: String?) -> (token: String?, email: String?) {
+        let token = comps?.queryItems?.first { $0.name == "token" || $0.name == "token_hash" }?.value
+            ?? fragmentParam(fragment, name: "token")
+            ?? fragmentParam(fragment, name: "token_hash")
+        let email = comps?.queryItems?.first { $0.name == "email" }?.value
+            ?? fragmentParam(fragment, name: "email")
+        return (token, email)
     }
 
     /// Pulls a single key out of a `#` fragment of the form `key=v&k2=v2`.
