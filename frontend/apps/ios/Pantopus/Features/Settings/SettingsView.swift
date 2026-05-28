@@ -38,17 +38,20 @@ public struct SettingsView: View {
     private let onClose: @MainActor () -> Void
     private let onEditProfile: @MainActor () -> Void
     private let onOpenReviewClaims: @MainActor () -> Void
+    private let onOpenWallet: @MainActor () -> Void
     private let onSignedOut: @MainActor () -> Void
 
     public init(
         onClose: @escaping @MainActor () -> Void = {},
         onEditProfile: @escaping @MainActor () -> Void = {},
         onOpenReviewClaims: @escaping @MainActor () -> Void = {},
+        onOpenWallet: @escaping @MainActor () -> Void = {},
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
         self.onClose = onClose
         self.onEditProfile = onEditProfile
         self.onOpenReviewClaims = onOpenReviewClaims
+        self.onOpenWallet = onOpenWallet
         self.onSignedOut = onSignedOut
     }
 
@@ -157,8 +160,10 @@ public struct SettingsView: View {
         case .verification: .verification
         // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
         case .dataExport: .placeholder(label: "Data export")
-        // P5.2 / A14.6 — Settings → Payments. Stripe Connect onboarding
-        // deep-links out to the Stripe-hosted flow when wired.
+        // P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
+        // setup · payout routing). Distinct from A10.10 Wallet
+        // (earnings-in), which the host still surfaces via
+        // `onOpenWallet` for any tab-level entry that needs it.
         case .paymentsPayouts: .payments
         case .help: .help
         case .legal: .legal

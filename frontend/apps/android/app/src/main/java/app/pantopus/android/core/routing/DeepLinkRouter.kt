@@ -33,6 +33,10 @@ object DeepLinkRouter {
 
         data object DiscoverHub : Destination
 
+        /** `pantopus://wallet` — A10.10 earnings wallet (distinct from
+         *  Settings → Payments; this is the earnings-side surface). */
+        data object Wallet : Destination
+
         data class SupportTrain(val id: String) : Destination
 
         /**
@@ -190,6 +194,7 @@ object DeepLinkRouter {
             "notifications" -> Destination.Notifications
             "connections" -> Destination.Connections
             "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub
+            "wallet" -> Destination.Wallet
             "support-trains", "support_train" -> {
                 val id = segments.getOrNull(1)
                 when {

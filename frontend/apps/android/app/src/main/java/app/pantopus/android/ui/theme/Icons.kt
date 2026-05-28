@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -302,6 +303,10 @@ enum class PantopusIcon(
     TrendingDown("trending-down"),
     Ban("ban"),
     FileText("file-text"),
+
+    // A10.10 — Wallet "This month" trend indicator + Withdraw CTA glyph.
+    TrendingUp("trending-up"),
+    ArrowDownToLine("arrow-down-to-line"),
 
     // T5.3.2 — My tasks V2 poster-side chip + footer icons.
     Plus("plus"),
@@ -607,6 +612,8 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.TrendingDown -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingDown)
         PantopusIcon.Ban -> IconSource.Material(Icons.Filled.Block)
         PantopusIcon.FileText -> IconSource.Material(Icons.AutoMirrored.Filled.Article)
+        PantopusIcon.TrendingUp -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingUp)
+        PantopusIcon.ArrowDownToLine -> IconSource.Material(Icons.Filled.Download)
         PantopusIcon.Plus -> IconSource.Material(Icons.Filled.Add)
         PantopusIcon.Rocket -> IconSource.Material(Icons.Filled.RocketLaunch)
         PantopusIcon.ClipboardList -> IconSource.Material(Icons.AutoMirrored.Filled.Assignment)

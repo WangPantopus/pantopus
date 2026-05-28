@@ -59,6 +59,9 @@ final class DeepLinkRouter {
         /// (the link from the resend / signup flow carries `&email=` so
         /// the screen can render the recipient).
         case verifyEmail(token: String, email: String?)
+        /// `pantopus://wallet` — A10.10 earnings wallet (distinct from
+        /// Settings → Payments; this is the earnings-side surface).
+        case wallet
         /// `pantopus://settings/payments` — A14.6 Settings → Payments.
         /// Distinct from `pantopus://wallet` (earnings-in surface).
         /// Consumed by the active tab's deep-link router which pushes
@@ -167,6 +170,8 @@ final class DeepLinkRouter {
             return .connections
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
+        case "wallet":
+            return .wallet
         case "invite":
             if let token = segments.dropFirst().first, !token.isEmpty {
                 return .invite(token: token)
