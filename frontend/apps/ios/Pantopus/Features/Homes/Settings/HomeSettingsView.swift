@@ -78,7 +78,7 @@ struct HomeSettingsIdentityCard: View {
     }
 
     private var addressChip: some View {
-        let style: AddressChipStyle = switch identity.addressChipTone {
+        let style = switch identity.addressChipTone {
         case .success:
             AddressChipStyle(background: Theme.Color.successBg, foreground: Theme.Color.success, icon: .shieldCheck)
         case .warning:

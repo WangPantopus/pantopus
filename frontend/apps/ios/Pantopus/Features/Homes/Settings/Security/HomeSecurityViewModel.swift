@@ -24,8 +24,14 @@ import Observation
 @Observable
 @MainActor
 public final class HomeSecurityViewModel: GroupedListDataSource {
-    public var title: String { "Security" }
-    public var footerCaption: String? { "\(footerHomeName) · Last audit 2h ago" }
+    public var title: String {
+        "Security"
+    }
+
+    public var footerCaption: String? {
+        "\(footerHomeName) · Last audit 2h ago"
+    }
+
     public private(set) var state: GroupedListState = .loading
 
     public let homeId: String
@@ -46,8 +52,8 @@ public final class HomeSecurityViewModel: GroupedListDataSource {
         homeName: String = "14 Elm Park Lane"
     ) {
         self.homeId = homeId
-        self.footerHomeName = homeName
-        self.toggles = Self.seedToggles(for: variant)
+        footerHomeName = homeName
+        toggles = Self.seedToggles(for: variant)
     }
 
     // MARK: - GroupedListDataSource
@@ -186,7 +192,7 @@ public final class HomeSecurityViewModel: GroupedListDataSource {
         switch variant {
         case .balanced:
             // 5 of 9 on — matches the audit's "balanced setup" frame.
-            return [
+            [
                 Toggles.guestApproval: true,
                 Toggles.memberNameVisibility: true,
                 Toggles.addressPrecision: false,
@@ -199,7 +205,7 @@ public final class HomeSecurityViewModel: GroupedListDataSource {
             ]
         case .strict:
             // All 9 on — matches the audit's "strict lockdown" frame.
-            return Dictionary(uniqueKeysWithValues: [
+            Dictionary(uniqueKeysWithValues: [
                 Toggles.guestApproval,
                 Toggles.memberNameVisibility,
                 Toggles.addressPrecision,

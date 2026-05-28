@@ -34,8 +34,14 @@ public enum HomeSettingsRoute: Sendable, Hashable {
 @Observable
 @MainActor
 public final class HomeSettingsViewModel: GroupedListDataSource {
-    public var title: String { "Home settings" }
-    public var footerCaption: String? { HomeSettingsSampleData.footer(for: frame) }
+    public var title: String {
+        "Home settings"
+    }
+
+    public var footerCaption: String? {
+        HomeSettingsSampleData.footer(for: frame)
+    }
+
     public private(set) var state: GroupedListState = .loading
 
     public let homeId: String
@@ -181,7 +187,7 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
     }
 
     private func windDownGroup() -> GroupedListGroup {
-        let row: GroupedListRow = switch frame {
+        let row = switch frame {
         case .populated:
             GroupedListRow(id: "leaveHome", label: "Leave this home", control: .chevron, destructive: true)
         case .pending:
