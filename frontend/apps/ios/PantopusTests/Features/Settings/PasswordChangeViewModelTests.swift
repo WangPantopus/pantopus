@@ -2,10 +2,11 @@
 //  PasswordChangeViewModelTests.swift
 //  PantopusTests
 //
-//  Covers field validation (length, match, current-required gating),
-//  the auth-methods discovery call (hasPassword vs OAuth-only), the
-//  success path (toast + shouldDismiss), and the 401 error path
-//  (current-password field gets the inline error).
+//  A13.14 — covers field validation (length, match, current-required
+//  gating), the auth-methods discovery call (hasPassword vs OAuth-only),
+//  the live strength + breach detection added by the reshape, the success
+//  path (toast + shouldDismiss), and the error path (current-password field
+//  error + form-level banner).
 //
 
 import XCTest
@@ -67,7 +68,35 @@ final class PasswordChangeViewModelTests: XCTestCase {
         vm.update(.new, to: "new-password-456")
         vm.update(.confirm, to: "different")
         XCTAssertFalse(vm.isValid)
-        XCTAssertEqual(vm.fields[.confirm]?.error, "Doesn't match")
+        XCTAssertEqual(vm.fields[.confirm]?.error, "Doesn't match the new password above.")
+    }
+
+    func testStrengthReflectsNewPassword() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"has_password\":true}")
+        ]
+        let vm = PasswordChangeViewModel(api: makeAPI())
+        await vm.load()
+        vm.update(.new, to: "Bake-Sourdough-Friday-77")
+        XCTAssertEqual(vm.strength.rulesMet, 4)
+        XCTAssertTrue(vm.strength.isStrong)
+        XCTAssertFalse(vm.isNewPasswordBreached)
+        XCTAssertTrue(vm.isNewValid)
+    }
+
+    func testBreachedNewPasswordIsInvalidAndFlagged() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"has_password\":true}")
+        ]
+        let vm = PasswordChangeViewModel(api: makeAPI())
+        await vm.load()
+        vm.update(.current, to: "old-password-123")
+        vm.update(.new, to: "password123")
+        vm.update(.confirm, to: "password123")
+        XCTAssertTrue(vm.isNewPasswordBreached)
+        XCTAssertTrue(vm.strength.breached)
+        XCTAssertFalse(vm.isValid)
+        XCTAssertEqual(vm.fields[.new]?.error, "Too common — appeared in 2.3M public records.")
     }
 
     func testSaveSuccessSetsToastAndShouldDismiss() async {
@@ -83,9 +112,10 @@ final class PasswordChangeViewModelTests: XCTestCase {
         await vm.save()
         XCTAssertEqual(vm.toast, "Password updated")
         XCTAssertTrue(vm.shouldDismiss)
+        XCTAssertNil(vm.formError)
     }
 
-    func testSave401MarksCurrentPasswordFieldWithError() async {
+    func testSave401MarksCurrentPasswordFieldAndShowsBanner() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: "{\"has_password\":true}"),
             .status(401, body: "{\"error\":\"Current password is incorrect\"}")
@@ -96,7 +126,8 @@ final class PasswordChangeViewModelTests: XCTestCase {
         vm.update(.new, to: "new-password-456")
         vm.update(.confirm, to: "new-password-456")
         await vm.save()
-        XCTAssertEqual(vm.fields[.current]?.error, "Current password is incorrect")
+        XCTAssertEqual(vm.fields[.current]?.error, "That doesn't match the password on file.")
+        XCTAssertEqual(vm.formError?.title, "Couldn't update password")
         XCTAssertFalse(vm.shouldDismiss)
     }
 }
