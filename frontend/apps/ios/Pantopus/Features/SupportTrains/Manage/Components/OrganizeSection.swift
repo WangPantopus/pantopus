@@ -213,8 +213,8 @@ public struct WindDownSection: View {
             )
         ]
     ) { _ in }
-    .padding()
-    .background(Theme.Color.appBg)
+        .padding()
+        .background(Theme.Color.appBg)
 }
 
 #Preview("WindDown") {
@@ -229,6 +229,6 @@ public struct WindDownSection: View {
             isDestructive: true
         )
     ) {}
-    .padding()
-    .background(Theme.Color.appBg)
+        .padding()
+        .background(Theme.Color.appBg)
 }

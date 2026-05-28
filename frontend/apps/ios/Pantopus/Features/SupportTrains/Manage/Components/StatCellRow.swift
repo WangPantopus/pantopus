@@ -36,7 +36,9 @@ public struct StatCellContent: Sendable, Hashable, Identifiable {
 public struct StatCellRow: View {
     private let cells: [StatCellContent]
 
-    public init(cells: [StatCellContent]) { self.cells = cells }
+    public init(cells: [StatCellContent]) {
+        self.cells = cells
+    }
 
     public var body: some View {
         HStack(spacing: Spacing.s0) {

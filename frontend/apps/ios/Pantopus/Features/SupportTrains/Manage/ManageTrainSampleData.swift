@@ -38,8 +38,8 @@ public enum ManageTrainSampleData {
         slotsTotal: 21,
         slotFillCaption: "18 / 21 · 86%",
         draftMessage:
-            "Quick note from Daniel — Theo had a rough night so we'll push Tuesday's drop to 6:30pm. "
-                + "Anything cold-friendly is perfect. Thank you all, truly.",
+        "Quick note from Daniel — Theo had a rough night so we'll push Tuesday's drop to 6:30pm. "
+            + "Anything cold-friendly is perfect. Thank you all, truly.",
         audienceChips: [
             AudienceChipContent(id: "all", label: "All helpers", count: "12"),
             AudienceChipContent(id: "upcoming", label: "Upcoming only", count: "6"),
@@ -91,8 +91,8 @@ public enum ManageTrainSampleData {
             neighborsHelped: "12",
             coverageDays: "12d",
             recipientQuote:
-                "\"Theo's eating, sleeping, and chubbing up. We can take it from here. "
-                    + "From the bottom of our spoon drawer — thank you.\" — Daniel"
+            "\"Theo's eating, sleeping, and chubbing up. We can take it from here. "
+                + "From the bottom of our spoon drawer — thank you.\" — Daniel"
         )
     )
 }

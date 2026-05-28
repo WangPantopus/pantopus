@@ -118,7 +118,7 @@ public struct ManageTrainContent: Sendable, Hashable {
     public let organizeRows: [OrganizeRowContent]
     public let closeRow: OrganizeRowContent
 
-    // Close-train sheet
+    /// Close-train sheet
     public let close: CloseTrainSheetContent
 
     public init(
@@ -222,11 +222,16 @@ public final class ManageTrainViewModel {
         sheetMode = .hidden
     }
 
-    public func refresh() async { await load() }
+    public func refresh() async {
+        await load()
+    }
 
     // MARK: - Send-update form
 
-    public var characterCount: Int { draftMessage.count }
+    public var characterCount: Int {
+        draftMessage.count
+    }
+
     public var characterCounterLabel: String {
         "\(characterCount) / \(manageTrainMessageMaxChars)"
     }
@@ -254,7 +259,9 @@ public final class ManageTrainViewModel {
         selectedAudienceId = id
     }
 
-    public func togglePush(_ value: Bool) { pushToPhones = value }
+    public func togglePush(_ value: Bool) {
+        pushToPhones = value
+    }
 
     /// Send the typed update. Clears the draft + flashes a toast so the
     /// helper count surfaces. Real `POST /api/support-trains/:id/updates`
@@ -267,14 +274,23 @@ public final class ManageTrainViewModel {
         toast = "Update sent · \(helperCount) helpers"
     }
 
-    public func acknowledgeToast() { toast = nil }
+    public func acknowledgeToast() {
+        toast = nil
+    }
 
     // MARK: - Close-train sheet
 
-    public func showCloseSheet() { sheetMode = .closing }
-    public func hideCloseSheet() { sheetMode = .hidden }
+    public func showCloseSheet() {
+        sheetMode = .closing
+    }
 
-    public func updateThankYouNote(_ value: String) { thankYouNote = value }
+    public func hideCloseSheet() {
+        sheetMode = .hidden
+    }
+
+    public func updateThankYouNote(_ value: String) {
+        thankYouNote = value
+    }
 
     /// Flip the train to `.closed`. The sheet dismisses and the train's
     /// chip flips from "Active" green to "Closed" neutral.
