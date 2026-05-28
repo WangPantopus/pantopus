@@ -159,6 +159,10 @@ import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KE
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
 import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
+import app.pantopus.android.ui.screens.homes.verify_landlord.VERIFY_LANDLORD_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.verify_landlord.VerifyLandlordWizardScreen
+import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.POSTCARD_VERIFICATION_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.PostcardVerificationScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -247,6 +251,16 @@ private object ChildRoutes {
     /** A12.10 — Create Business wizard route. */
     const val CREATE_BUSINESS = "businesses/new"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
+
+    /** A12.5 / A12.6 — Verify landlord wizard. Pushed from the home
+     *  dashboard's ownership-claim CTA when the home record marks
+     *  the resident as a renter, or directly via the
+     *  `pantopus://homes/:id/verify-landlord` deep link. */
+    const val VERIFY_LANDLORD = "homes/{$VERIFY_LANDLORD_HOME_ID_KEY}/verify-landlord"
+
+    /** A12.7 — Postcard verification sibling status screen. */
+    const val POSTCARD_VERIFICATION =
+        "homes/{$POSTCARD_VERIFICATION_HOME_ID_KEY}/verify-postcard"
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
 
@@ -891,6 +905,12 @@ private object ChildRoutes {
     /** Build the claim-ownership wizard path. */
     fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
 
+    /** Build the verify-landlord wizard path. */
+    fun verifyLandlord(homeId: String): String = "homes/$homeId/verify-landlord"
+
+    /** Build the postcard verification standalone path. */
+    fun postcardVerification(homeId: String): String = "homes/$homeId/verify-postcard"
+
     /** Build the generic placeholder path with an encoded label. */
     fun placeholder(label: String): String = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
 
@@ -1180,6 +1200,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.placeholder("Member requests · ${pending.id}"))
                 DeepLinkRouter.consume()
             }
+            is DeepLinkRouter.Destination.VerifyLandlord -> {
+                navController.navigate(ChildRoutes.verifyLandlord(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.PostcardVerification -> {
+                navController.navigate(ChildRoutes.postcardVerification(pending.id))
+                DeepLinkRouter.consume()
+            }
             is DeepLinkRouter.Destination.User -> {
                 navController.navigate(ChildRoutes.publicProfile(pending.id))
                 DeepLinkRouter.consume()
@@ -1386,7 +1414,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                     },
                     onClaimOwnership = { homeId ->
-                        navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        // The ownership-claim flow branches on whether the
+                        // resident is the owner or a renter. Until the
+                        // backend wires that decision into the claim
+                        // start endpoint, we key off the sample-data
+                        // homeId pattern so QA can hit either path. Both
+                        // branches start identically from the dashboard
+                        // banner.
+                        val target =
+                            if (
+                                homeId.contains("renter", ignoreCase = true) ||
+                                homeId.contains("verify-landlord", ignoreCase = true)
+                            ) {
+                                ChildRoutes.verifyLandlord(homeId)
+                            } else {
+                                ChildRoutes.claimOwnership(homeId)
+                            }
+                        navController.navigate(target)
                     },
                     onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
                     onOpenBills = { homeId ->
@@ -3116,6 +3160,37 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenClaimsList = {
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.MY_CLAIMS)
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.VERIFY_LANDLORD,
+                arguments = listOf(navArgument(VERIFY_LANDLORD_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                VerifyLandlordWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenPostcardVerification = { resolvedHomeId ->
+                        // Replace the wizard with the postcard tracker so
+                        // Back returns to the home dashboard, not the
+                        // wizard.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.postcardVerification(resolvedHomeId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.POSTCARD_VERIFICATION,
+                arguments =
+                    listOf(
+                        navArgument(POSTCARD_VERIFICATION_HOME_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                PostcardVerificationScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onVerified = { _ ->
+                        // Pop the tracker — the underlying home dashboard
+                        // refreshes on next visit.
+                        navController.popBackStack()
                     },
                 )
             }
