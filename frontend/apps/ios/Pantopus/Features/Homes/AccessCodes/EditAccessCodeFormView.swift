@@ -80,7 +80,7 @@ public struct EditAccessCodeFormView: View {
 
     private var categorySection: some View {
         FormFieldGroup("Category") {
-            CategoryGrid(selected: viewModel.category) {
+            AccessCodeCategoryGrid(selected: viewModel.category) {
                 viewModel.selectCategory($0)
             }
         }
@@ -183,7 +183,7 @@ public struct EditAccessCodeFormView: View {
 /// category's tinted background + a 2pt primary600 border so the
 /// selection is unambiguous against the white card.
 @MainActor
-private struct CategoryGrid: View {
+private struct AccessCodeCategoryGrid: View {
     let selected: AccessCategory
     let onSelect: (AccessCategory) -> Void
 

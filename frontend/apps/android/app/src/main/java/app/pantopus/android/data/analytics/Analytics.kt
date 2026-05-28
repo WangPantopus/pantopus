@@ -235,6 +235,25 @@ sealed class AnalyticsEvent(
 
     /** P2.2 — Post-a-Task wizard submit tap (fires before the POST). */
     data object CtaComposeGigSubmit : AnalyticsEvent("cta.compose_gig.submit")
+
+    /** A12.10 Create Business wizard — step view. */
+    data class ScreenCreateBusinessStepViewed(
+        val stepNumber: Int,
+        val stepName: String,
+    ) : AnalyticsEvent("screen.create_business_wizard.step_viewed") {
+        override val properties =
+            mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
+    /**
+     * A12.10 Create Business wizard — "Add as custom category" tap on
+     * the search frame's dashed-violet fallback row.
+     */
+    data class CtaCreateBusinessCustomCategorySubmit(
+        val label: String,
+    ) : AnalyticsEvent("cta.create_business.custom_category_submit") {
+        override val properties = mapOf("label" to label)
+    }
 }
 
 /** Standard outcomes for form submissions and other yes/no telemetry. */

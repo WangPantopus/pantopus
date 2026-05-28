@@ -5,13 +5,13 @@
 //  A10.10 — pure value types backing the Wallet screen. Mirrors the
 //  shape of `wallet-frames.jsx` so the populated / hold variants
 //  snapshot reproducibly. UI types stay out of the model; the view
-//  maps `ActivityCategory` → `Theme.Color` and `PantopusIcon`.
+//  maps `WalletActivityCategory` → `Theme.Color` and `PantopusIcon`.
 //
 
 import Foundation
 
 /// Activity-row category — drives the per-row icon tile colour + glyph.
-public enum ActivityCategory: String, Equatable, Sendable, CaseIterable {
+public enum WalletActivityCategory: String, Equatable, Sendable, CaseIterable {
     case cleaning
     case childCare = "child-care"
     case handyman
@@ -50,7 +50,7 @@ public struct WalletActivityItem: Identifiable, Equatable, Sendable {
     public let description: String
     /// Counterparty ("Marcus P." / "Chase ••••7421" / "Pantopus").
     public let counterparty: String
-    public let category: ActivityCategory
+    public let category: WalletActivityCategory
     public let direction: ActivityDirection
     public let status: ActivityStatus
     /// Pre-formatted amount string without the leading sign or "$".
@@ -67,7 +67,7 @@ public struct WalletActivityItem: Identifiable, Equatable, Sendable {
         dateLabel: String,
         description: String,
         counterparty: String,
-        category: ActivityCategory,
+        category: WalletActivityCategory,
         direction: ActivityDirection,
         status: ActivityStatus,
         amount: String,

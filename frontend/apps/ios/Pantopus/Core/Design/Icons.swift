@@ -291,6 +291,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     /// Lucide `bot` token and can swap to a real vector later.
     case bot
 
+    // A12.10 Create Business — category tile glyphs. `cpu` backs the Tech &
+    // Repair tile; `truck` backs the Delivery & Errands tile.
+    case cpu
+    case truck
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -513,6 +518,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // A15.3 AI Assistant. SF Symbols has no robot glyph; `bot` falls
         // back to `sparkles`, the house AI/magic glyph.
         case .bot: "sparkles"
+        // A12.10 Create Business — SF Symbols ships direct `cpu` and
+        // `box.truck` glyphs.
+        case .cpu: "cpu"
+        case .truck: "box.truck"
         }
     }
 }

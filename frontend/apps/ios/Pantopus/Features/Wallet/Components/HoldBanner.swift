@@ -11,7 +11,7 @@ import SwiftUI
 
 struct HoldBanner: View {
     let headline: String
-    let body: String
+    let bodyText: String
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s3) {
@@ -28,7 +28,7 @@ struct HoldBanner: View {
                     .font(.system(size: 13.5, weight: .bold))
                     .tracking(-0.15)
                     .foregroundStyle(WalletPalette.amberDeep)
-                Text(body)
+                Text(bodyText)
                     .font(.system(size: 11.5))
                     .foregroundStyle(WalletPalette.amberDeep.opacity(0.92))
                     .fixedSize(horizontal: false, vertical: true)
@@ -45,7 +45,7 @@ struct HoldBanner: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg + 2, style: .continuous))
         .pantopusShadow(.sm)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(headline). \(body)")
+        .accessibilityLabel("\(headline). \(bodyText)")
         .accessibilityIdentifier("walletHoldBanner")
     }
 }
@@ -53,7 +53,7 @@ struct HoldBanner: View {
 #Preview("HoldBanner") {
     HoldBanner(
         headline: "Bank verification expired",
-        body: "Chase asks us to re-confirm your account every 12 months. A 2-minute "
+        bodyText: "Chase asks us to re-confirm your account every 12 months. A 2-minute "
             + "micro-deposit check unlocks payouts again. Earnings keep landing in "
             + "your wallet — they're safe."
     )

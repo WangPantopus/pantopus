@@ -11,7 +11,7 @@
 import SwiftUI
 
 /// Single recent-activity row.
-struct ActivityRow: View {
+struct WalletActivityRow: View {
     let item: WalletActivityItem
     let isLast: Bool
 
@@ -129,7 +129,7 @@ struct ActivityRow: View {
 /// from the canonical palette get a tone-tinted background derived
 /// from the category accent's `opacity(0.18)`.
 enum ActivityCategoryPalette {
-    static func background(for category: ActivityCategory) -> Color {
+    static func background(for category: WalletActivityCategory) -> Color {
         switch category {
         case .cleaning: return Theme.Color.homeBg
         case .childCare: return Theme.Color.warmAmberBg
@@ -140,7 +140,7 @@ enum ActivityCategoryPalette {
         }
     }
 
-    static func foreground(for category: ActivityCategory) -> Color {
+    static func foreground(for category: WalletActivityCategory) -> Color {
         switch category {
         case .cleaning: return Theme.Color.homeDark
         case .childCare: return Theme.Color.warmAmber
@@ -151,7 +151,7 @@ enum ActivityCategoryPalette {
         }
     }
 
-    static func icon(for category: ActivityCategory) -> PantopusIcon {
+    static func icon(for category: WalletActivityCategory) -> PantopusIcon {
         switch category {
         case .cleaning: return .sparkles
         case .childCare: return .baby
@@ -163,21 +163,21 @@ enum ActivityCategoryPalette {
     }
 }
 
-#Preview("ActivityRow variants") {
+#Preview("WalletActivityRow variants") {
     VStack(spacing: Spacing.s0) {
-        ActivityRow(
+        WalletActivityRow(
             item: WalletSampleData.populated.activity[0],
             isLast: false
         )
-        ActivityRow(
+        WalletActivityRow(
             item: WalletSampleData.populated.activity[1],
             isLast: false
         )
-        ActivityRow(
+        WalletActivityRow(
             item: WalletSampleData.populated.activity[3],
             isLast: false
         )
-        ActivityRow(
+        WalletActivityRow(
             item: WalletSampleData.populated.activity[6],
             isLast: true
         )

@@ -80,7 +80,7 @@ public struct WalletView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.s0) {
                 if let hold = content.holdState {
-                    HoldBanner(headline: hold.bannerHeadline, body: hold.bannerBody)
+                    HoldBanner(headline: hold.bannerHeadline, bodyText: hold.bannerBody)
                         .padding(.bottom, Spacing.s3)
                 }
                 heroSection(content)
@@ -299,7 +299,7 @@ private struct ActivityList: View {
                             }
                         }
                 }
-                ActivityRow(item: item, isLast: index == items.count - 1)
+                WalletActivityRow(item: item, isLast: index == items.count - 1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
