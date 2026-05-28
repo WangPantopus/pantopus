@@ -525,10 +525,10 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
 - **Required slots (iOS only):** Gig hero (job summary + estimated payout), KeyFacts (location · when · category), other bids strip, Accept/Decline split dock.
 
 ### A17.7 — Memory
-- **iOS:** **MISSING**
-- **Android:** has `mailbox/item_detail/bodies/MemoryBody.kt` + `MemorySampleData.kt`.
-- **Status:** **BUILD** (iOS) · **POLISH** (Android)
-- **Required slots (iOS only):** Memory hero (polaroid frame + caption), date-from line, "Add to keepsakes" CTA.
+- **iOS:** `Mailbox/MailDetail/Variants/MemoryDetailLayout.swift` (composes `MemoryBody` + `PolaroidFrame`).
+- **Android:** `mailbox/mail_detail/variants/MemoryDetailLayout.kt` (composes `MemoryBody` + `PolaroidFrame`) + `MemorySampleData.kt`.
+- **Status:** **POLISH**
+- **Per-frame deltas:** verify hero card (polaroid frame + caption + date-from line) and the Save-to-Vault / saved-pill action swap.
 
 ### A17.8 — Package
 - **iOS:** **MISSING**
