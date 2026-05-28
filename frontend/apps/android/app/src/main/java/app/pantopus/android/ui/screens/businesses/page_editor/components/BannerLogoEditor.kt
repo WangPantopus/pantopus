@@ -285,4 +285,3 @@ private fun LogoView(logo: EditBusinessPageLogoState) {
             }
     }
 }
-

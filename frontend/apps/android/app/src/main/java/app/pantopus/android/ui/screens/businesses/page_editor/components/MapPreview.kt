@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.businesses.page_editor.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -29,7 +30,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Canvas
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -109,12 +109,13 @@ private fun MapBackgroundCanvas() {
             drawCircle(parkGreen.copy(alpha = 0.65f), radius = w * 0.018f, center = Offset(w * x, h * 0.53f))
         }
         // Corner blocks
-        val blockSpecs = listOf(
-            Quadruple(0.04f, 0.04f, 0.18f, 0.20f),
-            Quadruple(0.78f, 0.04f, 0.18f, 0.18f),
-            Quadruple(0.04f, 0.82f, 0.18f, 0.15f),
-            Quadruple(0.78f, 0.82f, 0.18f, 0.16f),
-        )
+        val blockSpecs =
+            listOf(
+                Quadruple(0.04f, 0.04f, 0.18f, 0.20f),
+                Quadruple(0.78f, 0.04f, 0.18f, 0.18f),
+                Quadruple(0.04f, 0.82f, 0.18f, 0.15f),
+                Quadruple(0.78f, 0.82f, 0.18f, 0.16f),
+            )
         blockSpecs.forEach { b ->
             drawRect(
                 blockColor.copy(alpha = 0.5f),
@@ -169,7 +170,10 @@ private fun PinComposite(pinDirty: Boolean) {
 }
 
 @Composable
-private fun VerificationChip(verified: Boolean, modifier: Modifier = Modifier) {
+private fun VerificationChip(
+    verified: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val bg = if (verified) PantopusColors.successBg else PantopusColors.warningBg
     val fg = if (verified) PantopusColors.success else PantopusColors.warmAmber
     val border = if (verified) PantopusColors.successLight else PantopusColors.warningLight

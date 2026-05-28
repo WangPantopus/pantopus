@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "MatchingDeclarationName")
 
 package app.pantopus.android.ui.screens.businesses.page_editor.components
 
@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -75,14 +75,23 @@ fun EditBusinessStickySave(
         ) {
             when (mode) {
                 is EditBusinessStickySaveMode.Dirty -> DirtyRow(count = mode.count, onDiscard = onDiscard, onSave = onSave)
-                is EditBusinessStickySaveMode.Setup -> SetupRow(remaining = mode.remaining, onSaveDraft = onSaveDraft, onPublish = onPublish)
+                is EditBusinessStickySaveMode.Setup ->
+                    SetupRow(
+                        remaining = mode.remaining,
+                        onSaveDraft = onSaveDraft,
+                        onPublish = onPublish,
+                    )
             }
         }
     }
 }
 
 @Composable
-private fun DirtyRow(count: Int, onDiscard: () -> Unit, onSave: () -> Unit) {
+private fun RowScope.DirtyRow(
+    count: Int,
+    onDiscard: () -> Unit,
+    onSave: () -> Unit,
+) {
     DirtyBadge(count = count)
     Spacer(modifier = Modifier.weight(1f))
     Box(
@@ -128,7 +137,11 @@ private fun DirtyRow(count: Int, onDiscard: () -> Unit, onSave: () -> Unit) {
 }
 
 @Composable
-private fun SetupRow(remaining: Int, onSaveDraft: () -> Unit, onPublish: () -> Unit) {
+private fun RowScope.SetupRow(
+    remaining: Int,
+    onSaveDraft: () -> Unit,
+    onPublish: () -> Unit,
+) {
     Row(
         modifier =
             Modifier

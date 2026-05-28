@@ -304,7 +304,10 @@ private fun EditBusinessTopBar(
 // MARK: - Sections
 
 @Composable
-private fun SectionWrapper(overline: String, content: @Composable () -> Unit) {
+private fun SectionWrapper(
+    overline: String,
+    content: @Composable () -> Unit,
+) {
     Column(
         modifier = Modifier.padding(horizontal = Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -520,13 +523,14 @@ private fun BizField(
             is BizFieldState.Error -> PantopusColors.error
             BizFieldState.Default -> PantopusColors.appBorder
         }
-    val a11y = buildString {
-        append(label)
-        if (required) append(", required")
-        if (field.current.isNotEmpty()) append(", value: ${field.current}")
-        if (field.isDirty) append(", unsaved")
-        if (state is BizFieldState.Error) append(", error: ${state.message}")
-    }
+    val a11y =
+        buildString {
+            append(label)
+            if (required) append(", required")
+            if (field.current.isNotEmpty()) append(", value: ${field.current}")
+            if (field.isDirty) append(", unsaved")
+            if (state is BizFieldState.Error) append(", error: ${state.message}")
+        }
     Column(
         modifier =
             Modifier
@@ -582,7 +586,10 @@ private fun BizField(
 }
 
 @Composable
-private fun TrailingIcon(state: BizFieldState, trailing: BizFieldTrailing) {
+private fun TrailingIcon(
+    state: BizFieldState,
+    trailing: BizFieldTrailing,
+) {
     when {
         state is BizFieldState.Valid ->
             PantopusIconImage(
@@ -621,7 +628,10 @@ private fun TrailingIcon(state: BizFieldState, trailing: BizFieldTrailing) {
 }
 
 @Composable
-private fun BizTextarea(field: EditBusinessPageField, charLimit: Int) {
+private fun BizTextarea(
+    field: EditBusinessPageField,
+    charLimit: Int,
+) {
     Box(
         modifier =
             Modifier
@@ -782,7 +792,11 @@ private fun LoadingLayout(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ErrorLayout(onBack: () -> Unit, message: String, onRetry: () -> Unit) {
+private fun ErrorLayout(
+    onBack: () -> Unit,
+    message: String,
+    onRetry: () -> Unit,
+) {
     Column(modifier = Modifier.fillMaxSize().testTag("editBusinessPage.error")) {
         EditBusinessTopBar(rightEnabled = false, onBack = onBack, onRight = {})
         EmptyState(

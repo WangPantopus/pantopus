@@ -54,7 +54,10 @@ fun EditBusinessGalleryEditor(
 }
 
 @Composable
-private fun PopulatedGallery(state: EditBusinessPageGalleryState, modifier: Modifier) {
+private fun PopulatedGallery(
+    state: EditBusinessPageGalleryState,
+    modifier: Modifier,
+) {
     val tiles = state.tiles + listOf<EditBusinessPageGalleryTile?>(null) // sentinel for add-tile
     // 3-column grid via two-pass layout: pre-compute rows of 3.
     Column(

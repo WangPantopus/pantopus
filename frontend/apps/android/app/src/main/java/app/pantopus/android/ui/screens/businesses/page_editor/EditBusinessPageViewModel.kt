@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "TooManyFunctions")
+@file:Suppress("PackageNaming", "TooManyFunctions", "MagicNumber")
 
 package app.pantopus.android.ui.screens.businesses.page_editor
 
@@ -184,8 +184,6 @@ private fun EditBusinessPageServicesState.cleaned(): EditBusinessPageServicesSta
 
 private fun EditBusinessPageGalleryState.cleaned(): EditBusinessPageGalleryState = copy(freshAddTile = false)
 
-private fun EditBusinessPageLocation.cleaned(): EditBusinessPageLocation =
-    copy(address = address.cleaned(), error = null, pinDirty = false)
+private fun EditBusinessPageLocation.cleaned(): EditBusinessPageLocation = copy(address = address.cleaned(), error = null, pinDirty = false)
 
-private fun EditBusinessPageLocation.reverted(): EditBusinessPageLocation =
-    copy(address = address.reverted(), pinDirty = false)
+private fun EditBusinessPageLocation.reverted(): EditBusinessPageLocation = copy(address = address.reverted(), pinDirty = false)
