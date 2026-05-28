@@ -18,7 +18,7 @@ public struct EditBusinessServiceChipsEditor: View {
     }
 
     public var body: some View {
-        FlowLayout(spacing: 6) {
+        EditBusinessFlowLayout(spacing: 6) {
             ForEach(chips) { chip in
                 EditServiceChip(chip: chip)
             }

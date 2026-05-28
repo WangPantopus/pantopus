@@ -81,9 +81,8 @@ public struct EditBusinessPageView: View {
                     title: "Edit business page",
                     rightLabel: "Preview",
                     rightEnabled: false,
-                    onBack: onBack,
-                    onRight: {}
-                )
+                    onBack: onBack
+                ) {}
                 // Hand-rolled shimmer mirroring the loaded geometry — strip,
                 // banner, two section placeholders. Never a screen-level
                 // `ProgressView` per the iOS state-rule.
@@ -123,15 +122,14 @@ public struct EditBusinessPageView: View {
                     title: "Edit business page",
                     rightLabel: "Preview",
                     rightEnabled: false,
-                    onBack: onBack,
-                    onRight: {}
-                )
+                    onBack: onBack
+                ) {}
                 EmptyState(
                     icon: .alertCircle,
                     headline: "Couldn't load editor",
                     subcopy: message,
                     cta: EmptyState.CTA(title: "Try again") {
-                        await MainActor.run { Task { await viewModel.refresh() } }
+                        await viewModel.refresh()
                     }
                 )
                 .frame(maxHeight: .infinity)
@@ -276,7 +274,7 @@ public struct EditBusinessPageLoadedView: View {
         }
     }
 
-    @ViewBuilder private var descriptionSection: some View {
+    private var descriptionSection: some View {
         EditBusinessSection(overline: "Description") {
             switch content.description {
             case let .field(field, limit):
@@ -328,8 +326,8 @@ public struct EditBusinessPageLoadedView: View {
                 BizField(
                     label: "Phone",
                     field: content.phone,
-                    leading: "+1",
-                    state: .valid
+                    state: .valid,
+                    leading: "+1"
                 )
                 BizField(
                     label: "Email",
@@ -734,15 +732,13 @@ private struct HideAddressToggle: View {
 #Preview("Published") {
     EditBusinessPageView(
         businessId: "biz-roost",
-        preview: EditBusinessPageSampleData.publishedRoostCafe,
-        onBack: {}
-    )
+        preview: EditBusinessPageSampleData.publishedRoostCafe
+    ) {}
 }
 
 #Preview("Setup") {
     EditBusinessPageView(
         businessId: "biz-patch-paw",
-        preview: EditBusinessPageSampleData.setupPatchAndPaw,
-        onBack: {}
-    )
+        preview: EditBusinessPageSampleData.setupPatchAndPaw
+    ) {}
 }

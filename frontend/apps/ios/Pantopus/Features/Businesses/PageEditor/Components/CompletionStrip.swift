@@ -66,7 +66,7 @@ public struct EditBusinessCompletionStrip: View {
             .frame(height: 6)
 
             // Chip row.
-            FlowLayout(spacing: 4) {
+            EditBusinessFlowLayout(spacing: 4) {
                 ForEach(items) { item in
                     ChipPill(item: item)
                 }
@@ -122,11 +122,10 @@ private struct ChipPill: View {
 /// rows. Used by the completion strip chip cluster and the services
 /// chip cluster in the body. Avoids adding a new dependency for one
 /// screen of usage.
-@MainActor
-struct FlowLayout: Layout {
+struct EditBusinessFlowLayout: Layout {
     var spacing: CGFloat = 6
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var rowWidth: CGFloat = 0
         var rowHeight: CGFloat = 0
@@ -155,9 +154,9 @@ struct FlowLayout: Layout {
 
     func placeSubviews(
         in bounds: CGRect,
-        proposal: ProposedViewSize,
+        proposal _: ProposedViewSize,
         subviews: Subviews,
-        cache: inout Void
+        cache _: inout Void
     ) {
         var x: CGFloat = bounds.minX
         var y: CGFloat = bounds.minY
@@ -191,7 +190,7 @@ struct FlowLayout: Layout {
             .init(id: "banner", label: "Banner", done: false),
             .init(id: "desc", label: "Description", done: false),
             .init(id: "hours", label: "Hours", done: false),
-            .init(id: "services", label: "Services", done: false),
+            .init(id: "services", label: "Services", done: false)
         ]
     )
 }

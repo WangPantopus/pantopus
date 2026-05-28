@@ -40,9 +40,11 @@ public struct EditBusinessBannerLogoEditor: View {
     /// Approximate baseline — at typical iPhone width (~328pt after the
     /// section's 16pt insets), the 16:7 banner is ~144pt tall. The 76pt
     /// logo well straddles the bottom edge by ~38pt.
-    private var logoOffset: CGFloat { 106 }
+    private var logoOffset: CGFloat {
+        106
+    }
 
-    @ViewBuilder private var bannerBlock: some View {
+    private var bannerBlock: some View {
         Group {
             switch banner {
             case .empty:
@@ -76,9 +78,9 @@ public struct EditBusinessBannerLogoEditor: View {
         )
     }
 
-    @ViewBuilder private func filledBanner(
+    private func filledBanner(
         dirty: Bool,
-        palette: EditBusinessPageBannerState.BannerPalette
+        palette _: EditBusinessPageBannerState.BannerPalette
     ) -> some View {
         ZStack(alignment: .topTrailing) {
             // Background palette art — Roost-Café golden-hour
@@ -191,7 +193,7 @@ private struct LogoDisc: View {
         switch palette {
         case .sunrise:
             // Warm cream → amber → bronze, matches the cafe palette.
-            return [Theme.Color.warningLight, Theme.Color.warning, Theme.Color.warmAmber]
+            [Theme.Color.warningLight, Theme.Color.warning, Theme.Color.warmAmber]
         }
     }
 }

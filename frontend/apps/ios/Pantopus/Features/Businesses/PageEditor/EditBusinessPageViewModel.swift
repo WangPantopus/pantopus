@@ -28,9 +28,9 @@ public final class EditBusinessPageViewModel {
     public init(businessId: String, preview: EditBusinessPageContent? = nil) {
         self.businessId = businessId
         if let preview {
-            self.state = .loaded(preview)
+            state = .loaded(preview)
         } else {
-            self.state = .loading
+            state = .loading
         }
     }
 
@@ -164,6 +164,7 @@ private extension EditBusinessPageBannerState {
         case let .filled(_, palette): .filled(dirty: false, palette: palette)
         }
     }
+
     var reverted: EditBusinessPageBannerState {
         // Discard the swap — same shape minus the dirty flag.
         cleaned
@@ -177,6 +178,7 @@ private extension EditBusinessPageDescriptionState {
         case .prompt: self
         }
     }
+
     var reverted: EditBusinessPageDescriptionState {
         switch self {
         case let .field(field, limit): .field(field.reverted, charLimit: limit)
@@ -195,7 +197,10 @@ private extension EditBusinessPageHoursState {
         case .quickApply: self
         }
     }
-    var reverted: EditBusinessPageHoursState { cleaned }
+
+    var reverted: EditBusinessPageHoursState {
+        cleaned
+    }
 }
 
 private extension EditBusinessPageServicesState {
@@ -208,7 +213,10 @@ private extension EditBusinessPageServicesState {
         case .prompt: self
         }
     }
-    var reverted: EditBusinessPageServicesState { cleaned }
+
+    var reverted: EditBusinessPageServicesState {
+        cleaned
+    }
 }
 
 private extension EditBusinessPageGalleryState {
@@ -220,7 +228,10 @@ private extension EditBusinessPageGalleryState {
             hintLabel: hintLabel
         )
     }
-    var reverted: EditBusinessPageGalleryState { cleaned }
+
+    var reverted: EditBusinessPageGalleryState {
+        cleaned
+    }
 }
 
 private extension EditBusinessPageLocation {
@@ -233,6 +244,7 @@ private extension EditBusinessPageLocation {
             hideExactAddress: hideExactAddress
         )
     }
+
     var reverted: EditBusinessPageLocation {
         EditBusinessPageLocation(
             address: address.reverted,

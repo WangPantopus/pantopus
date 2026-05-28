@@ -12,6 +12,13 @@
 
 import SwiftUI
 
+private struct MapBlock {
+    let x: CGFloat
+    let y: CGFloat
+    let width: CGFloat
+    let height: CGFloat
+}
+
 @MainActor
 public struct EditBusinessMapPreview: View {
     private let verified: Bool
@@ -81,20 +88,20 @@ public struct EditBusinessMapPreview: View {
         }
     }
 
-    @ViewBuilder private func cityBlocks(width w: CGFloat, height h: CGFloat) -> some View {
+    private func cityBlocks(width w: CGFloat, height h: CGFloat) -> some View {
         ForEach(0..<4) { idx in
-            let blocks: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
-                (0.10, 0.10, 0.18, 0.18),
-                (0.85, 0.12, 0.18, 0.16),
-                (0.10, 0.88, 0.18, 0.14),
-                (0.85, 0.88, 0.18, 0.16)
+            let blocks: [MapBlock] = [
+                MapBlock(x: 0.10, y: 0.10, width: 0.18, height: 0.18),
+                MapBlock(x: 0.85, y: 0.12, width: 0.18, height: 0.16),
+                MapBlock(x: 0.10, y: 0.88, width: 0.18, height: 0.14),
+                MapBlock(x: 0.85, y: 0.88, width: 0.18, height: 0.16)
             ]
             if blocks.indices.contains(idx) {
-                let b = blocks[idx]
+                let block = blocks[idx]
                 Rectangle()
                     .fill(Theme.Color.warningLight.opacity(0.5))
-                    .frame(width: w * b.2, height: h * b.3)
-                    .position(x: w * b.0, y: h * b.1)
+                    .frame(width: w * block.width, height: h * block.height)
+                    .position(x: w * block.x, y: h * block.y)
             }
         }
     }
@@ -150,7 +157,7 @@ public struct EditBusinessMapPreview: View {
         .offset(x: -w * 0.5 + 50, y: 0)
     }
 
-    private func zoomControls(width w: CGFloat, height h: CGFloat) -> some View {
+    private func zoomControls(width w: CGFloat, height _: CGFloat) -> some View {
         VStack(spacing: 0) {
             Text("+")
                 .font(.system(size: 14, weight: .semibold))

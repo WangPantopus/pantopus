@@ -190,7 +190,7 @@ private struct EditHoursRowView: View {
     }
 
     private var a11yLabel: String {
-        let stateLabel: String = switch row.state {
+        let stateLabel = switch row.state {
         case let .open(open, close): "\(open) to \(close)"
         case .closed: "Closed"
         case .notSet: "Not set"
@@ -238,7 +238,11 @@ private struct TimePill: View {
 #Preview("Setup") {
     EditBusinessHoursEditor(state: .quickApply(
         rows: (1...7).map { day in
-            .init(id: "d\(day)", dayLabel: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][day-1], state: .notSet)
+            .init(
+                id: "d\(day)",
+                dayLabel: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day - 1],
+                state: .notSet
+            )
         }
     ))
     .padding()

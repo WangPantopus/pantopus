@@ -54,7 +54,9 @@ public struct EditBusinessPageField: Sendable, Hashable {
         self.placeholder = placeholder
     }
 
-    public var isDirty: Bool { original != current }
+    public var isDirty: Bool {
+        original != current
+    }
 }
 
 /// Banner + logo composite — empty drop targets or a filled hero
@@ -161,7 +163,9 @@ public struct EditBusinessPageGalleryState: Sendable, Hashable {
 
     /// Empty-gallery variant carries no tiles and renders the "Add
     /// cover photo" spanning hero tile instead of the grid.
-    public var isEmpty: Bool { tiles.isEmpty }
+    public var isEmpty: Bool {
+        tiles.isEmpty
+    }
 }
 
 /// Address + map state. `error` is non-nil when the address fails
@@ -238,16 +242,16 @@ public struct EditBusinessPageContent: Sendable, Hashable {
     public let categoryRequired: Bool
     public let price: EditBusinessPageField
 
-    // Description
+    /// Description
     public let description: EditBusinessPageDescriptionState
 
-    // Hours
+    /// Hours
     public let hours: EditBusinessPageHoursState
 
-    // Services
+    /// Services
     public let services: EditBusinessPageServicesState
 
-    // Gallery
+    /// Gallery
     public let gallery: EditBusinessPageGalleryState
 
     // Contact (booking is optional → published includes it, setup omits)
@@ -256,7 +260,7 @@ public struct EditBusinessPageContent: Sendable, Hashable {
     public let website: EditBusinessPageField
     public let bookingLink: EditBusinessPageField?
 
-    // Location
+    /// Location
     public let location: EditBusinessPageLocation
 
     public init(
