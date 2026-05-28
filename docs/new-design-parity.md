@@ -553,10 +553,10 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
   - **RsvpCluster** — 3-way Going / Maybe / Can't make it (Going = rose primary in open state, green check in going state) + PlusOneStepper visible only in going state.
 
 ### A17.10 — Records
-- **iOS:** **MISSING**
-- **Android:** **MISSING**
-- **Status:** **BUILD** (both platforms)
-- **Build dependencies:** `PaperStack` primitive (multi-page tilted sheets — 3 PaperSheets at z-stacked rotations, slate `#475569` accent).
+- **iOS:** `MailDetail/Variants/RecordsDetailLayout.swift` (+ `Variants/Components/IssuerCard.swift`, `VaultBreadcrumb.swift`, `RelatedRecords.swift`) — wired in `MailDetailView.swift` `.records` branch.
+- **Android:** `mail_detail/variants/RecordsDetailLayout.kt` (+ `item_detail/bodies/RecordsBody.kt` & `bodies/components/{IssuerCard,VaultBreadcrumb,RelatedRecords}.kt`) — wired in `MailDetailScreen.kt` `Records` branch.
+- **Status:** **BUILT** (both platforms, P6.6). Open + filed states snapshot-locked. Vault filing stubbed to local state; PDF thumbnail is the decorative PaperStack.
+- **Build dependencies:** `PaperStack` primitive (multi-page tilted sheets — 3 PaperSheets at z-stacked rotations, slate `#475569` accent). Slate token added as `categoryRecords` (`#475569`) + `categoryRecordsBg`/`Border`/`Deep` per open question #4.
 - **Required slots:**
   - **RecordsNav** — slate `#475569` dot in eyebrow chip.
   - **RecordsHero** — `HeroCard` variant with slate accent strip + "Q1 2026 Investment Statement — Roth IRA" + reference mono ("Statement MWM-2026-Q1-9981842 · 4 pages · PDF + structured data") + green `Filed in Vault` stamp when filed.
@@ -700,6 +700,7 @@ Add 13 primitives listed in the Summary table to `Core/Design/Components/` (iOS)
 2. **A14.6 Payments vs A10.10 Wallet** — these are two distinct surfaces for adjacent intents (payments-out vs earnings-in). Confirm they should both exist, with the Wallet hosted under the `Wallet` tab/route and Payments hosted under Settings.
 3. **A12.10 Create Business** — the new design adds a typeahead/search frame with "Add as custom category" fallback. Confirm the back-end supports custom-category submissions (review-required) or whether we should hide the fallback until backend is ready.
 4. **A17.9 Party + A17.10 Records** — design uses `db2777` rose-magenta + `475569` slate accents that are **not** currently in `Colors.swift` / `Color.kt`. Confirm we extend the token system with `category-party` and `category-records`, or use raw hex (currently 158 hex literals already in allowed exceptions for category palettes).
+   - **Resolved (P6.6, Records):** extended the token system — added `categoryRecords` (`#475569`) + `categoryRecordsBg` (`#f8fafc`) / `categoryRecordsBorder` (`#e2e8f0`) / `categoryRecordsDeep` (`#1e293b`) to `Colors.swift` (asset catalog) and `Color.kt`. Party's rose-magenta still pending its build.
 5. **A18.3 Verification submitted** primary CTA — design uses "Back to home" as primary. Confirm this isn't a typo and we shouldn't surface "View status" as primary.
 
 ---

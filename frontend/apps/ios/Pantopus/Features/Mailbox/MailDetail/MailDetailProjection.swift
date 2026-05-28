@@ -33,7 +33,7 @@ extension MailDetailViewModel {
         let variants = decodeVariantDetails(category: category, object: detail.object)
         let resolvedAck = isAcknowledged || (variants.certified?.isAcknowledged ?? false)
         let detailTrust: MailDetailTrust = switch category {
-        case .certified, .community, .legal, .tax: .verified
+        case .certified, .community, .legal, .tax, .records: .verified
         default: trust.detailTrust
         }
         return MailDetailContent(
@@ -65,7 +65,8 @@ extension MailDetailViewModel {
             couponDetail: variants.coupon,
             gigDetail: variants.gig,
             memoryDetail: variants.memory,
-            packageDetail: variants.package
+            packageDetail: variants.package,
+            recordsDetail: variants.records
         )
     }
 
@@ -133,6 +134,7 @@ private struct MailVariantDetails {
     let gig: GigDetailDTO?
     let memory: MemoryDetailDTO?
     let package: PackageBodyContent?
+    let records: RecordsDetailDTO?
 }
 
 private func bodyParagraphs(from content: String?) -> [String] {
@@ -154,6 +156,7 @@ private func decodeVariantDetails(
         coupon: category == .coupon ? CouponDetailDTO.decode(from: object) : nil,
         gig: category == .gig ? GigDetailDTO.decode(from: object) : nil,
         memory: category == .memory ? MemoryDetailDTO.decode(from: object) : nil,
-        package: category == .package ? PackageBodyContent.decode(from: object) : nil
+        package: category == .package ? PackageBodyContent.decode(from: object) : nil,
+        records: category == .records ? RecordsDetailDTO.decode(from: object) : nil
     )
 }

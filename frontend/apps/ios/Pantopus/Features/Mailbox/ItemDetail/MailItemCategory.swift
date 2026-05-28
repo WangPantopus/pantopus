@@ -2,7 +2,7 @@
 //  MailItemCategory.swift
 //  Pantopus
 //
-//  19-category enum for mailbox items. Each case carries its accent
+//  20-category enum for mailbox items. Each case carries its accent
 //  color for the 4pt top strip.
 //
 
@@ -29,6 +29,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     case social
     case gig
     case memory
+    case records
     case general
 
     /// 4pt accent strip color sitting at the top of the detail shell.
@@ -52,6 +53,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: Theme.Color.cleaning
         case .gig: Theme.Color.handyman // "cat-gigs" orange per A17.6 gig accent
         case .memory: Theme.Color.warning // sun-amber per A17.7 stationery-summer accent
+        case .records: Theme.Color.categoryRecords // slate-600 per A17.10 archival accent
         case .general: Theme.Color.appTextSecondary
         }
     }
@@ -79,6 +81,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: .users
         case .gig: .handCoins
         case .memory: .heart
+        case .records: .archive
         case .general: .mailbox
         }
     }
@@ -104,6 +107,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: Theme.Color.homeBg
         case .gig: Theme.Color.warningBg
         case .memory: Theme.Color.warningBg
+        case .records: Theme.Color.categoryRecordsBg
         case .general: Theme.Color.appSurfaceSunken
         }
     }
@@ -130,6 +134,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: "Social"
         case .gig: "Gig"
         case .memory: "Memory"
+        case .records: "Records"
         case .general: "Mail"
         }
     }
@@ -138,7 +143,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     /// kind used by the A17 shell's top-bar eyebrow.
     public var detailTrust: MailDetailTrust {
         switch self {
-        case .certified, .community, .legal, .tax, .memory: .verified
+        case .certified, .community, .legal, .tax, .memory, .records: .verified
         case .notice, .bill: .warning
         default: .neutral
         }

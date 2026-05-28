@@ -58,6 +58,20 @@ extension MailDetailContent {
         return rebuild(content, memoryDetail: memory.withSaved(value))
     }
 
+    /// Return a copy of `content` with the records detail's `isFiled`
+    /// flag flipped. Used by the optimistic `fileRecordToVault` flow.
+    static func replacingRecordsFiled(
+        _ content: MailDetailContent,
+        with value: Bool,
+        filedAtLabel: String? = nil
+    ) -> MailDetailContent {
+        guard let records = content.recordsDetail else { return content }
+        return rebuild(
+            content,
+            recordsDetail: records.withFiled(value, filedAtLabel: filedAtLabel)
+        )
+    }
+
     /// Shared rebuilder so the per-field mutations stay one line each.
     /// Every parameter defaults to "keep the existing field"; pass only
     /// the field(s) you intend to flip.
@@ -71,7 +85,8 @@ extension MailDetailContent {
         couponDetail: CouponDetailDTO?? = nil,
         gigDetail: GigDetailDTO?? = nil,
         memoryDetail: MemoryDetailDTO?? = nil,
-        packageDetail: PackageBodyContent?? = nil
+        packageDetail: PackageBodyContent?? = nil,
+        recordsDetail: RecordsDetailDTO?? = nil
     ) -> MailDetailContent {
         MailDetailContent(
             mailId: content.mailId,
@@ -102,7 +117,8 @@ extension MailDetailContent {
             couponDetail: couponDetail ?? content.couponDetail,
             gigDetail: gigDetail ?? content.gigDetail,
             memoryDetail: memoryDetail ?? content.memoryDetail,
-            packageDetail: packageDetail ?? content.packageDetail
+            packageDetail: packageDetail ?? content.packageDetail,
+            recordsDetail: recordsDetail ?? content.recordsDetail
         )
     }
 }

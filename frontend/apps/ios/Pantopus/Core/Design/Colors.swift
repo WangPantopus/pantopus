@@ -180,4 +180,19 @@ public extension Theme.Color {
     static let rentals = SwiftUI.Color("Category/Rentals", bundle: Theme.bundle)
     /// Category: vehicles — `#dc2626`.
     static let vehicles = SwiftUI.Color("Category/Vehicles", bundle: Theme.bundle)
+    /// Category: records — `#475569` slate-600. The institutional /
+    /// archival accent for A17.10 Records mail (financial statements,
+    /// medical records, contracts, EOBs). Per audit open question #4.
+    static let categoryRecords = SwiftUI.Color("Category/Records", bundle: Theme.bundle)
+    /// Category: records soft background — `#f8fafc` slate-50. Pairs
+    /// with `categoryRecords` for KeyFacts emphasis rows, IssuerCard
+    /// trust note, and VaultDestination breadcrumb chips.
+    static let categoryRecordsBg = SwiftUI.Color("Category/RecordsBg", bundle: Theme.bundle)
+    /// Category: records soft border — `#e2e8f0` slate-200. Hairline
+    /// border on chips and trust note rows tinted with `categoryRecordsBg`.
+    static let categoryRecordsBorder = SwiftUI.Color("Category/RecordsBorder", bundle: Theme.bundle)
+    /// Category: records deep — `#1e293b` slate-800. The institutional
+    /// dark stop for letterhead bars, breadcrumb-current chip, and the
+    /// "File in Vault" primary CTA.
+    static let categoryRecordsDeep = SwiftUI.Color("Category/RecordsDeep", bundle: Theme.bundle)
 }

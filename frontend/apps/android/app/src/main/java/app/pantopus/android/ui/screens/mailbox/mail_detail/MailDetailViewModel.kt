@@ -13,6 +13,7 @@ import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.MemoryDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.RecordsDetailDto
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
@@ -84,6 +85,7 @@ data class MailDetailContent(
     val gigDetail: GigDetailDto? = null,
     val memoryDetail: MemoryDetailDto? = null,
     val packageDetail: PackageBodyContent? = null,
+    val recordsDetail: RecordsDetailDto? = null,
 ) {
     /** Build a typed key-facts row list for the shell's KeyFacts slot. */
     fun keyFacts(): List<MailDetailKeyFact> =
@@ -151,6 +153,10 @@ class MailDetailViewModel
         /** Gig accept-bid mutation in-flight; disables the action row. */
         private val _gigBidInFlight = MutableStateFlow(false)
         val gigBidInFlight: StateFlow<Boolean> = _gigBidInFlight.asStateFlow()
+
+        /** A17.10 records file-to-vault mutation in-flight; disables the CTA. */
+        private val _recordsFileInFlight = MutableStateFlow(false)
+        val recordsFileInFlight: StateFlow<Boolean> = _recordsFileInFlight.asStateFlow()
 
         /** T6.5e (P19.5) — Save-to-vault picker visibility. */
         private val _showsSaveToVaultPicker = MutableStateFlow(false)
@@ -349,6 +355,33 @@ class MailDetailViewModel
             }
         }
 
+        /**
+         * A17.10 — File the archival record in its suggested vault folder.
+         * Stub: flips the local `isFiled` flag and toasts (the real
+         * vault-filing backend is out of scope for P6.6). The body
+         * prepends the Status row, swaps the hero stamp + retention
+         * banner, switches the elf copy, and reveals the related strip.
+         */
+        fun fileRecordToVault() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val records = current.content.recordsDetail ?: return
+            if (current.content.category != MailItemCategory.Records || records.isFiled) return
+            if (_recordsFileInFlight.value) return
+            _recordsFileInFlight.value = true
+            _state.value =
+                MailDetailUiState.Loaded(
+                    current.content.copy(
+                        recordsDetail =
+                            records.copy(
+                                isFiled = true,
+                                filedAtLabel = "Today 2:14 PM · retention 7y",
+                            ),
+                    ),
+                )
+            _toast.value = "Filed in Vault"
+            _recordsFileInFlight.value = false
+        }
+
         private fun currentUnsavedMemoryContent(): Pair<MailDetailContent, MemoryDetailDto>? {
             val content = (_state.value as? MailDetailUiState.Loaded)?.content ?: return null
             val memory = content.memoryDetail ?: return null
@@ -444,6 +477,7 @@ class MailDetailViewModel
                     gigDetail = variants.gig,
                     memoryDetail = variants.memory,
                     packageDetail = variants.packageDetail,
+                    recordsDetail = variants.records,
                 )
             }
 
@@ -455,6 +489,7 @@ class MailDetailViewModel
                 val gig: GigDetailDto?,
                 val memory: MemoryDetailDto?,
                 val packageDetail: PackageBodyContent?,
+                val records: RecordsDetailDto?,
             )
 
             private fun bodyParagraphs(content: String?): List<String> =
@@ -509,6 +544,12 @@ class MailDetailViewModel
                     packageDetail =
                         if (category == MailItemCategory.Package) {
                             decodePackageDetail(payload)
+                        } else {
+                            null
+                        },
+                    records =
+                        if (category == MailItemCategory.Records) {
+                            RecordsDetailDto.decodeFromObjectPayload(payload)
                         } else {
                             null
                         },

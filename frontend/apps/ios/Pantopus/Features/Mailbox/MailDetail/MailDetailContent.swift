@@ -44,6 +44,7 @@ public struct MailDetailContent: Sendable {
     public let gigDetail: GigDetailDTO?
     public let memoryDetail: MemoryDetailDTO?
     public let packageDetail: PackageBodyContent?
+    public let recordsDetail: RecordsDetailDTO?
 
     public init(
         mailId: String,
@@ -74,7 +75,8 @@ public struct MailDetailContent: Sendable {
         couponDetail: CouponDetailDTO? = nil,
         gigDetail: GigDetailDTO? = nil,
         memoryDetail: MemoryDetailDTO? = nil,
-        packageDetail: PackageBodyContent? = nil
+        packageDetail: PackageBodyContent? = nil,
+        recordsDetail: RecordsDetailDTO? = nil
     ) {
         self.mailId = mailId
         self.category = category
@@ -105,6 +107,7 @@ public struct MailDetailContent: Sendable {
         self.gigDetail = gigDetail
         self.memoryDetail = memoryDetail
         self.packageDetail = packageDetail
+        self.recordsDetail = recordsDetail
     }
 
     /// Build a `KeyFactRow` list from the projected fields.

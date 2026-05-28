@@ -19,6 +19,7 @@ import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.ui.components.TimelineStep
 import app.pantopus.android.ui.components.TimelineStepState
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.RecordsSampleData
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
@@ -554,4 +555,16 @@ object MailItemSampleData {
 
     /** Same signed payload used for archived shell snapshots. */
     val certifiedArchived = certifiedSigned
+
+    /**
+     * A17.10 open-state records sample — Q1 2026 Meridian Wealth
+     * quarterly statement, freshly arrived in the mailbox.
+     */
+    val recordsOpen = RecordsSampleData.record
+
+    /**
+     * A17.10 filed-state records sample — same statement, filed in the
+     * Vault › Finance › Statements › 2026 folder.
+     */
+    val recordsFiled = RecordsSampleData.filedRecord
 }
