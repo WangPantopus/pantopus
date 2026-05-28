@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "UnusedPrivateMember")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.mailbox.disambiguate
 
@@ -10,17 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,19 +26,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.pantopus.android.ui.components.AvatarWithIdentityRing
+import app.pantopus.android.ui.components.EnvelopeOcrBox
+import app.pantopus.android.ui.components.EnvelopeOcrTone
 import app.pantopus.android.ui.components.PrimaryButton
-import app.pantopus.android.ui.components.Shimmer
-import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
+import app.pantopus.android.ui.screens.mailbox.disambiguate.components.CandidateRow
+import app.pantopus.android.ui.screens.mailbox.disambiguate.components.FallbackRow
+import app.pantopus.android.ui.screens.mailbox.disambiguate.components.OcrStrip
+import app.pantopus.android.ui.screens.mailbox.disambiguate.components.QuickActionChip
 import app.pantopus.android.ui.screens.shared.form.FormShell
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -50,12 +51,13 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.delay
 
 /**
- * Disambiguate-mail form. ViewModel reads the mail id (and optional
- * preview metadata) via [androidx.lifecycle.SavedStateHandle].
+ * A13.15 Disambiguate — scanned-envelope hero with an [EnvelopeOcrBox] overlay,
+ * an [OcrStrip] read-out, a ranked [CandidateRow] list with match badges,
+ * quick-action chips, and (in the unclear frame) a fallback card. A sticky
+ * Confirm CTA owns submit. ViewModel reads nav args via SavedStateHandle.
  */
 @Composable
 fun DisambiguateMailFormScreen(
@@ -77,49 +79,64 @@ fun DisambiguateMailFormScreen(
         }
     }
 
+    DisambiguateContent(
+        state = state,
+        onClose = onClose,
+        onSelectCandidate = viewModel::selectCandidate,
+        onThisIsMe = viewModel::selectThisIsMe,
+        onRouteToOther = viewModel::routeToOther,
+        onAddNewPerson = viewModel::addNewPerson,
+        onFallback = viewModel::selectFallback,
+        onConfirm = viewModel::submit,
+    )
+}
+
+/**
+ * Stateless screen body — split out so Paparazzi can snapshot it without the
+ * Hilt graph (mirrors `EditProfileLoaded`).
+ */
+@Composable
+internal fun DisambiguateContent(
+    state: DisambiguateUiState,
+    onClose: () -> Unit,
+    onSelectCandidate: (String) -> Unit,
+    onThisIsMe: () -> Unit,
+    onRouteToOther: () -> Unit,
+    onAddNewPerson: () -> Unit,
+    onFallback: (FallbackAction) -> Unit,
+    onConfirm: () -> Unit,
+) {
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                // Top-bar action is intentionally disabled; sticky CTA owns submit.
+                // Top-bar action is intentionally hidden; sticky CTA owns submit.
                 FormShell(
-                    title = "Who is this for?",
+                    title = "Disambiguate",
                     rightActionLabel = "",
                     isValid = false,
-                    // Drives discard-confirm on close.
                     isDirty = state.isDirty,
                     isSaving = false,
                     onClose = onClose,
                     onCommit = {},
                 ) {
-                    EnvelopeCard(
-                        ocrRecipient = state.ocrRecipient,
-                        confidence = state.confidence,
-                        envelopeUrl = state.envelopeUrl,
-                        modifier = Modifier.padding(horizontal = Spacing.s4),
+                    ScannedEnvelopeSection(state = state)
+                    CandidatesSection(
+                        state = state,
+                        onSelectCandidate = onSelectCandidate,
+                        onThisIsMe = onThisIsMe,
+                        onRouteToOther = onRouteToOther,
+                        onAddNewPerson = onAddNewPerson,
                     )
-                    FormFieldGroup("Possible recipients") {
-                        MailRecipientChoice.entries.forEach { choice ->
-                            RecipientRow(
-                                choice = choice,
-                                isSelected = state.selected == choice,
-                                onTap = { viewModel.select(choice) },
-                            )
-                        }
+                    if (state.isUnclear) {
+                        FallbackSection(onFallback = onFallback)
                     }
-                    FormFieldGroup("Anything else?") {
-                        AliasNotesField(
-                            text = state.aliasNotes,
-                            onChange = viewModel::setAliasNotes,
-                            error = state.aliasError,
-                        )
-                    }
-                    Spacer(Modifier.height(96.dp))
                 }
             }
-            StickyCTA(
+            StickyConfirm(
+                hint = state.confirmHint,
                 isLoading = state.isSubmitting,
-                isEnabled = state.canSubmit,
-                onClick = { viewModel.submit() },
+                isEnabled = state.canConfirm,
+                onClick = onConfirm,
             )
         }
 
@@ -143,233 +160,146 @@ fun DisambiguateMailFormScreen(
     }
 }
 
+// MARK: - Sections
+
 @Composable
-private fun EnvelopeCard(
-    ocrRecipient: String,
-    confidence: Double,
-    envelopeUrl: String?,
-    modifier: Modifier = Modifier,
+private fun ScannedEnvelopeSection(state: DisambiguateUiState) {
+    Section(overline = "Scanned envelope") {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            EnvelopeArtwork(tone = state.ocrTone, boxLabel = state.ocrBoxLabel)
+            OcrStrip(
+                tone = state.ocrTone,
+                detected = state.detectedText,
+                confidence = state.confidencePercent,
+                sub = state.ocrSubtext,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CandidatesSection(
+    state: DisambiguateUiState,
+    onSelectCandidate: (String) -> Unit,
+    onThisIsMe: () -> Unit,
+    onRouteToOther: () -> Unit,
+    onAddNewPerson: () -> Unit,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                    .semantics { contentDescription = "Scanned envelope" },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (envelopeUrl != null) {
-                SubcomposeAsyncImage(
-                    model = envelopeUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth(),
-                    loading = { Shimmer(width = 320.dp, height = 180.dp, cornerRadius = Radii.lg) },
-                    error = { EnvelopePlaceholder() },
+    Section(overline = state.candidatesOverline) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            if (!state.isUnclear) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    QuickActionChip(
+                        icon = PantopusIcon.UserCheck,
+                        label = "This is me",
+                        isPrimary = true,
+                        onClick = onThisIsMe,
+                        modifier = Modifier.weight(1f).testTag("disambiguateThisIsMe"),
+                    )
+                    QuickActionChip(
+                        icon = PantopusIcon.Forward,
+                        label = "Route to…",
+                        isPrimary = false,
+                        onClick = onRouteToOther,
+                        modifier = Modifier.weight(1f).testTag("disambiguateRouteTo"),
+                    )
+                }
+            }
+            state.candidates.forEach { candidate ->
+                CandidateRow(
+                    candidate = candidate,
+                    isSelected = state.isSelected(candidate.id),
+                    isSelectable = !state.isUnclear,
+                    onTap = { onSelectCandidate(candidate.id) },
                 )
-            } else {
-                EnvelopePlaceholder()
+            }
+            if (!state.isUnclear) {
+                Row(
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.sm))
+                            .clickable(onClick = onAddNewPerson)
+                            .padding(vertical = Spacing.s2)
+                            .testTag("disambiguateAddNewPerson"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Plus,
+                        contentDescription = null,
+                        size = 13.dp,
+                        tint = PantopusColors.primary600,
+                    )
+                    Text(
+                        text = "None of these — add new person",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.primary600,
+                    )
+                }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Text(
-                text = ocrRecipient.ifEmpty { "—" },
-                fontSize = 13.sp,
-                color = PantopusColors.appTextStrong,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 3,
-                modifier = Modifier.weight(1f),
-            )
-            ConfidencePill(confidence = confidence)
-        }
     }
 }
 
 @Composable
-private fun EnvelopePlaceholder() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        PantopusIconImage(
-            icon = PantopusIcon.Mailbox,
-            contentDescription = null,
-            size = 28.dp,
-            tint = PantopusColors.appTextMuted,
-        )
-        Text(
-            text = "Envelope preview unavailable",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun ConfidencePill(confidence: Double) {
-    val percent = (confidence * 100).toInt()
-    val (background, foreground) =
-        when {
-            confidence < 0.5 -> PantopusColors.errorBg to PantopusColors.error
-            confidence < 0.8 -> PantopusColors.warningBg to PantopusColors.warning
-            else -> PantopusColors.successBg to PantopusColors.success
-        }
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(background)
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
-                .semantics { contentDescription = "AI confidence $percent percent" },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Info,
-            contentDescription = null,
-            size = Radii.lg,
-            tint = foreground,
-        )
-        Text(
-            text = "AI confidence: $percent%",
-            style = PantopusTextStyle.caption,
-            color = foreground,
-        )
-    }
-}
-
-@Composable
-private fun RecipientRow(
-    choice: MailRecipientChoice,
-    isSelected: Boolean,
-    onTap: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp)
-                .clickable(onClick = onTap)
-                .padding(vertical = Spacing.s2)
-                .testTag("disambiguateRow_${choice.drawer}")
-                .semantics {
-                    contentDescription = "${choice.title}, ${choice.subtitle}"
-                },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        AvatarWithIdentityRing(
-            name = choice.title,
-            identity = choice.identity,
-            ringProgress = 1f,
-            size = 36.dp,
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = choice.title, style = PantopusTextStyle.body, color = PantopusColors.appText)
-            Text(
-                text = choice.subtitle,
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-        RadioMark(isSelected = isSelected)
-    }
-}
-
-@Composable
-private fun RadioMark(isSelected: Boolean) {
-    Box(
-        modifier =
-            Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .border(
-                    width = if (isSelected) 6.dp else 2.dp,
-                    color =
-                        if (isSelected) PantopusColors.primary600 else PantopusColors.appBorderStrong,
-                    shape = CircleShape,
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (isSelected) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(PantopusColors.appSurface),
-            )
-        }
-    }
-}
-
-@Composable
-private fun AliasNotesField(
-    text: String,
-    onChange: (String) -> Unit,
-    error: String?,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        Text(
-            text = "Notes",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-        )
-        OutlinedTextField(
-            value = text,
-            onValueChange = onChange,
-            placeholder = { Text("Add a name to remember this routing") },
-            shape = RoundedCornerShape(Radii.md),
-            textStyle = TextStyle(fontSize = 14.sp),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor =
-                        if (error == null) PantopusColors.primary600 else PantopusColors.error,
-                    unfocusedBorderColor =
-                        if (error == null) PantopusColors.appBorder else PantopusColors.error,
-                    focusedContainerColor = PantopusColors.appSurfaceSunken,
-                    unfocusedContainerColor = PantopusColors.appSurfaceSunken,
-                ),
+private fun FallbackSection(onFallback: (FallbackAction) -> Unit) {
+    Section(overline = "Or resolve another way") {
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 80.dp)
-                    .testTag("disambiguateAliasField"),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
         ) {
-            Text(
-                text = error.orEmpty(),
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.error,
-            )
-            Text(
-                text = "${text.length} / 255",
-                style = PantopusTextStyle.caption,
-                color =
-                    if (text.length > 255) PantopusColors.error else PantopusColors.appTextSecondary,
-            )
+            FallbackAction.entries.forEachIndexed { index, action ->
+                FallbackRow(
+                    icon = iconFor(action),
+                    title = action.title,
+                    subtitle = action.subtitle,
+                    onClick = { onFallback(action) },
+                    isDestructive = action.isDestructive,
+                    showsDivider = index < FallbackAction.entries.size - 1,
+                    rowTestTag = "disambiguateFallback_${action.name}",
+                )
+            }
         }
     }
 }
 
+private fun iconFor(action: FallbackAction): PantopusIcon =
+    when (action) {
+        FallbackAction.Rescan -> PantopusIcon.ScanLine
+        FallbackAction.TypeName -> PantopusIcon.Keyboard
+        FallbackAction.ReturnToSender -> PantopusIcon.Undo2
+        FallbackAction.MarkAsJunk -> PantopusIcon.Trash2
+    }
+
+// MARK: - Sticky CTA
+
 @Composable
-private fun StickyCTA(
+private fun StickyConfirm(
+    hint: String?,
     isLoading: Boolean,
     isEnabled: Boolean,
     onClick: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+        hint?.let {
+            Text(
+                text = it,
+                fontSize = 11.sp,
+                fontStyle = FontStyle.Italic,
+                color = PantopusColors.appTextSecondary,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.s4, top = Spacing.s2),
+            )
+        }
         Box(
             modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
             contentAlignment = Alignment.Center,
@@ -379,21 +309,125 @@ private fun StickyCTA(
                 onClick = onClick,
                 isEnabled = isEnabled,
                 isLoading = isLoading,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("disambiguateConfirm"),
             )
         }
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+// MARK: - Section helper
+
 @Composable
-private fun DisambiguatePreview() {
-    // Hilt-only ViewModel can't render in @Preview; surface a marker.
-    Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
+private fun Section(
+    overline: String,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
         Text(
-            text = "DisambiguateMailFormScreen — runtime Hilt graph required",
-            modifier = Modifier.align(Alignment.Center),
+            text = overline.uppercase(),
+            style = PantopusTextStyle.overline,
             color = PantopusColors.appTextSecondary,
+            modifier = Modifier.semantics { heading() },
+        )
+        content()
+    }
+}
+
+// MARK: - Envelope artwork
+
+/**
+ * Token-pure scanned-envelope artwork with an [EnvelopeOcrBox] overlay on the
+ * name line. Sender / address are sample decoration (real OCR is out of scope);
+ * the tone drives the box (clean = solid sky · unclear = dashed amber +
+ * water-stain) and the name redaction.
+ */
+@Composable
+private fun EnvelopeArtwork(
+    tone: EnvelopeOcrTone,
+    boxLabel: String,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(188.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.paperCream)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .semantics { contentDescription = "Scanned envelope" },
+    ) {
+        Column(modifier = Modifier.padding(Spacing.s4)) {
+            Text(
+                text = "GLOBAL BANK · RETURN SERVICE",
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextMuted,
+                modifier = Modifier.padding(bottom = Spacing.s2),
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .width(84.dp)
+                        .height(2.dp)
+                        .background(PantopusColors.appBorderStrong),
+            )
+            Spacer(Modifier.height(Spacing.s3))
+            Text(
+                text = if (tone == EnvelopeOcrTone.Clean) "Maria K." else "M___ K___",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextStrong,
+            )
+            Spacer(Modifier.height(Spacing.s1))
+            Text(
+                text = "412 Elm St, Apt 3B",
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = "Elm Park, NY 10013",
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+
+        // Postage stamp placeholder (top-right).
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(Spacing.s3)
+                    .size(width = 54.dp, height = 64.dp)
+                    .border(
+                        width = 1.5.dp,
+                        color = PantopusColors.appBorderStrong,
+                        shape = RoundedCornerShape(Radii.xs),
+                    ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("USA", fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = PantopusColors.appTextSecondary)
+            Text("68¢", fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, color = PantopusColors.appTextSecondary)
+            Text("FOREVER", fontSize = 6.sp, fontFamily = FontFamily.Monospace, color = PantopusColors.appTextSecondary)
+        }
+
+        // OCR bounding box over the name line.
+        EnvelopeOcrBox(
+            rect =
+                DpRect(
+                    left = 14.dp,
+                    top = 50.dp,
+                    right = 146.dp,
+                    bottom = 70.dp,
+                ),
+            tone = tone,
+            label = boxLabel,
         )
     }
 }
