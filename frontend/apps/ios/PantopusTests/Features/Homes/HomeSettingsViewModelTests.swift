@@ -110,6 +110,7 @@ final class HomeSettingsViewModelTests: XCTestCase {
 
     private func row(vm: HomeSettingsViewModel, groupId: String, rowId: String) -> GroupedListRow? {
         guard case let .loaded(groups) = vm.state else { return nil }
-        return groups.first(where: { $0.id == groupId })?.rows.first(where: { $0.id == rowId })
+        let group = groups.first { $0.id == groupId }
+        return group?.rows.first { $0.id == rowId }
     }
 }

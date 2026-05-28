@@ -78,37 +78,41 @@ struct HomeSettingsIdentityCard: View {
     }
 
     private var addressChip: some View {
-        let (bg, fg, icon): (Color, Color, PantopusIcon) = switch identity.addressChipTone {
-        case .success: (Theme.Color.successBg, Theme.Color.success, .shieldCheck)
-        case .warning: (Theme.Color.warningBg, Theme.Color.warning, .clock)
-        case .info: (Theme.Color.primary50, Theme.Color.primary700, .info)
-        case .neutral: (Theme.Color.appSurfaceSunken, Theme.Color.appTextStrong, .info)
+        let style: AddressChipStyle = switch identity.addressChipTone {
+        case .success:
+            AddressChipStyle(background: Theme.Color.successBg, foreground: Theme.Color.success, icon: .shieldCheck)
+        case .warning:
+            AddressChipStyle(background: Theme.Color.warningBg, foreground: Theme.Color.warning, icon: .clock)
+        case .info:
+            AddressChipStyle(background: Theme.Color.primary50, foreground: Theme.Color.primary700, icon: .info)
+        case .neutral:
+            AddressChipStyle(background: Theme.Color.appSurfaceSunken, foreground: Theme.Color.appTextStrong, icon: .info)
         }
         return HStack(spacing: 4) {
-            Icon(icon, size: 11, strokeWidth: 2.2, color: fg)
+            Icon(style.icon, size: 11, strokeWidth: 2.2, color: style.foreground)
             Text(identity.addressChipLabel.uppercased())
                 .font(.system(size: 10.5, weight: .bold))
                 .kerning(0.4)
-                .foregroundStyle(fg)
+                .foregroundStyle(style.foreground)
         }
         .padding(.horizontal, Spacing.s2)
         .padding(.vertical, 3)
-        .background(bg)
+        .background(style.background)
         .clipShape(Capsule())
         .accessibilityIdentifier("homeSettingsAddressChip")
     }
 }
 
+private struct AddressChipStyle {
+    let background: Color
+    let foreground: Color
+    let icon: PantopusIcon
+}
+
 #Preview("Populated") {
-    HomeSettingsView(
-        viewModel: HomeSettingsViewModel(homeId: "home-1", frame: .populated),
-        onBack: {}
-    )
+    HomeSettingsView(viewModel: HomeSettingsViewModel(homeId: "home-1", frame: .populated)) {}
 }
 
 #Preview("Pending") {
-    HomeSettingsView(
-        viewModel: HomeSettingsViewModel(homeId: "pending-home-2", frame: .pending),
-        onBack: {}
-    )
+    HomeSettingsView(viewModel: HomeSettingsViewModel(homeId: "pending-home-2", frame: .pending)) {}
 }

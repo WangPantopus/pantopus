@@ -1113,14 +1113,14 @@ public struct HubTabRoot: View {
             HomeSettingsView(
                 viewModel: HomeSettingsViewModel(homeId: homeId) { route in
                     handleHomeSettingsRoute(route, homeId: homeId)
-                },
-                onBack: { pop() }
-            )
+                }
+            ) {
+                pop()
+            }
         case let .homeSecurity(homeId):
-            HomeSecurityView(
-                viewModel: HomeSecurityViewModel(homeId: homeId),
-                onBack: { pop() }
-            )
+            HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: homeId)) {
+                pop()
+            }
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
                 homeId: homeId,

@@ -44,6 +44,21 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
         HomeSettingsSampleData.identity(for: frame)
     }
 
+    private static let routeByRowId: [String: HomeSettingsRoute] = [
+        "address": .address,
+        "propertyDetails": .propertyDetails,
+        "photos": .photos,
+        "documents": .documents,
+        "accessCodes": .accessCodes,
+        "trustedNeighbors": .trustedNeighbors,
+        "privacy": .security,
+        "people": .people,
+        "inviteLink": .inviteLink,
+        "homeNotifications": .homeNotifications,
+        "leaveHome": .leaveHome,
+        "cancelClaim": .cancelClaim
+    ]
+
     private let onNavigate: @MainActor (HomeSettingsRoute) -> Void
 
     public init(
@@ -61,21 +76,8 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
     }
 
     public func tapRow(_ rowId: String) async {
-        switch rowId {
-        case "address": onNavigate(.address)
-        case "propertyDetails": onNavigate(.propertyDetails)
-        case "photos": onNavigate(.photos)
-        case "documents": onNavigate(.documents)
-        case "accessCodes": onNavigate(.accessCodes)
-        case "trustedNeighbors": onNavigate(.trustedNeighbors)
-        case "privacy": onNavigate(.security)
-        case "people": onNavigate(.people)
-        case "inviteLink": onNavigate(.inviteLink)
-        case "homeNotifications": onNavigate(.homeNotifications)
-        case "leaveHome": onNavigate(.leaveHome)
-        case "cancelClaim": onNavigate(.cancelClaim)
-        default: break
-        }
+        guard let route = Self.routeByRowId[rowId] else { return }
+        onNavigate(route)
     }
 
     public func toggleRow(_: String, isOn _: Bool) async {}
@@ -105,7 +107,12 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
         case .populated:
             [
                 GroupedListRow(id: "address", label: "Address", subtext: "14 Elm Park Lane", control: addressControl),
-                GroupedListRow(id: "propertyDetails", label: "Property details", subtext: "3 bed · 2 bath · Built 1998", control: .chevron),
+                GroupedListRow(
+                    id: "propertyDetails",
+                    label: "Property details",
+                    subtext: "3 bed · 2 bath · Built 1998",
+                    control: .chevron
+                ),
                 GroupedListRow(id: "photos", label: "Photos", subtext: "Front porch · added Mar 2024", control: .chevron),
                 GroupedListRow(id: "documents", label: "Documents", subtext: "Lease, HOA, Tax", control: .chevron)
             ]
@@ -131,7 +138,12 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
         case .pending:
             [
                 GroupedListRow(id: "accessCodes", label: "Access codes", subtext: "Not set", control: .chevron),
-                GroupedListRow(id: "trustedNeighbors", label: "Trusted neighbors", subtext: "Available after verification", control: .chevron),
+                GroupedListRow(
+                    id: "trustedNeighbors",
+                    label: "Trusted neighbors",
+                    subtext: "Available after verification",
+                    control: .chevron
+                ),
                 GroupedListRow(id: "privacy", label: "Privacy", subtext: "Available after verification", control: .chevron)
             ]
         }

@@ -28,15 +28,9 @@ public struct HomeSecurityView: View {
 }
 
 #Preview("Balanced") {
-    HomeSecurityView(
-        viewModel: HomeSecurityViewModel(homeId: "home-1", variant: .balanced),
-        onBack: {}
-    )
+    HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: "home-1", variant: .balanced)) {}
 }
 
 #Preview("Strict") {
-    HomeSecurityView(
-        viewModel: HomeSecurityViewModel(homeId: "home-1", variant: .strict),
-        onBack: {}
-    )
+    HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: "home-1", variant: .strict)) {}
 }

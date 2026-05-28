@@ -141,11 +141,6 @@ import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
 import app.pantopus.android.ui.screens.homes.owners.transfer.TRANSFER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.transfer.TransferOwnershipScreen
-import app.pantopus.android.ui.screens.homes.settings.HOME_SETTINGS_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.settings.HomeSettingsRoute
-import app.pantopus.android.ui.screens.homes.settings.HomeSettingsScreen
-import app.pantopus.android.ui.screens.homes.settings.security.HOME_SECURITY_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.settings.security.HomeSecurityScreen
 import app.pantopus.android.ui.screens.homes.packages.LOG_PACKAGE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.packages.LogPackageScreen
 import app.pantopus.android.ui.screens.homes.packages.PACKAGES_HOME_ID_KEY
@@ -163,6 +158,11 @@ import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
 import app.pantopus.android.ui.screens.homes.polls.START_POLL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.StartPollFormScreen
 import app.pantopus.android.ui.screens.homes.property_details.PropertyDetailsScreen
+import app.pantopus.android.ui.screens.homes.settings.HOME_SETTINGS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.HomeSettingsRoute
+import app.pantopus.android.ui.screens.homes.settings.HomeSettingsScreen
+import app.pantopus.android.ui.screens.homes.settings.security.HOME_SECURITY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.security.HomeSecurityScreen
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
