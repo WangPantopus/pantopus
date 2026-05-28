@@ -172,5 +172,4 @@ private fun StatusChip(isActive: Boolean) {
     }
 }
 
-private fun dateRangeColor(isActive: Boolean): Color =
-    if (isActive) PantopusColors.warmAmber else PantopusColors.appTextSecondary
+private fun dateRangeColor(isActive: Boolean): Color = if (isActive) PantopusColors.warmAmber else PantopusColors.appTextSecondary

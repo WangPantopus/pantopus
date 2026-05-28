@@ -138,9 +138,10 @@ public struct OrganizeSection: View {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 ManageControlRow(
                     content: row,
-                    isLast: index == rows.count - 1,
-                    action: { onTapRow(row) }
-                )
+                    isLast: index == rows.count - 1
+                ) {
+                    onTapRow(row)
+                }
             }
         }
         .background(
@@ -184,23 +185,34 @@ public struct WindDownSection: View {
     OrganizeSection(
         rows: [
             OrganizeRowContent(
-                id: "edit-dates", icon: .calendarCog, tone: .amber,
-                label: "Edit dates & slots", meta: "21",
-                sub: "Add, swap, or remove cooking days.", isDestructive: false
+                id: "edit-dates",
+                icon: .calendarCog,
+                tone: .amber,
+                label: "Edit dates & slots",
+                meta: "21",
+                sub: "Add, swap, or remove cooking days.",
+                isDestructive: false
             ),
             OrganizeRowContent(
-                id: "invite", icon: .userPlus, tone: .sky,
-                label: "Invite more helpers", meta: nil,
-                sub: "Share a link or pick from neighbors.", isDestructive: false
+                id: "invite",
+                icon: .userPlus,
+                tone: .sky,
+                label: "Invite more helpers",
+                meta: nil,
+                sub: "Share a link or pick from neighbors.",
+                isDestructive: false
             ),
             OrganizeRowContent(
-                id: "analytics", icon: .barChart3, tone: .green,
-                label: "Analytics", meta: nil,
-                sub: "Fill rate, response time, top contributors.", isDestructive: false
+                id: "analytics",
+                icon: .barChart3,
+                tone: .green,
+                label: "Analytics",
+                meta: nil,
+                sub: "Fill rate, response time, top contributors.",
+                isDestructive: false
             )
-        ],
-        onTapRow: { _ in }
-    )
+        ]
+    ) { _ in }
     .padding()
     .background(Theme.Color.appBg)
 }
@@ -208,13 +220,15 @@ public struct WindDownSection: View {
 #Preview("WindDown") {
     WindDownSection(
         row: OrganizeRowContent(
-            id: "close", icon: .archive, tone: .red,
-            label: "Close train", meta: nil,
+            id: "close",
+            icon: .archive,
+            tone: .red,
+            label: "Close train",
+            meta: nil,
             sub: "Lock new signups and send a thank-you to everyone.",
             isDestructive: true
-        ),
-        onTap: {}
-    )
+        )
+    ) {}
     .padding()
     .background(Theme.Color.appBg)
 }

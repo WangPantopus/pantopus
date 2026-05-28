@@ -36,6 +36,7 @@ import app.pantopus.android.ui.theme.Spacing
 
 const val MANAGE_TRAIN_ORGANIZE_SECTION_TAG: String = "manageTrainOrganizeSection"
 const val MANAGE_TRAIN_WIND_DOWN_SECTION_TAG: String = "manageTrainWindDownSection"
+
 fun manageTrainControlRowTag(id: String): String = "manageTrainControlRow.$id"
 
 /**

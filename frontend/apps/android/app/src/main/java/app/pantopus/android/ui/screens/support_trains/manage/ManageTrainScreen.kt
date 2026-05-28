@@ -328,17 +328,21 @@ private fun LoadedBody(
                 isOverLimit = false,
             )
             SectionOverline("Organize")
-            OrganizeSection(rows = content.organizeRows) { row ->
-                when (row.id) {
-                    "edit-dates" -> onEditDates(content.trainId)
-                    "invite" -> onInviteHelpers(content.trainId)
-                    "analytics" -> onOpenAnalytics(content.trainId)
-                }
-            }
+            OrganizeSection(
+                rows = content.organizeRows,
+                onTapRow = { row ->
+                    when (row.id) {
+                        "edit-dates" -> onEditDates(content.trainId)
+                        "invite" -> onInviteHelpers(content.trainId)
+                        "analytics" -> onOpenAnalytics(content.trainId)
+                    }
+                },
+            )
             SectionOverline("Wind down")
-            WindDownSection(row = content.closeRow) {
-                viewModel.showCloseSheet()
-            }
+            WindDownSection(
+                row = content.closeRow,
+                onTap = { viewModel.showCloseSheet() },
+            )
         }
         StickyCTA(
             isEnabled = ui.canSendUpdate,

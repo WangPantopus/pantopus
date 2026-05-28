@@ -279,7 +279,9 @@ struct FlowingChipsRow: View {
     @ViewBuilder
     private func chipView(_ chip: AudienceChipContent) -> some View {
         let isSelected = chip.id == selectedId
-        Button(action: { selectedId = chip.id }) {
+        Button {
+            selectedId = chip.id
+        } label: {
             HStack(spacing: Spacing.s1) {
                 if isSelected {
                     Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.primary600)

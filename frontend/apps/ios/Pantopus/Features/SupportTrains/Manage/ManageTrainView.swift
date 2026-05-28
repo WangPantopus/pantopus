@@ -217,7 +217,9 @@ public struct ManageTrainView: View {
     // MARK: - Sticky CTA
 
     private func stickyCTA(content _: ManageTrainContent) -> some View {
-        Button(action: { viewModel.sendUpdate() }) {
+        Button {
+            viewModel.sendUpdate()
+        } label: {
             HStack(spacing: Spacing.s2) {
                 Icon(.send, size: 16, color: Theme.Color.appTextInverse)
                 Text("Send update")
@@ -304,9 +306,8 @@ public struct ManageTrainView: View {
 #Preview("Active") {
     NavigationStack {
         ManageTrainView(
-            viewModel: ManageTrainViewModel(trainId: ManageTrainSampleData.trainId),
-            onClose: {}
-        )
+            viewModel: ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        ) {}
     }
 }
 
@@ -321,7 +322,7 @@ private struct ClosingPreview: View {
     @State private var viewModel = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
 
     var body: some View {
-        ManageTrainView(viewModel: viewModel, onClose: {})
+        ManageTrainView(viewModel: viewModel) {}
             .task {
                 await viewModel.load()
                 viewModel.showCloseSheet()

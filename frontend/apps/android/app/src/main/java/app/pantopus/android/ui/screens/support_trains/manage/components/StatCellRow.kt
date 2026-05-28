@@ -33,6 +33,7 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 const val MANAGE_TRAIN_STAT_CELL_ROW_TAG: String = "manageTrainStatCellRow"
+
 fun manageTrainStatCellValueTag(id: String): String = "manageTrainStatCellValue.$id"
 
 /** Visual tone for a single stat cell — drives the value's color. */

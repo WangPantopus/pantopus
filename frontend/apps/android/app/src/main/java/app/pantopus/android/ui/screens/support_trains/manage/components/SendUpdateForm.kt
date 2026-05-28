@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.support_trains.manage.components
@@ -46,6 +46,7 @@ const val MANAGE_TRAIN_MESSAGE_FIELD_TAG: String = "manageTrainMessageField"
 const val MANAGE_TRAIN_MESSAGE_COUNTER_TAG: String = "manageTrainMessageCounter"
 const val MANAGE_TRAIN_PUSH_TOGGLE_TAG: String = "manageTrainPushToggle"
 const val MANAGE_TRAIN_SLOT_PREVIEW_TAG: String = "manageTrainSlotPreview"
+
 fun manageTrainAudienceChipTag(id: String): String = "manageTrainAudienceChip.$id"
 
 /**

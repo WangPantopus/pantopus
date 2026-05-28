@@ -134,6 +134,7 @@ class ManageTrainViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
+        @Suppress("UnusedPrivateProperty")
         private val trainId: String =
             savedStateHandle.get<String>(TRAIN_ID_KEY).orEmpty()
 
