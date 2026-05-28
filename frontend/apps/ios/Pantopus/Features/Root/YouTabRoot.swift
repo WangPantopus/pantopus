@@ -94,6 +94,9 @@ public enum YouRoute: Hashable {
     /// P6.6 — "Register a business · coming soon" waitlist surface. The
     /// full registration wizard is a future Phase 9 item.
     case businessWaitlist
+    /// A12.10 — Create Business wizard. Reached from the My Businesses
+    /// FAB / empty-state CTA in the You tab.
+    case createBusiness
     /// T6.3f / P14 — Home dashboard for a specific home, reached from
     /// the My homes row tap inside the You stack.
     case homeDashboard(homeId: String)
@@ -1720,12 +1723,25 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.businessProfile(businessId: businessId)) }
                     },
                     onRegister: {
-                        Task { @MainActor in path.append(.businessWaitlist) }
+                        Task { @MainActor in path.append(.createBusiness) }
                     }
                 )
             )
         case .businessWaitlist:
             BusinessWaitlistView { Task { @MainActor in pop() } }
+        case .createBusiness:
+            CreateBusinessWizardView(
+                onClose: { Task { @MainActor in pop() } },
+                onOpenBusiness: { businessId in
+                    // Replace the wizard with the business profile so Back
+                    // returns to My Businesses, not the success step.
+                    path.removeAll { route in
+                        if case .createBusiness = route { return true }
+                        return false
+                    }
+                    path.append(.businessProfile(businessId: businessId))
+                }
+            )
         case let .homeDashboard(homeId):
             HomeDashboardView(
                 homeId: homeId,

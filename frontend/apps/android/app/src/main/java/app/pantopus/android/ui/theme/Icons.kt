@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -102,6 +103,7 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocalFlorist
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -109,6 +111,7 @@ import androidx.compose.material.icons.filled.MarkAsUnread
 import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -301,6 +304,10 @@ enum class PantopusIcon(
     Ban("ban"),
     FileText("file-text"),
 
+    // A10.10 — Wallet "This month" trend indicator + Withdraw CTA glyph.
+    TrendingUp("trending-up"),
+    ArrowDownToLine("arrow-down-to-line"),
+
     // T5.3.2 — My tasks V2 poster-side chip + footer icons.
     Plus("plus"),
     Rocket("rocket"),
@@ -467,6 +474,12 @@ enum class PantopusIcon(
     // `sparkles`.
     Bot("bot"),
 
+    // A12.10 Create Business — category tile glyphs. `Cpu` backs the Tech &
+    // Repair tile (Material `Memory`); `Truck` backs the Delivery & Errands
+    // tile (Material `LocalShipping`).
+    Cpu("cpu"),
+    Truck("truck"),
+
     // A13.13 Manage train — Organize row glyphs. `bar-chart-3` paints the
     // Analytics row's icon tile; `calendar-cog` paints the Edit-dates row.
     BarChart3("bar-chart-3"),
@@ -600,6 +613,8 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.TrendingDown -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingDown)
         PantopusIcon.Ban -> IconSource.Material(Icons.Filled.Block)
         PantopusIcon.FileText -> IconSource.Material(Icons.AutoMirrored.Filled.Article)
+        PantopusIcon.TrendingUp -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingUp)
+        PantopusIcon.ArrowDownToLine -> IconSource.Material(Icons.Filled.Download)
         PantopusIcon.Plus -> IconSource.Material(Icons.Filled.Add)
         PantopusIcon.Rocket -> IconSource.Material(Icons.Filled.RocketLaunch)
         PantopusIcon.ClipboardList -> IconSource.Material(Icons.AutoMirrored.Filled.Assignment)
@@ -759,6 +774,11 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Warehouse -> IconSource.Material(Icons.Filled.Warehouse)
         // A15.3 AI Assistant — Material's robot-assistant glyph.
         PantopusIcon.Bot -> IconSource.Material(Icons.Filled.SmartToy)
+        // A12.10 Create Business — `Memory` is Material's chip/circuit
+        // glyph (closest Lucide `cpu` analogue); `LocalShipping` is the
+        // closest Lucide `truck` analogue.
+        PantopusIcon.Cpu -> IconSource.Material(Icons.Filled.Memory)
+        PantopusIcon.Truck -> IconSource.Material(Icons.Filled.LocalShipping)
         // A13.13 Manage train. Material ships `BarChart` for analytics
         // (vertical-bars glyph); `calendar-cog` reuses `EditCalendar`
         // (the gear-on-calendar Material glyph already mapped for

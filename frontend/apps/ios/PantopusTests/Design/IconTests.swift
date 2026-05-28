@@ -29,9 +29,13 @@ final class IconTests: XCTestCase {
         "ribbon", "palette", "play-circle", "grip-vertical", "grid-3x3", "square",
         "dog", "cat", "bird", "fish", "turtle", "paw-print",
         "sparkles", "timer", "repeat", "hourglass", "hand-coins", "package",
+        // A12.10 Create Business — category tiles.
+        "cpu", "truck",
         "compass", "filter",
         // T5.3.1 My bids — bid lifecycle chips + footer.
         "crown", "trending-down", "ban", "file-text",
+        // A10.10 Wallet — trend indicator and withdraw CTA glyph.
+        "trending-up", "arrow-down-to-line",
         // T5.3.2 My tasks — poster-side chips + footer.
         "plus", "rocket", "clipboard-list", "clock-plus", "circle-slash", "play", "pause",
         // T5.3.3 My posts — archive chip + empty-state compose icon.

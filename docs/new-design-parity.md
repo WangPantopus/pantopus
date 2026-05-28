@@ -145,9 +145,9 @@ All four A09 screens render through the shared `TransactionalDetailShell`
 ## A10 — Detail: content
 
 ### A10.9 — Support train detail (`/support-trains/[id].tsx`)
-- **iOS:** **MISSING** — `SupportTrains/` has only `SupportTrainsView.swift` (index list), `StartTrain/` (wizard A12.11), `EditSignupFormView.swift`, and `Search/`. No bespoke detail screen.
-- **Android:** **MISSING** — `support_trains/` mirrors iOS exactly. No detail screen.
-- **Status:** **BUILD** (both platforms)
+- **iOS:** `SupportTrains/Detail/SupportTrainDetailView.swift` + `SupportTrainDetailViewModel.swift` + `SupportTrainDetailContent.swift` + `SupportTrainDetailSampleData.swift` + `Detail/Components/{RecipientCard,TypeDatesCard,SlotRow}.swift` (P3.1).
+- **Android:** `support_trains/detail/SupportTrainDetailScreen.kt` + `SupportTrainDetailViewModel.kt` + `SupportTrainDetailContent.kt` + `SupportTrainDetailSampleData.kt` + `detail/components/{RecipientCard,TypeDatesCard,SlotRow}.kt` (P3.1).
+- **Status:** **MATCH** (both platforms, pending baseline PNG commit + backend detail-payload wiring)
 - **Designed frames:** populated (12/21 slots covered · 9 open) · fully covered (green celebration banner · "Your commitment" card · `Send a card` + `Join as backup` split dock)
 - **Build dependencies:** `SlotCalendar` primitive (see Phase 1 above).
 - **Required slots:**
@@ -158,7 +158,7 @@ All four A09 screens render through the shared `TransactionalDetailShell`
   - **`Already on the train` overline + `SlotRow` stack** showing who + what they're bringing.
   - **`HostedBy` footer.**
   - **`PrimaryCTA` dock:** `Sign up for a slot` (populated) → splits to `Send a card` ghost + `Join as backup` sky-ghost (covered).
-- **Routing:** wire from `DeepLinkRouter.swift:127` `.supportTrain(id:)` (currently lands on review-signups queue per `HubTabRoot.swift:358`). New screen must become the primary destination, with the existing review-signups queue moved to a sub-action.
+- **Routing (post-P3.1):** `DeepLinkRouter` `.supportTrain(id:)` now lands on `SupportTrainDetailView` (iOS) / `SupportTrainDetailScreen` (Android); organizers reach `ReviewSignupsView` via the dock-overflow `Manage signups` action or the new `pantopus://support-trains/:id/manage` deep link (`.supportTrainManage(id:)`). The `SupportTrains` list row tap and the `StartSupportTrainWizard` success path both push the participant detail.
 
 ### A10.10 — Wallet (`/wallet.tsx`)
 - **iOS:** **MISSING** — no `Features/Wallet/` folder. Currently `Settings/SettingsView.swift:148` maps to `placeholder(label: "Payments & payouts")`.
@@ -304,7 +304,7 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
 ### A13.13 — Manage train (`/support-trains/[id]/manage.tsx`)
 - **iOS:** `Features/SupportTrains/Manage/ManageTrainView.swift` + `ManageTrainViewModel.swift` + `Components/{TrainContextStrip, StatCellRow, SendUpdateForm, OrganizeSection, CloseTrainSheet}.swift` (P4.3).
 - **Android:** `ui/screens/support_trains/manage/ManageTrainScreen.kt` + `ManageTrainViewModel.kt` + `components/{TrainContextStrip, StatCellRow, SendUpdateForm, OrganizeSection, CloseTrainSheet}.kt` (P4.3).
-- **Status:** **BUILT** (P4.3) — snapshot baselines pending follow-up commit; wired from `pantopus://support-trains/:id/manage` + new `.manageTrain(trainId:)` route. The A10.9 dock-overflow entry point lands when A10.9 ships.
+- **Status:** **BUILT** (P4.3) — snapshot baselines pending follow-up commit; wired from `pantopus://support-trains/:id/manage` + new `.manageTrain(trainId:)` route; A10.9 detail dock-overflow's `onOpenManage` callback now pushes the Manage Train route (replacing the pre-P4.3 review-signups stub).
 - **Designed frames:** active train mid-edit (Murphy meal train · day 12/21 · 18 slots filled · draft note typed · audience: all helpers · push on · `Send update` CTA enabled) · closing sheet (close confirmation bottom sheet · summary stats · optional thank-you note · destructive "Close & thank" red CTA)
 - **Required slots:**
   - **`TrainContextStrip`** — title (`Murphy meal train`) + days-progress (12/21) + audience meta.

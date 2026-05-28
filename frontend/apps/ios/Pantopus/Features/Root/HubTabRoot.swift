@@ -19,6 +19,17 @@ public enum HubRoute: Hashable {
     case mailboxVault
     case addHome
     case claimOwnership(homeId: String)
+    /// A12.5 / A12.6 — Verify landlord wizard. Pushed when the
+    /// dashboard's ownership claim resolves to the "verify via
+    /// landlord" branch (rental detected, owner-claim path not
+    /// applicable) or from a `pantopus://homes/:id/verify-landlord`
+    /// deep link.
+    case verifyLandlord(homeId: String)
+    /// A12.7 — Sibling postcard verification status screen. Pushed
+    /// when the verify-landlord wizard's submit succeeds, or directly
+    /// from `pantopus://homes/:id/verify-postcard` for users who want
+    /// to track their postcard later.
+    case postcardVerification(homeId: String)
     case homeDashboard(homeId: String)
     /// Pets sub-screen for a specific home (T5.2.1).
     case homePets(homeId: String)
@@ -74,6 +85,10 @@ public enum HubRoute: Hashable {
     /// surface that previously routed to a `Business: <name>`
     /// placeholder.
     case businessProfile(businessId: String)
+    /// A12.10 — Create Business wizard. Reached from the My Businesses
+    /// FAB / empty-state CTA and from the `pantopus://businesses/new`
+    /// deep link.
+    case createBusiness
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
     case homeBills(homeId: String)
@@ -151,8 +166,16 @@ public enum HubRoute: Hashable {
     /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
     /// Pushed when the Support Trains FAB / empty-state CTA fires.
     case startSupportTrain
+    /// A10.9 (P3.1) — Participant-facing Support Train detail screen.
+    /// Pushed from a Support Trains row tap and from the
+    /// `pantopus://support-trains/:id` deep link. The organizer-only
+    /// review queue lives behind the dock overflow on this screen
+    /// (`reviewSignups`) for callers who own the train.
+    case supportTrainDetail(supportTrainId: String)
     /// Review-signups (T6.6c / P26.5) — organizer-only review queue
-    /// for one Support Train. Pushed from a Support Trains row tap.
+    /// for one Support Train. Reached from the participant detail
+    /// screen's dock-overflow `Manage signups` for organizers, or
+    /// from the `pantopus://support-trains/:id/manage` deep link.
     case reviewSignups(supportTrainId: String)
     /// P4.6 — Support Trains search. Pushed from the Support Trains list
     /// top-bar search action; reuses the shared `SearchListShell`.
@@ -223,6 +246,10 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A10.10 — Wallet (earnings-side surface). Reached from the
+    /// Settings → "Payments & payouts" row and the
+    /// `pantopus://wallet` deep link.
+    case wallet
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -347,6 +374,12 @@ public struct HubTabRoot: View {
         case let .homeMemberRequests(id):
             path.append(.homeMembers(homeId: id))
             _ = router.consume()
+        case let .verifyLandlord(id):
+            path.append(.verifyLandlord(homeId: id))
+            _ = router.consume()
+        case let .postcardVerification(id):
+            path.append(.postcardVerification(homeId: id))
+            _ = router.consume()
         case .notifications:
             path.append(.notifications)
             _ = router.consume()
@@ -359,20 +392,28 @@ public struct HubTabRoot: View {
         case .discoverHub:
             path.append(.discoverHub)
             _ = router.consume()
+        case .wallet:
+            path.append(.wallet)
+            _ = router.consume()
+        case .createBusiness:
+            path.append(.createBusiness)
+            _ = router.consume()
         case let .supportTrain(id):
-            // pantopus://support-trains/:id deep links land on the
-            // organizer review queue when the caller has access; the
-            // backend's `/:id/reservations` handler returns 403 for
-            // non-organizers and the screen surfaces an error state.
+            // A10.9 (P3.1) — pantopus://support-trains/:id deep links
+            // now land on the participant detail. Organizers reach the
+            // review queue via the dock overflow on the detail screen;
+            // the explicit `support-trains/:id/manage` deep link is
+            // their shortcut to the queue.
             path.append(.supportTrains)
             if !id.isEmpty {
-                path.append(.reviewSignups(supportTrainId: id))
+                path.append(.supportTrainDetail(supportTrainId: id))
             }
             _ = router.consume()
-        case let .manageTrain(id):
-            // pantopus://support-trains/:id/manage — A13.13 organizer
-            // surface. Drop the user on the Support Trains list first
-            // so a back-tap pops to a known surface, then push manage.
+        case let .supportTrainManage(id):
+            // P4.3 / A13.13 — `pantopus://support-trains/:id/manage`
+            // lands on the organizer Manage Train surface. Drop the
+            // user on the Support Trains list first so a back-tap
+            // pops to a known surface, then push manage.
             path.append(.supportTrains)
             if !id.isEmpty {
                 path.append(.manageTrain(trainId: id))
@@ -555,7 +596,23 @@ public struct HubTabRoot: View {
         case let .homeDashboard(homeId):
             HomeDashboardView(
                 homeId: homeId,
-                onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
+                onClaimOwnership: {
+                    // The ownership-claim flow branches on whether the
+                    // resident is the owner or a renter. Until the
+                    // backend wires that decision into the claim
+                    // start endpoint, we key off the sample-data
+                    // homeId pattern so QA can hit either path. Both
+                    // branches start identically from the dashboard
+                    // banner.
+                    Task { @MainActor in
+                        if homeId.localizedCaseInsensitiveContains("renter")
+                            || homeId.localizedCaseInsensitiveContains("verify-landlord") {
+                            push(.verifyLandlord(homeId: homeId))
+                        } else {
+                            push(.claimOwnership(homeId: homeId))
+                        }
+                    }
+                },
                 onOpenClaimsList: { Task { @MainActor in push(.myClaims) } },
                 onOpenBills: { Task { @MainActor in push(.homeBills(homeId: homeId)) } },
                 onOpenPolls: { Task { @MainActor in push(.homePolls(homeId: homeId)) } },
@@ -996,6 +1053,33 @@ public struct HubTabRoot: View {
                     path.append(.myClaims)
                 }
             )
+        case let .verifyLandlord(homeId):
+            VerifyLandlordWizardView(
+                homeId: homeId,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenPostcardVerification: { resolvedHomeId in
+                    // Replace the wizard with the postcard tracker so
+                    // Back returns to the home dashboard, not the
+                    // wizard.
+                    path.removeAll { route in
+                        if case .verifyLandlord = route { return true }
+                        return false
+                    }
+                    path.append(.postcardVerification(homeId: resolvedHomeId))
+                }
+            )
+        case let .postcardVerification(homeId):
+            PostcardVerificationView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onVerified: { _ in
+                    // Pop the tracker — the underlying home dashboard
+                    // refreshes its verification status on next visit.
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
         case let .mailItemDetail(mailId):
             // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will
             // extend this with package / coupon / booklet / certified
@@ -1036,6 +1120,19 @@ public struct HubTabRoot: View {
                     )
                 },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
+            )
+        case .createBusiness:
+            CreateBusinessWizardView(
+                onClose: { Task { @MainActor in pop() } },
+                onOpenBusiness: { businessId in
+                    // Replace the wizard with the business profile so Back
+                    // returns to wherever the wizard was launched from.
+                    path.removeAll { route in
+                        if case .createBusiness = route { return true }
+                        return false
+                    }
+                    path.append(.businessProfile(businessId: businessId))
+                }
             )
         case let .pulsePost(postId):
             PulsePostDetailView(
@@ -1289,7 +1386,7 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.startSupportTrain) }
                     },
                     onOpenTrain: { trainId in
-                        Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
+                        Task { @MainActor in push(.supportTrainDetail(supportTrainId: trainId)) }
                     },
                     onSearch: {
                         Task { @MainActor in push(.searchSupportTrains) }
@@ -1300,7 +1397,7 @@ public struct HubTabRoot: View {
             SupportTrainsSearchView(
                 viewModel: SupportTrainsSearchViewModel(
                     onOpenTrain: { trainId in
-                        Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
+                        Task { @MainActor in push(.supportTrainDetail(supportTrainId: trainId)) }
                     },
                     onCancel: { pop() }
                 )
@@ -1313,9 +1410,59 @@ public struct HubTabRoot: View {
                     }
                 },
                 onOpenTrain: { trainId in
+                    // After publish we land on the participant detail —
+                    // the organizer who just launched the train can
+                    // open the review queue from the dock overflow.
                     Task { @MainActor in
                         if !path.isEmpty { path.removeLast() }
-                        path.append(.reviewSignups(supportTrainId: trainId))
+                        path.append(.supportTrainDetail(supportTrainId: trainId))
+                    }
+                }
+            )
+        case let .supportTrainDetail(supportTrainId):
+            SupportTrainDetailView(
+                viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
+                onBack: { Task { @MainActor in pop() } },
+                onOpenManage: {
+                    // P4.3 / A13.13 — the A10.9 dock-overflow lands on
+                    // the organizer Manage Train surface (was wired to
+                    // the review-signups queue as a stub before A13.13
+                    // shipped).
+                    Task { @MainActor in
+                        push(.manageTrain(trainId: supportTrainId))
+                    }
+                },
+                onShare: {
+                    systemSheet = .share(
+                        items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
+                },
+                onSignUp: {
+                    // Slot claim sheet wiring lands with the
+                    // editor surface in P3.7 follow-up — keep the
+                    // affordance visible per the design contract.
+                    Task { @MainActor in
+                        push(.placeholder(label: "Claim a slot"))
+                    }
+                },
+                onEditSlot: { _ in
+                    Task { @MainActor in
+                        push(.placeholder(label: "Edit your slot"))
+                    }
+                },
+                onSendCard: {
+                    Task { @MainActor in
+                        push(.placeholder(label: "Send a card"))
+                    }
+                },
+                onJoinAsBackup: {
+                    Task { @MainActor in
+                        push(.placeholder(label: "Join as backup"))
+                    }
+                },
+                onMessageHost: {
+                    Task { @MainActor in
+                        push(.placeholder(label: "Message host"))
                     }
                 }
             )
@@ -1468,6 +1615,15 @@ public struct HubTabRoot: View {
                         push(.reviewClaims)
                     }
                 },
+                onOpenWallet: {
+                    // Same close-then-push pattern as reviewClaims: the
+                    // wallet is a top-level destination, not a sub-route
+                    // of Settings, so back from it returns to the Hub.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.wallet)
+                    }
+                },
                 onSignedOut: { Task { @MainActor in pop() } }
             )
         case .editProfile:
@@ -1567,6 +1723,16 @@ public struct HubTabRoot: View {
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case .wallet:
+            WalletView(
+                onBack: pop,
+                onOpenHistory: { Task { @MainActor in push(.placeholder(label: "Wallet history")) } },
+                onWithdraw: { Task { @MainActor in push(.placeholder(label: "Withdraw")) } },
+                onManagePayout: { Task { @MainActor in push(.placeholder(label: "Manage payout method")) } },
+                onReverifyPayout: { Task { @MainActor in push(.placeholder(label: "Re-verify bank")) } },
+                onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } },
+                onSeeAllActivity: { Task { @MainActor in push(.placeholder(label: "All activity")) } }
+            )
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

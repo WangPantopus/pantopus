@@ -65,6 +65,7 @@ HEX_EXEMPT=(
   "Features/Membership/MembershipDetailContent.swift"
   "Features/Shared/MailItemDetail/MailItemDetailShell.swift"
   "Features/Shared/MapListHybrid/MapListHybridPreview.swift"
+  "Features/Wallet/Components/WalletPalette.swift"
 )
 HEX_EXCLUDE_ARGS=()
 for f in "${HEX_EXEMPT[@]}"; do

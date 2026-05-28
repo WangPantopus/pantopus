@@ -90,6 +90,15 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun wallet_routes_to_wallet() {
+        assertEquals(DeepLinkRouter.Destination.Wallet, DeepLinkRouter.resolveString("pantopus://wallet"))
+        assertEquals(
+            DeepLinkRouter.Destination.Wallet,
+            DeepLinkRouter.resolveString("https://pantopus.app/wallet"),
+        )
+    }
+
+    @Test
     fun support_train_route() {
         assertEquals(
             DeepLinkRouter.Destination.SupportTrain("st_1"),
@@ -101,17 +110,23 @@ class DeepLinkRouterTest {
         )
     }
 
+    /**
+     * P4.3 / A13.13 — Organizers reach the Manage Train surface via
+     * `pantopus://support-trains/:id/manage`; the bare
+     * `support-trains/:id` URL lands on the A10.9 participant detail.
+     */
     @Test
-    fun manage_train_route() {
-        // P4.3 / A13.13 — `/support-trains/:id/manage` routes to the
-        // organizer-only manage surface.
+    fun support_train_manage_route() {
+        // P4.3 / A13.13 — `/support-trains/:id/manage` resolves to the
+        // organizer-only Manage Train deep-link destination on both URL
+        // shapes.
         assertEquals(
-            DeepLinkRouter.Destination.ManageTrain("st_1"),
+            DeepLinkRouter.Destination.SupportTrainManage("st_1"),
             DeepLinkRouter.resolveString("pantopus://support-trains/st_1/manage"),
         )
         assertEquals(
-            DeepLinkRouter.Destination.ManageTrain("st_2"),
-            DeepLinkRouter.resolveString("https://pantopus.app/support-trains/st_2/manage"),
+            DeepLinkRouter.Destination.SupportTrainManage("st_3"),
+            DeepLinkRouter.resolveString("https://pantopus.app/support-trains/st_3/manage"),
         )
     }
 
@@ -194,6 +209,22 @@ class DeepLinkRouterTest {
     @Test
     fun connections_route() {
         assertEquals(DeepLinkRouter.Destination.Connections, DeepLinkRouter.resolveString("pantopus://connections"))
+    }
+
+    @Test
+    fun create_business_route_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.CreateBusiness,
+            DeepLinkRouter.resolveString("pantopus://businesses/new"),
+        )
+    }
+
+    @Test
+    fun create_business_route_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.CreateBusiness,
+            DeepLinkRouter.resolveString("https://pantopus.app/businesses/new"),
+        )
     }
 
     // MARK: - T6.1c P5 — Auth deep links
@@ -284,5 +315,39 @@ class DeepLinkRouterTest {
         DeepLinkRouter.handle("pantopus://gigs/g_99")
         val pending = DeepLinkRouter.consume()
         assertEquals(DeepLinkRouter.Destination.Gig("g_99"), pending)
+    }
+
+    // MARK: - Verify-landlord routes (P2.1 / A12.5–A12.7)
+
+    @Test
+    fun verify_landlord_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyLandlord("h_42"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_42/verify-landlord"),
+        )
+    }
+
+    @Test
+    fun verify_landlord_underscore_shape() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyLandlord("h_42"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_42/verify_landlord"),
+        )
+    }
+
+    @Test
+    fun postcard_verification_deep_link() {
+        assertEquals(
+            DeepLinkRouter.Destination.PostcardVerification("h_42"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_42/verify-postcard"),
+        )
+    }
+
+    @Test
+    fun verify_landlord_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyLandlord("h_42"),
+            DeepLinkRouter.resolveString("https://pantopus.app/homes/h_42/verify-landlord"),
+        )
     }
 }

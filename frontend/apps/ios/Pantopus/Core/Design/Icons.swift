@@ -113,6 +113,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case ban
     case fileText = "file-text"
 
+    // A10.10 Wallet — BalanceHero "This month" trend indicator + Withdraw CTA glyph.
+    case trendingUp = "trending-up"
+    case arrowDownToLine = "arrow-down-to-line"
+
     // T5.3.2 My tasks V2 — poster-side chip + footer icons.
     case plus
     case rocket
@@ -287,6 +291,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     /// Lucide `bot` token and can swap to a real vector later.
     case bot
 
+    // A12.10 Create Business — category tile glyphs. `cpu` backs the Tech &
+    // Repair tile; `truck` backs the Delivery & Errands tile.
+    case cpu
+    case truck
+
     // A13.13 — Manage train. `bar-chart-3` paints the Analytics row's icon
     // tile; `calendar-cog` paints the Edit-dates-&-slots row.
     case barChart3 = "bar-chart-3"
@@ -382,6 +391,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trendingDown: "chart.line.downtrend.xyaxis"
         case .ban: "nosign"
         case .fileText: "doc.text"
+        case .trendingUp: "chart.line.uptrend.xyaxis"
+        case .arrowDownToLine: "arrow.down.to.line"
         case .plus: "plus"
         case .rocket: "paperplane.fill"
         case .clipboardList: "list.clipboard"
@@ -512,6 +523,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // A15.3 AI Assistant. SF Symbols has no robot glyph; `bot` falls
         // back to `sparkles`, the house AI/magic glyph.
         case .bot: "sparkles"
+        // A12.10 Create Business — SF Symbols ships direct `cpu` and
+        // `box.truck` glyphs.
+        case .cpu: "cpu"
+        case .truck: "box.truck"
         // A13.13 Manage train. `chart.bar` paints the analytics row;
         // `calendar.badge.clock` is the closest "calendar with gear" glyph
         // (no native `calendar.gearshape`), used on the Edit-dates row.

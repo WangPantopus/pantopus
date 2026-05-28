@@ -44,6 +44,7 @@ import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINES
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
+import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
@@ -158,6 +159,10 @@ import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KE
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
 import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
+import app.pantopus.android.ui.screens.homes.verify_landlord.VERIFY_LANDLORD_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.verify_landlord.VerifyLandlordWizardScreen
+import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.POSTCARD_VERIFICATION_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.verify_landlord.postcard.PostcardVerificationScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -227,11 +232,14 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
+import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailActions
+import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailScreen
 import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.support_trains.manage.ManageTrainScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
+import app.pantopus.android.ui.screens.wallet.WalletScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -243,7 +251,20 @@ private object ChildRoutes {
 
     /** P6.6 — "Register a business · coming soon" waitlist surface. */
     const val BUSINESS_WAITLIST = "businesses/waitlist"
+
+    /** A12.10 — Create Business wizard route. */
+    const val CREATE_BUSINESS = "businesses/new"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
+
+    /** A12.5 / A12.6 — Verify landlord wizard. Pushed from the home
+     *  dashboard's ownership-claim CTA when the home record marks
+     *  the resident as a renter, or directly via the
+     *  `pantopus://homes/:id/verify-landlord` deep link. */
+    const val VERIFY_LANDLORD = "homes/{$VERIFY_LANDLORD_HOME_ID_KEY}/verify-landlord"
+
+    /** A12.7 — Postcard verification sibling status screen. */
+    const val POSTCARD_VERIFICATION =
+        "homes/{$POSTCARD_VERIFICATION_HOME_ID_KEY}/verify-postcard"
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
 
@@ -689,6 +710,17 @@ private object ChildRoutes {
 
     fun reviewSignups(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/review"
 
+    /** A10.9 (P3.1) Participant-facing Support Train detail. `:id`
+     *  is the Support Train UUID. Replaces the previous default of
+     *  landing on the organizer review queue; organizers still
+     *  reach the queue via the dock-overflow `Manage signups`
+     *  action on this screen. Keep in sync with
+     *  `SupportTrainDetailViewModel.SUPPORT_TRAIN_ID_KEY`. */
+    const val SUPPORT_TRAIN_DETAIL_ID_KEY = "supportTrainDetailId"
+    const val SUPPORT_TRAIN_DETAIL = "support-trains/{$SUPPORT_TRAIN_DETAIL_ID_KEY}"
+
+    fun supportTrainDetail(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}"
+
     /** P3.7 Edit Signup form. `:reservationId` is the reservation UUID;
      *  the seed DTO is staged in
      *  `SupportTrainReservationsStore` by the Review-signups
@@ -898,6 +930,12 @@ private object ChildRoutes {
     /** Build the claim-ownership wizard path. */
     fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
 
+    /** Build the verify-landlord wizard path. */
+    fun verifyLandlord(homeId: String): String = "homes/$homeId/verify-landlord"
+
+    /** Build the postcard verification standalone path. */
+    fun postcardVerification(homeId: String): String = "homes/$homeId/verify-postcard"
+
     /** Build the generic placeholder path with an encoded label. */
     fun placeholder(label: String): String = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
 
@@ -1036,6 +1074,11 @@ private object ChildRoutes {
     /** A10.3 — Full "Today" briefing (weather, air, daylight, signals). */
     const val TODAY_DETAIL = "hub/today/detail"
 
+    /** A10.10 — Wallet (earnings-side surface). Reached from the
+     *  Settings → "Payments & payouts" row and the
+     *  `pantopus://wallet` deep link. */
+    const val WALLET = "wallet"
+
     /** A.4 — Property details for a home. */
     const val PROPERTY_DETAILS_HOME_ID_KEY = "homeId"
     const val PROPERTY_DETAILS = "homes/{$PROPERTY_DETAILS_HOME_ID_KEY}/property"
@@ -1143,6 +1186,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.DISCOVER_HUB)
                 DeepLinkRouter.consume()
             }
+            DeepLinkRouter.Destination.Wallet -> {
+                navController.navigate(ChildRoutes.WALLET)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.CreateBusiness -> {
+                navController.navigate(ChildRoutes.CREATE_BUSINESS)
+                DeepLinkRouter.consume()
+            }
             is DeepLinkRouter.Destination.Post -> {
                 navController.navigate(ChildRoutes.pulsePost(pending.id))
                 DeepLinkRouter.consume()
@@ -1155,20 +1206,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.SupportTrain -> {
-                // Deep links to a specific Support Train open the review queue
-                // (organizer-only) when the caller owns the train. The
-                // detail / non-organizer view is the next surface to land —
-                // until then the route lists the user's support trains so
-                // the deep link still resolves to something useful.
+                // A10.9 (P3.1) — `pantopus://support-trains/:id` now
+                // lands on the participant detail. Organizers reach
+                // the review queue from the dock overflow on the
+                // detail screen, or via the explicit
+                // `support-trains/:id/manage` deep link
+                // (handled separately).
                 navController.navigate(ChildRoutes.SUPPORT_TRAINS)
+                if (pending.id.isNotBlank()) {
+                    navController.navigate(ChildRoutes.supportTrainDetail(pending.id))
+                }
                 DeepLinkRouter.consume()
             }
-            is DeepLinkRouter.Destination.ManageTrain -> {
-                // `pantopus://support-trains/:id/manage` → A13.13 organizer
-                // surface. Drop the user on the Support Trains list first so
-                // a back-tap pops to a known surface, then push manage.
+            is DeepLinkRouter.Destination.SupportTrainManage -> {
+                // P4.3 / A13.13 — `pantopus://support-trains/:id/manage`
+                // lands on the organizer Manage Train surface. Drop the
+                // user on the Support Trains list first so a back-tap
+                // pops to a known surface, then push manage.
                 navController.navigate(ChildRoutes.SUPPORT_TRAINS)
-                navController.navigate(ChildRoutes.manageTrain(pending.id))
+                if (pending.id.isNotBlank()) {
+                    navController.navigate(ChildRoutes.manageTrain(pending.id))
+                }
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Gig -> {
@@ -1189,6 +1247,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.HomeMemberRequests -> {
                 navController.navigate(ChildRoutes.placeholder("Member requests · ${pending.id}"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.VerifyLandlord -> {
+                navController.navigate(ChildRoutes.verifyLandlord(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.PostcardVerification -> {
+                navController.navigate(ChildRoutes.postcardVerification(pending.id))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.User -> {
@@ -1374,8 +1440,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.MY_BUSINESSES) {
                 MyBusinessesScreen(
                     onOpenBusiness = { _ -> navController.navigate(ChildRoutes.placeholder("Business dashboard")) },
-                    onRegister = { navController.navigate(ChildRoutes.BUSINESS_WAITLIST) },
+                    onRegister = { navController.navigate(ChildRoutes.CREATE_BUSINESS) },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.CREATE_BUSINESS) {
+                CreateBusinessWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenBusiness = { _ ->
+                        navController.popBackStack(ChildRoutes.CREATE_BUSINESS, inclusive = true)
+                        navController.navigate(ChildRoutes.placeholder("Business dashboard"))
+                    },
                 )
             }
             composable(
@@ -1388,7 +1463,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                     },
                     onClaimOwnership = { homeId ->
-                        navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        // The ownership-claim flow branches on whether the
+                        // resident is the owner or a renter. Until the
+                        // backend wires that decision into the claim
+                        // start endpoint, we key off the sample-data
+                        // homeId pattern so QA can hit either path. Both
+                        // branches start identically from the dashboard
+                        // banner.
+                        val target =
+                            if (
+                                homeId.contains("renter", ignoreCase = true) ||
+                                homeId.contains("verify-landlord", ignoreCase = true)
+                            ) {
+                                ChildRoutes.verifyLandlord(homeId)
+                            } else {
+                                ChildRoutes.claimOwnership(homeId)
+                            }
+                        navController.navigate(target)
                     },
                     onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
                     onOpenBills = { homeId ->
@@ -2648,8 +2739,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
                             // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
                             SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
-                            // Parked until P8.5 — depends on Stripe Connect wallet UX.
-                            SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.placeholder("Payments & payouts"))
+                            // P3.2 / A10.10 — Wallet replaces the prior placeholder.
+                            SettingsRoute.PaymentsPayouts -> {
+                                // Pop the settings screen first so back from the wallet
+                                // returns to the Hub root, not back into Settings.
+                                navController.popBackStack()
+                                navController.navigate(ChildRoutes.WALLET)
+                            }
                             SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
                             SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
                             SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
@@ -2868,7 +2964,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 SupportTrainsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTrain = { trainId ->
-                        navController.navigate(ChildRoutes.reviewSignups(trainId))
+                        navController.navigate(ChildRoutes.supportTrainDetail(trainId))
                     },
                     onStartTrain = {
                         navController.navigate(ChildRoutes.START_SUPPORT_TRAIN)
@@ -2881,7 +2977,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.SUPPORT_TRAINS_SEARCH) {
                 SupportTrainsSearchScreen(
                     onOpenTrain = { trainId ->
-                        navController.navigate(ChildRoutes.reviewSignups(trainId))
+                        navController.navigate(ChildRoutes.supportTrainDetail(trainId))
                     },
                     onCancel = { navController.popBackStack() },
                 )
@@ -2890,13 +2986,62 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 StartSupportTrainWizardScreen(
                     onDismiss = { navController.popBackStack() },
                     onOpenTrain = { trainId ->
-                        // Pop the wizard then push the new train's
-                        // review-signups screen so Back goes back to
-                        // the Support Trains list rather than the
-                        // wizard.
+                        // A10.9 (P3.1) — After publish we land on the
+                        // participant detail; the organizer who just
+                        // launched it reaches the review queue via
+                        // the dock overflow on the detail screen.
                         navController.popBackStack()
-                        navController.navigate(ChildRoutes.reviewSignups(trainId))
+                        navController.navigate(ChildRoutes.supportTrainDetail(trainId))
                     },
+                )
+            }
+            composable(
+                route = ChildRoutes.SUPPORT_TRAIN_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.SUPPORT_TRAIN_DETAIL_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) { entry ->
+                val trainId = entry.arguments?.getString(ChildRoutes.SUPPORT_TRAIN_DETAIL_ID_KEY).orEmpty()
+                SupportTrainDetailScreen(
+                    actions =
+                        SupportTrainDetailActions(
+                            onBack = { navController.popBackStack() },
+                            onOpenManage = {
+                                // P4.3 / A13.13 — A10.9 dock-overflow lands
+                                // on the organizer Manage Train surface (was
+                                // wired to review-signups as a stub before
+                                // A13.13 shipped).
+                                navController.navigate(ChildRoutes.manageTrain(trainId))
+                            },
+                            onShare = {
+                                appContext.shareText(
+                                    "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                    "Share train",
+                                )
+                            },
+                            onSignUp = {
+                                // Slot-claim sheet lands with the
+                                // editor surface in a P3.7 follow-up — surface
+                                // the affordance via a placeholder for now so
+                                // the dock CTA remains testable.
+                                navController.navigate(ChildRoutes.placeholder("Claim a slot"))
+                            },
+                            onEditSlot = {
+                                navController.navigate(ChildRoutes.placeholder("Edit your slot"))
+                            },
+                            onSendCard = {
+                                navController.navigate(ChildRoutes.placeholder("Send a card"))
+                            },
+                            onJoinAsBackup = {
+                                navController.navigate(ChildRoutes.placeholder("Join as backup"))
+                            },
+                            onMessageHost = {
+                                navController.navigate(ChildRoutes.placeholder("Message host"))
+                            },
+                        ),
                 )
             }
             composable(
@@ -3000,6 +3145,29 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             // screen when the matching A.x screen ships. ----
             composable(ChildRoutes.TODAY_DETAIL) {
                 TodayDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.WALLET) {
+                WalletScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenHistory = {
+                        navController.navigate(ChildRoutes.placeholder("Wallet history"))
+                    },
+                    onWithdraw = {
+                        navController.navigate(ChildRoutes.placeholder("Withdraw"))
+                    },
+                    onManagePayout = {
+                        navController.navigate(ChildRoutes.placeholder("Manage payout method"))
+                    },
+                    onReverifyPayout = {
+                        navController.navigate(ChildRoutes.placeholder("Re-verify bank"))
+                    },
+                    onOpenTaxDocs = {
+                        navController.navigate(ChildRoutes.placeholder("Tax documents"))
+                    },
+                    onSeeAllActivity = {
+                        navController.navigate(ChildRoutes.placeholder("All activity"))
+                    },
+                )
             }
             composable(
                 route = ChildRoutes.PROPERTY_DETAILS,
@@ -3140,6 +3308,37 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenClaimsList = {
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.MY_CLAIMS)
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.VERIFY_LANDLORD,
+                arguments = listOf(navArgument(VERIFY_LANDLORD_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                VerifyLandlordWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenPostcardVerification = { resolvedHomeId ->
+                        // Replace the wizard with the postcard tracker so
+                        // Back returns to the home dashboard, not the
+                        // wizard.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.postcardVerification(resolvedHomeId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.POSTCARD_VERIFICATION,
+                arguments =
+                    listOf(
+                        navArgument(POSTCARD_VERIFICATION_HOME_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                PostcardVerificationScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onVerified = { _ ->
+                        // Pop the tracker — the underlying home dashboard
+                        // refreshes on next visit.
+                        navController.popBackStack()
                     },
                 )
             }

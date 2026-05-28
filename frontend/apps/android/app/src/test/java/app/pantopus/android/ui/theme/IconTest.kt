@@ -96,6 +96,9 @@ class IconTest {
             "hourglass",
             "hand-coins",
             "package",
+            // A12.10 — Create Business category tiles.
+            "cpu",
+            "truck",
             "compass",
             "filter",
             // T5.3.1 — My bids
@@ -103,6 +106,9 @@ class IconTest {
             "trending-down",
             "ban",
             "file-text",
+            // A10.10 — Wallet.
+            "trending-up",
+            "arrow-down-to-line",
             // T5.3.2 — My tasks
             "plus",
             "rocket",

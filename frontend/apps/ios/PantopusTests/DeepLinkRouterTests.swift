@@ -84,15 +84,17 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrain(id: "st_1"))
     }
 
-    func testManageTrainRoute() throws {
-        // `pantopus://support-trains/:id/manage` — A13.13 organizer surface.
+    /// A13.13 — `pantopus://support-trains/:id/manage` lands on the
+    /// organizer-only Manage Train surface. Bare `support-trains/:id`
+    /// keeps landing on the A10.9 participant detail.
+    func testSupportTrainManageRoute() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://support-trains/st_1/manage")))
-        XCTAssertEqual(DeepLinkRouter.shared.pending, .manageTrain(id: "st_1"))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrainManage(id: "st_1"))
     }
 
-    func testManageTrainRouteHttpsForm() throws {
+    func testSupportTrainManageRouteHttpsForm() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/support-trains/st_1/manage")))
-        XCTAssertEqual(DeepLinkRouter.shared.pending, .manageTrain(id: "st_1"))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrainManage(id: "st_1"))
     }
 
     func testGigRoute() throws {
@@ -147,6 +149,28 @@ final class DeepLinkRouterTests: XCTestCase {
     func testNotificationsRoute() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://notifications")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .notifications)
+    }
+
+    // MARK: - A10.10 P3.2 — wallet deep link
+
+    func testWalletRouteCustomScheme() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://wallet")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .wallet)
+    }
+
+    func testWalletRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/wallet")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .wallet)
+    }
+
+    func testCreateBusinessRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://businesses/new")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .createBusiness)
+    }
+
+    func testCreateBusinessHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/businesses/new")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .createBusiness)
     }
 
     // MARK: - T6.1c P5 — auth deep links
@@ -231,5 +255,31 @@ final class DeepLinkRouterTests: XCTestCase {
     func testHandlePathPassesThroughFullURLs() {
         DeepLinkRouter.shared.handle(path: "https://pantopus.app/user/u_1")
         XCTAssertEqual(DeepLinkRouter.shared.pending, .user(id: "u_1"))
+    }
+
+    // MARK: - Verify-landlord routes (P2.1 / A12.5–A12.7)
+
+    func testVerifyLandlordCustomScheme() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://homes/h_42/verify-landlord"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .verifyLandlord(id: "h_42"))
+    }
+
+    func testVerifyLandlordUnderscoreShape() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://homes/h_42/verify_landlord"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .verifyLandlord(id: "h_42"))
+    }
+
+    func testPostcardVerificationDeepLink() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://homes/h_42/verify-postcard"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .postcardVerification(id: "h_42"))
+    }
+
+    func testVerifyLandlordHttpsHost() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/homes/h_42/verify-landlord"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .verifyLandlord(id: "h_42"))
     }
 }
