@@ -372,7 +372,7 @@ private fun BalanceHeroPreview() {
                         note = "3 tasks · clears by Dec 4",
                     ),
                     BalanceHeroSplitCell(
-                        icon = PantopusIcon.ArrowUpRight,
+                        icon = PantopusIcon.TrendingUp,
                         overline = "This month",
                         value = "$1,284.50",
                         note = "8 tasks · ▲22% vs Oct",

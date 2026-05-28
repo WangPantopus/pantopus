@@ -255,7 +255,7 @@ public struct BalanceHero: View {
                     note: "3 tasks · clears by Dec 4"
                 ),
                 .init(
-                    icon: .arrowUpRight,
+                    icon: .trendingUp,
                     overline: "This month",
                     value: "$1,284.50",
                     note: "8 tasks · ▲22% vs Oct"
@@ -275,7 +275,7 @@ public struct BalanceHero: View {
                     note: "3 tasks · clears by Dec 4"
                 ),
                 .init(
-                    icon: .arrowUpRight,
+                    icon: .trendingUp,
                     overline: "This month",
                     value: "$1,284.50",
                     note: "8 tasks · ▲22% vs Oct"

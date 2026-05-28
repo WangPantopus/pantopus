@@ -113,6 +113,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case ban
     case fileText = "file-text"
 
+    // A10.10 Wallet — BalanceHero "This month" trend indicator + Withdraw CTA glyph.
+    case trendingUp = "trending-up"
+    case arrowDownToLine = "arrow-down-to-line"
+
     // T5.3.2 My tasks V2 — poster-side chip + footer icons.
     case plus
     case rocket
@@ -382,6 +386,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trendingDown: "chart.line.downtrend.xyaxis"
         case .ban: "nosign"
         case .fileText: "doc.text"
+        case .trendingUp: "chart.line.uptrend.xyaxis"
+        case .arrowDownToLine: "arrow.down.to.line"
         case .plus: "plus"
         case .rocket: "paperplane.fill"
         case .clipboardList: "list.clipboard"

@@ -238,6 +238,7 @@ import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupForm
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
+import app.pantopus.android.ui.screens.wallet.WalletScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -1062,6 +1063,11 @@ private object ChildRoutes {
     /** A10.3 — Full "Today" briefing (weather, air, daylight, signals). */
     const val TODAY_DETAIL = "hub/today/detail"
 
+    /** A10.10 — Wallet (earnings-side surface). Reached from the
+     *  Settings → "Payments & payouts" row and the
+     *  `pantopus://wallet` deep link. */
+    const val WALLET = "wallet"
+
     /** A.4 — Property details for a home. */
     const val PROPERTY_DETAILS_HOME_ID_KEY = "homeId"
     const val PROPERTY_DETAILS = "homes/{$PROPERTY_DETAILS_HOME_ID_KEY}/property"
@@ -1167,6 +1173,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             DeepLinkRouter.Destination.DiscoverHub -> {
                 navController.navigate(ChildRoutes.DISCOVER_HUB)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Wallet -> {
+                navController.navigate(ChildRoutes.WALLET)
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.CreateBusiness -> {
@@ -2714,8 +2724,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
                             // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
                             SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
-                            // Parked until P8.5 — depends on Stripe Connect wallet UX.
-                            SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.placeholder("Payments & payouts"))
+                            // P3.2 / A10.10 — Wallet replaces the prior placeholder.
+                            SettingsRoute.PaymentsPayouts -> {
+                                // Pop the settings screen first so back from the wallet
+                                // returns to the Hub root, not back into Settings.
+                                navController.popBackStack()
+                                navController.navigate(ChildRoutes.WALLET)
+                            }
                             SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
                             SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
                             SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
@@ -3089,6 +3104,29 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             // screen when the matching A.x screen ships. ----
             composable(ChildRoutes.TODAY_DETAIL) {
                 TodayDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.WALLET) {
+                WalletScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenHistory = {
+                        navController.navigate(ChildRoutes.placeholder("Wallet history"))
+                    },
+                    onWithdraw = {
+                        navController.navigate(ChildRoutes.placeholder("Withdraw"))
+                    },
+                    onManagePayout = {
+                        navController.navigate(ChildRoutes.placeholder("Manage payout method"))
+                    },
+                    onReverifyPayout = {
+                        navController.navigate(ChildRoutes.placeholder("Re-verify bank"))
+                    },
+                    onOpenTaxDocs = {
+                        navController.navigate(ChildRoutes.placeholder("Tax documents"))
+                    },
+                    onSeeAllActivity = {
+                        navController.navigate(ChildRoutes.placeholder("All activity"))
+                    },
+                )
             }
             composable(
                 route = ChildRoutes.PROPERTY_DETAILS,
