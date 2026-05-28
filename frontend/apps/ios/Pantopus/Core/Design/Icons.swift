@@ -303,8 +303,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case cpu
     case truck
 
-    // P5.2 / A14.6 Payments — the inline-empty hero disc inside the
-    // Payment methods card uses Lucide's `credit-card` glyph.
+    /// P5.2 / A14.6 Payments — the inline-empty hero disc inside the
+    /// Payment methods card uses Lucide's `credit-card` glyph.
     case creditCard = "credit-card"
 
     // A13.13 — Manage train. `bar-chart-3` paints the Analytics row's icon
