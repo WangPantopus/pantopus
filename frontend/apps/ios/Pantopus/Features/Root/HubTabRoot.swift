@@ -166,8 +166,16 @@ public enum HubRoute: Hashable {
     /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
     /// Pushed when the Support Trains FAB / empty-state CTA fires.
     case startSupportTrain
+    /// A10.9 (P3.1) — Participant-facing Support Train detail screen.
+    /// Pushed from a Support Trains row tap and from the
+    /// `pantopus://support-trains/:id` deep link. The organizer-only
+    /// review queue lives behind the dock overflow on this screen
+    /// (`reviewSignups`) for callers who own the train.
+    case supportTrainDetail(supportTrainId: String)
     /// Review-signups (T6.6c / P26.5) — organizer-only review queue
-    /// for one Support Train. Pushed from a Support Trains row tap.
+    /// for one Support Train. Reached from the participant detail
+    /// screen's dock-overflow `Manage signups` for organizers, or
+    /// from the `pantopus://support-trains/:id/manage` deep link.
     case reviewSignups(supportTrainId: String)
     /// P4.6 — Support Trains search. Pushed from the Support Trains list
     /// top-bar search action; reuses the shared `SearchListShell`.
@@ -380,10 +388,17 @@ public struct HubTabRoot: View {
             path.append(.createBusiness)
             _ = router.consume()
         case let .supportTrain(id):
-            // pantopus://support-trains/:id deep links land on the
-            // organizer review queue when the caller has access; the
-            // backend's `/:id/reservations` handler returns 403 for
-            // non-organizers and the screen surfaces an error state.
+            // A10.9 (P3.1) — pantopus://support-trains/:id deep links
+            // now land on the participant detail. Organizers reach the
+            // review queue via the dock overflow on the detail screen;
+            // the explicit `support-trains/:id/manage` deep link is
+            // their shortcut to the queue.
+            path.append(.supportTrains)
+            if !id.isEmpty {
+                path.append(.supportTrainDetail(supportTrainId: id))
+            }
+            _ = router.consume()
+        case let .supportTrainManage(id):
             path.append(.supportTrains)
             if !id.isEmpty {
                 path.append(.reviewSignups(supportTrainId: id))
@@ -1356,7 +1371,7 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.startSupportTrain) }
                     },
                     onOpenTrain: { trainId in
-                        Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
+                        Task { @MainActor in push(.supportTrainDetail(supportTrainId: trainId)) }
                     },
                     onSearch: {
                         Task { @MainActor in push(.searchSupportTrains) }
@@ -1367,7 +1382,7 @@ public struct HubTabRoot: View {
             SupportTrainsSearchView(
                 viewModel: SupportTrainsSearchViewModel(
                     onOpenTrain: { trainId in
-                        Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
+                        Task { @MainActor in push(.supportTrainDetail(supportTrainId: trainId)) }
                     },
                     onCancel: { pop() }
                 )
@@ -1380,9 +1395,55 @@ public struct HubTabRoot: View {
                     }
                 },
                 onOpenTrain: { trainId in
+                    // After publish we land on the participant detail —
+                    // the organizer who just launched the train can
+                    // open the review queue from the dock overflow.
                     Task { @MainActor in
                         if !path.isEmpty { path.removeLast() }
-                        path.append(.reviewSignups(supportTrainId: trainId))
+                        path.append(.supportTrainDetail(supportTrainId: trainId))
+                    }
+                }
+            )
+        case let .supportTrainDetail(supportTrainId):
+            SupportTrainDetailView(
+                viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
+                onBack: { Task { @MainActor in pop() } },
+                onOpenManage: {
+                    Task { @MainActor in
+                        push(.reviewSignups(supportTrainId: supportTrainId))
+                    }
+                },
+                onShare: {
+                    systemSheet = .share(
+                        items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
+                },
+                onSignUp: {
+                    // Slot claim sheet wiring lands with the
+                    // editor surface in P3.7 follow-up — keep the
+                    // affordance visible per the design contract.
+                    Task { @MainActor in
+                        push(.placeholder(label: "Claim a slot"))
+                    }
+                },
+                onEditSlot: { _ in
+                    Task { @MainActor in
+                        push(.placeholder(label: "Edit your slot"))
+                    }
+                },
+                onSendCard: {
+                    Task { @MainActor in
+                        push(.placeholder(label: "Send a card"))
+                    }
+                },
+                onJoinAsBackup: {
+                    Task { @MainActor in
+                        push(.placeholder(label: "Join as backup"))
+                    }
+                },
+                onMessageHost: {
+                    Task { @MainActor in
+                        push(.placeholder(label: "Message host"))
                     }
                 }
             )

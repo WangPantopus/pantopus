@@ -101,6 +101,23 @@ class DeepLinkRouterTest {
         )
     }
 
+    /**
+     * A10.9 (P3.1) — Organizers reach the review queue via
+     * `pantopus://support-trains/:id/manage`; the bare
+     * `support-trains/:id` URL now lands on the participant detail.
+     */
+    @Test
+    fun support_train_manage_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.SupportTrainManage("st_1"),
+            DeepLinkRouter.resolveString("pantopus://support-trains/st_1/manage"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.SupportTrainManage("st_3"),
+            DeepLinkRouter.resolveString("https://pantopus.app/support-trains/st_3/manage"),
+        )
+    }
+
     @Test
     fun gig_route() {
         assertEquals(

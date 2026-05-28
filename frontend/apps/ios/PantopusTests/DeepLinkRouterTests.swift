@@ -84,6 +84,14 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrain(id: "st_1"))
     }
 
+    /// A10.9 (P3.1) — Organizers reach the review queue via
+    /// `pantopus://support-trains/:id/manage`; the bare
+    /// `support-trains/:id` URL now lands on the participant detail.
+    func testSupportTrainManageRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://support-trains/st_1/manage")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrainManage(id: "st_1"))
+    }
+
     func testGigRoute() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://gig/g_42")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .gig(id: "g_42"))
