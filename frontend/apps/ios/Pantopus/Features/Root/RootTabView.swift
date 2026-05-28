@@ -107,11 +107,11 @@ public struct RootTabView: View {
         case let .invite(token):
             pendingInviteToken = token
             _ = router.consume()
-        case .feed, .post, .supportTrain, .user,
+        case .feed, .post, .supportTrain, .supportTrainManage, .user,
              .connections, .discoverHub,
              .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests,
              .verifyLandlord, .postcardVerification,
-             .notifications:
+             .notifications, .createBusiness, .wallet:
             model.selected = .hub
         case .conversation:
             model.selected = .inbox
