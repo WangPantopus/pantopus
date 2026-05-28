@@ -144,7 +144,7 @@ private struct CategoryGroup: View {
 
     var body: some View {
         FormFieldGroup("Category") {
-            CategoryGrid(selected: viewModel.category) { newValue in
+            MaintenanceCategoryGrid(selected: viewModel.category) { newValue in
                 viewModel.category = newValue
                 viewModel.recomputeDirty()
             }
@@ -153,7 +153,7 @@ private struct CategoryGroup: View {
     }
 }
 
-private struct CategoryGrid: View {
+private struct MaintenanceCategoryGrid: View {
     let selected: MaintenanceCategory
     let onSelect: (MaintenanceCategory) -> Void
 

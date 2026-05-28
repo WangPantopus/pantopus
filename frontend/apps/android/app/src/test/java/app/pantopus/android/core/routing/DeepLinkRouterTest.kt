@@ -182,6 +182,22 @@ class DeepLinkRouterTest {
         assertEquals(DeepLinkRouter.Destination.Connections, DeepLinkRouter.resolveString("pantopus://connections"))
     }
 
+    @Test
+    fun create_business_route_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.CreateBusiness,
+            DeepLinkRouter.resolveString("pantopus://businesses/new"),
+        )
+    }
+
+    @Test
+    fun create_business_route_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.CreateBusiness,
+            DeepLinkRouter.resolveString("https://pantopus.app/businesses/new"),
+        )
+    }
+
     // MARK: - T6.1c P5 — Auth deep links
 
     @Test

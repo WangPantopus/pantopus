@@ -101,6 +101,7 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocalFlorist
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -108,6 +109,7 @@ import androidx.compose.material.icons.filled.MarkAsUnread
 import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -465,6 +467,12 @@ enum class PantopusIcon(
     // for Lucide `bot`. iOS has no robot SF Symbol and falls back to
     // `sparkles`.
     Bot("bot"),
+
+    // A12.10 Create Business — category tile glyphs. `Cpu` backs the Tech &
+    // Repair tile (Material `Memory`); `Truck` backs the Delivery & Errands
+    // tile (Material `LocalShipping`).
+    Cpu("cpu"),
+    Truck("truck"),
     ;
 
     companion object {
@@ -753,6 +761,11 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Warehouse -> IconSource.Material(Icons.Filled.Warehouse)
         // A15.3 AI Assistant — Material's robot-assistant glyph.
         PantopusIcon.Bot -> IconSource.Material(Icons.Filled.SmartToy)
+        // A12.10 Create Business — `Memory` is Material's chip/circuit
+        // glyph (closest Lucide `cpu` analogue); `LocalShipping` is the
+        // closest Lucide `truck` analogue.
+        PantopusIcon.Cpu -> IconSource.Material(Icons.Filled.Memory)
+        PantopusIcon.Truck -> IconSource.Material(Icons.Filled.LocalShipping)
     }
 
 /**
