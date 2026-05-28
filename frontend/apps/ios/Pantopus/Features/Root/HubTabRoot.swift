@@ -185,6 +185,10 @@ public enum HubRoute: Hashable {
     /// action with the seed DTO baked into the route so the form can
     /// prefill without a re-fetch.
     case editSignup(reservation: SupportTrainReservationDTO)
+    /// A13.13 / P4.3 — Manage train (organizer surface). Pushed from
+    /// the A10.9 detail dock overflow when the viewer is the organizer
+    /// and from the `pantopus://support-trains/:id/manage` deep link.
+    case manageTrain(trainId: String)
     /// Admin home-ownership-claims review queue. Gated by
     /// `auth.user.isAdmin` and reached from the Settings menu's Admin
     /// group. Mirrors the web `/app/admin/review-claims` page.
@@ -406,9 +410,13 @@ public struct HubTabRoot: View {
             }
             _ = router.consume()
         case let .supportTrainManage(id):
+            // P4.3 / A13.13 — `pantopus://support-trains/:id/manage`
+            // lands on the organizer Manage Train surface. Drop the
+            // user on the Support Trains list first so a back-tap
+            // pops to a known surface, then push manage.
             path.append(.supportTrains)
             if !id.isEmpty {
-                path.append(.reviewSignups(supportTrainId: id))
+                path.append(.manageTrain(trainId: id))
             }
             _ = router.consume()
         default:
@@ -1416,8 +1424,12 @@ public struct HubTabRoot: View {
                 viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
                 onBack: { Task { @MainActor in pop() } },
                 onOpenManage: {
+                    // P4.3 / A13.13 — the A10.9 dock-overflow lands on
+                    // the organizer Manage Train surface (was wired to
+                    // the review-signups queue as a stub before A13.13
+                    // shipped).
                     Task { @MainActor in
-                        push(.reviewSignups(supportTrainId: supportTrainId))
+                        push(.manageTrain(trainId: supportTrainId))
                     }
                 },
                 onShare: {
@@ -1482,6 +1494,20 @@ public struct HubTabRoot: View {
             EditSignupFormView(reservation: reservation) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .manageTrain(trainId):
+            ManageTrainView(
+                viewModel: ManageTrainViewModel(trainId: trainId),
+                onClose: { Task { @MainActor in if !path.isEmpty { path.removeLast() } } },
+                onOpenAnalytics: { id in
+                    Task { @MainActor in push(.placeholder(label: "Train analytics · \(id)")) }
+                },
+                onEditDates: { id in
+                    Task { @MainActor in push(.placeholder(label: "Edit dates · \(id)")) }
+                },
+                onInviteHelpers: { id in
+                    Task { @MainActor in push(.placeholder(label: "Invite helpers · \(id)")) }
+                }
+            )
         case .discoverHub:
             DiscoverHubView(
                 viewModel: DiscoverHubViewModel(

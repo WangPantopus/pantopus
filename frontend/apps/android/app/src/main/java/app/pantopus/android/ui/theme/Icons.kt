@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Bookmark
@@ -478,6 +479,11 @@ enum class PantopusIcon(
     // tile (Material `LocalShipping`).
     Cpu("cpu"),
     Truck("truck"),
+
+    // A13.13 Manage train — Organize row glyphs. `bar-chart-3` paints the
+    // Analytics row's icon tile; `calendar-cog` paints the Edit-dates row.
+    BarChart3("bar-chart-3"),
+    CalendarCog("calendar-cog"),
     ;
 
     companion object {
@@ -773,6 +779,13 @@ internal fun PantopusIcon.source(): IconSource =
         // closest Lucide `truck` analogue.
         PantopusIcon.Cpu -> IconSource.Material(Icons.Filled.Memory)
         PantopusIcon.Truck -> IconSource.Material(Icons.Filled.LocalShipping)
+        // A13.13 Manage train. Material ships `BarChart` for analytics
+        // (vertical-bars glyph); `calendar-cog` reuses `EditCalendar`
+        // (the gear-on-calendar Material glyph already mapped for
+        // `calendar-clock`) since Material doesn't ship a separate
+        // calendar-cog glyph.
+        PantopusIcon.BarChart3 -> IconSource.Material(Icons.Filled.BarChart)
+        PantopusIcon.CalendarCog -> IconSource.Material(Icons.Filled.EditCalendar)
     }
 
 /**
