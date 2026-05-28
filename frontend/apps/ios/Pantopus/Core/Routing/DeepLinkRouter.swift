@@ -6,7 +6,7 @@
 //  destination so SwiftUI views (or coordinators) can react.
 //
 
-// swiftlint:disable cyclomatic_complexity
+// swiftlint:disable cyclomatic_complexity function_body_length
 
 import Foundation
 import Logging
@@ -29,6 +29,11 @@ final class DeepLinkRouter {
         case homeDetail(id: String)
         case homeDashboard(id: String)
         case homeMemberRequests(id: String)
+        /// `pantopus://homes/:id/verify-landlord` — opens A12.5 / A12.6.
+        case verifyLandlord(id: String)
+        /// `pantopus://homes/:id/verify-postcard` — opens the A12.7
+        /// sibling status screen directly.
+        case postcardVerification(id: String)
         case conversation(id: String)
         case user(id: String)
         case connections
@@ -147,6 +152,12 @@ final class DeepLinkRouter {
             }
             if trailing.first == "members" && tabQuery == "requests" {
                 return .homeMemberRequests(id: id)
+            }
+            if trailing.first == "verify-landlord" || trailing.first == "verify_landlord" {
+                return .verifyLandlord(id: id)
+            }
+            if trailing.first == "verify-postcard" || trailing.first == "verify_postcard" {
+                return .postcardVerification(id: id)
             }
             return .homeDetail(id: id)
         case "chat", "message", "messages", "conversation":
