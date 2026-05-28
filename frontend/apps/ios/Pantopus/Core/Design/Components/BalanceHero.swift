@@ -20,6 +20,12 @@ import SwiftUI
 /// separately so it can be baseline-aligned at half scale), a
 /// `currencyCode` for the glass chip, and 0–2 `SplitCell`s for the
 /// glass split-strip below the amount.
+///
+/// Passing a `payoutFooter` swaps the card into the A14.6 Payments
+/// shape: the currency chip + arcs + split-strip collapse and a
+/// compact "Next payout · date" + frequency pill row renders below
+/// the amount. The gradient and glass styling are preserved so both
+/// surfaces read as the same primitive family.
 public struct BalanceHero: View {
     /// Visual tone — `.holdTone` appends an inline amber banner under
     /// the split strip warning that payouts are paused.
@@ -48,6 +54,20 @@ public struct BalanceHero: View {
         }
     }
 
+    /// A14.6 Payments variant — replaces the currency chip + split
+    /// strip with a compact two-element row under the amount:
+    /// "Next payout · Mon, May 27" on the leading edge, a frequency
+    /// glass pill ("Weekly") on the trailing edge.
+    public struct PayoutFooter: Sendable, Hashable {
+        public let nextPayoutLabel: String
+        public let frequencyPill: String
+
+        public init(nextPayoutLabel: String, frequencyPill: String) {
+            self.nextPayoutLabel = nextPayoutLabel
+            self.frequencyPill = frequencyPill
+        }
+    }
+
     private let overline: String
     private let amount: String
     private let currencyCode: String
@@ -55,6 +75,7 @@ public struct BalanceHero: View {
     private let tone: Tone
     private let holdHeadline: String?
     private let holdBody: String?
+    private let payoutFooter: PayoutFooter?
 
     public init(
         overline: String,
@@ -63,7 +84,8 @@ public struct BalanceHero: View {
         split: [SplitCell] = [],
         tone: Tone = .default,
         holdHeadline: String? = nil,
-        holdBody: String? = nil
+        holdBody: String? = nil,
+        payoutFooter: PayoutFooter? = nil
     ) {
         self.overline = overline
         self.amount = amount
@@ -72,18 +94,24 @@ public struct BalanceHero: View {
         self.tone = tone
         self.holdHeadline = holdHeadline
         self.holdBody = holdBody
+        self.payoutFooter = payoutFooter
     }
 
     public var body: some View {
         ZStack(alignment: .topTrailing) {
-            arcs
-                .padding(.top, -50)
-                .padding(.trailing, -40)
+            if payoutFooter == nil {
+                arcs
+                    .padding(.top, -50)
+                    .padding(.trailing, -40)
+            }
 
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 topRow
                 amountRow
-                if !split.isEmpty {
+                if let payoutFooter {
+                    payoutFooterRow(payoutFooter)
+                }
+                if payoutFooter == nil, !split.isEmpty {
                     splitStrip
                 }
                 if tone == .holdTone {
@@ -107,7 +135,15 @@ public struct BalanceHero: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(overline): \(amount) \(currencyCode)")
+        .accessibilityLabel(accessibility)
+    }
+
+    private var accessibility: String {
+        if let payoutFooter {
+            "\(overline): \(amount). \(payoutFooter.nextPayoutLabel), \(payoutFooter.frequencyPill)"
+        } else {
+            "\(overline): \(amount) \(currencyCode)"
+        }
     }
 
     private var arcs: some View {
@@ -130,7 +166,9 @@ public struct BalanceHero: View {
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.Color.primary200)
             Spacer(minLength: Spacing.s2)
-            currencyChip
+            if payoutFooter == nil {
+                currencyChip
+            }
         }
     }
 
@@ -150,15 +188,34 @@ public struct BalanceHero: View {
     }
 
     private var amountRow: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
+        let isCompact = payoutFooter != nil
+        return HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
             Text("$")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: isCompact ? 16 : 22, weight: .bold))
                 .foregroundStyle(Theme.Color.primary200)
             Text(amount)
-                .font(.system(size: 44, weight: .heavy))
-                .tracking(-1.4)
+                .font(.system(size: isCompact ? 28 : 44, weight: isCompact ? .bold : .heavy))
+                .tracking(isCompact ? -0.5 : -1.4)
                 .foregroundStyle(.white)
                 .monospacedDigit()
+        }
+    }
+
+    private func payoutFooterRow(_ footer: PayoutFooter) -> some View {
+        HStack(alignment: .center) {
+            Text(footer.nextPayoutLabel)
+                .font(.system(size: 12))
+                .foregroundStyle(Color.white.opacity(0.85))
+                .lineLimit(1)
+            Spacer(minLength: Spacing.s2)
+            Text(footer.frequencyPill)
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(Color.white.opacity(0.18))
+                .clipShape(Capsule())
         }
     }
 
@@ -284,6 +341,17 @@ public struct BalanceHero: View {
             tone: .holdTone,
             holdHeadline: "Withdrawals paused",
             holdBody: "Re-verify your bank to release funds."
+        )
+
+        // A14.6 Payments — compact payout-footer variant.
+        BalanceHero(
+            overline: "Available to pay out",
+            amount: "124.50",
+            currencyCode: "USD",
+            payoutFooter: BalanceHero.PayoutFooter(
+                nextPayoutLabel: "Next payout · Mon, May 27",
+                frequencyPill: "Weekly"
+            )
         )
     }
     .padding(Spacing.s4)

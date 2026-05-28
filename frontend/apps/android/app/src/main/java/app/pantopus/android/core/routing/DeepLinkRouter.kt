@@ -96,6 +96,15 @@ object DeepLinkRouter {
          */
         data object CreateBusiness : Destination
 
+        /**
+         * `pantopus://settings/payments` — A14.6 Settings → Payments
+         * (payments-out · Stripe setup · payout routing). Distinct
+         * from `pantopus://wallet` (earnings-in). Consumed by the
+         * active tab's deep-link router which pushes Settings then
+         * forwards into the Payments route.
+         */
+        data object PaymentsSettings : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -270,6 +279,15 @@ object DeepLinkRouter {
                     Destination.Unknown(raw)
                 } else {
                     Destination.VerifyEmail(token = tokenQuery, email = emailQuery)
+                }
+            "settings" ->
+                // `pantopus://settings/payments` — A14.6. Other settings
+                // sub-routes aren't deep-linkable yet; the bare host
+                // `pantopus://settings` falls through to `.Unknown`.
+                if (segments.getOrNull(1) == "payments") {
+                    Destination.PaymentsSettings
+                } else {
+                    Destination.Unknown(raw)
                 }
             else -> Destination.Unknown(raw)
         }

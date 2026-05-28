@@ -65,6 +65,16 @@ data class BalanceHeroSplitCell(
 )
 
 /**
+ * A14.6 Payments compact variant — replaces the currency chip + split
+ * strip with a two-element row under the amount: "Next payout · date"
+ * on the leading edge, frequency glass pill on the trailing edge.
+ */
+data class BalanceHeroPayoutFooter(
+    val nextPayoutLabel: String,
+    val frequencyPill: String,
+)
+
+/**
  * Dark sky-gradient hero card for financial surfaces (Wallet,
  * Payments). The Compose mirror of iOS
  * `Core/Design/Components/BalanceHero.swift` — same parameter names so
@@ -93,6 +103,7 @@ fun BalanceHero(
     tone: BalanceHeroTone = BalanceHeroTone.Default,
     holdHeadline: String? = null,
     holdBody: String? = null,
+    payoutFooter: BalanceHeroPayoutFooter? = null,
 ) {
     val gradient =
         Brush.linearGradient(
@@ -104,20 +115,29 @@ fun BalanceHero(
                 ),
         )
 
+    val accessibility =
+        if (payoutFooter != null) {
+            "$overline: $amount. ${payoutFooter.nextPayoutLabel}, ${payoutFooter.frequencyPill}"
+        } else {
+            "$overline: $amount $currencyCode"
+        }
+
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(18.dp))
                 .background(gradient)
-                .semantics { contentDescription = "$overline: $amount $currencyCode" },
+                .semantics { contentDescription = accessibility },
     ) {
-        BalanceHeroArcs(
-            modifier =
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 40.dp, y = (-50).dp),
-        )
+        if (payoutFooter == null) {
+            BalanceHeroArcs(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 40.dp, y = (-50).dp),
+            )
+        }
         Column(
             modifier =
                 Modifier
@@ -125,9 +145,15 @@ fun BalanceHero(
                     .padding(top = Spacing.s1, bottom = 2.dp),
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            BalanceHeroTopRow(overline = overline, currencyCode = currencyCode)
-            BalanceHeroAmount(amount = amount)
-            if (split.isNotEmpty()) {
+            BalanceHeroTopRow(
+                overline = overline,
+                currencyCode = currencyCode,
+                hideCurrencyChip = payoutFooter != null,
+            )
+            BalanceHeroAmount(amount = amount, compact = payoutFooter != null)
+            if (payoutFooter != null) {
+                BalanceHeroPayoutFooterRow(footer = payoutFooter)
+            } else if (split.isNotEmpty()) {
                 BalanceHeroSplitStrip(cells = split)
             }
             if (tone == BalanceHeroTone.HoldTone) {
@@ -161,6 +187,7 @@ private fun BalanceHeroArcs(modifier: Modifier = Modifier) {
 private fun BalanceHeroTopRow(
     overline: String,
     currencyCode: String,
+    hideCurrencyChip: Boolean = false,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -174,35 +201,40 @@ private fun BalanceHeroTopRow(
             letterSpacing = 1.sp,
         )
         Spacer(modifier = Modifier.weight(1f))
-        Row(
-            modifier =
-                Modifier
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.16f))
-                    .padding(horizontal = Spacing.s2, vertical = 3.dp),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.ShieldCheck,
-                contentDescription = null,
-                size = 10.dp,
-                strokeWidth = 2.5f,
-                tint = Color.White,
-            )
-            Text(
-                text = currencyCode.uppercase(),
-                color = Color.White,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.4.sp,
-            )
+        if (!hideCurrencyChip) {
+            Row(
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.16f))
+                        .padding(horizontal = Spacing.s2, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ShieldCheck,
+                    contentDescription = null,
+                    size = 10.dp,
+                    strokeWidth = 2.5f,
+                    tint = Color.White,
+                )
+                Text(
+                    text = currencyCode.uppercase(),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.4.sp,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun BalanceHeroAmount(amount: String) {
+private fun BalanceHeroAmount(
+    amount: String,
+    compact: Boolean = false,
+) {
     Row(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -210,16 +242,44 @@ private fun BalanceHeroAmount(amount: String) {
         Text(
             text = "$",
             color = PantopusColors.primary200,
-            fontSize = 22.sp,
+            fontSize = if (compact) 16.sp else 22.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = if (compact) 4.dp else 8.dp),
         )
         Text(
             text = amount,
             color = Color.White,
-            fontSize = 44.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = (-1.4).sp,
+            fontSize = if (compact) 28.sp else 44.sp,
+            fontWeight = if (compact) FontWeight.Bold else FontWeight.ExtraBold,
+            letterSpacing = if (compact) (-0.5).sp else (-1.4).sp,
+        )
+    }
+}
+
+@Composable
+private fun BalanceHeroPayoutFooterRow(footer: BalanceHeroPayoutFooter) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = footer.nextPayoutLabel,
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 12.sp,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = footer.frequencyPill,
+            color = Color.White,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.4.sp,
+            modifier =
+                Modifier
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .padding(horizontal = 9.dp, vertical = 3.dp),
         )
     }
 }
@@ -395,6 +455,17 @@ private fun BalanceHeroPreview() {
             tone = BalanceHeroTone.HoldTone,
             holdHeadline = "Withdrawals paused",
             holdBody = "Re-verify your bank to release funds.",
+        )
+        // A14.6 Payments — compact payout-footer variant.
+        BalanceHero(
+            overline = "Available to pay out",
+            amount = "124.50",
+            currencyCode = "USD",
+            payoutFooter =
+                BalanceHeroPayoutFooter(
+                    nextPayoutLabel = "Next payout · Mon, May 27",
+                    frequencyPill = "Weekly",
+                ),
         )
         // padding hint
         Text(

@@ -437,9 +437,9 @@ that goes beyond the standard chevron/toggle row.
   - **Paused secondary**: master card replaced with `PauseBanner` — warm amber bg + warning-tinted bell-off icon + "Paused for 1h 24m left" + `Resume` neutral pill. Category cards stay rendered at 0.5 opacity.
 
 ### A14.6 — Payments (`/settings/payments.tsx`)
-- **iOS:** **MISSING from settings sub-routes** — `SettingsView.swift:148-150` maps `.paymentsPayouts` to `NotYetAvailableView`.
-- **Android:** **MISSING** — same placeholder pattern.
-- **Status:** **BUILD** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
+- **iOS:** `Features/Settings/Payments/PaymentsView.swift` + `PaymentsViewModel` (P5.2 — fixture-driven; Stripe Connect onboarding deep-link is a follow-up).
+- **Android:** `ui/screens/settings/payments/PaymentsScreen.kt` + `PaymentsViewModel`.
+- **Status:** **POLISH** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
 - **Designed frames:** populated (balance hero · 3 methods · Stripe connected · payouts to Chase weekly · YTD activity) · empty (no balance hero · inline empty in Methods card · Stripe `Connect` chip · gated payout method + tax rows)
 - **Required slots:**
   - **Balance hero** (same `BalanceHero` primitive as A10.10, but with `next-payout-date` + frequency pill chip on right of the available amount instead of the "USD" chip).

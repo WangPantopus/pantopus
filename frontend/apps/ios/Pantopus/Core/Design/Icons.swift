@@ -292,6 +292,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case cpu
     case truck
 
+    // P5.2 / A14.6 Payments — the inline-empty hero disc inside the
+    // Payment methods card uses Lucide's `credit-card` glyph.
+    case creditCard = "credit-card"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -516,6 +520,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // `box.truck` glyphs.
         case .cpu: "cpu"
         case .truck: "box.truck"
+        // P5.2 / A14.6 Payments — SF Symbols ships `creditcard`.
+        case .creditCard: "creditcard"
         }
     }
 }

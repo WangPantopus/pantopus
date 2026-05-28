@@ -5,7 +5,7 @@
 //  Settings hub. Hosts the index (`GroupedListView`) plus every
 //  sub-route. P8 / T6.2c wired six previously-placeholder rows to
 //  real screens (Blocked users, Password, Verification, Help, Legal,
-//  About). Data export + Payments & payouts stay on
+//  About). P5.2 / A14.6 wired Payments. Data export stays on
 //  `NotYetAvailableView` per Q7's "park until P8.5" decision.
 //
 
@@ -24,8 +24,12 @@ public enum SettingsStackRoute: Hashable {
     case legal
     case legalContent(LegalDocument)
     case about
-    /// Two routes intentionally parked until P8.5: data export wizard,
-    /// payments & payouts. See `docs/t6-open-questions-decisions.md` Q7.
+    /// P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
+    /// setup · payout routing). Distinct from A10.10 Wallet
+    /// (earnings-in) which lives under the Wallet tab.
+    case payments
+    /// One route intentionally parked until P8.5: data export wizard.
+    /// See `docs/t6-open-questions-decisions.md` Q7.
     case placeholder(label: String)
 }
 
@@ -105,6 +109,8 @@ public struct SettingsView: View {
             LegalContentView(document: doc) { popLast() }
         case .about:
             AboutView { popLast() }
+        case .payments:
+            PaymentsView { popLast() }
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         }
@@ -151,8 +157,9 @@ public struct SettingsView: View {
         case .verification: .verification
         // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
         case .dataExport: .placeholder(label: "Data export")
-        // Parked until P8.5 — depends on Stripe Connect wallet UX.
-        case .paymentsPayouts: .placeholder(label: "Payments & payouts")
+        // P5.2 / A14.6 — Settings → Payments. Stripe Connect onboarding
+        // deep-links out to the Stripe-hosted flow when wired.
+        case .paymentsPayouts: .payments
         case .help: .help
         case .legal: .legal
         case .about: .about

@@ -59,6 +59,11 @@ final class DeepLinkRouter {
         /// (the link from the resend / signup flow carries `&email=` so
         /// the screen can render the recipient).
         case verifyEmail(token: String, email: String?)
+        /// `pantopus://settings/payments` — A14.6 Settings → Payments.
+        /// Distinct from `pantopus://wallet` (earnings-in surface).
+        /// Consumed by the active tab's deep-link router which pushes
+        /// `.menu` then forwards into the Payments stack route.
+        case paymentsSettings
         case unknown(URL)
     }
 
@@ -175,6 +180,14 @@ final class DeepLinkRouter {
             return resetPasswordDestination(url: url, token: tokenQuery)
         case "verify-email", "verify_email":
             return verifyEmailDestination(url: url, token: tokenQuery, email: emailQuery)
+        case "settings":
+            // `pantopus://settings/payments` — A14.6. Other settings
+            // sub-routes aren't deep-linkable yet; the bare host
+            // `pantopus://settings` falls through to `.unknown`.
+            if segments.dropFirst().first == "payments" {
+                return .paymentsSettings
+            }
+            return .unknown(url)
         default:
             return .unknown(url)
         }
