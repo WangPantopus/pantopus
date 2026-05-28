@@ -91,6 +91,10 @@ public enum YouRoute: Hashable {
     case myBusinesses
     /// Public business profile reached from My businesses.
     case businessProfile(businessId: String)
+    /// P4.2 — A13.10 Edit Business Page (owner-only). Pushed from the
+    /// `BusinessProfileView` overflow when the viewer owns the business
+    /// and from the `pantopus://businesses/:id/page-editor` deep link.
+    case editBusinessPage(businessId: String)
     /// P6.6 — "Register a business · coming soon" waitlist surface. The
     /// full registration wizard is a future Phase 9 item.
     case businessWaitlist
@@ -1911,7 +1915,21 @@ public struct YouTabRoot: View {
                 onOpenReport: {
                     Task { @MainActor in path.append(.placeholder(label: "Report business")) }
                 },
-                onOpenWebsite: { url in openURL(url) }
+                onOpenWebsite: { url in openURL(url) },
+                onEdit: {
+                    Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) }
+                }
+            )
+        case let .editBusinessPage(businessId):
+            EditBusinessPageView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onPreview: {
+                    // Bounce the owner to the live profile they're editing.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(

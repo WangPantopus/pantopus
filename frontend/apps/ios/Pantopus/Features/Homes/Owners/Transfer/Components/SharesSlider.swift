@@ -37,7 +37,7 @@ public struct SharesSlider: View {
     public var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            let currentFraction = fraction(for: value)
+            let currentFraction = sliderFraction(for: value)
             ZStack(alignment: .leading) {
                 // Inactive track
                 Capsule()
@@ -50,7 +50,7 @@ public struct SharesSlider: View {
                 // Tick dots — sit on top of the track so they remain visible
                 // whether the active fill has covered them or not.
                 ForEach(ticks, id: \.self) { tick in
-                    let tickFraction = fraction(for: tick)
+                    let tickFraction = sliderFraction(for: tick)
                     Circle()
                         .fill(tick <= value ? Theme.Color.appTextInverse : Theme.Color.appBorderStrong)
                         .frame(width: 4, height: 4)
@@ -91,7 +91,7 @@ public struct SharesSlider: View {
         }
     }
 
-    private func fraction(for raw: Int) -> CGFloat {
+    private func sliderFraction(for raw: Int) -> CGFloat {
         let lower = CGFloat(range.lowerBound)
         let upper = CGFloat(range.upperBound)
         guard upper > lower else { return 0 }

@@ -112,7 +112,7 @@ public struct RootTabView: View {
              .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests,
              .homeOwnersTransfer,
              .verifyLandlord, .postcardVerification,
-             .notifications, .createBusiness, .wallet:
+             .notifications, .createBusiness, .businessProfile, .editBusinessPage, .wallet:
             model.selected = .hub
         case .conversation:
             model.selected = .inbox

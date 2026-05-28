@@ -52,6 +52,12 @@ final class DeepLinkRouter {
         /// wizard inside the active tab's nav stack.
         case createBusiness
         case invite(token: String)
+        /// P4.2 — A13.10 Edit Business Page (owner-only).
+        /// `pantopus://businesses/:id/page-editor`.
+        case editBusinessPage(businessId: String)
+        /// Public business profile reached from a share / push.
+        /// `pantopus://businesses/:id`.
+        case businessProfile(businessId: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
         /// token; the caller invokes `AuthManager.resetPassword` on submit.
@@ -150,13 +156,17 @@ final class DeepLinkRouter {
             return homeDestination(url: url, segments: segments, tabQuery: tabQuery)
         case "businesses", "business":
             // `pantopus://businesses/new` opens the Create Business wizard.
-            // Other `businesses/:id` paths are owned by the businessProfile
-            // route which lives behind a different host today; fall through
-            // to `.unknown` so they don't silently mis-route.
-            if segments.dropFirst().first == "new" {
+            // `pantopus://businesses/:id/page-editor` opens A13.10 (owner-only).
+            // `pantopus://businesses/:id` opens the public business profile.
+            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            if id == "new" {
                 return .createBusiness
             }
-            return .unknown(url)
+            let trailing = Array(segments.dropFirst(2))
+            if trailing.first == "page-editor" || trailing.first == "page_editor" {
+                return .editBusinessPage(businessId: id)
+            }
+            return .businessProfile(businessId: id)
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
