@@ -333,6 +333,7 @@ abstract class VerifyPantopusTokensTask : DefaultTask() {
                 "ui/screens/membership/MembershipDetailContent.kt",
                 "ui/screens/shared/mail_item_detail/MailItemDetailShell.kt",
                 "ui/screens/shared/map_list_hybrid/MapListHybridPreview.kt",
+                "ui/screens/wallet/components/WalletPalette.kt",
             )
 
         val hexPattern = Regex("""Color\(0x[0-9A-Fa-f]+\)""")

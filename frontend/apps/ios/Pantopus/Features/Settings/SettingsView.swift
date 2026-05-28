@@ -34,17 +34,20 @@ public struct SettingsView: View {
     private let onClose: @MainActor () -> Void
     private let onEditProfile: @MainActor () -> Void
     private let onOpenReviewClaims: @MainActor () -> Void
+    private let onOpenWallet: @MainActor () -> Void
     private let onSignedOut: @MainActor () -> Void
 
     public init(
         onClose: @escaping @MainActor () -> Void = {},
         onEditProfile: @escaping @MainActor () -> Void = {},
         onOpenReviewClaims: @escaping @MainActor () -> Void = {},
+        onOpenWallet: @escaping @MainActor () -> Void = {},
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
         self.onClose = onClose
         self.onEditProfile = onEditProfile
         self.onOpenReviewClaims = onOpenReviewClaims
+        self.onOpenWallet = onOpenWallet
         self.onSignedOut = onSignedOut
     }
 
@@ -137,6 +140,7 @@ public struct SettingsView: View {
         switch route {
         case .editProfile: onEditProfile()
         case .reviewClaims: onOpenReviewClaims()
+        case .paymentsPayouts: onOpenWallet()
         case .didSignOut: onSignedOut()
         default: break
         }
@@ -151,8 +155,12 @@ public struct SettingsView: View {
         case .verification: .verification
         // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
         case .dataExport: .placeholder(label: "Data export")
-        // Parked until P8.5 — depends on Stripe Connect wallet UX.
-        case .paymentsPayouts: .placeholder(label: "Payments & payouts")
+        // P3.2 / A10.10 — Wallet replaces the prior placeholder.
+        // Routed through `onOpenWallet`, not `stackRoute`, because the
+        // wallet lives in the host's NavigationStack (alongside other
+        // Hub-stack destinations) so its back chevron returns to the
+        // Hub root, not back into Settings.
+        case .paymentsPayouts: nil
         case .help: .help
         case .legal: .legal
         case .about: .about

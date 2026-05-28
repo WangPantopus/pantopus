@@ -106,6 +106,9 @@ class IconTest {
             "trending-down",
             "ban",
             "file-text",
+            // A10.10 — Wallet.
+            "trending-up",
+            "arrow-down-to-line",
             // T5.3.2 — My tasks
             "plus",
             "rocket",

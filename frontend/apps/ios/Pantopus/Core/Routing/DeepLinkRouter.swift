@@ -64,6 +64,9 @@ final class DeepLinkRouter {
         /// server state once the persistence layer lands; today the
         /// view-model seeds the scheduling form).
         case vacationHold
+        /// `pantopus://wallet` — A10.10 earnings wallet (distinct from
+        /// Settings → Payments; this is the earnings-side surface).
+        case wallet
         case unknown(URL)
     }
 
@@ -174,6 +177,8 @@ final class DeepLinkRouter {
                 return .vacationHold
             }
             return .unknown(url)
+        case "wallet":
+            return .wallet
         case "invite":
             if let token = segments.dropFirst().first, !token.isEmpty {
                 return .invite(token: token)
