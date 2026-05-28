@@ -68,12 +68,14 @@ final class StartSupportTrainWizardViewModelTests: XCTestCase {
     func testInviteRecipientBranchUpdatesCtaAndSearchAgain() {
         let vm = makeVM()
         vm.updateBeneficiaryQuery(StartSupportTrainSampleData.inviteQuery)
-        vm.selectReason(.newBaby)
+        vm.selectReason(.baby)
         XCTAssertTrue(vm.isInviteRecipientBranch)
         XCTAssertEqual(vm.chrome.primaryCTALabel, "Send invite & continue")
         XCTAssertEqual(vm.chrome.secondaryCTA?.label, "Search again")
+        XCTAssertEqual(vm.inviteCandidate?.typedName, StartSupportTrainSampleData.inviteQuery)
         vm.secondaryTapped()
         XCTAssertEqual(vm.beneficiaryQuery, "")
+        XCTAssertNil(vm.inviteCandidate)
     }
 
     func testReasonClampsAtCharLimit() {

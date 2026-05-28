@@ -244,9 +244,9 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
   - **Search frame**: focused 12pt search field with caret animation + `3 matches for "tutor"` header + `Highlighted` substring (violet bg) inside SearchResult rows + dashed violet `Add as custom category` fallback.
 
 ### A12.11 — Start a support train (`/support-trains/new.tsx`)
-- **iOS:** `SupportTrains/StartTrain/StartSupportTrainWizardView.swift` (~1100 lines) + `StartSupportTrainWizardViewModel.swift` + `StartSupportTrainContent.swift`
-- **Android:** `support_trains/start_train/StartSupportTrainWizardScreen.kt` + `StartSupportTrainViewModel.kt` + `StartSupportTrainContent.kt`
-- **Status:** **RESHAPE**
+- **iOS:** `SupportTrains/StartTrain/StartSupportTrainWizardView.swift` + `StartSupportTrainWizardViewModel.swift` + `StartSupportTrainContent.swift` + `StartTrain/Components/{TrainChip, ReasonPicker, RecipientCard, InviteRecipientCard, StepRail}.swift`
+- **Android:** `support_trains/start_train/StartSupportTrainWizardScreen.kt` + `StartSupportTrainViewModel.kt` + `StartSupportTrainContent.kt` + `start_train/components/{TrainChip, ReasonPicker, RecipientCard, InviteRecipientCard, StepRail}.kt`
+- **Status:** **RESHAPED** (P7.4) — wizard chrome now uses `WizardIdentity.warm`; step-1 pieces extracted to `Components/`; reason picker is the 6-tile 3×2 set (meal-train / ride / errand / surgery / baby / loss); recipient card gains the mutuals strip + verified-neighbor shield; invite branch reads `StartSupportTrainInviteCandidate`. Android Paparazzi baselines for the two step-1 frames need re-recording (`./gradlew paparazziRecord`); iOS snapshot baselines follow the existing skip-until-committed flow.
 - **Designed frames:** verified neighbor (TrainChip warm · recipient card with verified-neighbor shield + mutuals · 6-tile reason picker · short note · invite-only/block-visible toggles · 5-step rail preview) · invite branch (search row · "no verified neighbor" amber warning · invite by phone/email options · invite-only privacy hint · CTA → `Send invite & continue`)
 - **Per-frame deltas:**
   - **Wizard chrome re-themed warm-amber** (warm `#b45309` for CTA, warmBg `#fef3c7` for selected reason tile, progress rail in warm accent) — current implementation may be sky-blue.

@@ -40,16 +40,22 @@ final class StartSupportTrainSnapshotTests: XCTestCase {
         assertRenders(StartSupportTrainWizardView(viewModel: vm))
         XCTAssertEqual(vm.chrome.primaryCTALabel, "Continue")
         XCTAssertEqual(vm.chrome.progressLabel, .stepOf(current: 1, total: 5))
+        // Mutuals strip is wired for the selected verified neighbor.
+        XCTAssertFalse(vm.recipientMutuals.isEmpty)
+        XCTAssertNil(vm.inviteCandidate)
     }
 
     func test_a12_11_invite_recipient_frame_renders() {
         let vm = StartSupportTrainWizardViewModel()
         vm.updateBeneficiaryQuery(StartSupportTrainSampleData.inviteQuery)
-        vm.selectReason(.newBaby)
+        vm.selectReason(.baby)
 
         assertRenders(StartSupportTrainWizardView(viewModel: vm))
         XCTAssertEqual(vm.chrome.primaryCTALabel, "Send invite & continue")
         XCTAssertEqual(vm.chrome.secondaryCTA?.label, "Search again")
+        // Invite branch surfaces a candidate built from the typed query.
+        XCTAssertEqual(vm.inviteCandidate?.typedName, StartSupportTrainSampleData.inviteQuery)
+        XCTAssertTrue(vm.recipientMutuals.isEmpty)
     }
 
     func test_start_support_train_what_and_when_ios_baseline_is_present() throws {
