@@ -58,7 +58,7 @@ public enum WalletSampleData {
         holdState: WalletHoldState(
             bannerHeadline: "Bank verification expired",
             bannerBody:
-                "Chase asks us to re-confirm your account every 12 months. "
+            "Chase asks us to re-confirm your account every 12 months. "
                 + "A 2-minute micro-deposit check unlocks payouts again. "
                 + "Earnings keep landing in your wallet — they're safe.",
             heroBannerHeadline: "Withdrawals paused",

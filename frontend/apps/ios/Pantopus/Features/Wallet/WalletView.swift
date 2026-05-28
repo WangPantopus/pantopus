@@ -131,11 +131,11 @@ public struct WalletView: View {
         )
     }
 
-    @ViewBuilder private func section<Body: View>(
+    private func section(
         overline: String,
         action: String? = nil,
         onAction: @escaping () -> Void = {},
-        @ViewBuilder content: () -> Body
+        @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(alignment: .lastTextBaseline) {

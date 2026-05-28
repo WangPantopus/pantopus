@@ -162,7 +162,9 @@ public struct WalletContent: Equatable, Sendable {
     /// Populated only in the `.hold` variant.
     public let holdState: WalletHoldState?
 
-    public var isOnHold: Bool { holdState != nil }
+    public var isOnHold: Bool {
+        holdState != nil
+    }
 
     public init(
         available: String,

@@ -131,34 +131,34 @@ struct WalletActivityRow: View {
 enum ActivityCategoryPalette {
     static func background(for category: WalletActivityCategory) -> Color {
         switch category {
-        case .cleaning: return Theme.Color.homeBg
-        case .childCare: return Theme.Color.warmAmberBg
-        case .handyman: return Theme.Color.handyman.opacity(0.18)
-        case .petCare: return Theme.Color.errorLight
-        case .bank: return Theme.Color.personalBg
-        case .fee: return Theme.Color.appSurfaceSunken
+        case .cleaning: Theme.Color.homeBg
+        case .childCare: Theme.Color.warmAmberBg
+        case .handyman: Theme.Color.handyman.opacity(0.18)
+        case .petCare: Theme.Color.errorLight
+        case .bank: Theme.Color.personalBg
+        case .fee: Theme.Color.appSurfaceSunken
         }
     }
 
     static func foreground(for category: WalletActivityCategory) -> Color {
         switch category {
-        case .cleaning: return Theme.Color.homeDark
-        case .childCare: return Theme.Color.warmAmber
-        case .handyman: return Theme.Color.handyman
-        case .petCare: return Theme.Color.error
-        case .bank: return Theme.Color.business
-        case .fee: return Theme.Color.appTextSecondary
+        case .cleaning: Theme.Color.homeDark
+        case .childCare: Theme.Color.warmAmber
+        case .handyman: Theme.Color.handyman
+        case .petCare: Theme.Color.error
+        case .bank: Theme.Color.business
+        case .fee: Theme.Color.appTextSecondary
         }
     }
 
     static func icon(for category: WalletActivityCategory) -> PantopusIcon {
         switch category {
-        case .cleaning: return .sparkles
-        case .childCare: return .baby
-        case .handyman: return .wrench
-        case .petCare: return .dog
-        case .bank: return .building2
-        case .fee: return .receipt
+        case .cleaning: .sparkles
+        case .childCare: .baby
+        case .handyman: .wrench
+        case .petCare: .dog
+        case .bank: .building2
+        case .fee: .receipt
         }
     }
 }

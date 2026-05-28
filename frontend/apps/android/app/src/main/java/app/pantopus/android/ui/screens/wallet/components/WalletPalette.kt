@@ -9,8 +9,8 @@ import androidx.compose.ui.graphics.Color
  * design-system palette. The callouts are intentional design
  * decisions logged in `docs/token-drift-color.md`:
  *
- *   * [amberDeep] (Tailwind amber-800 `#92400E`) sits between
- *     `warning` (`#D97706`) and `warmAmber` (`#B45309`) — used for
+ *   * [amberDeep] (Tailwind amber-800 92400E) sits between
+ *     `warning` (D97706) and `warmAmber` (B45309) — used for
  *     the pending chip text + amber-row amount.
  *   * [chaseBlueDark] / [chaseBlueLight] (Tailwind blue-900 → blue-600)
  *     render the "physical Chase debit card" gradient; the
@@ -21,13 +21,13 @@ import androidx.compose.ui.graphics.Color
  * (mirrors `ui/screens/homes/bills/UtilityCategoryPalette.kt` &c.).
  */
 object WalletPalette {
-    /** `#92400E` — Tailwind amber-800. Pending-chip foreground and
+    /** Tailwind amber-800 92400E. Pending-chip foreground and
      *  amber-row amount colour in the wallet design. */
     val amberDeep: Color = Color(0xFF92400E)
 
-    /** Chase card gradient dark stop — Tailwind blue-900 `#1E3A8A`. */
+    /** Chase card gradient dark stop — Tailwind blue-900 1E3A8A. */
     val chaseBlueDark: Color = Color(0xFF1E3A8A)
 
-    /** Chase card gradient light stop — Tailwind blue-600 `#2563EB`. */
+    /** Chase card gradient light stop — Tailwind blue-600 2563EB. */
     val chaseBlueLight: Color = Color(0xFF2563EB)
 }

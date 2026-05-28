@@ -23,7 +23,7 @@ object WalletSampleData {
             pendingMeta = "3 tasks · clears by Dec 4",
             monthValue = "$1,284.50",
             monthMeta = "8 tasks · ▲22% vs Oct",
-            activity = activitySample,
+            activity = activitySample(),
             payoutMethod =
                 WalletPayoutMethod(
                     bankLabel = "Chase checking",
@@ -51,7 +51,7 @@ object WalletSampleData {
             pendingMeta = "3 tasks · clears by Dec 4",
             monthValue = "$1,284.50",
             monthMeta = "8 tasks · ▲22% vs Oct",
-            activity = activitySample.take(4),
+            activity = activitySample().take(4),
             payoutMethod =
                 WalletPayoutMethod(
                     bankLabel = "Chase checking",
@@ -77,7 +77,7 @@ object WalletSampleData {
                 ),
         )
 
-    private val activitySample: List<WalletActivityItem> =
+    private fun activitySample(): List<WalletActivityItem> =
         listOf(
             WalletActivityItem(
                 id = "tx-1",
