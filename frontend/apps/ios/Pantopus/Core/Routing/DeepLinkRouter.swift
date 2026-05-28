@@ -37,10 +37,18 @@ final class DeepLinkRouter {
         case homeDetail(id: String)
         case homeDashboard(id: String)
         case homeMemberRequests(id: String)
+        /// `pantopus://homes/:id/verify-landlord` — opens A12.5 / A12.6.
+        case verifyLandlord(id: String)
+        /// `pantopus://homes/:id/verify-postcard` — opens the A12.7
+        /// sibling status screen directly.
+        case postcardVerification(id: String)
         case conversation(id: String)
         case user(id: String)
         case connections
         case discoverHub
+        /// `pantopus://businesses/new` — open the A12.10 Create Business
+        /// wizard inside the active tab's nav stack.
+        case createBusiness
         case invite(token: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
@@ -99,22 +107,16 @@ final class DeepLinkRouter {
 
     /// Accepts both `pantopus://…` and `https://pantopus.app/…`.
     func resolve(url: URL) -> Destination {
-        // For custom-scheme URLs (`pantopus://messages/conv_42`) the route
-        // name lives in the host, not the path. For https URLs the host is
-        // the domain and the route is the first path component. Normalize
-        // both shapes into one `segments` array so the matcher below
-        // doesn't have to branch on scheme.
-        var segments = url.pathComponents.filter { $0 != "/" }
-        if url.scheme != "http", url.scheme != "https",
-           let host = url.host, !host.isEmpty {
-            segments.insert(host, at: 0)
-        }
+        let segments = routeSegments(for: url)
         let firstSegment = segments.first ?? ""
-        // Parse `?tab=requests` from the query string so the
-        // home-member-requests entry routes correctly.
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        let tabQuery = comps?.queryItems?.first { $0.name == "tab" }?.value
-        let auth = authParams(from: comps, fragment: url.fragment)
+        let tabQuery = queryValue("tab", in: comps)
+        let tokenQuery = queryValue("token", in: comps)
+            ?? queryValue("token_hash", in: comps)
+            ?? fragmentParam(url.fragment, name: "token")
+            ?? fragmentParam(url.fragment, name: "token_hash")
+        let emailQuery = queryValue("email", in: comps)
+            ?? fragmentParam(url.fragment, name: "email")
 
         switch firstSegment {
         case "feed":
@@ -140,15 +142,16 @@ final class DeepLinkRouter {
             if let id = segments.dropFirst().first { return .listing(id: id) }
             return .unknown(url)
         case "homes":
-            guard let id = segments.dropFirst().first else { return .unknown(url) }
-            let trailing = Array(segments.dropFirst(2))
-            if trailing.first == "dashboard" {
-                return .homeDashboard(id: id)
+            return homeDestination(url: url, segments: segments, tabQuery: tabQuery)
+        case "businesses", "business":
+            // `pantopus://businesses/new` opens the Create Business wizard.
+            // Other `businesses/:id` paths are owned by the businessProfile
+            // route which lives behind a different host today; fall through
+            // to `.unknown` so they don't silently mis-route.
+            if segments.dropFirst().first == "new" {
+                return .createBusiness
             }
-            if trailing.first == "members" && tabQuery == "requests" {
-                return .homeMemberRequests(id: id)
-            }
-            return .homeDetail(id: id)
+            return .unknown(url)
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
@@ -165,41 +168,73 @@ final class DeepLinkRouter {
             }
             return .unknown(url)
         case "auth":
-            // `pantopus://auth/reset-password?token=…` and
-            // `pantopus://auth/verify-email?token=…&email=…`.
-            let sub = segments.dropFirst().first ?? ""
-            switch sub {
-            case "reset-password", "reset_password":
-                guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
-                return .resetPassword(token: token)
-            case "verify-email", "verify_email":
-                guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
-                return .verifyEmail(token: token, email: auth.email)
-            default:
-                return .unknown(url)
-            }
+            return authDestination(url: url, segments: segments, token: tokenQuery, email: emailQuery)
         case "reset-password", "reset_password":
             // Tolerate the bare `/reset-password?token=…` shape that the
             // backend's older recovery template emits (no `/auth/` prefix).
-            guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
-            return .resetPassword(token: token)
+            return resetPasswordDestination(url: url, token: tokenQuery)
         case "verify-email", "verify_email":
-            guard let token = auth.token, !token.isEmpty else { return .unknown(url) }
-            return .verifyEmail(token: token, email: auth.email)
+            return verifyEmailDestination(url: url, token: tokenQuery, email: emailQuery)
         default:
             return .unknown(url)
         }
     }
 
-    /// Auth deep links may carry `token` / `token_hash` and optional `email`
-    /// in either the query string or fragment.
-    private func authParams(from comps: URLComponents?, fragment: String?) -> (token: String?, email: String?) {
-        let token = comps?.queryItems?.first { $0.name == "token" || $0.name == "token_hash" }?.value
-            ?? fragmentParam(fragment, name: "token")
-            ?? fragmentParam(fragment, name: "token_hash")
-        let email = comps?.queryItems?.first { $0.name == "email" }?.value
-            ?? fragmentParam(fragment, name: "email")
-        return (token, email)
+    private func routeSegments(for url: URL) -> [String] {
+        var segments = url.pathComponents.filter { $0 != "/" }
+        if url.scheme != "http", url.scheme != "https",
+           let host = url.host, !host.isEmpty {
+            segments.insert(host, at: 0)
+        }
+        return segments
+    }
+
+    private func queryValue(_ name: String, in components: URLComponents?) -> String? {
+        components?.queryItems?.first { $0.name == name }?.value
+    }
+
+    private func homeDestination(url: URL, segments: [String], tabQuery: String?) -> Destination {
+        guard let id = segments.dropFirst().first else { return .unknown(url) }
+        let trailing = Array(segments.dropFirst(2))
+        if trailing.first == "dashboard" {
+            return .homeDashboard(id: id)
+        }
+        if trailing.first == "members" && tabQuery == "requests" {
+            return .homeMemberRequests(id: id)
+        }
+        if trailing.first == "verify-landlord" || trailing.first == "verify_landlord" {
+            return .verifyLandlord(id: id)
+        }
+        if trailing.first == "verify-postcard" || trailing.first == "verify_postcard" {
+            return .postcardVerification(id: id)
+        }
+        return .homeDetail(id: id)
+    }
+
+    private func authDestination(
+        url: URL,
+        segments: [String],
+        token: String?,
+        email: String?
+    ) -> Destination {
+        switch segments.dropFirst().first ?? "" {
+        case "reset-password", "reset_password":
+            resetPasswordDestination(url: url, token: token)
+        case "verify-email", "verify_email":
+            verifyEmailDestination(url: url, token: token, email: email)
+        default:
+            .unknown(url)
+        }
+    }
+
+    private func resetPasswordDestination(url: URL, token: String?) -> Destination {
+        guard let token, !token.isEmpty else { return .unknown(url) }
+        return .resetPassword(token: token)
+    }
+
+    private func verifyEmailDestination(url: URL, token: String?, email: String?) -> Destination {
+        guard let token, !token.isEmpty else { return .unknown(url) }
+        return .verifyEmail(token: token, email: email)
     }
 
     /// Pulls a single key out of a `#` fragment of the form `key=v&k2=v2`.

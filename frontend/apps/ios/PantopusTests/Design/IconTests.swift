@@ -29,6 +29,8 @@ final class IconTests: XCTestCase {
         "ribbon", "palette", "play-circle", "grip-vertical", "grid-3x3", "square",
         "dog", "cat", "bird", "fish", "turtle", "paw-print",
         "sparkles", "timer", "repeat", "hourglass", "hand-coins", "package",
+        // A12.10 Create Business — category tiles.
+        "cpu", "truck",
         "compass", "filter",
         // T5.3.1 My bids — bid lifecycle chips + footer.
         "crown", "trending-down", "ban", "file-text",

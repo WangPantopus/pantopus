@@ -57,6 +57,18 @@ object DeepLinkRouter {
 
         data class HomeMemberRequests(val id: String) : Destination
 
+        /**
+         * `pantopus://homes/:id/verify-landlord` — opens the A12.5 /
+         * A12.6 wizard.
+         */
+        data class VerifyLandlord(val id: String) : Destination
+
+        /**
+         * `pantopus://homes/:id/verify-postcard` — opens the A12.7
+         * sibling status screen directly.
+         */
+        data class PostcardVerification(val id: String) : Destination
+
         data class Conversation(val id: String) : Destination
 
         data class User(val id: String) : Destination
@@ -77,6 +89,12 @@ object DeepLinkRouter {
          * can render the recipient.
          */
         data class VerifyEmail(val token: String, val email: String?) : Destination
+
+        /**
+         * `pantopus://businesses/new` — open the A12.10 Create Business
+         * wizard inside the active tab's nav stack.
+         */
+        data object CreateBusiness : Destination
 
         data class Unknown(val uri: String) : Destination
     }
@@ -187,11 +205,26 @@ object DeepLinkRouter {
                 val id = segments.getOrNull(1)
                 if (id.isNullOrBlank()) return Destination.Unknown(raw)
                 val trailing = segments.drop(2)
-                when {
-                    trailing.firstOrNull() == "dashboard" -> Destination.HomeDashboard(id)
-                    trailing.firstOrNull() == "members" && tabQuery == "requests" ->
-                        Destination.HomeMemberRequests(id)
+                when (trailing.firstOrNull()) {
+                    "dashboard" -> Destination.HomeDashboard(id)
+                    "members" ->
+                        if (tabQuery == "requests") {
+                            Destination.HomeMemberRequests(id)
+                        } else {
+                            Destination.HomeDetail(id)
+                        }
+                    "verify-landlord", "verify_landlord" -> Destination.VerifyLandlord(id)
+                    "verify-postcard", "verify_postcard" -> Destination.PostcardVerification(id)
                     else -> Destination.HomeDetail(id)
+                }
+            }
+            "businesses", "business" -> {
+                // `pantopus://businesses/new` opens the Create Business wizard.
+                // Other `businesses/:id` paths are not yet routed here.
+                if (segments.getOrNull(1) == "new") {
+                    Destination.CreateBusiness
+                } else {
+                    Destination.Unknown(raw)
                 }
             }
             "chat", "message", "messages", "conversation" -> {
