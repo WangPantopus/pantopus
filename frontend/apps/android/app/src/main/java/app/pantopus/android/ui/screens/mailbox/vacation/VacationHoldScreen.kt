@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "LongParameterList", "TooManyFunctions")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "LongParameterList", "TooManyFunctions", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.vacation
 

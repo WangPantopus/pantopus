@@ -49,7 +49,7 @@ final class VacationHoldViewModelTests: XCTestCase {
         guard case let .scheduling(draft) = vm.mode else {
             return XCTFail("Expected scheduling")
         }
-        XCTAssertEqual(draft.scopes.first(where: { $0.kind == .mail })?.isOn, false)
+        XCTAssertEqual(draft.scopes.first { $0.kind == .mail }?.isOn, false)
     }
 
     func test_civicLockedScope_isImmutable() {
@@ -59,7 +59,7 @@ final class VacationHoldViewModelTests: XCTestCase {
             return XCTFail("Expected scheduling")
         }
         // Civic stays locked + off — toggling does nothing.
-        let civic = draft.scopes.first(where: { $0.kind == .civic })
+        let civic = draft.scopes.first { $0.kind == .civic }
         XCTAssertTrue(civic?.isLocked ?? false)
         XCTAssertEqual(civic?.isOn, false)
     }

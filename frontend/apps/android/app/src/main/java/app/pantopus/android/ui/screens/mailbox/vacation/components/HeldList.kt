@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.vacation.components
 

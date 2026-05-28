@@ -14,6 +14,13 @@ import app.pantopus.android.ui.screens.mailbox.vacation.components.HeldList
 import app.pantopus.android.ui.screens.mailbox.vacation.components.HoldStatusHero
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -22,6 +29,7 @@ import org.junit.Test
  * variants plus the two feature-local primitives. Mirrors the iOS
  * `VacationHoldSnapshotTests`.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class VacationHoldSnapshotTest {
     @get:Rule
     val paparazzi: Paparazzi =
@@ -32,6 +40,10 @@ class VacationHoldSnapshotTest {
                     softButtons = false,
                 ),
         )
+
+    @Before fun setup() = Dispatchers.setMain(UnconfinedTestDispatcher())
+
+    @After fun tearDown() = Dispatchers.resetMain()
 
     @Test
     fun vacation_hold_scheduling_frame() {

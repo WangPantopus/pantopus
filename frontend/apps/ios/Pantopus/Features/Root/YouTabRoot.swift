@@ -819,9 +819,9 @@ public struct YouTabRoot: View {
             )
         case .vacationHold:
             VacationHoldView(
-                viewModel: VacationHoldViewModel(
-                    onBack: { Task { @MainActor in pop() } }
-                )
+                viewModel: VacationHoldViewModel {
+                    Task { @MainActor in pop() }
+                }
             )
         case let .mailItemDetail(mailId):
             // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will

@@ -75,19 +75,25 @@ public struct VacationHoldView: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("vacationHoldTitle")
             HStack {
-                Button(action: { viewModel.tapBack() }) {
-                    Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
-                        .frame(width: 44, height: 44)
-                }
+                Button(
+                    action: { viewModel.tapBack() },
+                    label: {
+                        Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
+                            .frame(width: 44, height: 44)
+                    }
+                )
                 .accessibilityLabel("Back")
                 .accessibilityIdentifier("vacationHoldBack")
                 Spacer()
-                Button(action: { viewModel.tapTrailingAction() }) {
-                    Text(viewModel.trailingActionLabel)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(viewModel.trailingActionTint)
-                        .frame(minWidth: 60, minHeight: 44)
-                }
+                Button(
+                    action: { viewModel.tapTrailingAction() },
+                    label: {
+                        Text(viewModel.trailingActionLabel)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(viewModel.trailingActionTint)
+                            .frame(minWidth: 60, minHeight: 44)
+                    }
+                )
                 .disabled(!viewModel.trailingActionEnabled)
                 .accessibilityLabel(viewModel.trailingActionLabel)
                 .accessibilityIdentifier("vacationHoldTrailingAction")
