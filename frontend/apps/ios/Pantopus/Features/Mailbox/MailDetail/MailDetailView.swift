@@ -169,7 +169,7 @@ public struct MailDetailView: View {
     @ViewBuilder
     private func gig(_ content: MailDetailContent) -> some View {
         if let gig = content.gigDetail {
-            GigDetailLayout(
+            GigMailDetailLayout(
                 content: content,
                 gig: gig,
                 bidInFlight: viewModel.gigBidInFlight,
