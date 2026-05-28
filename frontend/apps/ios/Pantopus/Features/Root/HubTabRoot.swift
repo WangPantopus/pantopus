@@ -255,6 +255,9 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A14.8 — Vacation hold (scheduling + active variants). Reached
+    /// from the Mailbox root top-bar settings menu.
+    case vacationHold
     /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
     /// Pushed from the Mailbox root header CTA + the
     /// `pantopus://mailbox/mailday` deep link.
@@ -438,6 +441,14 @@ public struct HubTabRoot: View {
             if !id.isEmpty {
                 path.append(.manageTrain(trainId: id))
             }
+            _ = router.consume()
+        case .vacationHold:
+            // A14.8 — `pantopus://mailbox/vacation` lands users on the
+            // Vacation hold screen via the Hub stack. We push through
+            // the Mailbox root so Back goes to the mailbox, not the
+            // hub home, matching the in-app entry point.
+            path.append(.mailboxRoot)
+            path.append(.vacationHold)
             _ = router.consume()
         case .mailDay:
             // pantopus://mailbox/mailday lands on the Mailbox root first
@@ -1767,11 +1778,18 @@ public struct HubTabRoot: View {
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
                     onOpenMailDay: { push(.mailDay(variant: .populated)) },
-                    onBrowseGigs: { push(.gigsFeed) }
+                    onBrowseGigs: { push(.gigsFeed) },
+                    onOpenVacationHold: { push(.vacationHold) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case .vacationHold:
+            VacationHoldView(
+                viewModel: VacationHoldViewModel {
+                    pop()
+                }
+            )
         case let .mailDay(variant):
             MailDayView(viewModel: MailDayViewModel(variant: variant)) {
                 pop()

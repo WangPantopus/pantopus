@@ -254,6 +254,16 @@ sealed class AnalyticsEvent(
     ) : AnalyticsEvent("cta.create_business.custom_category_submit") {
         override val properties = mapOf("label" to label)
     }
+
+    /**
+     * A14.8 Vacation hold screen view. `mode` is `scheduling` (composing
+     * a hold) or `active` (a hold is in flight).
+     */
+    data class ScreenVacationHoldViewed(
+        val mode: String,
+    ) : AnalyticsEvent("screen.vacation_hold.viewed") {
+        override val properties = mapOf("mode" to mode)
+    }
 }
 
 /** Standard outcomes for form submissions and other yes/no telemetry. */

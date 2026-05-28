@@ -243,6 +243,29 @@ class DeepLinkRouterTest {
         )
     }
 
+    // MARK: - A14.8 Vacation hold
+
+    @Test
+    fun vacation_hold_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.VacationHold,
+            DeepLinkRouter.resolveString("pantopus://mailbox/vacation"),
+        )
+    }
+
+    @Test
+    fun vacation_hold_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.VacationHold,
+            DeepLinkRouter.resolveString("https://pantopus.app/mailbox/vacation"),
+        )
+    }
+
+    @Test
+    fun mailbox_without_vacation_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://mailbox") is DeepLinkRouter.Destination.Unknown)
+    }
+
     // MARK: - T6.1c P5 — Auth deep links
 
     @Test

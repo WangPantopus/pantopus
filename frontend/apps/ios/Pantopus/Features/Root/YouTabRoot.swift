@@ -27,6 +27,9 @@ public enum YouRoute: Hashable {
     case mailItemDetail(mailId: String)
     /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
     case mailboxSearch
+    /// A14.8 — Vacation hold (scheduling + active variants). Reached
+    /// from the Mailbox root top-bar settings menu.
+    case vacationHold
     case settings
     case placeholder(label: String)
     case helpCenter
@@ -791,7 +794,8 @@ public struct YouTabRoot: View {
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
                     onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
-                    onBrowseGigs: { path.append(.gigsFeed) }
+                    onBrowseGigs: { path.append(.gigsFeed) },
+                    onOpenVacationHold: { path.append(.vacationHold) }
                 )
             )
         case .mailboxMap:
@@ -812,6 +816,12 @@ public struct YouTabRoot: View {
                         }
                     }
                 )
+            )
+        case .vacationHold:
+            VacationHoldView(
+                viewModel: VacationHoldViewModel {
+                    Task { @MainActor in pop() }
+                }
             )
         case let .mailItemDetail(mailId):
             // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will

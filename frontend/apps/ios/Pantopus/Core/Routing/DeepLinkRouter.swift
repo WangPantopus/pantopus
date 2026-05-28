@@ -67,6 +67,11 @@ final class DeepLinkRouter {
         /// (the link from the resend / signup flow carries `&email=` so
         /// the screen can render the recipient).
         case verifyEmail(token: String, email: String?)
+        /// A14.8 — `pantopus://mailbox/vacation` opens the Vacation
+        /// hold screen (scheduling or active variant depending on
+        /// server state once the persistence layer lands; today the
+        /// view-model seeds the scheduling form).
+        case vacationHold
         /// `pantopus://mailbox/mailday` — the A13.16 My Mail Day editor.
         /// Routed via the mailbox stack so Back returns to the mailbox
         /// root.
@@ -181,19 +186,20 @@ final class DeepLinkRouter {
             return .connections
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
+        case "mailbox":
+            // `pantopus://mailbox/vacation` opens A14.8; `pantopus://mailbox/mailday`
+            // opens the A13.16 My Mail Day editor. Other mailbox paths fall through
+            // to `.unknown` until they have routes.
+            switch segments.dropFirst().first {
+            case "vacation": return .vacationHold
+            case "mailday": return .mailDay
+            default: return .unknown(url)
+            }
         case "wallet":
             return .wallet
         case "invite":
             if let token = segments.dropFirst().first, !token.isEmpty {
                 return .invite(token: token)
-            }
-            return .unknown(url)
-        case "mailbox":
-            // `pantopus://mailbox/mailday` — only the mail-day sub-route
-            // is wired today. Bare `pantopus://mailbox` falls through to
-            // the existing tab-level routing.
-            if segments.dropFirst().first == "mailday" {
-                return .mailDay
             }
             return .unknown(url)
         case "auth":

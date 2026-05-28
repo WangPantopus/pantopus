@@ -86,6 +86,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     /// the search frame's dashed-violet fallback row.
     case ctaCreateBusinessCustomCategorySubmit(label: String)
 
+    /// A14.8 Vacation hold screen view. `mode` is `scheduling` (composing
+    /// a hold) or `active` (a hold is in flight).
+    case screenVacationHoldViewed(mode: String)
+
     /// Wire-format event name. Stable across versions — vendor / dashboard
     /// owners depend on these strings.
     public var name: String {
@@ -144,6 +148,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .ctaComposeGigSubmit: "cta.compose_gig.submit"
         case .screenCreateBusinessStepViewed: "screen.create_business_wizard.step_viewed"
         case .ctaCreateBusinessCustomCategorySubmit: "cta.create_business.custom_category_submit"
+        case .screenVacationHoldViewed: "screen.vacation_hold.viewed"
         }
     }
 
@@ -161,6 +166,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .ctaCreateBusinessCustomCategorySubmit(label):
             ["label": label]
+        case let .screenVacationHoldViewed(mode):
+            ["mode": mode]
         case let .screenListingComposeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenPetsWizardStepViewed(stepNumber, stepName):
