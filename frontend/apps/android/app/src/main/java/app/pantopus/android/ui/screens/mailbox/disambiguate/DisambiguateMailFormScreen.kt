@@ -261,7 +261,9 @@ private fun FallbackSection(onFallback: (FallbackAction) -> Unit) {
                     onClick = { onFallback(action) },
                     isDestructive = action.isDestructive,
                     showsDivider = index < FallbackAction.entries.size - 1,
-                    rowTestTag = "disambiguateFallback_${action.name}",
+                    // Mirror the iOS rawValue keys (rescan / typeName / …) so the
+                    // testTag strings match across platforms.
+                    rowTestTag = "disambiguateFallback_${action.name.replaceFirstChar { it.lowercase() }}",
                 )
             }
         }
