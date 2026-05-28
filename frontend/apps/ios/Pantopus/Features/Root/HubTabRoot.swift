@@ -85,6 +85,10 @@ public enum HubRoute: Hashable {
     /// surface that previously routed to a `Business: <name>`
     /// placeholder.
     case businessProfile(businessId: String)
+    /// P4.2 — A13.10 Edit Business Page (owner-only). Pushed from
+    /// `BusinessProfileView`'s overflow when the viewer owns the business
+    /// and from the `pantopus://businesses/:id/page-editor` deep link.
+    case editBusinessPage(businessId: String)
     /// A12.10 — Create Business wizard. Reached from the My Businesses
     /// FAB / empty-state CTA and from the `pantopus://businesses/new`
     /// deep link.
@@ -418,6 +422,12 @@ public struct HubTabRoot: View {
             if !id.isEmpty {
                 path.append(.manageTrain(trainId: id))
             }
+            _ = router.consume()
+        case let .businessProfile(businessId):
+            path.append(.businessProfile(businessId: businessId))
+            _ = router.consume()
+        case let .editBusinessPage(businessId):
+            path.append(.editBusinessPage(businessId: businessId))
             _ = router.consume()
         default:
             break
@@ -1119,7 +1129,18 @@ public struct HubTabRoot: View {
                         items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
                     )
                 },
-                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
+                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } },
+                onEdit: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } }
+            )
+        case let .editBusinessPage(businessId):
+            EditBusinessPageView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onPreview: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case .createBusiness:
             CreateBusinessWizardView(
@@ -1831,6 +1852,7 @@ private struct BusinessProfileDestination: View {
     let onOpenMessages: @MainActor () -> Void
     let onShare: @MainActor () -> Void
     let onOpenReport: @MainActor () -> Void
+    let onEdit: @MainActor () -> Void
 
     @Environment(\.openURL) private var openURL
 
@@ -1840,10 +1862,10 @@ private struct BusinessProfileDestination: View {
             onBack: onBack,
             onOpenMessages: onOpenMessages,
             onShare: onShare,
-            onOpenReport: onOpenReport
-        ) { url in
-            openURL(url)
-        }
+            onOpenReport: onOpenReport,
+            onOpenWebsite: { url in openURL(url) },
+            onEdit: onEdit
+        )
     }
 }
 

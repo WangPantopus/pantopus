@@ -131,6 +131,18 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .homeDetail(id: "h_1"))
     }
 
+    func testBusinessProfileRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/businesses/biz_42")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .businessProfile(businessId: "biz_42"))
+    }
+
+    func testEditBusinessPageRoute() throws {
+        try DeepLinkRouter.shared.handle(
+            url: XCTUnwrap(URL(string: "pantopus://businesses/biz_42/page-editor"))
+        )
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .editBusinessPage(businessId: "biz_42"))
+    }
+
     func testChatRouteUsesConversationCase() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://chat/room_1")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .conversation(id: "room_1"))

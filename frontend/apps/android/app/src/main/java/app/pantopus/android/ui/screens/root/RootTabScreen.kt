@@ -45,6 +45,8 @@ import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessWizardScreen
+import app.pantopus.android.ui.screens.businesses.page_editor.EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.businesses.page_editor.EditBusinessPageScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
@@ -571,6 +573,14 @@ private object ChildRoutes {
 
     /** Build the concrete path for a Business Profile. */
     fun businessProfile(businessId: String): String = "businesses/$businessId"
+
+    /** P4.2 — A13.10 Edit Business Page (owner-only). Pushed from the
+     *  `BusinessProfileScreen` overflow when `viewerIsOwner` is true,
+     *  and from the `pantopus://businesses/:id/page-editor` deep link. */
+    const val EDIT_BUSINESS_PAGE = "businesses/{$EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY}/page-editor"
+
+    /** Build the concrete path for the Edit Business Page editor. */
+    fun editBusinessPage(businessId: String): String = "businesses/$businessId/page-editor"
 
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
 
@@ -2112,8 +2122,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.BUSINESS_PROFILE,
                 arguments = listOf(navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { backStackEntry ->
                 val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                val businessId = backStackEntry.arguments?.getString(BUSINESS_PROFILE_BUSINESS_ID_KEY) ?: ""
                 BusinessProfileScreen(
                     onBack = { navController.popBackStack() },
                     onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
@@ -2125,6 +2136,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
                     onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
+                    onEdit = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_BUSINESS_PAGE,
+                arguments = listOf(navArgument(EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY) { type = NavType.StringType }),
+            ) {
+                EditBusinessPageScreen(
+                    onBack = { navController.popBackStack() },
+                    onPreview = { navController.popBackStack() },
                 )
             }
             composable(

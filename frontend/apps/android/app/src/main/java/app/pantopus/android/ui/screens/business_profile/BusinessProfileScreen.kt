@@ -81,6 +81,11 @@ fun BusinessProfileScreen(
     onShare: () -> Unit = {},
     onOpenReport: () -> Unit = {},
     onOpenWebsite: (String) -> Unit = {},
+    /**
+     * P4.2 — A13.10 Edit Business Page. Surfaced via the overflow sheet
+     * when the loaded payload's `viewerIsOwner` is true.
+     */
+    onEdit: () -> Unit = {},
     viewModel: BusinessProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -149,11 +154,18 @@ fun BusinessProfileScreen(
         }
 
         if (showOverflow) {
+            val viewerIsOwner =
+                (state as? BusinessProfileUiState.Loaded)?.content?.viewerIsOwner == true
             ModalBottomSheet(
                 onDismissRequest = { viewModel.setShowOverflow(false) },
                 sheetState = sheetState,
             ) {
                 OverflowSheetContent(
+                    showEdit = viewerIsOwner,
+                    onEdit = {
+                        viewModel.setShowOverflow(false)
+                        onEdit()
+                    },
                     onShare = {
                         viewModel.setShowOverflow(false)
                         onShare()
@@ -1077,6 +1089,8 @@ private fun OverflowSheetContent(
     onShare: () -> Unit,
     onReport: () -> Unit,
     onCancel: () -> Unit,
+    showEdit: Boolean = false,
+    onEdit: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -1085,6 +1099,9 @@ private fun OverflowSheetContent(
                 .padding(bottom = Spacing.s5),
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
+        if (showEdit) {
+            OverflowRow(label = "Edit business page", onClick = onEdit)
+        }
         OverflowRow(label = "Share business", onClick = onShare)
         OverflowRow(label = "Report", destructive = true, onClick = onReport)
         OverflowRow(label = "Cancel", onClick = onCancel)
