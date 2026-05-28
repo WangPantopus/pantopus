@@ -169,6 +169,17 @@ enum class MailItemCategory(
         label = "Memory",
         detailTrust = MailDetailTrust.Verified,
     ),
+    Party(
+        raw = "party",
+        // Rose `#db2777` per A17.9 invite accent. Token lives on
+        // `PantopusColors.categoryParty` so the swatch can be swapped
+        // without touching feature code.
+        accent = PantopusColors.categoryParty,
+        icon = PantopusIcon.PartyPopper,
+        rowBackground = PantopusColors.errorBg,
+        label = "Party",
+        detailTrust = MailDetailTrust.Celebration,
+    ),
     General(
         raw = "general",
         accent = PantopusColors.appTextSecondary,

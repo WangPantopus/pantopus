@@ -180,4 +180,9 @@ public extension Theme.Color {
     static let rentals = SwiftUI.Color("Category/Rentals", bundle: Theme.bundle)
     /// Category: vehicles — `#dc2626`.
     static let vehicles = SwiftUI.Color("Category/Vehicles", bundle: Theme.bundle)
+    /// Category: party — `#db2777` (rose-600). Drives the A17.9 party-invite
+    /// accent strip, eyebrow dot, date tile, confetti seed, and RSVP CTA.
+    /// Replaces the raw rose hex called out in the parity audit's open
+    /// question #4 ("prefer named token over raw hex").
+    static let categoryParty = SwiftUI.Color("Category/Party", bundle: Theme.bundle)
 }
