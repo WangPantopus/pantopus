@@ -37,7 +37,7 @@ public struct SharesSlider: View {
     public var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            let fraction = fraction(for: value)
+            let currentFraction = fraction(for: value)
             ZStack(alignment: .leading) {
                 // Inactive track
                 Capsule()
@@ -46,7 +46,7 @@ public struct SharesSlider: View {
                 // Active track
                 Capsule()
                     .fill(Theme.Color.primary600)
-                    .frame(width: max(0, width * fraction), height: 4)
+                    .frame(width: max(0, width * currentFraction), height: 4)
                 // Tick dots — sit on top of the track so they remain visible
                 // whether the active fill has covered them or not.
                 ForEach(ticks, id: \.self) { tick in
@@ -62,7 +62,7 @@ public struct SharesSlider: View {
                     .overlay(Circle().stroke(Theme.Color.primary600, lineWidth: 2))
                     .frame(width: 24, height: 24)
                     .shadow(color: Theme.Color.primary600.opacity(0.25), radius: 6, y: 2)
-                    .offset(x: max(0, width * fraction - 12))
+                    .offset(x: max(0, width * currentFraction - 12))
                     .accessibilityIdentifier("sharesSliderThumb")
             }
             .frame(maxWidth: .infinity, alignment: .leading)

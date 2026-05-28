@@ -77,6 +77,8 @@ final class IconTests: XCTestCase {
         "door-open", "car", "warehouse",
         // A15.3 AI Assistant — avatar/reply glyph.
         "bot",
+        // A13.4 Transfer ownership — Face ID gate and ownership-diff controls.
+        "scan-face", "arrow-right-left", "arrow-down",
         // A13.13 Manage train — Organize row glyphs.
         "bar-chart-3", "calendar-cog"
     ]
