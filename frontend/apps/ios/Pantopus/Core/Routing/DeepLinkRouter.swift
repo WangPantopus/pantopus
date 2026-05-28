@@ -23,16 +23,32 @@ final class DeepLinkRouter {
         case home
         case notifications
         case supportTrain(id: String)
+        /// `pantopus://support-trains/:id/manage` — organizer-only
+        /// review queue for a Support Train. Distinct from
+        /// `supportTrain(id:)`, which now lands on the participant
+        /// detail (A10.9). Owners reach the queue via the dock
+        /// overflow on the detail screen; this deep link is the
+        /// "land directly on the queue" entry point for organizer
+        /// shortcuts and back-of-house notifications.
+        case supportTrainManage(id: String)
         case post(id: String)
         case gig(id: String)
         case listing(id: String)
         case homeDetail(id: String)
         case homeDashboard(id: String)
         case homeMemberRequests(id: String)
+        /// `pantopus://homes/:id/verify-landlord` — opens A12.5 / A12.6.
+        case verifyLandlord(id: String)
+        /// `pantopus://homes/:id/verify-postcard` — opens the A12.7
+        /// sibling status screen directly.
+        case postcardVerification(id: String)
         case conversation(id: String)
         case user(id: String)
         case connections
         case discoverHub
+        /// `pantopus://businesses/new` — open the A12.10 Create Business
+        /// wizard inside the active tab's nav stack.
+        case createBusiness
         case invite(token: String)
         /// P4.2 — A13.10 Edit Business Page (owner-only).
         /// `pantopus://businesses/:id/page-editor`.
@@ -49,6 +65,9 @@ final class DeepLinkRouter {
         /// (the link from the resend / signup flow carries `&email=` so
         /// the screen can render the recipient).
         case verifyEmail(token: String, email: String?)
+        /// `pantopus://wallet` — A10.10 earnings wallet (distinct from
+        /// Settings → Payments; this is the earnings-side surface).
+        case wallet
         case unknown(URL)
     }
 
@@ -97,29 +116,15 @@ final class DeepLinkRouter {
 
     /// Accepts both `pantopus://…` and `https://pantopus.app/…`.
     func resolve(url: URL) -> Destination {
-        // For custom-scheme URLs (`pantopus://messages/conv_42`) the route
-        // name lives in the host, not the path. For https URLs the host is
-        // the domain and the route is the first path component. Normalize
-        // both shapes into one `segments` array so the matcher below
-        // doesn't have to branch on scheme.
-        var segments = url.pathComponents.filter { $0 != "/" }
-        if url.scheme != "http", url.scheme != "https",
-           let host = url.host, !host.isEmpty {
-            segments.insert(host, at: 0)
-        }
+        let segments = routeSegments(for: url)
         let firstSegment = segments.first ?? ""
-        // Parse `?tab=requests` from the query string so the
-        // home-member-requests entry routes correctly.
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        let tabQuery = comps?.queryItems?.first { $0.name == "tab" }?.value
-        // Auth deep links carry `token` / `token_hash` (Supabase's two
-        // recovery-link param names) and an optional `email`. Auth-callback
-        // emails sometimes encode params in the fragment instead of the
-        // query string, so parse both.
-        let tokenQuery = comps?.queryItems?.first { $0.name == "token" || $0.name == "token_hash" }?.value
+        let tabQuery = queryValue("tab", in: comps)
+        let tokenQuery = queryValue("token", in: comps)
+            ?? queryValue("token_hash", in: comps)
             ?? fragmentParam(url.fragment, name: "token")
             ?? fragmentParam(url.fragment, name: "token_hash")
-        let emailQuery = comps?.queryItems?.first { $0.name == "email" }?.value
+        let emailQuery = queryValue("email", in: comps)
             ?? fragmentParam(url.fragment, name: "email")
 
         switch firstSegment {
@@ -130,8 +135,12 @@ final class DeepLinkRouter {
         case "notifications":
             return .notifications
         case "support-trains", "support_train":
-            if let id = segments.dropFirst().first { return .supportTrain(id: id) }
-            return .unknown(url)
+            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            let trailing = segments.dropFirst(2).first ?? ""
+            if trailing == "manage" {
+                return .supportTrainManage(id: id)
+            }
+            return .supportTrain(id: id)
         case "post", "posts":
             if let id = segments.dropFirst().first { return .post(id: id) }
             return .unknown(url)
@@ -142,17 +151,15 @@ final class DeepLinkRouter {
             if let id = segments.dropFirst().first { return .listing(id: id) }
             return .unknown(url)
         case "homes":
-            guard let id = segments.dropFirst().first else { return .unknown(url) }
-            let trailing = Array(segments.dropFirst(2))
-            if trailing.first == "dashboard" {
-                return .homeDashboard(id: id)
-            }
-            if trailing.first == "members" && tabQuery == "requests" {
-                return .homeMemberRequests(id: id)
-            }
-            return .homeDetail(id: id)
+            return homeDestination(url: url, segments: segments, tabQuery: tabQuery)
         case "businesses", "business":
+            // `pantopus://businesses/new` opens the Create Business wizard.
+            // `pantopus://businesses/:id/page-editor` opens A13.10 (owner-only).
+            // `pantopus://businesses/:id` opens the public business profile.
             guard let id = segments.dropFirst().first else { return .unknown(url) }
+            if id == "new" {
+                return .createBusiness
+            }
             let trailing = Array(segments.dropFirst(2))
             if trailing.first == "page-editor" || trailing.first == "page_editor" {
                 return .editBusinessPage(businessId: id)
@@ -168,36 +175,81 @@ final class DeepLinkRouter {
             return .connections
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
+        case "wallet":
+            return .wallet
         case "invite":
             if let token = segments.dropFirst().first, !token.isEmpty {
                 return .invite(token: token)
             }
             return .unknown(url)
         case "auth":
-            // `pantopus://auth/reset-password?token=…` and
-            // `pantopus://auth/verify-email?token=…&email=…`.
-            let sub = segments.dropFirst().first ?? ""
-            switch sub {
-            case "reset-password", "reset_password":
-                guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
-                return .resetPassword(token: token)
-            case "verify-email", "verify_email":
-                guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
-                return .verifyEmail(token: token, email: emailQuery)
-            default:
-                return .unknown(url)
-            }
+            return authDestination(url: url, segments: segments, token: tokenQuery, email: emailQuery)
         case "reset-password", "reset_password":
             // Tolerate the bare `/reset-password?token=…` shape that the
             // backend's older recovery template emits (no `/auth/` prefix).
-            guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
-            return .resetPassword(token: token)
+            return resetPasswordDestination(url: url, token: tokenQuery)
         case "verify-email", "verify_email":
-            guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
-            return .verifyEmail(token: token, email: emailQuery)
+            return verifyEmailDestination(url: url, token: tokenQuery, email: emailQuery)
         default:
             return .unknown(url)
         }
+    }
+
+    private func routeSegments(for url: URL) -> [String] {
+        var segments = url.pathComponents.filter { $0 != "/" }
+        if url.scheme != "http", url.scheme != "https",
+           let host = url.host, !host.isEmpty {
+            segments.insert(host, at: 0)
+        }
+        return segments
+    }
+
+    private func queryValue(_ name: String, in components: URLComponents?) -> String? {
+        components?.queryItems?.first { $0.name == name }?.value
+    }
+
+    private func homeDestination(url: URL, segments: [String], tabQuery: String?) -> Destination {
+        guard let id = segments.dropFirst().first else { return .unknown(url) }
+        let trailing = Array(segments.dropFirst(2))
+        if trailing.first == "dashboard" {
+            return .homeDashboard(id: id)
+        }
+        if trailing.first == "members" && tabQuery == "requests" {
+            return .homeMemberRequests(id: id)
+        }
+        if trailing.first == "verify-landlord" || trailing.first == "verify_landlord" {
+            return .verifyLandlord(id: id)
+        }
+        if trailing.first == "verify-postcard" || trailing.first == "verify_postcard" {
+            return .postcardVerification(id: id)
+        }
+        return .homeDetail(id: id)
+    }
+
+    private func authDestination(
+        url: URL,
+        segments: [String],
+        token: String?,
+        email: String?
+    ) -> Destination {
+        switch segments.dropFirst().first ?? "" {
+        case "reset-password", "reset_password":
+            resetPasswordDestination(url: url, token: token)
+        case "verify-email", "verify_email":
+            verifyEmailDestination(url: url, token: token, email: email)
+        default:
+            .unknown(url)
+        }
+    }
+
+    private func resetPasswordDestination(url: URL, token: String?) -> Destination {
+        guard let token, !token.isEmpty else { return .unknown(url) }
+        return .resetPassword(token: token)
+    }
+
+    private func verifyEmailDestination(url: URL, token: String?, email: String?) -> Destination {
+        guard let token, !token.isEmpty else { return .unknown(url) }
+        return .verifyEmail(token: token, email: email)
     }
 
     /// Pulls a single key out of a `#` fragment of the form `key=v&k2=v2`.

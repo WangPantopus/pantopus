@@ -80,6 +80,11 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenComposeGigWizardStepViewed(stepNumber: Int, stepName: String)
     /// P2.2 — Post-a-Task wizard submit tap (fires before the POST).
     case ctaComposeGigSubmit
+    /// A12.10 Create Business wizard — step view.
+    case screenCreateBusinessStepViewed(stepNumber: Int, stepName: String)
+    /// A12.10 Create Business wizard — "Add as custom category" tap on
+    /// the search frame's dashed-violet fallback row.
+    case ctaCreateBusinessCustomCategorySubmit(label: String)
 
     /// Wire-format event name. Stable across versions — vendor / dashboard
     /// owners depend on these strings.
@@ -137,6 +142,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenPulseComposeViewed: "screen.pulse_compose.viewed"
         case .screenComposeGigWizardStepViewed: "screen.compose_gig_wizard.step_viewed"
         case .ctaComposeGigSubmit: "cta.compose_gig.submit"
+        case .screenCreateBusinessStepViewed: "screen.create_business_wizard.step_viewed"
+        case .ctaCreateBusinessCustomCategorySubmit: "cta.create_business.custom_category_submit"
         }
     }
 
@@ -150,6 +157,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenComposeGigWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .screenCreateBusinessStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .ctaCreateBusinessCustomCategorySubmit(label):
+            ["label": label]
         case let .screenListingComposeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenPetsWizardStepViewed(stepNumber, stepName):
