@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions", "FunctionNaming")
+@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions", "FunctionNaming", "LongParameterList")
 
 package app.pantopus.android.ui.screens.wallet
 

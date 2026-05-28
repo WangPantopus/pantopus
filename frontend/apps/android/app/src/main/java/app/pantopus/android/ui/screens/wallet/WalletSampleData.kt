@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "LongMethod")
 
 package app.pantopus.android.ui.screens.wallet
 
