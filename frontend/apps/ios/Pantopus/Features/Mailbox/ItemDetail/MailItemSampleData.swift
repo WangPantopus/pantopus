@@ -118,6 +118,10 @@ public extension MailItemSampleData {
 
     static let packageInTransit = PackageBodyContent(
         carrier: "USPS Priority Mail",
+        service: "USPS Priority Mail",
+        dimensions: "12 x 9 x 4 in",
+        weight: "2.4 lb",
+        trackingUrl: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
         etaLine: "Expected today by 3 PM",
         status: .inTransit,
         trackingNumber: "9505 5125 8841 6014 2203 17",
@@ -153,6 +157,10 @@ public extension MailItemSampleData {
 
     static let packageOutForDelivery = PackageBodyContent(
         carrier: "USPS Priority Mail",
+        service: "USPS Priority Mail",
+        dimensions: "12 x 9 x 4 in",
+        weight: "2.4 lb",
+        trackingUrl: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
         etaLine: "ETA window 1:00 - 3:00 PM - about 6 stops away",
         status: .outForDelivery,
         trackingNumber: "9505 5125 8841 6014 2203 17",
@@ -195,6 +203,10 @@ public extension MailItemSampleData {
 
     static let packageDelivered = PackageBodyContent(
         carrier: "USPS Priority Mail",
+        service: "USPS Priority Mail",
+        dimensions: "12 x 9 x 4 in",
+        weight: "2.4 lb",
+        trackingUrl: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
         etaLine: "Today - 1:47 PM - front porch - left in shade",
         status: .delivered,
         trackingNumber: "9505 5125 8841 6014 2203 17",
@@ -243,6 +255,90 @@ public extension MailItemSampleData {
         case .delivered: packageDelivered
         }
     }
+
+    /// UPS fixture - in transit. Used by A17.8 acceptance tests.
+    static let packageUpsInTransit = PackageBodyContent(
+        carrier: "UPS",
+        service: "UPS Ground",
+        dimensions: "14 x 10 x 6 in",
+        weight: "3.8 lb",
+        trackingUrl: "https://www.ups.com/track?tracknum=1Z999AA10123456784",
+        etaLine: "Expected tomorrow by 8 PM",
+        status: .inTransit,
+        trackingNumber: "1Z 999 AA1 0123 4567 84",
+        referenceLine: "UPS Ground - 3.8 lb - 14x10x6 in",
+        statusTitle: "In transit",
+        statusDetail: "Moving through Reno, NV",
+        trackingSteps: packageTrackingSteps(status: .inTransit),
+        handoffSteps: [
+            .init(
+                id: "in-transit",
+                title: "In transit",
+                location: "Reno, NV",
+                timestamp: "Sun May 17 - 9:14 PM",
+                icon: .arrowRight
+            ),
+            .init(
+                id: "picked-up",
+                title: "Picked up by UPS",
+                location: "Hayward, CA",
+                timestamp: "Sat May 16 - 5:42 PM",
+                icon: .package
+            ),
+            .init(
+                id: "label-created",
+                title: "Label created",
+                location: "Hayward, CA",
+                timestamp: "Sat May 16 - 11:11 AM",
+                icon: .tag
+            )
+        ]
+    )
+
+    /// UPS fixture - delivered. Used by A17.8 acceptance tests.
+    static let packageUpsDelivered = PackageBodyContent(
+        carrier: "UPS",
+        service: "UPS Ground",
+        dimensions: "14 x 10 x 6 in",
+        weight: "3.8 lb",
+        trackingUrl: "https://www.ups.com/track?tracknum=1Z999AA10123456784",
+        etaLine: "Today - 11:22 AM - front porch",
+        status: .delivered,
+        trackingNumber: "1Z 999 AA1 0123 4567 84",
+        referenceLine: "UPS Ground - 3.8 lb - 14x10x6 in",
+        statusTitle: "Delivered to your porch",
+        statusDetail: "Today - 11:22 AM - front porch",
+        trackingSteps: packageTrackingSteps(status: .delivered),
+        handoffSteps: [
+            .init(
+                id: "delivered",
+                title: "Delivered to front porch",
+                location: "Oakland, CA - 1428 Elm St",
+                timestamp: "Tue May 19 - 11:22 AM",
+                icon: .home
+            ),
+            .init(
+                id: "out-for-delivery",
+                title: "Out for delivery",
+                location: "Oakland Hub - Route 14",
+                timestamp: "Tue May 19 - 7:38 AM",
+                icon: .truck
+            ),
+            .init(
+                id: "in-transit",
+                title: "In transit",
+                location: "Reno, NV",
+                timestamp: "Sun May 17 - 9:14 PM",
+                icon: .arrowRight
+            )
+        ],
+        deliveryPhoto: PackageDeliveryPhoto(
+            capturedAt: "11:22 AM",
+            watermark: "UPS - 19/05/2026 11:22:14",
+            location: "Front porch - 1428 Elm St",
+            verificationLabel: "GPS verified"
+        )
+    )
 
     static func packageTrackingSteps(status: PackageDeliveryStatus) -> [TimelineStep] {
         let currentIndex = switch status {

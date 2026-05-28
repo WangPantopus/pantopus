@@ -102,6 +102,10 @@ private fun packageDefaultStatusDetail(status: PackageDeliveryStatus): String =
 /** Data projected onto the Package body slot. */
 data class PackageBodyContent(
     val carrier: String,
+    val service: String? = null,
+    val dimensions: String? = null,
+    val weight: String? = null,
+    val trackingUrl: String? = null,
     val etaLine: String? = null,
     val status: PackageDeliveryStatus = PackageDeliveryStatus.InTransit,
     val trackingNumber: String? = null,
@@ -875,6 +879,20 @@ private fun packageBodyContent(
             ?: sample.statusDetail
     return PackageBodyContent(
         carrier = carrier,
+        service =
+            (packageMap["service"] as? String)
+                ?: (packageMap["delivery_service"] as? String)
+                ?: (packageMap["mail_service"] as? String)
+                ?: sample.service,
+        dimensions =
+            (packageMap["dimensions"] as? String)
+                ?: (packageMap["size"] as? String)
+                ?: sample.dimensions,
+        weight = (packageMap["weight"] as? String) ?: sample.weight,
+        trackingUrl =
+            (packageMap["tracking_url"] as? String)
+                ?: (packageMap["carrier_url"] as? String)
+                ?: sample.trackingUrl,
         etaLine = (packageMap["eta_line"] as? String) ?: sample.etaLine,
         status = status,
         trackingNumber = trackingNumber ?: sample.trackingNumber,

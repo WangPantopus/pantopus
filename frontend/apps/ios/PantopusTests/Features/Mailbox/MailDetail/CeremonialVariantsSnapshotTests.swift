@@ -157,6 +157,24 @@ final class CeremonialVariantsSnapshotTests: XCTestCase {
         )
     }
 
+    func test_package_layout_ups_delivered_renders() {
+        let content = MailDetailContent.replacingAck(
+            makeContent(category: .package, title: "UPS package delivered"),
+            with: true
+        )
+        assertRenders(
+            PackageDetailLayout(
+                content: content,
+                package: MailItemSampleData.packageUpsDelivered,
+                ackInFlight: false,
+                onBack: {},
+                onAcknowledgeDelivery: {},
+                onOpenSenderProfile: { _ in },
+                onSaveToVault: {}
+            )
+        )
+    }
+
     // MARK: - Fixtures
 
     private func makeContent(
