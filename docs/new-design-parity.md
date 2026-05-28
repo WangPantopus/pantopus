@@ -373,28 +373,28 @@ toggles. The new designs introduce **per-screen bespoke control vocabulary**
 that goes beyond the standard chevron/toggle row.
 
 ### A14.1 — Home settings (`/homes/[id]/settings/index.tsx`)
-- **iOS:** **MISSING** — no `Homes/Settings/` folder. Currently the home dashboard surfaces the menu inline.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD**
+- **iOS:** `Features/Homes/Settings/HomeSettingsView.swift` + `HomeSettingsViewModel.swift` + `HomeSettingsSampleData.swift`. Wired via `HubRoute.homeSettings(homeId:)` from the home dashboard's top-bar `slidersHorizontal` affordance.
+- **Android:** `ui/screens/homes/settings/HomeSettingsScreen.kt` + `HomeSettingsViewModel.kt` + `HomeSettingsSampleData.kt`. Wired via `ChildRoutes.HOME_SETTINGS` from `HomeDashboardScreen.onOpenSettings`.
+- **Status:** **DONE** (P5.1)
 - **Designed frames:** established home (14 Elm Park Lane · address verified · 4 members · codes + trusted neighbors configured · all rows have meaningful subs) · newly claimed (amber `Verifying` chip on address · `Not set` / `Available after verification` subs · `Cancel claim` destructive)
 - **Required slots:**
-  - **Identity card** at top (home identity chip + address verified chip).
+  - **Identity card** at top (home identity chip + address verified chip) — rendered via the shared `GroupedListView`'s new optional `headerView` slot.
   - **`Home identity` overline + 4 chevron rows**: Address (with `Verified` chip) · Property details · Photos · Documents.
   - **`Access` overline + 3 chevron rows**: Access codes (with N count) · Trusted neighbors · Privacy.
   - **`Members` overline + 2 chevron rows**: People (4 members · 1 pending) · Invite link.
   - **`Notifications` overline + 1 chevron row**: Home notifications.
   - **`Wind down` overline + destructive row**: Leave this home (or `Cancel claim` in newly-claimed variant).
-- **Routing:** wire from `HomeDashboardView` settings menu trailing button.
+- **Routing:** `HomeDashboardView` / `HomeDashboardScreen` take an `onOpenSettings` callback wired to the `ContentDetailShell` top-bar trailing action.
 
 ### A14.2 — Home security (`/homes/[id]/settings/security.tsx`)
-- **iOS:** **MISSING** — same as A14.1.
-- **Android:** **MISSING**.
-- **Status:** **BUILD**
+- **iOS:** `Features/Homes/Settings/Security/HomeSecurityView.swift` + `HomeSecurityViewModel.swift`. Reached from the per-home Settings `Privacy` row.
+- **Android:** `ui/screens/homes/settings/security/HomeSecurityScreen.kt` + `HomeSecurityViewModel.kt`. Reached from the Settings `Privacy` row.
+- **Status:** **DONE** (P5.1)
 - **Designed frames:** balanced (5 of 9 toggles on · helper text per card) · strict lockdown (all 9 on · helper text shifts to consequence language)
 - **Required slots:**
   - **3 groups × 3 toggles**: Access control (Guest approval · Member name visibility · Address precision) · Privacy (Activity visibility · Map opt-out · Notification previews) · Documents (Doc lock · Photo blur · Vault auto-lock).
-  - **Helper line per card** that **changes based on which toggles are active** — e.g. "Guest approval is on, so guests need an owner-tap to enter" vs "Guest approval is off — anyone with a code is in. Tighten this if you're away."
-  - No chevrons, no destructive action — pure switchgear.
+  - **Helper line per card** that **changes based on which toggles are active** — "Guest approval is on, so guests need an owner-tap to enter" (balanced) vs "Guest approval is off — anyone with a code is in. Tighten this if you're away." (off) vs "All guest activity requires your explicit approval. Names and street precision are hidden from outsiders." (all-on consequence). iOS+Android keep these strings word-for-word identical via `HomeSecurityViewModel` helpers + the `HomeSecurityHelpers` Kotlin object.
+  - No chevrons, no destructive action — pure switchgear. Toggle persistence is stubbed to local state pending the backend `home_security_settings` table.
 
 ### A14.3 — Settings index (`/settings.tsx`)
 - **iOS:** `Settings/SettingsView.swift` + `Settings/SettingsViewModels.swift::SettingsIndexViewModel`

@@ -137,6 +137,11 @@ import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
+import app.pantopus.android.ui.screens.homes.settings.HOME_SETTINGS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.HomeSettingsRoute
+import app.pantopus.android.ui.screens.homes.settings.HomeSettingsScreen
+import app.pantopus.android.ui.screens.homes.settings.security.HOME_SECURITY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.security.HomeSecurityScreen
 import app.pantopus.android.ui.screens.homes.packages.LOG_PACKAGE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.packages.LogPackageScreen
 import app.pantopus.android.ui.screens.homes.packages.PACKAGES_HOME_ID_KEY
@@ -560,6 +565,18 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home members list. */
     fun homeMembers(homeId: String): String = "homes/$homeId/members"
+
+    /** A14.1 (P5.1) — Per-home Settings index. */
+    const val HOME_SETTINGS = "homes/{$HOME_SETTINGS_HOME_ID_KEY}/settings"
+
+    /** Build the concrete path for the per-home Settings index. */
+    fun homeSettings(homeId: String): String = "homes/$homeId/settings"
+
+    /** A14.2 (P5.1) — Per-home Security toggles. */
+    const val HOME_SECURITY = "homes/{$HOME_SECURITY_HOME_ID_KEY}/settings/security"
+
+    /** Build the concrete path for the per-home Security screen. */
+    fun homeSecurity(homeId: String): String = "homes/$homeId/settings/security"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
 
@@ -1496,6 +1513,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPropertyDetails = { homeId ->
                         navController.navigate(ChildRoutes.propertyDetails(homeId))
                     },
+                    onOpenSettings = { homeId ->
+                        navController.navigate(ChildRoutes.homeSettings(homeId))
+                    },
                 )
             }
             composable(
@@ -2050,6 +2070,47 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onBack = { navController.popBackStack() },
                     onAddGuest = { navController.navigate(ChildRoutes.addGuest(homeId)) },
                 )
+            }
+            composable(
+                route = ChildRoutes.HOME_SETTINGS,
+                arguments = listOf(navArgument(HOME_SETTINGS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(HOME_SETTINGS_HOME_ID_KEY).orEmpty()
+                HomeSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigate = { route ->
+                        when (route) {
+                            HomeSettingsRoute.Address, HomeSettingsRoute.PropertyDetails ->
+                                navController.navigate(ChildRoutes.propertyDetails(homeId))
+                            HomeSettingsRoute.Photos ->
+                                navController.navigate(ChildRoutes.placeholder("Photos"))
+                            HomeSettingsRoute.Documents ->
+                                navController.navigate(ChildRoutes.homeDocs(homeId))
+                            HomeSettingsRoute.AccessCodes ->
+                                navController.navigate(ChildRoutes.accessCodes(homeId, null))
+                            HomeSettingsRoute.TrustedNeighbors ->
+                                navController.navigate(ChildRoutes.placeholder("Trusted neighbors"))
+                            HomeSettingsRoute.Security ->
+                                navController.navigate(ChildRoutes.homeSecurity(homeId))
+                            HomeSettingsRoute.People ->
+                                navController.navigate(ChildRoutes.homeMembers(homeId))
+                            HomeSettingsRoute.InviteLink ->
+                                navController.navigate(ChildRoutes.placeholder("Invite link"))
+                            HomeSettingsRoute.HomeNotifications ->
+                                navController.navigate(ChildRoutes.placeholder("Home notifications"))
+                            HomeSettingsRoute.LeaveHome ->
+                                navController.navigate(ChildRoutes.placeholder("Leave home"))
+                            HomeSettingsRoute.CancelClaim ->
+                                navController.navigate(ChildRoutes.placeholder("Cancel claim"))
+                        }
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_SECURITY,
+                arguments = listOf(navArgument(HOME_SECURITY_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                HomeSecurityScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MAILBOX_ITEM_DETAIL,
