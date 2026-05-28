@@ -59,6 +59,11 @@ final class DeepLinkRouter {
         /// (the link from the resend / signup flow carries `&email=` so
         /// the screen can render the recipient).
         case verifyEmail(token: String, email: String?)
+        /// A14.8 — `pantopus://mailbox/vacation` opens the Vacation
+        /// hold screen (scheduling or active variant depending on
+        /// server state once the persistence layer lands; today the
+        /// view-model seeds the scheduling form).
+        case vacationHold
         case unknown(URL)
     }
 
@@ -162,6 +167,13 @@ final class DeepLinkRouter {
             return .connections
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
+        case "mailbox":
+            // `pantopus://mailbox/vacation` opens A14.8. Other mailbox
+            // paths fall through to `.unknown` until they have routes.
+            if segments.dropFirst().first == "vacation" {
+                return .vacationHold
+            }
+            return .unknown(url)
         case "invite":
             if let token = segments.dropFirst().first, !token.isEmpty {
                 return .invite(token: token)

@@ -130,6 +130,13 @@ fun ListOfRowsScreen(
      * slot's contents; concrete screens drop in arbitrary composables.
      */
     customHeader: (@Composable () -> Unit)? = null,
+    /**
+     * A14.8 — optional additional trailing action(s) rendered alongside
+     * [topBarAction]. Used by the Mailbox root to host its overflow
+     * "settings" menu (Vacation hold entry). Renders after [topBarAction]
+     * in the `actions` row.
+     */
+    extraTopBarAction: (@Composable () -> Unit)? = null,
 ) {
     val pullState =
         rememberPullRefreshState(
@@ -176,6 +183,7 @@ fun ListOfRowsScreen(
                     if (topBarAction != null) {
                         TopBarActionButton(action = topBarAction)
                     }
+                    extraTopBarAction?.invoke()
                 },
                 colors =
                     TopAppBarDefaults.centerAlignedTopAppBarColors(

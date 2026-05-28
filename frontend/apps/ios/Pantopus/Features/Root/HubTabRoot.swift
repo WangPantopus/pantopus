@@ -242,6 +242,9 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A14.8 — Vacation hold (scheduling + active variants). Reached
+    /// from the Mailbox root top-bar settings menu.
+    case vacationHold
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -403,6 +406,14 @@ public struct HubTabRoot: View {
             if !id.isEmpty {
                 path.append(.reviewSignups(supportTrainId: id))
             }
+            _ = router.consume()
+        case .vacationHold:
+            // A14.8 — `pantopus://mailbox/vacation` lands users on the
+            // Vacation hold screen via the Hub stack. We push through
+            // the Mailbox root so Back goes to the mailbox, not the
+            // hub home, matching the in-app entry point.
+            path.append(.mailboxRoot)
+            path.append(.vacationHold)
             _ = router.consume()
         default:
             break
@@ -1676,11 +1687,18 @@ public struct HubTabRoot: View {
                     },
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
-                    onBrowseGigs: { push(.gigsFeed) }
+                    onBrowseGigs: { push(.gigsFeed) },
+                    onOpenVacationHold: { push(.vacationHold) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case .vacationHold:
+            VacationHoldView(
+                viewModel: VacationHoldViewModel(
+                    onBack: { pop() }
+                )
+            )
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

@@ -196,6 +196,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_M
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
+import app.pantopus.android.ui.screens.mailbox.vacation.VacationHoldScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
@@ -1089,6 +1090,9 @@ private object ChildRoutes {
     /** A.x — Mailbox map. */
     const val MAILBOX_MAP = "mailbox/map"
 
+    /** A14.8 — Vacation hold (scheduling + active variants). */
+    const val MAILBOX_VACATION = "mailbox/vacation"
+
     /** A.x — Membership detail for a persona. */
     const val MEMBERSHIP_DETAIL_PERSONA_ID_KEY = "personaId"
     const val MEMBERSHIP_DETAIL = "personas/{$MEMBERSHIP_DETAIL_PERSONA_ID_KEY}/membership"
@@ -1234,6 +1238,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.User -> {
                 navController.navigate(ChildRoutes.publicProfile(pending.id))
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.VacationHold -> {
+                // A14.8 — push the Mailbox root first so Back returns
+                // to the mailbox surface (not the hub home), then drill
+                // into the Vacation hold screen.
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.MAILBOX_VACATION)
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.ResetPassword,
@@ -3148,11 +3160,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
                     onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
                     onBrowseGigs = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                    onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
                     onBack = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.MAILBOX_MAP) {
                 MailboxMapScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.MAILBOX_VACATION) {
+                VacationHoldScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MEMBERSHIP_DETAIL,

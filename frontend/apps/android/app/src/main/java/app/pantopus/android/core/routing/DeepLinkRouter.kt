@@ -96,6 +96,13 @@ object DeepLinkRouter {
          */
         data object CreateBusiness : Destination
 
+        /**
+         * A14.8 — `pantopus://mailbox/vacation` opens the Vacation hold
+         * screen (scheduling or active variant depending on server state
+         * once the persistence layer lands).
+         */
+        data object VacationHold : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -223,6 +230,15 @@ object DeepLinkRouter {
                 // Other `businesses/:id` paths are not yet routed here.
                 if (segments.getOrNull(1) == "new") {
                     Destination.CreateBusiness
+                } else {
+                    Destination.Unknown(raw)
+                }
+            }
+            "mailbox" -> {
+                // `pantopus://mailbox/vacation` opens A14.8. Other mailbox
+                // paths fall through to Unknown until they have routes.
+                if (segments.getOrNull(1) == "vacation") {
+                    Destination.VacationHold
                 } else {
                     Destination.Unknown(raw)
                 }
