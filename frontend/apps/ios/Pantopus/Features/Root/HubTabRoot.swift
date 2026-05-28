@@ -255,6 +255,10 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     /// A10.10 — Wallet (earnings-side surface). Reached from the
     /// Settings → "Payments & payouts" row and the
     /// `pantopus://wallet` deep link.
@@ -434,6 +438,13 @@ public struct HubTabRoot: View {
             if !id.isEmpty {
                 path.append(.manageTrain(trainId: id))
             }
+            _ = router.consume()
+        case .mailDay:
+            // pantopus://mailbox/mailday lands on the Mailbox root first
+            // so Back walks back through the drawer view, then pushes
+            // the day editor on top.
+            path.append(.mailboxRoot)
+            path.append(.mailDay(variant: .populated))
             _ = router.consume()
         case let .businessProfile(businessId):
             path.append(.businessProfile(businessId: businessId))
@@ -1755,11 +1766,16 @@ public struct HubTabRoot: View {
                     },
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
+                    onOpenMailDay: { push(.mailDay(variant: .populated)) },
                     onBrowseGigs: { push(.gigsFeed) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case let .mailDay(variant):
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                pop()
+            }
         case .wallet:
             WalletView(
                 onBack: pop,

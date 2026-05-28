@@ -30,6 +30,7 @@ fun MailboxRootScreen(
     onOpenMail: (String) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenMap: () -> Unit = {},
+    onOpenMailDay: () -> Unit = {},
     onBrowseGigs: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MailboxRootViewModel = hiltViewModel(),
@@ -85,6 +86,7 @@ fun MailboxRootScreen(
                 tabBadge = viewModel::tabBadge,
                 onSelectDrawer = viewModel::selectDrawer,
                 onSelectTab = viewModel::selectTab,
+                onOpenMailDay = onOpenMailDay,
             )
         },
     )

@@ -333,6 +333,26 @@ class DeepLinkRouterTest {
         assertEquals(DeepLinkRouter.Destination.Gig("g_99"), pending)
     }
 
+    // ---- A13.16 My Mail Day ----
+
+    @Test
+    fun mail_day_custom_scheme() {
+        assertEquals(DeepLinkRouter.Destination.MailDay, DeepLinkRouter.resolveString("pantopus://mailbox/mailday"))
+    }
+
+    @Test
+    fun mail_day_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.MailDay,
+            DeepLinkRouter.resolveString("https://pantopus.app/mailbox/mailday"),
+        )
+    }
+
+    @Test
+    fun mailbox_without_subroute_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://mailbox") is DeepLinkRouter.Destination.Unknown)
+    }
+
     // MARK: - Verify-landlord routes (P2.1 / A12.5–A12.7)
 
     @Test

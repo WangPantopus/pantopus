@@ -350,9 +350,9 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
   - **`StickyConfirm`** — `Confirm recipient` primary (active in strong match, disabled with hint in unclear).
 
 ### A13.16 — My Mail Day (`/mailbox/mailday.tsx`)
-- **iOS:** **MISSING** — no `Mailbox/MailDay/` folder.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD**
+- **iOS:** `Features/Mailbox/MailDay/MailDayView.swift` (+ `MailDayViewModel.swift`, `MailDayContent.swift`, `MailDaySampleData.swift`, `Components/{DayHeader, ScanMoreCard, UnreviewedItem, ReviewedRow, UndoCountdown, MailboxEmptyHero}.swift`). Pushed via `YouRoute.mailDay(variant:)` / `HubRoute.mailDay(variant:)`. Deep link: `pantopus://mailbox/mailday`.
+- **Android:** `ui/screens/mailbox/mail_day/MailDayScreen.kt` (+ `MailDayViewModel.kt`, `MailDayContent.kt`, `MailDaySampleData.kt`, `components/{DayHeader, ScanMoreCard, UnreviewedItem, ReviewedRow, UndoCountdown, MailboxEmptyHero}.kt`). Pushed via `ChildRoutes.MAIL_DAY` (`mailbox/mailday/{variant}`).
+- **Status:** **BUILT** (P4.4)
 - **Designed frames:** mid-afternoon (8-piece stack · 6 routed · 2 pending · AI-suggested recipients with confidence % · Reviewed list compact · 5-second undo on latest) · empty (mailbox illustration with "0" face · 12-day streak chip · `Scan today's stack` primary · yesterday recap + setup nudges)
 - **Required slots:**
   - **`DayHeader`** — date + streak chip + `ProgressRing` (56pt SwiftUI shape — done/total).
