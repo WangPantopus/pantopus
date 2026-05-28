@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "LongParameterList")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "LongParameterList", "MatchingDeclarationName")
 
 package app.pantopus.android.ui.screens.homes.owners.transfer.components
 
@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -216,4 +217,3 @@ private fun DiffDivider(
         Box(modifier = Modifier.weight(1f).height(DividerHeight).background(PantopusColors.appBorderSubtle))
     }
 }
-

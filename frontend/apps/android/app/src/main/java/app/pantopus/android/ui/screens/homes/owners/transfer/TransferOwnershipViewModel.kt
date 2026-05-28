@@ -93,49 +93,54 @@ data class TransferOwnershipUiState(
 
     val beforeSegments: List<SplitSegment>
         get() {
-            val you = SplitSegment(
-                id = currentUser.id,
-                owner = currentUser.displayName,
-                percent = currentUser.percent,
-                color = currentUser.palette.color,
-            )
-            val others = coOwners.map { owner ->
+            val you =
                 SplitSegment(
-                    id = owner.id,
-                    owner = owner.displayName,
-                    percent = owner.percent,
-                    color = owner.palette.color,
+                    id = currentUser.id,
+                    owner = currentUser.displayName,
+                    percent = currentUser.percent,
+                    color = currentUser.palette.color,
                 )
-            }
+            val others =
+                coOwners.map { owner ->
+                    SplitSegment(
+                        id = owner.id,
+                        owner = owner.displayName,
+                        percent = owner.percent,
+                        color = owner.palette.color,
+                    )
+                }
             return listOf(you) + others
         }
 
     val afterSegments: List<SplitSegment>
         get() {
             val recipientFirstName = recipient.name.split(" ").firstOrNull() ?: recipient.name
-            val you = SplitSegment(
-                id = currentUser.id,
-                owner = currentUser.displayName,
-                percent = (currentUser.percent - amount).coerceAtLeast(0),
-                color = currentUser.palette.color,
-                delta = -amount,
-            )
-            val newcomer = SplitSegment(
-                id = recipient.id,
-                owner = recipientFirstName,
-                percent = amount,
-                color = TransferOwnershipSampleData.recipientPaletteStart,
-                delta = amount,
-                isNew = true,
-            )
-            val others = coOwners.map { owner ->
+            val you =
                 SplitSegment(
-                    id = owner.id,
-                    owner = owner.displayName,
-                    percent = owner.percent,
-                    color = owner.palette.color,
+                    id = currentUser.id,
+                    owner = currentUser.displayName,
+                    percent = (currentUser.percent - amount).coerceAtLeast(0),
+                    color = currentUser.palette.color,
+                    delta = -amount,
                 )
-            }
+            val newcomer =
+                SplitSegment(
+                    id = recipient.id,
+                    owner = recipientFirstName,
+                    percent = amount,
+                    color = TransferOwnershipSampleData.recipientPaletteStart,
+                    delta = amount,
+                    isNew = true,
+                )
+            val others =
+                coOwners.map { owner ->
+                    SplitSegment(
+                        id = owner.id,
+                        owner = owner.displayName,
+                        percent = owner.percent,
+                        color = owner.palette.color,
+                    )
+                }
             return listOf(you, newcomer) + others
         }
 

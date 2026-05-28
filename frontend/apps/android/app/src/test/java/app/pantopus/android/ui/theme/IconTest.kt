@@ -225,6 +225,11 @@ class IconTest {
             "warehouse",
             // A15.3 — AI Assistant avatar/reply glyph.
             "bot",
+            // A13.4 — Transfer ownership (biometric face, bidirectional
+            // CTA arrow, "after" caret).
+            "scan-face",
+            "arrow-right-left",
+            "arrow-down",
         )
 
     @Test

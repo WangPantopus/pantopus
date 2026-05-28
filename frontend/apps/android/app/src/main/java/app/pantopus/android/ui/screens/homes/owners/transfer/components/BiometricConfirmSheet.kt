@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongParameterList", "LongMethod")
+@file:Suppress("PackageNaming", "MagicNumber", "LongParameterList", "LongMethod", "MatchingDeclarationName")
 
 package app.pantopus.android.ui.screens.homes.owners.transfer.components
 
@@ -265,13 +265,14 @@ private fun LegalBlock(
     timestamp: String,
     modifier: Modifier = Modifier,
 ) {
-    val text = buildString {
-        append("By confirming with $biometryLabel: ")
-        append("you grant $recipientName $amount% ownership of $homeAddress and forfeit that share. ")
-        append("$coOwnerNames keep their stakes. Recorded on chain at ")
-        append(timestamp)
-        append(".")
-    }
+    val text =
+        buildString {
+            append("By confirming with $biometryLabel: ")
+            append("you grant $recipientName $amount% ownership of $homeAddress and forfeit that share. ")
+            append("$coOwnerNames keep their stakes. Recorded on chain at ")
+            append(timestamp)
+            append(".")
+        }
     Text(
         text = text,
         fontSize = 11.sp,

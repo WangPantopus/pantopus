@@ -30,7 +30,6 @@ public struct TransferOwnershipView: View {
                 isSaving: false,
                 onClose: { dismiss() },
                 onCommit: viewModel.presentConfirmSheet,
-                // swiftlint:disable:next trailing_closure
                 content: { TransferOwnershipContent(viewModel: viewModel) },
                 stickyBottom: { AnyView(stickyCTA) }
             )
@@ -139,9 +138,10 @@ public struct TransferOwnershipView: View {
                     timestamp: viewModel.confirmationTimestamp,
                     biometryLabel: viewModel.biometryLabel,
                     isAuthenticating: viewModel.sheetPhase == .authenticating,
-                    onCancel: viewModel.dismissConfirmSheet,
-                    onConfirm: { Task { await viewModel.authenticateAndCommit() } }
-                )
+                    onCancel: viewModel.dismissConfirmSheet
+                ) {
+                    Task { await viewModel.authenticateAndCommit() }
+                }
             }
             .background(Theme.Color.appSurface)
             .frame(maxWidth: .infinity)

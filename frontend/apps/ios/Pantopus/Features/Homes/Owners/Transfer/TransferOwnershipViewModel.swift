@@ -310,15 +310,15 @@ public final class TransferOwnershipViewModel {
     private static func message(for error: LAError) -> String {
         switch error.code {
         case .userCancel, .systemCancel, .appCancel:
-            return "Authentication was cancelled."
+            "Authentication was cancelled."
         case .authenticationFailed:
-            return "Authentication failed. Try again."
+            "Authentication failed. Try again."
         case .passcodeNotSet:
-            return "Set a device passcode to confirm transfers."
+            "Set a device passcode to confirm transfers."
         case .biometryNotAvailable, .biometryNotEnrolled, .biometryLockout:
-            return "Biometric authentication isn't available right now."
+            "Biometric authentication isn't available right now."
         default:
-            return error.localizedDescription
+            error.localizedDescription
         }
     }
 }

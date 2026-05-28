@@ -212,20 +212,25 @@ public struct FaceIDConfirmSheet: View {
         }
     }
 
+    private var legalGrantCopy: String {
+        "you grant \(recipientName) \(amount)% ownership of \(homeAddress) "
+            + "and forfeit that share. \(coOwnerNames) keep their stakes. Recorded on chain at "
+    }
+
     private var legal: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             (Text("By confirming with \(biometryLabel): ")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
-                + Text("you grant \(recipientName) \(amount)% ownership of \(homeAddress) and forfeit that share. \(coOwnerNames) keep their stakes. Recorded on chain at ")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                + Text(legalGrantCopy)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
                 + Text(timestamp)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Theme.Color.appTextStrong)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Theme.Color.appTextStrong)
                 + Text(".")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary))
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary))
                 .lineSpacing(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

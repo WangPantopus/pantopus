@@ -122,8 +122,6 @@ import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoDetailScreen
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
 import app.pantopus.android.ui.screens.homes.guests.ADD_GUEST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.guests.AddGuestFormScreen
-import app.pantopus.android.ui.screens.homes.owners.transfer.TRANSFER_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.owners.transfer.TransferOwnershipScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
@@ -139,6 +137,8 @@ import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
+import app.pantopus.android.ui.screens.homes.owners.transfer.TRANSFER_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.owners.transfer.TransferOwnershipScreen
 import app.pantopus.android.ui.screens.homes.packages.LOG_PACKAGE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.packages.LogPackageScreen
 import app.pantopus.android.ui.screens.homes.packages.PACKAGES_HOME_ID_KEY
