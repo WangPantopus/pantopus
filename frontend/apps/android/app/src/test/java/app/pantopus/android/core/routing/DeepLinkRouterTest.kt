@@ -111,12 +111,15 @@ class DeepLinkRouterTest {
     }
 
     /**
-     * A10.9 (P3.1) — Organizers reach the review queue via
+     * P4.3 / A13.13 — Organizers reach the Manage Train surface via
      * `pantopus://support-trains/:id/manage`; the bare
-     * `support-trains/:id` URL now lands on the participant detail.
+     * `support-trains/:id` URL lands on the A10.9 participant detail.
      */
     @Test
     fun support_train_manage_route() {
+        // P4.3 / A13.13 — `/support-trains/:id/manage` resolves to the
+        // organizer-only Manage Train deep-link destination on both URL
+        // shapes.
         assertEquals(
             DeepLinkRouter.Destination.SupportTrainManage("st_1"),
             DeepLinkRouter.resolveString("pantopus://support-trains/st_1/manage"),
@@ -180,6 +183,22 @@ class DeepLinkRouterTest {
         assertEquals(
             DeepLinkRouter.Destination.HomeDetail("h_1"),
             DeepLinkRouter.resolveString("pantopus://homes/h_1/members"),
+        )
+    }
+
+    @Test
+    fun home_owners_transfer_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeOwnersTransfer("h_1"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_1/owners/transfer"),
+        )
+    }
+
+    @Test
+    fun home_owners_transfer_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeOwnersTransfer("h_2"),
+            DeepLinkRouter.resolveString("https://pantopus.app/homes/h_2/owners/transfer"),
         )
     }
 
@@ -312,6 +331,26 @@ class DeepLinkRouterTest {
         DeepLinkRouter.handle("pantopus://gigs/g_99")
         val pending = DeepLinkRouter.consume()
         assertEquals(DeepLinkRouter.Destination.Gig("g_99"), pending)
+    }
+
+    // ---- A13.16 My Mail Day ----
+
+    @Test
+    fun mail_day_custom_scheme() {
+        assertEquals(DeepLinkRouter.Destination.MailDay, DeepLinkRouter.resolveString("pantopus://mailbox/mailday"))
+    }
+
+    @Test
+    fun mail_day_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.MailDay,
+            DeepLinkRouter.resolveString("https://pantopus.app/mailbox/mailday"),
+        )
+    }
+
+    @Test
+    fun mailbox_without_subroute_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://mailbox") is DeepLinkRouter.Destination.Unknown)
     }
 
     // MARK: - Verify-landlord routes (P2.1 / A12.5–A12.7)

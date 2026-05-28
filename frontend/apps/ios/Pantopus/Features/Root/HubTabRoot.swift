@@ -85,6 +85,10 @@ public enum HubRoute: Hashable {
     /// surface that previously routed to a `Business: <name>`
     /// placeholder.
     case businessProfile(businessId: String)
+    /// P4.2 — A13.10 Edit Business Page (owner-only). Pushed from
+    /// `BusinessProfileView`'s overflow when the viewer owns the business
+    /// and from the `pantopus://businesses/:id/page-editor` deep link.
+    case editBusinessPage(businessId: String)
     /// A12.10 — Create Business wizard. Reached from the My Businesses
     /// FAB / empty-state CTA and from the `pantopus://businesses/new`
     /// deep link.
@@ -185,6 +189,10 @@ public enum HubRoute: Hashable {
     /// action with the seed DTO baked into the route so the form can
     /// prefill without a re-fetch.
     case editSignup(reservation: SupportTrainReservationDTO)
+    /// A13.13 / P4.3 — Manage train (organizer surface). Pushed from
+    /// the A10.9 detail dock overflow when the viewer is the organizer
+    /// and from the `pantopus://support-trains/:id/manage` deep link.
+    case manageTrain(trainId: String)
     /// Admin home-ownership-claims review queue. Gated by
     /// `auth.user.isAdmin` and reached from the Settings menu's Admin
     /// group. Mirrors the web `/app/admin/review-claims` page.
@@ -231,6 +239,11 @@ public enum HubRoute: Hashable {
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
     case addGuest(homeId: String)
+    /// A13.4 — Transfer ownership form. Pushed from the Owners list
+    /// "Transfer" action and from `pantopus://homes/:id/owners/transfer`
+    /// deep links. The form owns its own Face ID bottom-sheet confirm so
+    /// no extra modal is wired here.
+    case transferOwnership(homeId: String)
     /// A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
     /// opened from the Gigs feed's list/map toggle. Carries the active
     /// category so the map renders the same filtered window.
@@ -242,6 +255,10 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     /// A10.10 — Wallet (earnings-side surface). Reached from the
     /// Settings → "Payments & payouts" row and the
     /// `pantopus://wallet` deep link.
@@ -370,6 +387,13 @@ public struct HubTabRoot: View {
         case let .homeMemberRequests(id):
             path.append(.homeMembers(homeId: id))
             _ = router.consume()
+        case let .homeOwnersTransfer(id):
+            // Push the home's dashboard underneath so a back-tap from the
+            // transfer form lands somewhere useful rather than at the
+            // empty Hub root.
+            path.append(.homeDashboard(homeId: id))
+            path.append(.transferOwnership(homeId: id))
+            _ = router.consume()
         case let .verifyLandlord(id):
             path.append(.verifyLandlord(homeId: id))
             _ = router.consume()
@@ -406,10 +430,27 @@ public struct HubTabRoot: View {
             }
             _ = router.consume()
         case let .supportTrainManage(id):
+            // P4.3 / A13.13 — `pantopus://support-trains/:id/manage`
+            // lands on the organizer Manage Train surface. Drop the
+            // user on the Support Trains list first so a back-tap
+            // pops to a known surface, then push manage.
             path.append(.supportTrains)
             if !id.isEmpty {
-                path.append(.reviewSignups(supportTrainId: id))
+                path.append(.manageTrain(trainId: id))
             }
+            _ = router.consume()
+        case .mailDay:
+            // pantopus://mailbox/mailday lands on the Mailbox root first
+            // so Back walks back through the drawer view, then pushes
+            // the day editor on top.
+            path.append(.mailboxRoot)
+            path.append(.mailDay(variant: .populated))
+            _ = router.consume()
+        case let .businessProfile(businessId):
+            path.append(.businessProfile(businessId: businessId))
+            _ = router.consume()
+        case let .editBusinessPage(businessId):
+            path.append(.editBusinessPage(businessId: businessId))
             _ = router.consume()
         default:
             break
@@ -1111,7 +1152,18 @@ public struct HubTabRoot: View {
                         items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
                     )
                 },
-                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
+                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } },
+                onEdit: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } }
+            )
+        case let .editBusinessPage(businessId):
+            EditBusinessPageView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onPreview: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case .createBusiness:
             CreateBusinessWizardView(
@@ -1416,8 +1468,12 @@ public struct HubTabRoot: View {
                 viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
                 onBack: { Task { @MainActor in pop() } },
                 onOpenManage: {
+                    // P4.3 / A13.13 — the A10.9 dock-overflow lands on
+                    // the organizer Manage Train surface (was wired to
+                    // the review-signups queue as a stub before A13.13
+                    // shipped).
                     Task { @MainActor in
-                        push(.reviewSignups(supportTrainId: supportTrainId))
+                        push(.manageTrain(trainId: supportTrainId))
                     }
                 },
                 onShare: {
@@ -1482,6 +1538,20 @@ public struct HubTabRoot: View {
             EditSignupFormView(reservation: reservation) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .manageTrain(trainId):
+            ManageTrainView(
+                viewModel: ManageTrainViewModel(trainId: trainId),
+                onClose: { Task { @MainActor in if !path.isEmpty { path.removeLast() } } },
+                onOpenAnalytics: { id in
+                    Task { @MainActor in push(.placeholder(label: "Train analytics · \(id)")) }
+                },
+                onEditDates: { id in
+                    Task { @MainActor in push(.placeholder(label: "Edit dates · \(id)")) }
+                },
+                onInviteHelpers: { id in
+                    Task { @MainActor in push(.placeholder(label: "Invite helpers · \(id)")) }
+                }
+            )
         case .discoverHub:
             DiscoverHubView(
                 viewModel: DiscoverHubViewModel(
@@ -1657,6 +1727,10 @@ public struct HubTabRoot: View {
             AddGuestFormView(
                 viewModel: AddGuestFormViewModel(homeId: homeId)
             )
+        case let .transferOwnership(homeId):
+            TransferOwnershipView(
+                viewModel: TransferOwnershipViewModel(homeId: homeId)
+            )
         case let .tasksMap(categoryKey):
             TasksMapView(
                 viewModel: TasksMapViewModel(
@@ -1692,11 +1766,16 @@ public struct HubTabRoot: View {
                     },
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
+                    onOpenMailDay: { push(.mailDay(variant: .populated)) },
                     onBrowseGigs: { push(.gigsFeed) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case let .mailDay(variant):
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                pop()
+            }
         case .wallet:
             WalletView(
                 onBack: pop,
@@ -1805,6 +1884,7 @@ private struct BusinessProfileDestination: View {
     let onOpenMessages: @MainActor () -> Void
     let onShare: @MainActor () -> Void
     let onOpenReport: @MainActor () -> Void
+    let onEdit: @MainActor () -> Void
 
     @Environment(\.openURL) private var openURL
 
@@ -1814,10 +1894,10 @@ private struct BusinessProfileDestination: View {
             onBack: onBack,
             onOpenMessages: onOpenMessages,
             onShare: onShare,
-            onOpenReport: onOpenReport
-        ) { url in
-            openURL(url)
-        }
+            onOpenReport: onOpenReport,
+            onOpenWebsite: { url in openURL(url) },
+            onEdit: onEdit
+        )
     }
 }
 

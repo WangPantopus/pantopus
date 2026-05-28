@@ -40,12 +40,11 @@ object DeepLinkRouter {
         data class SupportTrain(val id: String) : Destination
 
         /**
-         * `pantopus://support-trains/:id/manage` — organizer-only
-         * review queue for a Support Train. Distinct from
-         * [SupportTrain], which now lands on the participant detail
-         * (A10.9). Owners reach the queue via the detail screen's
-         * dock overflow; this deep link is the "land directly on the
-         * queue" entry for organizer shortcuts.
+         * `pantopus://support-trains/:id/manage` — A13.13 organizer
+         * surface. Reached from the A10.9 detail screen's dock
+         * overflow when the viewer is the organizer, and from
+         * back-of-house shortcut links. Distinct from [SupportTrain],
+         * which lands on the participant detail (A10.9).
          */
         data class SupportTrainManage(val id: String) : Destination
 
@@ -60,6 +59,13 @@ object DeepLinkRouter {
         data class HomeDashboard(val id: String) : Destination
 
         data class HomeMemberRequests(val id: String) : Destination
+
+        /**
+         * `pantopus://homes/:id/owners/transfer` — A13.4 Transfer
+         * Ownership form. Lands on the populated state; the form owns
+         * its own biometric bottom sheet.
+         */
+        data class HomeOwnersTransfer(val id: String) : Destination
 
         /**
          * `pantopus://homes/:id/verify-landlord` — opens the A12.5 /
@@ -93,6 +99,13 @@ object DeepLinkRouter {
          * can render the recipient.
          */
         data class VerifyEmail(val token: String, val email: String?) : Destination
+
+        /**
+         * `pantopus://mailbox/mailday` — the A13.16 My Mail Day editor.
+         * Routed via the mailbox stack so Back returns to the mailbox
+         * root.
+         */
+        data object MailDay : Destination
 
         /**
          * `pantopus://businesses/new` — open the A12.10 Create Business
@@ -199,6 +212,7 @@ object DeepLinkRouter {
                 val id = segments.getOrNull(1)
                 when {
                     id.isNullOrBlank() -> Destination.Unknown(raw)
+                    // `/support-trains/:id/manage` → A13.13 organizer surface.
                     segments.getOrNull(2) == "manage" -> Destination.SupportTrainManage(id)
                     else -> Destination.SupportTrain(id)
                 }
@@ -227,6 +241,12 @@ object DeepLinkRouter {
                         } else {
                             Destination.HomeDetail(id)
                         }
+                    "owners" ->
+                        if (trailing.getOrNull(1) == "transfer") {
+                            Destination.HomeOwnersTransfer(id)
+                        } else {
+                            Destination.HomeDetail(id)
+                        }
                     "verify-landlord", "verify_landlord" -> Destination.VerifyLandlord(id)
                     "verify-postcard", "verify_postcard" -> Destination.PostcardVerification(id)
                     else -> Destination.HomeDetail(id)
@@ -252,6 +272,12 @@ object DeepLinkRouter {
             "invite" -> {
                 val token = segments.getOrNull(1)
                 if (token.isNullOrBlank()) Destination.Unknown(raw) else Destination.Invite(token)
+            }
+            "mailbox" -> {
+                // `pantopus://mailbox/mailday` — only the mail-day sub-route
+                // is wired today. Bare `pantopus://mailbox` falls through to
+                // the existing tab-level routing.
+                if (segments.getOrNull(1) == "mailday") Destination.MailDay else Destination.Unknown(raw)
             }
             "auth" -> {
                 when (segments.getOrNull(1)) {

@@ -405,7 +405,7 @@ private struct TagsEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             if !tags.isEmpty {
-                FlowLayout(spacing: Spacing.s1) {
+                UploadTagsFlowLayout(spacing: Spacing.s1) {
                     ForEach(tags, id: \.self) { tag in
                         TagChip(tag: tag) { onRemove(tag) }
                     }
@@ -458,7 +458,7 @@ private struct TagChip: View {
 }
 
 /// Minimal flow layout — wraps chips to multiple lines.
-private struct FlowLayout: Layout {
+private struct UploadTagsFlowLayout: Layout {
     var spacing: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
