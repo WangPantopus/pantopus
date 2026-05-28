@@ -24,8 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,9 +34,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroPayoutFooter
 import app.pantopus.android.ui.screens.settings.payments.components.PaymentMethodRow
+import app.pantopus.android.ui.screens.settings.payments.components.PaymentMethodRowModel
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -243,12 +244,15 @@ private fun MethodsCard(
         } else {
             methods.forEachIndexed { index, method ->
                 PaymentMethodRow(
-                    rowIdentifier = method.id,
-                    brand = method.brand,
-                    label = method.label,
-                    subtext = method.subtext,
-                    chip = method.chip,
-                    trailing = PaymentsRowTrailing.Chevron,
+                    model =
+                        PaymentMethodRowModel(
+                            rowIdentifier = method.id,
+                            brand = method.brand,
+                            label = method.label,
+                            subtext = method.subtext,
+                            chip = method.chip,
+                            trailing = PaymentsRowTrailing.Chevron,
+                        ),
                     modifier = Modifier.clickable { onTapRow(method.id) },
                 )
                 if (index < methods.size - 1) {
@@ -277,11 +281,14 @@ private fun PayoutsCard(
         rows.forEachIndexed { index, row ->
             val isGated = row.trailing is PaymentsRowTrailing.GatedDash
             PaymentMethodRow(
-                rowIdentifier = row.id,
-                brand = row.leadingBrand,
-                label = row.label,
-                subtext = row.subtext,
-                trailing = row.trailing,
+                model =
+                    PaymentMethodRowModel(
+                        rowIdentifier = row.id,
+                        brand = row.leadingBrand,
+                        label = row.label,
+                        subtext = row.subtext,
+                        trailing = row.trailing,
+                    ),
                 modifier =
                     if (isGated) {
                         Modifier
@@ -662,4 +669,3 @@ private fun ErrorFrame(
         }
     }
 }
-

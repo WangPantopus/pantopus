@@ -42,12 +42,14 @@ public struct SettingsView: View {
     private let onSignedOut: @MainActor () -> Void
 
     public init(
+        initialRoute: SettingsStackRoute? = nil,
         onClose: @escaping @MainActor () -> Void = {},
         onEditProfile: @escaping @MainActor () -> Void = {},
         onOpenReviewClaims: @escaping @MainActor () -> Void = {},
         onOpenWallet: @escaping @MainActor () -> Void = {},
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
+        _path = State(initialValue: initialRoute.map { [$0] } ?? [])
         self.onClose = onClose
         self.onEditProfile = onEditProfile
         self.onOpenReviewClaims = onOpenReviewClaims
@@ -95,6 +97,22 @@ public struct SettingsView: View {
             )
         case .audienceProfile:
             AudienceProfileView(onBack: popLast)
+        case .legal:
+            LegalIndexView(
+                onBack: { popLast() },
+                onSelect: { doc in path.append(.legalContent(doc)) }
+            )
+        case let .legalContent(doc):
+            LegalContentView(document: doc) { popLast() }
+        case let .placeholder(label):
+            NotYetAvailableView(tabName: label, icon: .info)
+        case .blockedUsers, .password, .verification, .help, .about, .payments:
+            settingsDestination(for: route)
+        }
+    }
+
+    @ViewBuilder private func settingsDestination(for route: SettingsStackRoute) -> some View {
+        switch route {
         case .blockedUsers:
             BlockedUsersView { popLast() }
         case .password:
@@ -103,19 +121,12 @@ public struct SettingsView: View {
             VerificationCenterView { popLast() }
         case .help:
             HelpCenterView { popLast() }
-        case .legal:
-            LegalIndexView(
-                onBack: { popLast() },
-                onSelect: { doc in path.append(.legalContent(doc)) }
-            )
-        case let .legalContent(doc):
-            LegalContentView(document: doc) { popLast() }
         case .about:
             AboutView { popLast() }
         case .payments:
             PaymentsView { popLast() }
-        case let .placeholder(label):
-            NotYetAvailableView(tabName: label, icon: .info)
+        default:
+            EmptyView()
         }
     }
 

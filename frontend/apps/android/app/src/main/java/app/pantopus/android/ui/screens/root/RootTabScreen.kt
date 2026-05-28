@@ -1227,6 +1227,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.WALLET)
                 DeepLinkRouter.consume()
             }
+            DeepLinkRouter.Destination.PaymentsSettings -> {
+                navController.navigate(ChildRoutes.MENU)
+                navController.navigate(ChildRoutes.SETTINGS_PAYMENTS)
+                DeepLinkRouter.consume()
+            }
             DeepLinkRouter.Destination.CreateBusiness -> {
                 navController.navigate(ChildRoutes.CREATE_BUSINESS)
                 DeepLinkRouter.consume()

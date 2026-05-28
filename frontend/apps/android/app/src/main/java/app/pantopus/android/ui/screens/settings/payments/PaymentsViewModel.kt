@@ -63,9 +63,9 @@ class PaymentsViewModel
          */
         fun tapRow(
             @Suppress("UNUSED_PARAMETER") id: String,
-        ) {}
+        ) = Unit
 
-        fun tapAddMethod() {}
+        fun tapAddMethod() = Unit
 
-        fun tapCloseAccount() {}
+        fun tapCloseAccount() = Unit
     }

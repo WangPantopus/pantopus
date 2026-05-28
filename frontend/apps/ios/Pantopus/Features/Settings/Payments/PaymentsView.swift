@@ -38,8 +38,10 @@ public struct PaymentsView: View {
         .task { await viewModel.load() }
         .accessibilityIdentifier("payments")
     }
+}
 
-    @ViewBuilder private var content: some View {
+private extension PaymentsView {
+    @ViewBuilder var content: some View {
         switch viewModel.state {
         case .loading: loadingFrame
         case let .loaded(loaded): loadedFrame(loaded)

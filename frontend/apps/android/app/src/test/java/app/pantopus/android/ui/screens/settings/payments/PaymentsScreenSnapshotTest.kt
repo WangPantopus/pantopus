@@ -11,6 +11,13 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -19,9 +26,10 @@ import org.junit.Test
  * populated and empty states. Mirrors iOS
  * `PaymentsSnapshotTests.swift`.
  *
- * Record new baselines: `./gradlew paparazziRecord --tests
+ * Record new baselines: `./gradlew :app:recordPaparazziDebug --tests
  * "*PaymentsScreenSnapshotTest*"`.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PaymentsScreenSnapshotTest {
     @get:Rule
     val paparazzi: Paparazzi =
@@ -32,6 +40,16 @@ class PaymentsScreenSnapshotTest {
                     softButtons = false,
                 ),
         )
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
 
     @Test
     fun payments_populated() {

@@ -25,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.screens.settings.payments.PaymentMethodBrand
-import app.pantopus.android.ui.screens.settings.payments.PaymentMethodChip
 import app.pantopus.android.ui.screens.settings.payments.PaymentsChipTone
 import app.pantopus.android.ui.screens.settings.payments.PaymentsRowTrailing
 import app.pantopus.android.ui.theme.PantopusColors
@@ -44,14 +43,8 @@ import app.pantopus.android.ui.theme.Spacing
  */
 @Composable
 fun PaymentMethodRow(
-    rowIdentifier: String,
-    label: String,
-    trailing: PaymentsRowTrailing,
+    model: PaymentMethodRowModel,
     modifier: Modifier = Modifier,
-    brand: PaymentMethodBrand? = null,
-    subtext: String? = null,
-    chip: PaymentMethodChip? = null,
-    labelColor: Color = PantopusColors.appText,
 ) {
     Row(
         modifier =
@@ -59,24 +52,24 @@ fun PaymentMethodRow(
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .padding(horizontal = Spacing.s4, vertical = 14.dp)
-                .testTag("paymentsRow_$rowIdentifier"),
+                .testTag("paymentsRow_${model.rowIdentifier}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        if (brand != null) {
-            PaymentBrandBadge(brand = brand)
+        if (model.brand != null) {
+            PaymentBrandBadge(brand = model.brand)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = label,
-                color = labelColor,
+                text = model.label,
+                color = model.labelColor,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
             )
-            if (!subtext.isNullOrEmpty()) {
+            if (!model.subtext.isNullOrEmpty()) {
                 Text(
-                    text = subtext,
+                    text = model.subtext,
                     color = PantopusColors.appTextSecondary,
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -84,10 +77,10 @@ fun PaymentMethodRow(
                 )
             }
         }
-        if (chip != null) {
-            PaymentsChipView(label = chip.label, tone = chip.tone)
+        if (model.chip != null) {
+            PaymentsChipView(label = model.chip.label, tone = model.chip.tone)
         }
-        TrailingView(rowIdentifier = rowIdentifier, trailing = trailing)
+        TrailingView(rowIdentifier = model.rowIdentifier, trailing = model.trailing)
     }
 }
 
