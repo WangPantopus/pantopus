@@ -61,6 +61,13 @@ object DeepLinkRouter {
         data class HomeMemberRequests(val id: String) : Destination
 
         /**
+         * `pantopus://homes/:id/owners/transfer` — A13.4 Transfer
+         * Ownership form. Lands on the populated state; the form owns
+         * its own biometric bottom sheet.
+         */
+        data class HomeOwnersTransfer(val id: String) : Destination
+
+        /**
          * `pantopus://homes/:id/verify-landlord` — opens the A12.5 /
          * A12.6 wizard.
          */
@@ -215,6 +222,12 @@ object DeepLinkRouter {
                     "members" ->
                         if (tabQuery == "requests") {
                             Destination.HomeMemberRequests(id)
+                        } else {
+                            Destination.HomeDetail(id)
+                        }
+                    "owners" ->
+                        if (trailing.getOrNull(1) == "transfer") {
+                            Destination.HomeOwnersTransfer(id)
                         } else {
                             Destination.HomeDetail(id)
                         }

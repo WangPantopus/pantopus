@@ -163,6 +163,9 @@ dependencies {
     // EncryptedSharedPreferences + MasterKey (Android Keystore-backed)
     implementation(libs.androidx.security.crypto)
 
+    // Biometric prompt — A13.4 Transfer ownership BiometricConfirmSheet.
+    implementation(libs.androidx.biometric)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

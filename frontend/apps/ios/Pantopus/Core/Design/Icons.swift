@@ -291,6 +291,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     /// Lucide `bot` token and can swap to a real vector later.
     case bot
 
+    // A13.4 Transfer ownership — Face ID confirmation glyph (`scan-face`),
+    // sticky-CTA bidirectional arrow (`arrow-right-left`), and the diff-
+    // direction "After" caret (`arrow-down`).
+    case scanFace = "scan-face"
+    case arrowRightLeft = "arrow-right-left"
+    case arrowDown = "arrow-down"
+
     // A12.10 Create Business — category tile glyphs. `cpu` backs the Tech &
     // Repair tile; `truck` backs the Delivery & Errands tile.
     case cpu
@@ -523,6 +530,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // A15.3 AI Assistant. SF Symbols has no robot glyph; `bot` falls
         // back to `sparkles`, the house AI/magic glyph.
         case .bot: "sparkles"
+        // A13.4 Transfer ownership. SF Symbols ships a true `faceid` glyph;
+        // `arrow.left.arrow.right` matches Lucide's left/right swap arrows;
+        // `arrow.down` is a direct match.
+        case .scanFace: "faceid"
+        case .arrowRightLeft: "arrow.left.arrow.right"
+        case .arrowDown: "arrow.down"
         // A12.10 Create Business — SF Symbols ships direct `cpu` and
         // `box.truck` glyphs.
         case .cpu: "cpu"

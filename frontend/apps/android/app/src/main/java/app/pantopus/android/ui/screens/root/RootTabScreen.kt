@@ -139,6 +139,8 @@ import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
+import app.pantopus.android.ui.screens.homes.owners.transfer.TRANSFER_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.owners.transfer.TransferOwnershipScreen
 import app.pantopus.android.ui.screens.homes.packages.LOG_PACKAGE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.packages.LogPackageScreen
 import app.pantopus.android.ui.screens.homes.packages.PACKAGES_HOME_ID_KEY
@@ -1101,6 +1103,14 @@ private object ChildRoutes {
 
     fun addGuest(homeId: String): String = "homes/$homeId/guests/new"
 
+    /** A13.4 — Transfer Ownership form. Pushed from the Owners list
+     *  "Transfer" action and from `pantopus://homes/:id/owners/transfer`
+     *  deep links. The form owns its own biometric bottom sheet. */
+    const val TRANSFER_OWNERSHIP_HOME_ID_KEY = "homeId"
+    const val TRANSFER_OWNERSHIP = "homes/{$TRANSFER_OWNERSHIP_HOME_ID_KEY}/owners/transfer"
+
+    fun transferOwnership(homeId: String): String = "homes/$homeId/owners/transfer"
+
     /** A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
      *  opened from the Gigs feed's list/map toggle. Seeded with the active
      *  category so the same filter applies on the map. */
@@ -1257,6 +1267,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.HomeMemberRequests -> {
                 navController.navigate(ChildRoutes.placeholder("Member requests · ${pending.id}"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HomeOwnersTransfer -> {
+                // Push the home's dashboard underneath so a back-tap from
+                // the transfer form lands somewhere useful rather than at
+                // the empty Hub root.
+                navController.navigate(ChildRoutes.homeDashboard(pending.id))
+                navController.navigate(ChildRoutes.transferOwnership(pending.id))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.VerifyLandlord -> {
@@ -3209,6 +3227,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 AddGuestFormScreen(
                     onClose = { navController.popBackStack() },
                     onSent = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.TRANSFER_OWNERSHIP,
+                arguments = listOf(navArgument(TRANSFER_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                TransferOwnershipScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(

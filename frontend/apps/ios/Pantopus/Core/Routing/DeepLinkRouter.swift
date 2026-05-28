@@ -35,6 +35,10 @@ final class DeepLinkRouter {
         case homeDetail(id: String)
         case homeDashboard(id: String)
         case homeMemberRequests(id: String)
+        /// `pantopus://homes/:id/owners/transfer` — A13.4 Transfer Ownership
+        /// form. Lands on the populated state; the form owns the Face ID
+        /// bottom sheet.
+        case homeOwnersTransfer(id: String)
         /// `pantopus://homes/:id/verify-landlord` — opens A12.5 / A12.6.
         case verifyLandlord(id: String)
         /// `pantopus://homes/:id/verify-postcard` — opens the A12.7
@@ -214,6 +218,9 @@ final class DeepLinkRouter {
         }
         if trailing.first == "members" && tabQuery == "requests" {
             return .homeMemberRequests(id: id)
+        }
+        if trailing.first == "owners" && trailing.dropFirst().first == "transfer" {
+            return .homeOwnersTransfer(id: id)
         }
         if trailing.first == "verify-landlord" || trailing.first == "verify_landlord" {
             return .verifyLandlord(id: id)
