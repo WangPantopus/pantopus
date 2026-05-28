@@ -45,6 +45,8 @@ import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessWizardScreen
+import app.pantopus.android.ui.screens.businesses.page_editor.EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.businesses.page_editor.EditBusinessPageScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
@@ -137,6 +139,8 @@ import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
+import app.pantopus.android.ui.screens.homes.owners.transfer.TRANSFER_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.owners.transfer.TransferOwnershipScreen
 import app.pantopus.android.ui.screens.homes.settings.HOME_SETTINGS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.settings.HomeSettingsRoute
 import app.pantopus.android.ui.screens.homes.settings.HomeSettingsScreen
@@ -198,6 +202,8 @@ import app.pantopus.android.ui.screens.listings.MyListingsScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
@@ -240,9 +246,11 @@ import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailActions
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailScreen
 import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
+import app.pantopus.android.ui.screens.support_trains.manage.ManageTrainScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
+import app.pantopus.android.ui.screens.wallet.WalletScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -587,6 +595,14 @@ private object ChildRoutes {
     /** Build the concrete path for a Business Profile. */
     fun businessProfile(businessId: String): String = "businesses/$businessId"
 
+    /** P4.2 — A13.10 Edit Business Page (owner-only). Pushed from the
+     *  `BusinessProfileScreen` overflow when `viewerIsOwner` is true,
+     *  and from the `pantopus://businesses/:id/page-editor` deep link. */
+    const val EDIT_BUSINESS_PAGE = "businesses/{$EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY}/page-editor"
+
+    /** Build the concrete path for the Edit Business Page editor. */
+    fun editBusinessPage(businessId: String): String = "businesses/$businessId/page-editor"
+
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
 
     const val INVITE_OWNER =
@@ -746,6 +762,16 @@ private object ChildRoutes {
     const val EDIT_SIGNUP = "support-trains/reservations/{$EDIT_SIGNUP_ID_KEY}/edit"
 
     fun editSignup(reservationId: String): String = "support-trains/reservations/${java.net.URLEncoder.encode(reservationId, "UTF-8")}/edit"
+
+    /** P4.3 / A13.13 Manage train (organizer surface). `:id` is the
+     *  Support Train UUID. Pushed from the A10.9 detail dock overflow
+     *  when the viewer is the organizer and from the
+     *  `pantopus://support-trains/:id/manage` deep link. Keep in sync
+     *  with `ManageTrainViewModel.TRAIN_ID_KEY`. */
+    const val MANAGE_TRAIN_ID_KEY = "supportTrainId"
+    const val MANAGE_TRAIN = "support-trains/{$MANAGE_TRAIN_ID_KEY}/manage"
+
+    fun manageTrain(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/manage"
 
     /** P1.1 — Admin Review-claims queue. Gated by [SettingsRoute.ReviewClaims]. */
     const val REVIEW_CLAIMS = "admin/review-claims"
@@ -1079,6 +1105,11 @@ private object ChildRoutes {
     /** A10.3 — Full "Today" briefing (weather, air, daylight, signals). */
     const val TODAY_DETAIL = "hub/today/detail"
 
+    /** A10.10 — Wallet (earnings-side surface). Reached from the
+     *  Settings → "Payments & payouts" row and the
+     *  `pantopus://wallet` deep link. */
+    const val WALLET = "wallet"
+
     /** A.4 — Property details for a home. */
     const val PROPERTY_DETAILS_HOME_ID_KEY = "homeId"
     const val PROPERTY_DETAILS = "homes/{$PROPERTY_DETAILS_HOME_ID_KEY}/property"
@@ -1090,6 +1121,14 @@ private object ChildRoutes {
     const val ADD_GUEST = "homes/{$ADD_GUEST_HOME_ID_KEY}/guests/new"
 
     fun addGuest(homeId: String): String = "homes/$homeId/guests/new"
+
+    /** A13.4 — Transfer Ownership form. Pushed from the Owners list
+     *  "Transfer" action and from `pantopus://homes/:id/owners/transfer`
+     *  deep links. The form owns its own biometric bottom sheet. */
+    const val TRANSFER_OWNERSHIP_HOME_ID_KEY = "homeId"
+    const val TRANSFER_OWNERSHIP = "homes/{$TRANSFER_OWNERSHIP_HOME_ID_KEY}/owners/transfer"
+
+    fun transferOwnership(homeId: String): String = "homes/$homeId/owners/transfer"
 
     /** A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
      *  opened from the Gigs feed's list/map toggle. Seeded with the active
@@ -1105,6 +1144,16 @@ private object ChildRoutes {
 
     /** A.x — Mailbox map. */
     const val MAILBOX_MAP = "mailbox/map"
+
+    /**
+     * A13.16 — My Mail Day editor. `{variant}` accepts "populated" (default)
+     * or "empty" to switch between the mid-afternoon triage view and the
+     * "nothing new today" hero. The Mailbox root header CTA pushes
+     * "populated"; the deep link `pantopus://mailbox/mailday` lands here too.
+     */
+    const val MAIL_DAY = "mailbox/mailday/{variant}"
+
+    fun mailDay(variant: String = "populated"): String = "mailbox/mailday/$variant"
 
     /** A.x — Membership detail for a persona. */
     const val MEMBERSHIP_DETAIL_PERSONA_ID_KEY = "personaId"
@@ -1186,6 +1235,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.DISCOVER_HUB)
                 DeepLinkRouter.consume()
             }
+            DeepLinkRouter.Destination.Wallet -> {
+                navController.navigate(ChildRoutes.WALLET)
+                DeepLinkRouter.consume()
+            }
             DeepLinkRouter.Destination.CreateBusiness -> {
                 navController.navigate(ChildRoutes.CREATE_BUSINESS)
                 DeepLinkRouter.consume()
@@ -1215,9 +1268,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.SupportTrainManage -> {
+                // P4.3 / A13.13 — `pantopus://support-trains/:id/manage`
+                // lands on the organizer Manage Train surface. Drop the
+                // user on the Support Trains list first so a back-tap
+                // pops to a known surface, then push manage.
                 navController.navigate(ChildRoutes.SUPPORT_TRAINS)
                 if (pending.id.isNotBlank()) {
-                    navController.navigate(ChildRoutes.reviewSignups(pending.id))
+                    navController.navigate(ChildRoutes.manageTrain(pending.id))
                 }
                 DeepLinkRouter.consume()
             }
@@ -1241,6 +1298,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.placeholder("Member requests · ${pending.id}"))
                 DeepLinkRouter.consume()
             }
+            is DeepLinkRouter.Destination.HomeOwnersTransfer -> {
+                // Push the home's dashboard underneath so a back-tap from
+                // the transfer form lands somewhere useful rather than at
+                // the empty Hub root.
+                navController.navigate(ChildRoutes.homeDashboard(pending.id))
+                navController.navigate(ChildRoutes.transferOwnership(pending.id))
+                DeepLinkRouter.consume()
+            }
             is DeepLinkRouter.Destination.VerifyLandlord -> {
                 navController.navigate(ChildRoutes.verifyLandlord(pending.id))
                 DeepLinkRouter.consume()
@@ -1251,6 +1316,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.User -> {
                 navController.navigate(ChildRoutes.publicProfile(pending.id))
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.MailDay -> {
+                // Push mailbox root first so Back walks back through the
+                // drawer view, then push the day editor on top.
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.mailDay())
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.ResetPassword,
@@ -2148,8 +2220,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.BUSINESS_PROFILE,
                 arguments = listOf(navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { backStackEntry ->
                 val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                val businessId = backStackEntry.arguments?.getString(BUSINESS_PROFILE_BUSINESS_ID_KEY) ?: ""
                 BusinessProfileScreen(
                     onBack = { navController.popBackStack() },
                     onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
@@ -2161,6 +2234,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
                     onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
+                    onEdit = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_BUSINESS_PAGE,
+                arguments = listOf(navArgument(EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY) { type = NavType.StringType }),
+            ) {
+                EditBusinessPageScreen(
+                    onBack = { navController.popBackStack() },
+                    onPreview = { navController.popBackStack() },
                 )
             }
             composable(
@@ -2775,8 +2858,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
                             // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
                             SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
-                            // Parked until P8.5 — depends on Stripe Connect wallet UX.
-                            SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.placeholder("Payments & payouts"))
+                            // P3.2 / A10.10 — Wallet replaces the prior placeholder.
+                            SettingsRoute.PaymentsPayouts -> {
+                                // Pop the settings screen first so back from the wallet
+                                // returns to the Hub root, not back into Settings.
+                                navController.popBackStack()
+                                navController.navigate(ChildRoutes.WALLET)
+                            }
                             SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
                             SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
                             SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
@@ -3041,7 +3129,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         SupportTrainDetailActions(
                             onBack = { navController.popBackStack() },
                             onOpenManage = {
-                                navController.navigate(ChildRoutes.reviewSignups(trainId))
+                                // P4.3 / A13.13 — A10.9 dock-overflow lands
+                                // on the organizer Manage Train surface (was
+                                // wired to review-signups as a stub before
+                                // A13.13 shipped).
+                                navController.navigate(ChildRoutes.manageTrain(trainId))
                             },
                             onShare = {
                                 appContext.shareText(
@@ -3109,6 +3201,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onClose = { navController.popBackStack() },
                 )
             }
+            composable(
+                route = ChildRoutes.MANAGE_TRAIN,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.MANAGE_TRAIN_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                ManageTrainScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenAnalytics = { id ->
+                        navController.navigate(ChildRoutes.placeholder("Train analytics · $id"))
+                    },
+                    onEditDates = { id ->
+                        navController.navigate(ChildRoutes.placeholder("Edit dates · $id"))
+                    },
+                    onInviteHelpers = { id ->
+                        navController.navigate(ChildRoutes.placeholder("Invite helpers · $id"))
+                    },
+                )
+            }
             composable(ChildRoutes.REVIEW_CLAIMS) {
                 ReviewClaimsScreen(
                     onBack = { navController.popBackStack() },
@@ -3151,6 +3265,29 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.TODAY_DETAIL) {
                 TodayDetailScreen(onBack = { navController.popBackStack() })
             }
+            composable(ChildRoutes.WALLET) {
+                WalletScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenHistory = {
+                        navController.navigate(ChildRoutes.placeholder("Wallet history"))
+                    },
+                    onWithdraw = {
+                        navController.navigate(ChildRoutes.placeholder("Withdraw"))
+                    },
+                    onManagePayout = {
+                        navController.navigate(ChildRoutes.placeholder("Manage payout method"))
+                    },
+                    onReverifyPayout = {
+                        navController.navigate(ChildRoutes.placeholder("Re-verify bank"))
+                    },
+                    onOpenTaxDocs = {
+                        navController.navigate(ChildRoutes.placeholder("Tax documents"))
+                    },
+                    onSeeAllActivity = {
+                        navController.navigate(ChildRoutes.placeholder("All activity"))
+                    },
+                )
+            }
             composable(
                 route = ChildRoutes.PROPERTY_DETAILS,
                 arguments =
@@ -3170,6 +3307,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 AddGuestFormScreen(
                     onClose = { navController.popBackStack() },
                     onSent = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.TRANSFER_OWNERSHIP,
+                arguments = listOf(navArgument(TRANSFER_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                TransferOwnershipScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(
@@ -3208,12 +3353,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
                     onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
+                    onOpenMailDay = { navController.navigate(ChildRoutes.mailDay()) },
                     onBrowseGigs = { navController.navigate(ChildRoutes.GIGS_FEED) },
                     onBack = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.MAILBOX_MAP) {
                 MailboxMapScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.MAIL_DAY,
+                arguments = listOf(navArgument(MAIL_DAY_VARIANT_KEY) { type = NavType.StringType }),
+            ) {
+                MailDayScreen(
+                    onClose = { navController.popBackStack() },
+                    onScan = { /* Out of scope per A13.16 — scanner integration */ },
+                    onSeeHistory = { /* Out of scope */ },
+                    onOpenNudge = { /* Out of scope */ },
+                )
             }
             composable(
                 route = ChildRoutes.MEMBERSHIP_DETAIL,

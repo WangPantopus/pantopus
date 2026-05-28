@@ -167,6 +167,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     private let onOpenMail: (String) -> Void
     private let onOpenSearch: @MainActor () -> Void
     private let onOpenMap: @MainActor () -> Void
+    let onOpenMailDay: @MainActor () -> Void
     private let onBrowseGigs: @MainActor () -> Void
     private let dataProvider: (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
     /// When set, `load()` surfaces this state verbatim — lets previews and
@@ -179,6 +180,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenMail: @escaping (String) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
         onOpenMap: @escaping @MainActor () -> Void = {},
+        onOpenMailDay: @escaping @MainActor () -> Void = {},
         onBrowseGigs: @escaping @MainActor () -> Void = {},
         dataProvider: @escaping (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
             = MailboxRootSampleData.sections,
@@ -189,6 +191,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         self.onOpenMail = onOpenMail
         self.onOpenSearch = onOpenSearch
         self.onOpenMap = onOpenMap
+        self.onOpenMailDay = onOpenMailDay
         self.onBrowseGigs = onBrowseGigs
         self.dataProvider = dataProvider
         self.seededState = seededState

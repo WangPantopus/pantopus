@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
@@ -42,6 +44,9 @@ import app.pantopus.android.ui.theme.Spacing
  * Mailbox root: the 4-drawer chip row (Me / Home / Biz / Earn) and the
  * 3-tab segmented underline bar (Incoming / Counter / Vault). Mirrors the
  * JSX `DrawerRow` + `TabRow`.
+ *
+ * Above the drawer row sits the A13.16 "My mail day" call-to-action —
+ * the host-supplied entry point into today's triage editor.
  */
 @Composable
 fun MailboxRootHeader(
@@ -53,8 +58,10 @@ fun MailboxRootHeader(
     tabBadge: (MailboxTab) -> Int?,
     onSelectDrawer: (MailboxDrawer) -> Unit,
     onSelectTab: (MailboxTab) -> Unit,
+    onOpenMailDay: () -> Unit = {},
 ) {
     Column(modifier = Modifier.background(PantopusColors.appSurface)) {
+        MailDayCTA(onClick = onOpenMailDay)
         Row(
             modifier =
                 Modifier
@@ -95,6 +102,61 @@ fun MailboxRootHeader(
             }
         }
         HorizontalDivider(color = PantopusColors.appBorder)
+    }
+}
+
+@Composable
+private fun MailDayCTA(onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.s4, vertical = 10.dp)
+                .heightIn(min = 44.dp)
+                .testTag("mailboxRootMailDayCTA")
+                .semantics { contentDescription = "My mail day — triage today's stack" },
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .height(32.dp)
+                    .sizeIn(minWidth = 32.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Mailbox,
+                contentDescription = null,
+                size = Radii.xl,
+                strokeWidth = 2.2f,
+                tint = PantopusColors.primary700,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "My mail day",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Triage today's stack",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 15.dp,
+            strokeWidth = 2.2f,
+            tint = PantopusColors.appTextMuted,
+        )
     }
 }
 

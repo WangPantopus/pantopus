@@ -163,6 +163,9 @@ dependencies {
     // EncryptedSharedPreferences + MasterKey (Android Keystore-backed)
     implementation(libs.androidx.security.crypto)
 
+    // Biometric prompt — A13.4 Transfer ownership BiometricConfirmSheet.
+    implementation(libs.androidx.biometric)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -327,12 +330,16 @@ abstract class VerifyPantopusTokensTask : DefaultTask() {
                 "ui/screens/homes/polls/PollKindPalette.kt",
                 "ui/screens/homes/tasks/HouseholdTaskCategoryPalette.kt",
                 "ui/screens/identity_center/IdentityCenterContent.kt",
+                "ui/screens/mailbox/mail_day/components/MailboxEmptyHero.kt",
+                "ui/screens/mailbox/mail_day/components/UndoCountdown.kt",
+                "ui/screens/mailbox/mail_day/components/UnreviewedItem.kt",
                 "ui/screens/mailbox/mail_detail/components/CertifiedComponents.kt",
                 "ui/screens/mailbox/mailbox_map/MailboxSpotKind.kt",
                 "ui/screens/marketplace/MarketplaceContent.kt",
                 "ui/screens/membership/MembershipDetailContent.kt",
                 "ui/screens/shared/mail_item_detail/MailItemDetailShell.kt",
                 "ui/screens/shared/map_list_hybrid/MapListHybridPreview.kt",
+                "ui/screens/wallet/components/WalletPalette.kt",
             )
 
         val hexPattern = Regex("""Color\(0x[0-9A-Fa-f]+\)""")

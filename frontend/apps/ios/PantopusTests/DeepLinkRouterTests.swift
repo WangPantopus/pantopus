@@ -84,11 +84,16 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrain(id: "st_1"))
     }
 
-    /// A10.9 (P3.1) — Organizers reach the review queue via
-    /// `pantopus://support-trains/:id/manage`; the bare
-    /// `support-trains/:id` URL now lands on the participant detail.
+    /// A13.13 — `pantopus://support-trains/:id/manage` lands on the
+    /// organizer-only Manage Train surface. Bare `support-trains/:id`
+    /// keeps landing on the A10.9 participant detail.
     func testSupportTrainManageRoute() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://support-trains/st_1/manage")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrainManage(id: "st_1"))
+    }
+
+    func testSupportTrainManageRouteHttpsForm() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/support-trains/st_1/manage")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .supportTrainManage(id: "st_1"))
     }
 
@@ -126,6 +131,32 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .homeDetail(id: "h_1"))
     }
 
+    func testHomeOwnersTransferRoute() throws {
+        try DeepLinkRouter.shared.handle(
+            url: XCTUnwrap(URL(string: "pantopus://homes/h_1/owners/transfer"))
+        )
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .homeOwnersTransfer(id: "h_1"))
+    }
+
+    func testHomeOwnersTransferRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(
+            url: XCTUnwrap(URL(string: "https://pantopus.app/homes/h_2/owners/transfer"))
+        )
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .homeOwnersTransfer(id: "h_2"))
+    }
+
+    func testBusinessProfileRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/businesses/biz_42")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .businessProfile(businessId: "biz_42"))
+    }
+
+    func testEditBusinessPageRoute() throws {
+        try DeepLinkRouter.shared.handle(
+            url: XCTUnwrap(URL(string: "pantopus://businesses/biz_42/page-editor"))
+        )
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .editBusinessPage(businessId: "biz_42"))
+    }
+
     func testChatRouteUsesConversationCase() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://chat/room_1")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .conversation(id: "room_1"))
@@ -144,6 +175,18 @@ final class DeepLinkRouterTests: XCTestCase {
     func testNotificationsRoute() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://notifications")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .notifications)
+    }
+
+    // MARK: - A10.10 P3.2 — wallet deep link
+
+    func testWalletRouteCustomScheme() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://wallet")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .wallet)
+    }
+
+    func testWalletRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/wallet")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .wallet)
     }
 
     func testCreateBusinessRoute() throws {
@@ -220,6 +263,30 @@ final class DeepLinkRouterTests: XCTestCase {
             // ok
         } else {
             XCTFail("Expected .unknown when /auth/verify-email is missing the token")
+        }
+    }
+
+    // MARK: - A13.16 My Mail Day
+
+    func testMailDayCustomScheme() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://mailbox/mailday"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .mailDay)
+    }
+
+    func testMailDayHTTPSHost() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/mailbox/mailday"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .mailDay)
+    }
+
+    func testMailboxRootWithoutSubrouteFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://mailbox"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case .unknown = DeepLinkRouter.shared.pending {
+            // ok — bare `pantopus://mailbox` is not a typed destination today.
+        } else {
+            XCTFail("Expected .unknown for bare /mailbox")
         }
     }
 

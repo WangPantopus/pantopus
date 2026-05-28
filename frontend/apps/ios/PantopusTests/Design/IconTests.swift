@@ -34,6 +34,8 @@ final class IconTests: XCTestCase {
         "compass", "filter",
         // T5.3.1 My bids — bid lifecycle chips + footer.
         "crown", "trending-down", "ban", "file-text",
+        // A10.10 Wallet — trend indicator and withdraw CTA glyph.
+        "trending-up", "arrow-down-to-line",
         // T5.3.2 My tasks — poster-side chips + footer.
         "plus", "rocket", "clipboard-list", "clock-plus", "circle-slash", "play", "pause",
         // T5.3.3 My posts — archive chip + empty-state compose icon.
@@ -74,7 +76,11 @@ final class IconTests: XCTestCase {
         // A13.1 Add Guest — allowed-area chips.
         "door-open", "car", "warehouse",
         // A15.3 AI Assistant — avatar/reply glyph.
-        "bot"
+        "bot",
+        // A13.4 Transfer ownership — Face ID gate and ownership-diff controls.
+        "scan-face", "arrow-right-left", "arrow-down",
+        // A13.13 Manage train — Organize row glyphs.
+        "bar-chart-3", "calendar-cog"
     ]
 
     func testInventoryMatches() {

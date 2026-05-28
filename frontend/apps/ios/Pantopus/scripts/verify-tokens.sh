@@ -58,6 +58,9 @@ HEX_EXEMPT=(
   "Features/Homes/Polls/PollKindPalette.swift"
   "Features/Homes/Tasks/HouseholdTaskCategoryPalette.swift"
   "Features/IdentityCenter/IdentityCenterContent.swift"
+  "Features/Mailbox/MailDay/MailDayContent.swift"
+  "Features/Mailbox/MailDay/Components/MailboxEmptyHero.swift"
+  "Features/Mailbox/MailDay/Components/UndoCountdown.swift"
   "Features/Mailbox/MailDetail/Components/CertifiedStampBadge.swift"
   "Features/Mailbox/MailDetail/Components/CombinedSenderCarrierCard.swift"
   "Features/Mailbox/MailboxMap/MailboxSpotKind.swift"
@@ -65,6 +68,7 @@ HEX_EXEMPT=(
   "Features/Membership/MembershipDetailContent.swift"
   "Features/Shared/MailItemDetail/MailItemDetailShell.swift"
   "Features/Shared/MapListHybrid/MapListHybridPreview.swift"
+  "Features/Wallet/Components/WalletPalette.swift"
 )
 HEX_EXCLUDE_ARGS=()
 for f in "${HEX_EXEMPT[@]}"; do

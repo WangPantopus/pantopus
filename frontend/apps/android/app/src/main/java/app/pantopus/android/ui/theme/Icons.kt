@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Approval
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AttachMoney
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Bookmark
@@ -75,6 +78,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Flag
@@ -158,6 +162,7 @@ import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.ThumbUp
@@ -301,6 +306,10 @@ enum class PantopusIcon(
     TrendingDown("trending-down"),
     Ban("ban"),
     FileText("file-text"),
+
+    // A10.10 — Wallet "This month" trend indicator + Withdraw CTA glyph.
+    TrendingUp("trending-up"),
+    ArrowDownToLine("arrow-down-to-line"),
 
     // T5.3.2 — My tasks V2 poster-side chip + footer icons.
     Plus("plus"),
@@ -468,11 +477,25 @@ enum class PantopusIcon(
     // `sparkles`.
     Bot("bot"),
 
+    // A13.4 Transfer ownership — bottom-sheet biometric icon (`scan-face`,
+    // mirrors the iOS Face ID glyph; on Android we render the closest
+    // Material face-id approximation), sticky-CTA bidirectional arrow
+    // (`arrow-right-left`), and the diff-direction "After" caret
+    // (`arrow-down`).
+    ScanFace("scan-face"),
+    ArrowRightLeft("arrow-right-left"),
+    ArrowDown("arrow-down"),
+
     // A12.10 Create Business — category tile glyphs. `Cpu` backs the Tech &
     // Repair tile (Material `Memory`); `Truck` backs the Delivery & Errands
     // tile (Material `LocalShipping`).
     Cpu("cpu"),
     Truck("truck"),
+
+    // A13.13 Manage train — Organize row glyphs. `bar-chart-3` paints the
+    // Analytics row's icon tile; `calendar-cog` paints the Edit-dates row.
+    BarChart3("bar-chart-3"),
+    CalendarCog("calendar-cog"),
     ;
 
     companion object {
@@ -602,6 +625,8 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.TrendingDown -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingDown)
         PantopusIcon.Ban -> IconSource.Material(Icons.Filled.Block)
         PantopusIcon.FileText -> IconSource.Material(Icons.AutoMirrored.Filled.Article)
+        PantopusIcon.TrendingUp -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingUp)
+        PantopusIcon.ArrowDownToLine -> IconSource.Material(Icons.Filled.Download)
         PantopusIcon.Plus -> IconSource.Material(Icons.Filled.Add)
         PantopusIcon.Rocket -> IconSource.Material(Icons.Filled.RocketLaunch)
         PantopusIcon.ClipboardList -> IconSource.Material(Icons.AutoMirrored.Filled.Assignment)
@@ -761,11 +786,25 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Warehouse -> IconSource.Material(Icons.Filled.Warehouse)
         // A15.3 AI Assistant — Material's robot-assistant glyph.
         PantopusIcon.Bot -> IconSource.Material(Icons.Filled.SmartToy)
+        // A13.4 Transfer ownership — Material has no `face-id` glyph; the
+        // closest visual match is `Face` (filled face outline). `SwapHoriz`
+        // is Material's bidirectional swap glyph and stands in for Lucide's
+        // `arrow-right-left`. `ArrowDownward` is a direct match.
+        PantopusIcon.ScanFace -> IconSource.Material(Icons.Filled.Face)
+        PantopusIcon.ArrowRightLeft -> IconSource.Material(Icons.Filled.SwapHoriz)
+        PantopusIcon.ArrowDown -> IconSource.Material(Icons.Filled.ArrowDownward)
         // A12.10 Create Business — `Memory` is Material's chip/circuit
         // glyph (closest Lucide `cpu` analogue); `LocalShipping` is the
         // closest Lucide `truck` analogue.
         PantopusIcon.Cpu -> IconSource.Material(Icons.Filled.Memory)
         PantopusIcon.Truck -> IconSource.Material(Icons.Filled.LocalShipping)
+        // A13.13 Manage train. Material ships `BarChart` for analytics
+        // (vertical-bars glyph); `calendar-cog` reuses `EditCalendar`
+        // (the gear-on-calendar Material glyph already mapped for
+        // `calendar-clock`) since Material doesn't ship a separate
+        // calendar-cog glyph.
+        PantopusIcon.BarChart3 -> IconSource.Material(Icons.Filled.BarChart)
+        PantopusIcon.CalendarCog -> IconSource.Material(Icons.Filled.EditCalendar)
     }
 
 /**

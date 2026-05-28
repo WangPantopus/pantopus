@@ -106,6 +106,9 @@ class IconTest {
             "trending-down",
             "ban",
             "file-text",
+            // A10.10 — Wallet.
+            "trending-up",
+            "arrow-down-to-line",
             // T5.3.2 — My tasks
             "plus",
             "rocket",
@@ -222,6 +225,14 @@ class IconTest {
             "warehouse",
             // A15.3 — AI Assistant avatar/reply glyph.
             "bot",
+            // A13.4 — Transfer ownership (biometric face, bidirectional
+            // CTA arrow, "after" caret).
+            "scan-face",
+            "arrow-right-left",
+            "arrow-down",
+            // A13.13 — Manage train Organize row glyphs.
+            "bar-chart-3",
+            "calendar-cog",
         )
 
     @Test
