@@ -30,14 +30,12 @@ struct PickCategoryStep: View {
 
         BusinessSearchField(text: $viewModel.searchText, focused: false)
 
-        CategoryGrid(
-            selectedId: viewModel.selectedCategoryId,
-            onPick: viewModel.selectCategory
-        )
+        BusinessCategoryGrid(selectedId: viewModel.selectedCategoryId) {
+            viewModel.selectCategory($0)
+        }
 
         if !viewModel.whatYouGetItems.isEmpty,
-           let selected = viewModel.selectedCategoryId
-        {
+           let selected = viewModel.selectedCategoryId {
             WhatYouGetStrip(category: selected, items: viewModel.whatYouGetItems)
         }
 
@@ -67,7 +65,7 @@ struct BusinessIdentityChip: View {
 
 // MARK: - Category grid (2 × 4)
 
-struct CategoryGrid: View {
+struct BusinessCategoryGrid: View {
     let selectedId: BusinessCategory?
     let onPick: (BusinessCategory) -> Void
 
@@ -79,11 +77,12 @@ struct CategoryGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: Spacing.s3) {
             ForEach(BusinessCategory.allCases) { category in
-                CategoryCard(
+                BusinessCategoryCard(
                     category: category,
-                    selected: selectedId == category,
-                    onPick: { onPick(category) }
-                )
+                    selected: selectedId == category
+                ) {
+                    onPick(category)
+                }
                 .accessibilityIdentifier("createBusinessCategoryTile_\(category.rawValue)")
             }
         }
@@ -91,7 +90,7 @@ struct CategoryGrid: View {
     }
 }
 
-private struct CategoryCard: View {
+private struct BusinessCategoryCard: View {
     let category: BusinessCategory
     let selected: Bool
     let onPick: () -> Void
@@ -276,7 +275,7 @@ struct BusinessSearchField: View {
                 "Search categories — e.g. \"tutor\", \"lawn care\"",
                 text: $text
             )
-            .pantopusTextStyle(.body)
+            .font(Theme.Font.body)
             .foregroundStyle(Theme.Color.appText)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()

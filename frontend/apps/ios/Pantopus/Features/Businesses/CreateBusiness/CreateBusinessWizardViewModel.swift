@@ -186,10 +186,10 @@ final class CreateBusinessWizardViewModel: WizardModel {
         switch currentStep {
         case .pickCategory:
             // Disabled if the user is mid-search with no selection.
-            return selectedCategoryId != nil && !isSubmittingCustom
+            selectedCategoryId != nil && !isSubmittingCustom
         case .legalInfo, .profile, .confirm:
             // Stubs gate the CTA open so the flow can be walked end-to-end.
-            return true
+            true
         }
     }
 

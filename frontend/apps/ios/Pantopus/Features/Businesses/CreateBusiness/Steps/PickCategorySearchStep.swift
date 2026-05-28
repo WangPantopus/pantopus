@@ -35,18 +35,20 @@ struct PickCategorySearchStep: View {
                 SearchResultRow(
                     hit: hit,
                     query: viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines),
-                    selected: viewModel.selectedCategoryId == hit.category,
-                    onPick: { viewModel.selectSearchHit(hit) }
-                )
+                    selected: viewModel.selectedCategoryId == hit.category
+                ) {
+                    viewModel.selectSearchHit(hit)
+                }
                 .accessibilityIdentifier("createBusinessSearchResult_\(hit.id)")
             }
         }
 
         AddCustomCategoryRow(
             label: viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines),
-            isSubmitting: false,
-            onTap: viewModel.submitCustomCategory
-        )
+            isSubmitting: false
+        ) {
+            viewModel.submitCustomCategory()
+        }
     }
 }
 
@@ -163,9 +165,9 @@ private struct HighlightedLabel: View {
         if query.isEmpty {
             plain
         } else if let range = text.range(of: query, options: .caseInsensitive) {
-            let before = String(text[text.startIndex ..< range.lowerBound])
+            let before = String(text[text.startIndex..<range.lowerBound])
             let match = String(text[range])
-            let after = String(text[range.upperBound ..< text.endIndex])
+            let after = String(text[range.upperBound..<text.endIndex])
             (
                 Text(before)
                     .foregroundColor(Theme.Color.appText)

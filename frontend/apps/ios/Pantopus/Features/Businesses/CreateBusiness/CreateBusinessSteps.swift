@@ -33,7 +33,9 @@ public extension CreateBusinessStep {
 
     /// Total number of steps in the wizard. Stays constant — the audit's
     /// frame 1 explicitly shows `1 of 4`.
-    static var totalSteps: Int { 4 }
+    static var totalSteps: Int {
+        4
+    }
 }
 
 /// Category tiles rendered in the 2×4 picker grid. Order is meaningful —
@@ -54,7 +56,9 @@ public enum BusinessCategory: String, CaseIterable, Sendable, Identifiable {
     case vehicles
     case other
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 }
 
 public extension BusinessCategory {

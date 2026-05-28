@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.businesses.create_business.steps
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,7 +36,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Canvas
 import app.pantopus.android.ui.screens.businesses.create_business.CategorySearchHit
 import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessUiState
 import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
