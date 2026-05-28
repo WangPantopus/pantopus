@@ -162,7 +162,7 @@ private struct TransferOwnershipContent: View {
 
         FormFieldGroup("Recipient") {
             RecipientSearchField(value: viewModel.recipient.name)
-            RecipientCard(recipient: viewModel.recipient)
+            TransferRecipientCard(recipient: viewModel.recipient)
         }
 
         FormFieldGroup("Share to transfer · \(viewModel.amount)%") {
@@ -285,7 +285,7 @@ private struct RecipientSearchField: View {
 
 // MARK: - Recipient card
 
-private struct RecipientCard: View {
+private struct TransferRecipientCard: View {
     let recipient: TransferOwnershipSampleData.RecipientSeed
 
     var body: some View {

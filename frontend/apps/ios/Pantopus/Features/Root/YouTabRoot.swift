@@ -75,6 +75,10 @@ public enum YouRoute: Hashable {
     /// action with the seed DTO baked in so the form can prefill
     /// without a re-fetch.
     case editSignup(reservation: SupportTrainReservationDTO)
+    /// A13.13 / P4.3 — Manage train (organizer surface). Pushed from
+    /// the A10.9 detail dock overflow when the viewer is the organizer
+    /// and from the `pantopus://support-trains/:id/manage` deep link.
+    case manageTrain(trainId: String)
     /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
     /// Activity-section row pushes here; tapping a row drills into the
     /// home dashboard via `homeDashboard(homeId:)`.
@@ -1245,6 +1249,20 @@ public struct YouTabRoot: View {
             EditSignupFormView(reservation: reservation) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .manageTrain(trainId):
+            ManageTrainView(
+                viewModel: ManageTrainViewModel(trainId: trainId),
+                onClose: { Task { @MainActor in pop() } },
+                onOpenAnalytics: { id in
+                    Task { @MainActor in path.append(.placeholder(label: "Train analytics · \(id)")) }
+                },
+                onEditDates: { id in
+                    Task { @MainActor in path.append(.placeholder(label: "Edit dates · \(id)")) }
+                },
+                onInviteHelpers: { id in
+                    Task { @MainActor in path.append(.placeholder(label: "Invite helpers · \(id)")) }
+                }
+            )
         case .identityCenter:
             IdentityCenterView(
                 onBack: { Task { @MainActor in pop() } },

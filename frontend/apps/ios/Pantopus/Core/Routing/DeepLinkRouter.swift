@@ -23,13 +23,11 @@ final class DeepLinkRouter {
         case home
         case notifications
         case supportTrain(id: String)
-        /// `pantopus://support-trains/:id/manage` — organizer-only
-        /// review queue for a Support Train. Distinct from
-        /// `supportTrain(id:)`, which now lands on the participant
-        /// detail (A10.9). Owners reach the queue via the dock
-        /// overflow on the detail screen; this deep link is the
-        /// "land directly on the queue" entry point for organizer
-        /// shortcuts and back-of-house notifications.
+        /// `pantopus://support-trains/:id/manage` — A13.13 organizer
+        /// surface. Reached from the A10.9 detail dock overflow when
+        /// the viewer is the organizer, and from back-of-house
+        /// shortcut links. Distinct from `supportTrain(id:)`, which
+        /// lands on the participant detail (A10.9).
         case supportTrainManage(id: String)
         case post(id: String)
         case gig(id: String)
@@ -134,8 +132,8 @@ final class DeepLinkRouter {
             return .notifications
         case "support-trains", "support_train":
             guard let id = segments.dropFirst().first else { return .unknown(url) }
-            let trailing = segments.dropFirst(2).first ?? ""
-            if trailing == "manage" {
+            // `/support-trains/:id/manage` → A13.13 organizer surface.
+            if segments.dropFirst(2).first == "manage" {
                 return .supportTrainManage(id: id)
             }
             return .supportTrain(id: id)

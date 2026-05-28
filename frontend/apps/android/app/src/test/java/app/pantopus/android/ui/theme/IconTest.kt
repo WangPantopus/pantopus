@@ -230,6 +230,9 @@ class IconTest {
             "scan-face",
             "arrow-right-left",
             "arrow-down",
+            // A13.13 — Manage train Organize row glyphs.
+            "bar-chart-3",
+            "calendar-cog",
         )
 
     @Test
