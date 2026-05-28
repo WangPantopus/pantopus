@@ -90,6 +90,15 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun wallet_routes_to_wallet() {
+        assertEquals(DeepLinkRouter.Destination.Wallet, DeepLinkRouter.resolveString("pantopus://wallet"))
+        assertEquals(
+            DeepLinkRouter.Destination.Wallet,
+            DeepLinkRouter.resolveString("https://pantopus.app/wallet"),
+        )
+    }
+
+    @Test
     fun support_train_route() {
         assertEquals(
             DeepLinkRouter.Destination.SupportTrain("st_1"),
@@ -98,6 +107,23 @@ class DeepLinkRouterTest {
         assertEquals(
             DeepLinkRouter.Destination.SupportTrain("st_2"),
             DeepLinkRouter.resolveString("pantopus://support_train/st_2"),
+        )
+    }
+
+    /**
+     * A10.9 (P3.1) — Organizers reach the review queue via
+     * `pantopus://support-trains/:id/manage`; the bare
+     * `support-trains/:id` URL now lands on the participant detail.
+     */
+    @Test
+    fun support_train_manage_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.SupportTrainManage("st_1"),
+            DeepLinkRouter.resolveString("pantopus://support-trains/st_1/manage"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.SupportTrainManage("st_3"),
+            DeepLinkRouter.resolveString("https://pantopus.app/support-trains/st_3/manage"),
         )
     }
 
@@ -196,6 +222,22 @@ class DeepLinkRouterTest {
     @Test
     fun connections_route() {
         assertEquals(DeepLinkRouter.Destination.Connections, DeepLinkRouter.resolveString("pantopus://connections"))
+    }
+
+    @Test
+    fun create_business_route_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.CreateBusiness,
+            DeepLinkRouter.resolveString("pantopus://businesses/new"),
+        )
+    }
+
+    @Test
+    fun create_business_route_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.CreateBusiness,
+            DeepLinkRouter.resolveString("https://pantopus.app/businesses/new"),
+        )
     }
 
     // MARK: - T6.1c P5 — Auth deep links

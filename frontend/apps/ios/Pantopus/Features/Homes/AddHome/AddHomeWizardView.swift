@@ -66,7 +66,7 @@ public struct AddHomeWizardView: View {
     private var stepContent: some View {
         switch viewModel.currentStep {
         case .address: AddressStep(viewModel: viewModel)
-        case .confirm: ConfirmStep(viewModel: viewModel)
+        case .confirm: AddHomeConfirmStep(viewModel: viewModel)
         case .role: RoleStep(viewModel: viewModel)
         case .review: ReviewStep(viewModel: viewModel)
         case .success: SuccessStep()
@@ -105,7 +105,7 @@ public struct AddHomeWizardView: View {
 
 // MARK: - Step 2: Confirm
 
-private struct ConfirmStep: View {
+private struct AddHomeConfirmStep: View {
     @Bindable var viewModel: AddHomeWizardViewModel
 
     var body: some View {
