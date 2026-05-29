@@ -131,6 +131,9 @@ public enum HubRoute: Hashable {
     case searchAccessCodes(homeId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
+    /// A03.2 — Beacon Updates feed (`surface=personas`). Reached from the
+    /// AudienceProfile entry and the `pantopus://beacons` deep link.
+    case beaconsFeed
     /// Compose post target — placeholder until the compose flow ships.
     case composePost(intent: String)
     /// P3.5 — Edit an existing Pulse post. Re-uses the compose flow in
@@ -447,6 +450,9 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case .connections:
             path.append(.connections)
+            _ = router.consume()
+        case .beacons:
+            path.append(.beaconsFeed)
             _ = router.consume()
         case .discoverHub:
             path.append(.discoverHub)
@@ -1290,6 +1296,17 @@ public struct HubTabRoot: View {
                 onCompose: { intent in
                     Task { @MainActor in push(.composePost(intent: intent.rawValue)) }
                 },
+                onBack: { Task { @MainActor in pop() } }
+            )
+        case .beaconsFeed:
+            BeaconsFeedView(
+                onOpenPost: { postId in
+                    Task { @MainActor in push(.pulsePost(postId: postId)) }
+                },
+                onCompose: { intent in
+                    Task { @MainActor in push(.composePost(intent: intent.rawValue)) }
+                },
+                onDiscover: { Task { @MainActor in push(.discoverHub) } },
                 onBack: { Task { @MainActor in pop() } }
             )
         case let .composePost(intent):

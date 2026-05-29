@@ -31,6 +31,9 @@ object DeepLinkRouter {
 
         data object Connections : Destination
 
+        /** `pantopus://beacons` — A03.2 Beacon Updates feed (`surface=personas`). */
+        data object Beacons : Destination
+
         data object DiscoverHub : Destination
 
         /** `pantopus://wallet` — A10.10 earnings wallet (distinct from
@@ -213,6 +216,7 @@ object DeepLinkRouter {
             "home" -> Destination.Home
             "notifications" -> Destination.Notifications
             "connections" -> Destination.Connections
+            "beacons", "beacon-updates", "beacon_updates" -> Destination.Beacons
             "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub
             "wallet" -> Destination.Wallet
             "support-trains", "support_train" -> {

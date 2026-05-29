@@ -7,20 +7,26 @@
 
 import SwiftUI
 
-/// Circular success-tinted check badge.
+/// Circular check badge pinned to an avatar corner.
 ///
-/// - Parameter size: Outer diameter; defaults to 16pt.
+/// - Parameters:
+///   - size: Outer diameter; defaults to 16pt.
+///   - tint: Disc fill. Defaults to `success` green (the app-wide "verified"
+///     language); the Pulse / Beacons feed passes `primary600` to match the
+///     A03 design's sky check disc.
 @MainActor
 public struct VerifiedBadge: View {
     private let size: CGFloat
+    private let tint: Color
 
-    public init(size: CGFloat = 16) {
+    public init(size: CGFloat = 16, tint: Color = Theme.Color.success) {
         self.size = size
+        self.tint = tint
     }
 
     public var body: some View {
         ZStack {
-            Circle().fill(Theme.Color.success)
+            Circle().fill(tint)
             Icon(.check, size: size * 0.6, color: Theme.Color.appTextInverse)
         }
         .frame(width: size, height: size)

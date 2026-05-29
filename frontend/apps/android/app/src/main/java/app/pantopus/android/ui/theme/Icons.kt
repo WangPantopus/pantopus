@@ -159,6 +159,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
@@ -260,10 +261,12 @@ enum class PantopusIcon(
     Star("star"),
     HelpCircle("help-circle"),
     Calendar("calendar"),
+    CalendarCheck("calendar-check"),
     Lightbulb("lightbulb"),
     Eye("eye"),
     Share("share"),
     Radio("radio"),
+    Rss("rss"),
     MapPin("map-pin"),
     Pencil("pencil"),
     Briefcase("briefcase"),
@@ -531,7 +534,6 @@ enum class PantopusIcon(
     BellOff("bell-off"),
     Minus("minus"),
     UserMinus("user-minus"),
-    CalendarCheck("calendar-check"),
     CalendarPlus("calendar-plus"),
     ;
 
@@ -616,10 +618,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Star -> IconSource.Material(Icons.Filled.Star)
         PantopusIcon.HelpCircle -> IconSource.Material(Icons.AutoMirrored.Filled.Help)
         PantopusIcon.Calendar -> IconSource.Material(Icons.Filled.DateRange)
+        PantopusIcon.CalendarCheck -> IconSource.Material(Icons.Filled.EventAvailable)
         PantopusIcon.Lightbulb -> IconSource.Material(Icons.Filled.Lightbulb)
         PantopusIcon.Eye -> IconSource.Material(Icons.Filled.Visibility)
         PantopusIcon.Share -> IconSource.Material(Icons.Filled.Share)
         PantopusIcon.Radio -> IconSource.Material(Icons.Filled.Public)
+        PantopusIcon.Rss -> IconSource.Material(Icons.Filled.RssFeed)
         PantopusIcon.MapPin -> IconSource.Material(Icons.Filled.LocationOn)
         PantopusIcon.Pencil -> IconSource.Material(Icons.Filled.Edit)
         PantopusIcon.Briefcase -> IconSource.Material(Icons.Filled.Work)
@@ -864,7 +868,6 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.BellOff -> IconSource.Material(Icons.Filled.NotificationsOff)
         PantopusIcon.Minus -> IconSource.Material(Icons.Filled.Remove)
         PantopusIcon.UserMinus -> IconSource.Material(Icons.Filled.PersonRemove)
-        PantopusIcon.CalendarCheck -> IconSource.Material(Icons.Filled.EventAvailable)
         PantopusIcon.CalendarPlus -> IconSource.Material(Icons.Filled.EventNote)
     }
 

@@ -65,10 +65,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case star
     case helpCircle = "help-circle"
     case calendar
+    case calendarCheck = "calendar-check"
     case lightbulb
     case eye
     case share
     case radio
+    case rss
     case mapPin = "map-pin"
     case pencil
     case briefcase
@@ -321,7 +323,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case undo2 = "undo-2"
     // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
     // dress / forecast vibe rows, ± plus-one stepper, RSVP cluster Can't
-    // chip, calendar-hold CTA, and the bell-off mute affordance.
+    // chip, calendar-plus CTA, and the bell-off mute affordance.
     case quote
     case cloudSun = "cloud-sun"
     case shirt
@@ -329,7 +331,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case bellOff = "bell-off"
     case minus
     case userMinus = "user-minus"
-    case calendarCheck = "calendar-check"
     case calendarPlus = "calendar-plus"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
@@ -383,10 +384,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .star: "star"
         case .helpCircle: "questionmark.circle"
         case .calendar: "calendar"
+        case .calendarCheck: "calendar.badge.checkmark"
         case .lightbulb: "lightbulb"
         case .eye: "eye"
         case .share: "square.and.arrow.up"
         case .radio: "antenna.radiowaves.left.and.right"
+        case .rss: "dot.radiowaves.up.forward"
         case .mapPin: "mappin"
         case .pencil: "pencil"
         case .briefcase: "briefcase"
@@ -581,8 +584,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .undo2: "arrow.uturn.backward"
         // A17.9 Party. SF Symbols ships direct quote / cloud.sun /
         // tshirt.fill / xmark.circle / bell.slash / minus glyphs;
-        // user-minus collapses to `person.badge.minus`, and the
-        // calendar-check / calendar-plus pair maps onto the badge variants.
+        // user-minus collapses to `person.badge.minus`; calendar-plus maps
+        // onto the badge-plus variant.
         case .quote: "quote.bubble"
         case .cloudSun: "cloud.sun"
         case .shirt: "tshirt.fill"
@@ -590,7 +593,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .bellOff: "bell.slash"
         case .minus: "minus"
         case .userMinus: "person.badge.minus"
-        case .calendarCheck: "calendar.badge.checkmark"
         case .calendarPlus: "calendar.badge.plus"
         }
     }

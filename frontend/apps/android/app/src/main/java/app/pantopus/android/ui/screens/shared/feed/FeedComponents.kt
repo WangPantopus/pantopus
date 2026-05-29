@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,18 +28,91 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.components.VerifiedBadge
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+
+/**
+ * Solid-fill tint for a [FeedAvatar]. Each case resolves to an on-scale
+ * design token — no raw hex. Authors are mapped to a tint by the feed
+ * view-model (business → violet, civic → slate, else sky); sample data
+ * assigns per-author tints to match the design frames.
+ */
+enum class FeedAvatarTint {
+    Sky,
+    Green,
+    Violet,
+    Rose,
+    Slate,
+    Amber,
+    Orange,
+    ;
+
+    val color: Color
+        get() =
+            when (this) {
+                Sky -> PantopusColors.primary500
+                Green -> PantopusColors.success
+                Violet -> PantopusColors.magic
+                Rose -> PantopusColors.rose
+                Slate -> PantopusColors.slate
+                Amber -> PantopusColors.warning
+                Orange -> PantopusColors.handyman
+            }
+}
+
+/**
+ * Feed author avatar: a solid identity-tinted disc with white initials and
+ * an optional sky verified check badge pinned bottom-end. Unlike
+ * [app.pantopus.android.ui.components.AvatarWithIdentityRing] (a
+ * profile-completion ring), the A03 feed card design shows a flat colored
+ * disc + check disc.
+ */
+@Composable
+fun FeedAvatar(
+    initials: String,
+    modifier: Modifier = Modifier,
+    tint: FeedAvatarTint = FeedAvatarTint.Sky,
+    verified: Boolean = false,
+    size: Dp = 32.dp,
+) {
+    Box(modifier = modifier.size(size), contentAlignment = Alignment.BottomEnd) {
+        Box(
+            modifier =
+                Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(tint.color),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = initials,
+                fontSize = if (size >= 32.dp) 13.sp else 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+        if (verified) {
+            VerifiedBadge(
+                modifier = Modifier.offset(x = 2.dp, y = 2.dp),
+                size = size * 0.4f,
+                tint = PantopusColors.primary600,
+            )
+        }
+    }
+}
 
 /** One entry in [FeedChipRow]. */
 @Immutable

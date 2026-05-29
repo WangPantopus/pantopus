@@ -67,9 +67,9 @@ unblock multiple screens and must land in Phase 1.
 ## A03 — Pulse feed (tab archetype)
 
 ### A03.1 — Pulse (`feed.tsx`)
-- **iOS:** `Feed/FeedView.swift` + `Feed/Pulse/PulsePostCard.swift` + `Feed/PulseFeedViewModel.swift`
-- **Android:** `feed/FeedScreen.kt` + `feed/pulse/PulsePostCard.kt` + `feed/pulse/PulseFeedViewModel.kt`
-- **Status:** **POLISH** (both platforms)
+- **iOS:** `Feed/FeedView.swift` + `Feed/FeedSurface.swift` + `Feed/Pulse/PulsePostCard.swift` + `Feed/PulseFeedViewModel.swift`
+- **Android:** `feed/FeedScreen.kt` + `feed/FeedSurface.kt` + `feed/pulse/PulsePostCard.kt` + `feed/pulse/PulseFeedViewModel.kt`
+- **Status:** **DONE** (P8.1, both platforms) — per-card `IntentChip` retoned to the design palette (amber `warmAmber` · success `success`/`successLight` · violet `magic` · rose · slate; `rose`+`slate` added as tokens). Filter chip row stays plain active/idle per the design JSX (confirmed with product). Event RSVP pill recoloured violet, reaction icons fixed (`going` → `calendar-check`, `Reply` → `message-circle`), avatars switched from the completion ring to a flat identity disc + sky verified check disc, empty copy + `· change in filter` scope footer landed, Android gained pull-to-refresh. Snapshot baselines pending render/record.
 - **Designed frames:** populated (5 mixed-intent cards · pull-to-refresh peek) · empty (radio glyph + "Create post" + scope footer chip)
 - **Per-frame deltas:**
   - Confirm chip row is the 6-intent set in design order: All · Ask · Recommend · Event · Lost & Found · Announce. Each chip uses the tinted bg color from `IntentChip` (amber / success / violet / rose / slate).
@@ -79,12 +79,13 @@ unblock multiple screens and must land in Phase 1.
   - **Empty state** must show: radio-tower glyph in `primary50` circle, "No posts yet" h2, primary "Create post" CTA, *footer chip* showing the active neighborhood scope ("Showing posts within Elm Park · change in filter"). The footer chip is the design's signature — check it exists.
 
 ### A03.2 — Beacons (`beacons.tsx` — Beacon Updates tab)
-- **iOS:** *no dedicated file* — likely served by a tab inside `Feed/FeedView.swift` or surfaced through `AudienceProfile`. **NEEDS LOCATION CONFIRM** before work starts.
-- **Android:** same situation — no dedicated `beacons/` folder under `screens/feed/`.
-- **Status:** **BUILD** if no current Beacons tab; **POLISH** if it's a sub-tab inside FeedView.
-- **Designed frames:** populated (5 verified beacons w/ broadcasts) · empty ("Follow a beacon" — RSS glyph + "Discover beacons" CTA + "0 beacons followed" footer chip)
+- **Location (resolved, P8.1):** net-new, but **not** a 5th bottom tab. The design renders the Pulse archetype parametrized to `surface=personas` (`<FeedScreen initialSurface="personas" hideSurfaceTabs />`), so Beacons reuses the same screen via a `FeedSurface` enum. Backend `surface=personas` already exists (`backend/routes/posts.js` + `feedService.js`); the API/repository layers already accept the param. `AudienceProfile` is the persona-*ownership* surface, not the followed-beacons feed.
+- **iOS:** `Feed/Beacons/BeaconsFeedView.swift` (thin wrapper over `FeedView` with `PulseFeedViewModel(surface: .beacons)`) + shared `Feed/FeedSampleData.swift`. Reached via `HubRoute.beaconsFeed` + the `pantopus://beacons` deep link.
+- **Android:** `feed/beacons/BeaconsFeedScreen.kt` (wraps `FeedScreen(surface = FeedSurface.Beacons)`) + shared `feed/FeedSampleData.kt`. Reached via `ChildRoutes.BEACONS_FEED` + the `pantopus://beacons` deep link.
+- **Status:** **DONE** (P8.1, both platforms). One follow-up: the in-UI AudienceProfile "Beacon Updates" entry row (deep link + route already wired).
+- **Designed frames:** populated (5 verified beacons w/ broadcasts) · empty ("Follow a beacon" — RSS glyph + "Discover beacons" CTA + "You follow 0 beacons · suggestions nearby" footer chip)
 - **Per-frame deltas:**
-  - Same archetype as A03.1; only divergence is the empty-state icon (`rss` not `radio`), CTA copy ("Discover beacons"), footer chip wording, and the absence of any non-verified posts. All authors must carry the verified check disc.
+  - Same archetype as A03.1; the only divergence is the empty-state icon (`rss` not `radio`), CTA copy ("Discover beacons"), footer chip wording, and the absence of any non-verified posts — the `.beacons` surface forces a verified author floor so all authors carry the verified check disc.
 
 ---
 

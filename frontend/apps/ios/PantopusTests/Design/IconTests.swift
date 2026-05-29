@@ -21,7 +21,7 @@ final class IconTests: XCTestCase {
         "more-horizontal", "arrow-left", "arrow-right", "send", "chevron-down", "chevron-up",
         "trash-2", "edit-2", "upload", "shield", "lock", "check-circle",
         "alert-circle", "circle", "info", "wifi-off", "heart", "thumbs-up", "star",
-        "help-circle", "calendar", "lightbulb", "eye", "share", "radio", "map-pin",
+        "help-circle", "calendar", "calendar-check", "lightbulb", "eye", "share", "radio", "rss", "map-pin",
         "pencil", "briefcase", "gavel", "sliders-horizontal", "message-circle",
         "at-sign", "badge-check", "tag", "shield-alert", "check-check", "history",
         "receipt", "clock", "users", "dollar-sign",
@@ -85,7 +85,7 @@ final class IconTests: XCTestCase {
         "bar-chart-3", "calendar-cog",
         // A17.9 Party — invite chrome glyphs.
         "quote", "cloud-sun", "shirt", "x-circle", "bell-off", "minus",
-        "user-minus", "calendar-check", "calendar-plus",
+        "user-minus", "calendar-plus",
         // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
         "credit-card"
     ]

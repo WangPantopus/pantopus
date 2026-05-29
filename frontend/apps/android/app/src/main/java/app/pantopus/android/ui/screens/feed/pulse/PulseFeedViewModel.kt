@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.feed.FeedPost
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.ui.screens.feed.FeedEmptyContent
+import app.pantopus.android.ui.screens.feed.FeedSurface
+import app.pantopus.android.ui.screens.shared.feed.FeedAvatarTint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +24,7 @@ sealed interface PulseFeedUiState {
     data object Loading : PulseFeedUiState
 
     data class Empty(
-        val scopeLabel: String? = null,
+        val content: FeedEmptyContent,
     ) : PulseFeedUiState
 
     data class Loaded(
@@ -46,6 +49,14 @@ class PulseFeedViewModel
         private val _activeIntent = MutableStateFlow(PulseIntent.All)
         val activeIntent: StateFlow<PulseIntent> = _activeIntent.asStateFlow()
 
+        /** True while a pull-to-refresh refetch is in flight (drives the spinner). */
+        private val _isRefreshing = MutableStateFlow(false)
+        val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+        /** Which surface this feed renders (Pulse vs Beacons). */
+        var surface: FeedSurface = FeedSurface.Pulse
+            private set
+
         private var scopeLabel: String? = null
         private var latitude: Double? = null
         private var longitude: Double? = null
@@ -60,12 +71,17 @@ class PulseFeedViewModel
             this.longitude = longitude
         }
 
+        /** Select the surface (Pulse vs Beacons) before the first load. */
+        fun configureSurface(surface: FeedSurface) {
+            this.surface = surface
+        }
+
         fun load() {
             if (_state.value is PulseFeedUiState.Loaded) return
             fetch()
         }
 
-        fun refresh() = fetch()
+        fun refresh() = fetch(isRefresh = true)
 
         fun selectIntent(intent: PulseIntent) {
             if (_activeIntent.value == intent) return
@@ -121,9 +137,10 @@ class PulseFeedViewModel
             }
         }
 
-        private fun fetch() {
+        private fun fetch(isRefresh: Boolean = false) {
             if (loading) return
             loading = true
+            if (isRefresh) _isRefreshing.value = true
             if (_state.value !is PulseFeedUiState.Loaded) {
                 _state.value = PulseFeedUiState.Loading
             }
@@ -132,7 +149,7 @@ class PulseFeedViewModel
                     when (
                         val result =
                             repo.feed(
-                                surface = "place",
+                                surface = surface.backendSurface,
                                 latitude = latitude,
                                 longitude = longitude,
                                 postType = _activeIntent.value.postType,
@@ -143,7 +160,9 @@ class PulseFeedViewModel
                             scopeLabel = response.posts.firstOrNull()?.locationName ?: scopeLabel
                             _state.value =
                                 if (response.posts.isEmpty()) {
-                                    PulseFeedUiState.Empty(scopeLabel = scopeLabel)
+                                    PulseFeedUiState.Empty(
+                                        content = surface.emptyContent(scopeLabel = scopeLabel, followCount = 0),
+                                    )
                                 } else {
                                     PulseFeedUiState.Loaded(rows = response.posts.map(::projectCard))
                                 }
@@ -154,6 +173,7 @@ class PulseFeedViewModel
                     }
                 } finally {
                     loading = false
+                    _isRefreshing.value = false
                 }
             }
         }
@@ -161,11 +181,15 @@ class PulseFeedViewModel
         private fun projectCard(post: FeedPost): PulsePostCardContent {
             val intent = PulseIntent.fromPostType(post.postType)
             val authorName = post.creator?.displayName() ?: "Pantopus user"
+            val isBusiness = post.creator?.accountType == "business"
             return PulsePostCardContent(
                 id = post.id,
                 authorName = authorName,
                 authorInitials = initials(authorName),
-                authorVerified = post.creator?.accountType == "business" || post.userHasLiked,
+                // Beacons authors are all verified by definition; on Pulse, fall
+                // back to account-type until the backend surfaces creator.verified.
+                authorVerified = surface.authorsAlwaysVerified || isBusiness || post.userHasLiked,
+                avatarTint = if (isBusiness) FeedAvatarTint.Violet else FeedAvatarTint.Sky,
                 meta = metaString(post),
                 intent = intent,
                 title = if (intent == PulseIntent.Event) post.title else null,

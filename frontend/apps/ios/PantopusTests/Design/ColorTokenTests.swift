@@ -54,6 +54,13 @@ final class ColorTokenTests: XCTestCase {
         assertColor(Theme.Color.businessBg, hex: "#F3E8FF")
     }
 
+    func testPulseIntentAccents() {
+        assertColor(Theme.Color.rose, hex: "#BE123C")
+        assertColor(Theme.Color.roseBg, hex: "#FFE4E6")
+        assertColor(Theme.Color.slate, hex: "#475569")
+        assertColor(Theme.Color.slateBg, hex: "#E2E8F0")
+    }
+
     func testNeutrals() {
         assertColor(Theme.Color.appBg, hex: "#f6f7f9")
         assertColor(Theme.Color.appSurface, hex: "#ffffff")

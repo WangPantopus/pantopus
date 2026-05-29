@@ -17,6 +17,9 @@ public enum SettingsStackRoute: Hashable {
     case privacy
     case identityCenter
     case audienceProfile
+    /// A03.2 — Beacon Updates feed, reached from the Audience Profile
+    /// "Beacon Updates" entry row.
+    case beaconsFeed
     case blockedUsers
     case password
     case verification
@@ -96,7 +99,14 @@ public struct SettingsView: View {
                 }
             )
         case .audienceProfile:
-            AudienceProfileView(onBack: popLast)
+            AudienceProfileView(onBack: popLast) { path.append(.beaconsFeed) }
+        case .beaconsFeed:
+            BeaconsFeedView(
+                onOpenPost: { _ in path.append(.placeholder(label: "Post")) },
+                onCompose: { _ in path.append(.placeholder(label: "Compose")) },
+                onDiscover: { path.append(.placeholder(label: "Discover beacons")) },
+                onBack: popLast
+            )
         case .legal:
             LegalIndexView(
                 onBack: { popLast() },

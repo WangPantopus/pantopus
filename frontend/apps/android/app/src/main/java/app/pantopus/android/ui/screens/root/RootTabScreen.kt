@@ -68,6 +68,7 @@ import app.pantopus.android.ui.screens.explore.ExploreEntity
 import app.pantopus.android.ui.screens.explore.ExploreKind
 import app.pantopus.android.ui.screens.explore.ExploreMapScreen
 import app.pantopus.android.ui.screens.feed.FeedScreen
+import app.pantopus.android.ui.screens.feed.beacons.BeaconsFeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
@@ -800,6 +801,12 @@ private object ChildRoutes {
     /** Pulse tab (T1.2). Reached from Hub → pillar(.Pulse). */
     const val PULSE_FEED = "feed/pulse"
 
+    /**
+     * A03.2 — Beacon Updates feed (`surface=personas`). Reached from the
+     * AudienceProfile entry and the `pantopus://beacons` deep link.
+     */
+    const val BEACONS_FEED = "feed/beacons"
+
     /** Gigs feed (T2.3). Reached from Hub → pillar(.Gigs). */
     const val GIGS_FEED = "gigs/feed"
 
@@ -1238,6 +1245,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             DeepLinkRouter.Destination.Connections -> {
                 navController.navigate(ChildRoutes.CONNECTIONS)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Beacons -> {
+                navController.navigate(ChildRoutes.BEACONS_FEED)
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.DiscoverHub -> {
@@ -2474,6 +2485,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable(ChildRoutes.BEACONS_FEED) {
+                BeaconsFeedScreen(
+                    onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
+                    onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
+                    onDiscover = { navController.navigate(ChildRoutes.DISCOVER_HUB) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable(ChildRoutes.MARKETPLACE) {
                 MarketplaceScreen(
                     onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
@@ -3041,6 +3060,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenEditPersona = {
                         navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
+                    },
+                    onOpenBeacons = {
+                        navController.navigate(ChildRoutes.BEACONS_FEED)
                     },
                     viewModel = audienceViewModel,
                 )

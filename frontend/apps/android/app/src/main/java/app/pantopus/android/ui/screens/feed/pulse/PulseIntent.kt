@@ -112,7 +112,7 @@ fun PulseIntent.reactionTemplate(
             )
         PulseIntent.Event ->
             listOf(
-                PulseReaction(PulseReaction.Kind.Going, PantopusIcon.Check, "going", helpfulCount, true),
+                PulseReaction(PulseReaction.Kind.Going, PantopusIcon.CalendarCheck, "going", helpfulCount, true),
                 PulseReaction(PulseReaction.Kind.Heart, PantopusIcon.Heart, "", secondaryCount, false),
             )
         PulseIntent.Lost ->

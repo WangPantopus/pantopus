@@ -30,8 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.pantopus.android.ui.components.AvatarWithIdentityRing
-import app.pantopus.android.ui.components.IdentityPillar
+import app.pantopus.android.ui.screens.shared.feed.FeedAvatar
+import app.pantopus.android.ui.screens.shared.feed.FeedAvatarTint
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -45,6 +45,7 @@ data class PulsePostCardContent(
     val authorName: String,
     val authorInitials: String,
     val authorVerified: Boolean,
+    val avatarTint: FeedAvatarTint = FeedAvatarTint.Sky,
     val meta: String,
     val intent: PulseIntent,
     val title: String?,
@@ -124,10 +125,10 @@ private fun CardHeader(content: PulsePostCardContent) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        AvatarWithIdentityRing(
-            name = content.authorInitials,
-            identity = IdentityPillar.Personal,
-            ringProgress = if (content.authorVerified) 1f else 0.35f,
+        FeedAvatar(
+            initials = content.authorInitials,
+            tint = content.avatarTint,
+            verified = content.authorVerified,
             size = 32.dp,
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -181,10 +182,9 @@ private fun AttendeeStrip(
                                 .clip(CircleShape)
                                 .border(2.dp, PantopusColors.appSurface, CircleShape),
                     ) {
-                        AvatarWithIdentityRing(
-                            name = initials,
-                            identity = IdentityPillar.Personal,
-                            ringProgress = 1f,
+                        FeedAvatar(
+                            initials = initials,
+                            tint = attendeeTints[index % attendeeTints.size],
                             size = 22.dp,
                         )
                     }
@@ -203,7 +203,7 @@ private fun AttendeeStrip(
                         Modifier
                             .height(26.dp)
                             .clip(RoundedCornerShape(Radii.pill))
-                            .background(PantopusColors.businessBg)
+                            .background(PantopusColors.magicBg)
                             .clickable(onClick = onRSVP)
                             .padding(horizontal = Spacing.s3)
                             .testTag("pulseRSVP_$postId"),
@@ -214,13 +214,13 @@ private fun AttendeeStrip(
                         icon = if (attendees.userIsGoing) PantopusIcon.Check else PantopusIcon.PlusCircle,
                         contentDescription = null,
                         size = 10.dp,
-                        tint = PantopusColors.business,
+                        tint = PantopusColors.magic,
                     )
                     Text(
                         text = if (attendees.userIsGoing) "Going" else "RSVP",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PantopusColors.business,
+                        color = PantopusColors.magic,
                     )
                 }
             }
@@ -249,7 +249,7 @@ private fun ReactionStrip(
         Spacer(modifier = Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             PantopusIconImage(
-                icon = PantopusIcon.Send,
+                icon = PantopusIcon.MessageCircle,
                 contentDescription = null,
                 size = Radii.lg,
                 tint = PantopusColors.appTextSecondary,
@@ -342,14 +342,17 @@ fun PulseIntentChip(intent: PulseIntent) {
     }
 }
 
+private val attendeeTints =
+    listOf(FeedAvatarTint.Orange, FeedAvatarTint.Sky, FeedAvatarTint.Violet, FeedAvatarTint.Green)
+
 private fun PulseIntent.tintColors(): Pair<Color, Color> =
     when (this) {
         PulseIntent.All -> PantopusColors.appTextSecondary to PantopusColors.appSurfaceSunken
-        PulseIntent.Ask -> PantopusColors.warning to PantopusColors.warningBg
-        PulseIntent.Recommend -> PantopusColors.success to PantopusColors.successBg
-        PulseIntent.Event -> PantopusColors.business to PantopusColors.businessBg
-        PulseIntent.Lost -> PantopusColors.error to PantopusColors.errorBg
-        PulseIntent.Announce -> PantopusColors.appTextStrong to PantopusColors.appSurfaceSunken
+        PulseIntent.Ask -> PantopusColors.warmAmber to PantopusColors.warmAmberBg
+        PulseIntent.Recommend -> PantopusColors.success to PantopusColors.successLight
+        PulseIntent.Event -> PantopusColors.magic to PantopusColors.magicBg
+        PulseIntent.Lost -> PantopusColors.rose to PantopusColors.roseBg
+        PulseIntent.Announce -> PantopusColors.slate to PantopusColors.slateBg
     }
 
 private fun buildA11yLabel(content: PulsePostCardContent): String {

@@ -26,21 +26,25 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**
- * Small green-check badge pinned to an avatar corner.
+ * Small check badge pinned to an avatar corner.
  *
  * @param size Outer diameter; defaults to 16dp.
+ * @param tint Disc fill. Defaults to [PantopusColors.success] green (the
+ *   app-wide "verified" language); the Pulse / Beacons feed passes
+ *   [PantopusColors.primary600] to match the A03 design's sky check disc.
  */
 @Composable
 fun VerifiedBadge(
     modifier: Modifier = Modifier,
     size: Dp = 16.dp,
+    tint: Color = PantopusColors.success,
 ) {
     Box(
         modifier =
             modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(PantopusColors.success)
+                .background(tint)
                 .border(1.5.dp, Color.White, CircleShape)
                 .semantics { contentDescription = "Verified" },
         contentAlignment = Alignment.Center,
