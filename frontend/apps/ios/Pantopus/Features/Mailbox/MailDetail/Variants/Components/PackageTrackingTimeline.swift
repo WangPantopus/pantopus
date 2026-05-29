@@ -90,6 +90,6 @@ public struct PackageTrackingTimeline: View {
         ],
         carrier: "USPS"
     ) {}
-    .padding()
-    .background(Theme.Color.appBg)
+        .padding()
+        .background(Theme.Color.appBg)
 }
