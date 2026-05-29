@@ -20,6 +20,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -78,7 +79,41 @@ class PasswordChangeViewModelTest {
             vm.update(PasswordChangeViewModel.FieldKey.New, "new-password-456")
             vm.update(PasswordChangeViewModel.FieldKey.Confirm, "different")
             assertFalse(vm.isValid)
-            assertEquals("Doesn't match", vm.fields.value[PasswordChangeViewModel.FieldKey.Confirm]?.error)
+            assertEquals(
+                "Doesn't match the new password above.",
+                vm.fields.value[PasswordChangeViewModel.FieldKey.Confirm]?.error,
+            )
+        }
+
+    @Test fun strengthReflectsNewPassword() =
+        runTest {
+            coEvery { account.authMethods() } returns
+                NetworkResult.Success(AuthMethodsResponse(hasPassword = true))
+            val vm = viewModel()
+            vm.load()
+            vm.update(PasswordChangeViewModel.FieldKey.New, "Bake-Sourdough-Friday-77")
+            assertEquals(4, vm.strength.rulesMet)
+            assertTrue(vm.strength.isStrong)
+            assertFalse(vm.isNewPasswordBreached)
+            assertTrue(vm.isNewValid)
+        }
+
+    @Test fun breachedNewPasswordIsInvalidAndFlagged() =
+        runTest {
+            coEvery { account.authMethods() } returns
+                NetworkResult.Success(AuthMethodsResponse(hasPassword = true))
+            val vm = viewModel()
+            vm.load()
+            vm.update(PasswordChangeViewModel.FieldKey.Current, "old-password-123")
+            vm.update(PasswordChangeViewModel.FieldKey.New, "password123")
+            vm.update(PasswordChangeViewModel.FieldKey.Confirm, "password123")
+            assertTrue(vm.isNewPasswordBreached)
+            assertTrue(vm.strength.breached)
+            assertFalse(vm.isValid)
+            assertEquals(
+                "Too common — appeared in 2.3M public records.",
+                vm.fields.value[PasswordChangeViewModel.FieldKey.New]?.error,
+            )
         }
 
     @Test fun saveSuccessSetsToastAndShouldDismiss() =
@@ -95,13 +130,14 @@ class PasswordChangeViewModelTest {
             vm.save()
             assertEquals("Password updated", vm.toast.value)
             assertTrue(vm.shouldDismiss.value)
+            assertNull(vm.formError.value)
             // Body uses camelCase (no snake_case adapter). Reach inside to verify.
             assertNotNull(body.captured)
             assertEquals("old-password-123", body.captured.currentPassword)
             assertEquals("new-password-456", body.captured.newPassword)
         }
 
-    @Test fun save401MarksCurrentPasswordFieldWithError() =
+    @Test fun save401MarksCurrentPasswordFieldAndShowsBanner() =
         runTest {
             coEvery { account.authMethods() } returns
                 NetworkResult.Success(AuthMethodsResponse(hasPassword = true))
@@ -114,9 +150,10 @@ class PasswordChangeViewModelTest {
             vm.update(PasswordChangeViewModel.FieldKey.Confirm, "new-password-456")
             vm.save()
             assertEquals(
-                "Current password is incorrect",
+                "That doesn't match the password on file.",
                 vm.fields.value[PasswordChangeViewModel.FieldKey.Current]?.error,
             )
+            assertEquals("Couldn't update password", vm.formError.value?.title)
             assertFalse(vm.shouldDismiss.value)
         }
 }
