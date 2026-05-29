@@ -40,7 +40,13 @@ class InvoiceDetailViewModel
             fun fixture(invoiceId: String): ContentDetailContent =
                 ContentDetailContent(
                     kind = ContentDetailKind.Invoice,
-                    statusPill = ContentDetailPill(id = "status", label = "Due in 7 days", icon = PantopusIcon.Clock, tone = ContentDetailPill.Tone.Warning),
+                    statusPill =
+                        ContentDetailPill(
+                            id = "status",
+                            label = "Due in 7 days",
+                            icon = PantopusIcon.Clock,
+                            tone = ContentDetailPill.Tone.Warning,
+                        ),
                     hero =
                         ContentDetailHero(
                             title = "Holiday lighting · install + takedown",
@@ -56,7 +62,9 @@ class InvoiceDetailViewModel
                                 id = "terms",
                                 title = "Payment terms",
                                 icon = PantopusIcon.File,
-                                label = "Net 14 from issue. Pantopus Pay (instant), card, or ACH. Late fee 1.5%/mo applies after due date.",
+                                label =
+                                "Net 14 from issue. Pantopus Pay (instant), card, or ACH. " +
+                                    "Late fee 1.5%/mo applies after due date.",
                             ),
                             noteFromSender,
                         ),
@@ -71,7 +79,13 @@ class InvoiceDetailViewModel
             fun paidFixture(invoiceId: String): ContentDetailContent =
                 ContentDetailContent(
                     kind = ContentDetailKind.Invoice,
-                    statusPill = ContentDetailPill(id = "status", label = "Paid · Dec 14", icon = PantopusIcon.CheckCircle, tone = ContentDetailPill.Tone.Success),
+                    statusPill =
+                        ContentDetailPill(
+                            id = "status",
+                            label = "Paid · Dec 14",
+                            icon = PantopusIcon.CheckCircle,
+                            tone = ContentDetailPill.Tone.Success,
+                        ),
                     hero =
                         ContentDetailHero(
                             title = "Holiday lighting · install + takedown",
@@ -107,8 +121,20 @@ class InvoiceDetailViewModel
             private val payerPayee =
                 ContentDetailModule.FromTo(
                     id = "fromto",
-                    from = ContentDetailParty(label = "From", name = "Brightside Outdoor", sub = "Business · Verified", accent = ContentDetailParty.Accent.Business),
-                    to = ContentDetailParty(label = "To", name = "Marcus Chen", sub = "Personal", accent = ContentDetailParty.Accent.Personal),
+                    from =
+                        ContentDetailParty(
+                            label = "From",
+                            name = "Brightside Outdoor",
+                            sub = "Business · Verified",
+                            accent = ContentDetailParty.Accent.Business,
+                        ),
+                    to =
+                        ContentDetailParty(
+                            label = "To",
+                            name = "Marcus Chen",
+                            sub = "Personal",
+                            accent = ContentDetailParty.Accent.Personal,
+                        ),
                 )
 
             private fun lineItems(

@@ -687,6 +687,16 @@ public struct TransactionalDetailShell: View {
             sectionCard(title: m.title, icon: nil, sub: m.sub) {
                 bidsTable(m.bids)
             }
+        case .fromTo, .lineItems, .summary:
+            invoiceModuleView(module)
+        }
+    }
+
+    /// Invoice-only modules, split out to keep `moduleView`'s cyclomatic
+    /// complexity under the SwiftLint threshold.
+    @ViewBuilder
+    private func invoiceModuleView(_ module: ContentDetailModule) -> some View {
+        switch module {
         case let .fromTo(m):
             HStack(spacing: Spacing.s2) {
                 partyCard(m.from)
@@ -700,6 +710,8 @@ public struct TransactionalDetailShell: View {
         case let .summary(m):
             summaryCard(m)
                 .padding(.horizontal, Spacing.s5)
+        default:
+            EmptyView()
         }
     }
 
@@ -1016,7 +1028,7 @@ public struct TransactionalDetailShell: View {
             .padding(.vertical, Spacing.s2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Color.appSurfaceMuted)
-            ForEach(Array(module.rows.enumerated()), id: \.element.id) { index, row in
+            ForEach(Array(module.rows.enumerated()), id: \.element.id) { _, row in
                 HStack(spacing: Spacing.s0) {
                     Text(row.item)
                         .font(.system(size: 12, weight: .medium))
@@ -1179,7 +1191,9 @@ public struct TransactionalDetailShell: View {
                 .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 .shadow(
                     color: dock.primary.enabled ? Theme.Color.primary600.opacity(0.30) : Color.clear,
-                    radius: 8, x: 0, y: 6
+                    radius: 8,
+                    x: 0,
+                    y: 6
                 )
             }
             .buttonStyle(.plain)

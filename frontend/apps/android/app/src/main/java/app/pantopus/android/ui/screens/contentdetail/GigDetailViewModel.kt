@@ -139,19 +139,43 @@ class GigDetailViewModel
                 val modules =
                     buildList {
                         gig.description?.takeIf { it.isNotEmpty() }?.let {
-                            add(ContentDetailModule.Description(id = "desc", title = "What needs doing", icon = PantopusIcon.ClipboardList, body = it))
+                            add(
+                                ContentDetailModule.Description(
+                                    id = "desc",
+                                    title = "What needs doing",
+                                    icon = PantopusIcon.ClipboardList,
+                                    body = it,
+                                ),
+                            )
                         }
                         addAll(locationModules(gig))
                         gig.scheduledStart?.takeIf { it.isNotEmpty() }?.let { iso ->
-                            add(ContentDetailModule.CaptionedText(id = "when", title = "When", icon = PantopusIcon.Calendar, label = iso))
+                            add(
+                                ContentDetailModule.CaptionedText(
+                                    id = "when",
+                                    title = "When",
+                                    icon = PantopusIcon.Calendar,
+                                    label = iso,
+                                ),
+                            )
                         }
                         add(
                             ContentDetailModule.CapsuleRow(
                                 id = "trust",
                                 capsules =
                                     listOf(
-                                        ContentDetailPill(id = "addr", label = "Verified address", icon = PantopusIcon.ShieldCheck, tone = ContentDetailPill.Tone.Info),
-                                        ContentDetailPill(id = "local", label = "Local Pantopus job", icon = PantopusIcon.Check, tone = ContentDetailPill.Tone.Success),
+                                        ContentDetailPill(
+                                            id = "addr",
+                                            label = "Verified address",
+                                            icon = PantopusIcon.ShieldCheck,
+                                            tone = ContentDetailPill.Tone.Info,
+                                        ),
+                                        ContentDetailPill(
+                                            id = "local",
+                                            label = "Local Pantopus job",
+                                            icon = PantopusIcon.Check,
+                                            tone = ContentDetailPill.Tone.Success,
+                                        ),
                                     ),
                             ),
                         )
@@ -166,16 +190,29 @@ class GigDetailViewModel
                                     icon = PantopusIcon.HandCoins,
                                     iconTone = ContentDetailModule.Callout.IconTone.Primary,
                                     title = "Be the first to bid",
-                                    subtitle = "Fresh posts usually get a hire in the first hour. First three bids land at the top of the list.",
+                                    subtitle =
+                                        "Fresh posts usually get a hire in the first hour. " +
+                                            "First three bids land at the top of the list.",
                                     footerPill = "neighbors viewing",
                                 ),
                             )
                         }
                     }
-                val statusLabel = if (bidCount > 0) "Open · $bidCount ${if (bidCount == 1) "bid" else "bids"}" else "Open · No bids yet"
+                val statusLabel =
+                    if (bidCount > 0) {
+                        "Open · $bidCount ${if (bidCount == 1) "bid" else "bids"}"
+                    } else {
+                        "Open · No bids yet"
+                    }
                 return ContentDetailContent(
                     kind = ContentDetailKind.Gig,
-                    statusPill = ContentDetailPill(id = "status", label = statusLabel, icon = PantopusIcon.Circle, tone = ContentDetailPill.Tone.Warning),
+                    statusPill =
+                        ContentDetailPill(
+                            id = "status",
+                            label = statusLabel,
+                            icon = PantopusIcon.Circle,
+                            tone = ContentDetailPill.Tone.Warning,
+                        ),
                     hero = hero,
                     statStrip = statStrip,
                     modules = modules,
@@ -199,8 +236,18 @@ class GigDetailViewModel
                             icon = PantopusIcon.MapPin,
                             stops =
                                 listOf(
-                                    ContentDetailModule.TwoStop.Stop("A", ContentDetailModule.TwoStop.StopTone.Primary, pickup, distanceLabel(gig.distanceMiles)),
-                                    ContentDetailModule.TwoStop.Stop("B", ContentDetailModule.TwoStop.StopTone.Success, dropoff, null),
+                                    ContentDetailModule.TwoStop.Stop(
+                                        letter = "A",
+                                        tone = ContentDetailModule.TwoStop.StopTone.Primary,
+                                        address = pickup,
+                                        distance = distanceLabel(gig.distanceMiles),
+                                    ),
+                                    ContentDetailModule.TwoStop.Stop(
+                                        letter = "B",
+                                        tone = ContentDetailModule.TwoStop.StopTone.Success,
+                                        address = dropoff,
+                                        distance = null,
+                                    ),
                                 ),
                         ),
                     )
@@ -262,7 +309,14 @@ class GigDetailViewModel
                         }
                         (gig.creator?.name ?: gig.creator?.username)?.let { poster ->
                             val posted = relativeAge(gig.createdAt)?.let { " · $it ago" } ?: ""
-                            add(ContentDetailModule.CaptionedText(id = "postedby", title = "Posted by", icon = null, label = "$poster$posted"))
+                            add(
+                                ContentDetailModule.CaptionedText(
+                                    id = "postedby",
+                                    title = "Posted by",
+                                    icon = null,
+                                    label = "$poster$posted",
+                                ),
+                            )
                         }
                         if (bids.isNotEmpty()) {
                             add(
@@ -279,9 +333,19 @@ class GigDetailViewModel
                     kind = ContentDetailKind.Gig,
                     statusPill =
                         if (awarded) {
-                            ContentDetailPill(id = "status", label = "Awarded", icon = PantopusIcon.Check, tone = ContentDetailPill.Tone.Success)
+                            ContentDetailPill(
+                                id = "status",
+                                label = "Awarded",
+                                icon = PantopusIcon.Check,
+                                tone = ContentDetailPill.Tone.Success,
+                            )
                         } else {
-                            ContentDetailPill(id = "status", label = "Open", icon = PantopusIcon.Circle, tone = ContentDetailPill.Tone.Warning)
+                            ContentDetailPill(
+                                id = "status",
+                                label = "Open",
+                                icon = PantopusIcon.Circle,
+                                tone = ContentDetailPill.Tone.Warning,
+                            )
                         },
                     hero = hero,
                     statStrip = emptyList(),

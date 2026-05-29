@@ -8,8 +8,6 @@
 //  via `POST /api/gigs/:gigId/bids`.
 //
 
-// swiftlint:disable function_body_length
-
 import Foundation
 import Observation
 
@@ -113,9 +111,13 @@ public final class GigDetailViewModel {
         }
         modules.append(contentsOf: locationModules(gig))
         if let scheduledStart = gig.scheduledStart, !scheduledStart.isEmpty {
-            modules.append(.captionedText(ContentDetailCaptionedText(title: "When", icon: .calendar, label: formatScheduledStart(scheduledStart))))
+            modules.append(.captionedText(ContentDetailCaptionedText(
+                title: "When", icon: .calendar, label: formatScheduledStart(scheduledStart)
+            )))
         } else if let deadline = gig.deadline, !deadline.isEmpty {
-            modules.append(.captionedText(ContentDetailCaptionedText(title: "By", icon: .calendar, label: formatScheduledStart(deadline))))
+            modules.append(.captionedText(ContentDetailCaptionedText(
+                title: "By", icon: .calendar, label: formatScheduledStart(deadline)
+            )))
         }
         modules.append(.capsuleRow(ContentDetailCapsuleRow(capsules: [
             ContentDetailPill(label: "Verified address", icon: .shieldCheck, tone: .info),
@@ -155,23 +157,24 @@ public final class GigDetailViewModel {
     private static func locationModules(_ gig: GigDTO) -> [ContentDetailModule] {
         if let pickup = gig.pickupAddress, !pickup.isEmpty,
            let dropoff = gig.dropoffAddress, !dropoff.isEmpty {
-            return [.twoStop(ContentDetailTwoStop(
-                title: "Pickup → drop-off",
-                icon: .mapPin,
-                stops: [
-                    ContentDetailTwoStop.Stop(letter: "A", tone: .primary, address: pickup, distance: distanceLabel(gig.distanceMiles)),
-                    ContentDetailTwoStop.Stop(letter: "B", tone: .success, address: dropoff, distance: nil)
-                ]
-            ))]
+            let stops = [
+                ContentDetailTwoStop.Stop(
+                    letter: "A", tone: .primary, address: pickup, distance: distanceLabel(gig.distanceMiles)
+                ),
+                ContentDetailTwoStop.Stop(letter: "B", tone: .success, address: dropoff, distance: nil)
+            ]
+            let card = ContentDetailTwoStop(title: "Pickup → drop-off", icon: .mapPin, stops: stops)
+            return [.twoStop(card)]
         }
         if let pickup = gig.pickupAddress, !pickup.isEmpty {
-            return [.detailRow(ContentDetailDetailRow(
+            let row = ContentDetailDetailRow(
                 title: "Where",
                 sectionIcon: .mapPin,
                 rowIcon: .mapPin,
                 label: pickup,
                 trailing: distanceLabel(gig.distanceMiles)
-            ))]
+            )
+            return [.detailRow(row)]
         }
         return []
     }
@@ -195,14 +198,18 @@ public final class GigDetailViewModel {
         )
         var modules: [ContentDetailModule] = []
         if awarded {
+            let awardTitle = awardWinnerName(gig: gig, bids: bids).map { "Awarded to \($0)" } ?? "Awarded"
+            let awardSubtitle = [relativeAge(gig.acceptedAt).map { "\($0) ago" }, "bidding now closed"]
+                .compactMap { $0 }
+                .joined(separator: " · ")
             modules.append(.callout(ContentDetailCallout(
                 identifier: "awarded",
                 style: .banner,
                 tone: .success,
                 icon: .check,
                 iconTone: .success,
-                title: awardWinnerName(gig: gig, bids: bids).map { "Awarded to \($0)" } ?? "Awarded",
-                subtitle: [relativeAge(gig.acceptedAt).map { "\($0) ago" }, "bidding now closed"].compactMap { $0 }.joined(separator: " · ")
+                title: awardTitle,
+                subtitle: awardSubtitle
             )))
         }
         if let body = gig.description, !body.isEmpty {

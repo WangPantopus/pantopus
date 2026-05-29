@@ -487,7 +487,11 @@ private fun StandardHero(content: ContentDetailContent) {
             HeroSubtitle(content.hero)
         }
         if (content.hero.priceLine != null) {
-            PriceBlock(content.hero, content.kind, modifier = Modifier.padding(horizontal = Spacing.s5, top = 18.dp))
+            PriceBlock(
+                content.hero,
+                content.kind,
+                modifier = Modifier.padding(start = Spacing.s5, end = Spacing.s5, top = 18.dp),
+            )
         }
     }
 }
@@ -514,7 +518,8 @@ private fun ListingHero(content: ContentDetailContent) {
                 content.kind,
                 modifier =
                     Modifier.padding(
-                        horizontal = Spacing.s5,
+                        start = Spacing.s5,
+                        end = Spacing.s5,
                         top = if (content.statusPill == null) 18.dp else 12.dp,
                     ),
             )
@@ -1026,6 +1031,22 @@ private fun PartyCard(
 }
 
 @Composable
+private fun ColumnHeader(
+    text: String,
+    modifier: Modifier,
+    textAlign: TextAlign,
+) {
+    Text(
+        text = text,
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Bold,
+        color = PantopusColors.appTextMuted,
+        textAlign = textAlign,
+        modifier = modifier,
+    )
+}
+
+@Composable
 private fun LineItemsTable(module: ContentDetailModule.LineItems) {
     Column(
         modifier =
@@ -1042,20 +1063,45 @@ private fun LineItemsTable(module: ContentDetailModule.LineItems) {
                     .background(PantopusColors.appSurfaceMuted)
                     .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         ) {
-            Text(text = "ITEM", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, modifier = Modifier.weight(1f))
-            Text(text = "QTY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
-            Text(text = "UNIT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
-            Text(text = "TOTAL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
+            ColumnHeader("ITEM", Modifier.weight(1f), TextAlign.Start)
+            ColumnHeader("QTY", Modifier.width(36.dp), TextAlign.Center)
+            ColumnHeader("UNIT", Modifier.width(60.dp), TextAlign.End)
+            ColumnHeader("TOTAL", Modifier.width(60.dp), TextAlign.End)
         }
         module.rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = row.item, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appText, modifier = Modifier.weight(1f))
-                Text(text = row.qty, fontSize = 12.sp, color = PantopusColors.appTextSecondary, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
-                Text(text = row.unit, fontSize = 12.sp, color = PantopusColors.appTextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
-                Text(text = row.total, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
+                Text(
+                    text = row.item,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = row.qty,
+                    fontSize = 12.sp,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(36.dp),
+                )
+                Text(
+                    text = row.unit,
+                    fontSize = 12.sp,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(60.dp),
+                )
+                Text(
+                    text = row.total,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(60.dp),
+                )
             }
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder.copy(alpha = 0.5f)))
         }
@@ -1183,11 +1229,17 @@ private fun TwoStopCard(stops: List<ContentDetailModule.TwoStop.Stop>) {
                             ),
                     contentAlignment = Alignment.Center,
                 ) {
+                    val letterColor =
+                        if (stop.tone == ContentDetailModule.TwoStop.StopTone.Primary) {
+                            PantopusColors.primary700
+                        } else {
+                            PantopusColors.success
+                        }
                     Text(
                         text = stop.letter,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
-                        color = if (stop.tone == ContentDetailModule.TwoStop.StopTone.Primary) PantopusColors.primary700 else PantopusColors.success,
+                        color = letterColor,
                     )
                 }
                 Text(text = stop.address, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
@@ -1208,8 +1260,20 @@ private fun DetailsGrid(rows: List<ContentDetailModule.DetailsGrid.Row>) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         rows.forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s4)) {
-                Text(text = row.key, fontSize = 12.5.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary, modifier = Modifier.width(96.dp))
-                Text(text = row.value, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+                Text(
+                    text = row.key,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.width(96.dp),
+                )
+                Text(
+                    text = row.value,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -1327,8 +1391,19 @@ private fun CalloutEmpty(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                PantopusIconImage(icon = PantopusIcon.Eye, contentDescription = null, size = 11.dp, strokeWidth = 2f, tint = PantopusColors.appTextSecondary)
-                Text(text = footer, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextSecondary)
+                PantopusIconImage(
+                    icon = PantopusIcon.Eye,
+                    contentDescription = null,
+                    size = 11.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextSecondary,
+                )
+                Text(
+                    text = footer,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appTextSecondary,
+                )
             }
         }
     }
@@ -1358,14 +1433,26 @@ private fun CalloutIconDisc(
                         .border(1.5.dp, PantopusColors.success, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = icon, contentDescription = null, size = size * 0.47f, strokeWidth = 2.4f, tint = PantopusColors.success)
+                PantopusIconImage(
+                    icon = icon,
+                    contentDescription = null,
+                    size = size * 0.47f,
+                    strokeWidth = 2.4f,
+                    tint = PantopusColors.success,
+                )
             }
         ContentDetailModule.Callout.IconTone.Primary ->
             Box(
                 modifier = Modifier.size(size).clip(CircleShape).background(PantopusColors.primary50),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = icon, contentDescription = null, size = size * 0.47f, strokeWidth = 2f, tint = PantopusColors.primary600)
+                PantopusIconImage(
+                    icon = icon,
+                    contentDescription = null,
+                    size = size * 0.47f,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.primary600,
+                )
             }
     }
 }

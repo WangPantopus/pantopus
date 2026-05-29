@@ -13,6 +13,50 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * Frames use literal strings so the Paparazzi baselines stay deterministic.
  */
 object ListingDetailSampleData {
+    // Shared pieces (declared before the frames so the object's
+    // top-to-bottom initialization order is satisfied).
+
+    private val inlinePills =
+        listOf(
+            ContentDetailPill(
+                id = "cond",
+                label = "Excellent",
+                icon = PantopusIcon.Sparkles,
+                tone = ContentDetailPill.Tone.Success,
+            ),
+            ContentDetailPill(
+                id = "pickup",
+                label = "Pickup",
+                icon = PantopusIcon.Hand,
+                tone = ContentDetailPill.Tone.Neutral,
+            ),
+            ContentDetailPill(id = "dist", label = "0.8 mi", tone = ContentDetailPill.Tone.Neutral),
+        )
+
+    private val description =
+        ContentDetailModule.Description(
+            id = "desc",
+            title = "Description",
+            icon = null,
+            body =
+                "Late-80s Bianchi Sport SX, celeste paint, Campagnolo Veloce groupset. " +
+                    "New tires last spring (Continental Gatorskins), recent tune, brand-new bar " +
+                    "tape. 56cm c-t, fits ~5'10\"–6'0\". Pickup only — won't ship. Cash, Venmo, " +
+                    "or Pantopus pay.",
+        )
+
+    private val alertSimilar =
+        ContentDetailModule.Callout(
+            id = "alert-similar",
+            style = ContentDetailModule.Callout.Style.Banner,
+            tone = ContentDetailModule.Callout.Tone.Neutral,
+            icon = PantopusIcon.Bell,
+            iconTone = ContentDetailModule.Callout.IconTone.Primary,
+            title = "Alert me when similar appears",
+            subtitle = "Vintage road bike · 0.5 mi · under $450",
+            trailingActionLabel = "Set",
+        )
+
     val populated: ContentDetailContent =
         ContentDetailContent(
             kind = ContentDetailKind.Listing,
@@ -42,7 +86,13 @@ object ListingDetailSampleData {
         ContentDetailContent(
             kind = ContentDetailKind.Listing,
             cover = cover(sold = true),
-            statusPill = ContentDetailPill(id = "status", label = "Sold", icon = PantopusIcon.AlertCircle, tone = ContentDetailPill.Tone.Error),
+            statusPill =
+                ContentDetailPill(
+                    id = "status",
+                    label = "Sold",
+                    icon = PantopusIcon.AlertCircle,
+                    tone = ContentDetailPill.Tone.Error,
+                ),
             hero =
                 ContentDetailHero(
                     title = "Vintage Bianchi road bike · 56cm",
@@ -58,16 +108,7 @@ object ListingDetailSampleData {
                     description,
                     detailsGrid(soldRow = true),
                     similar(label = "Similar still available"),
-                    ContentDetailModule.Callout(
-                        id = "alert-similar",
-                        style = ContentDetailModule.Callout.Style.Banner,
-                        tone = ContentDetailModule.Callout.Tone.Neutral,
-                        icon = PantopusIcon.Bell,
-                        iconTone = ContentDetailModule.Callout.IconTone.Primary,
-                        title = "Alert me when similar appears",
-                        subtitle = "Vintage road bike · 0.5 mi · under $450",
-                        trailingActionLabel = "Set",
-                    ),
+                    alertSimilar,
                 ),
             dock =
                 ContentDetailDock(
@@ -87,13 +128,6 @@ object ListingDetailSampleData {
             glassActions = listOf(PantopusIcon.Share, PantopusIcon.Bookmark),
         )
 
-    private val inlinePills =
-        listOf(
-            ContentDetailPill(id = "cond", label = "Excellent", icon = PantopusIcon.Sparkles, tone = ContentDetailPill.Tone.Success),
-            ContentDetailPill(id = "pickup", label = "Pickup", icon = PantopusIcon.Hand, tone = ContentDetailPill.Tone.Neutral),
-            ContentDetailPill(id = "dist", label = "0.8 mi", tone = ContentDetailPill.Tone.Neutral),
-        )
-
     private fun seller(trailing: String): ContentDetailCounterparty =
         ContentDetailCounterparty(
             displayName = "Manny R.",
@@ -103,18 +137,6 @@ object ListingDetailSampleData {
             rating = 4.9,
             trailing = trailing,
             showsMessageButton = true,
-        )
-
-    private val description =
-        ContentDetailModule.Description(
-            id = "desc",
-            title = "Description",
-            icon = null,
-            body =
-                "Late-80s Bianchi Sport SX, celeste paint, Campagnolo Veloce groupset. " +
-                    "New tires last spring (Continental Gatorskins), recent tune, brand-new bar " +
-                    "tape. 56cm c-t, fits ~5'10\"–6'0\". Pickup only — won't ship. Cash, Venmo, " +
-                    "or Pantopus pay.",
         )
 
     private fun detailsGrid(soldRow: Boolean): ContentDetailModule.DetailsGrid =

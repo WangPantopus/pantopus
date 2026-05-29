@@ -144,9 +144,15 @@ enum ListingDetailSampleData {
             title: label,
             sub: "0.5 mi",
             items: [
-                ContentDetailSimilarItem(id: "trek", title: "Trek 520 · 54cm", price: "$340", gradient: ListingGradient.from(id: "a09-trek")),
-                ContentDetailSimilarItem(id: "cannondale", title: "Cannondale CAAD", price: "$520", gradient: ListingGradient.from(id: "a09-cannondale")),
-                ContentDetailSimilarItem(id: "surly", title: "Surly Cross-Check", price: "$390", gradient: ListingGradient.from(id: "a09-surly"))
+                ContentDetailSimilarItem(
+                    id: "trek", title: "Trek 520 · 54cm", price: "$340", gradient: ListingGradient.from(id: "a09-trek")
+                ),
+                ContentDetailSimilarItem(
+                    id: "cannondale", title: "Cannondale CAAD", price: "$520", gradient: ListingGradient.from(id: "a09-cannondale")
+                ),
+                ContentDetailSimilarItem(
+                    id: "surly", title: "Surly Cross-Check", price: "$390", gradient: ListingGradient.from(id: "a09-surly")
+                )
             ]
         ))
     }

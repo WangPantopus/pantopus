@@ -18,8 +18,7 @@ final class ContentDetailProjectionTests: XCTestCase {
     // MARK: - Gig V2 (Task)
 
     func testTaskV2ProjectionFillsStatusHeroBidsAndTwoStop() {
-        let gig = makeGig(
-            id: "g1",
+        let gig = makeGig(GigSpec(
             title: "Move queen mattress + frame",
             description: "Queen mattress plus metal bed frame, disassembled.",
             price: 85,
@@ -30,7 +29,7 @@ final class ContentDetailProjectionTests: XCTestCase {
             dropoffAddress: "209 Cedar Ave, Apt 7",
             bidCount: 6,
             distanceMiles: 0.6
-        )
+        ))
         let bids = (1...6).map { makeBid(id: "b\($0)", userId: "u\($0)", amount: Double(50 + $0 * 5), name: "Bidder \($0)") }
         let content = GigDetailViewModel.project(gig: gig, bids: bids)
         XCTAssertEqual(content.kind, .gig)
@@ -50,7 +49,14 @@ final class ContentDetailProjectionTests: XCTestCase {
     }
 
     func testTaskV2NoBidsRendersBeFirstCallout() {
-        let gig = makeGig(id: "g2", title: "Move queen mattress + frame", price: 85, category: "moving", status: "open", isV2: true, bidCount: 0)
+        let gig = makeGig(GigSpec(
+            title: "Move queen mattress + frame",
+            price: 85,
+            category: "moving",
+            status: "open",
+            isV2: true,
+            bidCount: 0
+        ))
         let content = GigDetailViewModel.project(gig: gig, bids: [])
         XCTAssertEqual(content.statusPill?.label, "Open · No bids yet")
         XCTAssertFalse(content.modules.contains { if case .bids = $0 { true } else { false } })
@@ -64,7 +70,15 @@ final class ContentDetailProjectionTests: XCTestCase {
     // MARK: - Gig V1 (legacy)
 
     func testGigV1ProjectionIsSparse() {
-        let gig = makeGig(id: "g3", title: "Dog walk · 45 min", description: "Walk Biscuit.", price: 22, category: "petcare", status: "open", isV2: false, bidCount: 3)
+        let gig = makeGig(GigSpec(
+            title: "Dog walk · 45 min",
+            description: "Walk Biscuit.",
+            price: 22,
+            category: "petcare",
+            status: "open",
+            isV2: false,
+            bidCount: 3
+        ))
         let bids = (1...3).map { makeBid(id: "b\($0)", userId: "u\($0)", amount: Double(18 + $0 * 2), name: "Bidder \($0)") }
         let content = GigDetailViewModel.project(gig: gig, bids: bids)
         XCTAssertEqual(content.statusPill?.label, "Open")
@@ -76,8 +90,7 @@ final class ContentDetailProjectionTests: XCTestCase {
     }
 
     func testGigV1AwardedDimsLosersAndLocksDock() {
-        let gig = makeGig(
-            id: "g4",
+        let gig = makeGig(GigSpec(
             title: "Dog walk · 45 min",
             price: 22,
             category: "petcare",
@@ -85,7 +98,7 @@ final class ContentDetailProjectionTests: XCTestCase {
             isV2: false,
             acceptedBy: "u1",
             bidCount: 3
-        )
+        ))
         let bids = [
             makeBid(id: "b1", userId: "u1", amount: 20, name: "Tomás G."),
             makeBid(id: "b2", userId: "u2", amount: 22, name: "Rae N."),
@@ -115,7 +128,9 @@ final class ContentDetailProjectionTests: XCTestCase {
     // MARK: - Listing
 
     func testListingProjectionCarriesCoverInlinePillsAndOfferDock() {
-        let listing = makeListing(id: "l1", title: "Mid-century sofa", price: 320, condition: "like_new", locationName: "West Adams", distanceMeters: 644)
+        let listing = makeListing(ListingSpec(
+            title: "Mid-century sofa", price: 320, condition: "like_new", locationName: "West Adams", distanceMeters: 644
+        ))
         let content = ListingDetailViewModel.project(listing)
         XCTAssertEqual(content.kind, .listing)
         XCTAssertNotNil(content.cover)
@@ -128,7 +143,9 @@ final class ContentDetailProjectionTests: XCTestCase {
     }
 
     func testListingSoldDesaturatesStrikesPriceAndPivotsDock() {
-        let listing = makeListing(id: "l3", title: "Bianchi", price: 410, condition: "good", status: "sold", soldAt: "2025-12-14T10:00:00Z")
+        let listing = makeListing(ListingSpec(
+            id: "l3", title: "Bianchi", price: 410, condition: "good", status: "sold", soldAt: "2025-12-14T10:00:00Z"
+        ))
         let content = ListingDetailViewModel.project(listing)
         XCTAssertEqual(content.cover?.sold, true)
         XCTAssertEqual(content.statusPill?.label, "Sold")
@@ -142,7 +159,9 @@ final class ContentDetailProjectionTests: XCTestCase {
     }
 
     func testListingFreeRendersFreePrice() {
-        let listing = makeListing(id: "l2", title: "Moving boxes", price: 0, isFree: true, category: "free_stuff", layer: "goods")
+        let listing = makeListing(ListingSpec(
+            id: "l2", title: "Moving boxes", price: 0, isFree: true, category: "free_stuff", layer: "goods"
+        ))
         let content = ListingDetailViewModel.project(listing)
         XCTAssertEqual(content.hero.priceLine, "Free")
         XCTAssertTrue(content.hero.inlinePills.contains { $0.label == "Free" })
@@ -224,46 +243,51 @@ final class ContentDetailProjectionTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private func makeGig(
-        id: String,
-        title: String,
-        description: String? = nil,
-        price: Double?,
-        category: String?,
-        status: String?,
-        isV2: Bool?,
-        acceptedBy: String? = nil,
-        pickupAddress: String? = nil,
-        dropoffAddress: String? = nil,
-        bidCount: Int?,
-        distanceMiles: Double? = nil
-    ) -> GigDTO {
+    /// Test fixture spec — keeps `makeGig` to a single parameter (under
+    /// SwiftLint's function_parameter_count threshold) while letting each
+    /// test set only the fields it cares about.
+    private struct GigSpec {
+        var id = "g1"
+        var title = "Task"
+        var description: String?
+        var price: Double?
+        var category: String?
+        var status: String?
+        var isV2: Bool?
+        var acceptedBy: String?
+        var pickupAddress: String?
+        var dropoffAddress: String?
+        var bidCount: Int?
+        var distanceMiles: Double?
+    }
+
+    private func makeGig(_ spec: GigSpec) -> GigDTO {
         GigDTO(
-            id: id,
-            title: title,
-            description: description,
-            price: price,
-            category: category,
-            status: status,
+            id: spec.id,
+            title: spec.title,
+            description: spec.description,
+            price: spec.price,
+            category: spec.category,
+            status: spec.status,
             createdAt: nil,
             deadline: nil,
             isUrgent: false,
             tags: nil,
             userId: "owner",
-            acceptedBy: acceptedBy,
-            acceptedAt: acceptedBy == nil ? nil : "2025-11-14T17:30:00Z",
+            acceptedBy: spec.acceptedBy,
+            acceptedAt: spec.acceptedBy == nil ? nil : "2025-11-14T17:30:00Z",
             scheduledStart: nil,
             paymentStatus: nil,
             engagementMode: nil,
             scheduleType: nil,
             payType: nil,
             taskArchetype: nil,
-            isV2: isV2,
-            pickupAddress: pickupAddress,
-            dropoffAddress: dropoffAddress,
-            bidCount: bidCount,
+            isV2: spec.isV2,
+            pickupAddress: spec.pickupAddress,
+            dropoffAddress: spec.dropoffAddress,
+            bidCount: spec.bidCount,
             savedByUser: false,
-            distanceMiles: distanceMiles,
+            distanceMiles: spec.distanceMiles,
             latitude: nil,
             longitude: nil,
             approxLocation: nil,
@@ -284,43 +308,45 @@ final class ContentDetailProjectionTests: XCTestCase {
         )
     }
 
-    private func makeListing(
-        id: String,
-        title: String,
-        price: Double?,
-        isFree: Bool = false,
-        category: String = "furniture",
-        condition: String? = nil,
-        status: String = "active",
-        layer: String = "goods",
-        locationName: String? = nil,
-        distanceMeters: Double? = nil,
-        soldAt: String? = nil
-    ) -> ListingDTO {
+    private struct ListingSpec {
+        var id = "l1"
+        var title = "Listing"
+        var price: Double?
+        var isFree = false
+        var category = "furniture"
+        var condition: String?
+        var status = "active"
+        var layer = "goods"
+        var locationName: String?
+        var distanceMeters: Double?
+        var soldAt: String?
+    }
+
+    private func makeListing(_ spec: ListingSpec) -> ListingDTO {
         ListingDTO(
-            id: id,
+            id: spec.id,
             userId: "u1",
-            title: title,
+            title: spec.title,
             description: "Sample description.",
-            price: price,
-            isFree: isFree,
-            category: category,
-            condition: condition,
-            status: status,
+            price: spec.price,
+            isFree: spec.isFree,
+            category: spec.category,
+            condition: spec.condition,
+            status: spec.status,
             mediaUrls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
             firstImage: "https://example.com/a.jpg",
-            layer: layer,
+            layer: spec.layer,
             listingType: "sell_item",
             latitude: nil,
             longitude: nil,
-            locationName: locationName,
-            distanceMeters: distanceMeters,
+            locationName: spec.locationName,
+            distanceMeters: spec.distanceMeters,
             createdAt: nil,
             userHasSaved: false,
             approxLocation: nil,
             viewCount: nil,
             activeOfferCount: nil,
-            soldAt: soldAt,
+            soldAt: spec.soldAt,
             archivedAt: nil
         )
     }

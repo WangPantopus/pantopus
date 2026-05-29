@@ -357,6 +357,7 @@ public struct IdentityCenterView: View {
         case .warning: (Theme.Color.warningBg, Theme.Color.warning)
         case .business: (Theme.Color.businessBg, Theme.Color.business)
         case .neutral: (Theme.Color.appSurfaceSunken, Theme.Color.appTextStrong)
+        case .error: (Theme.Color.errorBg, Theme.Color.error)
         }
     }
 }

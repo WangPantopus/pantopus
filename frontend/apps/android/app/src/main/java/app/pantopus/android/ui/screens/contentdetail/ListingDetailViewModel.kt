@@ -128,11 +128,22 @@ class ListingDetailViewModel
                         }
                         val detailRows =
                             buildList {
-                                conditionLabel(listing.condition)?.let { add(ContentDetailModule.DetailsGrid.Row("Condition", it)) }
-                                listing.locationName?.takeIf { it.isNotEmpty() }?.let { add(ContentDetailModule.DetailsGrid.Row("Location", it)) }
+                                conditionLabel(listing.condition)?.let {
+                                    add(ContentDetailModule.DetailsGrid.Row("Condition", it))
+                                }
+                                listing.locationName?.takeIf { it.isNotEmpty() }?.let {
+                                    add(ContentDetailModule.DetailsGrid.Row("Location", it))
+                                }
                             }
                         if (detailRows.isNotEmpty()) {
-                            add(ContentDetailModule.DetailsGrid(id = "details", title = "Details", icon = PantopusIcon.AlertCircle, rows = detailRows))
+                            add(
+                                ContentDetailModule.DetailsGrid(
+                                    id = "details",
+                                    title = "Details",
+                                    icon = PantopusIcon.AlertCircle,
+                                    rows = detailRows,
+                                ),
+                            )
                         }
                         if (sold) {
                             add(
@@ -164,7 +175,17 @@ class ListingDetailViewModel
                 return ContentDetailContent(
                     kind = ContentDetailKind.Listing,
                     cover = cover,
-                    statusPill = if (sold) ContentDetailPill(id = "status", label = "Sold", icon = PantopusIcon.AlertCircle, tone = ContentDetailPill.Tone.Error) else null,
+                    statusPill =
+                        if (sold) {
+                            ContentDetailPill(
+                                id = "status",
+                                label = "Sold",
+                                icon = PantopusIcon.AlertCircle,
+                                tone = ContentDetailPill.Tone.Error,
+                            )
+                        } else {
+                            null
+                        },
                     hero =
                         ContentDetailHero(
                             title = listing.title ?: "Listing",
@@ -186,15 +207,43 @@ class ListingDetailViewModel
             ): List<ContentDetailPill> =
                 buildList {
                     conditionLabel(listing.condition)?.let {
-                        add(ContentDetailPill(id = "cond", label = it, icon = PantopusIcon.Sparkles, tone = ContentDetailPill.Tone.Success))
+                        add(
+                            ContentDetailPill(
+                                id = "cond",
+                                label = it,
+                                icon = PantopusIcon.Sparkles,
+                                tone = ContentDetailPill.Tone.Success,
+                            ),
+                        )
                     }
                     when {
                         listing.layer == "rentals" ->
-                            add(ContentDetailPill(id = "rental", label = "Rental", icon = PantopusIcon.Calendar, tone = ContentDetailPill.Tone.Business))
+                            add(
+                                ContentDetailPill(
+                                    id = "rental",
+                                    label = "Rental",
+                                    icon = PantopusIcon.Calendar,
+                                    tone = ContentDetailPill.Tone.Business,
+                                ),
+                            )
                         isFree ->
-                            add(ContentDetailPill(id = "free", label = "Free", icon = PantopusIcon.Heart, tone = ContentDetailPill.Tone.Success))
+                            add(
+                                ContentDetailPill(
+                                    id = "free",
+                                    label = "Free",
+                                    icon = PantopusIcon.Heart,
+                                    tone = ContentDetailPill.Tone.Success,
+                                ),
+                            )
                         else ->
-                            add(ContentDetailPill(id = "pickup", label = "Pickup", icon = PantopusIcon.Hand, tone = ContentDetailPill.Tone.Neutral))
+                            add(
+                                ContentDetailPill(
+                                    id = "pickup",
+                                    label = "Pickup",
+                                    icon = PantopusIcon.Hand,
+                                    tone = ContentDetailPill.Tone.Neutral,
+                                ),
+                            )
                     }
                     distanceLabel(listing.distanceMeters)?.let {
                         add(ContentDetailPill(id = "dist", label = it, tone = ContentDetailPill.Tone.Neutral))

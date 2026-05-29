@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.gigs.GigCreator
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.ui.screens.gigs.GigsCategory
+import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -59,7 +60,16 @@ class ContentDetailProjectionTest {
     }
 
     @Test fun gig_v1_projection_is_sparse() {
-        val gig = gig(title = "Dog walk · 45 min", description = "Walk Biscuit.", price = 22.0, category = "petcare", status = "open", isV2 = false, bidCount = 3)
+        val gig =
+            gig(
+                title = "Dog walk · 45 min",
+                description = "Walk Biscuit.",
+                price = 22.0,
+                category = "petcare",
+                status = "open",
+                isV2 = false,
+                bidCount = 3,
+            )
         val bids = (1..3).map { bid("b$it", "u$it", (18 + it * 2).toDouble(), "Bidder $it") }
         val content = GigDetailViewModel.Projection.project(gig, bids)
         assertEquals("Open", content.statusPill?.label)
@@ -71,7 +81,17 @@ class ContentDetailProjectionTest {
     }
 
     @Test fun gig_v1_awarded_dims_losers_and_locks_dock() {
-        val gig = gig(title = "Dog walk · 45 min", price = 22.0, category = "petcare", status = "accepted", isV2 = false, acceptedBy = "u1", acceptedAt = "2025-11-14T17:30:00Z", bidCount = 3)
+        val gig =
+            gig(
+                title = "Dog walk · 45 min",
+                price = 22.0,
+                category = "petcare",
+                status = "accepted",
+                isV2 = false,
+                acceptedBy = "u1",
+                acceptedAt = "2025-11-14T17:30:00Z",
+                bidCount = 3,
+            )
         val bids =
             listOf(
                 bid("b1", "u1", 20.0, "Tomás G."),
@@ -92,12 +112,19 @@ class ContentDetailProjectionTest {
     }
 
     @Test fun listing_projection_carries_cover_inline_pills_and_offer_dock() {
-        val listing = listing(title = "Mid-century sofa", price = 320.0, condition = "like_new", locationName = "West Adams", distanceMeters = 644.0)
+        val listing =
+            listing(
+                title = "Mid-century sofa",
+                price = 320.0,
+                condition = "like_new",
+                locationName = "West Adams",
+                distanceMeters = 644.0,
+            )
         val content = ListingDetailViewModel.Projection.project(listing)
         assertEquals(ContentDetailKind.Listing, content.kind)
         assertNotNull(content.cover)
         assertFalse(content.cover!!.sold)
-        assertEquals(listOf(app.pantopus.android.ui.theme.PantopusIcon.Share, app.pantopus.android.ui.theme.PantopusIcon.Bookmark), content.cover.glassActions)
+        assertEquals(listOf(PantopusIcon.Share, PantopusIcon.Bookmark), content.cover.glassActions)
         assertEquals("$320", content.hero.priceLine)
         assertFalse(content.hero.priceStrikethrough)
         assertTrue(content.hero.inlinePills.any { it.label == "Like new" })
