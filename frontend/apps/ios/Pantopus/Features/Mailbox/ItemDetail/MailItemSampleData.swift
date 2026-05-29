@@ -255,6 +255,16 @@ public extension MailItemSampleData {
     static let certifiedArchived = certifiedSigned
 }
 
+public extension MailItemSampleData {
+    /// A17.10 open-state records sample — Q1 2026 Meridian Wealth
+    /// quarterly statement, freshly arrived in the mailbox.
+    static let recordsOpen = RecordsSampleData.record
+
+    /// A17.10 filed-state records sample — same statement, filed in the
+    /// Vault › Finance › Statements › 2026 folder.
+    static let recordsFiled = RecordsSampleData.filedRecord
+}
+
 private extension MailItemSampleData {
     static let certifiedNoticeBody = [
         """

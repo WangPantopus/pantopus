@@ -314,6 +314,19 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case barChart3 = "bar-chart-3"
     case calendarCog = "calendar-cog"
 
+    // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
+    // dress / forecast vibe rows, ± plus-one stepper, RSVP cluster Can't
+    // chip, calendar-hold CTA, and the bell-off mute affordance.
+    case quote
+    case cloudSun = "cloud-sun"
+    case shirt
+    case xCircle = "x-circle"
+    case bellOff = "bell-off"
+    case minus
+    case userMinus = "user-minus"
+    case calendarCheck = "calendar-check"
+    case calendarPlus = "calendar-plus"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -555,6 +568,19 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // (no native `calendar.gearshape`), used on the Edit-dates row.
         case .barChart3: "chart.bar"
         case .calendarCog: "calendar.badge.clock"
+        // A17.9 Party. SF Symbols ships direct quote / cloud.sun /
+        // tshirt.fill / xmark.circle / bell.slash / minus glyphs;
+        // user-minus collapses to `person.badge.minus`, and the
+        // calendar-check / calendar-plus pair maps onto the badge variants.
+        case .quote: "quote.bubble"
+        case .cloudSun: "cloud.sun"
+        case .shirt: "tshirt.fill"
+        case .xCircle: "xmark.circle"
+        case .bellOff: "bell.slash"
+        case .minus: "minus"
+        case .userMinus: "person.badge.minus"
+        case .calendarCheck: "calendar.badge.checkmark"
+        case .calendarPlus: "calendar.badge.plus"
         }
     }
 }

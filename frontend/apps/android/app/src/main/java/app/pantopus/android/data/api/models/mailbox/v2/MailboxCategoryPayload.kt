@@ -23,6 +23,8 @@ sealed interface MailboxCategoryPayload {
 
     data class Memory(val detail: MemoryDetailDto) : MailboxCategoryPayload
 
+    data class Records(val detail: RecordsDetailDto) : MailboxCategoryPayload
+
     /**
      * No category-specific decoder applies (Package, Bill, Notice, …).
      * Bodies fall back to the generic placeholder layout.
@@ -58,6 +60,9 @@ sealed interface MailboxCategoryPayload {
                 MailItemCategory.Memory ->
                     MemoryDetailDto.decodeFromObjectPayload(objectPayload)
                         ?.let(::Memory) ?: Other
+                MailItemCategory.Records ->
+                    RecordsDetailDto.decodeFromObjectPayload(objectPayload)
+                        ?.let(::Records) ?: Other
                 else -> Other
             }
     }

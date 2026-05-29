@@ -90,12 +90,14 @@ class StartSupportTrainViewModelTest {
         runTest(dispatcher) {
             val vm = StartSupportTrainViewModel(supportTrains, mailCompose)
             vm.updateBeneficiaryQuery(StartSupportTrainSampleData.INVITE_QUERY)
-            vm.selectReason(StartSupportTrainReason.NewBaby)
+            vm.selectReason(StartSupportTrainReason.Baby)
             assertTrue(vm.isInviteRecipientBranch())
             assertEquals("Send invite & continue", vm.chrome.primaryCtaLabel)
             assertEquals("Search again", vm.chrome.secondaryCta?.label)
+            assertEquals(StartSupportTrainSampleData.INVITE_QUERY, vm.inviteCandidate()?.typedName)
             vm.onSecondary()
             assertEquals("", vm.form.value.beneficiaryQuery)
+            assertEquals(null, vm.inviteCandidate())
         }
 
     @Test fun reason_clamps_at_char_limit() =

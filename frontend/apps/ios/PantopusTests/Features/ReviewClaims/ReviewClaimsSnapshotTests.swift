@@ -7,7 +7,7 @@
 //  the baseline PNG isn't recorded yet, so CI doesn't fail on the first
 //  PR but starts enforcing parity once the platform-rendered baseline
 //  lands. Cover all four list states (loading / empty / populated /
-//  error) plus the detail screen's success state.
+//  error) plus the A13.3 detail screen pending + challenge-composer states.
 //
 
 import XCTest
@@ -39,8 +39,12 @@ final class ReviewClaimsSnapshotTests: XCTestCase {
         try assertBaselineOrSkip("error")
     }
 
-    func test_review_claim_detail_success_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("detail-success")
+    func test_review_claim_detail_pending_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("detail-pending")
+    }
+
+    func test_review_claim_detail_challenging_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("detail-challenging")
     }
 
     private func assertBaselineOrSkip(_ screen: String) throws {
