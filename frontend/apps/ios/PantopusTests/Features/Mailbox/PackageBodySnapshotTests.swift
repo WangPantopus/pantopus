@@ -81,9 +81,8 @@ final class PackageBodySnapshotTests: XCTestCase {
         assertRenders(
             PackageTrackingTimeline(
                 steps: MailItemSampleData.packageUpsDelivered.trackingSteps,
-                carrier: "UPS",
-                onOpenCarrier: {}
-            )
+                carrier: "UPS"
+            ) {}
         )
     }
 

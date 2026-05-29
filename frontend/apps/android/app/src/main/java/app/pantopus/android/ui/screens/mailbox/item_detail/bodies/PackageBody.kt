@@ -309,8 +309,9 @@ private fun PackageTimelineCard(content: PackageBodyContent) {
     val openCarrier: (() -> Unit)? =
         content.trackingUrl?.let { url ->
             {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val intent =
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
             }
         }
@@ -557,8 +558,9 @@ private fun PackageSplitDock(
     val openTracking: (() -> Unit)? =
         content.trackingUrl?.let { url ->
             {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val intent =
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
             }
         }
@@ -726,4 +728,3 @@ private fun PackageCard(
         content()
     }
 }
-

@@ -589,8 +589,9 @@ private fun PackageDetailActions(
             isEnabled = trackingUrl != null,
             onClick = {
                 trackingUrl?.let { url ->
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    val intent =
+                        Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(intent)
                 }
             },

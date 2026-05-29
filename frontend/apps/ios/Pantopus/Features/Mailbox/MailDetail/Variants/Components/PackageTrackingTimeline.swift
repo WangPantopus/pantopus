@@ -88,9 +88,8 @@ public struct PackageTrackingTimeline: View {
             TimelineStep(id: "out", title: "Out for delivery", subtitle: "Mon May 18", state: .current),
             TimelineStep(id: "delivered", title: "Delivered", subtitle: "Expected today", state: .upcoming)
         ],
-        carrier: "USPS",
-        onOpenCarrier: {}
-    )
+        carrier: "USPS"
+    ) {}
     .padding()
     .background(Theme.Color.appBg)
 }

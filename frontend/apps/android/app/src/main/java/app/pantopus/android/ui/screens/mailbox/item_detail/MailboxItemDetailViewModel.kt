@@ -860,6 +860,8 @@ class MailboxItemDetailViewModel
         }
     }
 
+private fun Map<String, Any?>.stringValue(vararg keys: String): String? = keys.firstNotNullOfOrNull { key -> this[key] as? String }
+
 private fun packageBodyContent(
     carrier: String,
     trackingNumber: String?,
@@ -870,35 +872,28 @@ private fun packageBodyContent(
 ): PackageBodyContent {
     val sample = MailItemSampleData.packageBody(status)
     val statusTitle =
-        (packageMap["status_title"] as? String)
-            ?: (packageMap["status_label"] as? String)
+        packageMap.stringValue("status_title", "status_label")
             ?: sample.statusTitle
     val statusDetail =
-        (packageMap["status_detail"] as? String)
-            ?: (packageMap["eta_line"] as? String)
+        packageMap.stringValue("status_detail", "eta_line")
             ?: sample.statusDetail
     return PackageBodyContent(
         carrier = carrier,
         service =
-            (packageMap["service"] as? String)
-                ?: (packageMap["delivery_service"] as? String)
-                ?: (packageMap["mail_service"] as? String)
+            packageMap.stringValue("service", "delivery_service", "mail_service")
                 ?: sample.service,
         dimensions =
-            (packageMap["dimensions"] as? String)
-                ?: (packageMap["size"] as? String)
+            packageMap.stringValue("dimensions", "size")
                 ?: sample.dimensions,
-        weight = (packageMap["weight"] as? String) ?: sample.weight,
+        weight = packageMap.stringValue("weight") ?: sample.weight,
         trackingUrl =
-            (packageMap["tracking_url"] as? String)
-                ?: (packageMap["carrier_url"] as? String)
+            packageMap.stringValue("tracking_url", "carrier_url")
                 ?: sample.trackingUrl,
-        etaLine = (packageMap["eta_line"] as? String) ?: sample.etaLine,
+        etaLine = packageMap.stringValue("eta_line") ?: sample.etaLine,
         status = status,
         trackingNumber = trackingNumber ?: sample.trackingNumber,
         referenceLine =
-            (packageMap["reference"] as? String)
-                ?: (packageMap["reference_line"] as? String)
+            packageMap.stringValue("reference", "reference_line")
                 ?: sample.referenceLine,
         statusTitle = if (received) "Logged as received" else statusTitle,
         statusDetail = if (received) "Today - by you" else statusDetail,
