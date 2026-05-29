@@ -228,6 +228,11 @@ class IconTest {
             // A13.13 — Manage train Organize row glyphs.
             "bar-chart-3",
             "calendar-cog",
+            // A13.15 — Disambiguate quick actions + fallback rows.
+            "user-check",
+            "forward",
+            "keyboard",
+            "undo-2",
         )
 
     @Test

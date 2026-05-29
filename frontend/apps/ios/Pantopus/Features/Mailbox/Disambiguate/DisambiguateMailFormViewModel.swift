@@ -150,7 +150,9 @@ public enum FallbackAction: String, CaseIterable, Identifiable, Sendable {
     case returnToSender
     case markAsJunk
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {

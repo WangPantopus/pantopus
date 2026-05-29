@@ -78,7 +78,9 @@ final class IconTests: XCTestCase {
         // A15.3 AI Assistant — avatar/reply glyph.
         "bot",
         // A13.13 Manage train — Organize row glyphs.
-        "bar-chart-3", "calendar-cog"
+        "bar-chart-3", "calendar-cog",
+        // A13.15 Disambiguate — quick actions + fallback rows.
+        "user-check", "forward", "keyboard", "undo-2"
     ]
 
     func testInventoryMatches() {

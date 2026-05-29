@@ -32,14 +32,32 @@ struct MatchBadge: View {
             .accessibilityLabel("\(tier.word), \(percent) percent match")
     }
 
-    private var palette: (background: Color, foreground: Color, border: Color) {
+    private struct Palette {
+        let background: Color
+        let foreground: Color
+        let border: Color
+    }
+
+    private var palette: Palette {
         switch tier {
         case .strong:
-            (Theme.Color.successBg, Theme.Color.success, Theme.Color.successLight)
+            Palette(
+                background: Theme.Color.successBg,
+                foreground: Theme.Color.success,
+                border: Theme.Color.successLight
+            )
         case .partial:
-            (Theme.Color.warmAmberBg, Theme.Color.warmAmber, Theme.Color.warningLight)
+            Palette(
+                background: Theme.Color.warmAmberBg,
+                foreground: Theme.Color.warmAmber,
+                border: Theme.Color.warningLight
+            )
         case .weak:
-            (Theme.Color.appSurfaceSunken, Theme.Color.appTextSecondary, Theme.Color.appBorder)
+            Palette(
+                background: Theme.Color.appSurfaceSunken,
+                foreground: Theme.Color.appTextSecondary,
+                border: Theme.Color.appBorder
+            )
         }
     }
 }

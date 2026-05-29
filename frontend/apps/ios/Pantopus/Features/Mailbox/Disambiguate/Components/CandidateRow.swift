@@ -23,8 +23,11 @@ struct CandidateRow: View {
     var body: some View {
         Group {
             if isSelectable {
-                Button(action: { onTap() }) { rowContent }
-                    .buttonStyle(.plain)
+                Button(
+                    action: { onTap() },
+                    label: { rowContent }
+                )
+                .buttonStyle(.plain)
             } else {
                 rowContent
             }
@@ -163,8 +166,13 @@ struct CandidateRow: View {
     }
 
     private var accessibilityText: String {
-        var parts = [candidate.name, candidate.role.title, candidate.grant.label,
-                     "\(candidate.tier.word) \(candidate.matchPercent) percent"]
+        var parts =
+            [
+                candidate.name,
+                candidate.role.title,
+                candidate.grant.label,
+                "\(candidate.tier.word) \(candidate.matchPercent) percent"
+            ]
         if let presence = candidate.presence { parts.append(presence) }
         return parts.joined(separator: ", ")
     }

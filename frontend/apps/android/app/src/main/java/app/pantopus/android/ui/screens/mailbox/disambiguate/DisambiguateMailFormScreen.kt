@@ -259,11 +259,14 @@ private fun FallbackSection(onFallback: (FallbackAction) -> Unit) {
                     title = action.title,
                     subtitle = action.subtitle,
                     onClick = { onFallback(action) },
-                    isDestructive = action.isDestructive,
-                    showsDivider = index < FallbackAction.entries.size - 1,
                     // Mirror the iOS rawValue keys (rescan / typeName / …) so the
                     // testTag strings match across platforms.
-                    rowTestTag = "disambiguateFallback_${action.name.replaceFirstChar { it.lowercase() }}",
+                    modifier =
+                        Modifier.testTag(
+                            "disambiguateFallback_${action.name.replaceFirstChar { it.lowercase() }}",
+                        ),
+                    isDestructive = action.isDestructive,
+                    showsDivider = index < FallbackAction.entries.size - 1,
                 )
             }
         }
@@ -299,7 +302,7 @@ private fun StickyConfirm(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.s4, top = Spacing.s2),
+                        .padding(start = Spacing.s4, top = Spacing.s2, end = Spacing.s4),
             )
         }
         Box(
@@ -414,8 +417,20 @@ private fun EnvelopeArtwork(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("USA", fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = PantopusColors.appTextSecondary)
-            Text("68¢", fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, color = PantopusColors.appTextSecondary)
+            Text(
+                text = "USA",
+                fontSize = 7.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = "68¢",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextSecondary,
+            )
             Text("FOREVER", fontSize = 6.sp, fontFamily = FontFamily.Monospace, color = PantopusColors.appTextSecondary)
         }
 

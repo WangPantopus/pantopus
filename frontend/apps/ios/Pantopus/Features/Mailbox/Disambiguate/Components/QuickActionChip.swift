@@ -19,22 +19,25 @@ struct QuickActionChip: View {
     let action: @MainActor () -> Void
 
     var body: some View {
-        Button(action: { action() }) {
-            HStack(spacing: Spacing.s1) {
-                Icon(icon, size: 15, color: foreground)
-                Text(label)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(foreground)
+        Button(
+            action: { action() },
+            label: {
+                HStack(spacing: Spacing.s1) {
+                    Icon(icon, size: 15, color: foreground)
+                    Text(label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(foreground)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(background)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .stroke(border, lineWidth: 1)
+                )
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .stroke(border, lineWidth: 1)
-            )
-        }
+        )
         .buttonStyle(.plain)
         .accessibilityLabel(label)
     }

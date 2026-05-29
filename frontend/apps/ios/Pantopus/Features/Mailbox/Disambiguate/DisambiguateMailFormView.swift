@@ -218,9 +218,9 @@ struct DisambiguateMailFormView: View {
 
     // MARK: - Section helper
 
-    private func section<Content: View>(
+    private func section(
         _ overline: String,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text(overline.uppercased())

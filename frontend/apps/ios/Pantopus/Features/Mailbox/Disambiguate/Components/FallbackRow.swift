@@ -23,30 +23,33 @@ struct FallbackRow: View {
     let onTap: @MainActor () -> Void
 
     var body: some View {
-        Button(action: { onTap() }) {
-            VStack(spacing: Spacing.s0) {
-                HStack(spacing: Spacing.s3) {
-                    iconTile
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appText)
-                        Text(subtitle)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+        Button(
+            action: { onTap() },
+            label: {
+                VStack(spacing: Spacing.s0) {
+                    HStack(spacing: Spacing.s3) {
+                        iconTile
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(title)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.Color.appText)
+                            Text(subtitle)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: Spacing.s2)
+                        Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
                     }
-                    Spacer(minLength: Spacing.s2)
-                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
-                }
-                .padding(Spacing.s3)
-                if showsDivider {
-                    Rectangle()
-                        .fill(Theme.Color.appBorderSubtle)
-                        .frame(height: 1)
+                    .padding(Spacing.s3)
+                    if showsDivider {
+                        Rectangle()
+                            .fill(Theme.Color.appBorderSubtle)
+                            .frame(height: 1)
+                    }
                 }
             }
-        }
+        )
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(subtitle)")

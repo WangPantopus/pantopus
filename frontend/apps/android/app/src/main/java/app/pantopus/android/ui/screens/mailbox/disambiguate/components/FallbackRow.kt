@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -44,13 +43,11 @@ fun FallbackRow(
     modifier: Modifier = Modifier,
     isDestructive: Boolean = false,
     showsDivider: Boolean = true,
-    rowTestTag: String? = null,
 ) {
     Column(
         modifier =
             modifier
                 .fillMaxWidth()
-                .then(if (rowTestTag != null) Modifier.testTag(rowTestTag) else Modifier)
                 .clickable(onClick = onClick)
                 .semantics { contentDescription = "$title. $subtitle" },
     ) {
