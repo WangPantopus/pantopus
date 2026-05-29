@@ -20,9 +20,16 @@ public enum YouRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map (physical postal venues), reached from the root.
     case mailboxMap
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     case mailItemDetail(mailId: String)
     /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
     case mailboxSearch
+    /// A14.8 — Vacation hold (scheduling + active variants). Reached
+    /// from the Mailbox root top-bar settings menu.
+    case vacationHold
     case settings
     case placeholder(label: String)
     case helpCenter
@@ -91,6 +98,10 @@ public enum YouRoute: Hashable {
     case myBusinesses
     /// Public business profile reached from My businesses.
     case businessProfile(businessId: String)
+    /// P4.2 — A13.10 Edit Business Page (owner-only). Pushed from the
+    /// `BusinessProfileView` overflow when the viewer owns the business
+    /// and from the `pantopus://businesses/:id/page-editor` deep link.
+    case editBusinessPage(businessId: String)
     /// P6.6 — "Register a business · coming soon" waitlist surface. The
     /// full registration wizard is a future Phase 9 item.
     case businessWaitlist
@@ -782,11 +793,17 @@ public struct YouTabRoot: View {
                     },
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
-                    onBrowseGigs: { path.append(.gigsFeed) }
+                    onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
+                    onBrowseGigs: { path.append(.gigsFeed) },
+                    onOpenVacationHold: { path.append(.vacationHold) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { Task { @MainActor in pop() } }
+        case let .mailDay(variant):
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                Task { @MainActor in pop() }
+            }
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(
@@ -799,6 +816,12 @@ public struct YouTabRoot: View {
                         }
                     }
                 )
+            )
+        case .vacationHold:
+            VacationHoldView(
+                viewModel: VacationHoldViewModel {
+                    Task { @MainActor in pop() }
+                }
             )
         case let .mailItemDetail(mailId):
             // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will
@@ -1911,7 +1934,21 @@ public struct YouTabRoot: View {
                 onOpenReport: {
                     Task { @MainActor in path.append(.placeholder(label: "Report business")) }
                 },
-                onOpenWebsite: { url in openURL(url) }
+                onOpenWebsite: { url in openURL(url) },
+                onEdit: {
+                    Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) }
+                }
+            )
+        case let .editBusinessPage(businessId):
+            EditBusinessPageView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onPreview: {
+                    // Bounce the owner to the live profile they're editing.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(

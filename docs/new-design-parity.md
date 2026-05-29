@@ -161,9 +161,9 @@ All four A09 screens render through the shared `TransactionalDetailShell`
 - **Routing (post-P3.1):** `DeepLinkRouter` `.supportTrain(id:)` now lands on `SupportTrainDetailView` (iOS) / `SupportTrainDetailScreen` (Android); organizers reach `ReviewSignupsView` via the dock-overflow `Manage signups` action or the new `pantopus://support-trains/:id/manage` deep link (`.supportTrainManage(id:)`). The `SupportTrains` list row tap and the `StartSupportTrainWizard` success path both push the participant detail.
 
 ### A10.10 — Wallet (`/wallet.tsx`)
-- **iOS:** **MISSING** — no `Features/Wallet/` folder. Currently `Settings/SettingsView.swift:148` maps to `placeholder(label: "Payments & payouts")`.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD** (both platforms)
+- **iOS:** `Features/Wallet/WalletView.swift` + `WalletViewModel` (P3.2).
+- **Android:** `ui/screens/wallet/WalletScreen.kt` + `WalletViewModel`.
+- **Status:** **POLISH** (both platforms)
 - **Designed frames:** populated ($847.50 available · $186 pending · 22% above October) · payout on hold (bank verification expired · withdraw locked · re-verify card · 1099-ready chip)
 - **Build dependencies:** `BalanceHero` primitive.
 - **Required slots:**
@@ -173,7 +173,7 @@ All four A09 screens render through the shared `TransactionalDetailShell`
   - **`Taxes` overline + `TaxDocsRow`** — file-text icon tile + "Tax documents" + YTD line + chevron. Ready variant: home-green icon bg + `New` chip + "1099-NEC for 2025 ready · $9,847 reported".
   - **`BottomBar` with gradient fade** (linear `app-bg`-alpha 0 → 0.92 → 1) — *not* a solid frosted dock. **`WithdrawCTA`** showing icon + "Withdraw" left + amount tabular-nums right. Hold variant: greyed locked button + "Re-verify your bank above to unlock payouts" footnote in `appTextSecondary` 10.5pt center-aligned.
   - **Hold variant additions:** amber `HoldBanner` at top of scroll (shield-alert icon disc + "Bank verification expired" + body copy + "earnings keep landing — they're safe" reassurance), `BalanceHero` gets `holdTone` (yellow inset banner under split strip).
-- **Routing:** new `WalletView` (iOS) / `WalletScreen` (Android), wired from settings index `Payments` row (replacing the placeholder) and from a `pantopus://wallet` deep link.
+- **Routing:** `WalletView` (iOS) / `WalletScreen` (Android), reached via the `pantopus://wallet` deep link and the host's wallet tab/route entry. (P5.2 reclaimed the Settings → `Payments & payouts` row for A14.6 Payments — distinct payments-out surface; Wallet still owns the earnings-in flow.)
 
 ---
 
@@ -350,9 +350,9 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
   - **`StickyConfirm`** — `Confirm recipient` primary (active in strong match, disabled with hint in unclear).
 
 ### A13.16 — My Mail Day (`/mailbox/mailday.tsx`)
-- **iOS:** **MISSING** — no `Mailbox/MailDay/` folder.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD**
+- **iOS:** `Features/Mailbox/MailDay/MailDayView.swift` (+ `MailDayViewModel.swift`, `MailDayContent.swift`, `MailDaySampleData.swift`, `Components/{DayHeader, ScanMoreCard, UnreviewedItem, ReviewedRow, UndoCountdown, MailboxEmptyHero}.swift`). Pushed via `YouRoute.mailDay(variant:)` / `HubRoute.mailDay(variant:)`. Deep link: `pantopus://mailbox/mailday`.
+- **Android:** `ui/screens/mailbox/mail_day/MailDayScreen.kt` (+ `MailDayViewModel.kt`, `MailDayContent.kt`, `MailDaySampleData.kt`, `components/{DayHeader, ScanMoreCard, UnreviewedItem, ReviewedRow, UndoCountdown, MailboxEmptyHero}.kt`). Pushed via `ChildRoutes.MAIL_DAY` (`mailbox/mailday/{variant}`).
+- **Status:** **BUILT** (P4.4)
 - **Designed frames:** mid-afternoon (8-piece stack · 6 routed · 2 pending · AI-suggested recipients with confidence % · Reviewed list compact · 5-second undo on latest) · empty (mailbox illustration with "0" face · 12-day streak chip · `Scan today's stack` primary · yesterday recap + setup nudges)
 - **Required slots:**
   - **`DayHeader`** — date + streak chip + `ProgressRing` (56pt SwiftUI shape — done/total).
@@ -373,28 +373,28 @@ toggles. The new designs introduce **per-screen bespoke control vocabulary**
 that goes beyond the standard chevron/toggle row.
 
 ### A14.1 — Home settings (`/homes/[id]/settings/index.tsx`)
-- **iOS:** **MISSING** — no `Homes/Settings/` folder. Currently the home dashboard surfaces the menu inline.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD**
+- **iOS:** `Features/Homes/Settings/HomeSettingsView.swift` + `HomeSettingsViewModel.swift` + `HomeSettingsSampleData.swift`. Wired via `HubRoute.homeSettings(homeId:)` from the home dashboard's top-bar `slidersHorizontal` affordance.
+- **Android:** `ui/screens/homes/settings/HomeSettingsScreen.kt` + `HomeSettingsViewModel.kt` + `HomeSettingsSampleData.kt`. Wired via `ChildRoutes.HOME_SETTINGS` from `HomeDashboardScreen.onOpenSettings`.
+- **Status:** **DONE** (P5.1)
 - **Designed frames:** established home (14 Elm Park Lane · address verified · 4 members · codes + trusted neighbors configured · all rows have meaningful subs) · newly claimed (amber `Verifying` chip on address · `Not set` / `Available after verification` subs · `Cancel claim` destructive)
 - **Required slots:**
-  - **Identity card** at top (home identity chip + address verified chip).
+  - **Identity card** at top (home identity chip + address verified chip) — rendered via the shared `GroupedListView`'s new optional `headerView` slot.
   - **`Home identity` overline + 4 chevron rows**: Address (with `Verified` chip) · Property details · Photos · Documents.
   - **`Access` overline + 3 chevron rows**: Access codes (with N count) · Trusted neighbors · Privacy.
   - **`Members` overline + 2 chevron rows**: People (4 members · 1 pending) · Invite link.
   - **`Notifications` overline + 1 chevron row**: Home notifications.
   - **`Wind down` overline + destructive row**: Leave this home (or `Cancel claim` in newly-claimed variant).
-- **Routing:** wire from `HomeDashboardView` settings menu trailing button.
+- **Routing:** `HomeDashboardView` / `HomeDashboardScreen` take an `onOpenSettings` callback wired to the `ContentDetailShell` top-bar trailing action.
 
 ### A14.2 — Home security (`/homes/[id]/settings/security.tsx`)
-- **iOS:** **MISSING** — same as A14.1.
-- **Android:** **MISSING**.
-- **Status:** **BUILD**
+- **iOS:** `Features/Homes/Settings/Security/HomeSecurityView.swift` + `HomeSecurityViewModel.swift`. Reached from the per-home Settings `Privacy` row.
+- **Android:** `ui/screens/homes/settings/security/HomeSecurityScreen.kt` + `HomeSecurityViewModel.kt`. Reached from the Settings `Privacy` row.
+- **Status:** **DONE** (P5.1)
 - **Designed frames:** balanced (5 of 9 toggles on · helper text per card) · strict lockdown (all 9 on · helper text shifts to consequence language)
 - **Required slots:**
   - **3 groups × 3 toggles**: Access control (Guest approval · Member name visibility · Address precision) · Privacy (Activity visibility · Map opt-out · Notification previews) · Documents (Doc lock · Photo blur · Vault auto-lock).
-  - **Helper line per card** that **changes based on which toggles are active** — e.g. "Guest approval is on, so guests need an owner-tap to enter" vs "Guest approval is off — anyone with a code is in. Tighten this if you're away."
-  - No chevrons, no destructive action — pure switchgear.
+  - **Helper line per card** that **changes based on which toggles are active** — "Guest approval is on, so guests need an owner-tap to enter" (balanced) vs "Guest approval is off — anyone with a code is in. Tighten this if you're away." (off) vs "All guest activity requires your explicit approval. Names and street precision are hidden from outsiders." (all-on consequence). iOS+Android keep these strings word-for-word identical via `HomeSecurityViewModel` helpers + the `HomeSecurityHelpers` Kotlin object.
+  - No chevrons, no destructive action — pure switchgear. Toggle persistence is stubbed to local state pending the backend `home_security_settings` table.
 
 ### A14.3 — Settings index (`/settings.tsx`)
 - **iOS:** `Settings/SettingsView.swift` + `Settings/SettingsViewModels.swift::SettingsIndexViewModel`
@@ -437,9 +437,9 @@ that goes beyond the standard chevron/toggle row.
   - **Paused secondary**: master card replaced with `PauseBanner` — warm amber bg + warning-tinted bell-off icon + "Paused for 1h 24m left" + `Resume` neutral pill. Category cards stay rendered at 0.5 opacity.
 
 ### A14.6 — Payments (`/settings/payments.tsx`)
-- **iOS:** **MISSING from settings sub-routes** — `SettingsView.swift:148-150` maps `.paymentsPayouts` to `NotYetAvailableView`.
-- **Android:** **MISSING** — same placeholder pattern.
-- **Status:** **BUILD** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
+- **iOS:** `Features/Settings/Payments/PaymentsView.swift` + `PaymentsViewModel` (P5.2 — fixture-driven; Stripe Connect onboarding deep-link is a follow-up).
+- **Android:** `ui/screens/settings/payments/PaymentsScreen.kt` + `PaymentsViewModel`.
+- **Status:** **POLISH** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
 - **Designed frames:** populated (balance hero · 3 methods · Stripe connected · payouts to Chase weekly · YTD activity) · empty (no balance hero · inline empty in Methods card · Stripe `Connect` chip · gated payout method + tax rows)
 - **Required slots:**
   - **Balance hero** (same `BalanceHero` primitive as A10.10, but with `next-payout-date` + frequency pill chip on right of the available amount instead of the "USD" chip).
@@ -466,9 +466,9 @@ that goes beyond the standard chevron/toggle row.
   - **Stealth banner** in stealth mode: dark `#0b1220` bg, sky-tinted eye-off icon disc, "Stealth mode is on" + "Your profile is hidden from search. Existing connections still see you." — pinned above the radios.
 
 ### A14.8 — Vacation hold (`/mailbox/vacation.tsx`)
-- **iOS:** **MISSING** — no `Mailbox/Vacation/` folder.
-- **Android:** **MISSING**.
-- **Status:** **BUILD**
+- **iOS:** `Features/Mailbox/Vacation/` (P5.3).
+- **Android:** `ui/screens/mailbox/vacation/` (P5.3).
+- **Status:** **POLISH** (P5.3 BUILD landed)
 - **Designed frames:** scheduling (13-day range · `DateSpan` strip · scope toggles all on · civic locked · forwarding · emergency contact · `Save` in top bar primary-600) · active (sky-gradient `HoldStatusHero` · 5 days left · 3-cell stats · ledger of held items · top bar swaps Save for neutral `End hold`)
 - **Build dependencies:** `DateSpan` primitive + `HoldStatusHero` primitive.
 - **Required slots:**
@@ -513,10 +513,10 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
 - **Status:** **POLISH**
 
 ### A17.5 — Coupon
-- **iOS:** **MISSING** — falls through to GenericMailDetailLayout.
-- **Android:** has `mailbox/item_detail/bodies/CouponBody.kt` + `CouponBodyState.kt` + `components/CouponHero.kt` + `components/BarcodeView.kt` — but check if dispatched.
-- **Status:** **BUILD** (iOS) · **POLISH** (Android — verify dispatch)
-- **Required slots (iOS only):** CouponHero (gradient hero + brand + discount % + expiry · barcode), KeyFacts (terms · valid through · redemptions left · where), BodyCard (fine print), `Redeem` CTA in dock.
+- **iOS:** `Mailbox/MailDetail/Variants/CouponDetailLayout.swift` (composes `MailItemDetailShell` with `Mailbox/ItemDetail/Bodies/CouponBody.swift` + `Bodies/Components/CouponHero.swift` + `Bodies/Components/BarcodeView.swift`).
+- **Android:** `mailbox/mail_detail/variants/CouponDetailLayout.kt` (composes the parity shell with `mailbox/item_detail/bodies/CouponBody.kt` + `bodies/components/CouponHero.kt` + `bodies/components/BarcodeView.kt`).
+- **Status:** **POLISH** (BUILD landed in PR #138 — A17.5–A17.8 ceremonial detail variants; dispatch wired through `MailDetailView` / `MailDetailScreen` and `MailDetailContent.couponDetail`).
+- **Per-frame deltas:** verify ticket-style `CouponHero` (amber gradient + brand chip + 42pt discount + dashed code capsule + ticket-stub barcode), `KeyFacts` (Merchant · Code · Min. spend · Expires), `FinePrintCard` (bulleted terms + fine print), `StoreBarcodeCard` with show-in-store expand toggle, redemption-state CTA (`Mark redeemed` primary → `Already redeemed` success pill → `This offer has expired` terminal). Sample fixtures live in `MailItemSampleData.coupon{Unused,Redeemed,Expired}`; snapshot coverage in `CouponBodySnapshotTests` (4 cases) + `CeremonialVariantsSnapshotTests` (layout unused / redeemed).
 
 ### A17.6 — Gig mail
 - **iOS:** **MISSING** — falls through to GenericMailDetailLayout.
@@ -525,10 +525,10 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
 - **Required slots (iOS only):** Gig hero (job summary + estimated payout), KeyFacts (location · when · category), other bids strip, Accept/Decline split dock.
 
 ### A17.7 — Memory
-- **iOS:** **MISSING**
-- **Android:** has `mailbox/item_detail/bodies/MemoryBody.kt` + `MemorySampleData.kt`.
-- **Status:** **BUILD** (iOS) · **POLISH** (Android)
-- **Required slots (iOS only):** Memory hero (polaroid frame + caption), date-from line, "Add to keepsakes" CTA.
+- **iOS:** `Mailbox/MailDetail/Variants/MemoryDetailLayout.swift` (composes `MemoryBody` + `PolaroidFrame`).
+- **Android:** `mailbox/mail_detail/variants/MemoryDetailLayout.kt` (composes `MemoryBody` + `PolaroidFrame`) + `MemorySampleData.kt`.
+- **Status:** **POLISH**
+- **Per-frame deltas:** verify hero card (polaroid frame + caption + date-from line) and the Save-to-Vault / saved-pill action swap.
 
 ### A17.8 — Package
 - **iOS:** **MISSING**

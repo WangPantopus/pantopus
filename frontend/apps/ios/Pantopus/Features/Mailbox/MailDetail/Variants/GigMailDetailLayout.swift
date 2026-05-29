@@ -1,14 +1,15 @@
 //
-//  GigDetailLayout.swift
+//  GigMailDetailLayout.swift
 //  Pantopus
 //
-//  A17.6 — Gig ceremonial variant of the mail item detail. Sits on the
-//  shared `MailItemDetailShell` (P19); the body slot composes the gig
-//  body from the existing card components — bid summary, post summary,
-//  bidder profile, and (when bids are still open) the other-bids strip.
-//  The actions shelf is the three-way Accept / Counter / Decline row,
-//  collapsing to a single "Bid accepted" pill once the recipient has
-//  accepted.
+//  A17.6 — Gig mail variant of the mail item detail. Sits on the
+//  shared `MailItemDetailShell` (P19); the body slot composes the
+//  bidder profile, post summary, focal `BidCard`, and (while the bid
+//  is open) the other-bids strip. The actions shelf is the three-way
+//  Accept / Counter / Decline row in the open state, swapping to the
+//  next-steps timeline + Open thread CTA once the recipient accepts.
+//  Mirrors the Android `GigBody.kt` body composition so the two
+//  platforms render the same gig surface.
 //
 
 import SwiftUI
@@ -16,7 +17,7 @@ import SwiftUI
 // swiftlint:disable multiple_closures_with_trailing_closure
 
 @MainActor
-struct GigDetailLayout: View {
+struct GigMailDetailLayout: View {
     let content: MailDetailContent
     let gig: GigDetailDTO
     let bidInFlight: Bool
@@ -37,14 +38,16 @@ struct GigDetailLayout: View {
                     BidCard(bid: gig.bid, isAccepted: gig.isAccepted)
                     PostSummaryCard(post: gig.post)
                     BidderProfileCard(bidder: gig.bidder)
-                    if !gig.isAccepted, !gig.otherBids.isEmpty {
+                    if gig.isAccepted {
+                        GigMailNextStepsCard(steps: gig.nextSteps)
+                    } else if !gig.otherBids.isEmpty {
                         OtherBidsStrip(bids: gig.otherBids)
                     }
                 }
             },
             sender: { GigSenderCard(content: content, onOpenProfile: onOpenSenderProfile) },
             actions: {
-                GigDetailActions(
+                GigSplitDock(
                     isAccepted: gig.isAccepted,
                     amount: gig.bid.amount,
                     inFlight: bidInFlight,
@@ -54,6 +57,8 @@ struct GigDetailLayout: View {
         )
         .accessibilityIdentifier("mailDetail_gig")
     }
+
+    // MARK: - Top bar
 
     private func makeTopBar() -> MailTopBarConfig {
         MailTopBarConfig(
@@ -75,31 +80,34 @@ struct GigDetailLayout: View {
         )
     }
 
+    // MARK: - AI elf
+
     private func makeAIElf() -> AIElfStripContent? {
-        let bullets: [AIElfBullet]
         let headline: String
         let summary: String
+        let bullets: [AIElfBullet]
         if gig.isAccepted {
             headline = "Bid accepted · funds held in escrow"
-            summary = "Pantopus opened the thread, set a calendar reminder, and queued the next-step nudges."
+            summary = "Pantopus opened the thread, saved the date, and queued next-step nudges."
             bullets = [
-                AIElfBullet(icon: .calendarClock, label: "Calendar reminder set", text: gig.bid.eta),
-                AIElfBullet(icon: .messageCircle, label: "Thread joined", text: "you can chat now"),
-                AIElfBullet(icon: .shieldCheck, label: "Funds escrowed", text: "released after the job")
+                AIElfBullet(icon: .lock, label: "$\(gig.bid.amount) held in escrow", text: "released after the job"),
+                AIElfBullet(icon: .messageCircle, label: "Chat thread opened", text: "you can chat now"),
+                AIElfBullet(icon: .calendarClock, label: "Calendar saved", text: gig.bid.eta)
             ]
         } else {
             let otherBidCount = gig.otherBids.count
-            headline = "Pantopus read this bid for you"
-            summary = "Compare against the \(otherBidCount) other bid\(otherBidCount == 1 ? "" : "s") " +
-                "on the same gig before you accept."
+            headline = "Pantopus sized this bid up"
+            summary = "Compare against \(otherBidCount) other bid\(otherBidCount == 1 ? "" : "s") on the same gig before you accept."
             bullets = [
-                AIElfBullet(icon: .info, label: "$\(gig.bid.amount) \(gig.bid.unit)", text: nil),
+                AIElfBullet(icon: .dollarSign, label: "$\(gig.bid.amount) \(gig.bid.unit)", text: nil),
                 AIElfBullet(icon: .calendarClock, label: gig.bid.eta, text: nil),
                 AIElfBullet(icon: .clock, label: gig.bid.expires, text: nil)
             ]
         }
         return AIElfStripContent(headline: headline, summary: summary, bullets: bullets)
     }
+
+    // MARK: - Attachments
 
     private func makeAttachments() -> AttachmentsRowContent? {
         guard !content.attachments.isEmpty else { return nil }
@@ -109,12 +117,25 @@ struct GigDetailLayout: View {
         return AttachmentsRowContent(items: items)
     }
 
+    // MARK: - Key facts
+
     private func makeKeyFacts() -> [MailDetailKeyFact] {
         var rows: [MailDetailKeyFact] = []
-        rows.append(MailDetailKeyFact(icon: .briefcase, label: "Gig", value: gig.post.title))
-        rows.append(MailDetailKeyFact(icon: .clock, label: "When", value: gig.post.schedule.isEmpty ? gig.bid.eta : gig.post.schedule))
-        rows.append(MailDetailKeyFact(icon: .mapPin, label: "Where", value: gig.post.location))
-        rows.append(MailDetailKeyFact(icon: .hash, label: "Budget", value: gig.post.budget))
+        rows.append(
+            MailDetailKeyFact(
+                icon: .mapPin,
+                label: "Where",
+                value: gig.post.location.isEmpty ? "Pantopus mailbox" : gig.post.location
+            )
+        )
+        rows.append(
+            MailDetailKeyFact(
+                icon: .calendarDays,
+                label: "When",
+                value: gig.post.schedule.isEmpty ? gig.bid.eta : gig.post.schedule
+            )
+        )
+        rows.append(MailDetailKeyFact(icon: .briefcase, label: "Category", value: gig.post.categoryLabel))
         return rows
     }
 }
@@ -144,12 +165,9 @@ private struct GigHeroCard: View {
                 .font(.system(size: 19, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .fixedSize(horizontal: false, vertical: true)
+            payoutBlock
             if gig.isAccepted {
                 acceptedPill
-            } else if let excerpt = content.excerpt, !excerpt.isEmpty {
-                Text(excerpt)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
         .padding(Spacing.s3)
@@ -162,6 +180,23 @@ private struct GigHeroCard: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+    }
+
+    private var payoutBlock: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
+            Text("ESTIMATED PAYOUT")
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Spacer(minLength: Spacing.s0)
+            Text("$\(gig.bid.amount)")
+                .font(.system(size: 20, weight: .heavy))
+                .foregroundStyle(Theme.Color.appTextStrong)
+            Text("· \(gig.bid.unit)")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .padding(.top, Spacing.s1)
+        .accessibilityIdentifier("mailDetail_gig_estimatedPayout")
     }
 
     private var acceptedPill: some View {
@@ -179,10 +214,10 @@ private struct GigHeroCard: View {
         .padding(.vertical, Spacing.s2)
         .background(Theme.Color.successBg)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: Radii.md)
                 .stroke(Theme.Color.successLight, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md))
         .padding(.top, Spacing.s1)
         .accessibilityIdentifier("mailDetail_gig_acceptedPill")
     }
@@ -213,13 +248,14 @@ private struct GigKeyFactsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
-            Text("BID FACTS")
+            Text("KEY FACTS")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.5)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, Spacing.s2)
+                .accessibilityAddTraits(.isHeader)
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 HStack(alignment: .top, spacing: Spacing.s3) {
@@ -251,6 +287,32 @@ private struct GigKeyFactsCard: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .accessibilityIdentifier("mailDetail_gig_keyFacts")
+    }
+}
+
+// MARK: - Next-steps timeline (accepted state)
+
+private struct GigMailNextStepsCard: View {
+    let steps: [GigDetailDTO.NextStep]
+
+    var body: some View {
+        GigCard {
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                GigSectionLabel(text: "WHAT HAPPENS NEXT")
+                TimelineStepper(steps: steps.map(Self.timelineStep))
+            }
+        }
+        .accessibilityIdentifier("mailDetail_gig_nextSteps")
+    }
+
+    private static func timelineStep(_ step: GigDetailDTO.NextStep) -> TimelineStep {
+        let state: TimelineStepState = switch step.state {
+        case .active: .done
+        case .pending: .current
+        case .upcoming: .upcoming
+        }
+        return TimelineStep(id: step.id, title: step.label, subtitle: step.whenText, state: state)
     }
 }
 
@@ -299,9 +361,9 @@ private struct GigSenderCard: View {
     }
 }
 
-// MARK: - Actions
+// MARK: - Accept / Decline split dock
 
-private struct GigDetailActions: View {
+private struct GigSplitDock: View {
     let isAccepted: Bool
     let amount: Int
     let inFlight: Bool
@@ -309,13 +371,13 @@ private struct GigDetailActions: View {
 
     var body: some View {
         if isAccepted {
-            acceptedPill
+            acceptedShelf
         } else {
             actionRow
         }
     }
 
-    private var acceptedPill: some View {
+    private var acceptedShelf: some View {
         HStack(spacing: Spacing.s2) {
             Icon(.checkCircle, size: 16, color: Theme.Color.success)
             Text("Bid accepted · funds in escrow")
@@ -326,26 +388,46 @@ private struct GigDetailActions: View {
         .padding(.vertical, 14)
         .background(Theme.Color.successBg)
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Radii.lg)
                 .stroke(Theme.Color.successLight, lineWidth: 1.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
         .accessibilityIdentifier("mailDetail_gig_acceptedShelf")
     }
 
     private var actionRow: some View {
         HStack(spacing: Spacing.s2) {
-            primary
-            secondary(id: "counter", icon: .arrowsRepeat, label: "Counter")
-            secondary(id: "decline", icon: .x, label: "Decline", destructive: true)
+            primaryButton(
+                icon: .check,
+                label: "Accept · $\(amount)",
+                identifier: "mailDetail_gig_accept",
+                action: onAccept
+            )
+            secondaryButton(
+                icon: .arrowsRepeat,
+                label: "Counter",
+                kind: .ghost,
+                identifier: "mailDetail_gig_counter"
+            )
+            secondaryButton(
+                icon: .x,
+                label: "Decline",
+                kind: .destructive,
+                identifier: "mailDetail_gig_decline"
+            )
         }
     }
 
-    private var primary: some View {
-        Button(action: { onAccept() }) {
+    private func primaryButton(
+        icon: PantopusIcon,
+        label: String,
+        identifier: String,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
+        Button(action: { action() }) {
             HStack(spacing: 5) {
-                Icon(.check, size: 14, color: Theme.Color.appTextInverse)
-                Text("Accept · $\(amount)")
+                Icon(icon, size: 14, color: Theme.Color.appTextInverse)
+                Text(label)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(Theme.Color.appTextInverse)
                     .lineLimit(1)
@@ -359,28 +441,40 @@ private struct GigDetailActions: View {
         }
         .buttonStyle(.plain)
         .disabled(inFlight)
-        .accessibilityIdentifier("mailDetail_gig_accept")
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(label)
     }
 
-    private func secondary(id: String, icon: PantopusIcon, label: String, destructive: Bool = false) -> some View {
-        Button(action: {}) {
+    private enum SecondaryKind { case ghost, destructive }
+
+    private func secondaryButton(
+        icon: PantopusIcon,
+        label: String,
+        kind: SecondaryKind,
+        identifier: String
+    ) -> some View {
+        let foreground = kind == .ghost ? Theme.Color.appText : Theme.Color.appTextInverse
+        let background = kind == .ghost ? Theme.Color.appSurface : Theme.Color.error
+        return Button(action: {}) {
             HStack(spacing: 5) {
-                Icon(icon, size: 14, color: destructive ? Theme.Color.appTextInverse : Theme.Color.appText)
+                Icon(icon, size: 14, color: foreground)
                 Text(label)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(destructive ? Theme.Color.appTextInverse : Theme.Color.appText)
+                    .foregroundColor(foreground)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.vertical, Spacing.s2)
-            .background(destructive ? Theme.Color.error : Theme.Color.appSurface)
+            .background(background)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg)
-                    .stroke(destructive ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
+                    .stroke(kind == .ghost ? Theme.Color.appBorder : Color.clear, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("mailDetail_gig_\(id)")
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(label)
     }
 }

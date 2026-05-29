@@ -67,7 +67,7 @@ final class CeremonialVariantsSnapshotTests: XCTestCase {
 
     func test_gig_layout_received_renders() {
         assertRenders(
-            GigDetailLayout(
+            GigMailDetailLayout(
                 content: makeContent(category: .gig, title: "Sofa move — bid received"),
                 gig: MailItemSampleData.gigReceived,
                 bidInFlight: false,
@@ -81,7 +81,7 @@ final class CeremonialVariantsSnapshotTests: XCTestCase {
 
     func test_gig_layout_accepted_renders() {
         assertRenders(
-            GigDetailLayout(
+            GigMailDetailLayout(
                 content: makeContent(category: .gig, title: "Sofa move — accepted"),
                 gig: MailItemSampleData.gigAccepted,
                 bidInFlight: false,

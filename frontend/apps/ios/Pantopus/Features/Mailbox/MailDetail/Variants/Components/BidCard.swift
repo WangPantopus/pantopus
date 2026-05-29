@@ -2,10 +2,11 @@
 //  BidCard.swift
 //  Pantopus
 //
-//  The bid headline card for the Gig mail body — large amount on the left,
-//  unit + ETA, an expiry / "Locked in" pill on the right, and the bidder's
-//  multi-line message below. Tinted with the gig accent (orange) so it
-//  reads as the focal surface.
+//  The bid headline card for the A17.6 Gig mail body — large amount on
+//  the left, unit + ETA, an expiry / "Locked in" pill on the right, and
+//  the bidder's multi-line message below. Tinted with the gig accent
+//  (orange) so it reads as the focal surface. Mirrors the Android
+//  `BidCard.kt` shape so the two platforms render the same focal card.
 //
 
 import SwiftUI

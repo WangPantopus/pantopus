@@ -187,6 +187,22 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun home_owners_transfer_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeOwnersTransfer("h_1"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_1/owners/transfer"),
+        )
+    }
+
+    @Test
+    fun home_owners_transfer_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeOwnersTransfer("h_2"),
+            DeepLinkRouter.resolveString("https://pantopus.app/homes/h_2/owners/transfer"),
+        )
+    }
+
+    @Test
     fun chat_route_uses_conversation_case() {
         assertEquals(
             DeepLinkRouter.Destination.Conversation("c_1"),
@@ -225,6 +241,29 @@ class DeepLinkRouterTest {
             DeepLinkRouter.Destination.CreateBusiness,
             DeepLinkRouter.resolveString("https://pantopus.app/businesses/new"),
         )
+    }
+
+    // MARK: - A14.8 Vacation hold
+
+    @Test
+    fun vacation_hold_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.VacationHold,
+            DeepLinkRouter.resolveString("pantopus://mailbox/vacation"),
+        )
+    }
+
+    @Test
+    fun vacation_hold_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.VacationHold,
+            DeepLinkRouter.resolveString("https://pantopus.app/mailbox/vacation"),
+        )
+    }
+
+    @Test
+    fun mailbox_without_vacation_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://mailbox") is DeepLinkRouter.Destination.Unknown)
     }
 
     // MARK: - T6.1c P5 — Auth deep links
@@ -317,6 +356,26 @@ class DeepLinkRouterTest {
         assertEquals(DeepLinkRouter.Destination.Gig("g_99"), pending)
     }
 
+    // ---- A13.16 My Mail Day ----
+
+    @Test
+    fun mail_day_custom_scheme() {
+        assertEquals(DeepLinkRouter.Destination.MailDay, DeepLinkRouter.resolveString("pantopus://mailbox/mailday"))
+    }
+
+    @Test
+    fun mail_day_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.MailDay,
+            DeepLinkRouter.resolveString("https://pantopus.app/mailbox/mailday"),
+        )
+    }
+
+    @Test
+    fun mailbox_without_subroute_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://mailbox") is DeepLinkRouter.Destination.Unknown)
+    }
+
     // MARK: - Verify-landlord routes (P2.1 / A12.5–A12.7)
 
     @Test
@@ -349,5 +408,28 @@ class DeepLinkRouterTest {
             DeepLinkRouter.Destination.VerifyLandlord("h_42"),
             DeepLinkRouter.resolveString("https://pantopus.app/homes/h_42/verify-landlord"),
         )
+    }
+
+    // MARK: - P5.2 / A14.6 — Settings → Payments deep link
+
+    @Test
+    fun payments_settings_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.PaymentsSettings,
+            DeepLinkRouter.resolveString("pantopus://settings/payments"),
+        )
+    }
+
+    @Test
+    fun payments_settings_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.PaymentsSettings,
+            DeepLinkRouter.resolveString("https://pantopus.app/settings/payments"),
+        )
+    }
+
+    @Test
+    fun bare_settings_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://settings") is DeepLinkRouter.Destination.Unknown)
     }
 }

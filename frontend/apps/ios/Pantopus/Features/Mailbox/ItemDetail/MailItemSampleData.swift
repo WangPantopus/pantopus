@@ -365,9 +365,55 @@ public extension MailItemSampleData {
 
     /// Bid-accepted secondary state.
     static let gigAccepted = gigReceived.accepted()
+
+    /// Builds a `MailDetailContent` envelope wrapping a gig DTO for the
+    /// A17.6 layout. Previews + snapshot tests use this so they don't
+    /// have to round-trip the projection.
+    static func gigMailContent(
+        gig: GigDetailDTO,
+        title: String = "New bid · $65 to move your sofa Saturday"
+    ) -> MailDetailContent {
+        MailDetailContent(
+            mailId: "gig-\(gig.isAccepted ? "accepted" : "received")",
+            category: .gig,
+            trust: .chain,
+            detailTrust: .neutral,
+            senderDisplayName: gig.bidder.name,
+            senderMeta: gig.bidder.handle.isEmpty ? gig.bidder.blurb : gig.bidder.handle,
+            senderTypeLabel: "Pantopus user",
+            carrierLine: "via Pantopus Mail",
+            senderInitials: gig.bidder.initials,
+            senderUserId: "gig-bidder",
+            title: title,
+            excerpt: "Bid on your gig “\(gig.post.title)”.",
+            referenceLabel: "Bid GIG-4421",
+            createdAtLabel: "12m ago",
+            expiresAtLabel: gig.bid.expires,
+            readStatusLabel: gig.isAccepted ? "Read" : "Unread",
+            bodyParagraphs: [],
+            attachments: [],
+            aiSummary: nil,
+            ackRequired: false,
+            isAcknowledged: gig.isAccepted,
+            gigDetail: gig
+        )
+    }
 }
 
 public extension MailItemSampleData {
+    /// A17.7 fresh-arrival memory — keepsake not yet kept in the vault.
+    /// Forwards to the dedicated `MemorySampleData.memory` fixture so
+    /// catalog-style call sites can reach memory data through the same
+    /// `MailItemSampleData` entry point as the other A17 variants.
+    static var memoryFresh: MemoryDetailDTO {
+        MemorySampleData.memory
+    }
+
+    /// A17.7 saved-state memory — same payload with `isSaved` flipped.
+    static var memorySaved: MemoryDetailDTO {
+        MemorySampleData.savedMemory
+    }
+
     /// A17.3 open/pre-signature certified mail state.
     static let certifiedUnread = CertifiedDetailDTO(
         referenceNumber: "7014 2026 0411 3344 5577",
