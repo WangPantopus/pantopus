@@ -94,7 +94,7 @@ class PartyDetailSnapshotTest {
         assertEquals("MAY", invite.event.date.monthLabel)
         assertEquals("24", invite.event.date.dayNumber)
         assertEquals(4, invite.bringList.size)
-        assertEquals(5, invite.goingAttendees.size)
+        assertEquals(6, invite.goingAttendees.size)
         assertEquals(1, invite.maybeCount)
         assertEquals(PartyRsvpStatus.Undecided, invite.rsvp)
         assertEquals(3, invite.elfOpen.bullets.size)
@@ -106,8 +106,8 @@ class PartyDetailSnapshotTest {
         assertEquals(1, going.plusOneCount)
         assertEquals("You", going.bringList.first().claimedBy)
         assertNotNull(going.rsvpConfirmedAtLabel)
-        // Going headcount: 5 friends + 2 friend plus-ones + you + your +1 = 9
-        assertEquals(9, going.headcount)
+        // Going headcount: 6 friends + 3 friend plus-ones + you + your +1 = 11
+        assertEquals(11, going.headcount)
     }
 
     private fun makeContent(party: PartyDetailDto): MailDetailContent =

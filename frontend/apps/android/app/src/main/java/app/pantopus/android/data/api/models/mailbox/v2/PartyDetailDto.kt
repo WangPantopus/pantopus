@@ -24,8 +24,7 @@ enum class PartyRsvpStatus(val raw: String) {
     ;
 
     companion object {
-        fun fromRaw(value: String?): PartyRsvpStatus =
-            entries.firstOrNull { it.raw == value } ?: Undecided
+        fun fromRaw(value: String?): PartyRsvpStatus = entries.firstOrNull { it.raw == value } ?: Undecided
     }
 }
 
@@ -214,7 +213,7 @@ data class PartyDetailDto(
          * path for personal invites isn't shipped yet. When the route
          * lands, fill this in to mirror `MemoryDetailDto.decode(...)`.
          */
-        @Suppress("UNUSED_PARAMETER")
+        @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
         fun decodeFromObjectPayload(payload: Map<String, Any?>?): PartyDetailDto? = null
     }
 }

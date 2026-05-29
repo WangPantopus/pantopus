@@ -228,6 +228,16 @@ class IconTest {
             // A13.13 — Manage train Organize row glyphs.
             "bar-chart-3",
             "calendar-cog",
+            // A17.9 — Party invite detail glyphs.
+            "quote",
+            "cloud-sun",
+            "shirt",
+            "x-circle",
+            "bell-off",
+            "minus",
+            "user-minus",
+            "calendar-check",
+            "calendar-plus",
         )
 
     @Test
