@@ -3,6 +3,9 @@
 package app.pantopus.android.ui.screens.shared.grouped_list
 
 import androidx.compose.runtime.Immutable
+import app.pantopus.android.ui.components.ChannelGlyph
+import app.pantopus.android.ui.components.FuzzStop
+import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
  * Render models for the shared GroupedList archetype — every
@@ -43,6 +46,19 @@ sealed interface RowControl {
         val index: Int,
     ) : RowControl
 
+    /**
+     * A14.5 Notifications — three Push / Email / SMS channel chips
+     * (`ChannelTriad`) tiled into the trailing slot. `locked` forces a
+     * chip "on, untoggleable" — Emergency alerts keep push locked on.
+     */
+    @Immutable
+    data class ChannelTriad(
+        val p: Boolean,
+        val e: Boolean,
+        val s: Boolean,
+        val locked: Set<ChannelGlyph>,
+    ) : RowControl
+
     enum class ChipTone { Success, Info, Neutral, Warning }
 }
 
@@ -54,6 +70,12 @@ data class GroupedListRow(
     /** Optional secondary line under the label. */
     val subtext: String? = null,
     val control: RowControl,
+    /**
+     * A14.7 — optional leading icon disc (primary-tinted) before the
+     * label. Used by the Privacy "Your data" action rows. `null` for
+     * plain settings rows.
+     */
+    val leadingIcon: PantopusIcon? = null,
     /** Red destructive text + this row lands in its own card. */
     val destructive: Boolean = false,
 )
@@ -67,6 +89,44 @@ data class GroupedListGroup(
     /** 11.5sp caption below the card. */
     val helper: String? = null,
     val rows: List<GroupedListRow>,
+    /**
+     * A14.5 — render a P/E/S column-header band (`ChannelHeader`) as the
+     * first element inside the card. `false` for every other surface.
+     */
+    val showsChannelHeader: Boolean = false,
+    /**
+     * A14.7 — when set, the card renders a `LocationFuzzSlider` (lead-in
+     * + stepped slider + `FuzzMap` preview) instead of `rows`.
+     */
+    val fuzz: GroupedListFuzz? = null,
+)
+
+/**
+ * A14.5 — a banner pinned above the groups inside the scroll. `Pause`
+ * is the warm-amber `PauseBanner` (A14.5, with an action pill);
+ * `Stealth` is the dark `StealthBanner` (A14.7, no action).
+ */
+@Immutable
+data class GroupedListBanner(
+    val icon: PantopusIcon,
+    val title: String,
+    val subtitle: String? = null,
+    /** Trailing neutral pill label (e.g. "Resume"). Empty for [Style.Stealth]. */
+    val actionLabel: String = "",
+    val style: Style = Style.Pause,
+) {
+    enum class Style { Pause, Stealth }
+}
+
+/**
+ * A14.7 — drives the Privacy "Map location fuzz" card: a lead-in line,
+ * the stepped `LocationFuzzSlider`, and the `FuzzMap` preview. Carried
+ * on [GroupedListGroup.fuzz].
+ */
+@Immutable
+data class GroupedListFuzz(
+    val leadIn: String,
+    val stop: FuzzStop,
 )
 
 /** Render state for the shell. */
