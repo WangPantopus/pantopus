@@ -83,6 +83,19 @@ public struct WizardShell<Content: View>: View {
     private func stickyCTA(chrome: WizardChrome) -> some View {
         VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+            if let hint = chrome.footerHint {
+                HStack(spacing: Spacing.s1) {
+                    Icon(.hourglass, size: 12, color: Theme.Color.appTextSecondary)
+                    Text(hint)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, Spacing.s3)
+                .background(Theme.Color.appSurface)
+                .accessibilityIdentifier("wizardFooterHint")
+            }
             HStack(spacing: Spacing.s3) {
                 if let secondary = chrome.secondaryCTA {
                     GhostButton(title: secondary.label) {

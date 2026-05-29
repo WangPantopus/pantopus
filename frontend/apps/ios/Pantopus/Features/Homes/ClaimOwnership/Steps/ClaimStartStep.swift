@@ -16,7 +16,7 @@ struct ClaimStartStep: View {
     }
 
     var body: some View {
-        HomeContextChip(label: content.homeLabel)
+        ClaimHomeChip(label: content.homeLabel)
 
         if let contestedClaim = content.contestedClaim {
             ContestedClaimNotice(claim: contestedClaim)
@@ -83,26 +83,6 @@ struct ClaimStartStep: View {
                 subcopy: "Deed, tax record, or mortgage statement."
             )
         ]
-    }
-}
-
-private struct HomeContextChip: View {
-    let label: String
-
-    var body: some View {
-        HStack(spacing: Spacing.s1) {
-            Icon(.home, size: 11, color: Theme.Color.home)
-            Text("Home · \(label)")
-                .pantopusTextStyle(.overline)
-                .foregroundStyle(Theme.Color.home)
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s1)
-        .background(Theme.Color.homeBg)
-        .clipShape(Capsule())
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Home, \(label)")
-        .accessibilityIdentifier("claimOwnershipHomeChip")
     }
 }
 

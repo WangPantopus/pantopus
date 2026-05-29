@@ -15,11 +15,13 @@ import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
+import io.mockk.coAnswers
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,6 +81,49 @@ class ClaimOwnershipWizardViewModelTest {
         assertFalse(vm.chrome.primaryCtaEnabled)
         assertEquals(WizardLeadingControl.Back, vm.chrome.leading)
     }
+
+    @Test fun picked_computes_address_match_when_filename_carries_street_number() {
+        // Sample-data heuristic: a filename carrying the home's street number
+        // ("412") resolves to a Matches verdict on the slot.
+        val vm = makeVm()
+        vm.onPrimary()
+        vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed_412_elm.pdf"))
+        val verdict = vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership]
+        assertTrue(verdict is ClaimAddressMatch.Matches)
+        assertTrue((verdict as ClaimAddressMatch.Matches).detail.contains("412 Elm St"))
+    }
+
+    @Test fun picked_computes_address_differs_when_street_number_absent() {
+        val vm = makeVm()
+        vm.onPrimary()
+        vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("mortgage_statement.pdf"))
+        assertTrue(vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership] is ClaimAddressMatch.Differs)
+    }
+
+    @Test fun remove_clears_address_match() {
+        val vm = makeVm()
+        vm.onPrimary()
+        vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed_412.pdf"))
+        assertNotNull(vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership])
+        vm.remove(ClaimEvidenceSlot.Ownership)
+        assertNull(vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership])
+    }
+
+    @Test fun submitting_shows_waiting_footer_hint() =
+        runTest {
+            // Hold the create-claim call in-flight so we can observe the
+            // upload-step chrome while `isSubmitting` is true.
+            val gate = CompletableDeferred<NetworkResult<SubmitClaimResponse>>()
+            coEvery { repo.submitClaim(any(), any()) } coAnswers { gate.await() }
+            val vm = makeVm()
+            vm.onPrimary()
+            vm.picked(ClaimEvidenceSlot.Identity, pickedFile("id.jpg"))
+            vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed.pdf"))
+            assertNull(vm.chrome.footerHint)
+            vm.onPrimary() // submit — suspends at the gated claim call
+            assertEquals("Waiting for upload to finish", vm.chrome.footerHint)
+            gate.complete(NetworkResult.Failure(NetworkError.Server(500, null)))
+        }
 
     @Test fun submit_blocked_without_both_files() =
         runTest {

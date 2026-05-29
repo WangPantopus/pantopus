@@ -97,6 +97,65 @@ final class ClaimOwnershipWizardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.slots[.identity]?.hasFile == true)
     }
 
+    func testPickedComputesAddressMatchWhenFilenameCarriesStreetNumber() {
+        // Sample-data heuristic: a filename carrying the home's street number
+        // ("412") resolves to a `.matches` verdict on the slot.
+        let vm = makeVM()
+        vm.primaryTapped()
+        vm.picked(
+            .ownership,
+            file: ClaimPickedFile(filename: "deed_412_elm.pdf", mimeType: "application/pdf", data: Data([1]))
+        )
+        guard case let .matches(detail) = vm.addressMatches[.ownership] else {
+            return XCTFail("Expected .matches verdict for a filename containing the street number")
+        }
+        XCTAssertTrue(detail.contains("412 Elm St"))
+    }
+
+    func testPickedComputesAddressDiffersWhenStreetNumberAbsent() {
+        let vm = makeVM()
+        vm.primaryTapped()
+        vm.picked(
+            .ownership,
+            file: ClaimPickedFile(filename: "mortgage_statement.pdf", mimeType: "application/pdf", data: Data([1]))
+        )
+        guard case .differs = vm.addressMatches[.ownership] else {
+            return XCTFail("Expected .differs verdict when the street number is absent")
+        }
+    }
+
+    func testRemoveClearsAddressMatch() {
+        let vm = makeVM()
+        vm.primaryTapped()
+        vm.picked(
+            .ownership,
+            file: ClaimPickedFile(filename: "deed_412.pdf", mimeType: "application/pdf", data: Data([1]))
+        )
+        XCTAssertNotNil(vm.addressMatches[.ownership])
+        vm.remove(.ownership)
+        XCTAssertNil(vm.addressMatches[.ownership])
+    }
+
+    func testSubmittingShowsWaitingFooterHint() async {
+        // While uploads are in flight the upload-step chrome surfaces the
+        // "Waiting for upload to finish" dock hint.
+        SequencedURLProtocol.sequence = [
+            .status(201, body: """
+            {"message":"ok","claim":{"id":"claim-fh","status":"under_review"}}
+            """)
+        ]
+        let vm = makeVM()
+        vm.primaryTapped()
+        XCTAssertNil(vm.chrome.footerHint, "No hint before submit")
+        vm.picked(.identity, file: ClaimPickedFile(filename: "id.jpg", mimeType: "image/jpeg", data: Data([1])))
+        vm.picked(.ownership, file: ClaimPickedFile(filename: "deed.pdf", mimeType: "application/pdf", data: Data([2])))
+        let task = Task { await vm.submit() }
+        await waitFor("isSubmitting surfaces the footer hint") {
+            vm.chrome.footerHint == "Waiting for upload to finish"
+        }
+        await task.value
+    }
+
     func testSubmitFailureKeepsFilesAndShowsError() async {
         // Submit endpoint returns 500 → wizard stays on upload, slots remain.
         SequencedURLProtocol.sequence = [

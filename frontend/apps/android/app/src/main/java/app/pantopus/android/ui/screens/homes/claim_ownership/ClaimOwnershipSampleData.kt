@@ -19,6 +19,18 @@ data class ClaimOwnershipContestedClaim(
     val statusLabel: String,
 )
 
+/**
+ * Verdict of the per-file address check surfaced on each populated upload
+ * slot. [detail] is the supporting copy shown after the bold lead.
+ */
+sealed interface ClaimAddressMatch {
+    val detail: String
+
+    data class Matches(override val detail: String) : ClaimAddressMatch
+
+    data class Differs(override val detail: String) : ClaimAddressMatch
+}
+
 object ClaimOwnershipSampleData {
     fun startContent(homeId: String): ClaimOwnershipStartContent =
         if (homeId.contains("contested", ignoreCase = true)) {
@@ -26,6 +38,29 @@ object ClaimOwnershipSampleData {
         } else {
             canonicalStart
         }
+
+    /**
+     * Sample-data heuristic standing in for real server-side OCR address
+     * extraction. A document "matches" when its filename carries the home's
+     * street number; otherwise we surface a soft, non-blocking mismatch the
+     * reviewer resolves at review time. Swap for the OCR result once the
+     * evidence pipeline returns a parsed address.
+     */
+    fun addressMatch(
+        filename: String,
+        homeLabel: String,
+    ): ClaimAddressMatch {
+        val streetNumber = homeLabel.takeWhile { it.isDigit() }
+        val haystack = filename.lowercase()
+        return if (streetNumber.isNotEmpty() && haystack.contains(streetNumber)) {
+            ClaimAddressMatch.Matches("\"$homeLabel\" matches the address on your account.")
+        } else {
+            ClaimAddressMatch.Differs(
+                "We couldn't confirm $homeLabel on this document. " +
+                    "You can still submit — the reviewer will resolve it.",
+            )
+        }
+    }
 
     val canonicalStart =
         ClaimOwnershipStartContent(
