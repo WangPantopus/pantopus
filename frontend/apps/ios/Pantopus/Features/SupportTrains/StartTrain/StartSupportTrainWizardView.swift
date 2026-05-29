@@ -8,7 +8,7 @@
 //  train's id back to the host stack via `onOpenTrain`.
 //
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 import SwiftUI
 
@@ -121,10 +121,9 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 "A support train coordinates meals, rides, and help around someone going through something. Pick the person and the moment."
             )
             beneficiarySection
-            ReasonPicker(
-                selected: viewModel.selectedReason,
-                onSelect: { viewModel.selectReason($0) }
-            )
+            ReasonPicker(selected: viewModel.selectedReason) {
+                viewModel.selectReason($0)
+            }
             if viewModel.isInviteRecipientBranch {
                 invitePrivacyHint
             } else {
@@ -148,9 +147,10 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 } else if let selected = viewModel.selectedBeneficiary {
                     StartTrainRecipientCard(
                         recipient: selected,
-                        mutuals: viewModel.recipientMutuals,
-                        onChange: { viewModel.clearBeneficiary() }
-                    )
+                        mutuals: viewModel.recipientMutuals
+                    ) {
+                        viewModel.clearBeneficiary()
+                    }
                 } else {
                     searchField
                     if !viewModel.beneficiaryResults.isEmpty {
@@ -358,7 +358,6 @@ private struct StartSupportTrainWhoAndWhyStep: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("startSupportTrainInvitePrivacyHint")
     }
-
 }
 
 // MARK: - Step 2 · What & when

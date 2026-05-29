@@ -1,5 +1,5 @@
 //
-//  RecipientCard.swift
+//  StartTrainRecipientCard.swift
 //  Pantopus
 //
 //  A12.11 — Verified-neighbor recipient card for step 1 of the
@@ -162,9 +162,8 @@ struct StartTrainRecipientCard: View {
 #Preview {
     StartTrainRecipientCard(
         recipient: StartSupportTrainSampleData.verifiedNeighbor,
-        mutuals: StartSupportTrainSampleData.mutuals,
-        onChange: {}
-    )
-    .padding(Spacing.s4)
-    .background(Theme.Color.appBg)
+        mutuals: StartSupportTrainSampleData.mutuals
+    ) {}
+        .padding(Spacing.s4)
+        .background(Theme.Color.appBg)
 }

@@ -83,7 +83,7 @@ struct ReasonPicker: View {
 }
 
 #Preview {
-    ReasonPicker(selected: .surgery, onSelect: { _ in })
+    ReasonPicker(selected: .surgery) { _ in }
         .padding(Spacing.s4)
         .background(Theme.Color.appBg)
 }
