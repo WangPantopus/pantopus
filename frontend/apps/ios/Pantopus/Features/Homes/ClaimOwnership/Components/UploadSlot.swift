@@ -172,7 +172,7 @@ struct UploadSlot: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer(minLength: Spacing.s0)
-                removeButton(icon: .trash, background: .clear)
+                removeButton(icon: .trash2, background: .clear)
             }
             ocrRow(detail: detail, isWarn: isWarn)
         }

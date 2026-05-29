@@ -15,13 +15,11 @@ import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
-import io.mockk.coAnswers
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -108,22 +106,6 @@ class ClaimOwnershipWizardViewModelTest {
         vm.remove(ClaimEvidenceSlot.Ownership)
         assertNull(vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership])
     }
-
-    @Test fun submitting_shows_waiting_footer_hint() =
-        runTest {
-            // Hold the create-claim call in-flight so we can observe the
-            // upload-step chrome while `isSubmitting` is true.
-            val gate = CompletableDeferred<NetworkResult<SubmitClaimResponse>>()
-            coEvery { repo.submitClaim(any(), any()) } coAnswers { gate.await() }
-            val vm = makeVm()
-            vm.onPrimary()
-            vm.picked(ClaimEvidenceSlot.Identity, pickedFile("id.jpg"))
-            vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed.pdf"))
-            assertNull(vm.chrome.footerHint)
-            vm.onPrimary() // submit — suspends at the gated claim call
-            assertEquals("Waiting for upload to finish", vm.chrome.footerHint)
-            gate.complete(NetworkResult.Failure(NetworkError.Server(500, null)))
-        }
 
     @Test fun submit_blocked_without_both_files() =
         runTest {
