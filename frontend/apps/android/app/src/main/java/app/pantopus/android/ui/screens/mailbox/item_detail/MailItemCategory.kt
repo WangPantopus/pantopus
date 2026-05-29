@@ -169,6 +169,17 @@ enum class MailItemCategory(
         label = "Memory",
         detailTrust = MailDetailTrust.Verified,
     ),
+    Party(
+        raw = "party",
+        // Party accent per A17.9 invite treatment. Token lives on
+        // `PantopusColors.categoryParty` so the swatch can be swapped
+        // without touching feature code.
+        accent = PantopusColors.categoryParty,
+        icon = PantopusIcon.PartyPopper,
+        rowBackground = PantopusColors.errorBg,
+        label = "Party",
+        detailTrust = MailDetailTrust.Celebration,
+    ),
     Records(
         raw = "records",
         // Slate-600 per A17.10 archival accent — institutional, archival.

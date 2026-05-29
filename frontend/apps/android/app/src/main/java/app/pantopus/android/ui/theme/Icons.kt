@@ -44,11 +44,13 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ChildCare
@@ -76,6 +78,8 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmergencyShare
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
@@ -86,6 +90,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.FormatPaint
+import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Grain
@@ -124,6 +129,7 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanTool
@@ -133,6 +139,7 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonPin
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.PestControl
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Phone
@@ -147,6 +154,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Savings
@@ -501,6 +509,20 @@ enum class PantopusIcon(
     // Analytics row's icon tile; `calendar-cog` paints the Edit-dates row.
     BarChart3("bar-chart-3"),
     CalendarCog("calendar-cog"),
+
+    // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
+    // handwritten-note open-quote, dress / forecast vibe rows, ± plus-one
+    // stepper, RSVP cluster "Can't" chip, calendar-hold + calendar-saved
+    // CTAs, and the bell-off mute affordance.
+    Quote("quote"),
+    CloudSun("cloud-sun"),
+    Shirt("shirt"),
+    XCircle("x-circle"),
+    BellOff("bell-off"),
+    Minus("minus"),
+    UserMinus("user-minus"),
+    CalendarCheck("calendar-check"),
+    CalendarPlus("calendar-plus"),
     ;
 
     companion object {
@@ -813,6 +835,19 @@ internal fun PantopusIcon.source(): IconSource =
         // calendar-cog glyph.
         PantopusIcon.BarChart3 -> IconSource.Material(Icons.Filled.BarChart)
         PantopusIcon.CalendarCog -> IconSource.Material(Icons.Filled.EditCalendar)
+        // A17.9 Party — Material ships direct glyphs for all but
+        // `cloud-sun` (which uses Material's `WbSunny` sun-with-rays as the
+        // closest weather analogue) and `shirt` (which uses `Checkroom`'s
+        // hanger glyph as Material's only clothing icon).
+        PantopusIcon.Quote -> IconSource.Material(Icons.Filled.FormatQuote)
+        PantopusIcon.CloudSun -> IconSource.Material(Icons.Filled.WbSunny)
+        PantopusIcon.Shirt -> IconSource.Material(Icons.Filled.Checkroom)
+        PantopusIcon.XCircle -> IconSource.Material(Icons.Filled.Cancel)
+        PantopusIcon.BellOff -> IconSource.Material(Icons.Filled.NotificationsOff)
+        PantopusIcon.Minus -> IconSource.Material(Icons.Filled.Remove)
+        PantopusIcon.UserMinus -> IconSource.Material(Icons.Filled.PersonRemove)
+        PantopusIcon.CalendarCheck -> IconSource.Material(Icons.Filled.EventAvailable)
+        PantopusIcon.CalendarPlus -> IconSource.Material(Icons.Filled.EventNote)
     }
 
 /**

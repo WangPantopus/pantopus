@@ -233,6 +233,16 @@ class IconTest {
             // A13.13 — Manage train Organize row glyphs.
             "bar-chart-3",
             "calendar-cog",
+            // A17.9 — Party invite detail glyphs.
+            "quote",
+            "cloud-sun",
+            "shirt",
+            "x-circle",
+            "bell-off",
+            "minus",
+            "user-minus",
+            "calendar-check",
+            "calendar-plus",
             // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
             "credit-card",
         )

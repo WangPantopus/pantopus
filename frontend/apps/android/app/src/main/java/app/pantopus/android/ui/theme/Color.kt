@@ -138,6 +138,15 @@ object PantopusColors {
     val vehicles = Color(0xFFDC2626)
 
     /**
+     * Category: party — `#DB2777` (rose-600). Drives the A17.9 party-invite
+     * accent strip, eyebrow dot, date tile, confetti seed, and RSVP CTA.
+     * Replaces the raw rose hex called out in the parity audit's open
+     * question #4 ("prefer named token over raw hex"). The same value is
+     * mirrored on iOS as `Theme.Color.categoryParty`.
+     */
+    val categoryParty = Color(0xFFDB2777)
+
+    /**
      * Category: records — `#475569` slate-600. The institutional /
      * archival accent for A17.10 Records mail (financial statements,
      * medical records, contracts, EOBs). Per audit open question #4.

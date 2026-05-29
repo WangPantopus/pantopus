@@ -152,8 +152,11 @@ class MailItemDetailShellContractTest {
         val v = MailDetailTrust.Verified.dotColor
         val n = MailDetailTrust.Neutral.dotColor
         val w = MailDetailTrust.Warning.dotColor
+        val c = MailDetailTrust.Celebration.dotColor
         assertFalse(v == n)
         assertFalse(n == w)
         assertFalse(v == w)
+        assertFalse(c == v)
+        assertFalse(c == w)
     }
 }

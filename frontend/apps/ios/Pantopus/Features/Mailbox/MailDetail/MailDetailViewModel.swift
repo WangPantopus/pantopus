@@ -41,6 +41,8 @@ public final class MailDetailViewModel {
     public private(set) var couponRedeemInFlight: Bool = false
     /// Gig accept-bid mutation is in-flight; disables the action row.
     public private(set) var gigBidInFlight: Bool = false
+    /// Party RSVP mutation is in-flight; disables the three-way cluster.
+    public private(set) var partyRsvpInFlight: Bool = false
     /// A17.10 — Records file-to-vault mutation in-flight; disables the
     /// "File in vault" CTA while the optimistic flip is rolling.
     public private(set) var recordsFileInFlight: Bool = false
@@ -189,6 +191,68 @@ public final class MailDetailViewModel {
         let optimistic = MailDetailContent.replacingGigAccepted(content, with: gig.accepted())
         state = .loaded(optimistic)
         toast = "Bid accepted"
+    }
+
+    /// A17.9 — Set the user's RSVP on a Party mail item. Backend wiring
+    /// is not yet exposed for personal invites; the projection flips
+    /// locally so the variant swaps into the going-state hero / elf /
+    /// potluck-claim affordances. Mirrors the community RSVP shape so a
+    /// future personal-invite endpoint slots in without a UI churn.
+    public func setPartyRsvp(_ status: PartyRsvpStatus) async {
+        guard case let .loaded(content) = state,
+              content.category == .party,
+              content.partyDetail != nil,
+              !partyRsvpInFlight else { return }
+        partyRsvpInFlight = true
+        defer { partyRsvpInFlight = false }
+        let confirmedAtLabel = status == .going ? Self.partyRsvpStamp(now: now()) : nil
+        let optimistic = MailDetailContent.replacingPartyRsvp(
+            content,
+            with: status,
+            confirmedAtLabel: confirmedAtLabel
+        )
+        state = .loaded(optimistic)
+        toast = Self.partyRsvpToast(for: status)
+    }
+
+    /// A17.9 — Adjust the plus-one stepper. Clamped to `0...4` so the
+    /// stepper can't underflow or pile on unbounded headcount in local
+    /// state. Only meaningful in the `going` RSVP state.
+    public func setPartyPlusOneCount(_ count: Int) async {
+        guard case let .loaded(content) = state,
+              content.category == .party,
+              content.partyDetail != nil else { return }
+        let clamped = max(0, min(count, 4))
+        let optimistic = MailDetailContent.replacingPartyPlusOneCount(content, with: clamped)
+        state = .loaded(optimistic)
+    }
+
+    /// A17.9 — Claim (or release) a potluck bring-item. Passing `name == nil`
+    /// releases the claim — the design uses this to flip the "I'll bring it"
+    /// pill back to the unclaimed style.
+    public func togglePartyBringClaim(at index: Int, byName name: String?) async {
+        guard case let .loaded(content) = state,
+              content.category == .party,
+              content.partyDetail != nil else { return }
+        let optimistic = MailDetailContent.replacingPartyBringClaim(content, at: index, by: name)
+        state = .loaded(optimistic)
+        toast = name == nil ? "Released" : "Claimed"
+    }
+
+    private static func partyRsvpToast(for status: PartyRsvpStatus) -> String {
+        switch status {
+        case .going: "You're in"
+        case .maybe: "Saved as maybe"
+        case .notGoing: "Sent regrets"
+        case .undecided: "RSVP cleared"
+        }
+    }
+
+    private static func partyRsvpStamp(now: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        return "Today \(formatter.string(from: now))"
     }
 
     /// A17.7 — Save the memory keepsake straight to the user's default

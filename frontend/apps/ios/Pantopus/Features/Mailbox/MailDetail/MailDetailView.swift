@@ -93,6 +93,8 @@ public struct MailDetailView: View {
             memory(content)
         case .package:
             package(content)
+        case .party:
+            party(content)
         case .records:
             records(content)
         default:
@@ -211,6 +213,26 @@ public struct MailDetailView: View {
                 ackInFlight: viewModel.ackInFlight,
                 onBack: { onBack() },
                 onAcknowledgeDelivery: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func party(_ content: MailDetailContent) -> some View {
+        if let party = content.partyDetail {
+            PartyDetailLayout(
+                content: content,
+                party: party,
+                rsvpInFlight: viewModel.partyRsvpInFlight,
+                onBack: { onBack() },
+                onSetRsvp: { status in Task { await viewModel.setPartyRsvp(status) } },
+                onAdjustPlusOne: { count in Task { await viewModel.setPartyPlusOneCount(count) } },
+                onClaimBring: { index in Task { await viewModel.togglePartyBringClaim(at: index, byName: "You") } },
+                onReleaseBring: { index in Task { await viewModel.togglePartyBringClaim(at: index, byName: nil) } },
                 onOpenSenderProfile: onOpenSenderProfile,
                 onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )

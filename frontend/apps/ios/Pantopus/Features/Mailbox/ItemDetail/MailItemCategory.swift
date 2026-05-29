@@ -29,6 +29,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     case social
     case gig
     case memory
+    case party
     case records
     case general
 
@@ -53,6 +54,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: Theme.Color.cleaning
         case .gig: Theme.Color.handyman // "cat-gigs" orange per A17.6 gig accent
         case .memory: Theme.Color.warning // sun-amber per A17.7 stationery-summer accent
+        case .party: Theme.Color.categoryParty // A17.9 party-invite accent token
         case .records: Theme.Color.categoryRecords // slate-600 per A17.10 archival accent
         case .general: Theme.Color.appTextSecondary
         }
@@ -81,6 +83,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: .users
         case .gig: .handCoins
         case .memory: .heart
+        case .party: .partyPopper
         case .records: .archive
         case .general: .mailbox
         }
@@ -107,6 +110,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: Theme.Color.homeBg
         case .gig: Theme.Color.warningBg
         case .memory: Theme.Color.warningBg
+        case .party: Theme.Color.errorBg // soft rose-50 tint pairs with the categoryParty accent
         case .records: Theme.Color.categoryRecordsBg
         case .general: Theme.Color.appSurfaceSunken
         }
@@ -134,6 +138,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: "Social"
         case .gig: "Gig"
         case .memory: "Memory"
+        case .party: "Party"
         case .records: "Records"
         case .general: "Mail"
         }
@@ -145,6 +150,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         switch self {
         case .certified, .community, .legal, .tax, .memory, .records: .verified
         case .notice, .bill: .warning
+        case .party: .celebration
         default: .neutral
         }
     }

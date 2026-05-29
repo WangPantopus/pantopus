@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
+import app.pantopus.android.data.api.models.mailbox.v2.PartyRsvpStatus
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -40,6 +41,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GenericMailD
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GigDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.MemoryDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PackageDetailLayout
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PartyDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.RecordsDetailLayout
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailTopBar
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarConfig
@@ -65,6 +67,7 @@ fun MailDetailScreen(
     val rsvpInFlight by viewModel.rsvpInFlight.collectAsStateWithLifecycle()
     val couponRedeemInFlight by viewModel.couponRedeemInFlight.collectAsStateWithLifecycle()
     val gigBidInFlight by viewModel.gigBidInFlight.collectAsStateWithLifecycle()
+    val partyRsvpInFlight by viewModel.partyRsvpInFlight.collectAsStateWithLifecycle()
     val recordsFileInFlight by viewModel.recordsFileInFlight.collectAsStateWithLifecycle()
     val saveToVaultInFlight by viewModel.saveToVaultInFlight.collectAsStateWithLifecycle()
     val showsSaveToVault by viewModel.showsSaveToVaultPicker.collectAsStateWithLifecycle()
@@ -88,6 +91,7 @@ fun MailDetailScreen(
                     rsvpInFlight = rsvpInFlight,
                     couponRedeemInFlight = couponRedeemInFlight,
                     gigBidInFlight = gigBidInFlight,
+                    partyRsvpInFlight = partyRsvpInFlight,
                     recordsFileInFlight = recordsFileInFlight,
                     saveToVaultInFlight = saveToVaultInFlight,
                     onBack = onBack,
@@ -96,6 +100,10 @@ fun MailDetailScreen(
                     onRedeemCoupon = viewModel::redeemCoupon,
                     onAcceptGigBid = viewModel::acceptGigBid,
                     onSaveMemory = viewModel::saveMemoryToVault,
+                    onPartyRsvp = viewModel::setPartyRsvp,
+                    onPartyAdjustPlusOne = viewModel::setPartyPlusOneCount,
+                    onPartyClaimBring = { index -> viewModel.togglePartyBringClaim(index, "You") },
+                    onPartyReleaseBring = { index -> viewModel.togglePartyBringClaim(index, null) },
                     onFileRecord = viewModel::fileRecordToVault,
                     onOpenSenderProfile = onOpenSenderProfile,
                     onSaveToVault = viewModel::openSaveToVaultPicker,
@@ -168,6 +176,7 @@ private fun LoadedLayout(
     rsvpInFlight: Boolean,
     couponRedeemInFlight: Boolean,
     gigBidInFlight: Boolean,
+    partyRsvpInFlight: Boolean,
     recordsFileInFlight: Boolean,
     saveToVaultInFlight: Boolean,
     onBack: () -> Unit,
@@ -176,6 +185,10 @@ private fun LoadedLayout(
     onRedeemCoupon: () -> Unit,
     onAcceptGigBid: () -> Unit,
     onSaveMemory: () -> Unit,
+    onPartyRsvp: (PartyRsvpStatus) -> Unit,
+    onPartyAdjustPlusOne: (Int) -> Unit,
+    onPartyClaimBring: (Int) -> Unit,
+    onPartyReleaseBring: (Int) -> Unit,
     onFileRecord: () -> Unit,
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
@@ -191,6 +204,7 @@ private fun LoadedLayout(
     val gig = content.gigDetail
     val memory = content.memoryDetail
     val pkg = content.packageDetail
+    val party = content.partyDetail
     val records = content.recordsDetail
     when {
         content.category == MailItemCategory.Booklet && booklet != null ->
@@ -258,6 +272,19 @@ private fun LoadedLayout(
                 ackInFlight = ackInFlight,
                 onBack = onBack,
                 onAcknowledgeDelivery = onAcknowledge,
+                onOpenSenderProfile = onOpenSenderProfile,
+                onSaveToVault = onSaveToVault,
+            )
+        content.category == MailItemCategory.Party && party != null ->
+            PartyDetailLayout(
+                content = content,
+                party = party,
+                rsvpInFlight = partyRsvpInFlight,
+                onBack = onBack,
+                onSetRsvp = onPartyRsvp,
+                onAdjustPlusOne = onPartyAdjustPlusOne,
+                onClaimBring = onPartyClaimBring,
+                onReleaseBring = onPartyReleaseBring,
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
             )
