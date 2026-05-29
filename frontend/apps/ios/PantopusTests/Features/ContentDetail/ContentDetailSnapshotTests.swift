@@ -25,14 +25,37 @@ final class ContentDetailSnapshotTests: XCTestCase {
             .appendingPathComponent("p8-a09-transactional")
     }
 
-    func test_task_v2_populated_ios_baseline_is_present() throws { try assertBaselineOrSkip("task-v2-populated") }
-    func test_task_v2_no_bids_ios_baseline_is_present() throws { try assertBaselineOrSkip("task-v2-no-bids") }
-    func test_gig_v1_populated_ios_baseline_is_present() throws { try assertBaselineOrSkip("gig-v1-populated") }
-    func test_gig_v1_awarded_ios_baseline_is_present() throws { try assertBaselineOrSkip("gig-v1-awarded") }
-    func test_listing_populated_ios_baseline_is_present() throws { try assertBaselineOrSkip("listing-populated") }
-    func test_listing_sold_ios_baseline_is_present() throws { try assertBaselineOrSkip("listing-sold") }
-    func test_invoice_due_ios_baseline_is_present() throws { try assertBaselineOrSkip("invoice-due") }
-    func test_invoice_paid_ios_baseline_is_present() throws { try assertBaselineOrSkip("invoice-paid") }
+    func test_task_v2_populated_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("task-v2-populated")
+    }
+
+    func test_task_v2_no_bids_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("task-v2-no-bids")
+    }
+
+    func test_gig_v1_populated_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("gig-v1-populated")
+    }
+
+    func test_gig_v1_awarded_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("gig-v1-awarded")
+    }
+
+    func test_listing_populated_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("listing-populated")
+    }
+
+    func test_listing_sold_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("listing-sold")
+    }
+
+    func test_invoice_due_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("invoice-due")
+    }
+
+    func test_invoice_paid_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("invoice-paid")
+    }
 
     private func assertBaselineOrSkip(_ slug: String) throws {
         let url = baselineURL.appendingPathComponent("\(slug)-ios.png")

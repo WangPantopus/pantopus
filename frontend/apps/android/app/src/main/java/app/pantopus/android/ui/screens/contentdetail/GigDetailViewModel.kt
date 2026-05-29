@@ -285,7 +285,7 @@ class GigDetailViewModel
                         categoryChip = null,
                         meta = metaPieces.takeIf { it.isNotEmpty() }?.joinToString(" · "),
                         priceLine = priceLine,
-                        priceCaption = if (priceLine == null) null else if (awarded) "winning bid" else "budget",
+                        priceCaption = gigV1PriceCaption(priceLine, awarded),
                     )
                 val modules =
                     buildList {
@@ -441,4 +441,14 @@ class GigDetailViewModel
                 }.getOrNull()
             }
         }
+    }
+
+private fun gigV1PriceCaption(
+    priceLine: String?,
+    awarded: Boolean,
+): String? =
+    when {
+        priceLine == null -> null
+        awarded -> "winning bid"
+        else -> "budget"
     }

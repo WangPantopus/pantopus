@@ -63,8 +63,8 @@ class InvoiceDetailViewModel
                                 title = "Payment terms",
                                 icon = PantopusIcon.File,
                                 label =
-                                "Net 14 from issue. Pantopus Pay (instant), card, or ACH. " +
-                                    "Late fee 1.5%/mo applies after due date.",
+                                    "Net 14 from issue. Pantopus Pay (instant), card, or ACH. " +
+                                        "Late fee 1.5%/mo applies after due date.",
                             ),
                             noteFromSender,
                         ),

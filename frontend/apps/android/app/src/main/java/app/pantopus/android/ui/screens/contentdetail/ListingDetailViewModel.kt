@@ -93,14 +93,8 @@ class ListingDetailViewModel
                 isViewerOwner: Boolean = false,
             ): ContentDetailContent {
                 val isFree = listing.isFree ?: false
-                val sold = listing.soldAt != null || listing.status == "sold"
-                val priceLine =
-                    when {
-                        isFree -> "Free"
-                        listing.price == null -> "—"
-                        listing.price % 1.0 == 0.0 -> "$${listing.price.toInt()}"
-                        else -> String.format("$%.2f", listing.price)
-                    }
+                val sold = isSold(listing)
+                val priceLine = listingPriceLine(listing, isFree)
                 val imageUrl = listing.firstImage ?: listing.mediaUrls?.firstOrNull()
                 val cover =
                     ContentDetailCover(
@@ -200,6 +194,19 @@ class ListingDetailViewModel
                     dock = dock,
                 )
             }
+
+            private fun isSold(listing: ListingDto): Boolean = listing.soldAt != null || listing.status == "sold"
+
+            private fun listingPriceLine(
+                listing: ListingDto,
+                isFree: Boolean,
+            ): String =
+                when {
+                    isFree -> "Free"
+                    listing.price == null -> "—"
+                    listing.price % 1.0 == 0.0 -> "$${listing.price.toInt()}"
+                    else -> String.format("$%.2f", listing.price)
+                }
 
             private fun inlinePills(
                 listing: ListingDto,
