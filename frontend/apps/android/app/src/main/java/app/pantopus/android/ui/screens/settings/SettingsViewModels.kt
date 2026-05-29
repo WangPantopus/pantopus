@@ -5,13 +5,13 @@ package app.pantopus.android.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.BuildConfig
-import app.pantopus.android.data.api.models.settings.PrivacySettingsDto
-import app.pantopus.android.data.api.models.settings.PrivacySettingsUpdate
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
 import app.pantopus.android.ui.components.ChannelGlyph
+import app.pantopus.android.ui.components.FuzzStop
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListBanner
+import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListFuzz
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListRow
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListUiState
@@ -506,194 +506,261 @@ internal object NotificationCatalog {
 
 // MARK: - Privacy
 
+/**
+ * P7.6 / A14.7 — Privacy preferences. Reshaped to the design's
+ * full-vocabulary frame: two RadioCards (Profile visibility · Address
+ * on profile), a "Map location fuzz" card hosting the `FuzzMap` stepped
+ * slider, an Activity toggle card, and a "Your data" card of
+ * leading-icon action rows + a detached destructive Delete row. A dark
+ * `StealthBanner` rides above the first card in the stealth frame.
+ *
+ * Backend persistence is out of scope (mirrors A14.2 / A14.5) — the new
+ * control set doesn't map onto the existing PrivacySettings fields, so
+ * radios / toggles / fuzz flip local state only; data-export + delete
+ * open placeholders. Copy is the parity contract, mirrored on iOS.
+ */
 @HiltViewModel
 class PrivacySettingsViewModel
     @Inject
-    constructor(
-        private val privacy: PrivacyRepository,
-    ) : ViewModel() {
+    constructor() : ViewModel() {
+        enum class Variant { Populated, Stealth }
+
         val title: String = "Privacy"
+
+        val footerCaption: String
+            get() = if (isStealth) "Stealth · auto-applied May 26, 2026" else "Last updated · Mar 12, 2024"
+
+        private var isStealth: Boolean = false
+        private var visibility: String = "verified"
+        private var address: String = "street"
+        private var fuzz: FuzzStop = FuzzStop.BlockDefault
+        private val activity: MutableMap<String, Boolean> = PrivacyCatalog.seedActivity(stealth = false).toMutableMap()
 
         private val _state = MutableStateFlow<GroupedListUiState>(GroupedListUiState.Loading)
         val state: StateFlow<GroupedListUiState> = _state.asStateFlow()
 
-        private var settings: PrivacySettingsDto? = null
+        private val _banner = MutableStateFlow<GroupedListBanner?>(null)
+        val banner: StateFlow<GroupedListBanner?> = _banner.asStateFlow()
 
         fun load() {
-            _state.value = GroupedListUiState.Loading
-            viewModelScope.launch {
-                when (val result = privacy.settings()) {
-                    is NetworkResult.Success -> {
-                        settings = result.data.settings
-                        rebuild()
-                    }
-                    is NetworkResult.Failure -> {
-                        _state.value = GroupedListUiState.Error("Couldn't load privacy settings.")
-                    }
-                }
-            }
+            rebuild()
+        }
+
+        /** Test / preview seam: boot straight into a variant frame. */
+        fun setVariant(variant: Variant) {
+            isStealth = variant == Variant.Stealth
+            visibility = if (isStealth) "hidden" else "verified"
+            address = if (isStealth) "hidden" else "street"
+            fuzz = if (isStealth) FuzzStop.Neighborhood else FuzzStop.BlockDefault
+            activity.clear()
+            activity.putAll(PrivacyCatalog.seedActivity(isStealth))
+            rebuild()
         }
 
         fun onRadio(rowId: String) {
-            if (!rowId.startsWith("visibility.")) return
-            val value = rowId.removePrefix("visibility.")
-            viewModelScope.launch {
-                persist(PrivacySettingsUpdate(searchVisibility = value)) { it.copy(searchVisibility = value) }
+            when {
+                rowId.startsWith("visibility.") -> visibility = rowId.removePrefix("visibility.")
+                rowId.startsWith("address.") -> address = rowId.removePrefix("address.")
+                else -> return
             }
-        }
-
-        fun onSlider(
-            rowId: String,
-            index: Int,
-        ) {
-            if (rowId != "addressPrecision" || index !in PrecisionStops.indices) return
-            val value = PrecisionStops[index].lowercase()
-            viewModelScope.launch {
-                persist(PrivacySettingsUpdate(addressPrecision = value)) { it.copy(addressPrecision = value) }
-            }
+            rebuild()
         }
 
         fun onToggle(
             rowId: String,
             isOn: Boolean,
         ) {
-            viewModelScope.launch {
-                when (rowId) {
-                    "hideFromSearch" ->
-                        persist(PrivacySettingsUpdate(hideFromSearch = isOn)) { it.copy(hideFromSearch = isOn) }
-                    "showOnlineStatus" ->
-                        persist(PrivacySettingsUpdate(showOnlineStatus = isOn)) { it.copy(showOnlineStatus = isOn) }
-                    "showLastActive" ->
-                        persist(PrivacySettingsUpdate(showLastActive = isOn)) { it.copy(showLastActive = isOn) }
-                    "showReadReceipts" ->
-                        persist(PrivacySettingsUpdate(showReadReceipts = isOn)) { it.copy(showReadReceipts = isOn) }
-                    "shareHomeCheckIns" ->
-                        persist(PrivacySettingsUpdate(shareHomeCheckIns = isOn)) { it.copy(shareHomeCheckIns = isOn) }
-                }
-            }
+            if (!activity.containsKey(rowId)) return
+            activity[rowId] = isOn
+            rebuild()
         }
 
-        private suspend fun persist(
-            update: PrivacySettingsUpdate,
-            applyLocal: (PrivacySettingsDto) -> PrivacySettingsDto,
+        fun onSetFuzz(
+            rowId: String,
+            stop: FuzzStop,
         ) {
-            val previous = settings
-            settings?.let {
-                settings = applyLocal(it)
-                rebuild()
-            }
-            when (val result = privacy.updateSettings(update)) {
-                is NetworkResult.Success -> {
-                    settings = result.data.settings
-                    rebuild()
-                }
-                is NetworkResult.Failure -> {
-                    settings = previous
-                    rebuild()
-                }
-            }
+            if (rowId != PrivacyCatalog.FUZZ) return
+            fuzz = stop
+            rebuild()
         }
 
         private fun rebuild() {
-            val current = settings ?: PrivacySettingsDto()
-            val currentVisibility = current.searchVisibility ?: "verified"
-            val visibilityRows =
-                VisibilityOptions.map { option ->
-                    GroupedListRow(
-                        id = "visibility.${option.id}",
-                        label = option.label,
-                        subtext = option.sub,
-                        control = RowControl.Radio(option.id == currentVisibility),
+            _banner.value =
+                if (isStealth) {
+                    GroupedListBanner(
+                        icon = PantopusIcon.EyeOff,
+                        title = "Stealth mode is on",
+                        subtitle = "Your profile is hidden from search. Existing connections still see you.",
+                        style = GroupedListBanner.Style.Stealth,
                     )
+                } else {
+                    null
                 }
-            val precisionValue = current.addressPrecision ?: "street"
-            val precisionIndex = PrecisionStops.indexOfFirst { it.lowercase() == precisionValue }.coerceAtLeast(1)
-            val precisionRow =
-                GroupedListRow(
-                    id = "addressPrecision",
-                    label = "Precision · ${precisionValue.replaceFirstChar { it.uppercase() }}",
-                    subtext = "How precisely Pantopus shares your address with verified connections.",
-                    control = RowControl.Slider(PrecisionStops, precisionIndex),
-                )
-            val hideRow =
-                GroupedListRow(
-                    id = "hideFromSearch",
-                    label = "Hide from search results",
-                    subtext = "Your address won't appear in neighbor searches.",
-                    control = RowControl.Toggle(current.hideFromSearch ?: false),
-                )
-            val activityRows =
-                listOf(
-                    GroupedListRow(
-                        id = "showOnlineStatus",
-                        label = "Show online status",
-                        control = RowControl.Toggle(current.showOnlineStatus ?: true),
+            _state.value = GroupedListUiState.Loaded(groups())
+        }
+
+        private fun groups(): List<GroupedListGroup> =
+            listOf(
+                visibilityGroup(),
+                addressGroup(),
+                fuzzGroup(),
+                activityGroup(),
+                dataGroup(),
+                deleteGroup(),
+            )
+
+        private fun visibilityGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = "visibility",
+                overline = "Profile visibility",
+                helper =
+                    if (isStealth) {
+                        "Hidden — your profile won't show in search or recommendations."
+                    } else {
+                        "Verified neighbors can find you and start a conversation."
+                    },
+                rows =
+                    PrivacyCatalog.visibilityOptions.map { option ->
+                        GroupedListRow(
+                            id = "visibility.${option.key}",
+                            label = option.label,
+                            subtext = option.sub,
+                            control = RowControl.Radio(option.key == visibility),
+                        )
+                    },
+            )
+
+        private fun addressGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = "address",
+                overline = "Address on profile",
+                helper =
+                    if (isStealth) {
+                        "Address hidden everywhere. Deliveries still route correctly."
+                    } else {
+                        "Street name shows on your profile; full address only to people you hire or sell to."
+                    },
+                rows =
+                    PrivacyCatalog.addressOptions.map { option ->
+                        GroupedListRow(
+                            id = "address.${option.key}",
+                            label = option.label,
+                            subtext = option.sub,
+                            control = RowControl.Radio(option.key == address),
+                        )
+                    },
+            )
+
+        private fun fuzzGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = PrivacyCatalog.FUZZ,
+                overline = "Map location fuzz",
+                helper =
+                    if (isStealth) {
+                        "Pins fuzz to your neighborhood — buyers see only \"Park Slope\", never your block."
+                    } else {
+                        "Pins drop within a block of you. Exact address only shared after a task is accepted."
+                    },
+                rows = emptyList(),
+                fuzz =
+                    GroupedListFuzz(
+                        leadIn = "How exact your task and listing pins appear on the map.",
+                        stop = fuzz,
                     ),
-                    GroupedListRow(
-                        id = "showLastActive",
-                        label = "Show last active time",
-                        control = RowControl.Toggle(current.showLastActive ?: false),
-                    ),
-                    GroupedListRow(
-                        id = "showReadReceipts",
-                        label = "Show read receipts",
-                        subtext = "In direct messages only",
-                        control = RowControl.Toggle(current.showReadReceipts ?: true),
-                    ),
-                    GroupedListRow(
-                        id = "shareHomeCheckIns",
-                        label = "Share home check-ins",
-                        control = RowControl.Toggle(current.shareHomeCheckIns ?: false),
-                    ),
-                )
-            _state.value =
-                GroupedListUiState.Loaded(
-                    groups =
-                        listOf(
-                            GroupedListGroup(
-                                id = "visibility",
-                                overline = "Profile visibility",
-                                helper = "Choose who can find and view your profile.",
-                                rows = visibilityRows,
-                            ),
-                            GroupedListGroup(
-                                id = "address",
-                                overline = "Address sharing",
-                                rows = listOf(precisionRow, hideRow),
-                            ),
-                            GroupedListGroup(
-                                id = "activity",
-                                overline = "Activity",
-                                helper = "Controls what your verified connections can see about your activity.",
-                                rows = activityRows,
-                            ),
+            )
+
+        private fun activityGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = "activity",
+                overline = "Activity",
+                rows =
+                    PrivacyCatalog.activitySpecs.map { spec ->
+                        GroupedListRow(
+                            id = spec.key,
+                            label = spec.label,
+                            subtext = spec.sub,
+                            control = RowControl.Toggle(activity[spec.key] ?: false),
+                        )
+                    },
+            )
+
+        private fun dataGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = "data",
+                overline = "Your data",
+                rows =
+                    listOf(
+                        GroupedListRow(
+                            id = "downloadData",
+                            label = "Download your data",
+                            subtext = "ZIP of profile, tasks, messages — emailed to you",
+                            control = RowControl.Chevron,
+                            leadingIcon = PantopusIcon.Download,
                         ),
-                )
-        }
+                        GroupedListRow(
+                            id = "whatWeCollect",
+                            label = "What we collect",
+                            subtext = "Full data policy & current categories",
+                            control = RowControl.Chevron,
+                            leadingIcon = PantopusIcon.FileText,
+                        ),
+                    ),
+            )
 
-        companion object {
-            data class Option(val id: String, val label: String, val sub: String)
-
-            internal val VisibilityOptions =
-                listOf(
-                    Option("anyone", "Anyone", "Everyone on Pantopus can see your profile."),
-                    Option("verified", "Verified connections only", "Only verified neighbors and people you follow."),
-                    Option("none", "No one", "Your profile is hidden from search and discovery."),
-                )
-
-            internal val PrecisionStops = listOf("Exact", "Street", "Block", "Neighborhood")
-        }
+        private fun deleteGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = "delete",
+                rows =
+                    listOf(
+                        GroupedListRow(
+                            id = "deleteAccount",
+                            label = "Delete account",
+                            subtext = "Permanent. 30-day grace period.",
+                            control = RowControl.Chevron,
+                            destructive = true,
+                        ),
+                    ),
+            )
     }
 
-// MARK: - Helpers
+/**
+ * A14.7 privacy catalog — the radio options, activity specs, and seeds.
+ * Top-level (mirror of the iOS static data) so the view-model stays
+ * lean. Copy here is the parity contract with iOS.
+ */
+internal object PrivacyCatalog {
+    const val FUZZ = "fuzz"
 
-internal fun PrivacySettingsDto.updating(
-    channel: String,
-    map: Map<String, Boolean>,
-): PrivacySettingsDto =
-    when (channel) {
-        "push" -> copy(pushPreferences = map)
-        "email" -> copy(emailPreferences = map)
-        "sms" -> copy(smsPreferences = map)
-        else -> this
-    }
+    data class Option(
+        val key: String,
+        val label: String,
+        val sub: String?,
+    )
+
+    val visibilityOptions: List<Option> =
+        listOf(
+            Option("public", "Public", "Anyone with the link can see your profile"),
+            Option("verified", "Verified neighbors only", "People with a verified address can see you"),
+            Option("connections", "Connections only", "Only people you've interacted with"),
+            Option("hidden", "Hidden", "Profile not browsable. Existing chats still work"),
+        )
+
+    val addressOptions: List<Option> =
+        listOf(
+            Option("full", "Full address", "14 Elm Park Lane, Brooklyn NY"),
+            Option("street", "Street only", "Elm Park Lane, Brooklyn"),
+            Option("neighborhood", "Neighborhood", "Park Slope, Brooklyn"),
+            Option("hidden", "Hidden", "Verified badge shown, address not"),
+        )
+
+    val activitySpecs: List<Option> =
+        listOf(
+            Option("online", "Show online status", "Green dot when you're active"),
+            Option("recent", "Show recent activity", "\"Posted a task 2h ago\" on profile"),
+            Option("nearby", "Appear in nearby search", "Neighbors can find you by proximity"),
+            Option("ratings", "Show ratings publicly", null),
+        )
+
+    fun seedActivity(stealth: Boolean): Map<String, Boolean> = activitySpecs.associate { it.key to !stealth }
+}
+

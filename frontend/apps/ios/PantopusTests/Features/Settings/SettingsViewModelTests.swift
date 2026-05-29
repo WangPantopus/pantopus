@@ -2,10 +2,10 @@
 //  SettingsViewModelTests.swift
 //  PantopusTests
 //
-//  Covers the three Settings data sources: index loads chevron rows
-//  + chips; notifications toggle persists optimistically with
-//  rollback on PATCH failure; privacy radio + slider persist; index
-//  signOut clears auth state.
+//  Covers the Settings index data source: load produces the expected
+//  groups + destructive sign-out card, and every wired sub-route id
+//  surfaces in the index. (A14.5 Notifications + A14.7 Privacy moved to
+//  NotificationSettingsViewModelTests / PrivacyViewModelTests.)
 //
 
 import XCTest
@@ -25,23 +25,6 @@ final class SettingsViewModelTests: XCTestCase {
             retryPolicy: .none
         )
     }
-
-    private static let defaultSettingsJSON = """
-    {"settings":{
-      "user_id":"u_test",
-      "search_visibility":"verified",
-      "address_precision":"street",
-      "hide_from_search":false,
-      "show_online_status":true,
-      "show_last_active":false,
-      "show_read_receipts":true,
-      "share_home_check_ins":false,
-      "push_preferences":{"messages":true,"gigs":true,"listings":false,"mailbox":true,"home":true},
-      "email_preferences":{"messages":false,"gigs":true,"listings":false,"mailbox":true,"home":false},
-      "sms_preferences":{"messages":false,"gigs":false,"listings":false,"mailbox":true,"home":false},
-      "updated_at":"2026-01-01T00:00:00Z"
-    }}
-    """
 
     // MARK: - Index
 
@@ -82,67 +65,5 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertTrue(wired.isSubset(of: allRowIds), "Missing wired row ids: \(wired.subtracting(allRowIds))")
         let placeheld: Set = ["export", "paymentsPayouts"]
         XCTAssertTrue(placeheld.isSubset(of: allRowIds), "Placeholder routes must still surface in the index.")
-    }
-
-    // MARK: - Privacy
-
-    func testPrivacyRadioPersists() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.defaultSettingsJSON),
-            .status(200, body: """
-            {"settings":{
-              "user_id":"u_test",
-              "search_visibility":"none",
-              "address_precision":"street",
-              "hide_from_search":false,
-              "show_online_status":true,
-              "show_last_active":false,
-              "show_read_receipts":true,
-              "share_home_check_ins":false,
-              "updated_at":"2026-01-01T00:00:00Z"
-            }}
-            """)
-        ]
-        let vm = PrivacySettingsViewModel(api: makeAPI())
-        await vm.load()
-        await vm.selectRadio("visibility.none")
-        guard case let .loaded(groups) = vm.state else {
-            XCTFail("Expected .loaded")
-            return
-        }
-        let visibility = groups.first { $0.id == "visibility" }
-        let selected = visibility?.rows.first { row in
-            if case let .radio(isSelected) = row.control { return isSelected }
-            return false
-        }
-        XCTAssertEqual(selected?.id, "visibility.none")
-    }
-
-    func testPrivacySliderPersists() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.defaultSettingsJSON),
-            .status(200, body: """
-            {"settings":{
-              "user_id":"u_test",
-              "search_visibility":"verified",
-              "address_precision":"block",
-              "updated_at":"2026-01-01T00:00:00Z"
-            }}
-            """)
-        ]
-        let vm = PrivacySettingsViewModel(api: makeAPI())
-        await vm.load()
-        await vm.setSlider("addressPrecision", index: 2) // "Block"
-        guard case let .loaded(groups) = vm.state else {
-            XCTFail("Expected .loaded")
-            return
-        }
-        let address = groups.first { $0.id == "address" }
-        let precisionRow = address?.row(id: "addressPrecision")
-        if case let .slider(_, index) = precisionRow?.control {
-            XCTAssertEqual(index, 2)
-        } else {
-            XCTFail("Expected slider on addressPrecision row")
-        }
     }
 }

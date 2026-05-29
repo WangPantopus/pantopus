@@ -47,7 +47,10 @@ import app.pantopus.android.ui.components.ChannelGlyph
 import app.pantopus.android.ui.components.ChannelHeader
 import app.pantopus.android.ui.components.ChannelState
 import app.pantopus.android.ui.components.ChannelTriad
+import app.pantopus.android.ui.components.FuzzStop
+import app.pantopus.android.ui.components.LocationFuzzSlider
 import app.pantopus.android.ui.components.PauseBanner
+import app.pantopus.android.ui.components.StealthBanner
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -69,6 +72,8 @@ data class GroupedListCallbacks(
     val onToggleChannel: (String, ChannelGlyph, Boolean) -> Unit = { _, _, _ -> },
     /** A14.5 — tap on the banner action pill (e.g. Resume). */
     val onTapBanner: () -> Unit = {},
+    /** A14.7 — release the location-fuzz slider on `stop`. */
+    val onSetFuzz: (String, FuzzStop) -> Unit = { _, _ -> },
     val onRetry: () -> Unit = {},
 )
 
@@ -229,23 +234,34 @@ internal fun LoadedFrame(
         }
         if (banner != null) {
             item(key = "banner") {
-                PauseBanner(
-                    icon = banner.icon,
-                    title = banner.title,
-                    subtitle = banner.subtitle,
-                    actionLabel = banner.actionLabel,
-                    modifier =
-                        Modifier
-                            .padding(start = Spacing.s3, end = Spacing.s3, top = Spacing.s3)
-                            .testTag("groupedListBanner"),
-                    onAction = callbacks.onTapBanner,
-                )
+                val bannerModifier =
+                    Modifier
+                        .padding(start = Spacing.s3, end = Spacing.s3, top = Spacing.s3)
+                        .testTag("groupedListBanner")
+                when (banner.style) {
+                    GroupedListBanner.Style.Pause ->
+                        PauseBanner(
+                            icon = banner.icon,
+                            title = banner.title,
+                            subtitle = banner.subtitle,
+                            actionLabel = banner.actionLabel,
+                            modifier = bannerModifier,
+                            onAction = callbacks.onTapBanner,
+                        )
+                    GroupedListBanner.Style.Stealth ->
+                        StealthBanner(
+                            icon = banner.icon,
+                            title = banner.title,
+                            subtitle = banner.subtitle,
+                            modifier = bannerModifier,
+                        )
+                }
             }
         }
         groups.forEach { group ->
             val regular = group.rows.filter { !it.destructive }
             val destructive = group.rows.filter { it.destructive }
-            if (regular.isNotEmpty()) {
+            if (regular.isNotEmpty() || group.fuzz != null) {
                 item(key = "overline_${group.id}") {
                     if (group.overline != null) {
                         Text(
@@ -348,27 +364,36 @@ private fun Card(
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .testTag("groupedListCard_${group.id}"),
     ) {
-        if (group.showsChannelHeader) {
-            ChannelHeader()
-        }
-        rows.forEachIndexed { index, row ->
-            RowItem(
-                row = row,
-                control = optimistic[row.id] ?: row.control,
-                isLast = index == rows.size - 1,
-                optimistic = optimistic,
-                callbacks = callbacks,
-                contentDimmed = contentDimmed,
+        val fuzz = group.fuzz
+        if (fuzz != null) {
+            LocationFuzzSlider(
+                leadIn = fuzz.leadIn,
+                stop = fuzz.stop,
+                onChange = { newStop -> callbacks.onSetFuzz(group.id, newStop) },
             )
-            if (index < rows.size - 1) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .padding(start = Spacing.s4)
-                            .background(PantopusColors.appBorder.copy(alpha = 0.6f)),
+        } else {
+            if (group.showsChannelHeader) {
+                ChannelHeader()
+            }
+            rows.forEachIndexed { index, row ->
+                RowItem(
+                    row = row,
+                    control = optimistic[row.id] ?: row.control,
+                    isLast = index == rows.size - 1,
+                    optimistic = optimistic,
+                    callbacks = callbacks,
+                    contentDimmed = contentDimmed,
                 )
+                if (index < rows.size - 1) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .padding(start = Spacing.s4)
+                                .background(PantopusColors.appBorder.copy(alpha = 0.6f)),
+                    )
+                }
             }
         }
     }
@@ -409,6 +434,23 @@ private fun RowItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
+        row.leadingIcon?.let { leadingIcon ->
+            Box(
+                modifier =
+                    Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.primary50),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = leadingIcon,
+                    contentDescription = null,
+                    size = 16.dp,
+                    tint = PantopusColors.primary600,
+                )
+            }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = row.label,

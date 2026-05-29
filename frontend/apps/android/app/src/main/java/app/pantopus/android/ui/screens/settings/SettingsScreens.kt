@@ -73,23 +73,26 @@ fun NotificationSettingsScreen(
     )
 }
 
-/** T3.1 Privacy preferences (radio + slider + toggles). */
+/** A14.7 Privacy preferences (RadioCards + fuzz slider + toggles + data rows). */
 @Composable
 fun PrivacySettingsScreen(
     onBack: () -> Unit = {},
     viewModel: PrivacySettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val banner by viewModel.banner.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
     GroupedListScreen(
         title = viewModel.title,
         state = state,
+        footerCaption = viewModel.footerCaption,
+        banner = banner,
         callbacks =
             GroupedListCallbacks(
                 onBack = onBack,
                 onToggleRow = viewModel::onToggle,
                 onSelectRadio = viewModel::onRadio,
-                onSetSlider = viewModel::onSlider,
+                onSetFuzz = viewModel::onSetFuzz,
                 onRetry = viewModel::load,
             ),
     )

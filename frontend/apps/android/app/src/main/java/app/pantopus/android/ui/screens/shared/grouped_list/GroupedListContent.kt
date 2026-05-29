@@ -4,6 +4,7 @@ package app.pantopus.android.ui.screens.shared.grouped_list
 
 import androidx.compose.runtime.Immutable
 import app.pantopus.android.ui.components.ChannelGlyph
+import app.pantopus.android.ui.components.FuzzStop
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
@@ -69,6 +70,12 @@ data class GroupedListRow(
     /** Optional secondary line under the label. */
     val subtext: String? = null,
     val control: RowControl,
+    /**
+     * A14.7 — optional leading icon disc (primary-tinted) before the
+     * label. Used by the Privacy "Your data" action rows. `null` for
+     * plain settings rows.
+     */
+    val leadingIcon: PantopusIcon? = null,
     /** Red destructive text + this row lands in its own card. */
     val destructive: Boolean = false,
 )
@@ -87,19 +94,39 @@ data class GroupedListGroup(
      * first element inside the card. `false` for every other surface.
      */
     val showsChannelHeader: Boolean = false,
+    /**
+     * A14.7 — when set, the card renders a `LocationFuzzSlider` (lead-in
+     * + stepped slider + `FuzzMap` preview) instead of `rows`.
+     */
+    val fuzz: GroupedListFuzz? = null,
 )
 
 /**
- * A14.5 — a banner pinned above the groups inside the scroll. The
- * paused-notifications state swaps its Master card for one of these.
- * Rendered by `PauseBanner`.
+ * A14.5 — a banner pinned above the groups inside the scroll. `Pause`
+ * is the warm-amber `PauseBanner` (A14.5, with an action pill);
+ * `Stealth` is the dark `StealthBanner` (A14.7, no action).
  */
 @Immutable
 data class GroupedListBanner(
     val icon: PantopusIcon,
     val title: String,
     val subtitle: String? = null,
-    val actionLabel: String,
+    /** Trailing neutral pill label (e.g. "Resume"). Empty for [Style.Stealth]. */
+    val actionLabel: String = "",
+    val style: Style = Style.Pause,
+) {
+    enum class Style { Pause, Stealth }
+}
+
+/**
+ * A14.7 — drives the Privacy "Map location fuzz" card: a lead-in line,
+ * the stepped `LocationFuzzSlider`, and the `FuzzMap` preview. Carried
+ * on [GroupedListGroup.fuzz].
+ */
+@Immutable
+data class GroupedListFuzz(
+    val leadIn: String,
+    val stop: FuzzStop,
 )
 
 /** Render state for the shell. */

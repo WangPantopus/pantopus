@@ -118,9 +118,7 @@ public struct SettingsView: View {
         case .notifications:
             NotificationSettingsView { popLast() }
         case .privacy:
-            GroupedListView(
-                dataSource: PrivacySettingsViewModel()
-            ) { popLast() }
+            PrivacyView { popLast() }
         default:
             EmptyView()
         }

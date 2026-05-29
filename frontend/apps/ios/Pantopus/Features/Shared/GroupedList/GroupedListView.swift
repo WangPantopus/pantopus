@@ -130,22 +130,15 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                         .accessibilityIdentifier("groupedListHeader")
                 }
                 if let banner = dataSource.banner {
-                    PauseBanner(
-                        icon: banner.icon,
-                        title: banner.title,
-                        subtitle: banner.subtitle,
-                        actionLabel: banner.actionLabel
-                    ) {
-                        Task { await dataSource.tapBanner() }
-                    }
-                    .padding(.horizontal, Spacing.s3)
-                    .padding(.top, Spacing.s3)
-                    .accessibilityIdentifier("groupedListBanner")
+                    bannerView(banner)
+                        .padding(.horizontal, Spacing.s3)
+                        .padding(.top, Spacing.s3)
+                        .accessibilityIdentifier("groupedListBanner")
                 }
                 ForEach(groups) { group in
                     let destructiveRows = group.rows.filter(\.destructive)
                     let regularRows = group.rows.filter { !$0.destructive }
-                    if !regularRows.isEmpty {
+                    if !regularRows.isEmpty || group.fuzz != nil {
                         groupCard(group, rows: regularRows)
                     }
                     ForEach(destructiveRows) { row in
@@ -181,6 +174,27 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     }
 
     @ViewBuilder
+    private func bannerView(_ banner: GroupedListBanner) -> some View {
+        switch banner.style {
+        case .pause:
+            PauseBanner(
+                icon: banner.icon,
+                title: banner.title,
+                subtitle: banner.subtitle,
+                actionLabel: banner.actionLabel
+            ) {
+                Task { await dataSource.tapBanner() }
+            }
+        case .stealth:
+            StealthBanner(
+                icon: banner.icon,
+                title: banner.title,
+                subtitle: banner.subtitle
+            )
+        }
+    }
+
+    @ViewBuilder
     private func groupCard(_ group: GroupedListGroup, rows: [GroupedListRow]) -> some View {
         if let overline = group.overline {
             Text(overline.uppercased())
@@ -193,17 +207,25 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("groupedListOverline_\(group.id)")
         }
-        VStack(spacing: Spacing.s0) {
-            if group.showsChannelHeader {
-                ChannelHeader()
-            }
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                renderRow(row, isLastInCard: index == rows.count - 1)
-                if index < rows.count - 1 {
-                    Rectangle()
-                        .fill(Theme.Color.appBorder.opacity(0.6))
-                        .frame(height: 1)
-                        .padding(.leading, Spacing.s4)
+        Group {
+            if let fuzz = group.fuzz {
+                LocationFuzzSlider(leadIn: fuzz.leadIn, stop: fuzz.stop) { newStop in
+                    flipFuzz(rowId: group.id, stop: newStop)
+                }
+            } else {
+                VStack(spacing: Spacing.s0) {
+                    if group.showsChannelHeader {
+                        ChannelHeader()
+                    }
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        renderRow(row, isLastInCard: index == rows.count - 1)
+                        if index < rows.count - 1 {
+                            Rectangle()
+                                .fill(Theme.Color.appBorder.opacity(0.6))
+                                .frame(height: 1)
+                                .padding(.leading, Spacing.s4)
+                        }
+                    }
                 }
             }
         }
@@ -230,6 +252,9 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     private func renderRow(_ row: GroupedListRow, isLastInCard _: Bool) -> some View {
         let activeControl = optimisticOverrides[row.id] ?? row.control
         let rowBody = HStack(spacing: Spacing.s3) {
+            if let leadingIcon = row.leadingIcon {
+                leadingIconDisc(leadingIcon)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.label)
                     .font(.system(size: 15, weight: .medium))
@@ -479,6 +504,21 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         }
         optimisticOverrides[rowId] = .channelTriad(p: newP, e: newE, s: newS, locked: locked)
         Task { await dataSource.toggleChannel(rowId, channel: glyph, isOn: newValue) }
+    }
+
+    private func flipFuzz(rowId: String, stop: FuzzStop) {
+        // Fuzz state is owned by the data source (local + synchronous
+        // here), so the re-render flows back from `setFuzz`; no optimistic
+        // override is needed and `FuzzMap` animates its own ring.
+        Task { await dataSource.setFuzz(rowId, stop: stop) }
+    }
+
+    private func leadingIconDisc(_ icon: PantopusIcon) -> some View {
+        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+            .fill(Theme.Color.primary50)
+            .frame(width: 32, height: 32)
+            .overlay(Icon(icon, size: 16, color: Theme.Color.primary600))
+            .accessibilityHidden(true)
     }
 
     private func accessibilityLabel(_ row: GroupedListRow, control: RowControl) -> String {

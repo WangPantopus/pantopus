@@ -44,6 +44,10 @@ public struct GroupedListRow: Identifiable, Sendable, Hashable {
     /// "Push, email, SMS").
     public let subtext: String?
     public let control: RowControl
+    /// A14.7 — optional leading icon disc (primary-tinted) before the
+    /// label. Used by the Privacy "Your data" action rows. `nil` for
+    /// plain settings rows.
+    public let leadingIcon: PantopusIcon?
     /// Red destructive text + force this row into its own card. The
     /// shell pulls it out of the group and renders a dedicated card.
     public let destructive: Bool
@@ -53,12 +57,14 @@ public struct GroupedListRow: Identifiable, Sendable, Hashable {
         label: String,
         subtext: String? = nil,
         control: RowControl,
+        leadingIcon: PantopusIcon? = nil,
         destructive: Bool = false
     ) {
         self.id = id
         self.label = label
         self.subtext = subtext
         self.control = control
+        self.leadingIcon = leadingIcon
         self.destructive = destructive
     }
 }
@@ -76,6 +82,10 @@ public struct GroupedListGroup: Identifiable, Sendable, Hashable {
     /// the first element inside the card, above the first row. `false`
     /// for every non-channel surface.
     public let showsChannelHeader: Bool
+    /// A14.7 — when set, the card renders a `LocationFuzzSlider` (lead-in
+    /// + stepped slider + `FuzzMap` preview) instead of `rows`. The
+    /// overline + helper render as usual around it.
+    public let fuzz: GroupedListFuzz?
     public let rows: [GroupedListRow]
 
     public init(
@@ -83,12 +93,14 @@ public struct GroupedListGroup: Identifiable, Sendable, Hashable {
         overline: String? = nil,
         helper: String? = nil,
         showsChannelHeader: Bool = false,
+        fuzz: GroupedListFuzz? = nil,
         rows: [GroupedListRow]
     ) {
         self.id = id
         self.overline = overline
         self.helper = helper
         self.showsChannelHeader = showsChannelHeader
+        self.fuzz = fuzz
         self.rows = rows
     }
 }
@@ -98,22 +110,43 @@ public struct GroupedListGroup: Identifiable, Sendable, Hashable {
 /// Generic + value-typed so other surfaces can reuse it; `PauseBanner`
 /// is the view that renders it.
 public struct GroupedListBanner: Sendable, Hashable {
+    /// Which banner treatment to render. `.pause` is the warm-amber
+    /// `PauseBanner` (A14.5, with an action pill); `.stealth` is the dark
+    /// `StealthBanner` (A14.7, no action).
+    public enum Style: Sendable, Hashable { case pause, stealth }
+
     public let icon: PantopusIcon
     public let title: String
     public let subtitle: String?
-    /// Trailing neutral pill label (e.g. "Resume").
+    /// Trailing neutral pill label (e.g. "Resume"). Empty for `.stealth`.
     public let actionLabel: String
+    public let style: Style
 
     public init(
         icon: PantopusIcon,
         title: String,
         subtitle: String? = nil,
-        actionLabel: String
+        actionLabel: String = "",
+        style: Style = .pause
     ) {
         self.icon = icon
         self.title = title
         self.subtitle = subtitle
         self.actionLabel = actionLabel
+        self.style = style
+    }
+}
+
+/// A14.7 — drives the Privacy "Map location fuzz" card: a lead-in line,
+/// the stepped `LocationFuzzSlider`, and the `FuzzMap` preview. Carried
+/// on `GroupedListGroup.fuzz`.
+public struct GroupedListFuzz: Sendable, Hashable {
+    public let leadIn: String
+    public let stop: FuzzStop
+
+    public init(leadIn: String, stop: FuzzStop) {
+        self.leadIn = leadIn
+        self.stop = stop
     }
 }
 
@@ -162,15 +195,18 @@ public protocol GroupedListDataSource: AnyObject, Observable {
     func toggleChannel(_ rowId: String, channel: ChannelGlyph, isOn: Bool) async
     /// A14.5 — tap on the banner's trailing action pill (e.g. Resume).
     func tapBanner() async
+    /// A14.7 — release the Privacy location-fuzz slider on `stop`.
+    func setFuzz(_ rowId: String, stop: FuzzStop) async
 }
 
-/// Defaults so surfaces that predate A14.5 (and those without a banner
-/// or channel matrix) conform without boilerplate.
+/// Defaults so surfaces that predate A14.5/A14.7 (and those without a
+/// banner, channel matrix, or fuzz slider) conform without boilerplate.
 public extension GroupedListDataSource {
     var banner: GroupedListBanner? { nil }
     var contentDimmed: Bool { false }
     func toggleChannel(_: String, channel _: ChannelGlyph, isOn _: Bool) async {}
     func tapBanner() async {}
+    func setFuzz(_: String, stop _: FuzzStop) async {}
 }
 
 /// Convenience helpers feature view-models reach for in their
