@@ -25,6 +25,23 @@ public struct MailboxRootView: View {
         ListOfRowsView(dataSource: viewModel) {
             MailboxRootHeader(viewModel: viewModel)
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        viewModel.openVacationHold()
+                    } label: {
+                        Label("Vacation hold", systemImage: "calendar")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.vacationHold")
+                } label: {
+                    Icon(.moreVertical, size: 22, color: Theme.Color.appText)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Mailbox settings")
+                .accessibilityIdentifier("mailboxRootSettings")
+            }
+        }
         .accessibilityIdentifier("mailboxRoot")
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .onAppear { Analytics.track(.screenMailboxRootViewed) }

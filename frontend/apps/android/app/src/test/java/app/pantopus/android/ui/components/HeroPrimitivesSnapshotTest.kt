@@ -89,6 +89,27 @@ class HeroPrimitivesSnapshotTest {
     }
 
     @Test
+    fun balanceHero_payoutFooter() {
+        // A14.6 Payments — compact variant: hides arcs + currency chip +
+        // split strip, drops in a "Next payout · date" + frequency pill
+        // row under a smaller 28sp amount.
+        paparazzi.snapshot {
+            HeroFrame {
+                BalanceHero(
+                    overline = "Available to pay out",
+                    amount = "124.50",
+                    currencyCode = "USD",
+                    payoutFooter =
+                        BalanceHeroPayoutFooter(
+                            nextPayoutLabel = "Next payout · Mon, May 27",
+                            frequencyPill = "Weekly",
+                        ),
+                )
+            }
+        }
+    }
+
+    @Test
     fun paperStack_default() {
         paparazzi.snapshot {
             HeroFrame {

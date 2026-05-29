@@ -79,6 +79,12 @@ public enum HubRoute: Hashable {
     case editMaintenance(homeId: String, taskId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
+    /// A14.1 (P5.1) — Per-home Settings index. Reached from the home
+    /// dashboard's top-bar settings affordance.
+    case homeSettings(homeId: String)
+    /// A14.2 (P5.1) — Per-home Security toggles. Reached from the
+    /// per-home Settings `Privacy` row.
+    case homeSecurity(homeId: String)
     case publicProfile(userId: String)
     /// P1.6 — Typed Business Profile screen. Pushed from DiscoverHub
     /// business cards, DiscoverBusinesses row taps, and any other
@@ -224,6 +230,8 @@ public enum HubRoute: Hashable {
     case recentActivity
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
+    /// A14.6 — Settings → Payments deep-link target.
+    case paymentsSettings
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
     case editProfile
     /// Mailbox search target (P4.2). Client-side filter over the user's
@@ -239,6 +247,11 @@ public enum HubRoute: Hashable {
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
     case addGuest(homeId: String)
+    /// A13.4 — Transfer ownership form. Pushed from the Owners list
+    /// "Transfer" action and from `pantopus://homes/:id/owners/transfer`
+    /// deep links. The form owns its own Face ID bottom-sheet confirm so
+    /// no extra modal is wired here.
+    case transferOwnership(homeId: String)
     /// A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
     /// opened from the Gigs feed's list/map toggle. Carries the active
     /// category so the map renders the same filtered window.
@@ -250,6 +263,13 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// A14.8 — Vacation hold (scheduling + active variants). Reached
+    /// from the Mailbox root top-bar settings menu.
+    case vacationHold
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     /// A10.10 — Wallet (earnings-side surface). Reached from the
     /// Settings → "Payments & payouts" row and the
     /// `pantopus://wallet` deep link.
@@ -316,6 +336,34 @@ public struct HubTabRoot: View {
         Task { @MainActor in pop() }
     }
 
+    @MainActor
+    private func handleHomeSettingsRoute(_ route: HomeSettingsRoute, homeId: String) {
+        switch route {
+        case .address, .propertyDetails:
+            path.append(.propertyDetails(homeId: homeId))
+        case .photos:
+            path.append(.placeholder(label: "Photos"))
+        case .documents:
+            path.append(.homeDocs(homeId: homeId))
+        case .accessCodes:
+            path.append(.accessCodes(homeId: homeId, homeName: nil))
+        case .trustedNeighbors:
+            path.append(.placeholder(label: "Trusted neighbors"))
+        case .security:
+            path.append(.homeSecurity(homeId: homeId))
+        case .people:
+            path.append(.homeMembers(homeId: homeId))
+        case .inviteLink:
+            path.append(.placeholder(label: "Invite link"))
+        case .homeNotifications:
+            path.append(.placeholder(label: "Home notifications"))
+        case .leaveHome:
+            path.append(.placeholder(label: "Leave home"))
+        case .cancelClaim:
+            path.append(.placeholder(label: "Cancel claim"))
+        }
+    }
+
     public var body: some View {
         NavigationStack(path: navigationPathBinding) {
             hub
@@ -378,6 +426,13 @@ public struct HubTabRoot: View {
         case let .homeMemberRequests(id):
             path.append(.homeMembers(homeId: id))
             _ = router.consume()
+        case let .homeOwnersTransfer(id):
+            // Push the home's dashboard underneath so a back-tap from the
+            // transfer form lands somewhere useful rather than at the
+            // empty Hub root.
+            path.append(.homeDashboard(homeId: id))
+            path.append(.transferOwnership(homeId: id))
+            _ = router.consume()
         case let .verifyLandlord(id):
             path.append(.verifyLandlord(homeId: id))
             _ = router.consume()
@@ -398,6 +453,9 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case .wallet:
             path.append(.wallet)
+            _ = router.consume()
+        case .paymentsSettings:
+            path.append(.paymentsSettings)
             _ = router.consume()
         case .createBusiness:
             path.append(.createBusiness)
@@ -422,6 +480,21 @@ public struct HubTabRoot: View {
             if !id.isEmpty {
                 path.append(.manageTrain(trainId: id))
             }
+            _ = router.consume()
+        case .vacationHold:
+            // A14.8 — `pantopus://mailbox/vacation` lands users on the
+            // Vacation hold screen via the Hub stack. We push through
+            // the Mailbox root so Back goes to the mailbox, not the
+            // hub home, matching the in-app entry point.
+            path.append(.mailboxRoot)
+            path.append(.vacationHold)
+            _ = router.consume()
+        case .mailDay:
+            // pantopus://mailbox/mailday lands on the Mailbox root first
+            // so Back walks back through the drawer view, then pushes
+            // the day editor on top.
+            path.append(.mailboxRoot)
+            path.append(.mailDay(variant: .populated))
             _ = router.consume()
         case let .businessProfile(businessId):
             path.append(.businessProfile(businessId: businessId))
@@ -658,6 +731,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenPropertyDetails: { id in
                     Task { @MainActor in push(.propertyDetails(homeId: id)) }
+                },
+                onOpenSettings: { id in
+                    Task { @MainActor in push(.homeSettings(homeId: id)) }
                 }
             )
         case let .homeMaintenance(homeId):
@@ -1048,6 +1124,18 @@ public struct HubTabRoot: View {
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId) {
                 modalRoute = HubModalRoute(route: .addGuest(homeId: homeId))
+            }
+        case let .homeSettings(homeId):
+            HomeSettingsView(
+                viewModel: HomeSettingsViewModel(homeId: homeId) { route in
+                    handleHomeSettingsRoute(route, homeId: homeId)
+                }
+            ) {
+                pop()
+            }
+        case let .homeSecurity(homeId):
+            HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: homeId)) {
+                pop()
             }
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
@@ -1647,6 +1735,25 @@ public struct HubTabRoot: View {
                 },
                 onSignedOut: { Task { @MainActor in pop() } }
             )
+        case .paymentsSettings:
+            SettingsView(
+                initialRoute: .payments,
+                onClose: { Task { @MainActor in pop() } },
+                onEditProfile: { Task { @MainActor in push(.editProfile) } },
+                onOpenReviewClaims: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.reviewClaims)
+                    }
+                },
+                onOpenWallet: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.wallet)
+                    }
+                },
+                onSignedOut: { Task { @MainActor in pop() } }
+            )
         case .editProfile:
             // `EditProfileView` reads `@Environment(\.dismiss)` and uses
             // it for both Close and save-success pop. Inside a
@@ -1704,6 +1811,10 @@ public struct HubTabRoot: View {
             AddGuestFormView(
                 viewModel: AddGuestFormViewModel(homeId: homeId)
             )
+        case let .transferOwnership(homeId):
+            TransferOwnershipView(
+                viewModel: TransferOwnershipViewModel(homeId: homeId)
+            )
         case let .tasksMap(categoryKey):
             TasksMapView(
                 viewModel: TasksMapViewModel(
@@ -1739,11 +1850,23 @@ public struct HubTabRoot: View {
                     },
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
-                    onBrowseGigs: { push(.gigsFeed) }
+                    onOpenMailDay: { push(.mailDay(variant: .populated)) },
+                    onBrowseGigs: { push(.gigsFeed) },
+                    onOpenVacationHold: { push(.vacationHold) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case .vacationHold:
+            VacationHoldView(
+                viewModel: VacationHoldViewModel {
+                    pop()
+                }
+            )
+        case let .mailDay(variant):
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                pop()
+            }
         case .wallet:
             WalletView(
                 onBack: pop,

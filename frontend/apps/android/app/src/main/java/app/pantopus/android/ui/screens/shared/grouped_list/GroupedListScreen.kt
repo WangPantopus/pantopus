@@ -69,6 +69,13 @@ fun GroupedListScreen(
     state: GroupedListUiState,
     callbacks: GroupedListCallbacks = GroupedListCallbacks(),
     footerCaption: String? = null,
+    /**
+     * Optional hero / identity strip rendered above the first group
+     * inside the scrollable area. Used by per-home settings screens
+     * (A14.1) to host an identity card; null for vanilla settings
+     * surfaces.
+     */
+    header: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -86,6 +93,7 @@ fun GroupedListScreen(
                     groups = state.groups,
                     callbacks = callbacks,
                     footerCaption = footerCaption,
+                    header = header,
                 )
         }
     }
@@ -172,6 +180,7 @@ internal fun LoadedFrame(
     groups: List<GroupedListGroup>,
     callbacks: GroupedListCallbacks,
     footerCaption: String?,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val optimistic = remember { mutableStateMapOf<String, RowControl>() }
     LaunchedEffect(groups) {
@@ -190,6 +199,16 @@ internal fun LoadedFrame(
         modifier = Modifier.fillMaxSize().testTag("groupedListContent"),
         contentPadding = PaddingValues(bottom = Spacing.s6),
     ) {
+        if (header != null) {
+            item(key = "header") {
+                Box(
+                    modifier =
+                        Modifier
+                            .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
+                            .testTag("groupedListHeader"),
+                ) { header() }
+            }
+        }
         groups.forEach { group ->
             val regular = group.rows.filter { !it.destructive }
             val destructive = group.rows.filter { it.destructive }

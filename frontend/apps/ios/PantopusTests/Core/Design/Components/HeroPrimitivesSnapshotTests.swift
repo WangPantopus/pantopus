@@ -92,6 +92,23 @@ final class HeroPrimitivesSnapshotTests: XCTestCase {
         }
     }
 
+    func testBalanceHero_payoutFooter() {
+        // A14.6 Payments — compact variant: hides arcs + currency chip +
+        // split strip, drops in a "Next payout · date" + frequency pill
+        // row under a smaller 28pt amount.
+        assertRenders("BalanceHero payout footer", size: CGSize(width: 360, height: 140)) {
+            BalanceHero(
+                overline: "Available to pay out",
+                amount: "124.50",
+                currencyCode: "USD",
+                payoutFooter: BalanceHero.PayoutFooter(
+                    nextPayoutLabel: "Next payout · Mon, May 27",
+                    frequencyPill: "Weekly"
+                )
+            )
+        }
+    }
+
     // MARK: - PaperStack
 
     func testPaperStack_default() {

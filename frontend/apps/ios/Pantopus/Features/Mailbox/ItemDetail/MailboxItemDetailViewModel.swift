@@ -159,6 +159,10 @@ public struct PackageContents: Sendable, Hashable {
 /// Data for the Package body sub-card.
 public struct PackageBodyContent: Sendable {
     public let carrier: String
+    public let service: String?
+    public let dimensions: String?
+    public let weight: String?
+    public let trackingUrl: String?
     public let etaLine: String?
     public let status: PackageDeliveryStatus
     public let trackingNumber: String?
@@ -172,6 +176,10 @@ public struct PackageBodyContent: Sendable {
 
     public init(
         carrier: String,
+        service: String? = nil,
+        dimensions: String? = nil,
+        weight: String? = nil,
+        trackingUrl: String? = nil,
         etaLine: String? = nil,
         status: PackageDeliveryStatus = .inTransit,
         trackingNumber: String? = nil,
@@ -184,6 +192,10 @@ public struct PackageBodyContent: Sendable {
         contents: PackageContents? = nil
     ) {
         self.carrier = carrier
+        self.service = service
+        self.dimensions = dimensions
+        self.weight = weight
+        self.trackingUrl = trackingUrl
         self.etaLine = etaLine
         self.status = status
         self.trackingNumber = trackingNumber
@@ -217,6 +229,10 @@ public struct PackageBodyContent: Sendable {
     fileprivate func receivedCopy() -> PackageBodyContent {
         PackageBodyContent(
             carrier: carrier,
+            service: service,
+            dimensions: dimensions,
+            weight: weight,
+            trackingUrl: trackingUrl,
             etaLine: etaLine,
             status: .delivered,
             trackingNumber: trackingNumber,

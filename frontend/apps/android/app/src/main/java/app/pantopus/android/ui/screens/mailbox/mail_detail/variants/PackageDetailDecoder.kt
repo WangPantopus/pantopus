@@ -24,10 +24,11 @@ import app.pantopus.android.ui.theme.PantopusIcon
 fun decodePackageDetail(payload: Map<String, Any?>?): PackageBodyContent? {
     if (payload == null) return null
     val status = PackageDeliveryStatus.fromRaw(payload["status"] as? String)
-    val carrier =
-        (payload["carrier"] as? String)
-            ?: (payload["service"] as? String)
+    val service =
+        (payload["service"] as? String)
             ?: (payload["delivery_service"] as? String)
+            ?: (payload["mail_service"] as? String)
+    val carrier = (payload["carrier"] as? String) ?: service
     val trackingNumber =
         (payload["tracking_number"] as? String)
             ?: (payload["tracking"] as? String)
@@ -36,6 +37,10 @@ fun decodePackageDetail(payload: Map<String, Any?>?): PackageBodyContent? {
     if (carrier == null && trackingNumber == null) return null
     return PackageBodyContent(
         carrier = carrier ?: "Pantopus Mail",
+        service = service,
+        dimensions = (payload["dimensions"] as? String) ?: (payload["size"] as? String),
+        weight = payload["weight"] as? String,
+        trackingUrl = (payload["tracking_url"] as? String) ?: (payload["carrier_url"] as? String),
         etaLine = (payload["eta_line"] as? String) ?: (payload["eta"] as? String),
         status = status,
         trackingNumber = trackingNumber,

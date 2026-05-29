@@ -20,9 +20,16 @@ public enum YouRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map (physical postal venues), reached from the root.
     case mailboxMap
+    /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
+    /// Pushed from the Mailbox root header CTA + the
+    /// `pantopus://mailbox/mailday` deep link.
+    case mailDay(variant: MailDayVariant)
     case mailItemDetail(mailId: String)
     /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
     case mailboxSearch
+    /// A14.8 — Vacation hold (scheduling + active variants). Reached
+    /// from the Mailbox root top-bar settings menu.
+    case vacationHold
     case settings
     case placeholder(label: String)
     case helpCenter
@@ -786,11 +793,17 @@ public struct YouTabRoot: View {
                     },
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
-                    onBrowseGigs: { path.append(.gigsFeed) }
+                    onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
+                    onBrowseGigs: { path.append(.gigsFeed) },
+                    onOpenVacationHold: { path.append(.vacationHold) }
                 )
             )
         case .mailboxMap:
             MailboxMapView { Task { @MainActor in pop() } }
+        case let .mailDay(variant):
+            MailDayView(viewModel: MailDayViewModel(variant: variant)) {
+                Task { @MainActor in pop() }
+            }
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(
@@ -803,6 +816,12 @@ public struct YouTabRoot: View {
                         }
                     }
                 )
+            )
+        case .vacationHold:
+            VacationHoldView(
+                viewModel: VacationHoldViewModel {
+                    Task { @MainActor in pop() }
+                }
             )
         case let .mailItemDetail(mailId):
             // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will

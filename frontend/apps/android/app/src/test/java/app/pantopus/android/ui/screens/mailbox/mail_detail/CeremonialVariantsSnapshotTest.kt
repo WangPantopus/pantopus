@@ -206,6 +206,25 @@ class CeremonialVariantsSnapshotTest {
         }
     }
 
+    @Test
+    fun package_layout_ups_delivered() {
+        paparazzi.snapshot {
+            Root {
+                PackageDetailLayout(
+                    content =
+                        makeContent(category = MailItemCategory.Package, title = "UPS package delivered")
+                            .copy(isAcknowledged = true),
+                    packageDetail = MailItemSampleData.packageUpsDelivered,
+                    ackInFlight = false,
+                    onBack = {},
+                    onAcknowledgeDelivery = {},
+                    onOpenSenderProfile = {},
+                    onSaveToVault = {},
+                )
+            }
+        }
+    }
+
     private fun makeContent(
         category: MailItemCategory,
         title: String,
