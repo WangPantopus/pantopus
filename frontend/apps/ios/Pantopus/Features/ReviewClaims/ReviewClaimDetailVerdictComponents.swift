@@ -142,7 +142,9 @@ private struct VerdictButton: View {
         .disabled(disabled)
     }
 
-    private var cornerRadius: CGFloat { style == .accept ? Radii.lg : 10 }
+    private var cornerRadius: CGFloat {
+        style == .accept ? Radii.lg : 10
+    }
 
     private var foreground: Color {
         switch style {

@@ -34,7 +34,9 @@ public enum ChallengeReason: String, CaseIterable, Sendable, Hashable, Identifia
     case dontRecognize
     case other
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

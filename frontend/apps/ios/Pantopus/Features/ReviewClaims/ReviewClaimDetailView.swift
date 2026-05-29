@@ -319,8 +319,8 @@ enum ReviewClaimMap {
         return note?.isEmpty == false
             ? note
             : "I bought a 25% stake from Mateo when he moved out in 2018. " +
-                "We never got around to recording the transfer on Pantopus, " +
-                "but the deed is on file with Kings County and ConEd has been in my name since."
+            "We never got around to recording the transfer on Pantopus, " +
+            "but the deed is on file with Kings County and ConEd has been in my name since."
     }
 
     static func statementAttribution(_ detail: AdminClaimDetailResponse) -> String? {

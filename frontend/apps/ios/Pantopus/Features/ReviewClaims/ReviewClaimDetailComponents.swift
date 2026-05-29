@@ -20,7 +20,7 @@ import SwiftUI
 // MARK: - Presentation models
 
 /// Tone palette for a `TrustChip`. Drawn entirely from `Theme.Color`.
-enum TrustChipTone: Sendable {
+enum TrustChipTone {
     case success
     case warn
     case neutral
@@ -31,11 +31,13 @@ struct TrustChipModel: Identifiable, Hashable {
     let icon: PantopusIcon
     let label: String
     let tone: TrustChipTone
-    var id: String { label }
+    var id: String {
+        label
+    }
 }
 
 /// Synthetic preview style for an evidence thumbnail.
-enum EvidenceKind: Sendable {
+enum EvidenceKind {
     case deed
     case photo
     case utility
@@ -241,7 +243,7 @@ struct ClaimantCard: View {
 
     private var initials: String {
         let parts = model.name.split(separator: " ").prefix(2)
-        let letters = parts.compactMap { $0.first }.map(String.init).joined()
+        let letters = parts.compactMap(\.first).map(String.init).joined()
         return letters.isEmpty ? "?" : letters.uppercased()
     }
 }
@@ -343,7 +345,7 @@ private struct EvidencePreview: View {
         }
     }
 
-    // White page with title + ruled body lines + a sky "recorded" stamp.
+    /// White page with title + ruled body lines + a sky "recorded" stamp.
     private var deed: some View {
         VStack(alignment: .leading, spacing: 2.5) {
             line(width: 0.6, color: Theme.Color.appTextStrong, height: 4)
@@ -367,7 +369,7 @@ private struct EvidencePreview: View {
         .padding(Spacing.s2)
     }
 
-    // Warm fall-sunset porch: gradient sky, dark porch, cream door, sun.
+    /// Warm fall-sunset porch: gradient sky, dark porch, cream door, sun.
     private var photo: some View {
         GeometryReader { geo in
             let w = geo.size.width
@@ -395,7 +397,7 @@ private struct EvidencePreview: View {
         }
     }
 
-    // Utility bill: sky logo bar, ruled lines, a faint "shimmer" line, total.
+    /// Utility bill: sky logo bar, ruled lines, a faint "shimmer" line, total.
     private var utility: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
@@ -425,7 +427,7 @@ private struct EvidencePreview: View {
         .padding(Spacing.s2)
     }
 
-    // Signed statement: ruled body + a stylised handwritten signature.
+    /// Signed statement: ruled body + a stylised handwritten signature.
     private var signedStatement: some View {
         VStack(alignment: .leading, spacing: 2.5) {
             line(width: 0.85)
