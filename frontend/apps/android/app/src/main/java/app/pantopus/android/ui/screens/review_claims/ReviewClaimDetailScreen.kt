@@ -11,9 +11,9 @@
 
 package app.pantopus.android.ui.screens.review_claims
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -62,9 +62,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,6 +88,7 @@ import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.util.Locale
 
 /**
  * Test tag on the Review Claim Detail screen. Mirrors iOS
@@ -1042,9 +1043,30 @@ private fun SignedStatementPreview() {
             val path =
                 Path().apply {
                     moveTo(0f, size.height * 0.8f)
-                    cubicTo(size.width * 0.05f, size.height * 0.2f, size.width * 0.2f, 0f, size.width * 0.32f, size.height * 0.1f)
-                    cubicTo(size.width * 0.42f, size.height * 0.2f, size.width * 0.4f, size.height * 0.95f, size.width * 0.5f, size.height * 0.9f)
-                    cubicTo(size.width * 0.62f, size.height * 0.85f, size.width * 0.66f, size.height * 0.1f, size.width * 0.78f, size.height * 0.25f)
+                    cubicTo(
+                        size.width * 0.05f,
+                        size.height * 0.2f,
+                        size.width * 0.2f,
+                        0f,
+                        size.width * 0.32f,
+                        size.height * 0.1f,
+                    )
+                    cubicTo(
+                        size.width * 0.42f,
+                        size.height * 0.2f,
+                        size.width * 0.4f,
+                        size.height * 0.95f,
+                        size.width * 0.5f,
+                        size.height * 0.9f,
+                    )
+                    cubicTo(
+                        size.width * 0.62f,
+                        size.height * 0.85f,
+                        size.width * 0.66f,
+                        size.height * 0.1f,
+                        size.width * 0.78f,
+                        size.height * 0.25f,
+                    )
                     lineTo(size.width * 0.95f, size.height * 0.55f)
                 }
             drawPath(
@@ -1113,7 +1135,7 @@ private fun fileTypeLabel(item: AdminClaimEvidenceDto): String {
 
 private fun sizeLabel(bytes: Int): String =
     if (bytes >= 1_048_576) {
-        String.format("%.1f MB", bytes.toDouble() / 1_048_576.0)
+        String.format(Locale.US, "%.1f MB", bytes.toDouble() / 1_048_576.0)
     } else {
         "${maxOf(1, bytes / 1024)} KB"
     }

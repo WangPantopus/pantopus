@@ -73,24 +73,28 @@ public struct ReviewClaimDetailView: View {
                 rejectNote = ""
             }
         }
-        .sheet(isPresented: $showChallengeSheet, onDismiss: { viewModel.resetChallengeComposer() }) {
-            ChallengeComposerSheet(
-                claimantFirstName: challengeClaimantName,
-                coOwnerCount: 2,
-                question: challengeQuestionBinding,
-                selectedReasons: viewModel.selectedReasons,
-                isSubmitting: viewModel.reviewingAction == .challenge,
-                canSend: viewModel.canSendChallenge,
-                onToggleReason: { viewModel.toggleReason($0) },
-                onSend: {
-                    Task {
-                        let ok = await viewModel.submitChallenge()
-                        if ok { showChallengeSheet = false }
-                    }
-                },
-                onBack: { showChallengeSheet = false }
-            )
-        }
+        .sheet(
+            isPresented: $showChallengeSheet,
+            onDismiss: { viewModel.resetChallengeComposer() },
+            content: {
+                ChallengeComposerSheet(
+                    claimantFirstName: challengeClaimantName,
+                    coOwnerCount: 2,
+                    question: challengeQuestionBinding,
+                    selectedReasons: viewModel.selectedReasons,
+                    isSubmitting: viewModel.reviewingAction == .challenge,
+                    canSend: viewModel.canSendChallenge,
+                    onToggleReason: { viewModel.toggleReason($0) },
+                    onSend: {
+                        Task {
+                            let ok = await viewModel.submitChallenge()
+                            if ok { showChallengeSheet = false }
+                        }
+                    },
+                    onBack: { showChallengeSheet = false }
+                )
+            }
+        )
     }
 
     // MARK: - Bindings / derived
@@ -314,7 +318,9 @@ enum ReviewClaimMap {
         let note = claim.reviewNote?.trimmingCharacters(in: .whitespacesAndNewlines)
         return note?.isEmpty == false
             ? note
-            : "I bought a 25% stake from Mateo when he moved out in 2018. We never got around to recording the transfer on Pantopus, but the deed is on file with Kings County and ConEd has been in my name since."
+            : "I bought a 25% stake from Mateo when he moved out in 2018. " +
+                "We never got around to recording the transfer on Pantopus, " +
+                "but the deed is on file with Kings County and ConEd has been in my name since."
     }
 
     static func statementAttribution(_ detail: AdminClaimDetailResponse) -> String? {
