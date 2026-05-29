@@ -13,6 +13,9 @@ import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.MemoryDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.PartyDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.PartyRsvpStatus
+import app.pantopus.android.data.api.models.mailbox.v2.RecordsDetailDto
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
@@ -84,6 +87,8 @@ data class MailDetailContent(
     val gigDetail: GigDetailDto? = null,
     val memoryDetail: MemoryDetailDto? = null,
     val packageDetail: PackageBodyContent? = null,
+    val partyDetail: PartyDetailDto? = null,
+    val recordsDetail: RecordsDetailDto? = null,
 ) {
     /** Build a typed key-facts row list for the shell's KeyFacts slot. */
     fun keyFacts(): List<MailDetailKeyFact> =
@@ -151,6 +156,14 @@ class MailDetailViewModel
         /** Gig accept-bid mutation in-flight; disables the action row. */
         private val _gigBidInFlight = MutableStateFlow(false)
         val gigBidInFlight: StateFlow<Boolean> = _gigBidInFlight.asStateFlow()
+
+        /** Party RSVP mutation in-flight; disables the three-way cluster. */
+        private val _partyRsvpInFlight = MutableStateFlow(false)
+        val partyRsvpInFlight: StateFlow<Boolean> = _partyRsvpInFlight.asStateFlow()
+
+        /** A17.10 records file-to-vault mutation in-flight; disables the CTA. */
+        private val _recordsFileInFlight = MutableStateFlow(false)
+        val recordsFileInFlight: StateFlow<Boolean> = _recordsFileInFlight.asStateFlow()
 
         /** T6.5e (P19.5) — Save-to-vault picker visibility. */
         private val _showsSaveToVaultPicker = MutableStateFlow(false)
@@ -328,6 +341,75 @@ class MailDetailViewModel
         }
 
         /**
+         * A17.9 — Set the user's RSVP on a Party mail item. Backend
+         * wiring is not yet exposed for personal invites; the projection
+         * flips locally so the variant swaps into the going-state hero /
+         * elf / potluck-claim affordances.
+         */
+        fun setPartyRsvp(status: PartyRsvpStatus) {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val party = current.content.partyDetail ?: return
+            if (_partyRsvpInFlight.value) return
+            _partyRsvpInFlight.value = true
+            val confirmedAtLabel =
+                if (status == PartyRsvpStatus.Going) partyRsvpStamp() else null
+            _state.value =
+                MailDetailUiState.Loaded(
+                    current.content.copy(
+                        partyDetail = party.withRsvp(status, confirmedAtLabel),
+                    ),
+                )
+            _toast.value = partyRsvpToast(status)
+            _partyRsvpInFlight.value = false
+        }
+
+        /**
+         * A17.9 — Adjust the plus-one stepper. Clamped to `0..4`.
+         */
+        fun setPartyPlusOneCount(count: Int) {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val party = current.content.partyDetail ?: return
+            val clamped = count.coerceIn(0, 4)
+            _state.value =
+                MailDetailUiState.Loaded(
+                    current.content.copy(partyDetail = party.withPlusOneCount(clamped)),
+                )
+        }
+
+        /**
+         * A17.9 — Claim (or release) a potluck bring-item. Passing
+         * `name = null` releases the claim — design uses this to flip
+         * "I'll bring it" back to the unclaimed style.
+         */
+        fun togglePartyBringClaim(
+            index: Int,
+            name: String?,
+        ) {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val party = current.content.partyDetail ?: return
+            _state.value =
+                MailDetailUiState.Loaded(
+                    current.content.copy(partyDetail = party.withBringClaim(index, name)),
+                )
+            _toast.value = if (name == null) "Released" else "Claimed"
+        }
+
+        private fun partyRsvpToast(status: PartyRsvpStatus): String =
+            when (status) {
+                PartyRsvpStatus.Going -> "You're in"
+                PartyRsvpStatus.Maybe -> "Saved as maybe"
+                PartyRsvpStatus.NotGoing -> "Sent regrets"
+                PartyRsvpStatus.Undecided -> "RSVP cleared"
+            }
+
+        private fun partyRsvpStamp(): String {
+            val formatter =
+                java.time.format.DateTimeFormatter
+                    .ofPattern("h:mm a", java.util.Locale.US)
+            return "Today ${formatter.format(java.time.LocalTime.now())}"
+        }
+
+        /**
          * A17.7 — Save the memory keepsake to the user's default
          * memories vault folder. Falls through to the picker if no
          * folders are cached yet; once cached, prefers a folder whose
@@ -347,6 +429,33 @@ class MailDetailViewModel
             } else {
                 saveToVault(folderId)
             }
+        }
+
+        /**
+         * A17.10 — File the archival record in its suggested vault folder.
+         * Stub: flips the local `isFiled` flag and toasts (the real
+         * vault-filing backend is out of scope for P6.6). The body
+         * prepends the Status row, swaps the hero stamp + retention
+         * banner, switches the elf copy, and reveals the related strip.
+         */
+        fun fileRecordToVault() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val records = current.content.recordsDetail ?: return
+            if (current.content.category != MailItemCategory.Records || records.isFiled) return
+            if (_recordsFileInFlight.value) return
+            _recordsFileInFlight.value = true
+            _state.value =
+                MailDetailUiState.Loaded(
+                    current.content.copy(
+                        recordsDetail =
+                            records.copy(
+                                isFiled = true,
+                                filedAtLabel = "Today 2:14 PM · retention 7y",
+                            ),
+                    ),
+                )
+            _toast.value = "Filed in Vault"
+            _recordsFileInFlight.value = false
         }
 
         private fun currentUnsavedMemoryContent(): Pair<MailDetailContent, MemoryDetailDto>? {
@@ -444,6 +553,8 @@ class MailDetailViewModel
                     gigDetail = variants.gig,
                     memoryDetail = variants.memory,
                     packageDetail = variants.packageDetail,
+                    partyDetail = variants.party,
+                    recordsDetail = variants.records,
                 )
             }
 
@@ -455,6 +566,8 @@ class MailDetailViewModel
                 val gig: GigDetailDto?,
                 val memory: MemoryDetailDto?,
                 val packageDetail: PackageBodyContent?,
+                val party: PartyDetailDto?,
+                val records: RecordsDetailDto?,
             )
 
             private fun bodyParagraphs(content: String?): List<String> =
@@ -509,6 +622,26 @@ class MailDetailViewModel
                     packageDetail =
                         if (category == MailItemCategory.Package) {
                             decodePackageDetail(payload)
+                        } else {
+                            null
+                        },
+                    // Backend ingestion for personal invites is not yet
+                    // wired; fall back to the deterministic fixture so the
+                    // A17.9 variant lights up the moment a user opens a
+                    // party-categorised mail. Once the wire schema ships,
+                    // `PartyDetailDto.decodeFromObjectPayload(...)` returns
+                    // the real payload and this fallback becomes dead code.
+                    party =
+                        if (category == MailItemCategory.Party) {
+                            PartyDetailDto.decodeFromObjectPayload(payload)
+                                ?: app.pantopus.android.ui.screens.mailbox.item_detail.MailItemSampleData
+                                    .partyInvite
+                        } else {
+                            null
+                        },
+                    records =
+                        if (category == MailItemCategory.Records) {
+                            RecordsDetailDto.decodeFromObjectPayload(payload)
                         } else {
                             null
                         },

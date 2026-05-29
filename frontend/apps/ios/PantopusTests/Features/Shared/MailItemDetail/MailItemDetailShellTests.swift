@@ -233,11 +233,14 @@ final class MailItemDetailShellTests: XCTestCase {
         let v = MailDetailTrust.verified.dotColor
         let n = MailDetailTrust.neutral.dotColor
         let w = MailDetailTrust.warning.dotColor
+        let c = MailDetailTrust.celebration.dotColor
         // SwiftUI's Color isn't Equatable on raw RGB, but identity via
         // description is good enough for the smoke contract.
         XCTAssertNotEqual(String(describing: v), String(describing: n))
         XCTAssertNotEqual(String(describing: n), String(describing: w))
         XCTAssertNotEqual(String(describing: v), String(describing: w))
+        XCTAssertNotEqual(String(describing: c), String(describing: v))
+        XCTAssertNotEqual(String(describing: c), String(describing: w))
     }
 }
 

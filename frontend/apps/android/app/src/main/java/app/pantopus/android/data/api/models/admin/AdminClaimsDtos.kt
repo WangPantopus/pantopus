@@ -42,7 +42,16 @@ enum class AdminClaimBucket(val backendValue: String) {
 enum class AdminClaimReviewAction(val backendValue: String) {
     Approve("approve"),
     Reject("reject"),
-    RequestMoreInfo("request_more_info"),
+
+    /**
+     * `Challenge` keeps the legacy `request_more_info` wire value — the
+     * A13.3 reshape renamed the reviewer-facing verdict from "Request more
+     * info" to "Challenge" (an inline composer with reason chips), but the
+     * backend route still classifies it as `request_more_info` and flips
+     * the claim into the `challenged` phase
+     * (`backend/routes/admin.js:399`).
+     */
+    Challenge("request_more_info"),
 }
 
 /** Enriched home payload joined onto every admin claim row. */
@@ -144,6 +153,9 @@ data class AdminClaimRecordDto(
     @Json(name = "reviewed_by") val reviewedBy: String?,
     @Json(name = "reviewed_at") val reviewedAt: String?,
     @Json(name = "review_note") val reviewNote: String?,
+    // Claimant identity-verification state — `not_started | pending |
+    // verified | failed`. Drives the "Verified ID" trust chip (A13.3).
+    @Json(name = "identity_status") val identityStatus: String? = null,
 )
 
 /** Full claim detail envelope returned by `GET /api/admin/claims/:claimId`. */

@@ -21,5 +21,22 @@ object StartSupportTrainSampleData {
     const val VERIFIED_CONTEXT_NOTE: String =
         "Maya is home after knee surgery on the 12th. Meals, dog walks for Pixel, and rides to PT would help."
 
+    /** Mutual connections shared with the verified neighbor — drives the
+     *  recipient card's micro-avatar strip ("2 mutuals: Marisa, Devon"). */
+    val mutuals: List<StartSupportTrainMutual> =
+        listOf(
+            StartSupportTrainMutual(id = "u_marisa_lee", name = "Marisa"),
+            StartSupportTrainMutual(id = "u_devon_park", name = "Devon"),
+        )
+
     const val INVITE_QUERY: String = "David Chen"
+
+    /** The Frame-2 invite candidate built from the typed query plus
+     *  stubbed contact handles (real contact-picker is out of scope). */
+    val inviteCandidate =
+        StartSupportTrainInviteCandidate(
+            typedName = INVITE_QUERY,
+            phone = "+1 (415) 555-0142",
+            email = "d.chen@example.com",
+        )
 }

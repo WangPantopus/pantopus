@@ -238,6 +238,16 @@ class IconTest {
             "forward",
             "keyboard",
             "undo-2",
+            // A17.9 — Party invite detail glyphs.
+            "quote",
+            "cloud-sun",
+            "shirt",
+            "x-circle",
+            "bell-off",
+            "minus",
+            "user-minus",
+            "calendar-check",
+            "calendar-plus",
             // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
             "credit-card",
         )
