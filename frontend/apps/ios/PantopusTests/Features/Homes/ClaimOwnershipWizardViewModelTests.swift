@@ -37,7 +37,8 @@ final class ClaimOwnershipWizardViewModelTests: XCTestCase {
         ClaimOwnershipWizardViewModel(
             homeId: "home-1",
             api: makeAPI(),
-            uploader: makeUploader()
+            uploader: makeUploader(),
+            isOnlineProvider: { true }
         )
     }
 

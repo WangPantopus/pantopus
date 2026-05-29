@@ -90,16 +90,7 @@ struct UploadSlot: View {
             HStack(spacing: Spacing.s3) {
                 iconDisc(.upload)
                 VStack(alignment: .leading, spacing: Spacing.s1) {
-                    (
-                        Text(label)
-                            .font(.system(size: 13.5, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appText)
-                        + (required
-                            ? Text("  *")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Theme.Color.error)
-                            : Text(""))
-                    )
+                    requiredLabelText
                     Text(hint)
                         .font(.system(size: 11.5))
                         .foregroundStyle(Theme.Color.appTextSecondary)
@@ -133,14 +124,7 @@ struct UploadSlot: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
-                    (
-                        Text("Uploading · \(file.sizeLabel) · ")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                        + Text("\(Int((progress * 100).rounded()))%")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Theme.Color.primary600)
-                    )
+                    uploadProgressText(file: file, progress: progress)
                 }
                 Spacer(minLength: Spacing.s0)
                 removeButton(icon: .x, background: Theme.Color.appSurfaceSunken)
@@ -197,14 +181,9 @@ struct UploadSlot: View {
                 )
             }
             .frame(width: 18, height: 18)
-            (
-                Text(isWarn ? UploadSlotState.differLead : UploadSlotState.matchLead)
-                    .font(.system(size: 11.5, weight: .semibold))
-                + Text(" \(detail)")
-                    .font(.system(size: 11.5))
-            )
-            .foregroundStyle(isWarn ? Theme.Color.warning : Theme.Color.success)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            ocrDetailText(detail: detail, isWarn: isWarn)
+                .foregroundStyle(isWarn ? Theme.Color.warning : Theme.Color.success)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(Spacing.s2)
         .background(isWarn ? Theme.Color.warningBg : Theme.Color.successBg)
@@ -212,6 +191,33 @@ struct UploadSlot: View {
     }
 
     // MARK: - Shared bits
+
+    private var requiredLabelText: Text {
+        let base = Text(label)
+            .font(.system(size: 13.5, weight: .semibold))
+            .foregroundStyle(Theme.Color.appText)
+        guard required else { return base }
+        return base
+            + Text("  *")
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(Theme.Color.error)
+    }
+
+    private func uploadProgressText(file: UploadSlotFile, progress: Double) -> Text {
+        Text("Uploading · \(file.sizeLabel) · ")
+            .font(.system(size: 11))
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            + Text("\(Int((progress * 100).rounded()))%")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Theme.Color.primary600)
+    }
+
+    private func ocrDetailText(detail: String, isWarn: Bool) -> Text {
+        Text(isWarn ? UploadSlotState.differLead : UploadSlotState.matchLead)
+            .font(.system(size: 11.5, weight: .semibold))
+            + Text(" \(detail)")
+            .font(.system(size: 11.5))
+    }
 
     private func iconDisc(_ icon: PantopusIcon) -> some View {
         RoundedRectangle(cornerRadius: Radii.md, style: .continuous)

@@ -14,9 +14,15 @@ final class SequencedURLProtocol: URLProtocol {
         let status: Int
         let body: Data
         let headers: [String: String]
+        let delay: TimeInterval
 
-        static func status(_ code: Int, body: String, headers: [String: String] = [:]) -> Response {
-            Response(status: code, body: Data(body.utf8), headers: headers)
+        static func status(
+            _ code: Int,
+            body: String,
+            headers: [String: String] = [:],
+            delay: TimeInterval = 0
+        ) -> Response {
+            Response(status: code, body: Data(body.utf8), headers: headers, delay: delay)
         }
     }
 
@@ -69,6 +75,9 @@ final class SequencedURLProtocol: URLProtocol {
 
     override func startLoading() {
         let response = Self.nextResponse(for: request)
+        if response.delay > 0 {
+            Thread.sleep(forTimeInterval: response.delay)
+        }
 
         guard let url = request.url,
               let http = HTTPURLResponse(

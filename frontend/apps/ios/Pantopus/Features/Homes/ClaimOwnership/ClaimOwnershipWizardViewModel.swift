@@ -61,17 +61,22 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     private let homeId: String
     private let api: APIClient
     private let uploader: MultipartUploader
+    private let isOnlineProvider: @MainActor () -> Bool
     private let logger = Logger(label: "app.pantopus.ios.ClaimOwnershipWizard")
 
     init(
         homeId: String,
         api: APIClient = .shared,
         uploader: MultipartUploader = .shared,
-        startContent: ClaimOwnershipStartContent? = nil
+        startContent: ClaimOwnershipStartContent? = nil,
+        // Defaults to the live monitor in production. Tests inject a fixed
+        // value so CI simulator reachability does not gate stubbed requests.
+        isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
     ) {
         self.homeId = homeId
         self.api = api
         self.uploader = uploader
+        self.isOnlineProvider = isOnlineProvider
         self.startContent = startContent ?? ClaimOwnershipSampleData.startContent(for: homeId)
         for slot in ClaimEvidenceSlot.allCases {
             slots[slot] = .empty
@@ -201,7 +206,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
 
     func submit() async {
         guard bothSlotsHaveFiles, !isSubmitting else { return }
-        if !NetworkMonitor.shared.isOnline {
+        if !isOnlineProvider() {
             submitError = "You're offline. Try again when you're back online."
             return
         }

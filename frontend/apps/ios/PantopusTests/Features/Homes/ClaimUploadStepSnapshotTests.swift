@@ -172,7 +172,10 @@ private struct SnapshotWizardFrame<Content: View>: View {
 @MainActor
 private final class SnapshotWizardModel: WizardModel {
     let chrome: WizardChrome
-    init(chrome: WizardChrome) { self.chrome = chrome }
+    init(chrome: WizardChrome) {
+        self.chrome = chrome
+    }
+
     func leadingTapped() {}
     func discardConfirmed() {}
     func primaryTapped() {}

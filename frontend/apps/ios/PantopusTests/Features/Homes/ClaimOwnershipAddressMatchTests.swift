@@ -29,7 +29,8 @@ final class ClaimOwnershipAddressMatchTests: XCTestCase {
             uploader: MultipartUploader(
                 environment: .current,
                 session: SequencedURLProtocol.makeSession()
-            )
+            ),
+            isOnlineProvider: { true }
         )
     }
 
@@ -92,7 +93,7 @@ final class ClaimOwnershipAddressMatchTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(201, body: """
             {"message":"ok","claim":{"id":"claim-fh","status":"under_review"}}
-            """),
+            """, delay: 0.2),
             .status(200, body: """
             {"message":"uploaded","file":{"id":"f-1","url":"https://files/pantopus/fh1"}}
             """),
