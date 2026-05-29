@@ -18,7 +18,9 @@ final class GroupedListContractTests: XCTestCase {
             .toggle(isOn: false),
             .radio(isSelected: true),
             .chipStatus(label: "Verified", tone: .success, includesChevron: true),
-            .slider(stops: ["A", "B", "C"], index: 1)
+            .slider(stops: ["A", "B", "C"], index: 1),
+            .channelTriad(p: true, e: false, s: true, locked: []),
+            .channelTriad(p: true, e: true, s: true, locked: [.p])
         ]
         for control in cases {
             let row = GroupedListRow(id: "r", label: "Row", control: control)

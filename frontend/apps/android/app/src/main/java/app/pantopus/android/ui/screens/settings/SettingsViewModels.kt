@@ -10,10 +10,13 @@ import app.pantopus.android.data.api.models.settings.PrivacySettingsUpdate
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
+import app.pantopus.android.ui.components.ChannelGlyph
+import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListBanner
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListRow
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListUiState
 import app.pantopus.android.ui.screens.shared.grouped_list.RowControl
+import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -243,161 +246,263 @@ class SettingsIndexViewModel
 
 // MARK: - Notification preferences
 
+/**
+ * P7.5 / A14.5 — Notification preferences. Reshaped from the old
+ * channel-keyed toggle list into the design's three-channel matrix:
+ * five category cards (Tasks · Pulse · Marketplace · Home & Mailbox ·
+ * Account & security), each row carrying a [ChannelTriad] (Push /
+ * Email / SMS). A Master card on top hosts the Pause-all toggle + a
+ * Quiet-hours row; flipping Pause swaps the Master card for the amber
+ * [PauseBanner] and dims the category cards to 0.5.
+ *
+ * Backend persistence is out of scope for P7.5 (mirrors A14.2 Home
+ * security) — chips / toggles flip local state only. The helper lines
+ * and channel patterns are the parity contract, mirrored word-for-word
+ * in the iOS `NotificationSettingsViewModel`.
+ */
 @HiltViewModel
 class NotificationSettingsViewModel
     @Inject
-    constructor(
-        private val privacy: PrivacyRepository,
-        private val auth: AuthRepository,
-    ) : ViewModel() {
+    constructor() : ViewModel() {
+        enum class Variant { Populated, Paused }
+
         val title: String = "Notifications"
+
+        /** Mono legend pinned at the bottom of the scroll. */
+        val footerCaption: String = "P · Push   E · Email   S · SMS"
+
+        private var isPaused: Boolean = false
+        private val patterns: MutableMap<String, NotificationCatalog.Pattern> =
+            NotificationCatalog.seed().toMutableMap()
 
         private val _state = MutableStateFlow<GroupedListUiState>(GroupedListUiState.Loading)
         val state: StateFlow<GroupedListUiState> = _state.asStateFlow()
 
-        private var settings: PrivacySettingsDto? = null
+        private val _banner = MutableStateFlow<GroupedListBanner?>(null)
+        val banner: StateFlow<GroupedListBanner?> = _banner.asStateFlow()
 
-        private val emailAddress: String?
-            get() = (auth.state.value as? AuthRepository.State.SignedIn)?.user?.email
+        private val _dimmed = MutableStateFlow(false)
+        val dimmed: StateFlow<Boolean> = _dimmed.asStateFlow()
 
         fun load() {
-            _state.value = GroupedListUiState.Loading
-            viewModelScope.launch {
-                when (val result = privacy.settings()) {
-                    is NetworkResult.Success -> {
-                        settings = result.data.settings
-                        rebuild()
-                    }
-                    is NetworkResult.Failure -> {
-                        _state.value = GroupedListUiState.Error("Couldn't load notification settings.")
-                    }
-                }
-            }
+            rebuild()
+        }
+
+        /** Test / preview seam: boot straight into a variant frame. */
+        fun setVariant(variant: Variant) {
+            isPaused = variant == Variant.Paused
+            patterns.clear()
+            patterns.putAll(NotificationCatalog.seed())
+            rebuild()
         }
 
         fun onToggle(
             rowId: String,
             isOn: Boolean,
         ) {
-            val parts = rowId.split(".")
-            if (parts.size != 2) return
-            val (channel, category) = parts
-            val previous = preferenceValue(channel, category)
-            viewModelScope.launch { applyToggle(channel, category, isOn, previous) }
-        }
-
-        private suspend fun applyToggle(
-            channel: String,
-            category: String,
-            isOn: Boolean,
-            rollbackTo: Boolean,
-        ) {
-            applyLocal(channel, category, isOn)
-            val snapshot = preferenceMap(channel).toMutableMap().apply { put(category, isOn) }
-            val update =
-                when (channel) {
-                    "push" -> PrivacySettingsUpdate(pushPreferences = snapshot)
-                    "email" -> PrivacySettingsUpdate(emailPreferences = snapshot)
-                    "sms" -> PrivacySettingsUpdate(smsPreferences = snapshot)
-                    else -> return
-                }
-            when (val result = privacy.updateSettings(update)) {
-                is NetworkResult.Success -> {
-                    settings = result.data.settings
-                    rebuild()
-                }
-                is NetworkResult.Failure -> {
-                    applyLocal(channel, category, rollbackTo)
-                }
-            }
-        }
-
-        private fun applyLocal(
-            channel: String,
-            category: String,
-            isOn: Boolean,
-        ) {
-            val map = preferenceMap(channel).toMutableMap().apply { put(category, isOn) }
-            settings = settings?.updating(channel, map)
+            if (rowId != NotificationCatalog.PAUSE_ALL) return
+            isPaused = isOn
             rebuild()
         }
 
-        private fun preferenceValue(
-            channel: String,
-            category: String,
-        ): Boolean = preferenceMap(channel)[category] ?: (channel == "push")
+        fun onToggleChannel(
+            rowId: String,
+            channel: ChannelGlyph,
+            isOn: Boolean,
+        ) {
+            val pattern = patterns[rowId] ?: return
+            if (NotificationCatalog.lockedFor(rowId).contains(channel)) return
+            patterns[rowId] =
+                when (channel) {
+                    ChannelGlyph.P -> pattern.copy(p = isOn)
+                    ChannelGlyph.E -> pattern.copy(e = isOn)
+                    ChannelGlyph.S -> pattern.copy(s = isOn)
+                }
+            rebuild()
+        }
 
-        private fun preferenceMap(channel: String): Map<String, Boolean> =
-            when (channel) {
-                "push" -> settings?.pushPreferences ?: defaults(channel)
-                "email" -> settings?.emailPreferences ?: defaults(channel)
-                "sms" -> settings?.smsPreferences ?: defaults(channel)
-                else -> emptyMap()
-            }
-
-        private fun defaults(channel: String): Map<String, Boolean> {
-            val defaultOn = channel == "push"
-            return Categories.associateWith { defaultOn }
+        /** Resume — clears the pause; the configured pattern comes back. */
+        fun onTapBanner() {
+            isPaused = false
+            rebuild()
         }
 
         private fun rebuild() {
-            val pushRows =
-                Categories.map { category ->
-                    GroupedListRow(
-                        id = "push.$category",
-                        label = category.replaceFirstChar { it.uppercase() },
-                        control = RowControl.Toggle(preferenceValue("push", category)),
-                    )
-                }
-            val emailRows =
-                Categories.map { category ->
-                    GroupedListRow(
-                        id = "email.$category",
-                        label = category.replaceFirstChar { it.uppercase() },
-                        control = RowControl.Toggle(preferenceValue("email", category)),
-                    )
-                }
-            val smsRows =
-                Categories.map { category ->
-                    GroupedListRow(
-                        id = "sms.$category",
-                        label = category.replaceFirstChar { it.uppercase() },
-                        control = RowControl.Toggle(preferenceValue("sms", category)),
-                    )
-                }
-            val emailHelper =
-                emailAddress?.let { "Sent to $it. Digest at 7:30 a.m. local." }
-                    ?: "Sent to your account email. Digest at 7:30 a.m. local."
-            _state.value =
-                GroupedListUiState.Loaded(
-                    groups =
-                        listOf(
-                            GroupedListGroup(
-                                id = "push",
-                                overline = "Push",
-                                helper = "Receive on this device. Sounds and badges follow system settings.",
-                                rows = pushRows,
-                            ),
-                            GroupedListGroup(
-                                id = "email",
-                                overline = "Email",
-                                helper = emailHelper,
-                                rows = emailRows,
-                            ),
-                            GroupedListGroup(
-                                id = "sms",
-                                overline = "SMS",
-                                helper = "Carrier rates may apply.",
-                                rows = smsRows,
-                            ),
-                        ),
-                )
+            _banner.value = if (isPaused) pauseBanner() else null
+            _dimmed.value = isPaused
+            _state.value = GroupedListUiState.Loaded(groups())
         }
 
-        companion object {
-            internal val Categories = listOf("messages", "gigs", "listings", "mailbox", "home")
-        }
+        private fun groups(): List<GroupedListGroup> =
+            buildList {
+                if (!isPaused) add(masterGroup())
+                NotificationCatalog.categories.forEach { add(categoryGroup(it)) }
+            }
+
+        private fun masterGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = "master",
+                overline = "Master",
+                helper = "Pause all silences every channel except emergency alerts. Quiet hours just delays them.",
+                rows =
+                    listOf(
+                        GroupedListRow(
+                            id = NotificationCatalog.PAUSE_ALL,
+                            label = "Pause all notifications",
+                            subtext = "Snooze everything but emergencies",
+                            control = RowControl.Toggle(isPaused),
+                        ),
+                        GroupedListRow(
+                            id = NotificationCatalog.QUIET_HOURS,
+                            label = "Quiet hours",
+                            subtext = "10:00 PM – 7:00 AM · Weekdays",
+                            control = RowControl.ChipStatus("On", RowControl.ChipTone.Neutral, includesChevron = true),
+                        ),
+                    ),
+            )
+
+        private fun categoryGroup(category: NotificationCatalog.Category): GroupedListGroup =
+            GroupedListGroup(
+                id = category.id,
+                overline = category.title,
+                helper = category.helper,
+                showsChannelHeader = true,
+                rows =
+                    category.rows.map { row ->
+                        val pattern = patterns[row.id] ?: row.seed
+                        GroupedListRow(
+                            id = row.id,
+                            label = row.label,
+                            subtext = row.sub,
+                            control =
+                                RowControl.ChannelTriad(
+                                    p = pattern.p,
+                                    e = pattern.e,
+                                    s = pattern.s,
+                                    locked = NotificationCatalog.lockedFor(row.id),
+                                ),
+                        )
+                    },
+            )
+
+        private fun pauseBanner(): GroupedListBanner =
+            GroupedListBanner(
+                icon = PantopusIcon.BellOff,
+                title = "Paused for 2 hours",
+                subtitle = "Resumes 11:42 AM · Emergency alerts still come through",
+                actionLabel = "Resume",
+            )
     }
+
+/**
+ * A14.5 notification catalog — the five category cards, their rows, seed
+ * channel patterns, and locked channels. Top-level (mirror of the iOS
+ * `NotificationSettingsViewModel` static data) so the view-model stays
+ * lean. Copy + patterns here are the parity contract with iOS.
+ */
+internal object NotificationCatalog {
+    const val PAUSE_ALL = "master.pauseAll"
+    const val QUIET_HOURS = "master.quietHours"
+    const val EMERGENCY = "home.emergency"
+
+    data class Pattern(
+        val p: Boolean,
+        val e: Boolean,
+        val s: Boolean,
+    )
+
+    data class RowSpec(
+        val id: String,
+        val label: String,
+        val sub: String?,
+        val seed: Pattern,
+    )
+
+    data class Category(
+        val id: String,
+        val title: String,
+        val helper: String?,
+        val rows: List<RowSpec>,
+    )
+
+    /** Channels that can't be muted — Emergency keeps push locked on. */
+    fun lockedFor(rowId: String): Set<ChannelGlyph> =
+        if (rowId == EMERGENCY) setOf(ChannelGlyph.P) else emptySet()
+
+    fun seed(): Map<String, Pattern> = categories.flatMap { it.rows }.associate { it.id to it.seed }
+
+    private fun spec(
+        id: String,
+        label: String,
+        sub: String?,
+        p: Boolean,
+        e: Boolean,
+        s: Boolean,
+    ) = RowSpec(id, label, sub, Pattern(p, e, s))
+
+    val categories: List<Category> =
+        listOf(
+            Category(
+                id = "tasks",
+                title = "Tasks",
+                helper = "Push only for things that need a fast reply. Receipts go to email so they're searchable.",
+                rows =
+                    listOf(
+                        spec("tasks.bids", "Bids on my tasks", "Within 5 minutes of posting", p = true, e = false, s = false),
+                        spec("tasks.messages", "New messages", "From clients & taskers", p = true, e = true, s = false),
+                        spec("tasks.status", "Status updates", "Accepted, on the way, done", p = true, e = false, s = false),
+                        spec("tasks.receipts", "Payment receipts", null, p = false, e = true, s = false),
+                    ),
+            ),
+            Category(
+                id = "pulse",
+                title = "Pulse",
+                helper = "Pulse is quiet by default. Mentions break through, browsing doesn't.",
+                rows =
+                    listOf(
+                        spec("pulse.replies", "Replies to my posts", null, p = true, e = false, s = false),
+                        spec("pulse.mentions", "Mentions", "When a neighbor @s you", p = true, e = false, s = false),
+                        spec("pulse.lostFound", "Nearby Lost & Found", "Within 0.5 mi of your address", p = false, e = false, s = false),
+                        spec("pulse.digest", "Weekly digest", "Sundays, 8am", p = false, e = true, s = false),
+                    ),
+            ),
+            Category(
+                id = "marketplace",
+                title = "Marketplace",
+                helper = null,
+                rows =
+                    listOf(
+                        spec("marketplace.offers", "Offers on my listings", null, p = true, e = true, s = false),
+                        spec("marketplace.buyerMessages", "Buyer messages", null, p = true, e = false, s = false),
+                        spec("marketplace.priceDrops", "Price drops on saved items", null, p = false, e = true, s = false),
+                        spec("marketplace.expiring", "Listing expiring soon", "48h before auto-pause", p = false, e = true, s = false),
+                    ),
+            ),
+            Category(
+                id = "homeMailbox",
+                title = "Home & Mailbox",
+                helper = "Emergency alerts can't be muted on push.",
+                rows =
+                    listOf(
+                        spec("home.package", "Package arrived", "When carrier scans \"delivered\"", p = true, e = true, s = true),
+                        spec("home.member", "Member activity", "Check-ins, new passes, edits", p = true, e = false, s = false),
+                        spec("home.civic", "Civic notices", "Permits, service alerts", p = true, e = true, s = false),
+                        spec(EMERGENCY, "Emergency alerts", null, p = true, e = true, s = true),
+                    ),
+            ),
+            Category(
+                id = "accountSecurity",
+                title = "Account & security",
+                helper = "Security alerts always come through. You can choose how.",
+                rows =
+                    listOf(
+                        spec("account.signIn", "New sign-in", null, p = true, e = true, s = true),
+                        spec("account.verification", "Verification status", null, p = true, e = true, s = false),
+                        spec("account.billing", "Billing & receipts", null, p = false, e = true, s = false),
+                    ),
+            ),
+        )
+}
 
 // MARK: - Privacy
 

@@ -28,6 +28,10 @@ public enum RowControl: Sendable, Hashable {
     /// Stops-based slider. `stops` is the ordered label list, `index`
     /// is the active index.
     case slider(stops: [String], index: Int)
+    /// A14.5 Notifications — three Push / Email / SMS channel chips
+    /// tiled into the trailing slot (`ChannelTriad`). `locked` forces a
+    /// chip "on, untoggleable" — Emergency alerts keep push locked on.
+    case channelTriad(p: Bool, e: Bool, s: Bool, locked: Set<ChannelGlyph>)
 
     public enum ChipTone: Sendable, Hashable { case success, info, neutral, warning }
 }
@@ -68,18 +72,48 @@ public struct GroupedListGroup: Identifiable, Sendable, Hashable {
     /// 11.5pt fg3 caption below the card. Used for context like
     /// "Sent to maria@…" or "Carrier rates may apply".
     public let helper: String?
+    /// A14.5 — render a P/E/S column-header band (`ChannelHeader`) as
+    /// the first element inside the card, above the first row. `false`
+    /// for every non-channel surface.
+    public let showsChannelHeader: Bool
     public let rows: [GroupedListRow]
 
     public init(
         id: String,
         overline: String? = nil,
         helper: String? = nil,
+        showsChannelHeader: Bool = false,
         rows: [GroupedListRow]
     ) {
         self.id = id
         self.overline = overline
         self.helper = helper
+        self.showsChannelHeader = showsChannelHeader
         self.rows = rows
+    }
+}
+
+/// A14.5 — a banner pinned above the groups inside the scroll. The
+/// paused-notifications state swaps its Master card for one of these.
+/// Generic + value-typed so other surfaces can reuse it; `PauseBanner`
+/// is the view that renders it.
+public struct GroupedListBanner: Sendable, Hashable {
+    public let icon: PantopusIcon
+    public let title: String
+    public let subtitle: String?
+    /// Trailing neutral pill label (e.g. "Resume").
+    public let actionLabel: String
+
+    public init(
+        icon: PantopusIcon,
+        title: String,
+        subtitle: String? = nil,
+        actionLabel: String
+    ) {
+        self.icon = icon
+        self.title = title
+        self.subtitle = subtitle
+        self.actionLabel = actionLabel
     }
 }
 
@@ -101,6 +135,13 @@ public protocol GroupedListDataSource: AnyObject, Observable {
     var footerCaption: String? { get }
     /// Observed state.
     var state: GroupedListState { get }
+    /// A14.5 — optional banner pinned above the groups inside the scroll
+    /// (the paused-notifications state surfaces one here in place of its
+    /// Master card). `nil` on every other surface.
+    var banner: GroupedListBanner? { get }
+    /// A14.5 — dims every group card to 0.5 opacity (paused state) while
+    /// leaving the banner at full strength.
+    var contentDimmed: Bool { get }
 
     /// Triggered on first appear + retry-after-error.
     func load() async
@@ -116,6 +157,20 @@ public protocol GroupedListDataSource: AnyObject, Observable {
     /// Drag on a `.slider` row. `index` is the stop index after the
     /// user's release.
     func setSlider(_ rowId: String, index: Int) async
+    /// A14.5 — tap on one chip of a `.channelTriad` row. `isOn` is the
+    /// value after the flip. Locked chips never call this.
+    func toggleChannel(_ rowId: String, channel: ChannelGlyph, isOn: Bool) async
+    /// A14.5 — tap on the banner's trailing action pill (e.g. Resume).
+    func tapBanner() async
+}
+
+/// Defaults so surfaces that predate A14.5 (and those without a banner
+/// or channel matrix) conform without boilerplate.
+public extension GroupedListDataSource {
+    var banner: GroupedListBanner? { nil }
+    var contentDimmed: Bool { false }
+    func toggleChannel(_: String, channel _: ChannelGlyph, isOn _: Bool) async {}
+    func tapBanner() async {}
 }
 
 /// Convenience helpers feature view-models reach for in their

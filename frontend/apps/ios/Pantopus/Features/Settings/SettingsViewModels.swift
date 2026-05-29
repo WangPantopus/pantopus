@@ -2,12 +2,14 @@
 //  SettingsViewModels.swift
 //  Pantopus
 //
-//  Three GroupedListDataSource view-models for the T3.1 Settings
+//  Two GroupedListDataSource view-models for the T3.1 Settings
 //  surfaces:
 //  - SettingsIndexViewModel: chevron rows + Verified / Stripe chips.
-//  - NotificationSettingsViewModel: 3 channel groups × 5 toggle rows.
 //  - PrivacySettingsViewModel: radio visibility + slider precision +
 //    activity toggles.
+//
+//  A14.5 Notification preferences moved to its own file:
+//  `Features/Settings/Notifications/NotificationSettingsViewModel.swift`.
 //
 //  Every mutation is optimistic — we update local state first and roll
 //  back if the PATCH fails.
@@ -236,158 +238,6 @@ public enum SettingsRoute: Sendable, Hashable {
     /// has `isAdmin == true`; the host pushes `HubRoute.reviewClaims`.
     case reviewClaims
     case didSignOut
-}
-
-// MARK: - Notification preferences
-
-@Observable
-@MainActor
-public final class NotificationSettingsViewModel: GroupedListDataSource {
-    public var title: String {
-        "Notifications"
-    }
-
-    public var footerCaption: String? {
-        nil
-    }
-
-    public private(set) var state: GroupedListState = .loading
-
-    private static let categories = ["messages", "gigs", "listings", "mailbox", "home"]
-
-    private let api: APIClient
-    private var settings: PrivacySettings?
-    private var emailAddress: String?
-
-    init(api: APIClient = .shared, auth: AuthManager = .shared) {
-        self.api = api
-        if case let .signedIn(user) = auth.state { emailAddress = user.email }
-    }
-
-    public func load() async {
-        state = .loading
-        do {
-            let response: PrivacySettingsResponse = try await api.request(PrivacyEndpoints.settings)
-            settings = response.settings
-            rebuild()
-        } catch {
-            state = .error(message: "Couldn't load notification settings.")
-        }
-    }
-
-    public func tapRow(_: String) async {}
-    public func selectRadio(_: String) async {}
-    public func setSlider(_: String, index _: Int) async {}
-
-    public func toggleRow(_ rowId: String, isOn: Bool) async {
-        // Row id encodes the channel + category, e.g. "push.messages".
-        let parts = rowId.split(separator: ".")
-        guard parts.count == 2 else { return }
-        let channel = String(parts[0])
-        let category = String(parts[1])
-        let previous = preferenceValue(channel: channel, category: category)
-        await applyToggle(channel: channel, category: category, isOn: isOn, rollbackTo: previous)
-    }
-
-    private func applyToggle(channel: String, category: String, isOn: Bool, rollbackTo: Bool) async {
-        applyLocal(channel: channel, category: category, isOn: isOn)
-        var update = PrivacySettingsUpdate()
-        var snapshot = preferenceMap(channel: channel)
-        snapshot[category] = isOn
-        switch channel {
-        case "push": update.pushPreferences = snapshot
-        case "email": update.emailPreferences = snapshot
-        case "sms": update.smsPreferences = snapshot
-        default: return
-        }
-        do {
-            let response: PrivacySettingsResponse = try await api.request(PrivacyEndpoints.updateSettings(update))
-            settings = response.settings
-            rebuild()
-        } catch {
-            applyLocal(channel: channel, category: category, isOn: rollbackTo)
-        }
-    }
-
-    private func applyLocal(channel: String, category: String, isOn: Bool) {
-        var map = preferenceMap(channel: channel)
-        map[category] = isOn
-        settings = settings?.updating(channel: channel, map: map)
-        rebuild()
-    }
-
-    private func preferenceValue(channel: String, category: String) -> Bool {
-        preferenceMap(channel: channel)[category] ?? defaultValue(channel: channel, category: category)
-    }
-
-    private func preferenceMap(channel: String) -> [String: Bool] {
-        switch channel {
-        case "push": settings?.pushPreferences ?? defaults(channel: "push")
-        case "email": settings?.emailPreferences ?? defaults(channel: "email")
-        case "sms": settings?.smsPreferences ?? defaults(channel: "sms")
-        default: [:]
-        }
-    }
-
-    private func defaults(channel: String) -> [String: Bool] {
-        let defaultOn = channel == "push"
-        return Self.categories.reduce(into: [:]) { acc, key in
-            acc[key] = defaultOn
-        }
-    }
-
-    private func defaultValue(channel: String, category _: String) -> Bool {
-        channel == "push"
-    }
-
-    private func rebuild() {
-        let pushRows = Self.categories.map { category in
-            GroupedListRow(
-                id: "push.\(category)",
-                label: category.capitalized,
-                control: .toggle(isOn: preferenceValue(channel: "push", category: category))
-            )
-        }
-        let emailRows = Self.categories.map { category in
-            GroupedListRow(
-                id: "email.\(category)",
-                label: category.capitalized,
-                control: .toggle(isOn: preferenceValue(channel: "email", category: category))
-            )
-        }
-        let smsRows = Self.categories.map { category in
-            GroupedListRow(
-                id: "sms.\(category)",
-                label: category.capitalized,
-                control: .toggle(isOn: preferenceValue(channel: "sms", category: category))
-            )
-        }
-        let emailHelper = if let email = emailAddress, !email.isEmpty {
-            "Sent to \(email). Digest at 7:30 a.m. local."
-        } else {
-            "Sent to your account email. Digest at 7:30 a.m. local."
-        }
-        state = .loaded([
-            GroupedListGroup(
-                id: "push",
-                overline: "Push",
-                helper: "Receive on this device. Sounds and badges follow iOS settings.",
-                rows: pushRows
-            ),
-            GroupedListGroup(
-                id: "email",
-                overline: "Email",
-                helper: emailHelper,
-                rows: emailRows
-            ),
-            GroupedListGroup(
-                id: "sms",
-                overline: "SMS",
-                helper: "Carrier rates may apply.",
-                rows: smsRows
-            )
-        ])
-    }
 }
 
 // MARK: - Privacy

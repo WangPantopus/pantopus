@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -42,6 +43,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.components.ChannelGlyph
+import app.pantopus.android.ui.components.ChannelHeader
+import app.pantopus.android.ui.components.ChannelState
+import app.pantopus.android.ui.components.ChannelTriad
+import app.pantopus.android.ui.components.PauseBanner
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -59,6 +65,10 @@ data class GroupedListCallbacks(
     val onToggleRow: (String, Boolean) -> Unit = { _, _ -> },
     val onSelectRadio: (String) -> Unit = {},
     val onSetSlider: (String, Int) -> Unit = { _, _ -> },
+    /** A14.5 — tap on one chip of a channelTriad row. `Boolean` is the value after the flip. */
+    val onToggleChannel: (String, ChannelGlyph, Boolean) -> Unit = { _, _, _ -> },
+    /** A14.5 — tap on the banner action pill (e.g. Resume). */
+    val onTapBanner: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
 
@@ -69,6 +79,10 @@ fun GroupedListScreen(
     state: GroupedListUiState,
     callbacks: GroupedListCallbacks = GroupedListCallbacks(),
     footerCaption: String? = null,
+    /** A14.5 — optional banner pinned above the groups (paused state). */
+    banner: GroupedListBanner? = null,
+    /** A14.5 — dims every group card to 0.5 opacity (paused state). */
+    contentDimmed: Boolean = false,
     /**
      * Optional hero / identity strip rendered above the first group
      * inside the scrollable area. Used by per-home settings screens
@@ -93,6 +107,8 @@ fun GroupedListScreen(
                     groups = state.groups,
                     callbacks = callbacks,
                     footerCaption = footerCaption,
+                    banner = banner,
+                    contentDimmed = contentDimmed,
                     header = header,
                 )
         }
@@ -180,6 +196,8 @@ internal fun LoadedFrame(
     groups: List<GroupedListGroup>,
     callbacks: GroupedListCallbacks,
     footerCaption: String?,
+    banner: GroupedListBanner? = null,
+    contentDimmed: Boolean = false,
     header: (@Composable () -> Unit)? = null,
 ) {
     val optimistic = remember { mutableStateMapOf<String, RowControl>() }
@@ -209,6 +227,21 @@ internal fun LoadedFrame(
                 ) { header() }
             }
         }
+        if (banner != null) {
+            item(key = "banner") {
+                PauseBanner(
+                    icon = banner.icon,
+                    title = banner.title,
+                    subtitle = banner.subtitle,
+                    actionLabel = banner.actionLabel,
+                    modifier =
+                        Modifier
+                            .padding(start = Spacing.s3, end = Spacing.s3, top = Spacing.s3)
+                            .testTag("groupedListBanner"),
+                    onAction = callbacks.onTapBanner,
+                )
+            }
+        }
         groups.forEach { group ->
             val regular = group.rows.filter { !it.destructive }
             val destructive = group.rows.filter { it.destructive }
@@ -232,14 +265,20 @@ internal fun LoadedFrame(
                     }
                 }
                 item(key = "card_${group.id}") {
-                    Card(group = group, rows = regular, optimistic = optimistic, callbacks = callbacks)
+                    Card(
+                        group = group,
+                        rows = regular,
+                        optimistic = optimistic,
+                        callbacks = callbacks,
+                        contentDimmed = contentDimmed,
+                    )
                 }
                 if (group.helper != null) {
                     item(key = "helper_${group.id}") {
                         Text(
                             text = group.helper,
                             fontSize = 11.5.sp,
-                            color = PantopusColors.appTextSecondary,
+                            color = if (contentDimmed) PantopusColors.appTextMuted else PantopusColors.appTextSecondary,
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -296,17 +335,22 @@ private fun Card(
     rows: List<GroupedListRow>,
     optimistic: androidx.compose.runtime.snapshots.SnapshotStateMap<String, RowControl>,
     callbacks: GroupedListCallbacks,
+    contentDimmed: Boolean = false,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s3)
+                .alpha(if (contentDimmed) 0.5f else 1f)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .testTag("groupedListCard_${group.id}"),
     ) {
+        if (group.showsChannelHeader) {
+            ChannelHeader()
+        }
         rows.forEachIndexed { index, row ->
             RowItem(
                 row = row,
@@ -314,6 +358,7 @@ private fun Card(
                 isLast = index == rows.size - 1,
                 optimistic = optimistic,
                 callbacks = callbacks,
+                contentDimmed = contentDimmed,
             )
             if (index < rows.size - 1) {
                 Box(
@@ -336,6 +381,7 @@ private fun RowItem(
     isLast: Boolean,
     optimistic: androidx.compose.runtime.snapshots.SnapshotStateMap<String, RowControl>,
     callbacks: GroupedListCallbacks,
+    contentDimmed: Boolean = false,
 ) {
     val onClickRow = {
         when (control) {
@@ -350,12 +396,14 @@ private fun RowItem(
                 }
         }
     }
+    // Triad rows own their chip taps; the row itself isn't tappable.
+    val isTriad = control is RowControl.ChannelTriad
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .clickable(onClick = onClickRow)
+                .then(if (isTriad) Modifier else Modifier.clickable(onClick = onClickRow))
                 .padding(horizontal = Spacing.s4, vertical = 14.dp)
                 .testTag("groupedListRow_${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
@@ -415,9 +463,54 @@ private fun RowItem(
                 }
             }
             is RowControl.Slider -> {}
+            is RowControl.ChannelTriad ->
+                ChannelTriad(
+                    p = channelState(control.p, ChannelGlyph.P, control.locked),
+                    e = channelState(control.e, ChannelGlyph.E, control.locked),
+                    s = channelState(control.s, ChannelGlyph.S, control.locked),
+                    onTap =
+                        if (contentDimmed) {
+                            null
+                        } else {
+                            { glyph -> flipChannel(row.id, control, glyph, optimistic, callbacks) }
+                        },
+                    modifier = Modifier.testTag("groupedListTriad_${row.id}"),
+                )
         }
     }
     if (!isLast) Box(modifier = Modifier.size(0.dp))
+}
+
+private fun channelState(
+    on: Boolean,
+    glyph: ChannelGlyph,
+    locked: Set<ChannelGlyph>,
+): ChannelState =
+    when {
+        locked.contains(glyph) -> ChannelState.Locked
+        on -> ChannelState.On
+        else -> ChannelState.Off
+    }
+
+private fun flipChannel(
+    rowId: String,
+    control: RowControl.ChannelTriad,
+    glyph: ChannelGlyph,
+    optimistic: androidx.compose.runtime.snapshots.SnapshotStateMap<String, RowControl>,
+    callbacks: GroupedListCallbacks,
+) {
+    if (control.locked.contains(glyph)) return
+    val newP = if (glyph == ChannelGlyph.P) !control.p else control.p
+    val newE = if (glyph == ChannelGlyph.E) !control.e else control.e
+    val newS = if (glyph == ChannelGlyph.S) !control.s else control.s
+    val newValue =
+        when (glyph) {
+            ChannelGlyph.P -> newP
+            ChannelGlyph.E -> newE
+            ChannelGlyph.S -> newS
+        }
+    optimistic[rowId] = RowControl.ChannelTriad(newP, newE, newS, control.locked)
+    callbacks.onToggleChannel(rowId, glyph, newValue)
 }
 
 @Composable

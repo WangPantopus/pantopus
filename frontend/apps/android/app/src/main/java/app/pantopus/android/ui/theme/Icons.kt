@@ -123,6 +123,7 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanTool
@@ -421,6 +422,9 @@ enum class PantopusIcon(
     Trees("trees"),
     PaintRoller("paint-roller"),
     BellRing("bell-ring"),
+
+    // A14.5 Notifications — the paused-state banner stamps `bell-off`.
+    BellOff("bell-off"),
 
     // T6.5e — Mailbox Vault: closed/open envelope glyphs + folder-plus
     // FAB + receipt-text / piggy-bank / plane folder palette. Distinct
@@ -736,6 +740,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Trees -> IconSource.Material(Icons.Filled.Park)
         PantopusIcon.PaintRoller -> IconSource.Material(Icons.Filled.FormatPaint)
         PantopusIcon.BellRing -> IconSource.Material(Icons.Filled.NotificationsActive)
+        PantopusIcon.BellOff -> IconSource.Material(Icons.Filled.NotificationsOff)
 
         // T6.5e — Mailbox Vault. Material has direct envelope glyphs
         // for `mail` / `mail-open` (`Email` / `MarkAsUnread`); the

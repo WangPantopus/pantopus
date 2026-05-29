@@ -116,9 +116,7 @@ public struct SettingsView: View {
     @ViewBuilder private func groupedDestination(for route: SettingsStackRoute) -> some View {
         switch route {
         case .notifications:
-            GroupedListView(
-                dataSource: NotificationSettingsViewModel()
-            ) { popLast() }
+            NotificationSettingsView { popLast() }
         case .privacy:
             GroupedListView(
                 dataSource: PrivacySettingsViewModel()

@@ -217,6 +217,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case trees
     case paintRoller = "paint-roller"
     case bellRing = "bell-ring"
+    // A14.5 Notifications — the paused-state banner stamps `bell-off` in
+    // its warning-tinted icon disc.
+    case bellOff = "bell-off"
 
     // T6.5e Mailbox Vault — folder palette + mail-type tile glyphs + FAB
     // glyph. Distinct from existing `mailbox` (mail.stack) so the new
@@ -476,6 +479,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trees: "tree"
         case .paintRoller: "paintbrush.pointed"
         case .bellRing: "bell.badge"
+        case .bellOff: "bell.slash"
         // T6.5e Mailbox Vault. SF Symbols has direct envelope glyphs;
         // `piggy-bank` and `arrow-down-up` lack 1:1 equivalents so fall
         // back to `dollarsign.circle` and `arrow.up.arrow.down` glyphs.

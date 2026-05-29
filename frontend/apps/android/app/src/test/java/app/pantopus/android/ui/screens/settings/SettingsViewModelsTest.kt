@@ -7,7 +7,6 @@ import app.pantopus.android.data.api.models.settings.PrivacySettingsDto
 import app.pantopus.android.data.api.models.settings.PrivacySettingsResponse
 import app.pantopus.android.data.api.models.settings.PrivacySettingsUpdate
 import app.pantopus.android.data.api.models.users.UserDto
-import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
@@ -31,11 +30,12 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Covers the three Settings VMs:
+ * Covers the Settings index + privacy VMs:
  * - index loads chevron rows + verification chip + footer caption.
- * - notification toggle persists optimistically, rolls back on PATCH
- *   failure.
  * - privacy radio + slider persist and reflect the server echo.
+ *
+ * A14.5 notification preferences moved to
+ * [NotificationSettingsViewModelTest].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelsTest {
@@ -99,37 +99,6 @@ class SettingsViewModelsTest {
             val logOut = state.groups.last().rows.first()
             assertEquals("signOut", logOut.id)
             assertTrue(logOut.destructive)
-        }
-
-    // MARK: - Notifications
-
-    @Test fun notification_toggle_optimistic_persists_on_success() =
-        runTest {
-            coEvery { privacy.settings() } returns NetworkResult.Success(PrivacySettingsResponse(seedSettings()))
-            coEvery { privacy.updateSettings(any()) } returns
-                NetworkResult.Success(PrivacySettingsResponse(seedSettings(pushListings = false)))
-            val vm = NotificationSettingsViewModel(privacy, auth)
-            vm.load()
-            vm.onToggle("push.listings", isOn = true)
-            val state = vm.state.value as GroupedListUiState.Loaded
-            val pushGroup = state.groups.first { it.id == "push" }
-            val listingsRow = pushGroup.rows.first { it.id == "push.listings" }
-            // Server canned response keeps listings=false → reflect it.
-            assertEquals(RowControl.Toggle(isOn = false), listingsRow.control)
-        }
-
-    @Test fun notification_toggle_rolls_back_on_failure() =
-        runTest {
-            coEvery { privacy.settings() } returns NetworkResult.Success(PrivacySettingsResponse(seedSettings()))
-            coEvery { privacy.updateSettings(any()) } returns NetworkResult.Failure(NetworkError.Server(500, null))
-            val vm = NotificationSettingsViewModel(privacy, auth)
-            vm.load()
-            vm.onToggle("push.messages", isOn = false)
-            val state = vm.state.value as GroupedListUiState.Loaded
-            val pushMessages =
-                state.groups.first { it.id == "push" }.rows.first { it.id == "push.messages" }
-            // Default seed has messages=true. After rollback we expect true.
-            assertEquals(RowControl.Toggle(isOn = true), pushMessages.control)
         }
 
     // MARK: - Privacy

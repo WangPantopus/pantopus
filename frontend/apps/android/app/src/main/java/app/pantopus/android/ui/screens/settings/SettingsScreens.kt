@@ -53,14 +53,21 @@ fun NotificationSettingsScreen(
     viewModel: NotificationSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val banner by viewModel.banner.collectAsStateWithLifecycle()
+    val dimmed by viewModel.dimmed.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
     GroupedListScreen(
         title = viewModel.title,
         state = state,
+        footerCaption = viewModel.footerCaption,
+        banner = banner,
+        contentDimmed = dimmed,
         callbacks =
             GroupedListCallbacks(
                 onBack = onBack,
                 onToggleRow = viewModel::onToggle,
+                onToggleChannel = viewModel::onToggleChannel,
+                onTapBanner = viewModel::onTapBanner,
                 onRetry = viewModel::load,
             ),
     )

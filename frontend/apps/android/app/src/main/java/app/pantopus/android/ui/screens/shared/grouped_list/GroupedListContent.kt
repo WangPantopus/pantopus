@@ -3,6 +3,8 @@
 package app.pantopus.android.ui.screens.shared.grouped_list
 
 import androidx.compose.runtime.Immutable
+import app.pantopus.android.ui.components.ChannelGlyph
+import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
  * Render models for the shared GroupedList archetype — every
@@ -43,6 +45,19 @@ sealed interface RowControl {
         val index: Int,
     ) : RowControl
 
+    /**
+     * A14.5 Notifications — three Push / Email / SMS channel chips
+     * (`ChannelTriad`) tiled into the trailing slot. `locked` forces a
+     * chip "on, untoggleable" — Emergency alerts keep push locked on.
+     */
+    @Immutable
+    data class ChannelTriad(
+        val p: Boolean,
+        val e: Boolean,
+        val s: Boolean,
+        val locked: Set<ChannelGlyph>,
+    ) : RowControl
+
     enum class ChipTone { Success, Info, Neutral, Warning }
 }
 
@@ -67,6 +82,24 @@ data class GroupedListGroup(
     /** 11.5sp caption below the card. */
     val helper: String? = null,
     val rows: List<GroupedListRow>,
+    /**
+     * A14.5 — render a P/E/S column-header band (`ChannelHeader`) as the
+     * first element inside the card. `false` for every other surface.
+     */
+    val showsChannelHeader: Boolean = false,
+)
+
+/**
+ * A14.5 — a banner pinned above the groups inside the scroll. The
+ * paused-notifications state swaps its Master card for one of these.
+ * Rendered by `PauseBanner`.
+ */
+@Immutable
+data class GroupedListBanner(
+    val icon: PantopusIcon,
+    val title: String,
+    val subtitle: String? = null,
+    val actionLabel: String,
 )
 
 /** Render state for the shell. */

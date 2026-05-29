@@ -84,53 +84,6 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertTrue(placeheld.isSubset(of: allRowIds), "Placeholder routes must still surface in the index.")
     }
 
-    // MARK: - Notifications
-
-    func testNotificationToggleOptimisticPersistsOnSuccess() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.defaultSettingsJSON),
-            .status(200, body: Self.defaultSettingsJSON) // PATCH echo
-        ]
-        let vm = NotificationSettingsViewModel(api: makeAPI(), auth: AuthManager.previewSignedIn)
-        await vm.load()
-        await vm.toggleRow("push.listings", isOn: true)
-        guard case let .loaded(groups) = vm.state else {
-            XCTFail("Expected .loaded")
-            return
-        }
-        // After persist, the server response wins — listings remains
-        // false in the canned JSON, so the row reflects that.
-        let pushGroup = groups.first { $0.id == "push" }
-        let listings = pushGroup?.rows.first { $0.id == "push.listings" }
-        if case let .toggle(isOn) = listings?.control {
-            XCTAssertFalse(isOn, "server canned response has listings=false; the VM should reflect it")
-        } else {
-            XCTFail("Expected toggle control on push.listings")
-        }
-    }
-
-    func testNotificationToggleRollsBackOnFailure() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.defaultSettingsJSON),
-            .status(500, body: "{}") // PATCH fails
-        ]
-        let vm = NotificationSettingsViewModel(api: makeAPI(), auth: AuthManager.previewSignedIn)
-        await vm.load()
-        await vm.toggleRow("push.messages", isOn: false)
-        guard case let .loaded(groups) = vm.state else {
-            XCTFail("Expected .loaded")
-            return
-        }
-        let messages = groups.first?.rows.first { $0.id == "push.messages" }
-        if case let .toggle(isOn) = messages?.control {
-            // After rollback, messages should be back to the original
-            // value (true in the canned default).
-            XCTAssertTrue(isOn, "VM should roll back to the seed value when the PATCH fails")
-        } else {
-            XCTFail("Expected toggle on push.messages")
-        }
-    }
-
     // MARK: - Privacy
 
     func testPrivacyRadioPersists() async {

@@ -129,6 +129,19 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                         .padding(.top, Spacing.s3)
                         .accessibilityIdentifier("groupedListHeader")
                 }
+                if let banner = dataSource.banner {
+                    PauseBanner(
+                        icon: banner.icon,
+                        title: banner.title,
+                        subtitle: banner.subtitle,
+                        actionLabel: banner.actionLabel
+                    ) {
+                        Task { await dataSource.tapBanner() }
+                    }
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.top, Spacing.s3)
+                    .accessibilityIdentifier("groupedListBanner")
+                }
                 ForEach(groups) { group in
                     let destructiveRows = group.rows.filter(\.destructive)
                     let regularRows = group.rows.filter { !$0.destructive }
@@ -181,6 +194,9 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                 .accessibilityIdentifier("groupedListOverline_\(group.id)")
         }
         VStack(spacing: Spacing.s0) {
+            if group.showsChannelHeader {
+                ChannelHeader()
+            }
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 renderRow(row, isLastInCard: index == rows.count - 1)
                 if index < rows.count - 1 {
@@ -197,11 +213,12 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .opacity(dataSource.contentDimmed ? 0.5 : 1)
         .padding(.horizontal, Spacing.s3)
         if let helper = group.helper {
             Text(helper)
                 .font(.system(size: 11.5))
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .foregroundStyle(dataSource.contentDimmed ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary)
                 .padding(.horizontal, Spacing.s4)
                 .padding(.top, Spacing.s2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -212,7 +229,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     @ViewBuilder
     private func renderRow(_ row: GroupedListRow, isLastInCard _: Bool) -> some View {
         let activeControl = optimisticOverrides[row.id] ?? row.control
-        HStack(spacing: Spacing.s3) {
+        let rowBody = HStack(spacing: Spacing.s3) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.label)
                     .font(.system(size: 15, weight: .medium))
@@ -233,12 +250,24 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         .padding(.horizontal, Spacing.s4)
         .padding(.vertical, 14)
         .frame(minHeight: 48)
-        .contentShape(Rectangle())
-        .onTapGesture { handleTap(rowId: row.id, control: activeControl, destructive: row.destructive) }
-        .accessibilityIdentifier("groupedListRow_\(row.id)")
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel(row, control: activeControl))
-        .accessibilityAddTraits(accessibilityTraits(control: activeControl))
+
+        if case .channelTriad = activeControl {
+            // Triad rows expose each P/E/S chip as its own VoiceOver
+            // element. `.combine` would flatten the three buttons into
+            // the row label and lose the per-channel toggles; the chips
+            // also own their own taps, so the row carries no tap gesture.
+            rowBody
+                .accessibilityIdentifier("groupedListRow_\(row.id)")
+                .accessibilityElement(children: .contain)
+        } else {
+            rowBody
+                .contentShape(Rectangle())
+                .onTapGesture { handleTap(rowId: row.id, control: activeControl, destructive: row.destructive) }
+                .accessibilityIdentifier("groupedListRow_\(row.id)")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibilityLabel(row, control: activeControl))
+                .accessibilityAddTraits(accessibilityTraits(control: activeControl))
+        }
     }
 
     @ViewBuilder
@@ -267,7 +296,22 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             }
         case .slider:
             EmptyView()
+        case let .channelTriad(p, e, s, locked):
+            ChannelTriad(
+                p: channelState(on: p, glyph: .p, locked: locked),
+                e: channelState(on: e, glyph: .e, locked: locked),
+                s: channelState(on: s, glyph: .s, locked: locked),
+                onTap: dataSource.contentDimmed ? nil : { glyph in
+                    flipChannel(rowId: rowId, p: p, e: e, s: s, locked: locked, glyph: glyph)
+                }
+            )
+            .accessibilityIdentifier("groupedListTriad_\(rowId)")
         }
+    }
+
+    private func channelState(on: Bool, glyph: ChannelGlyph, locked: Set<ChannelGlyph>) -> ChannelState {
+        if locked.contains(glyph) { return .locked }
+        return on ? .on : .off
     }
 
     private func radio(isSelected: Bool) -> some View {
@@ -390,9 +434,9 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         case .radio:
             optimisticOverrides[rowId] = .radio(isSelected: true)
             Task { await dataSource.selectRadio(rowId) }
-        case .toggle, .slider:
-            // Toggle / slider already drive their own callbacks.
-            // Chevron / chipStatus rows also handle taps for
+        case .toggle, .slider, .channelTriad:
+            // Toggle / slider / channel chips already drive their own
+            // callbacks. Chevron / chipStatus rows also handle taps for
             // navigation even when destructive.
             if destructive {
                 Task { await dataSource.tapRow(rowId) }
@@ -417,6 +461,26 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         Task { await dataSource.setSlider(rowId, index: newIndex) }
     }
 
+    private func flipChannel(
+        rowId: String,
+        p: Bool,
+        e: Bool,
+        s: Bool,
+        locked: Set<ChannelGlyph>,
+        glyph: ChannelGlyph
+    ) {
+        guard !locked.contains(glyph) else { return }
+        var newP = p, newE = e, newS = s
+        let newValue: Bool
+        switch glyph {
+        case .p: newP.toggle(); newValue = newP
+        case .e: newE.toggle(); newValue = newE
+        case .s: newS.toggle(); newValue = newS
+        }
+        optimisticOverrides[rowId] = .channelTriad(p: newP, e: newE, s: newS, locked: locked)
+        Task { await dataSource.toggleChannel(rowId, channel: glyph, isOn: newValue) }
+    }
+
     private func accessibilityLabel(_ row: GroupedListRow, control: RowControl) -> String {
         var parts = [row.label]
         if let subtext = row.subtext { parts.append(subtext) }
@@ -429,6 +493,11 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             parts.append(label)
         case let .slider(stops, index):
             if stops.indices.contains(index) { parts.append("currently \(stops[index])") }
+        case let .channelTriad(p, e, s, locked):
+            for (glyph, isOn) in [(ChannelGlyph.p, p), (.e, e), (.s, s)] {
+                let word = locked.contains(glyph) ? "locked on" : (isOn ? "on" : "off")
+                parts.append("\(glyph.fullName) \(word)")
+            }
         case .chevron:
             break
         }
@@ -439,6 +508,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         switch control {
         case .toggle, .radio: .isButton
         case .chevron, .chipStatus, .slider: .isButton
+        case .channelTriad: []
         }
     }
 }
