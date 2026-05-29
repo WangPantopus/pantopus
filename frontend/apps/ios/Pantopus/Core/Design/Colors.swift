@@ -119,6 +119,23 @@ public extension Theme.Color {
     /// magic-tinted callouts.
     static let magicBorder = SwiftUI.Color("Identity/MagicBorder", bundle: Theme.bundle)
 
+    // MARK: - Pulse intent accents
+
+    /// Rose accent — `#BE123C`. Tailwind rose-700. The foreground for the
+    /// `Lost & Found` Pulse intent chip; pairs with `roseBg`. Distinct from
+    /// `error` (#DC2626) — a lost-item post is not an error state.
+    static let rose = SwiftUI.Color("Accent/Rose", bundle: Theme.bundle)
+    /// Rose accent background — `#FFE4E6`. Tailwind rose-100; the soft fill
+    /// behind the `Lost & Found` intent chip.
+    static let roseBg = SwiftUI.Color("Accent/RoseBg", bundle: Theme.bundle)
+    /// Slate accent — `#475569`. Tailwind slate-600. The foreground for the
+    /// `Announce` Pulse intent chip; pairs with `slateBg`. A calmer neutral
+    /// than `appTextStrong` so civic announcements read as informational.
+    static let slate = SwiftUI.Color("Accent/Slate", bundle: Theme.bundle)
+    /// Slate accent background — `#E2E8F0`. Tailwind slate-200; the soft fill
+    /// behind the `Announce` intent chip.
+    static let slateBg = SwiftUI.Color("Accent/SlateBg", bundle: Theme.bundle)
+
     // MARK: - App shell / neutrals
 
     /// App background — `#f6f7f9`.

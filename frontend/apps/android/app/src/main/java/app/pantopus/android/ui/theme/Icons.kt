@@ -76,6 +76,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmergencyShare
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
@@ -149,6 +150,7 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
@@ -250,10 +252,12 @@ enum class PantopusIcon(
     Star("star"),
     HelpCircle("help-circle"),
     Calendar("calendar"),
+    CalendarCheck("calendar-check"),
     Lightbulb("lightbulb"),
     Eye("eye"),
     Share("share"),
     Radio("radio"),
+    Rss("rss"),
     MapPin("map-pin"),
     Pencil("pencil"),
     Briefcase("briefcase"),
@@ -584,10 +588,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Star -> IconSource.Material(Icons.Filled.Star)
         PantopusIcon.HelpCircle -> IconSource.Material(Icons.AutoMirrored.Filled.Help)
         PantopusIcon.Calendar -> IconSource.Material(Icons.Filled.DateRange)
+        PantopusIcon.CalendarCheck -> IconSource.Material(Icons.Filled.EventAvailable)
         PantopusIcon.Lightbulb -> IconSource.Material(Icons.Filled.Lightbulb)
         PantopusIcon.Eye -> IconSource.Material(Icons.Filled.Visibility)
         PantopusIcon.Share -> IconSource.Material(Icons.Filled.Share)
         PantopusIcon.Radio -> IconSource.Material(Icons.Filled.Public)
+        PantopusIcon.Rss -> IconSource.Material(Icons.Filled.RssFeed)
         PantopusIcon.MapPin -> IconSource.Material(Icons.Filled.LocationOn)
         PantopusIcon.Pencil -> IconSource.Material(Icons.Filled.Edit)
         PantopusIcon.Briefcase -> IconSource.Material(Icons.Filled.Work)

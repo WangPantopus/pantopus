@@ -9,6 +9,70 @@
 
 import SwiftUI
 
+// MARK: - Avatar
+
+/// Solid-fill tint for a `FeedAvatar`. Each case resolves to an on-scale
+/// design token — no raw hex. Authors are mapped to a tint by the feed
+/// view-model (business → violet, civic → slate, else sky); sample data
+/// assigns per-author tints to match the design frames.
+public enum FeedAvatarTint: Sendable, Hashable, CaseIterable {
+    case sky, green, violet, rose, slate, amber, orange
+
+    var color: Color {
+        switch self {
+        case .sky: Theme.Color.primary500
+        case .green: Theme.Color.success
+        case .violet: Theme.Color.magic
+        case .rose: Theme.Color.rose
+        case .slate: Theme.Color.slate
+        case .amber: Theme.Color.warning
+        case .orange: Theme.Color.handyman
+        }
+    }
+}
+
+/// Feed author avatar: a solid identity-tinted disc with white initials and
+/// an optional sky verified check badge pinned bottom-trailing. Unlike
+/// `AvatarWithIdentityRing` (profile-completion ring), the feed card design
+/// (A03) shows a flat colored disc + check disc.
+public struct FeedAvatar: View {
+    private let initials: String
+    private let tint: FeedAvatarTint
+    private let verified: Bool
+    private let size: CGFloat
+
+    public init(
+        initials: String,
+        tint: FeedAvatarTint = .sky,
+        verified: Bool = false,
+        size: CGFloat = 32
+    ) {
+        self.initials = initials
+        self.tint = tint
+        self.verified = verified
+        self.size = size
+    }
+
+    public var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Circle()
+                .fill(tint.color)
+                .frame(width: size, height: size)
+                .overlay(
+                    Text(initials)
+                        .font(.system(size: size >= 32 ? 13 : 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                )
+            if verified {
+                VerifiedBadge(size: size * 0.4, tint: Theme.Color.primary600)
+                    .offset(x: 2, y: 2)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Chip row
 
 /// One entry in `FeedChipRow`. The `id` is the filter key sent to the

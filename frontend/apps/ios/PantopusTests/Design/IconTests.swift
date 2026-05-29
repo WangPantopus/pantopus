@@ -21,7 +21,7 @@ final class IconTests: XCTestCase {
         "more-horizontal", "arrow-left", "arrow-right", "send", "chevron-down", "chevron-up",
         "trash-2", "edit-2", "upload", "shield", "lock", "check-circle",
         "alert-circle", "circle", "info", "wifi-off", "heart", "thumbs-up", "star",
-        "help-circle", "calendar", "lightbulb", "eye", "share", "radio", "map-pin",
+        "help-circle", "calendar", "calendar-check", "lightbulb", "eye", "share", "radio", "rss", "map-pin",
         "pencil", "briefcase", "gavel", "sliders-horizontal", "message-circle",
         "at-sign", "badge-check", "tag", "shield-alert", "check-check", "history",
         "receipt", "clock", "users", "dollar-sign",

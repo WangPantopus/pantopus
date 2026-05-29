@@ -16,6 +16,7 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
     public let authorName: String
     public let authorInitials: String
     public let authorVerified: Bool
+    public let avatarTint: FeedAvatarTint
     public let meta: String
     public let intent: PulseIntent
     public let title: String?
@@ -29,6 +30,7 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
         authorName: String,
         authorInitials: String,
         authorVerified: Bool,
+        avatarTint: FeedAvatarTint = .sky,
         meta: String,
         intent: PulseIntent,
         title: String?,
@@ -41,6 +43,7 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
         self.authorName = authorName
         self.authorInitials = authorInitials
         self.authorVerified = authorVerified
+        self.avatarTint = avatarTint
         self.meta = meta
         self.intent = intent
         self.title = title
@@ -121,10 +124,10 @@ public struct PulsePostCard: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 9) {
-            AvatarWithIdentityRing(
-                name: content.authorInitials,
-                identity: .personal,
-                ringProgress: content.authorVerified ? 1 : 0.35,
+            FeedAvatar(
+                initials: content.authorInitials,
+                tint: content.avatarTint,
+                verified: content.authorVerified,
                 size: 32
             )
             VStack(alignment: .leading, spacing: 2) {
@@ -150,11 +153,10 @@ public struct PulsePostCard: View {
                 .padding(.top, Spacing.s2)
             HStack(alignment: .center, spacing: Spacing.s2) {
                 HStack(spacing: -8) {
-                    ForEach(Array(strip.avatars.prefix(4).enumerated()), id: \.offset) { _, initials in
-                        AvatarWithIdentityRing(
-                            name: initials,
-                            identity: .personal,
-                            ringProgress: 1,
+                    ForEach(Array(strip.avatars.prefix(4).enumerated()), id: \.offset) { index, initials in
+                        FeedAvatar(
+                            initials: initials,
+                            tint: Self.attendeeTints[index % Self.attendeeTints.count],
                             size: 22
                         )
                         .overlay(
@@ -173,15 +175,15 @@ public struct PulsePostCard: View {
                                 strip.userIsGoing ? .check : .plusCircle,
                                 size: 10,
                                 strokeWidth: 3,
-                                color: Theme.Color.business
+                                color: Theme.Color.magic
                             )
                             Text(strip.userIsGoing ? "Going" : "RSVP")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Theme.Color.business)
+                                .foregroundStyle(Theme.Color.magic)
                         }
                         .padding(.horizontal, Spacing.s3)
                         .frame(height: 26)
-                        .background(Theme.Color.businessBg)
+                        .background(Theme.Color.magicBg)
                         .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
@@ -200,7 +202,7 @@ public struct PulsePostCard: View {
             }
             Spacer()
             HStack(spacing: Spacing.s1) {
-                Icon(.send, size: 12, color: Theme.Color.appTextSecondary)
+                Icon(.messageCircle, size: 12, color: Theme.Color.appTextSecondary)
                 Text("Reply")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextSecondary)
@@ -208,6 +210,10 @@ public struct PulsePostCard: View {
         }
         .padding(.top, Spacing.s2)
     }
+
+    /// Cycling tint palette for the Event attendee mini-avatars (decorative;
+    /// the live feed has no per-attendee identity, fixtures echo the design).
+    private static let attendeeTints: [FeedAvatarTint] = [.orange, .sky, .violet, .green]
 
     @ViewBuilder
     private func reactionPill(_ reaction: PulseReaction) -> some View {
@@ -275,22 +281,22 @@ public struct PulseIntentChip: View {
     private var foreground: Color {
         switch intent {
         case .all: Theme.Color.appTextSecondary
-        case .ask: Theme.Color.warning
+        case .ask: Theme.Color.warmAmber
         case .recommend: Theme.Color.success
-        case .event: Theme.Color.business
-        case .lost: Theme.Color.error
-        case .announce: Theme.Color.appTextStrong
+        case .event: Theme.Color.magic
+        case .lost: Theme.Color.rose
+        case .announce: Theme.Color.slate
         }
     }
 
     private var background: Color {
         switch intent {
         case .all: Theme.Color.appSurfaceSunken
-        case .ask: Theme.Color.warningBg
-        case .recommend: Theme.Color.successBg
-        case .event: Theme.Color.businessBg
-        case .lost: Theme.Color.errorBg
-        case .announce: Theme.Color.appSurfaceSunken
+        case .ask: Theme.Color.warmAmberBg
+        case .recommend: Theme.Color.successLight
+        case .event: Theme.Color.magicBg
+        case .lost: Theme.Color.roseBg
+        case .announce: Theme.Color.slateBg
         }
     }
 }

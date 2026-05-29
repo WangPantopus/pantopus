@@ -20,6 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +34,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -57,22 +65,26 @@ import app.pantopus.android.ui.theme.Spacing
  */
 @Composable
 fun FeedScreen(
+    surface: FeedSurface = FeedSurface.Pulse,
     onOpenPost: (String) -> Unit = {},
     onCompose: (PulseIntent) -> Unit = {},
+    onEmptyCta: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     viewModel: PulseFeedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIntent by viewModel.activeIntent.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
+        viewModel.configureSurface(surface)
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenPulseFeedViewed(intent = activeIntent.key))
     }
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg).testTag("pulseFeed")) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopBar(onBack = onBack)
+            TopBar(title = surface.title, onBack = onBack)
             FeedChipRow(
                 chips = PulseIntent.entries.map { FeedChipItem(id = it.key, label = it.label) },
                 activeId = activeIntent.key,
@@ -80,12 +92,15 @@ fun FeedScreen(
             )
             when (val s = state) {
                 is PulseFeedUiState.Loading -> LoadingFrame()
-                is PulseFeedUiState.Empty -> EmptyFrame(scopeLabel = s.scopeLabel) { onCompose(activeIntent) }
+                is PulseFeedUiState.Empty ->
+                    FeedEmptyState(content = s.content) { onEmptyCta?.invoke() ?: onCompose(activeIntent) }
                 is PulseFeedUiState.Loaded ->
                     PopulatedFrame(
                         state = s,
                         onTapPost = onOpenPost,
                         onTapReaction = viewModel::tapReaction,
+                        isRefreshing = isRefreshing,
+                        onRefresh = viewModel::refresh,
                     )
                 is PulseFeedUiState.Error ->
                     ErrorFrame(message = s.message, onRetry = { viewModel.refresh() })
@@ -102,7 +117,10 @@ fun FeedScreen(
 }
 
 @Composable
-private fun TopBar(onBack: (() -> Unit)?) {
+private fun TopBar(
+    title: String,
+    onBack: (() -> Unit)?,
+) {
     Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appBg)) {
         Row(
             modifier =
@@ -130,7 +148,7 @@ private fun TopBar(onBack: (() -> Unit)?) {
                 Spacer(modifier = Modifier.size(8.dp))
             }
             Text(
-                text = "Pulse",
+                text = title,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appText,
@@ -161,10 +179,15 @@ private fun LoadingFrame() {
     }
 }
 
+/**
+ * Centered empty-state for a feed surface (Pulse radio glyph / Beacons rss
+ * glyph). `internal` so the Pulse / Beacons snapshot tests can render it
+ * directly from a [FeedSurface] descriptor.
+ */
 @Composable
-private fun EmptyFrame(
-    scopeLabel: String?,
-    onCreatePost: () -> Unit,
+internal fun FeedEmptyState(
+    content: FeedEmptyContent,
+    onCta: () -> Unit,
 ) {
     Column(
         modifier =
@@ -184,7 +207,7 @@ private fun EmptyFrame(
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = PantopusIcon.Radio,
+                icon = content.icon,
                 contentDescription = null,
                 size = 32.dp,
                 tint = PantopusColors.primary600,
@@ -192,16 +215,18 @@ private fun EmptyFrame(
         }
         Spacer(modifier = Modifier.size(Spacing.s3))
         Text(
-            text = "Nothing here yet",
+            text = content.headline,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.size(Spacing.s2))
         Text(
-            text = "Be the first to post. Ask, recommend, or announce something local.",
+            text = content.body,
             fontSize = 13.5.sp,
             color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.size(Spacing.s4))
         Box(
@@ -209,7 +234,7 @@ private fun EmptyFrame(
                 Modifier
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.primary600)
-                    .clickable(onClick = onCreatePost)
+                    .clickable(onClick = onCta)
                     .padding(horizontal = 22.dp)
                     .height(44.dp)
                     .testTag("pulseEmptyCreatePost"),
@@ -220,20 +245,21 @@ private fun EmptyFrame(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.Pencil,
+                    icon = content.ctaIcon,
                     contentDescription = null,
                     size = 15.dp,
                     tint = PantopusColors.appTextInverse,
                 )
                 Text(
-                    text = "Create post",
+                    text = content.ctaLabel,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = PantopusColors.appTextInverse,
                 )
             }
         }
-        if (!scopeLabel.isNullOrEmpty()) {
+        val emphasis = content.footerEmphasis
+        if (!emphasis.isNullOrEmpty()) {
             Spacer(modifier = Modifier.size(Spacing.s4))
             Row(
                 modifier =
@@ -246,13 +272,23 @@ private fun EmptyFrame(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.MapPin,
+                    icon = content.footerIcon,
                     contentDescription = null,
                     size = 13.dp,
                     tint = PantopusColors.appTextMuted,
                 )
                 Text(
-                    text = "Showing posts within $scopeLabel",
+                    text =
+                        buildAnnotatedString {
+                            append(content.footerLead)
+                            withStyle(
+                                SpanStyle(
+                                    fontWeight = FontWeight.Bold,
+                                    color = PantopusColors.appTextStrong,
+                                ),
+                            ) { append(emphasis) }
+                            append(content.footerTrail)
+                        },
                     fontSize = 11.5.sp,
                     color = PantopusColors.appTextSecondary,
                 )
@@ -261,26 +297,38 @@ private fun EmptyFrame(
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 private fun PopulatedFrame(
     state: PulseFeedUiState.Loaded,
     onTapPost: (String) -> Unit,
     onTapReaction: (String) -> Unit,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().testTag("pulseFeedList"),
-        contentPadding = PaddingValues(Spacing.s3),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        items(items = state.rows, key = { it.id }) { row ->
-            PulsePostCard(
-                content = row,
-                onTap = { onTapPost(row.id) },
-                onPrimaryReaction = { onTapReaction(row.id) },
-                onRSVP = if (row.attendees == null) null else ({ onTapReaction(row.id) }),
-            )
+    val pullState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
+    Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().testTag("pulseFeedList"),
+            contentPadding = PaddingValues(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            items(items = state.rows, key = { it.id }) { row ->
+                PulsePostCard(
+                    content = row,
+                    onTap = { onTapPost(row.id) },
+                    onPrimaryReaction = { onTapReaction(row.id) },
+                    onRSVP = if (row.attendees == null) null else ({ onTapReaction(row.id) }),
+                )
+            }
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
-        item { Spacer(modifier = Modifier.height(80.dp)) }
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            contentColor = PantopusColors.primary600,
+        )
     }
 }
 

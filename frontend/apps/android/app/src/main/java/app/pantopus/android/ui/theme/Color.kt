@@ -100,6 +100,27 @@ object PantopusColors {
     /** Magic border — `#DDD6FE`. Hairline border for sparkles discs and magic-tinted callouts. */
     val magicBorder = Color(0xFFDDD6FE)
 
+    // Pulse intent accents
+    /**
+     * Rose accent — `#BE123C`. Tailwind rose-700. Foreground for the
+     * `Lost & Found` Pulse intent chip; pairs with [roseBg]. Distinct from
+     * [error] (#DC2626) — a lost-item post is not an error state.
+     */
+    val rose = Color(0xFFBE123C)
+
+    /** Rose accent background — `#FFE4E6`. Tailwind rose-100; soft fill behind the `Lost & Found` chip. */
+    val roseBg = Color(0xFFFFE4E6)
+
+    /**
+     * Slate accent — `#475569`. Tailwind slate-600. Foreground for the
+     * `Announce` Pulse intent chip; pairs with [slateBg]. A calmer neutral
+     * than [appTextStrong] so civic announcements read as informational.
+     */
+    val slate = Color(0xFF475569)
+
+    /** Slate accent background — `#E2E8F0`. Tailwind slate-200; soft fill behind the `Announce` chip. */
+    val slateBg = Color(0xFFE2E8F0)
+
     // App shell / neutrals
     val appBg = Color(0xFFF6F7F9)
     val appSurface = Color(0xFFFFFFFF)

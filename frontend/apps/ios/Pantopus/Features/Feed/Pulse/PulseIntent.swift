@@ -129,7 +129,7 @@ public extension PulseIntent {
             ]
         case .event:
             [
-                PulseReaction(kind: .going, icon: .check, label: "going", count: helpfulCount, isInteractive: true),
+                PulseReaction(kind: .going, icon: .calendarCheck, label: "going", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .heart, icon: .heart, label: "", count: secondaryCount, isInteractive: false)
             ]
         case .lost:

@@ -65,10 +65,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case star
     case helpCircle = "help-circle"
     case calendar
+    case calendarCheck = "calendar-check"
     case lightbulb
     case eye
     case share
     case radio
+    case rss
     case mapPin = "map-pin"
     case pencil
     case briefcase
@@ -363,10 +365,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .star: "star"
         case .helpCircle: "questionmark.circle"
         case .calendar: "calendar"
+        case .calendarCheck: "calendar.badge.checkmark"
         case .lightbulb: "lightbulb"
         case .eye: "eye"
         case .share: "square.and.arrow.up"
         case .radio: "antenna.radiowaves.left.and.right"
+        case .rss: "dot.radiowaves.up.forward"
         case .mapPin: "mappin"
         case .pencil: "pencil"
         case .briefcase: "briefcase"

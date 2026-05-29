@@ -47,6 +47,13 @@ class ColorTokenTest {
         assertHex(0xFFF3E8FF, PantopusColors.businessBg)
     }
 
+    @Test fun pulse_intent_accents() {
+        assertHex(0xFFBE123C, PantopusColors.rose)
+        assertHex(0xFFFFE4E6, PantopusColors.roseBg)
+        assertHex(0xFF475569, PantopusColors.slate)
+        assertHex(0xFFE2E8F0, PantopusColors.slateBg)
+    }
+
     @Test fun neutrals() {
         assertHex(0xFFF6F7F9, PantopusColors.appBg)
         assertHex(0xFFFFFFFF, PantopusColors.appSurface)

@@ -47,6 +47,8 @@ final class DeepLinkRouter {
         case conversation(id: String)
         case user(id: String)
         case connections
+        /// `pantopus://beacons` — A03.2 Beacon Updates feed (`surface=personas`).
+        case beacons
         case discoverHub
         /// `pantopus://businesses/new` — open the A12.10 Create Business
         /// wizard inside the active tab's nav stack.
@@ -189,6 +191,8 @@ final class DeepLinkRouter {
             return .unknown(url)
         case "connections":
             return .connections
+        case "beacons", "beacon-updates", "beacon_updates":
+            return .beacons
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
         case "mailbox":

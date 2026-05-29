@@ -14,28 +14,22 @@ import Observation
 /// Render state for the Pulse feed screen.
 public enum PulseFeedState: Sendable {
     case loading
-    case empty(PulseFeedEmpty)
+    case empty(FeedEmptyContent)
     case loaded([PulsePostCardContent])
     case error(message: String)
 }
 
-/// Empty-state content. `scopeLabel` is the locality the user is
-/// browsing within (e.g. "Elm Park") so the empty message can hint at
-/// the filter scope.
-public struct PulseFeedEmpty: Sendable, Hashable {
-    public let scopeLabel: String?
-
-    public init(scopeLabel: String? = nil) {
-        self.scopeLabel = scopeLabel
-    }
-}
-
-/// Pulse feed view-model.
+/// Pulse / Beacons feed view-model. The same engine backs both A03
+/// surfaces; `surface` selects the backend query, the verified floor, and
+/// the empty-state copy.
 @Observable
 @MainActor
 public final class PulseFeedViewModel {
     /// Current render state.
     public private(set) var state: PulseFeedState = .loading
+
+    /// Which surface this feed renders (Pulse vs Beacons).
+    public let surface: FeedSurface
 
     /// Active chip-row filter. Drives the list query and the compose
     /// FAB's pre-fill.
@@ -56,10 +50,12 @@ public final class PulseFeedViewModel {
 
     init(
         api: APIClient = .shared,
+        surface: FeedSurface = .pulse,
         latitude: Double? = nil,
         longitude: Double? = nil
     ) {
         self.api = api
+        self.surface = surface
         self.latitude = latitude
         self.longitude = longitude
     }
@@ -120,7 +116,7 @@ public final class PulseFeedViewModel {
         do {
             let response: FeedResponse = try await api.request(
                 PostsEndpoints.feed(
-                    surface: "place",
+                    surface: surface.backendSurface,
                     latitude: latitude,
                     longitude: longitude,
                     postType: activeIntent.postType,
@@ -130,9 +126,9 @@ public final class PulseFeedViewModel {
             loadedItems = response.posts
             scopeLabel = response.posts.first?.locationName ?? scopeLabel
             if response.posts.isEmpty {
-                state = .empty(PulseFeedEmpty(scopeLabel: scopeLabel))
+                state = .empty(surface.emptyContent(scopeLabel: scopeLabel, followCount: 0))
             } else {
-                state = .loaded(response.posts.map(Self.project))
+                state = .loaded(response.posts.map { Self.project($0, surface: surface) })
             }
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load posts."
@@ -142,9 +138,10 @@ public final class PulseFeedViewModel {
 
     // MARK: - Projection
 
-    private static func project(_ post: FeedPostDTO) -> PulsePostCardContent {
+    private static func project(_ post: FeedPostDTO, surface: FeedSurface) -> PulsePostCardContent {
         let intent = PulseIntent.from(postType: post.postType)
         let initials = Self.initials(from: post.creator?.displayName ?? "?")
+        let isBusiness = post.creator?.accountType == "business"
         let attendees: PulseAttendeeStrip? = intent == .event
             ? PulseAttendeeStrip(
                 avatars: [],
@@ -156,8 +153,10 @@ public final class PulseFeedViewModel {
             id: post.id,
             authorName: post.creator?.displayName ?? "Pantopus user",
             authorInitials: initials,
-            authorVerified: post.creator?.accountType == "business" || post.userHasLiked,
-            // placeholder until backend surfaces creator.verified
+            // Beacons authors are all verified by definition; on Pulse, fall
+            // back to account-type until the backend surfaces creator.verified.
+            authorVerified: surface.authorsAlwaysVerified || isBusiness || post.userHasLiked,
+            avatarTint: isBusiness ? .violet : .sky,
             meta: Self.metaString(post: post, intent: intent),
             intent: intent,
             title: intent == .event ? post.title : nil,

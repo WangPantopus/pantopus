@@ -15,17 +15,20 @@ public struct FeedView: View {
     @State private var viewModel: PulseFeedViewModel
     private let onOpenPost: @MainActor (String) -> Void
     private let onCompose: @MainActor (PulseIntent) -> Void
+    private let onEmptyCTA: (@MainActor () -> Void)?
     private let onBack: (@MainActor () -> Void)?
 
     init(
         viewModel: PulseFeedViewModel = PulseFeedViewModel(),
         onOpenPost: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (PulseIntent) -> Void = { _ in },
+        onEmptyCTA: (@MainActor () -> Void)? = nil,
         onBack: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenPost = onOpenPost
         self.onCompose = onCompose
+        self.onEmptyCTA = onEmptyCTA
         self.onBack = onBack
     }
 
@@ -64,7 +67,7 @@ public struct FeedView: View {
                 .accessibilityLabel("Back")
                 .accessibilityIdentifier("pulseBackButton")
             }
-            Text("Pulse")
+            Text(viewModel.surface.title)
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
@@ -82,8 +85,8 @@ public struct FeedView: View {
         switch viewModel.state {
         case .loading:
             loadingFrame
-        case let .empty(empty):
-            emptyFrame(empty)
+        case let .empty(content):
+            emptyFrame(content)
         case let .loaded(rows):
             populatedFrame(rows)
         case let .error(message):
@@ -104,27 +107,28 @@ public struct FeedView: View {
         .accessibilityIdentifier("pulseFeedLoading")
     }
 
-    private func emptyFrame(_ empty: PulseFeedEmpty) -> some View {
+    private func emptyFrame(_ content: FeedEmptyContent) -> some View {
         VStack(spacing: Spacing.s3) {
             Spacer()
-            Icon(.radio, size: 32, strokeWidth: 1.8, color: Theme.Color.primary600)
+            Icon(content.icon, size: 32, strokeWidth: 1.8, color: Theme.Color.primary600)
                 .frame(width: 72, height: 72)
                 .background(Theme.Color.primary50)
                 .clipShape(Circle())
-            Text("Nothing here yet")
+            Text(content.headline)
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
-            Text("Be the first to post. Ask, recommend, or announce something local.")
+                .multilineTextAlignment(.center)
+            Text(content.body)
                 .font(.system(size: 13.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 260)
+                .frame(maxWidth: 268)
             Button {
-                onCompose(viewModel.activeIntent)
+                if let onEmptyCTA { onEmptyCTA() } else { onCompose(viewModel.activeIntent) }
             } label: {
                 HStack(spacing: Spacing.s2) {
-                    Icon(.pencil, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
-                    Text("Create post")
+                    Icon(content.ctaIcon, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                    Text(content.ctaLabel)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.appTextInverse)
                 }
@@ -135,16 +139,19 @@ public struct FeedView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("pulseEmptyCreatePost")
-            if let scope = empty.scopeLabel, !scope.isEmpty {
+            if let emphasis = content.footerEmphasis, !emphasis.isEmpty {
                 HStack(spacing: Spacing.s2) {
-                    Icon(.mapPin, size: 13, color: Theme.Color.appTextMuted)
+                    Icon(content.footerIcon, size: 13, color: Theme.Color.appTextMuted)
                     Group {
-                        Text("Showing posts within ")
+                        Text(content.footerLead)
                             .font(.system(size: 11.5))
                             .foregroundStyle(Theme.Color.appTextSecondary)
-                            + Text(scope)
+                            + Text(emphasis)
                             .font(.system(size: 11.5, weight: .bold))
                             .foregroundStyle(Theme.Color.appTextStrong)
+                            + Text(content.footerTrail)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
                 .padding(.horizontal, 14)
