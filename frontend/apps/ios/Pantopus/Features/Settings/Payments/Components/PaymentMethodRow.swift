@@ -98,20 +98,16 @@ struct PaymentBrandBadge: View {
     @ViewBuilder private var background: some View {
         switch brand {
         case .visa:
-            // #1A1F71 — Visa navy. Asset catalog has no token for
-            // brand swatches; render via primary800 (close navy) so
-            // the hex-grep guard stays clean.
+            // Visa navy mapped to the closest design token.
             Theme.Color.primary800.opacity(0.94)
         case .mastercard:
-            // Warm fill matching the design's #fef3c7 amber.
+            // Warm amber fill mapped to the warning background token.
             Theme.Color.warningBg
         case .amex:
-            // #006FCF — Amex blue. Closest token: primary600.
+            // Amex blue mapped to the closest primary token.
             Theme.Color.primary600
         case .applePay:
-            // #0b0f17 — near-black wallet swatch. Closest token:
-            // `appText` (the dark neutral inverts in dark mode but
-            // payment surfaces stay light so it reads correctly).
+            // Near-black wallet swatch mapped to the dark text token.
             Theme.Color.appText
         case .bank:
             Theme.Color.primary100
