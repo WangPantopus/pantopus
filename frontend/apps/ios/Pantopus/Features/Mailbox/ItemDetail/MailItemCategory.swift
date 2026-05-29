@@ -53,7 +53,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .social: Theme.Color.cleaning
         case .gig: Theme.Color.handyman // "cat-gigs" orange per A17.6 gig accent
         case .memory: Theme.Color.warning // sun-amber per A17.7 stationery-summer accent
-        case .party: Theme.Color.categoryParty // rose `#db2777` per A17.9 invite accent
+        case .party: Theme.Color.categoryParty // A17.9 party-invite accent token
         case .general: Theme.Color.appTextSecondary
         }
     }

@@ -60,7 +60,7 @@ struct RsvpCluster: View {
 
     private var goingShelf: some View {
         VStack(spacing: Spacing.s2 + 2) {
-            Button(action: { onGetDirections() }) {
+            Button(action: { onGetDirections() }, label: {
                 HStack(spacing: Spacing.s2) {
                     Icon(.navigation, size: 16, color: Theme.Color.appTextInverse)
                     Text("Get directions · party in 2 days")
@@ -72,13 +72,17 @@ struct RsvpCluster: View {
                 .background(Theme.Color.categoryParty)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .shadow(color: Theme.Color.categoryParty.opacity(0.28), radius: 12, x: 0, y: 6)
-            }
+            })
             .buttonStyle(.plain)
             .accessibilityIdentifier("partyRsvpCluster_directions")
 
             HStack(spacing: Spacing.s2) {
-                tertiary(icon: .userMinus, label: "Drop +1", action: { onAdjustPlusOne(max(0, party.plusOneCount - 1)) })
-                tertiary(icon: .xCircle, label: "Can't make it", warn: true, action: { onSetRsvp(.notGoing) })
+                tertiary(icon: .userMinus, label: "Drop +1") {
+                    onAdjustPlusOne(max(0, party.plusOneCount - 1))
+                }
+                tertiary(icon: .xCircle, label: "Can't make it", warn: true) {
+                    onSetRsvp(.notGoing)
+                }
             }
             HStack(spacing: Spacing.s2) {
                 tertiary(icon: .messageSquare, label: "Message Priya", action: onMessageHost)
@@ -97,7 +101,7 @@ struct RsvpCluster: View {
         primary: Bool,
         weight: CGFloat
     ) -> some View {
-        Button(action: { onSetRsvp(status) }) {
+        Button(action: { onSetRsvp(status) }, label: {
             HStack(spacing: 6) {
                 Icon(icon, size: 15, color: primary ? Theme.Color.appTextInverse : Theme.Color.appText)
                 Text(label)
@@ -119,7 +123,7 @@ struct RsvpCluster: View {
                 y: primary ? 6 : 0
             )
             .opacity(inFlight ? 0.6 : 1)
-        }
+        })
         .buttonStyle(.plain)
         .disabled(inFlight)
         .layoutPriority(weight)
@@ -130,7 +134,7 @@ struct RsvpCluster: View {
     // MARK: - Calendar hold
 
     private var calendarHold: some View {
-        Button(action: { onAddToCalendar() }) {
+        Button(action: { onAddToCalendar() }, label: {
             HStack(spacing: 6) {
                 Icon(.calendarPlus, size: 15, color: Theme.Color.primary700)
                 Text("Add to calendar (hold the date)")
@@ -145,7 +149,7 @@ struct RsvpCluster: View {
                     .stroke(Theme.Color.primary200, lineWidth: 1.5)
             )
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        }
+        })
         .buttonStyle(.plain)
         .accessibilityIdentifier("partyRsvpCluster_addToCalendar")
     }
@@ -164,7 +168,7 @@ struct RsvpCluster: View {
             : muted ? Theme.Color.success : Theme.Color.appTextStrong
         let background: Color = muted ? Theme.Color.successBg : Theme.Color.appSurface
         let border: Color = muted ? Theme.Color.successLight : Theme.Color.appBorder
-        return Button(action: { action() }) {
+        return Button(action: { action() }, label: {
             VStack(spacing: Spacing.s1) {
                 Icon(icon, size: 16, color: foreground)
                 Text(label)
@@ -181,7 +185,7 @@ struct RsvpCluster: View {
                     .stroke(border, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        }
+        })
         .buttonStyle(.plain)
     }
 }
@@ -243,7 +247,7 @@ private struct StepperButton: View {
     let action: @MainActor () -> Void
 
     var body: some View {
-        Button(action: { action() }) {
+        Button(action: { action() }, label: {
             Icon(icon, size: 12, color: primary ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
                 .frame(width: 24, height: 24)
                 .background(primary ? Theme.Color.categoryParty : Theme.Color.appSurface)
@@ -251,7 +255,7 @@ private struct StepperButton: View {
                     Circle().stroke(primary ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
                 )
                 .clipShape(Circle())
-        }
+        })
         .buttonStyle(.plain)
     }
 }

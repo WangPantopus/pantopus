@@ -175,8 +175,6 @@ extension PartyAttendee.AccentTint {
 private struct FlowLayout: Layout {
     let spacing: CGFloat
 
-    init(spacing: CGFloat) { self.spacing = spacing }
-
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var x: CGFloat = 0

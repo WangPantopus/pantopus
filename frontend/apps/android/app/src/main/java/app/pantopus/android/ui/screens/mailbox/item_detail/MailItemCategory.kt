@@ -171,7 +171,7 @@ enum class MailItemCategory(
     ),
     Party(
         raw = "party",
-        // Rose `#db2777` per A17.9 invite accent. Token lives on
+        // Party accent per A17.9 invite treatment. Token lives on
         // `PantopusColors.categoryParty` so the swatch can be swapped
         // without touching feature code.
         accent = PantopusColors.categoryParty,

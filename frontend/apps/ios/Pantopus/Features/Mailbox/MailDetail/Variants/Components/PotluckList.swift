@@ -93,7 +93,7 @@ struct PotluckList: View {
     @ViewBuilder
     private func trailing(for _: PartyBringItem, at index: Int, isYou: Bool, claimed: Bool) -> some View {
         if !claimed {
-            Button(action: { onClaim(index) }) {
+            Button(action: { onClaim(index) }, label: {
                 Text("I'll bring it")
                     .font(.system(size: 11.5, weight: .heavy))
                     .foregroundStyle(Theme.Color.categoryParty)
@@ -105,13 +105,13 @@ struct PotluckList: View {
                             .stroke(Theme.Color.categoryParty.opacity(0.45), lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
-            }
+            })
             .buttonStyle(.plain)
             .accessibilityIdentifier("partyPotluckList_claim_\(index)")
         } else if isYou {
-            Button(action: { onRelease(index) }) {
+            Button(action: { onRelease(index) }, label: {
                 Icon(.checkCircle, size: 18, color: Theme.Color.categoryParty)
-            }
+            })
             .buttonStyle(.plain)
             .accessibilityLabel("You're bringing this. Tap to release.")
             .accessibilityIdentifier("partyPotluckList_release_\(index)")

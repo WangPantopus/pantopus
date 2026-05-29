@@ -195,7 +195,9 @@ public struct PartyElfBullet: Sendable, Hashable, Identifiable {
     public let label: String
     public let text: String
 
-    public var id: String { label }
+    public var id: String {
+        label
+    }
 
     public init(glyph: Glyph, label: String, text: String) {
         self.glyph = glyph

@@ -64,7 +64,7 @@ struct PartyHero: View {
 
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 HStack(spacing: Spacing.s1) {
-                    TrustPill()
+                    PartyHeroTrustPill()
                     PartyInvitePill()
                     Spacer()
                     Text(party.timeAgoLabel)
@@ -140,9 +140,9 @@ struct PartyHero: View {
             (
                 Text("You're going")
                     .font(.system(size: 12, weight: .heavy))
-                + Text(party.plusOneCount > 0 ? " · +\(party.plusOneCount)" : "")
+                    + Text(party.plusOneCount > 0 ? " · +\(party.plusOneCount)" : "")
                     .font(.system(size: 12, weight: .heavy))
-                + Text(party.rsvpConfirmedAtLabel.map { " · RSVP'd \($0)" } ?? "")
+                    + Text(party.rsvpConfirmedAtLabel.map { " · RSVP'd \($0)" } ?? "")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(Theme.Color.success.opacity(0.85))
             )
@@ -163,7 +163,7 @@ struct PartyHero: View {
 
 // MARK: - Chips
 
-private struct TrustPill: View {
+private struct PartyHeroTrustPill: View {
     var body: some View {
         HStack(spacing: 3) {
             Icon(.shieldCheck, size: 10, color: Theme.Color.success)
