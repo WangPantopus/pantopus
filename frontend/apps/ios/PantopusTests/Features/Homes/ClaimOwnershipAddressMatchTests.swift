@@ -29,9 +29,8 @@ final class ClaimOwnershipAddressMatchTests: XCTestCase {
             uploader: MultipartUploader(
                 environment: .current,
                 session: SequencedURLProtocol.makeSession()
-            ),
-            isOnlineProvider: { true }
-        )
+            )
+        ) { true }
     }
 
     private func waitFor(
@@ -91,21 +90,37 @@ final class ClaimOwnershipAddressMatchTests: XCTestCase {
         // "Waiting for upload to finish" dock hint. Full happy-path sequence
         // so submit() runs to completion after the hint is observed.
         SequencedURLProtocol.sequence = [
-            .status(201, body: """
-            {"message":"ok","claim":{"id":"claim-fh","status":"under_review"}}
-            """, delay: 0.2),
-            .status(200, body: """
-            {"message":"uploaded","file":{"id":"f-1","url":"https://files/pantopus/fh1"}}
-            """),
-            .status(201, body: """
-            {"evidence":{"id":"e-1"},"verification_tier":null}
-            """),
-            .status(200, body: """
-            {"message":"uploaded","file":{"id":"f-2","url":"https://files/pantopus/fh2"}}
-            """),
-            .status(201, body: """
-            {"evidence":{"id":"e-2"},"verification_tier":null}
-            """)
+            .status(
+                201,
+                body: """
+                {"message":"ok","claim":{"id":"claim-fh","status":"under_review"}}
+                """,
+                delay: 0.2
+            ),
+            .status(
+                200,
+                body: """
+                {"message":"uploaded","file":{"id":"f-1","url":"https://files/pantopus/fh1"}}
+                """
+            ),
+            .status(
+                201,
+                body: """
+                {"evidence":{"id":"e-1"},"verification_tier":null}
+                """
+            ),
+            .status(
+                200,
+                body: """
+                {"message":"uploaded","file":{"id":"f-2","url":"https://files/pantopus/fh2"}}
+                """
+            ),
+            .status(
+                201,
+                body: """
+                {"evidence":{"id":"e-2"},"verification_tier":null}
+                """
+            )
         ]
         let vm = makeVM()
         vm.primaryTapped()
