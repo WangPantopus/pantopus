@@ -519,6 +519,7 @@ enum class PantopusIcon(
     Forward("forward"),
     Keyboard("keyboard"),
     Undo2("undo-2"),
+
     // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
     // handwritten-note open-quote, dress / forecast vibe rows, ± plus-one
     // stepper, RSVP cluster "Can't" chip, calendar-hold + calendar-saved
