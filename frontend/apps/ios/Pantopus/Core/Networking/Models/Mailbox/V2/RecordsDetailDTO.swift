@@ -75,7 +75,9 @@ public struct RecordsFact: Sendable, Hashable, Identifiable {
     public let tone: Tone
     public let emphasis: Bool
 
-    public var id: String { kind.rawValue }
+    public var id: String {
+        kind.rawValue
+    }
 
     public init(
         kind: Kind,
@@ -131,7 +133,9 @@ public struct RecordsElfBullet: Sendable, Hashable, Identifiable {
     public let label: String
     public let text: String
 
-    public var id: String { label }
+    public var id: String {
+        label
+    }
 
     public init(glyph: Glyph, label: String, text: String) {
         self.glyph = glyph
@@ -188,7 +192,9 @@ public struct RecordsVaultCrumb: Sendable, Hashable, Identifiable {
     public let label: String
     public let isCurrent: Bool
 
-    public var id: String { label }
+    public var id: String {
+        label
+    }
 
     public init(glyph: Glyph, label: String, isCurrent: Bool) {
         self.glyph = glyph

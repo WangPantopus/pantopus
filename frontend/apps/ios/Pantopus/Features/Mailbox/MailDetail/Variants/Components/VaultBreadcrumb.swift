@@ -43,7 +43,7 @@ struct VaultBreadcrumb: View {
 
     private var header: some View {
         HStack(spacing: Spacing.s1) {
-            Text((isFiled ? "FILED AT" : "WILL BE FILED AT"))
+            Text(isFiled ? "FILED AT" : "WILL BE FILED AT")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.5)
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -158,8 +158,8 @@ struct VaultBreadcrumb: View {
         retentionLine: RecordsSampleData.record.retentionLine,
         isFiled: false
     ) {}
-    .padding(Spacing.s4)
-    .background(Theme.Color.appBg)
+        .padding(Spacing.s4)
+        .background(Theme.Color.appBg)
 }
 
 #Preview("VaultBreadcrumb · filed") {
