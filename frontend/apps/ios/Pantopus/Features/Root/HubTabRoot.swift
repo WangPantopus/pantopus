@@ -79,6 +79,12 @@ public enum HubRoute: Hashable {
     case editMaintenance(homeId: String, taskId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
+    /// A14.1 (P5.1) — Per-home Settings index. Reached from the home
+    /// dashboard's top-bar settings affordance.
+    case homeSettings(homeId: String)
+    /// A14.2 (P5.1) — Per-home Security toggles. Reached from the
+    /// per-home Settings `Privacy` row.
+    case homeSecurity(homeId: String)
     case publicProfile(userId: String)
     /// P1.6 — Typed Business Profile screen. Pushed from DiscoverHub
     /// business cards, DiscoverBusinesses row taps, and any other
@@ -326,6 +332,34 @@ public struct HubTabRoot: View {
         // Pop the wizard — the listing-detail (or offers) screen
         // underneath refreshes on next `.task`.
         Task { @MainActor in pop() }
+    }
+
+    @MainActor
+    private func handleHomeSettingsRoute(_ route: HomeSettingsRoute, homeId: String) {
+        switch route {
+        case .address, .propertyDetails:
+            path.append(.propertyDetails(homeId: homeId))
+        case .photos:
+            path.append(.placeholder(label: "Photos"))
+        case .documents:
+            path.append(.homeDocs(homeId: homeId))
+        case .accessCodes:
+            path.append(.accessCodes(homeId: homeId, homeName: nil))
+        case .trustedNeighbors:
+            path.append(.placeholder(label: "Trusted neighbors"))
+        case .security:
+            path.append(.homeSecurity(homeId: homeId))
+        case .people:
+            path.append(.homeMembers(homeId: homeId))
+        case .inviteLink:
+            path.append(.placeholder(label: "Invite link"))
+        case .homeNotifications:
+            path.append(.placeholder(label: "Home notifications"))
+        case .leaveHome:
+            path.append(.placeholder(label: "Leave home"))
+        case .cancelClaim:
+            path.append(.placeholder(label: "Cancel claim"))
+        }
     }
 
     public var body: some View {
@@ -692,6 +726,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenPropertyDetails: { id in
                     Task { @MainActor in push(.propertyDetails(homeId: id)) }
+                },
+                onOpenSettings: { id in
+                    Task { @MainActor in push(.homeSettings(homeId: id)) }
                 }
             )
         case let .homeMaintenance(homeId):
@@ -1082,6 +1119,18 @@ public struct HubTabRoot: View {
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId) {
                 modalRoute = HubModalRoute(route: .addGuest(homeId: homeId))
+            }
+        case let .homeSettings(homeId):
+            HomeSettingsView(
+                viewModel: HomeSettingsViewModel(homeId: homeId) { route in
+                    handleHomeSettingsRoute(route, homeId: homeId)
+                }
+            ) {
+                pop()
+            }
+        case let .homeSecurity(homeId):
+            HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: homeId)) {
+                pop()
             }
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
