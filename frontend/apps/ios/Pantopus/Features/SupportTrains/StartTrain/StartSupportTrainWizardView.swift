@@ -8,7 +8,7 @@
 //  train's id back to the host stack via `onOpenTrain`.
 //
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 import SwiftUI
 
@@ -28,7 +28,7 @@ public struct StartSupportTrainWizardView: View {
     }
 
     public var body: some View {
-        WizardShell(model: viewModel) {
+        WizardShell(model: viewModel, identity: .warm) {
             stepBody
             if let error = viewModel.launchError {
                 StartSupportTrainErrorBanner(message: error)
@@ -115,30 +115,42 @@ private struct StartSupportTrainWhoAndWhyStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            SupportTrainChip()
+            TrainChip()
             HeadlineBlock("Who is this for, and why?")
             SubcopyBlock(
                 "A support train coordinates meals, rides, and help around someone going through something. Pick the person and the moment."
             )
             beneficiarySection
-            reasonPicker
+            ReasonPicker(selected: viewModel.selectedReason) {
+                viewModel.selectReason($0)
+            }
             if viewModel.isInviteRecipientBranch {
                 invitePrivacyHint
             } else {
                 contextNoteSection
                 privacySection
             }
-            SupportTrainStepRail(current: 1)
+            StepRail(current: 1)
         }
     }
 
     private var beneficiarySection: some View {
         LabeledField("RECIPIENT") {
             VStack(alignment: .leading, spacing: 6) {
-                if viewModel.isInviteRecipientBranch {
-                    inviteRecipientCard
+                if viewModel.isInviteRecipientBranch, let candidate = viewModel.inviteCandidate {
+                    InviteRecipientCard(
+                        candidate: candidate,
+                        selectedMethod: viewModel.inviteMethod,
+                        onClear: { viewModel.searchAgain() },
+                        onSelectMethod: { viewModel.selectInviteMethod($0) }
+                    )
                 } else if let selected = viewModel.selectedBeneficiary {
-                    verifiedRecipientCard(selected)
+                    StartTrainRecipientCard(
+                        recipient: selected,
+                        mutuals: viewModel.recipientMutuals
+                    ) {
+                        viewModel.clearBeneficiary()
+                    }
                 } else {
                     searchField
                     if !viewModel.beneficiaryResults.isEmpty {
@@ -216,220 +228,6 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-    }
-
-    private func verifiedRecipientCard(_ recipient: MailRecipientDTO) -> some View {
-        HStack(spacing: Spacing.s3) {
-            ZStack {
-                Circle()
-                    .fill(Theme.Color.personalBg)
-                    .frame(width: 48, height: 48)
-                Text(initials(for: recipient))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Theme.Color.personal)
-                Circle()
-                    .fill(Theme.Color.success)
-                    .frame(width: 18, height: 18)
-                    .overlay(Icon(.check, size: 10, strokeWidth: 3, color: Theme.Color.appTextInverse))
-                    .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
-                    .offset(x: 16, y: 16)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(recipient.name ?? recipient.username ?? "Recipient")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                    if recipient.isVerified != false {
-                        Text("VERIFIED")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Theme.Color.success)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Theme.Color.successBg)
-                            .clipShape(Capsule())
-                    }
-                }
-                Text(recipient.homeAddress ?? "Verified neighbor")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                HStack(spacing: Spacing.s1) {
-                    Icon(.users, size: 10, color: Theme.Color.appTextMuted)
-                    Text("3 mutual friends on your block")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Theme.Color.appTextMuted)
-                }
-            }
-            Spacer()
-            Button {
-                viewModel.clearBeneficiary()
-            } label: {
-                Text("Change")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.Color.primary600)
-                    .frame(minWidth: 44, minHeight: 44)
-            }
-            .accessibilityLabel("Change recipient")
-            .accessibilityIdentifier("startSupportTrainChangeRecipient")
-        }
-        .padding(Spacing.s3)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .accessibilityIdentifier("startSupportTrainSelectedBeneficiary")
-    }
-
-    private var inviteRecipientCard: some View {
-        VStack(spacing: Spacing.s0) {
-            HStack(spacing: 10) {
-                Icon(.search, size: 14, color: Theme.Color.appTextMuted)
-                Text(viewModel.beneficiaryQuery)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Theme.Color.appText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Button {
-                    viewModel.searchAgain()
-                } label: {
-                    Icon(.x, size: 12, color: Theme.Color.appTextSecondary)
-                        .frame(width: 32, height: 32)
-                }
-                .accessibilityLabel("Clear recipient search")
-                .accessibilityIdentifier("startSupportTrainClearInviteSearch")
-            }
-            .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, Spacing.s2)
-
-            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-
-            HStack(alignment: .top, spacing: 10) {
-                ZStack {
-                    Circle().fill(Theme.Color.warning).frame(width: 28, height: 28)
-                    Icon(.search, size: 14, color: Theme.Color.appTextInverse)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No verified neighbor found")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.Color.warning)
-                    Text("We searched verified addresses near yours. You can still start a train and invite them directly.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.warning)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(Spacing.s3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.Color.warningBg)
-
-            Rectangle().fill(Theme.Color.warningLight).frame(height: 1)
-
-            ForEach(Array(StartSupportTrainInviteMethod.allCases.enumerated()), id: \.element.id) { index, method in
-                inviteMethodRow(method)
-                if index < StartSupportTrainInviteMethod.allCases.count - 1 {
-                    Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-                }
-            }
-        }
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .accessibilityIdentifier("startSupportTrainInviteRecipientCard")
-    }
-
-    private func inviteMethodRow(_ method: StartSupportTrainInviteMethod) -> some View {
-        Button {
-            viewModel.selectInviteMethod(method)
-        } label: {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(Theme.Color.primary50)
-                    .frame(width: 32, height: 32)
-                    .overlay(Icon(method.icon, size: 15, color: Theme.Color.primary600))
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(method.title)
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Theme.Color.appText)
-                        if method == .phone {
-                            Text("RECOMMENDED")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Theme.Color.success)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Theme.Color.successBg)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    Text(method.value)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Spacer()
-                Icon(
-                    viewModel.inviteMethod == method ? .checkCircle : .chevronRight,
-                    size: 16,
-                    color: viewModel.inviteMethod == method ? Theme.Color.primary600 : Theme.Color.appTextMuted
-                )
-            }
-            .padding(Spacing.s3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("startSupportTrainInviteMethod_\(method.rawValue)")
-    }
-
-    private var reasonPicker: some View {
-        LabeledField("WHAT'S THE OCCASION?") {
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: Spacing.s2),
-                    GridItem(.flexible(), spacing: Spacing.s2)
-                ],
-                spacing: Spacing.s2
-            ) {
-                ForEach(StartSupportTrainReason.allCases) { reason in
-                    reasonTile(reason)
-                }
-            }
-        }
-    }
-
-    private func reasonTile(_ reason: StartSupportTrainReason) -> some View {
-        let isSelected = viewModel.selectedReason == reason
-        return Button {
-            viewModel.selectReason(reason)
-        } label: {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(isSelected ? Theme.Color.warning : Theme.Color.appSurfaceSunken)
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        Icon(
-                            reason.icon,
-                            size: 14,
-                            color: isSelected ? Theme.Color.appTextInverse : Theme.Color.appTextStrong
-                        )
-                    )
-                Text(reason.title)
-                    .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
-                    .foregroundStyle(isSelected ? Theme.Color.warning : Theme.Color.appText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(Spacing.s3)
-            .frame(minHeight: 56)
-            .background(isSelected ? Theme.Color.warningBg : Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(isSelected ? Theme.Color.warning : Theme.Color.appBorder, lineWidth: isSelected ? 1.5 : 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("startSupportTrainReason_\(reason.rawValue)")
     }
 
     private var contextNoteSection: some View {
@@ -514,13 +312,13 @@ private struct StartSupportTrainWhoAndWhyStep: View {
     ) -> some View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .fill(isOn.wrappedValue ? Theme.Color.warningBg : Theme.Color.appSurfaceSunken)
+                .fill(isOn.wrappedValue ? Theme.Color.warmAmberBg : Theme.Color.appSurfaceSunken)
                 .frame(width: 30, height: 30)
                 .overlay(
                     Icon(
                         icon,
                         size: 14,
-                        color: isOn.wrappedValue ? Theme.Color.warning : Theme.Color.appTextSecondary
+                        color: isOn.wrappedValue ? Theme.Color.warmAmber : Theme.Color.appTextSecondary
                     )
                 )
             VStack(alignment: .leading, spacing: 2) {
@@ -535,7 +333,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
             Spacer()
             Toggle("", isOn: isOn)
                 .labelsHidden()
-                .tint(Theme.Color.warning)
+                .tint(Theme.Color.warmAmber)
                 .accessibilityLabel(title)
                 .accessibilityIdentifier(identifier)
         }
@@ -559,86 +357,6 @@ private struct StartSupportTrainWhoAndWhyStep: View {
         .background(Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("startSupportTrainInvitePrivacyHint")
-    }
-
-    private func initials(for recipient: MailRecipientDTO) -> String {
-        let source = recipient.name ?? recipient.username ?? "Recipient"
-        let pieces = source.split(separator: " ")
-        let chars = pieces.prefix(2).compactMap(\.first)
-        let letters = chars.map(String.init).joined()
-        return letters.isEmpty ? "R" : letters.uppercased()
-    }
-}
-
-private struct SupportTrainChip: View {
-    var body: some View {
-        HStack(spacing: 5) {
-            Icon(.heart, size: 11, color: Theme.Color.warning)
-            Text("SUPPORT TRAIN")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Theme.Color.warning)
-                .kerning(0.4)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, Spacing.s1)
-        .background(Theme.Color.warningBg)
-        .clipShape(Capsule())
-        .accessibilityIdentifier("startSupportTrainChip")
-    }
-}
-
-private struct SupportTrainStepRail: View {
-    let current: Int
-
-    private let steps: [(Int, String)] = [
-        (1, "Recipient"),
-        (2, "Type"),
-        (3, "Dates"),
-        (4, "Invites"),
-        (5, "Review")
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            OverlineLabel(text: "YOU'RE ON STEP \(current) OF 5")
-            HStack(alignment: .top, spacing: Spacing.s1) {
-                ForEach(Array(steps.enumerated()), id: \.element.0) { index, step in
-                    VStack(spacing: Spacing.s1) {
-                        ZStack {
-                            Circle()
-                                .fill(step.0 <= current ? Theme.Color.warning : Theme.Color.appSurfaceSunken)
-                                .frame(width: 22, height: 22)
-                            if step.0 < current {
-                                Icon(.check, size: 11, strokeWidth: 3, color: Theme.Color.appTextInverse)
-                            } else {
-                                Text("\(step.0)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(step.0 == current ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
-                            }
-                        }
-                        Text(step.1)
-                            .font(.system(size: 9, weight: step.0 == current ? .bold : .medium))
-                            .foregroundStyle(step.0 == current ? Theme.Color.warning : Theme.Color.appTextMuted)
-                            .lineLimit(1)
-                    }
-                    if index < steps.count - 1 {
-                        Rectangle()
-                            .fill(step.0 < current ? Theme.Color.warning : Theme.Color.appBorder)
-                            .frame(height: 2)
-                            .padding(.top, 10)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            .padding(Spacing.s3)
-            .background(Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .accessibilityIdentifier("startSupportTrainStepRail")
-        }
     }
 }
 

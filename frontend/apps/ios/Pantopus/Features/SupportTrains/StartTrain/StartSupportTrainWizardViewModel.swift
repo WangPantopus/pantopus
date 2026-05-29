@@ -89,6 +89,28 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
         return "\(kind.title) for \(name)"
     }
 
+    /// Mutual connections shared with the selected verified neighbor,
+    /// surfaced as the recipient card's micro-avatar strip. The lookup is
+    /// stubbed from sample data — a real implementation would fetch the
+    /// organizer↔recipient mutuals when a beneficiary is selected.
+    public var recipientMutuals: [StartSupportTrainMutual] {
+        selectedBeneficiary == nil ? [] : StartSupportTrainSampleData.mutuals
+    }
+
+    /// The Frame-2 invite candidate when the organizer typed a name that
+    /// matched no verified neighbor. The contact handles are stubbed
+    /// (real contact-picker integration is out of scope); only the typed
+    /// name is live.
+    public var inviteCandidate: StartSupportTrainInviteCandidate? {
+        guard isInviteRecipientBranch else { return nil }
+        let typed = beneficiaryQuery.trimmingCharacters(in: .whitespaces)
+        return StartSupportTrainInviteCandidate(
+            typedName: typed,
+            phone: StartSupportTrainSampleData.inviteCandidate.phone,
+            email: StartSupportTrainSampleData.inviteCandidate.email
+        )
+    }
+
     // MARK: - Step 1 actions
 
     public func updateBeneficiaryQuery(_ value: String) {
