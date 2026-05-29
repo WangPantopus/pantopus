@@ -24,6 +24,19 @@ data class ReviewClaimToast(
     val isError: Boolean,
 )
 
+/**
+ * One pickable reason inside the Challenge composer. Labels are
+ * word-for-word with the A13.3 design + the iOS mirror (`ChallengeReason`
+ * in `ReviewClaimDetailViewModel.swift`).
+ */
+enum class ChallengeReason(val label: String) {
+    IdentityUnclear("Identity unclear"),
+    DocumentsAltered("Documents look altered"),
+    ShareDisputed("Ownership share disputed"),
+    DontRecognize("Don't recognize claimant"),
+    Other("Other"),
+}
+
 /** Lifecycle state for the claim detail screen. */
 sealed interface ReviewClaimDetailUiState {
     data object Loading : ReviewClaimDetailUiState
@@ -40,8 +53,8 @@ sealed interface ReviewClaimDetailUiState {
 /**
  * P1.1 — Admin claim-detail view-model. Reads `claimId` from
  * [SavedStateHandle], loads the full claim payload (claimant + home +
- * evidence) and exposes [review] for the Approve / Reject /
- * Request-more-info actions.
+ * evidence) and exposes [review] for the Accept / Challenge / Reject
+ * actions. `Challenge` keeps the legacy backend wire value.
  */
 @HiltViewModel
 class ReviewClaimDetailViewModel
@@ -61,6 +74,13 @@ class ReviewClaimDetailViewModel
 
         private val _toast = MutableStateFlow<ReviewClaimToast?>(null)
         val toast: StateFlow<ReviewClaimToast?> = _toast.asStateFlow()
+
+        // Challenge composer state -------------------------------------------
+        private val _selectedReasons = MutableStateFlow<Set<ChallengeReason>>(emptySet())
+        val selectedReasons: StateFlow<Set<ChallengeReason>> = _selectedReasons.asStateFlow()
+
+        private val _challengeQuestion = MutableStateFlow("")
+        val challengeQuestion: StateFlow<String> = _challengeQuestion.asStateFlow()
 
         private var loadedOnce: Boolean = false
 
@@ -123,6 +143,41 @@ class ReviewClaimDetailViewModel
             _toast.value = null
         }
 
+        // Challenge composer -------------------------------------------------
+
+        /** Toggle a reason chip in the Challenge composer. */
+        fun toggleReason(reason: ChallengeReason) {
+            _selectedReasons.update { current ->
+                if (current.contains(reason)) current - reason else current + reason
+            }
+        }
+
+        /** Hoisted text-field setter for the drafted question. */
+        fun setChallengeQuestion(text: String) {
+            _challengeQuestion.value = text
+        }
+
+        /** The Send-challenge CTA stays disabled until a question is drafted. */
+        fun canSendChallenge(): Boolean = _challengeQuestion.value.isNotBlank()
+
+        /**
+         * Submit the drafted challenge. Folds the picked reasons + question
+         * into the review note carried by the `Challenge` action. Clears the
+         * composer on success so a re-open starts blank.
+         */
+        suspend fun submitChallenge(): Boolean {
+            val note = composeChallengeNote(_selectedReasons.value, _challengeQuestion.value)
+            val ok = review(AdminClaimReviewAction.Challenge, note = note)
+            if (ok) resetChallengeComposer()
+            return ok
+        }
+
+        /** Reset composer state — on send + on dismiss. */
+        fun resetChallengeComposer() {
+            _selectedReasons.value = emptySet()
+            _challengeQuestion.value = ""
+        }
+
         private suspend fun reload() {
             when (val result = repo.claimDetail(claimId)) {
                 is NetworkResult.Success -> {
@@ -134,13 +189,38 @@ class ReviewClaimDetailViewModel
 
         private fun successCopy(action: AdminClaimReviewAction): String =
             when (action) {
-                AdminClaimReviewAction.Approve -> "Claim approved. User has been verified."
-                AdminClaimReviewAction.Reject -> "Claim rejected. User has been notified."
-                AdminClaimReviewAction.RequestMoreInfo -> "More info requested. User has been notified."
+                AdminClaimReviewAction.Approve -> "Claim accepted. The claimant is now a verified owner."
+                AdminClaimReviewAction.Reject -> "Claim rejected. The claimant has been notified."
+                AdminClaimReviewAction.Challenge -> "Challenge sent. The claimant has 14 days to respond."
             }
 
         companion object {
             /** Nav-arg key matching `ChildRoutes.REVIEW_CLAIM_DETAIL_ID_KEY`. */
             const val CLAIM_ID_KEY = "claimId"
+
+            /**
+             * Fold the picked reasons + drafted question into a single review
+             * note. Reasons lead (in declaration order, regardless of tap
+             * order) so the claimant reads a tidy "Reasons: …" header before
+             * the free-text. Returns `null` when both are empty.
+             */
+            fun composeChallengeNote(
+                reasons: Set<ChallengeReason>,
+                question: String,
+            ): String? {
+                val trimmed = question.trim()
+                val reasonLabels =
+                    ChallengeReason.entries
+                        .filter { reasons.contains(it) }
+                        .map { it.label }
+                val parts = mutableListOf<String>()
+                if (reasonLabels.isNotEmpty()) {
+                    parts.add("Reasons: " + reasonLabels.joinToString(", "))
+                }
+                if (trimmed.isNotEmpty()) {
+                    parts.add(trimmed)
+                }
+                return parts.joinToString("\n\n").ifEmpty { null }
+            }
         }
     }
