@@ -409,4 +409,27 @@ class DeepLinkRouterTest {
             DeepLinkRouter.resolveString("https://pantopus.app/homes/h_42/verify-landlord"),
         )
     }
+
+    // MARK: - P5.2 / A14.6 — Settings → Payments deep link
+
+    @Test
+    fun payments_settings_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.PaymentsSettings,
+            DeepLinkRouter.resolveString("pantopus://settings/payments"),
+        )
+    }
+
+    @Test
+    fun payments_settings_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.PaymentsSettings,
+            DeepLinkRouter.resolveString("https://pantopus.app/settings/payments"),
+        )
+    }
+
+    @Test
+    fun bare_settings_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://settings") is DeepLinkRouter.Destination.Unknown)
+    }
 }

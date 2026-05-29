@@ -33,7 +33,8 @@ extension MailDetailViewModel {
         let variants = decodeVariantDetails(category: category, object: detail.object)
         let resolvedAck = isAcknowledged || (variants.certified?.isAcknowledged ?? false)
         let detailTrust: MailDetailTrust = switch category {
-        case .certified, .community, .legal, .tax: .verified
+        case .certified, .community, .legal, .tax, .records: .verified
+        case .party: .celebration
         default: trust.detailTrust
         }
         return MailDetailContent(
@@ -65,7 +66,9 @@ extension MailDetailViewModel {
             couponDetail: variants.coupon,
             gigDetail: variants.gig,
             memoryDetail: variants.memory,
-            packageDetail: variants.package
+            packageDetail: variants.package,
+            partyDetail: variants.party,
+            recordsDetail: variants.records
         )
     }
 
@@ -133,6 +136,8 @@ private struct MailVariantDetails {
     let gig: GigDetailDTO?
     let memory: MemoryDetailDTO?
     let package: PackageBodyContent?
+    let party: PartyDetailDTO?
+    let records: RecordsDetailDTO?
 }
 
 private func bodyParagraphs(from content: String?) -> [String] {
@@ -154,6 +159,15 @@ private func decodeVariantDetails(
         coupon: category == .coupon ? CouponDetailDTO.decode(from: object) : nil,
         gig: category == .gig ? GigDetailDTO.decode(from: object) : nil,
         memory: category == .memory ? MemoryDetailDTO.decode(from: object) : nil,
-        package: category == .package ? PackageBodyContent.decode(from: object) : nil
+        package: category == .package ? PackageBodyContent.decode(from: object) : nil,
+        // Backend ingestion for personal invites is not yet wired; fall back
+        // to the deterministic fixture so the A17.9 variant lights up the
+        // moment a user opens a party-categorised mail. Once the wire schema
+        // ships, `PartyDetailDTO.decode(from:)` returns the real payload and
+        // this fallback becomes dead code we can drop.
+        party: category == .party
+            ? (PartyDetailDTO.decode(from: object) ?? MailItemSampleData.partyInvite)
+            : nil,
+        records: category == .records ? RecordsDetailDTO.decode(from: object) : nil
     )
 }

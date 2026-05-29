@@ -209,6 +209,25 @@ class StartSupportTrainViewModel
             return current.endDateMillis >= current.startDateMillis && generatedSlots().isNotEmpty()
         }
 
+        /** Mutual connections shared with the selected verified neighbor —
+         *  drives the recipient card's micro-avatar strip. Stubbed from
+         *  sample data; a real implementation would fetch the mutuals when
+         *  a beneficiary is selected. */
+        fun recipientMutuals(): List<StartSupportTrainMutual> =
+            if (_selectedBeneficiary.value == null) emptyList() else StartSupportTrainSampleData.mutuals
+
+        /** The Frame-2 invite candidate when the typed name matched no
+         *  verified neighbor. Contact handles are stubbed (real
+         *  contact-picker is out of scope); only the typed name is live. */
+        fun inviteCandidate(): StartSupportTrainInviteCandidate? {
+            if (!isInviteRecipientBranch()) return null
+            return StartSupportTrainInviteCandidate(
+                typedName = _form.value.beneficiaryQuery.trim(),
+                phone = StartSupportTrainSampleData.inviteCandidate.phone,
+                email = StartSupportTrainSampleData.inviteCandidate.email,
+            )
+        }
+
         // ─── WizardModel ────────────────────────────────────────────────
 
         override val chrome: WizardChrome

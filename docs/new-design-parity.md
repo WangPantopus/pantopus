@@ -161,9 +161,9 @@ All four A09 screens render through the shared `TransactionalDetailShell`
 - **Routing (post-P3.1):** `DeepLinkRouter` `.supportTrain(id:)` now lands on `SupportTrainDetailView` (iOS) / `SupportTrainDetailScreen` (Android); organizers reach `ReviewSignupsView` via the dock-overflow `Manage signups` action or the new `pantopus://support-trains/:id/manage` deep link (`.supportTrainManage(id:)`). The `SupportTrains` list row tap and the `StartSupportTrainWizard` success path both push the participant detail.
 
 ### A10.10 — Wallet (`/wallet.tsx`)
-- **iOS:** **MISSING** — no `Features/Wallet/` folder. Currently `Settings/SettingsView.swift:148` maps to `placeholder(label: "Payments & payouts")`.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD** (both platforms)
+- **iOS:** `Features/Wallet/WalletView.swift` + `WalletViewModel` (P3.2).
+- **Android:** `ui/screens/wallet/WalletScreen.kt` + `WalletViewModel`.
+- **Status:** **POLISH** (both platforms)
 - **Designed frames:** populated ($847.50 available · $186 pending · 22% above October) · payout on hold (bank verification expired · withdraw locked · re-verify card · 1099-ready chip)
 - **Build dependencies:** `BalanceHero` primitive.
 - **Required slots:**
@@ -173,7 +173,7 @@ All four A09 screens render through the shared `TransactionalDetailShell`
   - **`Taxes` overline + `TaxDocsRow`** — file-text icon tile + "Tax documents" + YTD line + chevron. Ready variant: home-green icon bg + `New` chip + "1099-NEC for 2025 ready · $9,847 reported".
   - **`BottomBar` with gradient fade** (linear `app-bg`-alpha 0 → 0.92 → 1) — *not* a solid frosted dock. **`WithdrawCTA`** showing icon + "Withdraw" left + amount tabular-nums right. Hold variant: greyed locked button + "Re-verify your bank above to unlock payouts" footnote in `appTextSecondary` 10.5pt center-aligned.
   - **Hold variant additions:** amber `HoldBanner` at top of scroll (shield-alert icon disc + "Bank verification expired" + body copy + "earnings keep landing — they're safe" reassurance), `BalanceHero` gets `holdTone` (yellow inset banner under split strip).
-- **Routing:** new `WalletView` (iOS) / `WalletScreen` (Android), wired from settings index `Payments` row (replacing the placeholder) and from a `pantopus://wallet` deep link.
+- **Routing:** `WalletView` (iOS) / `WalletScreen` (Android), reached via the `pantopus://wallet` deep link and the host's wallet tab/route entry. (P5.2 reclaimed the Settings → `Payments & payouts` row for A14.6 Payments — distinct payments-out surface; Wallet still owns the earnings-in flow.)
 
 ---
 
@@ -244,9 +244,9 @@ All A12 wizards use the same chrome: 48pt top bar (back · centered title ·
   - **Search frame**: focused 12pt search field with caret animation + `3 matches for "tutor"` header + `Highlighted` substring (violet bg) inside SearchResult rows + dashed violet `Add as custom category` fallback.
 
 ### A12.11 — Start a support train (`/support-trains/new.tsx`)
-- **iOS:** `SupportTrains/StartTrain/StartSupportTrainWizardView.swift` (~1100 lines) + `StartSupportTrainWizardViewModel.swift` + `StartSupportTrainContent.swift`
-- **Android:** `support_trains/start_train/StartSupportTrainWizardScreen.kt` + `StartSupportTrainViewModel.kt` + `StartSupportTrainContent.kt`
-- **Status:** **RESHAPE**
+- **iOS:** `SupportTrains/StartTrain/StartSupportTrainWizardView.swift` + `StartSupportTrainWizardViewModel.swift` + `StartSupportTrainContent.swift` + `StartTrain/Components/{TrainChip, ReasonPicker, RecipientCard, InviteRecipientCard, StepRail}.swift`
+- **Android:** `support_trains/start_train/StartSupportTrainWizardScreen.kt` + `StartSupportTrainViewModel.kt` + `StartSupportTrainContent.kt` + `start_train/components/{TrainChip, ReasonPicker, RecipientCard, InviteRecipientCard, StepRail}.kt`
+- **Status:** **RESHAPED** (P7.4) — wizard chrome now uses `WizardIdentity.warm`; step-1 pieces extracted to `Components/`; reason picker is the 6-tile 3×2 set (meal-train / ride / errand / surgery / baby / loss); recipient card gains the mutuals strip + verified-neighbor shield; invite branch reads `StartSupportTrainInviteCandidate`. Android Paparazzi baselines for the two step-1 frames need re-recording (`./gradlew paparazziRecord`); iOS snapshot baselines follow the existing skip-until-committed flow.
 - **Designed frames:** verified neighbor (TrainChip warm · recipient card with verified-neighbor shield + mutuals · 6-tile reason picker · short note · invite-only/block-visible toggles · 5-step rail preview) · invite branch (search row · "no verified neighbor" amber warning · invite by phone/email options · invite-only privacy hint · CTA → `Send invite & continue`)
 - **Per-frame deltas:**
   - **Wizard chrome re-themed warm-amber** (warm `#b45309` for CTA, warmBg `#fef3c7` for selected reason tile, progress rail in warm accent) — current implementation may be sky-blue.
@@ -437,9 +437,9 @@ that goes beyond the standard chevron/toggle row.
   - **Paused secondary**: master card replaced with `PauseBanner` — warm amber bg + warning-tinted bell-off icon + "Paused for 1h 24m left" + `Resume` neutral pill. Category cards stay rendered at 0.5 opacity.
 
 ### A14.6 — Payments (`/settings/payments.tsx`)
-- **iOS:** **MISSING from settings sub-routes** — `SettingsView.swift:148-150` maps `.paymentsPayouts` to `NotYetAvailableView`.
-- **Android:** **MISSING** — same placeholder pattern.
-- **Status:** **BUILD** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
+- **iOS:** `Features/Settings/Payments/PaymentsView.swift` + `PaymentsViewModel` (P5.2 — fixture-driven; Stripe Connect onboarding deep-link is a follow-up).
+- **Android:** `ui/screens/settings/payments/PaymentsScreen.kt` + `PaymentsViewModel`.
+- **Status:** **POLISH** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
 - **Designed frames:** populated (balance hero · 3 methods · Stripe connected · payouts to Chase weekly · YTD activity) · empty (no balance hero · inline empty in Methods card · Stripe `Connect` chip · gated payout method + tax rows)
 - **Required slots:**
   - **Balance hero** (same `BalanceHero` primitive as A10.10, but with `next-payout-date` + frequency pill chip on right of the available amount instead of the "USD" chip).
@@ -525,16 +525,17 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
 - **Required slots (iOS only):** Gig hero (job summary + estimated payout), KeyFacts (location · when · category), other bids strip, Accept/Decline split dock.
 
 ### A17.7 — Memory
-- **iOS:** **MISSING**
-- **Android:** has `mailbox/item_detail/bodies/MemoryBody.kt` + `MemorySampleData.kt`.
-- **Status:** **BUILD** (iOS) · **POLISH** (Android)
-- **Required slots (iOS only):** Memory hero (polaroid frame + caption), date-from line, "Add to keepsakes" CTA.
+- **iOS:** `Mailbox/MailDetail/Variants/MemoryDetailLayout.swift` (composes `MemoryBody` + `PolaroidFrame`).
+- **Android:** `mailbox/mail_detail/variants/MemoryDetailLayout.kt` (composes `MemoryBody` + `PolaroidFrame`) + `MemorySampleData.kt`.
+- **Status:** **POLISH**
+- **Per-frame deltas:** verify hero card (polaroid frame + caption + date-from line) and the Save-to-Vault / saved-pill action swap.
 
 ### A17.8 — Package
-- **iOS:** **MISSING**
-- **Android:** **MISSING** (no PackageBody body file).
-- **Status:** **BUILD** (both platforms)
-- **Required slots:** Package hero (carrier badge · tracking number mono · status pill), Tracking timeline, KeyFacts (carrier · service · dimensions · weight), package photo (front-door snapshot if delivered), `Track on carrier` + `Confirm pickup` split dock.
+- **iOS:** `Mailbox/MailDetail/Variants/PackageDetailLayout.swift` (ceremonial) + `Mailbox/ItemDetail/Bodies/CategoryBodies.swift` `PackageBody` (shared body). New components: `Variants/Components/CarrierBadge.swift`, `Variants/Components/PackageTrackingTimeline.swift`.
+- **Android:** `mailbox/item_detail/bodies/PackageBody.kt` (shared body, extracted from `CategoryBodies.kt`) + `mailbox/mail_detail/variants/PackageDetailLayout.kt` (ceremonial). New components: `bodies/components/CarrierBadge.kt`, `bodies/components/PackageTrackingTimeline.kt`.
+- **Status:** **POLISH**
+- **Slots delivered:** Package hero (`CarrierBadge` + tracking number mono + status pill), `PackageTrackingTimeline` (Shipped → In transit → Out for delivery → Delivered), KeyFacts (carrier · service · dimensions · weight · tracking · ETA), proof photo (front-door snapshot when delivered), split dock `Track on carrier` (opens carrier URL) + `Confirm pickup` primary.
+- **Fixtures:** USPS (`packageInTransit` / `packageOutForDelivery` / `packageDelivered`) + UPS (`packageUpsInTransit` / `packageUpsDelivered`) in both `MailItemSampleData`. `PackageBodyContent` carries `service` / `dimensions` / `weight` / `trackingUrl`; decoders on both platforms project them from the backend payload.
 
 ### A17.9 — Party (event invite)
 - **iOS:** **MISSING**
@@ -553,10 +554,10 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
   - **RsvpCluster** — 3-way Going / Maybe / Can't make it (Going = rose primary in open state, green check in going state) + PlusOneStepper visible only in going state.
 
 ### A17.10 — Records
-- **iOS:** **MISSING**
-- **Android:** **MISSING**
-- **Status:** **BUILD** (both platforms)
-- **Build dependencies:** `PaperStack` primitive (multi-page tilted sheets — 3 PaperSheets at z-stacked rotations, slate `#475569` accent).
+- **iOS:** `MailDetail/Variants/RecordsDetailLayout.swift` (+ `Variants/Components/IssuerCard.swift`, `VaultBreadcrumb.swift`, `RelatedRecords.swift`) — wired in `MailDetailView.swift` `.records` branch.
+- **Android:** `mail_detail/variants/RecordsDetailLayout.kt` (+ `item_detail/bodies/RecordsBody.kt` & `bodies/components/{IssuerCard,VaultBreadcrumb,RelatedRecords}.kt`) — wired in `MailDetailScreen.kt` `Records` branch.
+- **Status:** **BUILT** (both platforms, P6.6). Open + filed states snapshot-locked. Vault filing stubbed to local state; PDF thumbnail is the decorative PaperStack.
+- **Build dependencies:** `PaperStack` primitive (multi-page tilted sheets — 3 PaperSheets at z-stacked rotations, slate `#475569` accent). Slate token added as `categoryRecords` (`#475569`) + `categoryRecordsBg`/`Border`/`Deep` per open question #4.
 - **Required slots:**
   - **RecordsNav** — slate `#475569` dot in eyebrow chip.
   - **RecordsHero** — `HeroCard` variant with slate accent strip + "Q1 2026 Investment Statement — Roth IRA" + reference mono ("Statement MWM-2026-Q1-9981842 · 4 pages · PDF + structured data") + green `Filed in Vault` stamp when filed.
@@ -671,8 +672,8 @@ Add 13 primitives listed in the Summary table to `Core/Design/Components/` (iOS)
 3. A14.8 Vacation hold (`Mailbox/Vacation/`).
 
 **Phase 6 — BUILD batch E (mail variants)** (one PR per variant):
-1. iOS: A17.5 Coupon, A17.6 Gig mail, A17.7 Memory, A17.8 Package (iOS+Android), A17.9 Party (iOS+Android), A17.10 Records (iOS+Android).
-2. Android: A17.8 Package, A17.9 Party, A17.10 Records (Android catches up).
+1. iOS: A17.5 Coupon, A17.6 Gig mail, A17.7 Memory, ~~A17.8 Package (iOS+Android)~~ ✅ done, A17.9 Party (iOS+Android), A17.10 Records (iOS+Android).
+2. Android: ~~A17.8 Package~~ ✅ done, A17.9 Party, A17.10 Records (Android catches up).
 
 **Phase 7 — RESHAPE batch** (per-screen PRs):
 1. A13.14 Change Password (move Save inline, add strength meter, breach detection, context band).
@@ -700,6 +701,7 @@ Add 13 primitives listed in the Summary table to `Core/Design/Components/` (iOS)
 2. **A14.6 Payments vs A10.10 Wallet** — these are two distinct surfaces for adjacent intents (payments-out vs earnings-in). Confirm they should both exist, with the Wallet hosted under the `Wallet` tab/route and Payments hosted under Settings.
 3. **A12.10 Create Business** — the new design adds a typeahead/search frame with "Add as custom category" fallback. Confirm the back-end supports custom-category submissions (review-required) or whether we should hide the fallback until backend is ready.
 4. **A17.9 Party + A17.10 Records** — design uses `db2777` rose-magenta + `475569` slate accents that are **not** currently in `Colors.swift` / `Color.kt`. Confirm we extend the token system with `category-party` and `category-records`, or use raw hex (currently 158 hex literals already in allowed exceptions for category palettes).
+   - **Resolved (P6.6, Records):** extended the token system — added `categoryRecords` (`#475569`) + `categoryRecordsBg` (`#f8fafc`) / `categoryRecordsBorder` (`#e2e8f0`) / `categoryRecordsDeep` (`#1e293b`) to `Colors.swift` (asset catalog) and `Color.kt`. Party's rose-magenta still pending its build.
 5. **A18.3 Verification submitted** primary CTA — design uses "Back to home" as primary. Confirm this isn't a typo and we shouldn't surface "View status" as primary.
 
 ---

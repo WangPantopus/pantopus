@@ -58,6 +58,52 @@ extension MailDetailContent {
         return rebuild(content, memoryDetail: memory.withSaved(value))
     }
 
+    /// Return a copy of `content` with the party detail's `rsvp` flipped.
+    /// `confirmedAtLabel` is stamped into the going-state confirmation banner.
+    static func replacingPartyRsvp(
+        _ content: MailDetailContent,
+        with status: PartyRsvpStatus,
+        confirmedAtLabel: String? = nil
+    ) -> MailDetailContent {
+        guard let party = content.partyDetail else { return content }
+        return rebuild(content, partyDetail: party.withRsvp(status, confirmedAtLabel: confirmedAtLabel))
+    }
+
+    /// Return a copy of `content` with the party plus-one count clamped to
+    /// the supplied value. Used by the stepper in the going state.
+    static func replacingPartyPlusOneCount(
+        _ content: MailDetailContent,
+        with count: Int
+    ) -> MailDetailContent {
+        guard let party = content.partyDetail else { return content }
+        return rebuild(content, partyDetail: party.withPlusOneCount(count))
+    }
+
+    /// Return a copy of `content` with the party bring-list item at `index`
+    /// claimed/unclaimed. Used by the potluck "I'll bring it" affordance.
+    static func replacingPartyBringClaim(
+        _ content: MailDetailContent,
+        at index: Int,
+        by name: String?
+    ) -> MailDetailContent {
+        guard let party = content.partyDetail else { return content }
+        return rebuild(content, partyDetail: party.withBringClaim(at: index, by: name))
+    }
+
+    /// Return a copy of `content` with the records detail's `isFiled`
+    /// flag flipped. Used by the optimistic `fileRecordToVault` flow.
+    static func replacingRecordsFiled(
+        _ content: MailDetailContent,
+        with value: Bool,
+        filedAtLabel: String? = nil
+    ) -> MailDetailContent {
+        guard let records = content.recordsDetail else { return content }
+        return rebuild(
+            content,
+            recordsDetail: records.withFiled(value, filedAtLabel: filedAtLabel)
+        )
+    }
+
     /// Shared rebuilder so the per-field mutations stay one line each.
     /// Every parameter defaults to "keep the existing field"; pass only
     /// the field(s) you intend to flip.
@@ -71,7 +117,9 @@ extension MailDetailContent {
         couponDetail: CouponDetailDTO?? = nil,
         gigDetail: GigDetailDTO?? = nil,
         memoryDetail: MemoryDetailDTO?? = nil,
-        packageDetail: PackageBodyContent?? = nil
+        packageDetail: PackageBodyContent?? = nil,
+        partyDetail: PartyDetailDTO?? = nil,
+        recordsDetail: RecordsDetailDTO?? = nil
     ) -> MailDetailContent {
         MailDetailContent(
             mailId: content.mailId,
@@ -102,7 +150,9 @@ extension MailDetailContent {
             couponDetail: couponDetail ?? content.couponDetail,
             gigDetail: gigDetail ?? content.gigDetail,
             memoryDetail: memoryDetail ?? content.memoryDetail,
-            packageDetail: packageDetail ?? content.packageDetail
+            packageDetail: packageDetail ?? content.packageDetail,
+            partyDetail: partyDetail ?? content.partyDetail,
+            recordsDetail: recordsDetail ?? content.recordsDetail
         )
     }
 }

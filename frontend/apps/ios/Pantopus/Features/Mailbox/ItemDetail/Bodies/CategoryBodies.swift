@@ -9,14 +9,19 @@
 // swiftlint:disable file_length
 
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// A17.8 Package body: courier status, proof photo, tracking stepper,
-/// carrier handoff scans, contents, and receive-at-door affordance.
+/// carrier handoff scans, contents, and the carrier-tracking +
+/// confirm-pickup split dock.
 public struct PackageBody: View {
     private let content: PackageBodyContent
     private let isReceiveEnabled: Bool
     private let isReceiveLoading: Bool
     private let isReceived: Bool
+    private let showsActions: Bool
     private let onReceiveAtDoor: @MainActor () -> Void
 
     public init(
@@ -24,12 +29,14 @@ public struct PackageBody: View {
         isReceiveEnabled: Bool = true,
         isReceiveLoading: Bool = false,
         isReceived: Bool = false,
+        showsActions: Bool = true,
         onReceiveAtDoor: @escaping @MainActor () -> Void = {}
     ) {
         self.content = content
         self.isReceiveEnabled = isReceiveEnabled
         self.isReceiveLoading = isReceiveLoading
         self.isReceived = isReceived
+        self.showsActions = showsActions
         self.onReceiveAtDoor = onReceiveAtDoor
     }
 
@@ -46,11 +53,16 @@ public struct PackageBody: View {
         isReceiveEnabled: Bool = true,
         isReceiveLoading: Bool = false,
         isReceived: Bool = false,
+        showsActions: Bool = true,
         onReceiveAtDoor: @escaping @MainActor () -> Void = {}
     ) {
         let sample = MailItemSampleData.packageBody(status: status)
         content = PackageBodyContent(
             carrier: carrier,
+            service: sample.service,
+            dimensions: sample.dimensions,
+            weight: sample.weight,
+            trackingUrl: sample.trackingUrl,
             etaLine: etaLine ?? sample.etaLine,
             status: status,
             trackingNumber: trackingNumber ?? sample.trackingNumber,
@@ -65,6 +77,7 @@ public struct PackageBody: View {
         self.isReceiveEnabled = isReceiveEnabled
         self.isReceiveLoading = isReceiveLoading
         self.isReceived = isReceived
+        self.showsActions = showsActions
         self.onReceiveAtDoor = onReceiveAtDoor
     }
 
@@ -75,18 +88,20 @@ public struct PackageBody: View {
                 PackageDeliveryPhotoCard(photo: photo)
             }
             PackageInsightCard(status: content.status)
-            PackageTimelineCard(steps: content.trackingSteps)
+            PackageTimelineCard(content: content)
             PackageHandoffCard(steps: content.handoffSteps)
             if let contents = content.contents {
                 PackageContentsCard(contents: contents)
             }
-            PackageReceiveCard(
-                status: content.status,
-                isEnabled: isReceiveEnabled,
-                isLoading: isReceiveLoading,
-                isReceived: isReceived || content.deliveryPhoto?.isReceived == true,
-                onReceiveAtDoor: onReceiveAtDoor
-            )
+            if showsActions {
+                PackageSplitDock(
+                    content: content,
+                    isEnabled: isReceiveEnabled,
+                    isLoading: isReceiveLoading,
+                    isReceived: isReceived || content.deliveryPhoto?.isReceived == true,
+                    onConfirmPickup: onReceiveAtDoor
+                )
+            }
         }
         .padding(.horizontal, Spacing.s4)
         .accessibilityIdentifier("packageBody")
@@ -99,7 +114,7 @@ private struct PackageStatusCard: View {
     var body: some View {
         PackageCard(noPadding: true) {
             HStack(spacing: Spacing.s3) {
-                CourierMark(carrier: content.carrier)
+                CarrierBadge(carrier: content.carrier)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(content.carrier) - Tracking #")
                         .pantopusTextStyle(.overline)
@@ -210,37 +225,6 @@ private struct EtaProgressBar: View {
     }
 }
 
-private struct CourierMark: View {
-    let carrier: String
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .fill(Theme.Color.primary900)
-            Rectangle()
-                .fill(Theme.Color.error)
-                .frame(height: 3)
-                .offset(y: 5)
-            VStack(spacing: Spacing.s1) {
-                Text(carrierInitials)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                Text("PRIORITY")
-                    .pantopusTextStyle(.overline)
-                    .foregroundStyle(Theme.Color.appTextInverse.opacity(0.85))
-            }
-        }
-        .frame(width: 46, height: 46)
-        .accessibilityHidden(true)
-    }
-
-    private var carrierInitials: String {
-        let words = carrier.split(separator: " ").prefix(2)
-        let initials = words.compactMap(\.first).map(String.init).joined()
-        return initials.isEmpty ? "PKG" : initials.uppercased()
-    }
-}
-
 private struct PackageInsightCard: View {
     let status: PackageDeliveryStatus
 
@@ -312,15 +296,28 @@ private struct PackageInsightCard: View {
     }
 }
 
+@MainActor
 private struct PackageTimelineCard: View {
-    let steps: [TimelineStep]
+    let content: PackageBodyContent
 
     var body: some View {
-        PackageCard {
-            SectionHeader("Tracking timeline")
-            TimelineStepper(steps: steps)
-        }
+        PackageTrackingTimeline(
+            steps: content.trackingSteps,
+            carrier: content.carrier,
+            onOpenCarrier: openCarrierAction
+        )
         .accessibilityIdentifier("packageBody.trackingTimeline")
+    }
+
+    private var openCarrierAction: (@MainActor () -> Void)? {
+        guard let urlString = content.trackingUrl, let url = URL(string: urlString) else {
+            return nil
+        }
+        return {
+            #if canImport(UIKit)
+            UIApplication.shared.open(url)
+            #endif
+        }
     }
 }
 
@@ -556,100 +553,109 @@ private struct PackageContentsCard: View {
     }
 }
 
-private struct PackageReceiveCard: View {
-    let status: PackageDeliveryStatus
+/// A17.8 split dock: "Track on carrier" (secondary, opens the browser to
+/// the carrier tracking URL) + "Confirm pickup" (primary, fires the
+/// receive-at-door flow). The primary flips into a "Picked up" indicator
+/// once the recipient confirms in-hand receipt. Mirrors the Android
+/// `PackageSplitDock`.
+private struct PackageSplitDock: View {
+    let content: PackageBodyContent
     let isEnabled: Bool
     let isLoading: Bool
     let isReceived: Bool
-    let onReceiveAtDoor: @MainActor () -> Void
+    let onConfirmPickup: @MainActor () -> Void
 
     var body: some View {
-        PackageCard {
-            receiveButton
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 4), spacing: Spacing.s2) {
-                if status == .delivered {
-                    actionChip(icon: .alertTriangle, label: "Wrong photo", identifier: "packageBody.wrongPhoto")
-                    actionChip(icon: .userPlus, label: "Hand-off", identifier: "packageBody.handoff")
-                    actionChip(icon: .arrowsRepeat, label: "Return", identifier: "packageBody.return")
-                    actionChip(icon: .archive, label: "Archive", identifier: "packageBody.archive")
-                } else {
-                    actionChip(icon: .map, label: "Track map", identifier: "packageBody.trackMap")
-                    actionChip(icon: .userPlus, label: "Hand-off", identifier: "packageBody.handoff")
-                    actionChip(icon: .messageSquare, label: "Note", identifier: "packageBody.courierNote")
-                    actionChip(icon: .archive, label: "Archive", identifier: "packageBody.archive")
-                }
-            }
+        HStack(spacing: Spacing.s2) {
+            trackButton
+            confirmButton
         }
         .accessibilityIdentifier("packageBody.actions")
     }
 
-    private var receiveButton: some View {
-        Button {
-            onReceiveAtDoor()
-        } label: {
+    @ViewBuilder
+    private var trackButton: some View {
+        if let urlString = content.trackingUrl, let url = URL(string: urlString) {
+            Link(destination: url) { trackLabel }
+                .accessibilityIdentifier("mailDetail_package_trackOnCarrier")
+        } else {
+            Button(action: {}, label: { trackLabel })
+                .buttonStyle(.plain)
+                .disabled(true)
+                .opacity(0.5)
+                .accessibilityIdentifier("mailDetail_package_trackOnCarrier")
+        }
+    }
+
+    private var trackLabel: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.externalLink, size: 15, color: Theme.Color.appTextStrong)
+            Text("Track on \(carrierShort)")
+                .pantopusTextStyle(.small)
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var confirmButton: some View {
+        if isReceived {
             HStack(spacing: Spacing.s2) {
-                if isLoading {
-                    ProgressView().tint(Theme.Color.appTextInverse)
-                } else {
-                    Icon(isReceived ? .checkCircle : .package, size: 16, color: foreground)
-                }
-                Text(buttonTitle)
+                Icon(.checkCircle, size: 16, color: Theme.Color.success)
+                Text("Picked up")
                     .pantopusTextStyle(.body)
-                    .foregroundStyle(foreground)
+                    .foregroundStyle(Theme.Color.success)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(buttonBackground)
+            .background(Theme.Color.successBg)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(buttonBorder, lineWidth: isReceived ? 1.5 : 0)
+                    .stroke(Theme.Color.successLight, lineWidth: 1.5)
             )
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .opacity(isEnabled || isReceived ? 1 : 0.5)
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled || isLoading || isReceived)
-        .accessibilityLabel(buttonTitle)
-        .accessibilityIdentifier("packageBody.receiveAtDoor")
-    }
-
-    private func actionChip(icon: PantopusIcon, label: String, identifier: String) -> some View {
-        Button(action: {}, label: {
-            VStack(spacing: Spacing.s1) {
-                Icon(icon, size: 16, color: icon == .alertTriangle ? Theme.Color.error : Theme.Color.appTextStrong)
-                Text(label)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextStrong)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+            .onTapGesture { onConfirmPickup() }
+            .accessibilityIdentifier("mailDetail_package_received")
+        } else {
+            Button {
+                onConfirmPickup()
+            } label: {
+                HStack(spacing: Spacing.s2) {
+                    if isLoading {
+                        ProgressView().tint(Theme.Color.appTextInverse)
+                    } else {
+                        Icon(.checkCircle, size: 16, color: Theme.Color.appTextInverse)
+                    }
+                    Text("Confirm pickup")
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                .opacity(isEnabled ? 1 : 0.6)
             }
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        })
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(identifier)
+            .buttonStyle(.plain)
+            .disabled(!isEnabled || isLoading)
+            .accessibilityIdentifier("mailDetail_package_confirmPickup")
+        }
     }
 
-    private var buttonTitle: String {
-        if isReceived { return "Received at door" }
-        return status == .delivered ? "Receive at door" : "Receive at door when delivered"
-    }
-
-    private var foreground: Color {
-        isReceived ? Theme.Color.success : Theme.Color.appTextInverse
-    }
-
-    private var buttonBackground: Color {
-        isReceived ? Theme.Color.appSurface : Theme.Color.primary600
-    }
-
-    private var buttonBorder: Color {
-        isReceived ? Theme.Color.successLight : Theme.Color.primary600
+    private var carrierShort: String {
+        let upper = content.carrier.uppercased()
+        if upper.contains("USPS") { return "USPS" }
+        if upper.contains("UPS") { return "UPS" }
+        if upper.contains("FEDEX") { return "FedEx" }
+        if upper.contains("DHL") { return "DHL" }
+        return "carrier"
     }
 }
 

@@ -306,10 +306,27 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case cpu
     case truck
 
+    /// P5.2 / A14.6 Payments — the inline-empty hero disc inside the
+    /// Payment methods card uses Lucide's `credit-card` glyph.
+    case creditCard = "credit-card"
+
     // A13.13 — Manage train. `bar-chart-3` paints the Analytics row's icon
     // tile; `calendar-cog` paints the Edit-dates-&-slots row.
     case barChart3 = "bar-chart-3"
     case calendarCog = "calendar-cog"
+
+    // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
+    // dress / forecast vibe rows, ± plus-one stepper, RSVP cluster Can't
+    // chip, calendar-hold CTA, and the bell-off mute affordance.
+    case quote
+    case cloudSun = "cloud-sun"
+    case shirt
+    case xCircle = "x-circle"
+    case bellOff = "bell-off"
+    case minus
+    case userMinus = "user-minus"
+    case calendarCheck = "calendar-check"
+    case calendarPlus = "calendar-plus"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -544,11 +561,26 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // `box.truck` glyphs.
         case .cpu: "cpu"
         case .truck: "box.truck"
+        // P5.2 / A14.6 Payments — SF Symbols ships `creditcard`.
+        case .creditCard: "creditcard"
         // A13.13 Manage train. `chart.bar` paints the analytics row;
         // `calendar.badge.clock` is the closest "calendar with gear" glyph
         // (no native `calendar.gearshape`), used on the Edit-dates row.
         case .barChart3: "chart.bar"
         case .calendarCog: "calendar.badge.clock"
+        // A17.9 Party. SF Symbols ships direct quote / cloud.sun /
+        // tshirt.fill / xmark.circle / bell.slash / minus glyphs;
+        // user-minus collapses to `person.badge.minus`, and the
+        // calendar-check / calendar-plus pair maps onto the badge variants.
+        case .quote: "quote.bubble"
+        case .cloudSun: "cloud.sun"
+        case .shirt: "tshirt.fill"
+        case .xCircle: "xmark.circle"
+        case .bellOff: "bell.slash"
+        case .minus: "minus"
+        case .userMinus: "person.badge.minus"
+        case .calendarCheck: "calendar.badge.checkmark"
+        case .calendarPlus: "calendar.badge.plus"
         }
     }
 }

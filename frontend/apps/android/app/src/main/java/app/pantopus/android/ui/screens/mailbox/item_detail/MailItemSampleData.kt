@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "LargeClass")
 
 package app.pantopus.android.ui.screens.mailbox.item_detail
 
@@ -17,8 +17,19 @@ import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityUpdateInfo
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.PartyAttendee
+import app.pantopus.android.data.api.models.mailbox.v2.PartyBringItem
+import app.pantopus.android.data.api.models.mailbox.v2.PartyDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.PartyElfBullet
+import app.pantopus.android.data.api.models.mailbox.v2.PartyElfContent
+import app.pantopus.android.data.api.models.mailbox.v2.PartyEventDate
+import app.pantopus.android.data.api.models.mailbox.v2.PartyEventInfo
+import app.pantopus.android.data.api.models.mailbox.v2.PartyHostInfo
+import app.pantopus.android.data.api.models.mailbox.v2.PartyNoteContent
+import app.pantopus.android.data.api.models.mailbox.v2.PartyRsvpStatus
 import app.pantopus.android.ui.components.TimelineStep
 import app.pantopus.android.ui.components.TimelineStepState
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.RecordsSampleData
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
@@ -134,6 +145,10 @@ object MailItemSampleData {
     val packageInTransit =
         PackageBodyContent(
             carrier = "USPS Priority Mail",
+            service = "USPS Priority Mail",
+            dimensions = "12 x 9 x 4 in",
+            weight = "2.4 lb",
+            trackingUrl = "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
             etaLine = "Expected today by 3 PM",
             status = PackageDeliveryStatus.InTransit,
             trackingNumber = "9505 5125 8841 6014 2203 17",
@@ -171,6 +186,10 @@ object MailItemSampleData {
     val packageOutForDelivery =
         PackageBodyContent(
             carrier = "USPS Priority Mail",
+            service = "USPS Priority Mail",
+            dimensions = "12 x 9 x 4 in",
+            weight = "2.4 lb",
+            trackingUrl = "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
             etaLine = "ETA window 1:00 - 3:00 PM - about 6 stops away",
             status = PackageDeliveryStatus.OutForDelivery,
             trackingNumber = "9505 5125 8841 6014 2203 17",
@@ -215,6 +234,10 @@ object MailItemSampleData {
     val packageDelivered =
         PackageBodyContent(
             carrier = "USPS Priority Mail",
+            service = "USPS Priority Mail",
+            dimensions = "12 x 9 x 4 in",
+            weight = "2.4 lb",
+            trackingUrl = "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
             etaLine = "Today - 1:47 PM - front porch - left in shade",
             status = PackageDeliveryStatus.Delivered,
             trackingNumber = "9505 5125 8841 6014 2203 17",
@@ -263,6 +286,95 @@ object MailItemSampleData {
             PackageDeliveryStatus.OutForDelivery -> packageOutForDelivery
             PackageDeliveryStatus.Delivered -> packageDelivered
         }
+
+    /** UPS fixture - in transit. Used by A17.8 acceptance tests. */
+    val packageUpsInTransit =
+        PackageBodyContent(
+            carrier = "UPS",
+            service = "UPS Ground",
+            dimensions = "14 x 10 x 6 in",
+            weight = "3.8 lb",
+            trackingUrl = "https://www.ups.com/track?tracknum=1Z999AA10123456784",
+            etaLine = "Expected tomorrow by 8 PM",
+            status = PackageDeliveryStatus.InTransit,
+            trackingNumber = "1Z 999 AA1 0123 4567 84",
+            referenceLine = "UPS Ground - 3.8 lb - 14x10x6 in",
+            statusTitle = "In transit",
+            statusDetail = "Moving through Reno, NV",
+            trackingSteps = packageTrackingSteps(PackageDeliveryStatus.InTransit),
+            handoffSteps =
+                listOf(
+                    PackageHandoffStep(
+                        id = "in-transit",
+                        title = "In transit",
+                        location = "Reno, NV",
+                        timestamp = "Sun May 17 - 9:14 PM",
+                        icon = PantopusIcon.ArrowRight,
+                    ),
+                    PackageHandoffStep(
+                        id = "picked-up",
+                        title = "Picked up by UPS",
+                        location = "Hayward, CA",
+                        timestamp = "Sat May 16 - 5:42 PM",
+                        icon = PantopusIcon.Package,
+                    ),
+                    PackageHandoffStep(
+                        id = "label-created",
+                        title = "Label created",
+                        location = "Hayward, CA",
+                        timestamp = "Sat May 16 - 11:11 AM",
+                        icon = PantopusIcon.Tag,
+                    ),
+                ),
+        )
+
+    /** UPS fixture - delivered. Used by A17.8 acceptance tests. */
+    val packageUpsDelivered =
+        PackageBodyContent(
+            carrier = "UPS",
+            service = "UPS Ground",
+            dimensions = "14 x 10 x 6 in",
+            weight = "3.8 lb",
+            trackingUrl = "https://www.ups.com/track?tracknum=1Z999AA10123456784",
+            etaLine = "Today - 11:22 AM - front porch",
+            status = PackageDeliveryStatus.Delivered,
+            trackingNumber = "1Z 999 AA1 0123 4567 84",
+            referenceLine = "UPS Ground - 3.8 lb - 14x10x6 in",
+            statusTitle = "Delivered to your porch",
+            statusDetail = "Today - 11:22 AM - front porch",
+            trackingSteps = packageTrackingSteps(PackageDeliveryStatus.Delivered),
+            handoffSteps =
+                listOf(
+                    PackageHandoffStep(
+                        id = "delivered",
+                        title = "Delivered to front porch",
+                        location = "Oakland, CA - 1428 Elm St",
+                        timestamp = "Tue May 19 - 11:22 AM",
+                        icon = PantopusIcon.Home,
+                    ),
+                    PackageHandoffStep(
+                        id = "out-for-delivery",
+                        title = "Out for delivery",
+                        location = "Oakland Hub - Route 14",
+                        timestamp = "Tue May 19 - 7:38 AM",
+                        icon = PantopusIcon.Truck,
+                    ),
+                    PackageHandoffStep(
+                        id = "in-transit",
+                        title = "In transit",
+                        location = "Reno, NV",
+                        timestamp = "Sun May 17 - 9:14 PM",
+                        icon = PantopusIcon.ArrowRight,
+                    ),
+                ),
+            deliveryPhoto =
+                PackageDeliveryPhoto(
+                    capturedAt = "11:22 AM",
+                    watermark = "UPS - 19/05/2026 11:22:14",
+                    location = "Front porch - 1428 Elm St",
+                    verificationLabel = "GPS verified",
+                ),
+        )
 
     fun packageTrackingSteps(status: PackageDeliveryStatus): List<TimelineStep> {
         val currentIndex =
@@ -554,4 +666,145 @@ object MailItemSampleData {
 
     /** Same signed payload used for archived shell snapshots. */
     val certifiedArchived = certifiedSigned
+
+    /**
+     * A17.9 — personal-invite fixture (Priya's backyard housewarming).
+     * Mirrors `docs/designs/A17/party.jsx` so the Party variant renders
+     * the same as the design hand-off until the backend ingests real
+     * personal invites. Kept in lock-step with iOS `partyInvite`.
+     */
+    val partyInvite =
+        PartyDetailDto(
+            partyItemId = "party-housewarming",
+            host =
+                PartyHostInfo(
+                    name = "Priya Ramanathan",
+                    initials = "PR",
+                    blurb = "Maple St · moved in last month",
+                    relationLabel = "Friend · neighbor",
+                    isVerified = true,
+                ),
+            event =
+                PartyEventInfo(
+                    what = "Backyard housewarming",
+                    date =
+                        PartyEventDate(
+                            weekday = "Saturday",
+                            dayLabel = "SAT",
+                            monthLabel = "MAY",
+                            dayNumber = "24",
+                            timeRange = "6:00 PM – late",
+                        ),
+                    location = "1631 Maple St",
+                    locationNote = "Side gate is open · look for the string lights",
+                    walkLabel = "0.2 mi · 4 min walk",
+                    dressCode = "Casual · bring a layer (it gets cool)",
+                    kids = "Kids welcome until 9",
+                    weatherSummary = "Clear · light breeze",
+                    weatherTemperatureF = 71,
+                ),
+            attendees =
+                listOf(
+                    PartyAttendee("jamal", "Jamal", "JT", PartyAttendee.AccentTint.Home, 1, PartyAttendee.Status.Going),
+                    PartyAttendee("maria", "Maria", "MK", PartyAttendee.AccentTint.Personal, 1, PartyAttendee.Status.Going),
+                    PartyAttendee("lin", "Lin", "LS", PartyAttendee.AccentTint.Business, 0, PartyAttendee.Status.Going),
+                    PartyAttendee("derek", "Derek", "DR", PartyAttendee.AccentTint.Warning, 1, PartyAttendee.Status.Going),
+                    PartyAttendee("sara", "Sara", "SN", PartyAttendee.AccentTint.Error, 0, PartyAttendee.Status.Going),
+                    PartyAttendee("paul", "Paul", "PC", PartyAttendee.AccentTint.Primary, 0, PartyAttendee.Status.Maybe),
+                    PartyAttendee("aliyah", "Aliyah", "AW", PartyAttendee.AccentTint.Home, 0, PartyAttendee.Status.Going),
+                ),
+            bringList =
+                listOf(
+                    PartyBringItem("bottle", "A bottle of something", "🍷", null),
+                    PartyBringItem("side", "Side or salad", "🥗", "Jamal"),
+                    PartyBringItem("dessert", "Dessert", "🍰", "Maria + Lin"),
+                    PartyBringItem("speaker", "Outdoor speaker", "🔊", "Derek"),
+                ),
+            note =
+                PartyNoteContent(
+                    eyebrow = "A note from Priya",
+                    paragraphs =
+                        listOf(
+                            "Finally unpacked enough to have people over! It'd mean a lot if you came.",
+                            "Backyard, string lights, my brother is bringing his pizza oven. No need to bring anything " +
+                                "but yourself — but if you want to claim a dish below, even better.",
+                        ),
+                    signature = "Priya x",
+                ),
+            elfOpen =
+                PartyElfContent(
+                    headline = "Pantopus mapped this out",
+                    summary =
+                        "5 of your friends are going already, Priya lives 3 doors down, and your Saturday evening " +
+                            "is clear. Weather looks great.",
+                    bullets =
+                        listOf(
+                            PartyElfBullet(
+                                PartyElfBullet.Glyph.Users,
+                                "5 friends going",
+                                "including Jamal, Maria, Lin",
+                            ),
+                            PartyElfBullet(
+                                PartyElfBullet.Glyph.CloudSun,
+                                "71° clear evening",
+                                "no rain · sunset 8:14 PM",
+                            ),
+                            PartyElfBullet(
+                                PartyElfBullet.Glyph.Calendar,
+                                "Saturday is clear",
+                                "no conflicts after 4 PM",
+                            ),
+                        ),
+                ),
+            elfGoing =
+                PartyElfContent(
+                    headline = "You're in · here's what's set",
+                    summary =
+                        "Priya was notified you're coming with a +1. Saturday 6 PM is on your calendar and you're " +
+                            "bringing a bottle. We'll remind you Saturday at 4.",
+                    bullets =
+                        listOf(
+                            PartyElfBullet(
+                                PartyElfBullet.Glyph.CalendarCheck,
+                                "Calendar saved",
+                                "Sat May 24 · 6:00 PM · reminder Sat 4 PM",
+                            ),
+                            PartyElfBullet(
+                                PartyElfBullet.Glyph.UserPlus,
+                                "Bringing a +1",
+                                "Priya can see your headcount",
+                            ),
+                            PartyElfBullet(
+                                PartyElfBullet.Glyph.Gift,
+                                "You claimed: bottle",
+                                "Priya marked off the dish list",
+                            ),
+                        ),
+                ),
+            timeAgoLabel = "3h ago",
+            invitedCount = 12,
+            rsvp = PartyRsvpStatus.Undecided,
+            plusOneCount = 0,
+            rsvpConfirmedAtLabel = null,
+        )
+
+    /** A17.9 secondary "you're going" state — RSVPed Going with +1,
+     *  claimed the bottle, confirmation banner stamp. */
+    val partyInviteGoing: PartyDetailDto =
+        partyInvite
+            .withRsvp(PartyRsvpStatus.Going, "Today 2:14 PM")
+            .withPlusOneCount(1)
+            .withBringClaim(0, "You")
+
+    /**
+     * A17.10 open-state records sample — Q1 2026 Meridian Wealth
+     * quarterly statement, freshly arrived in the mailbox.
+     */
+    val recordsOpen = RecordsSampleData.record
+
+    /**
+     * A17.10 filed-state records sample — same statement, filed in the
+     * Vault › Finance › Statements › 2026 folder.
+     */
+    val recordsFiled = RecordsSampleData.filedRecord
 }

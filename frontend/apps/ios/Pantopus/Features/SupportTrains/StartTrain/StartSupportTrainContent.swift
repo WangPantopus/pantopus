@@ -36,15 +36,19 @@ public enum StartSupportTrainStep: Int, CaseIterable, Sendable {
 }
 
 /// Step-1 reason picker values from A12.11. This is separate from
-/// `SupportTrainKind`: the reason explains the moment, while kind drives
-/// the volunteer slot type on the next step.
+/// `SupportTrainKind`: the reason names the moment the train rallies
+/// around, while kind drives the volunteer slot type on the next step.
+///
+/// The six tiles render in declaration order as a 3×2 grid — the first
+/// row groups the everyday-help reasons (meal train · ride · errand)
+/// and the second row the life-moment reasons (surgery · baby · loss).
 public enum StartSupportTrainReason: String, CaseIterable, Sendable, Identifiable {
+    case mealTrain = "meal_train"
+    case ride
+    case errand
     case surgery
-    case newBaby = "new_baby"
-    case move
-    case illness
-    case grief
-    case other
+    case baby
+    case loss
 
     public var id: String {
         rawValue
@@ -52,23 +56,68 @@ public enum StartSupportTrainReason: String, CaseIterable, Sendable, Identifiabl
 
     public var title: String {
         switch self {
+        case .mealTrain: "Meal train"
+        case .ride: "Ride"
+        case .errand: "Errand"
         case .surgery: "Surgery"
-        case .newBaby: "New baby"
-        case .move: "Move"
-        case .illness: "Illness"
-        case .grief: "Grief"
-        case .other: "Other"
+        case .baby: "Baby"
+        case .loss: "Loss"
         }
     }
 
     public var icon: PantopusIcon {
         switch self {
+        case .mealTrain: .utensils
+        case .ride: .car
+        case .errand: .shoppingBag
         case .surgery: .stethoscope
-        case .newBaby: .baby
-        case .move: .car
-        case .illness: .heartPulse
-        case .grief: .flower
-        case .other: .moreHorizontal
+        case .baby: .baby
+        case .loss: .flower
+        }
+    }
+}
+
+/// A mutual connection shared between the organizer and the recipient,
+/// surfaced as a micro-avatar strip on the verified-neighbor card so the
+/// organizer can confirm they have the right person.
+public struct StartSupportTrainMutual: Sendable, Hashable, Identifiable {
+    public let id: String
+    public let name: String
+
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
+    }
+
+    /// One- or two-letter monogram for the micro-avatar.
+    public var initials: String {
+        let pieces = name.split(separator: " ")
+        let chars = pieces.prefix(2).compactMap(\.first)
+        let letters = chars.map(String.init).joined()
+        return letters.isEmpty ? "?" : letters.uppercased()
+    }
+}
+
+/// The recipient the organizer typed but who isn't a verified Pantopus
+/// neighbor yet — the Frame-2 invite branch. Carries the typed name plus
+/// the (stubbed) contact handles the organizer can send the invite to.
+public struct StartSupportTrainInviteCandidate: Sendable, Hashable {
+    public let typedName: String
+    public let phone: String
+    public let email: String
+
+    public init(typedName: String, phone: String, email: String) {
+        self.typedName = typedName
+        self.phone = phone
+        self.email = email
+    }
+
+    /// The contact handle for a given invite method, rendered in the
+    /// invite row's monospace value line.
+    public func value(for method: StartSupportTrainInviteMethod) -> String {
+        switch method {
+        case .phone: phone
+        case .email: email
         }
     }
 }

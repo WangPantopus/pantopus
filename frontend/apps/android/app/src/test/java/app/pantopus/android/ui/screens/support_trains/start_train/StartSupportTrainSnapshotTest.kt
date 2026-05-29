@@ -46,6 +46,8 @@ class StartSupportTrainSnapshotTest {
                     results = emptyList(),
                     selected = StartSupportTrainSampleData.verifiedNeighbor,
                     isSearching = false,
+                    mutuals = StartSupportTrainSampleData.mutuals,
+                    inviteCandidate = null,
                     onQuery = {},
                     onSelectBeneficiary = {},
                     onClearBeneficiary = {},
@@ -69,11 +71,13 @@ class StartSupportTrainSnapshotTest {
                     form =
                         StartSupportTrainFormState(
                             beneficiaryQuery = StartSupportTrainSampleData.INVITE_QUERY,
-                            selectedReason = StartSupportTrainReason.NewBaby,
+                            selectedReason = StartSupportTrainReason.Baby,
                         ),
                     results = emptyList(),
                     selected = null,
                     isSearching = false,
+                    mutuals = emptyList(),
+                    inviteCandidate = StartSupportTrainSampleData.inviteCandidate,
                     onQuery = {},
                     onSelectBeneficiary = {},
                     onClearBeneficiary = {},

@@ -28,10 +28,16 @@ public enum AdminClaimBucket: String, Sendable, Hashable {
 
 /// Action posted to `/api/admin/claims/:claimId/review`. The handler
 /// rejects anything outside this set with a 400.
+///
+/// `.challenge` keeps the legacy `request_more_info` wire value — the
+/// A13.3 reshape renamed the reviewer-facing verdict from "Request more
+/// info" to "Challenge" (an inline composer with reason chips), but the
+/// backend route still classifies it as `request_more_info` and flips the
+/// claim into the `challenged` phase. See `backend/routes/admin.js:399`.
 public enum AdminClaimReviewAction: String, Codable, Sendable, Hashable {
     case approve
     case reject
-    case requestMoreInfo = "request_more_info"
+    case challenge = "request_more_info"
 }
 
 /// Enriched home payload joined onto every admin claim row.
@@ -157,6 +163,10 @@ public struct AdminClaimRecordDTO: Decodable, Sendable, Hashable, Identifiable {
     public let reviewedBy: String?
     public let reviewedAt: String?
     public let reviewNote: String?
+    /// Claimant identity-verification state — `not_started | pending |
+    /// verified | failed`. Drives the "Verified ID" trust chip on the
+    /// A13.3 claimant card.
+    public let identityStatus: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, state, method
@@ -169,6 +179,7 @@ public struct AdminClaimRecordDTO: Decodable, Sendable, Hashable, Identifiable {
         case reviewedBy = "reviewed_by"
         case reviewedAt = "reviewed_at"
         case reviewNote = "review_note"
+        case identityStatus = "identity_status"
     }
 }
 

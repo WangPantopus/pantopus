@@ -5,7 +5,7 @@
 //  Settings hub. Hosts the index (`GroupedListView`) plus every
 //  sub-route. P8 / T6.2c wired six previously-placeholder rows to
 //  real screens (Blocked users, Password, Verification, Help, Legal,
-//  About). Data export + Payments & payouts stay on
+//  About). P5.2 / A14.6 wired Payments. Data export stays on
 //  `NotYetAvailableView` per Q7's "park until P8.5" decision.
 //
 
@@ -24,8 +24,12 @@ public enum SettingsStackRoute: Hashable {
     case legal
     case legalContent(LegalDocument)
     case about
-    /// Two routes intentionally parked until P8.5: data export wizard,
-    /// payments & payouts. See `docs/t6-open-questions-decisions.md` Q7.
+    /// P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
+    /// setup · payout routing). Distinct from A10.10 Wallet
+    /// (earnings-in) which lives under the Wallet tab.
+    case payments
+    /// One route intentionally parked until P8.5: data export wizard.
+    /// See `docs/t6-open-questions-decisions.md` Q7.
     case placeholder(label: String)
 }
 
@@ -38,12 +42,14 @@ public struct SettingsView: View {
     private let onSignedOut: @MainActor () -> Void
 
     public init(
+        initialRoute: SettingsStackRoute? = nil,
         onClose: @escaping @MainActor () -> Void = {},
         onEditProfile: @escaping @MainActor () -> Void = {},
         onOpenReviewClaims: @escaping @MainActor () -> Void = {},
         onOpenWallet: @escaping @MainActor () -> Void = {},
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
+        _path = State(initialValue: initialRoute.map { [$0] } ?? [])
         self.onClose = onClose
         self.onEditProfile = onEditProfile
         self.onOpenReviewClaims = onOpenReviewClaims
@@ -91,6 +97,22 @@ public struct SettingsView: View {
             )
         case .audienceProfile:
             AudienceProfileView(onBack: popLast)
+        case .legal:
+            LegalIndexView(
+                onBack: { popLast() },
+                onSelect: { doc in path.append(.legalContent(doc)) }
+            )
+        case let .legalContent(doc):
+            LegalContentView(document: doc) { popLast() }
+        case let .placeholder(label):
+            NotYetAvailableView(tabName: label, icon: .info)
+        case .blockedUsers, .password, .verification, .help, .about, .payments:
+            settingsDestination(for: route)
+        }
+    }
+
+    @ViewBuilder private func settingsDestination(for route: SettingsStackRoute) -> some View {
+        switch route {
         case .blockedUsers:
             BlockedUsersView { popLast() }
         case .password:
@@ -99,17 +121,12 @@ public struct SettingsView: View {
             VerificationCenterView { popLast() }
         case .help:
             HelpCenterView { popLast() }
-        case .legal:
-            LegalIndexView(
-                onBack: { popLast() },
-                onSelect: { doc in path.append(.legalContent(doc)) }
-            )
-        case let .legalContent(doc):
-            LegalContentView(document: doc) { popLast() }
         case .about:
             AboutView { popLast() }
-        case let .placeholder(label):
-            NotYetAvailableView(tabName: label, icon: .info)
+        case .payments:
+            PaymentsView { popLast() }
+        default:
+            EmptyView()
         }
     }
 
@@ -136,7 +153,6 @@ public struct SettingsView: View {
         switch route {
         case .editProfile: onEditProfile()
         case .reviewClaims: onOpenReviewClaims()
-        case .paymentsPayouts: onOpenWallet()
         case .didSignOut: onSignedOut()
         default: break
         }
@@ -151,12 +167,11 @@ public struct SettingsView: View {
         case .verification: .verification
         // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
         case .dataExport: .placeholder(label: "Data export")
-        // P3.2 / A10.10 — Wallet replaces the prior placeholder.
-        // Routed through `onOpenWallet`, not `stackRoute`, because the
-        // wallet lives in the host's NavigationStack (alongside other
-        // Hub-stack destinations) so its back chevron returns to the
-        // Hub root, not back into Settings.
-        case .paymentsPayouts: nil
+        // P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
+        // setup · payout routing). Distinct from A10.10 Wallet
+        // (earnings-in), which the host still surfaces via
+        // `onOpenWallet` for any tab-level entry that needs it.
+        case .paymentsPayouts: .payments
         case .help: .help
         case .legal: .legal
         case .about: .about

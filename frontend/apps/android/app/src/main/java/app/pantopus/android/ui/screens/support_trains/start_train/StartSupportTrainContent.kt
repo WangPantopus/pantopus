@@ -40,17 +40,66 @@ enum class StartSupportTrainStep {
     }
 }
 
-/** Step-1 occasion picker values from A12.11. */
+/**
+ * Step-1 reason picker values from A12.11. Renders in declaration order as
+ * a 3×2 grid — everyday-help reasons on the first row (meal train · ride ·
+ * errand), life moments on the second (surgery · baby · loss).
+ *
+ * [wire] mirrors the iOS `StartSupportTrainReason` raw value so the
+ * `startSupportTrainReason_<wire>` test tags match across platforms.
+ */
 enum class StartSupportTrainReason(
+    val wire: String,
     val title: String,
     val icon: PantopusIcon,
 ) {
-    Surgery("Surgery", PantopusIcon.Stethoscope),
-    NewBaby("New baby", PantopusIcon.Baby),
-    Move("Move", PantopusIcon.Car),
-    Illness("Illness", PantopusIcon.HeartPulse),
-    Grief("Grief", PantopusIcon.Flower),
-    Other("Other", PantopusIcon.MoreHorizontal),
+    MealTrain("meal_train", "Meal train", PantopusIcon.Utensils),
+    Ride("ride", "Ride", PantopusIcon.Car),
+    Errand("errand", "Errand", PantopusIcon.ShoppingBag),
+    Surgery("surgery", "Surgery", PantopusIcon.Stethoscope),
+    Baby("baby", "Baby", PantopusIcon.Baby),
+    Loss("loss", "Loss", PantopusIcon.Flower),
+}
+
+/**
+ * A mutual connection shared between the organizer and the recipient,
+ * surfaced as a micro-avatar strip on the verified-neighbor card so the
+ * organizer can confirm they picked the right person.
+ */
+@Immutable
+data class StartSupportTrainMutual(
+    val id: String,
+    val name: String,
+) {
+    /** One- or two-letter monogram for the micro-avatar. */
+    val initials: String
+        get() =
+            name
+                .split(" ")
+                .filter { it.isNotBlank() }
+                .take(2)
+                .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                .joinToString("")
+                .ifBlank { "?" }
+}
+
+/**
+ * The recipient the organizer typed but who isn't a verified Pantopus
+ * neighbor yet — the Frame-2 invite branch. Carries the typed name plus
+ * the (stubbed) contact handles the invite can be sent to.
+ */
+@Immutable
+data class StartSupportTrainInviteCandidate(
+    val typedName: String,
+    val phone: String,
+    val email: String,
+) {
+    /** The contact handle for a given invite method. */
+    fun valueFor(method: StartSupportTrainInviteMethod): String =
+        when (method) {
+            StartSupportTrainInviteMethod.Phone -> phone
+            StartSupportTrainInviteMethod.Email -> email
+        }
 }
 
 /** Invite path option when the recipient is not on Pantopus yet. */

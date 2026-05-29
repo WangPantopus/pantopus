@@ -242,6 +242,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalContentScreen
 import app.pantopus.android.ui.screens.settings.legal.LegalDocument
 import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
+import app.pantopus.android.ui.screens.settings.payments.PaymentsScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailActions
@@ -680,6 +681,10 @@ private object ChildRoutes {
 
     /** P8 / T6.2c — Settings → About. */
     const val SETTINGS_ABOUT = "settings/about"
+
+    /** P5.2 / A14.6 — Settings → Payments (payments-out · Stripe setup
+     *  · payout routing). Distinct from `pantopus://wallet` (earnings-in). */
+    const val SETTINGS_PAYMENTS = "settings/payments"
 
     /** Profiles & Privacy / Identity Center (T3.2). */
     const val IDENTITY_CENTER = "identity-center"
@@ -1241,6 +1246,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             DeepLinkRouter.Destination.Wallet -> {
                 navController.navigate(ChildRoutes.WALLET)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.PaymentsSettings -> {
+                navController.navigate(ChildRoutes.MENU)
+                navController.navigate(ChildRoutes.SETTINGS_PAYMENTS)
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.CreateBusiness -> {
@@ -2870,13 +2880,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
                             // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
                             SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
-                            // P3.2 / A10.10 — Wallet replaces the prior placeholder.
-                            SettingsRoute.PaymentsPayouts -> {
-                                // Pop the settings screen first so back from the wallet
-                                // returns to the Hub root, not back into Settings.
-                                navController.popBackStack()
-                                navController.navigate(ChildRoutes.WALLET)
-                            }
+                            // P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
+                            // setup · payout routing). Distinct from A10.10 Wallet
+                            // (earnings-in) which lives at `ChildRoutes.WALLET` and
+                            // is reachable via the Wallet tab + `pantopus://wallet`
+                            // deep link.
+                            SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.SETTINGS_PAYMENTS)
                             SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
                             SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
                             SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
@@ -2949,6 +2958,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.SETTINGS_ABOUT) {
                 AboutScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.SETTINGS_PAYMENTS) {
+                PaymentsScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.PRIVACY_HANDSHAKE,

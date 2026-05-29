@@ -36,6 +36,8 @@ public enum MailDetailTrust: Sendable, Equatable {
     case neutral
     /// Warning — amber dot.
     case warning
+    /// Celebration / personal-invite — rose dot (A17.9 Party variant).
+    case celebration
 
     /// Eyebrow dot foreground.
     public var dotColor: Color {
@@ -43,6 +45,7 @@ public enum MailDetailTrust: Sendable, Equatable {
         case .verified: Theme.Color.success
         case .neutral: Theme.Color.appTextSecondary
         case .warning: Theme.Color.warning
+        case .celebration: Theme.Color.categoryParty
         }
     }
 }

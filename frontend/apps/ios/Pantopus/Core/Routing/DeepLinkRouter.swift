@@ -79,6 +79,11 @@ final class DeepLinkRouter {
         /// `pantopus://wallet` — A10.10 earnings wallet (distinct from
         /// Settings → Payments; this is the earnings-side surface).
         case wallet
+        /// `pantopus://settings/payments` — A14.6 Settings → Payments.
+        /// Distinct from `pantopus://wallet` (earnings-in surface).
+        /// Consumed by the active tab's deep-link router which pushes
+        /// `.menu` then forwards into the Payments stack route.
+        case paymentsSettings
         case unknown(URL)
     }
 
@@ -187,14 +192,7 @@ final class DeepLinkRouter {
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
         case "mailbox":
-            // `pantopus://mailbox/vacation` opens A14.8; `pantopus://mailbox/mailday`
-            // opens the A13.16 My Mail Day editor. Other mailbox paths fall through
-            // to `.unknown` until they have routes.
-            switch segments.dropFirst().first {
-            case "vacation": return .vacationHold
-            case "mailday": return .mailDay
-            default: return .unknown(url)
-            }
+            return mailboxDestination(url: url, segments: segments)
         case "wallet":
             return .wallet
         case "invite":
@@ -210,6 +208,14 @@ final class DeepLinkRouter {
             return resetPasswordDestination(url: url, token: tokenQuery)
         case "verify-email", "verify_email":
             return verifyEmailDestination(url: url, token: tokenQuery, email: emailQuery)
+        case "settings":
+            // `pantopus://settings/payments` — A14.6. Other settings
+            // sub-routes aren't deep-linkable yet; the bare host
+            // `pantopus://settings` falls through to `.unknown`.
+            if segments.dropFirst().first == "payments" {
+                return .paymentsSettings
+            }
+            return .unknown(url)
         default:
             return .unknown(url)
         }
@@ -247,6 +253,17 @@ final class DeepLinkRouter {
             return .postcardVerification(id: id)
         }
         return .homeDetail(id: id)
+    }
+
+    private func mailboxDestination(url: URL, segments: [String]) -> Destination {
+        // `pantopus://mailbox/vacation` opens A14.8; `pantopus://mailbox/mailday`
+        // opens the A13.16 My Mail Day editor. Other mailbox paths fall through
+        // to `.unknown` until they have routes.
+        switch segments.dropFirst().first {
+        case "vacation": .vacationHold
+        case "mailday": .mailDay
+        default: .unknown(url)
+        }
     }
 
     private func authDestination(

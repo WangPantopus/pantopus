@@ -36,6 +36,9 @@ enum class MailDetailTrust {
 
     /** Warning — amber dot. */
     Warning,
+
+    /** Celebration / personal-invite — rose dot (A17.9 Party variant). */
+    Celebration,
     ;
 
     val dotColor: Color
@@ -44,6 +47,7 @@ enum class MailDetailTrust {
                 Verified -> PantopusColors.success
                 Neutral -> PantopusColors.appTextSecondary
                 Warning -> PantopusColors.warning
+                Celebration -> PantopusColors.categoryParty
             }
 }
 

@@ -110,39 +110,6 @@ public struct GigBody: View {
     }
 }
 
-// MARK: - Shared card chrome
-
-/// White rounded card used by the gig sub-surfaces. `padded == false`
-/// lets cards that draw their own internal dividers (post summary) manage
-/// edge insets per-section.
-@MainActor
-struct GigCard<Content: View>: View {
-    var padded: Bool = true
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        content()
-            .padding(padded ? Spacing.s3 : 0)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.xl)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-    }
-}
-
-/// Uppercase section eyebrow shared by the gig cards.
-struct GigSectionLabel: View {
-    let text: String
-    var body: some View {
-        Text(text)
-            .pantopusTextStyle(.overline)
-            .foregroundStyle(Theme.Color.appTextSecondary)
-    }
-}
-
 // MARK: - Three-way action row
 
 /// Accept (success) · Counter (ghost) · Decline (destructive). Equal width.
