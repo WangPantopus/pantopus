@@ -134,6 +134,10 @@ object MailItemSampleData {
     val packageInTransit =
         PackageBodyContent(
             carrier = "USPS Priority Mail",
+            service = "USPS Priority Mail",
+            dimensions = "12 x 9 x 4 in",
+            weight = "2.4 lb",
+            trackingUrl = "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
             etaLine = "Expected today by 3 PM",
             status = PackageDeliveryStatus.InTransit,
             trackingNumber = "9505 5125 8841 6014 2203 17",
@@ -171,6 +175,10 @@ object MailItemSampleData {
     val packageOutForDelivery =
         PackageBodyContent(
             carrier = "USPS Priority Mail",
+            service = "USPS Priority Mail",
+            dimensions = "12 x 9 x 4 in",
+            weight = "2.4 lb",
+            trackingUrl = "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
             etaLine = "ETA window 1:00 - 3:00 PM - about 6 stops away",
             status = PackageDeliveryStatus.OutForDelivery,
             trackingNumber = "9505 5125 8841 6014 2203 17",
@@ -215,6 +223,10 @@ object MailItemSampleData {
     val packageDelivered =
         PackageBodyContent(
             carrier = "USPS Priority Mail",
+            service = "USPS Priority Mail",
+            dimensions = "12 x 9 x 4 in",
+            weight = "2.4 lb",
+            trackingUrl = "https://tools.usps.com/go/TrackConfirmAction?tLabels=9505512588416014220317",
             etaLine = "Today - 1:47 PM - front porch - left in shade",
             status = PackageDeliveryStatus.Delivered,
             trackingNumber = "9505 5125 8841 6014 2203 17",
@@ -263,6 +275,95 @@ object MailItemSampleData {
             PackageDeliveryStatus.OutForDelivery -> packageOutForDelivery
             PackageDeliveryStatus.Delivered -> packageDelivered
         }
+
+    /** UPS fixture - in transit. Used by A17.8 acceptance tests. */
+    val packageUpsInTransit =
+        PackageBodyContent(
+            carrier = "UPS",
+            service = "UPS Ground",
+            dimensions = "14 x 10 x 6 in",
+            weight = "3.8 lb",
+            trackingUrl = "https://www.ups.com/track?tracknum=1Z999AA10123456784",
+            etaLine = "Expected tomorrow by 8 PM",
+            status = PackageDeliveryStatus.InTransit,
+            trackingNumber = "1Z 999 AA1 0123 4567 84",
+            referenceLine = "UPS Ground - 3.8 lb - 14x10x6 in",
+            statusTitle = "In transit",
+            statusDetail = "Moving through Reno, NV",
+            trackingSteps = packageTrackingSteps(PackageDeliveryStatus.InTransit),
+            handoffSteps =
+                listOf(
+                    PackageHandoffStep(
+                        id = "in-transit",
+                        title = "In transit",
+                        location = "Reno, NV",
+                        timestamp = "Sun May 17 - 9:14 PM",
+                        icon = PantopusIcon.ArrowRight,
+                    ),
+                    PackageHandoffStep(
+                        id = "picked-up",
+                        title = "Picked up by UPS",
+                        location = "Hayward, CA",
+                        timestamp = "Sat May 16 - 5:42 PM",
+                        icon = PantopusIcon.Package,
+                    ),
+                    PackageHandoffStep(
+                        id = "label-created",
+                        title = "Label created",
+                        location = "Hayward, CA",
+                        timestamp = "Sat May 16 - 11:11 AM",
+                        icon = PantopusIcon.Tag,
+                    ),
+                ),
+        )
+
+    /** UPS fixture - delivered. Used by A17.8 acceptance tests. */
+    val packageUpsDelivered =
+        PackageBodyContent(
+            carrier = "UPS",
+            service = "UPS Ground",
+            dimensions = "14 x 10 x 6 in",
+            weight = "3.8 lb",
+            trackingUrl = "https://www.ups.com/track?tracknum=1Z999AA10123456784",
+            etaLine = "Today - 11:22 AM - front porch",
+            status = PackageDeliveryStatus.Delivered,
+            trackingNumber = "1Z 999 AA1 0123 4567 84",
+            referenceLine = "UPS Ground - 3.8 lb - 14x10x6 in",
+            statusTitle = "Delivered to your porch",
+            statusDetail = "Today - 11:22 AM - front porch",
+            trackingSteps = packageTrackingSteps(PackageDeliveryStatus.Delivered),
+            handoffSteps =
+                listOf(
+                    PackageHandoffStep(
+                        id = "delivered",
+                        title = "Delivered to front porch",
+                        location = "Oakland, CA - 1428 Elm St",
+                        timestamp = "Tue May 19 - 11:22 AM",
+                        icon = PantopusIcon.Home,
+                    ),
+                    PackageHandoffStep(
+                        id = "out-for-delivery",
+                        title = "Out for delivery",
+                        location = "Oakland Hub - Route 14",
+                        timestamp = "Tue May 19 - 7:38 AM",
+                        icon = PantopusIcon.Truck,
+                    ),
+                    PackageHandoffStep(
+                        id = "in-transit",
+                        title = "In transit",
+                        location = "Reno, NV",
+                        timestamp = "Sun May 17 - 9:14 PM",
+                        icon = PantopusIcon.ArrowRight,
+                    ),
+                ),
+            deliveryPhoto =
+                PackageDeliveryPhoto(
+                    capturedAt = "11:22 AM",
+                    watermark = "UPS - 19/05/2026 11:22:14",
+                    location = "Front porch - 1428 Elm St",
+                    verificationLabel = "GPS verified",
+                ),
+        )
 
     fun packageTrackingSteps(status: PackageDeliveryStatus): List<TimelineStep> {
         val currentIndex =

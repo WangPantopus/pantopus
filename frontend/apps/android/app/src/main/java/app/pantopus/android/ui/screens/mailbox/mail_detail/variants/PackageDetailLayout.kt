@@ -9,6 +9,8 @@
 
 package app.pantopus.android.ui.screens.mailbox.mail_detail.variants
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,9 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +49,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.item_detail.PackageBodyContent
 import app.pantopus.android.ui.screens.mailbox.item_detail.PackageDeliveryStatus
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CarrierBadge
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailContent
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailKeyFact
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfBullet
@@ -85,13 +92,14 @@ fun PackageDetailLayout(
             aiElf = makeAIElf(packageDetail = packageDetail),
             attachments = makeAttachments(content = content),
             hero = { PackageHeroCard(content = content, packageDetail = packageDetail) },
-            keyFacts = { PackageKeyFactsCard(rows = makeKeyFacts(content, packageDetail), packageDetail = packageDetail) },
+            keyFacts = { PackageKeyFactsCard(rows = makeKeyFacts(packageDetail), packageDetail = packageDetail) },
             body = {
                 PackageBody(
                     content = packageDetail,
                     isReceiveEnabled = !ackInFlight,
                     isReceiveLoading = ackInFlight,
                     isReceived = isReceived,
+                    showsActions = false,
                     onReceiveAtDoor = onAcknowledgeDelivery,
                 )
             },
@@ -99,10 +107,10 @@ fun PackageDetailLayout(
             actions = {
                 PackageDetailActions(
                     isReceived = content.isAcknowledged,
-                    status = packageDetail.status,
                     ackInFlight = ackInFlight,
-                    onAck = onAcknowledgeDelivery,
-                    onSaveToVault = onSaveToVault,
+                    trackingUrl = packageDetail.trackingUrl,
+                    carrier = packageDetail.carrier,
+                    onConfirmPickup = onAcknowledgeDelivery,
                 )
             },
         )
@@ -200,20 +208,24 @@ private fun makeAttachments(content: MailDetailContent): AttachmentsRowContent? 
     return AttachmentsRowContent(title = "Order documents", items = items)
 }
 
-private fun makeKeyFacts(
-    content: MailDetailContent,
-    packageDetail: PackageBodyContent,
-): List<MailDetailKeyFact> =
+private fun makeKeyFacts(packageDetail: PackageBodyContent): List<MailDetailKeyFact> =
+    // A17.8 spec: carrier · service · dimensions · weight.
     buildList {
         add(MailDetailKeyFact(icon = PantopusIcon.Package, label = "Carrier", value = packageDetail.carrier))
+        packageDetail.service?.let {
+            add(MailDetailKeyFact(icon = PantopusIcon.Truck, label = "Service", value = it))
+        }
+        packageDetail.dimensions?.let {
+            add(MailDetailKeyFact(icon = PantopusIcon.Archive, label = "Dimensions", value = it))
+        }
+        packageDetail.weight?.let {
+            add(MailDetailKeyFact(icon = PantopusIcon.Package, label = "Weight", value = it))
+        }
         packageDetail.trackingNumber?.let {
             add(MailDetailKeyFact(icon = PantopusIcon.Hash, label = "Tracking", value = it))
         }
         packageDetail.etaLine?.let {
             add(MailDetailKeyFact(icon = PantopusIcon.Clock, label = "ETA", value = it))
-        }
-        content.createdAtLabel?.let {
-            add(MailDetailKeyFact(icon = PantopusIcon.Calendar, label = "Received", value = it))
         }
     }
 
@@ -248,21 +260,39 @@ private fun PackageHeroCard(
                     Text(text = received, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
                 }
             }
-            Text(
-                text = content.senderDisplayName.uppercase(),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.6.sp,
-                color = PantopusColors.appTextSecondary,
-            )
-            Text(
-                text = content.title,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appText,
-                lineHeight = 24.sp,
-                modifier = Modifier.semantics { heading() },
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+                verticalAlignment = Alignment.Top,
+            ) {
+                CarrierBadge(carrier = packageDetail.carrier, size = 44.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = content.senderDisplayName.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.6.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                    Text(
+                        text = content.title,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                        lineHeight = 24.sp,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                }
+            }
+            packageDetail.trackingNumber?.let { tracking ->
+                Text(
+                    text = tracking,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.testTag("mailDetail_package_trackingNumber"),
+                )
+            }
             CarrierTrackPill(packageDetail = packageDetail)
         }
     }
@@ -538,150 +568,173 @@ private fun PackageSenderCard(
     }
 }
 
+/**
+ * A17.8 split dock: "Track on carrier" (secondary, opens the browser to
+ * the carrier tracking URL) + "Confirm pickup" (primary, fires the
+ * acknowledge-delivery flow). Confirm pickup flips into a "Picked up"
+ * indicator once the recipient confirms. Mirrors iOS `PackageDetailActions`.
+ */
 @Composable
 private fun PackageDetailActions(
     isReceived: Boolean,
-    status: PackageDeliveryStatus,
     ackInFlight: Boolean,
-    onAck: () -> Unit,
-    onSaveToVault: () -> Unit,
+    trackingUrl: String?,
+    carrier: String,
+    onConfirmPickup: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        if (isReceived) {
-            ReceivedPill(onAck = onAck)
-        } else {
-            AckButton(status = status, ackInFlight = ackInFlight, onAck = onAck)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            SecondaryTile(
-                id = "trackMap",
-                icon = PantopusIcon.Map,
-                label = "Track",
-                modifier = Modifier.weight(1f),
-            )
-            SecondaryTile(
-                id = "handoff",
-                icon = PantopusIcon.UserPlus,
-                label = "Hand-off",
-                modifier = Modifier.weight(1f),
-            )
-            SecondaryTile(
-                id = "save",
-                icon = PantopusIcon.Bookmark,
-                label = "Save",
-                onClick = onSaveToVault,
-                modifier = Modifier.weight(1f),
-            )
-        }
+    val context = LocalContext.current
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        TrackOnCarrierButton(
+            label = "Track on ${carrierShort(carrier)}",
+            isEnabled = trackingUrl != null,
+            onClick = {
+                trackingUrl?.let { url ->
+                    val intent =
+                        Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                }
+            },
+            modifier = Modifier.weight(1f),
+        )
+        ConfirmPickupButton(
+            isReceived = isReceived,
+            ackInFlight = ackInFlight,
+            onConfirm = onConfirmPickup,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
 @Composable
-private fun AckButton(
-    status: PackageDeliveryStatus,
-    ackInFlight: Boolean,
-    onAck: () -> Unit,
+private fun TrackOnCarrierButton(
+    label: String,
+    isEnabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val label =
-        if (status == PackageDeliveryStatus.Delivered) {
-            "Acknowledge delivery"
-        } else {
-            "Acknowledge when delivered"
-        }
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
+            modifier
                 .clip(RoundedCornerShape(14.dp))
-                .background(PantopusColors.primary600)
-                .clickable(enabled = !ackInFlight, onClick = onAck)
-                .padding(vertical = 14.dp)
-                .alpha(if (ackInFlight) 0.6f else 1f)
-                .semantics { contentDescription = label }
-                .testTag("mailDetail_package_acknowledge"),
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
+                .alpha(if (isEnabled) 1f else 0.5f)
+                .clickable(enabled = isEnabled, onClick = onClick)
+                .padding(vertical = 14.dp, horizontal = Spacing.s3)
+                .semantics {
+                    contentDescription = label
+                    role = Role.Button
+                }
+                .testTag("mailDetail_package_trackOnCarrier"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         PantopusIconImage(
-            icon = PantopusIcon.Package,
+            icon = PantopusIcon.ExternalLink,
             contentDescription = null,
-            size = 16.dp,
-            tint = PantopusColors.appTextInverse,
+            size = 15.dp,
+            tint = PantopusColors.appTextStrong,
         )
         Spacer(Modifier.width(Spacing.s2))
         Text(
             text = label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextStrong,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ConfirmPickupButton(
+    isReceived: Boolean,
+    ackInFlight: Boolean,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (isReceived) {
+        Row(
+            modifier =
+                modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(PantopusColors.successBg)
+                    .border(1.5.dp, PantopusColors.successLight, RoundedCornerShape(14.dp))
+                    .clickable(onClick = onConfirm)
+                    .padding(vertical = 14.dp)
+                    .semantics {
+                        contentDescription = "Picked up"
+                        role = Role.Button
+                    }
+                    .testTag("mailDetail_package_received"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.CheckCircle,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.success,
+            )
+            Spacer(Modifier.width(Spacing.s2))
+            Text(
+                text = "Picked up",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.success,
+                maxLines = 1,
+            )
+        }
+        return
+    }
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(PantopusColors.primary600)
+                .clickable(enabled = !ackInFlight, onClick = onConfirm)
+                .padding(vertical = 14.dp)
+                .alpha(if (ackInFlight) 0.6f else 1f)
+                .semantics {
+                    contentDescription = "Confirm pickup"
+                    role = Role.Button
+                }
+                .testTag("mailDetail_package_confirmPickup"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (ackInFlight) {
+            CircularProgressIndicator(
+                color = PantopusColors.appTextInverse,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp),
+            )
+        } else {
+            PantopusIconImage(
+                icon = PantopusIcon.CheckCircle,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Spacer(Modifier.width(Spacing.s2))
+        Text(
+            text = "Confirm pickup",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appTextInverse,
+            maxLines = 1,
         )
     }
 }
 
-@Composable
-private fun ReceivedPill(onAck: () -> Unit) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(PantopusColors.successBg)
-                .border(1.5.dp, PantopusColors.successLight, RoundedCornerShape(14.dp))
-                .clickable(onClick = onAck)
-                .padding(vertical = 14.dp)
-                .semantics { contentDescription = "Received at door, tap to undo" }
-                .testTag("mailDetail_package_received"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.CheckCircle,
-            contentDescription = null,
-            size = 16.dp,
-            tint = PantopusColors.success,
-        )
-        Spacer(Modifier.width(Spacing.s2))
-        Text(
-            text = "Received at door · tap to undo",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.success,
-        )
-    }
-}
-
-@Composable
-private fun SecondaryTile(
-    id: String,
-    icon: PantopusIcon,
-    label: String,
-    onClick: () -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .clickable(onClick = onClick)
-                .padding(vertical = 10.dp)
-                .semantics { contentDescription = label }
-                .testTag("mailDetail_package_action_$id"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        PantopusIconImage(
-            icon = icon,
-            contentDescription = null,
-            size = 17.dp,
-            tint = PantopusColors.appTextStrong,
-        )
-        Text(
-            text = label,
-            fontSize = 10.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appTextStrong,
-        )
-    }
+@Suppress("ReturnCount")
+private fun carrierShort(carrier: String): String {
+    val upper = carrier.uppercase()
+    if (upper.contains("USPS")) return "USPS"
+    if (upper.contains("UPS")) return "UPS"
+    if (upper.contains("FEDEX")) return "FedEx"
+    if (upper.contains("DHL")) return "DHL"
+    return "carrier"
 }

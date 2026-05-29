@@ -531,10 +531,11 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
 - **Per-frame deltas:** verify hero card (polaroid frame + caption + date-from line) and the Save-to-Vault / saved-pill action swap.
 
 ### A17.8 — Package
-- **iOS:** **MISSING**
-- **Android:** **MISSING** (no PackageBody body file).
-- **Status:** **BUILD** (both platforms)
-- **Required slots:** Package hero (carrier badge · tracking number mono · status pill), Tracking timeline, KeyFacts (carrier · service · dimensions · weight), package photo (front-door snapshot if delivered), `Track on carrier` + `Confirm pickup` split dock.
+- **iOS:** `Mailbox/MailDetail/Variants/PackageDetailLayout.swift` (ceremonial) + `Mailbox/ItemDetail/Bodies/CategoryBodies.swift` `PackageBody` (shared body). New components: `Variants/Components/CarrierBadge.swift`, `Variants/Components/PackageTrackingTimeline.swift`.
+- **Android:** `mailbox/item_detail/bodies/PackageBody.kt` (shared body, extracted from `CategoryBodies.kt`) + `mailbox/mail_detail/variants/PackageDetailLayout.kt` (ceremonial). New components: `bodies/components/CarrierBadge.kt`, `bodies/components/PackageTrackingTimeline.kt`.
+- **Status:** **POLISH**
+- **Slots delivered:** Package hero (`CarrierBadge` + tracking number mono + status pill), `PackageTrackingTimeline` (Shipped → In transit → Out for delivery → Delivered), KeyFacts (carrier · service · dimensions · weight · tracking · ETA), proof photo (front-door snapshot when delivered), split dock `Track on carrier` (opens carrier URL) + `Confirm pickup` primary.
+- **Fixtures:** USPS (`packageInTransit` / `packageOutForDelivery` / `packageDelivered`) + UPS (`packageUpsInTransit` / `packageUpsDelivered`) in both `MailItemSampleData`. `PackageBodyContent` carries `service` / `dimensions` / `weight` / `trackingUrl`; decoders on both platforms project them from the backend payload.
 
 ### A17.9 — Party (event invite)
 - **iOS:** **MISSING**
@@ -671,8 +672,8 @@ Add 13 primitives listed in the Summary table to `Core/Design/Components/` (iOS)
 3. A14.8 Vacation hold (`Mailbox/Vacation/`).
 
 **Phase 6 — BUILD batch E (mail variants)** (one PR per variant):
-1. iOS: A17.5 Coupon, A17.6 Gig mail, A17.7 Memory, A17.8 Package (iOS+Android), A17.9 Party (iOS+Android), A17.10 Records (iOS+Android).
-2. Android: A17.8 Package, A17.9 Party, A17.10 Records (Android catches up).
+1. iOS: A17.5 Coupon, A17.6 Gig mail, A17.7 Memory, ~~A17.8 Package (iOS+Android)~~ ✅ done, A17.9 Party (iOS+Android), A17.10 Records (iOS+Android).
+2. Android: ~~A17.8 Package~~ ✅ done, A17.9 Party, A17.10 Records (Android catches up).
 
 **Phase 7 — RESHAPE batch** (per-screen PRs):
 1. A13.14 Change Password (move Save inline, add strength meter, breach detection, context band).

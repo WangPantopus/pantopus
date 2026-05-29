@@ -19,9 +19,10 @@ extension PackageBodyContent {
     public static func decode(from value: JSONValue?) -> PackageBodyContent? {
         guard let dict = value?.dictValue else { return nil }
         let status = PackageDeliveryStatus(rawStatus: dict["status"]?.stringValue)
-        let carrier = dict["carrier"]?.stringValue
-            ?? dict["service"]?.stringValue
+        let service = dict["service"]?.stringValue
             ?? dict["delivery_service"]?.stringValue
+            ?? dict["mail_service"]?.stringValue
+        let carrier = dict["carrier"]?.stringValue ?? service
         let trackingNumber = dict["tracking_number"]?.stringValue
             ?? dict["tracking"]?.stringValue
         // Reject payloads that don't carry at least a carrier or
@@ -29,6 +30,10 @@ extension PackageBodyContent {
         guard carrier != nil || trackingNumber != nil else { return nil }
         return PackageBodyContent(
             carrier: carrier ?? "Pantopus Mail",
+            service: service,
+            dimensions: dict["dimensions"]?.stringValue ?? dict["size"]?.stringValue,
+            weight: dict["weight"]?.stringValue,
+            trackingUrl: dict["tracking_url"]?.stringValue ?? dict["carrier_url"]?.stringValue,
             etaLine: dict["eta_line"]?.stringValue ?? dict["eta"]?.stringValue,
             status: status,
             trackingNumber: trackingNumber,

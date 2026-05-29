@@ -13,8 +13,6 @@
 
 import SwiftUI
 
-// swiftlint:disable multiple_closures_with_trailing_closure
-
 @MainActor
 struct PackageDetailLayout: View {
     let content: MailDetailContent
@@ -38,6 +36,7 @@ struct PackageDetailLayout: View {
                     isReceiveEnabled: !ackInFlight,
                     isReceiveLoading: ackInFlight,
                     isReceived: content.isAcknowledged || (package.deliveryPhoto?.isReceived ?? false),
+                    showsActions: false,
                     onReceiveAtDoor: onAcknowledgeDelivery
                 )
             },
@@ -45,10 +44,10 @@ struct PackageDetailLayout: View {
             actions: {
                 PackageDetailActions(
                     isReceived: content.isAcknowledged,
-                    status: package.status,
                     ackInFlight: ackInFlight,
-                    onAck: onAcknowledgeDelivery,
-                    onSaveToVault: onSaveToVault
+                    trackingUrl: package.trackingUrl,
+                    carrier: package.carrier,
+                    onConfirmPickup: onAcknowledgeDelivery
                 )
             }
         )
@@ -117,16 +116,23 @@ struct PackageDetailLayout: View {
     }
 
     private func makeKeyFacts() -> [MailDetailKeyFact] {
+        // A17.8 spec: carrier · service · dimensions · weight.
         var rows: [MailDetailKeyFact] = []
         rows.append(MailDetailKeyFact(icon: .package, label: "Carrier", value: package.carrier))
+        if let service = package.service {
+            rows.append(MailDetailKeyFact(icon: .truck, label: "Service", value: service))
+        }
+        if let dimensions = package.dimensions {
+            rows.append(MailDetailKeyFact(icon: .archive, label: "Dimensions", value: dimensions))
+        }
+        if let weight = package.weight {
+            rows.append(MailDetailKeyFact(icon: .package, label: "Weight", value: weight))
+        }
         if let tracking = package.trackingNumber {
             rows.append(MailDetailKeyFact(icon: .hash, label: "Tracking", value: tracking))
         }
         if let eta = package.etaLine {
             rows.append(MailDetailKeyFact(icon: .clock, label: "ETA", value: eta))
-        }
-        if let received = content.createdAtLabel {
-            rows.append(MailDetailKeyFact(icon: .calendar, label: "Received", value: received))
         }
         return rows
     }
@@ -149,14 +155,26 @@ private struct PackageHeroCard: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
-            Text(content.senderDisplayName.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-            Text(content.title)
-                .font(.system(size: 19, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: Spacing.s3) {
+                CarrierBadge(carrier: package.carrier, size: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(content.senderDisplayName.uppercased())
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(0.6)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Text(content.title)
+                        .font(.system(size: 19, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if let tracking = package.trackingNumber {
+                Text(tracking)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("mailDetail_package_trackingNumber")
+            }
             CarrierTrackPill(package: package)
         }
         .padding(Spacing.s3)
@@ -370,101 +388,5 @@ private struct PackageSenderCard: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-    }
-}
-
-// MARK: - Actions
-
-private struct PackageDetailActions: View {
-    let isReceived: Bool
-    let status: PackageDeliveryStatus
-    let ackInFlight: Bool
-    let onAck: @MainActor () -> Void
-    let onSaveToVault: @MainActor () -> Void
-
-    var body: some View {
-        VStack(spacing: Spacing.s2) {
-            primary
-            HStack(spacing: Spacing.s2) {
-                secondary(id: "trackMap", icon: .map, label: "Track")
-                secondary(id: "handoff", icon: .userPlus, label: "Hand-off")
-                secondary(id: "save", icon: .bookmark, label: "Save", action: onSaveToVault)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var primary: some View {
-        if isReceived {
-            receivedPill
-        } else {
-            ackButton
-        }
-    }
-
-    private var ackButton: some View {
-        Button(action: { onAck() }) {
-            HStack(spacing: Spacing.s2) {
-                Icon(.package, size: 16, color: Theme.Color.appTextInverse)
-                Text(status == .delivered
-                    ? "Acknowledge delivery"
-                    : "Acknowledge when delivered")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Theme.Color.primary600)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .opacity(ackInFlight ? 0.6 : 1)
-        }
-        .buttonStyle(.plain)
-        .disabled(ackInFlight)
-        .accessibilityIdentifier("mailDetail_package_acknowledge")
-    }
-
-    private var receivedPill: some View {
-        HStack(spacing: Spacing.s2) {
-            Icon(.checkCircle, size: 16, color: Theme.Color.success)
-            Text("Received at door · tap to undo")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundColor(Theme.Color.success)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(Theme.Color.successBg)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Theme.Color.successLight, lineWidth: 1.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .onTapGesture { onAck() }
-        .accessibilityIdentifier("mailDetail_package_received")
-    }
-
-    private func secondary(
-        id: String,
-        icon: PantopusIcon,
-        label: String,
-        action: @escaping @MainActor () -> Void = {}
-    ) -> some View {
-        Button(action: { action() }) {
-            VStack(spacing: Spacing.s1) {
-                Icon(icon, size: 17, color: Theme.Color.appTextStrong)
-                Text(label)
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("mailDetail_package_action_\(id)")
     }
 }
