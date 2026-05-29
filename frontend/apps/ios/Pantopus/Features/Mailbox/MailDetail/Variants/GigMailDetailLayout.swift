@@ -39,7 +39,7 @@ struct GigMailDetailLayout: View {
                     PostSummaryCard(post: gig.post)
                     BidderProfileCard(bidder: gig.bidder)
                     if gig.isAccepted {
-                        GigNextStepsCard(steps: gig.nextSteps)
+                        GigMailNextStepsCard(steps: gig.nextSteps)
                     } else if !gig.otherBids.isEmpty {
                         OtherBidsStrip(bids: gig.otherBids)
                     }
@@ -121,8 +121,20 @@ struct GigMailDetailLayout: View {
 
     private func makeKeyFacts() -> [MailDetailKeyFact] {
         var rows: [MailDetailKeyFact] = []
-        rows.append(MailDetailKeyFact(icon: .mapPin, label: "Where", value: gig.post.location.isEmpty ? "Pantopus mailbox" : gig.post.location))
-        rows.append(MailDetailKeyFact(icon: .calendarDays, label: "When", value: gig.post.schedule.isEmpty ? gig.bid.eta : gig.post.schedule))
+        rows.append(
+            MailDetailKeyFact(
+                icon: .mapPin,
+                label: "Where",
+                value: gig.post.location.isEmpty ? "Pantopus mailbox" : gig.post.location
+            )
+        )
+        rows.append(
+            MailDetailKeyFact(
+                icon: .calendarDays,
+                label: "When",
+                value: gig.post.schedule.isEmpty ? gig.bid.eta : gig.post.schedule
+            )
+        )
         rows.append(MailDetailKeyFact(icon: .briefcase, label: "Category", value: gig.post.categoryLabel))
         return rows
     }
@@ -281,7 +293,7 @@ private struct GigKeyFactsCard: View {
 
 // MARK: - Next-steps timeline (accepted state)
 
-private struct GigNextStepsCard: View {
+private struct GigMailNextStepsCard: View {
     let steps: [GigDetailDTO.NextStep]
 
     var body: some View {
