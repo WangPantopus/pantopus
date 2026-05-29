@@ -115,6 +115,9 @@ public enum YouRoute: Hashable {
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
     case audienceProfile
+    /// A03.2 — Beacon Updates feed (`surface=personas`), reached from the
+    /// Audience Profile "Beacon Updates" entry row.
+    case beaconsFeed
     case privacyHandshake(personaHandle: String)
     /// P1.3 — Broadcast detail full-screen takeover, pushed when the
     /// creator taps an update card on the Audience Profile. The
@@ -1334,7 +1337,23 @@ public struct YouTabRoot: View {
                 },
                 onOpenEditPersona: {
                     Task { @MainActor in path.append(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                },
+                onOpenBeacons: {
+                    Task { @MainActor in path.append(.beaconsFeed) }
                 }
+            )
+        case .beaconsFeed:
+            BeaconsFeedView(
+                onOpenPost: { _ in
+                    Task { @MainActor in path.append(.placeholder(label: "Post")) }
+                },
+                onCompose: { _ in
+                    Task { @MainActor in path.append(.placeholder(label: "Compose")) }
+                },
+                onDiscover: {
+                    Task { @MainActor in path.append(.placeholder(label: "Discover beacons")) }
+                },
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .broadcastDetail(broadcastId, card, tierSegments):
             BroadcastDetailView(

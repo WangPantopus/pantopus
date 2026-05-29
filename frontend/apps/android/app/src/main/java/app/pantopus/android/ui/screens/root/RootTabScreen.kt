@@ -3061,6 +3061,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenEditPersona = {
                         navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
                     },
+                    onOpenBeacons = {
+                        navController.navigate(ChildRoutes.BEACONS_FEED)
+                    },
                     viewModel = audienceViewModel,
                 )
             }

@@ -31,6 +31,10 @@ public struct AudienceProfileView: View {
     private let onComposeBroadcast: @MainActor (String) -> Void
     /// A13.12 — top-bar "Edit persona" action into the creator-side editor.
     private let onOpenEditPersona: @MainActor () -> Void
+    /// A03.2 — "Beacon Updates" entry into the followed-beacons feed
+    /// (`surface=personas`). Distinct from this surface, which manages the
+    /// persona the creator *owns*.
+    private let onOpenBeacons: @MainActor () -> Void
 
     init(
         viewModel: AudienceProfileViewModel = AudienceProfileViewModel(),
@@ -42,7 +46,8 @@ public struct AudienceProfileView: View {
         onOpenCreatorInbox: @escaping @MainActor () -> Void = {},
         onOpenMembership: @escaping @MainActor (String) -> Void = { _ in },
         onComposeBroadcast: @escaping @MainActor (String) -> Void = { _ in },
-        onOpenEditPersona: @escaping @MainActor () -> Void = {}
+        onOpenEditPersona: @escaping @MainActor () -> Void = {},
+        onOpenBeacons: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
@@ -54,6 +59,7 @@ public struct AudienceProfileView: View {
         self.onOpenMembership = onOpenMembership
         self.onComposeBroadcast = onComposeBroadcast
         self.onOpenEditPersona = onOpenEditPersona
+        self.onOpenBeacons = onOpenBeacons
     }
 
     public var body: some View {
@@ -290,9 +296,44 @@ public struct AudienceProfileView: View {
             statusLine(loaded.header)
             tabStrip
             tabContent(loaded)
+            beaconsFooter
             memberFooter
         }
         .accessibilityIdentifier("audienceProfileContent")
+    }
+
+    /// A03.2 — entry into the Beacon Updates feed (broadcasts from beacons
+    /// the user follows). Mirrors `memberFooter`'s row recipe.
+    private var beaconsFooter: some View {
+        Button(action: onOpenBeacons) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.rss, size: 16, color: Theme.Color.primary600)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Beacon Updates")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Broadcasts from beacons you follow")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: Spacing.s0)
+                Text("Open")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary700)
+                Icon(.chevronRight, size: 14, color: Theme.Color.primary600)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Beacon Updates. Broadcasts from beacons you follow. Open.")
+        .accessibilityIdentifier("audienceProfileBeaconsEntry")
     }
 
     /// "You're a member" footer — the Wave A direct-link entry point into

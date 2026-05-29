@@ -82,6 +82,7 @@ fun AudienceProfileScreen(
     onOpenMembership: (String) -> Unit = {},
     onComposeBroadcast: (String) -> Unit = {},
     onOpenEditPersona: () -> Unit = {},
+    onOpenBeacons: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -154,9 +155,67 @@ fun AudienceProfileScreen(
                             ),
                     )
                 }
+                BeaconsFooter(onOpenBeacons = onOpenBeacons)
                 MemberFooter(onOpenMembership = onOpenMembership)
             }
         }
+    }
+}
+
+/**
+ * A03.2 — entry into the Beacon Updates feed (broadcasts from beacons the
+ * user follows). Mirrors [MemberFooter]'s row recipe.
+ */
+@Composable
+private fun BeaconsFooter(onOpenBeacons: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .clickable { onOpenBeacons() }
+                .padding(horizontal = Spacing.s4, vertical = 10.dp)
+                .heightIn(min = 48.dp)
+                .testTag("audienceProfileBeaconsEntry")
+                .semantics {
+                    contentDescription = "Beacon Updates. Broadcasts from beacons you follow. Open."
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Rss,
+            contentDescription = null,
+            size = Radii.xl,
+            strokeWidth = 2.3f,
+            tint = PantopusColors.primary600,
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = "Beacon Updates",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Broadcasts from beacons you follow",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = "Open",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary700,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
     }
 }
 
