@@ -38,6 +38,10 @@ public struct WizardChrome: Sendable, Equatable {
     public let primaryCTAEnabled: Bool
     public let secondaryCTA: WizardSecondaryCTA?
     public let isSubmitting: Bool
+    /// Optional caption rendered above the primary CTA in the sticky dock —
+    /// e.g. the claim wizard's "Waiting for upload to finish" hint while a
+    /// document is still streaming. `nil` renders nothing (legacy behaviour).
+    public let footerHint: String?
     public let dirty: Bool
     public let showsProgressBar: Bool
 
@@ -50,6 +54,7 @@ public struct WizardChrome: Sendable, Equatable {
         primaryCTAEnabled: Bool,
         secondaryCTA: WizardSecondaryCTA? = nil,
         isSubmitting: Bool = false,
+        footerHint: String? = nil,
         dirty: Bool,
         showsProgressBar: Bool
     ) {
@@ -61,6 +66,7 @@ public struct WizardChrome: Sendable, Equatable {
         self.primaryCTAEnabled = primaryCTAEnabled
         self.secondaryCTA = secondaryCTA
         self.isSubmitting = isSubmitting
+        self.footerHint = footerHint
         self.dirty = dirty
         self.showsProgressBar = showsProgressBar
     }

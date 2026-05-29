@@ -38,7 +38,7 @@ final class ClaimOwnershipWizardViewModelTests: XCTestCase {
             homeId: "home-1",
             api: makeAPI(),
             uploader: makeUploader()
-        )
+        ) { true }
     }
 
     private func waitFor(

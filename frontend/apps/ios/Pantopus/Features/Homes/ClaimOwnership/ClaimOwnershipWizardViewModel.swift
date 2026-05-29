@@ -36,6 +36,10 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
 
     private(set) var currentStep: ClaimOwnershipStep = .start
     var slots: [ClaimEvidenceSlot: ClaimSlotUiState] = [:]
+    /// Per-slot address-match verdict from the on-upload OCR check. Computed
+    /// when a file is picked (sample-data heuristic until the evidence
+    /// pipeline returns a parsed address) and cleared when the slot is reset.
+    var addressMatches: [ClaimEvidenceSlot: ClaimAddressMatch] = [:]
     var note: String = ""
     private(set) var startContent: ClaimOwnershipStartContent
     private(set) var isSubmitting: Bool = false
@@ -57,17 +61,22 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     private let homeId: String
     private let api: APIClient
     private let uploader: MultipartUploader
+    private let isOnlineProvider: @MainActor () -> Bool
     private let logger = Logger(label: "app.pantopus.ios.ClaimOwnershipWizard")
 
     init(
         homeId: String,
         api: APIClient = .shared,
         uploader: MultipartUploader = .shared,
-        startContent: ClaimOwnershipStartContent? = nil
+        startContent: ClaimOwnershipStartContent? = nil,
+        // Defaults to the live monitor in production. Tests inject a fixed
+        // value so CI simulator reachability does not gate stubbed requests.
+        isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
     ) {
         self.homeId = homeId
         self.api = api
         self.uploader = uploader
+        self.isOnlineProvider = isOnlineProvider
         self.startContent = startContent ?? ClaimOwnershipSampleData.startContent(for: homeId)
         for slot in ClaimEvidenceSlot.allCases {
             slots[slot] = .empty
@@ -105,6 +114,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
                 primaryCTAEnabled: bothSlotsHaveFiles && !isSubmitting,
                 secondaryCTA: nil,
                 isSubmitting: isSubmitting,
+                footerHint: isSubmitting ? "Waiting for upload to finish" : nil,
                 dirty: anySlotHasFile || !note.isEmpty,
                 showsProgressBar: true
             )
@@ -159,6 +169,12 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
 
     func picked(_ slot: ClaimEvidenceSlot, file: ClaimPickedFile) {
         slots[slot] = .picked(file: file)
+        // Run the address check on upload completion (sample-data heuristic
+        // for now) so the slot can render its done/warn confirmation.
+        addressMatches[slot] = ClaimOwnershipSampleData.addressMatch(
+            forFilename: file.filename,
+            homeLabel: startContent.homeLabel
+        )
         // Picking a new file invalidates any prior URL we'd cached for
         // this slot — the next submit must re-upload these bytes.
         pendingUploadURLs[slot] = nil
@@ -167,6 +183,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
 
     func remove(_ slot: ClaimEvidenceSlot) {
         slots[slot] = .empty
+        addressMatches[slot] = nil
         pendingUploadURLs[slot] = nil
     }
 
@@ -189,7 +206,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
 
     func submit() async {
         guard bothSlotsHaveFiles, !isSubmitting else { return }
-        if !NetworkMonitor.shared.isOnline {
+        if !isOnlineProvider() {
             submitError = "You're offline. Try again when you're back online."
             return
         }

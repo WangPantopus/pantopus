@@ -45,6 +45,12 @@ data class ClaimOwnershipUiState(
     val startContent: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart,
     val slots: Map<ClaimEvidenceSlot, ClaimSlotState> =
         ClaimEvidenceSlot.entries.associateWith { ClaimSlotState.Empty },
+    /**
+     * Per-slot address-match verdict from the on-upload OCR check. Computed
+     * when a file is picked (sample-data heuristic until the evidence
+     * pipeline returns a parsed address) and cleared when the slot is reset.
+     */
+    val addressMatches: Map<ClaimEvidenceSlot, ClaimAddressMatch> = emptyMap(),
     val note: String = "",
     val isSubmitting: Boolean = false,
     val submitError: String? = null,
@@ -152,9 +158,17 @@ open class ClaimOwnershipWizardViewModel
             // Picking a new file invalidates any prior URL we'd cached
             // for this slot — the next submit must re-upload these bytes.
             pendingUploadUrls.remove(slot)
+            // Run the address check on upload completion (sample-data
+            // heuristic for now) so the slot renders its done/warn line.
+            val verdict =
+                ClaimOwnershipSampleData.addressMatch(
+                    filename = file.filename,
+                    homeLabel = _state.value.startContent.homeLabel,
+                )
             _state.update { current ->
                 current.copy(
                     slots = current.slots.toMutableMap().apply { put(slot, ClaimSlotState.Picked(file)) },
+                    addressMatches = current.addressMatches.toMutableMap().apply { put(slot, verdict) },
                     submitError = null,
                 )
             }
@@ -163,7 +177,10 @@ open class ClaimOwnershipWizardViewModel
         fun remove(slot: ClaimEvidenceSlot) {
             pendingUploadUrls.remove(slot)
             _state.update { current ->
-                current.copy(slots = current.slots.toMutableMap().apply { put(slot, ClaimSlotState.Empty) })
+                current.copy(
+                    slots = current.slots.toMutableMap().apply { put(slot, ClaimSlotState.Empty) },
+                    addressMatches = current.addressMatches.toMutableMap().apply { remove(slot) },
+                )
             }
         }
 
@@ -345,6 +362,7 @@ open class ClaimOwnershipWizardViewModel
                         primaryCtaEnabled = state.bothSlotsHaveFiles && !state.isSubmitting,
                         secondaryCta = null,
                         isSubmitting = state.isSubmitting,
+                        footerHint = if (state.isSubmitting) "Waiting for upload to finish" else null,
                         dirty = state.anySlotHasFile || state.note.isNotEmpty(),
                         showsProgressBar = true,
                     )

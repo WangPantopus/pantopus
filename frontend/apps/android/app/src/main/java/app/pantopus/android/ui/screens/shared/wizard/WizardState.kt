@@ -45,6 +45,12 @@ data class WizardChrome(
     val primaryCtaEnabled: Boolean,
     val secondaryCta: WizardSecondaryCta? = null,
     val isSubmitting: Boolean = false,
+    /**
+     * Optional caption rendered above the primary CTA in the sticky dock —
+     * e.g. the claim wizard's "Waiting for upload to finish" hint while a
+     * document is still streaming. `null` renders nothing (legacy behaviour).
+     */
+    val footerHint: String? = null,
     val dirty: Boolean,
     val showsProgressBar: Boolean,
 )

@@ -18,9 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,20 +35,22 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.screens.homes.claim_ownership.components.ClaimHomeChip
+import app.pantopus.android.ui.screens.homes.claim_ownership.components.ClaimStatement
+import app.pantopus.android.ui.screens.homes.claim_ownership.components.UploadSlot
+import app.pantopus.android.ui.screens.homes.claim_ownership.components.UploadSlotFile
+import app.pantopus.android.ui.screens.homes.claim_ownership.components.UploadSlotState
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
 import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.RequirementsCardBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.RequirementsRow
 import app.pantopus.android.ui.screens.shared.wizard.blocks.SubcopyBlock
-import app.pantopus.android.ui.screens.shared.wizard.blocks.UploadSlot
-import app.pantopus.android.ui.screens.shared.wizard.blocks.UploadSlotState
-import app.pantopus.android.ui.screens.shared.wizard.blocks.UploadSlotsBlock
 import app.pantopus.android.ui.screens.status.StatusWaitingBody
 import app.pantopus.android.ui.screens.status.StatusWaitingContent
 import app.pantopus.android.ui.theme.PantopusColors
@@ -113,7 +112,7 @@ fun ClaimOwnershipWizardScreen(
 
 @Composable
 internal fun StartStep(content: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart) {
-    HomeContextChip(label = content.homeLabel)
+    ClaimHomeChip(label = content.homeLabel)
     content.contestedClaim?.let { ContestedClaimNotice(it) }
     HeadlineBlock(if (content.isContested) "File a competing claim" else "Let's verify you own this home")
     SubcopyBlock(
@@ -175,32 +174,6 @@ private fun requirementsRows(isContested: Boolean): List<RequirementsRow> =
             ),
         )
     }
-
-@Composable
-private fun HomeContextChip(label: String) {
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(PantopusColors.homeBg)
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
-                .testTag("claimOwnershipHomeChip"),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Home,
-            contentDescription = null,
-            size = 11.dp,
-            tint = PantopusColors.home,
-        )
-        Text(
-            text = "Home · $label",
-            style = PantopusTextStyle.overline,
-            color = PantopusColors.home,
-        )
-    }
-}
 
 @Composable
 private fun ContestedClaimNotice(claim: ClaimOwnershipContestedClaim) {
@@ -402,32 +375,95 @@ private fun UploadStep(
             vm.picked(slot, ClaimPickedFile(filename = name, mimeType = mime, bytes = bytes))
         }
 
-    HeadlineBlock("Upload your evidence")
-    SubcopyBlock(
-        "Uploads stay private and are only seen by the verification team. We'll never share them publicly.",
-    )
-    UploadSlotsBlock(
+    UploadStepContent(
+        homeLabel = state.startContent.homeLabel,
         slots =
             ClaimEvidenceSlot.entries.map { slot ->
-                UploadSlot(
+                ClaimUploadSlotModel(
                     id = slot.name,
-                    title = slot.title,
-                    acceptHint = slot.acceptHint,
-                    state = state.slots[slot]?.toViewState() ?: UploadSlotState.Empty,
+                    label = slot.title,
+                    required = true,
+                    hint = slot.acceptHint,
+                    state =
+                        (state.slots[slot] ?: ClaimSlotState.Empty)
+                            .toUploadState(state.addressMatches[slot], state.startContent.homeLabel),
                 )
             },
+        note = state.note,
+        onNoteChange = vm::setNote,
+        submitError = state.submitError,
         onPick = { id ->
-            val slot = ClaimEvidenceSlot.entries.firstOrNull { it.name == id } ?: return@UploadSlotsBlock
+            val slot = ClaimEvidenceSlot.entries.firstOrNull { it.name == id } ?: return@UploadStepContent
             pickerSlot = slot
             picker.launch(arrayOf("image/*", "application/pdf"))
         },
         onRemove = { id ->
-            val slot = ClaimEvidenceSlot.entries.firstOrNull { it.name == id } ?: return@UploadSlotsBlock
+            val slot = ClaimEvidenceSlot.entries.firstOrNull { it.name == id } ?: return@UploadStepContent
             vm.remove(slot)
         },
     )
-    ReviewerNoteField(text = state.note, onChange = vm::setNote)
-    state.submitError?.let { ErrorBanner(it) }
+}
+
+/** One slot's display descriptor, assembled from the view model (or from
+ * sample fixtures in snapshot tests). */
+internal data class ClaimUploadSlotModel(
+    val id: String,
+    val label: String,
+    val required: Boolean,
+    val hint: String,
+    val state: UploadSlotState,
+)
+
+/**
+ * The Evidence step body as a pure function of its state. [UploadStep] builds
+ * this from the view model; Paparazzi snapshots render it from fixtures.
+ */
+@Composable
+internal fun UploadStepContent(
+    homeLabel: String,
+    slots: List<ClaimUploadSlotModel>,
+    note: String,
+    onNoteChange: (String) -> Unit,
+    submitError: String?,
+    onPick: (String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    val attached = slots.count { it.state.isAttached }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        ClaimHomeChip(label = homeLabel)
+        HeadlineBlock("Upload your evidence")
+        SubcopyBlock(
+            "Two documents help us verify you own $homeLabel. We auto-check the address against your account.",
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+            Text(
+                text = "Documents · $attached of ${slots.size} attached",
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.appTextSecondary,
+            )
+            slots.forEach { slot ->
+                UploadSlot(
+                    id = slot.id,
+                    label = slot.label,
+                    hint = slot.hint,
+                    state = slot.state,
+                    required = slot.required,
+                    onPick = { onPick(slot.id) },
+                    onRemove = { onRemove(slot.id) },
+                )
+            }
+        }
+        ClaimStatement(
+            value = note,
+            onValueChange = onNoteChange,
+            placeholder = ClaimUploadCopy.STATEMENT_PLACEHOLDER,
+        )
+        submitError?.let { ErrorBanner(it) }
+        EncryptionFooter()
+    }
 }
 
 // MARK: - Step 3
@@ -442,58 +478,68 @@ private fun SuccessStep() {
 
 // MARK: - Helpers
 
-private fun ClaimSlotState.toViewState(): UploadSlotState =
+private fun ClaimSlotState.toUploadState(
+    verdict: ClaimAddressMatch?,
+    homeLabel: String,
+): UploadSlotState =
     when (this) {
         ClaimSlotState.Empty -> UploadSlotState.Empty
-        is ClaimSlotState.Picked -> UploadSlotState.Picked(file.filename, file.sizeBytes)
-        is ClaimSlotState.Uploading -> UploadSlotState.Uploading(file.filename, fraction)
-        is ClaimSlotState.Uploaded -> UploadSlotState.Uploaded(file.filename, file.sizeBytes)
-        is ClaimSlotState.Failed -> UploadSlotState.Failed(file.filename, message)
+        is ClaimSlotState.Uploading -> UploadSlotState.Uploading(file.toDisplay(), fraction)
+        is ClaimSlotState.Picked -> file.toDisplay().withVerdict(verdict ?: file.fallbackMatch(homeLabel))
+        is ClaimSlotState.Uploaded -> file.toDisplay().withVerdict(verdict ?: file.fallbackMatch(homeLabel))
+        is ClaimSlotState.Failed -> file.toDisplay().withVerdict(verdict ?: file.fallbackMatch(homeLabel))
     }
 
-@Composable
-private fun ReviewerNoteField(
-    text: String,
-    onChange: (String) -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Text(
-            text = "Add a note for the reviewer (optional)",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-        )
-        OutlinedTextField(
-            value = text,
-            onValueChange = { if (it.length <= 500) onChange(it) },
-            placeholder = {
-                Text("Anything the reviewer should know about your claim…", style = PantopusTextStyle.body)
+private fun ClaimPickedFile.fallbackMatch(homeLabel: String): ClaimAddressMatch =
+    ClaimOwnershipSampleData.addressMatch(filename = filename, homeLabel = homeLabel)
+
+private fun UploadSlotFile.withVerdict(verdict: ClaimAddressMatch): UploadSlotState =
+    when (verdict) {
+        is ClaimAddressMatch.Matches -> UploadSlotState.Done(this, verdict.detail)
+        is ClaimAddressMatch.Differs -> UploadSlotState.Warn(this, verdict.detail)
+    }
+
+private fun ClaimPickedFile.toDisplay(): UploadSlotFile =
+    UploadSlotFile(
+        name = filename,
+        sizeLabel = formatClaimFileSize(sizeBytes),
+        pageCount = null,
+        kind =
+            if (mimeType == "application/pdf" || filename.lowercase().endsWith(".pdf")) {
+                UploadSlotFile.Kind.Pdf
+            } else {
+                UploadSlotFile.Kind.Image
             },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            shape = RoundedCornerShape(Radii.md),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PantopusColors.primary600,
-                    unfocusedBorderColor = PantopusColors.appBorder,
-                    focusedTextColor = PantopusColors.appText,
-                    unfocusedTextColor = PantopusColors.appText,
-                ),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp)
-                    .testTag("claimOwnership_note"),
+    )
+
+/** Human-readable file size, e.g. "1.4 MB" / "820 KB". */
+@Suppress("MagicNumber")
+internal fun formatClaimFileSize(bytes: Long): String {
+    val mb = bytes.toDouble() / 1_048_576.0
+    if (mb >= 1) return "%.1f MB".format(mb)
+    val kb = bytes.toDouble() / 1_024.0
+    return "%.0f KB".format(kb)
+}
+
+@Composable
+private fun EncryptionFooter() {
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("claimOwnership_encryptionFooter"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.Top,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Lock,
+            contentDescription = null,
+            size = Radii.lg,
+            tint = PantopusColors.appTextSecondary,
         )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Text(
-                text = "${text.length} / 500",
-                style = PantopusTextStyle.caption,
-                color =
-                    if (text.length > 500) PantopusColors.error else PantopusColors.appTextSecondary,
-            )
-        }
+        Text(
+            text = ClaimUploadCopy.ENCRYPTION_FOOTER,
+            color = PantopusColors.appTextSecondary,
+            fontSize = 11.5.sp,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

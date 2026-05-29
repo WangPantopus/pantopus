@@ -235,6 +235,26 @@ private fun WizardStickyCta(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorderSubtle)
+        chrome.footerHint?.let { hint ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(PantopusColors.appSurface)
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .testTag("wizardFooterHint"),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Hourglass,
+                    contentDescription = null,
+                    size = Radii.lg,
+                    tint = PantopusColors.appTextSecondary,
+                )
+                Text(text = hint, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            }
+        }
         Row(
             modifier =
                 Modifier

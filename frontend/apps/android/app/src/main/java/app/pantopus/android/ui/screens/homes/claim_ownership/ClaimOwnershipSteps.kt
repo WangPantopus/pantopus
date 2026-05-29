@@ -28,6 +28,14 @@ enum class ClaimEvidenceSlot(
     val acceptHint: String get() = "JPG, PNG, or PDF up to 10 MB"
 }
 
+/** Copy shared with the iOS screen — keep both platforms word-for-word. */
+object ClaimUploadCopy {
+    const val STATEMENT_PLACEHOLDER: String =
+        "Add a short statement to help the reviewer (e.g. how long you've owned, anyone else on title)…"
+    const val ENCRYPTION_FOOTER: String =
+        "Encrypted in transit. Visible only to the reviewer assigned to your claim."
+}
+
 /** Per-slot upload state surfaced to the UI. */
 sealed interface ClaimSlotState {
     data object Empty : ClaimSlotState

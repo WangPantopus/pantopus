@@ -80,6 +80,33 @@ class ClaimOwnershipWizardViewModelTest {
         assertEquals(WizardLeadingControl.Back, vm.chrome.leading)
     }
 
+    @Test fun picked_computes_address_match_when_filename_carries_street_number() {
+        // Sample-data heuristic: a filename carrying the home's street number
+        // ("412") resolves to a Matches verdict on the slot.
+        val vm = makeVm()
+        vm.onPrimary()
+        vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed_412_elm.pdf"))
+        val verdict = vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership]
+        assertTrue(verdict is ClaimAddressMatch.Matches)
+        assertTrue((verdict as ClaimAddressMatch.Matches).detail.contains("412 Elm St"))
+    }
+
+    @Test fun picked_computes_address_differs_when_street_number_absent() {
+        val vm = makeVm()
+        vm.onPrimary()
+        vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("mortgage_statement.pdf"))
+        assertTrue(vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership] is ClaimAddressMatch.Differs)
+    }
+
+    @Test fun remove_clears_address_match() {
+        val vm = makeVm()
+        vm.onPrimary()
+        vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed_412.pdf"))
+        assertNotNull(vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership])
+        vm.remove(ClaimEvidenceSlot.Ownership)
+        assertNull(vm.state.value.addressMatches[ClaimEvidenceSlot.Ownership])
+    }
+
     @Test fun submit_blocked_without_both_files() =
         runTest {
             val vm = makeVm()
