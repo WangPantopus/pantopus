@@ -112,9 +112,8 @@ public final class BlockedUsersViewModel: ListOfRowsDataSource {
                 ),
                 trailing: .pillButton(label: "Unblock", tone: .neutral) { [weak self] in
                     Task { @MainActor in await self?.unblock(blockId) }
-                },
-                onTap: {}
-            )
+                }
+            ) {}
         }
         state = .loaded(
             sections: [
