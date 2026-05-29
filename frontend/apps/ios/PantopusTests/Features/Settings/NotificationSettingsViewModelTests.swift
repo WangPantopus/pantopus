@@ -159,7 +159,9 @@ final class NotificationSettingsViewModelTests: XCTestCase {
     func testHelperCopyMatchesDesign() async {
         let vm = NotificationSettingsViewModel(variant: .populated)
         let groups = await loadedGroups(vm)
-        func helper(_ id: String) -> String? { groups.first { $0.id == id }?.helper }
+        func helper(_ id: String) -> String? {
+            groups.first { $0.id == id }?.helper
+        }
         XCTAssertEqual(
             helper("master"),
             "Pause all silences every channel except emergency alerts. Quiet hours just delays them."

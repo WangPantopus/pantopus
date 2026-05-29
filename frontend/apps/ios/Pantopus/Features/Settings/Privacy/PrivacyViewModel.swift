@@ -229,8 +229,17 @@ public final class PrivacySettingsViewModel: GroupedListDataSource {
 
     // MARK: - Seed data (parity contract — mirrored in Android)
 
-    struct Option: Sendable { let key: String; let label: String; let sub: String? }
-    struct ActivitySpec: Sendable { let key: String; let label: String; let sub: String? }
+    struct Option {
+        let key: String
+        let label: String
+        let sub: String?
+    }
+
+    struct ActivitySpec {
+        let key: String
+        let label: String
+        let sub: String?
+    }
 
     static let visibilityOptions: [Option] = [
         Option(key: "public", label: "Public", sub: "Anyone with the link can see your profile"),

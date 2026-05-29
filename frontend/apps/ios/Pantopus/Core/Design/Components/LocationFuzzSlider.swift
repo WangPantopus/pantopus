@@ -34,7 +34,9 @@ public struct LocationFuzzSlider: View {
         self.onChange = onChange
     }
 
-    private var index: Int { stops.firstIndex(of: stop) ?? 0 }
+    private var index: Int {
+        stops.firstIndex(of: stop) ?? 0
+    }
 
     private var activeFraction: CGFloat {
         stops.count > 1 ? CGFloat(index) / CGFloat(stops.count - 1) : 0

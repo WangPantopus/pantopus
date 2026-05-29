@@ -179,20 +179,20 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
 
     // MARK: - Seed data (parity contract — mirrored in Android)
 
-    struct ChannelPattern: Sendable, Hashable {
+    struct ChannelPattern: Hashable {
         var p: Bool
         var e: Bool
         var s: Bool
     }
 
-    struct CategoryRowSpec: Sendable {
+    struct CategoryRowSpec {
         let id: String
         let label: String
         let sub: String?
         let seed: ChannelPattern
     }
 
-    struct Category: Sendable {
+    struct Category {
         let id: String
         let title: String
         let helper: String?
@@ -354,7 +354,9 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
     static func seedPatterns() -> [String: ChannelPattern] {
         var map: [String: ChannelPattern] = [:]
         for category in categories {
-            for row in category.rows { map[row.id] = row.seed }
+            for row in category.rows {
+                map[row.id] = row.seed
+            }
         }
         return map
     }

@@ -202,8 +202,14 @@ public protocol GroupedListDataSource: AnyObject, Observable {
 /// Defaults so surfaces that predate A14.5/A14.7 (and those without a
 /// banner, channel matrix, or fuzz slider) conform without boilerplate.
 public extension GroupedListDataSource {
-    var banner: GroupedListBanner? { nil }
-    var contentDimmed: Bool { false }
+    var banner: GroupedListBanner? {
+        nil
+    }
+
+    var contentDimmed: Bool {
+        false
+    }
+
     func toggleChannel(_: String, channel _: ChannelGlyph, isOn _: Bool) async {}
     func tapBanner() async {}
     func setFuzz(_: String, stop _: FuzzStop) async {}

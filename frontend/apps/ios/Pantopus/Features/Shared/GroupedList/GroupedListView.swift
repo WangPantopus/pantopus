@@ -492,9 +492,15 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         var newP = p, newE = e, newS = s
         let newValue: Bool
         switch glyph {
-        case .p: newP.toggle(); newValue = newP
-        case .e: newE.toggle(); newValue = newE
-        case .s: newS.toggle(); newValue = newS
+        case .p:
+            newP.toggle()
+            newValue = newP
+        case .e:
+            newE.toggle()
+            newValue = newE
+        case .s:
+            newS.toggle()
+            newValue = newS
         }
         optimisticOverrides[rowId] = .channelTriad(p: newP, e: newE, s: newS, locked: locked)
         Task { await dataSource.toggleChannel(rowId, channel: glyph, isOn: newValue) }

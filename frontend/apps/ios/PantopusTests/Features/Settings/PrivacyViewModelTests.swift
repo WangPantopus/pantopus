@@ -52,7 +52,7 @@ final class PrivacyViewModelTests: XCTestCase {
         XCTAssertEqual(address?.rows.count, 4)
         XCTAssertEqual(selectedRadioId(visibility), "visibility.verified")
         XCTAssertEqual(selectedRadioId(address), "address.street")
-        for row in (visibility?.rows ?? []) {
+        for row in visibility?.rows ?? [] {
             guard case .radio = row.control else { return XCTFail("\(row.id) should be a radio row") }
         }
     }
@@ -71,7 +71,7 @@ final class PrivacyViewModelTests: XCTestCase {
         let groups = await loadedGroups(vm)
         let activity = group(groups, "activity")
         XCTAssertEqual(activity?.rows.map(\.id), ["online", "recent", "nearby", "ratings"])
-        for row in (activity?.rows ?? []) {
+        for row in activity?.rows ?? [] {
             guard case let .toggle(isOn) = row.control else { return XCTFail("\(row.id) should be a toggle") }
             XCTAssertTrue(isOn, "\(row.id) defaults on in the populated frame")
         }
@@ -130,7 +130,7 @@ final class PrivacyViewModelTests: XCTestCase {
         XCTAssertEqual(selectedRadioId(group(groups, "visibility")), "visibility.hidden")
         XCTAssertEqual(selectedRadioId(group(groups, "address")), "address.hidden")
         XCTAssertEqual(group(groups, "fuzz")?.fuzz?.stop, .neighborhood)
-        for row in (group(groups, "activity")?.rows ?? []) {
+        for row in group(groups, "activity")?.rows ?? [] {
             if case let .toggle(isOn) = row.control { XCTAssertFalse(isOn, "\(row.id) off in stealth") }
         }
         XCTAssertEqual(vm.footerCaption, "Stealth · auto-applied May 26, 2026")
