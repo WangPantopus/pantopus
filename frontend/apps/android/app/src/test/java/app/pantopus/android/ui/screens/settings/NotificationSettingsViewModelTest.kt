@@ -129,6 +129,7 @@ class NotificationSettingsViewModelTest {
 
     @Test fun helper_copy_matches_design() {
         val groups = NotificationSettingsViewModel().loadedGroups()
+
         fun helper(id: String) = groups.first { it.id == id }.helper
         assertEquals(
             "Pause all silences every channel except emergency alerts. Quiet hours just delays them.",
@@ -165,8 +166,7 @@ class NotificationSettingsViewModelTest {
         return groups()
     }
 
-    private fun NotificationSettingsViewModel.groups(): List<GroupedListGroup> =
-        (state.value as GroupedListUiState.Loaded).groups
+    private fun NotificationSettingsViewModel.groups(): List<GroupedListGroup> = (state.value as GroupedListUiState.Loaded).groups
 
     private fun List<GroupedListGroup>.row(id: String): GroupedListRow? = flatMap { it.rows }.firstOrNull { it.id == id }
 }

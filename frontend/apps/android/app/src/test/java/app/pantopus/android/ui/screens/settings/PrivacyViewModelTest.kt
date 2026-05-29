@@ -154,8 +154,7 @@ class PrivacyViewModelTest {
         return groups()
     }
 
-    private fun PrivacySettingsViewModel.groups(): List<GroupedListGroup> =
-        (state.value as GroupedListUiState.Loaded).groups
+    private fun PrivacySettingsViewModel.groups(): List<GroupedListGroup> = (state.value as GroupedListUiState.Loaded).groups
 
     private fun List<GroupedListGroup>.group(id: String): GroupedListGroup? = firstOrNull { it.id == id }
 
