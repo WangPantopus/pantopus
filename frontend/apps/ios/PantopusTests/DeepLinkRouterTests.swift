@@ -221,6 +221,28 @@ final class DeepLinkRouterTests: XCTestCase {
         }
     }
 
+    // MARK: - A14.8 Vacation hold
+
+    func testVacationHoldRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/vacation")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .vacationHold)
+    }
+
+    func testVacationHoldHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/mailbox/vacation")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .vacationHold)
+    }
+
+    func testMailboxRootWithoutVacationFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://mailbox"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case .unknown = DeepLinkRouter.shared.pending {
+            // ok — only the `/vacation` sub-path is wired today.
+        } else {
+            XCTFail("Expected .unknown for bare /mailbox path")
+        }
+    }
+
     // MARK: - T6.1c P5 — auth deep links
 
     func testResetPasswordCustomScheme() throws {

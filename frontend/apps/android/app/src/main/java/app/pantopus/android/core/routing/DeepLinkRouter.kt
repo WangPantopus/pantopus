@@ -122,6 +122,13 @@ object DeepLinkRouter {
          */
         data object PaymentsSettings : Destination
 
+        /**
+         * A14.8 — `pantopus://mailbox/vacation` opens the Vacation hold
+         * screen (scheduling or active variant depending on server state
+         * once the persistence layer lands).
+         */
+        data object VacationHold : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -274,10 +281,15 @@ object DeepLinkRouter {
                 if (token.isNullOrBlank()) Destination.Unknown(raw) else Destination.Invite(token)
             }
             "mailbox" -> {
-                // `pantopus://mailbox/mailday` — only the mail-day sub-route
-                // is wired today. Bare `pantopus://mailbox` falls through to
-                // the existing tab-level routing.
-                if (segments.getOrNull(1) == "mailday") Destination.MailDay else Destination.Unknown(raw)
+                // `pantopus://mailbox/vacation` opens A14.8;
+                // `pantopus://mailbox/mailday` opens the A13.16 My Mail Day
+                // editor. Other mailbox paths fall through to Unknown until
+                // they have routes.
+                when (segments.getOrNull(1)) {
+                    "vacation" -> Destination.VacationHold
+                    "mailday" -> Destination.MailDay
+                    else -> Destination.Unknown(raw)
+                }
             }
             "auth" -> {
                 when (segments.getOrNull(1)) {

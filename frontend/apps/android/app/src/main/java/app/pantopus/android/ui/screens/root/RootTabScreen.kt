@@ -203,6 +203,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
+import app.pantopus.android.ui.screens.mailbox.vacation.VacationHoldScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.membership.MembershipDetailScreen
@@ -1133,6 +1134,9 @@ private object ChildRoutes {
     /** A.x — Mailbox map. */
     const val MAILBOX_MAP = "mailbox/map"
 
+    /** A14.8 — Vacation hold (scheduling + active variants). */
+    const val MAILBOX_VACATION = "mailbox/vacation"
+
     /**
      * A13.16 — My Mail Day editor. `{variant}` accepts "populated" (default)
      * or "empty" to switch between the mid-afternoon triage view and the
@@ -1309,6 +1313,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.User -> {
                 navController.navigate(ChildRoutes.publicProfile(pending.id))
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.VacationHold -> {
+                // A14.8 — push the Mailbox root first so Back returns
+                // to the mailbox surface (not the hub home), then drill
+                // into the Vacation hold screen.
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.MAILBOX_VACATION)
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.MailDay -> {
@@ -3306,11 +3318,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
                     onOpenMailDay = { navController.navigate(ChildRoutes.mailDay()) },
                     onBrowseGigs = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                    onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
                     onBack = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.MAILBOX_MAP) {
                 MailboxMapScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.MAILBOX_VACATION) {
+                VacationHoldScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MAIL_DAY,

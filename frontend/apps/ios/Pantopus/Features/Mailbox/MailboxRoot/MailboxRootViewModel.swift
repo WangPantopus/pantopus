@@ -169,6 +169,10 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     private let onOpenMap: @MainActor () -> Void
     let onOpenMailDay: @MainActor () -> Void
     private let onBrowseGigs: @MainActor () -> Void
+    /// A14.8 — settings-menu entry for the Vacation hold screen. The
+    /// Mailbox root top bar surfaces a `…` overflow that opens a menu
+    /// containing this single entry today (more settings can land later).
+    private let onOpenVacationHoldHandler: @MainActor () -> Void
     private let dataProvider: (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
     /// When set, `load()` surfaces this state verbatim — lets previews and
     /// tests pin the loading / error frames.
@@ -182,6 +186,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenMap: @escaping @MainActor () -> Void = {},
         onOpenMailDay: @escaping @MainActor () -> Void = {},
         onBrowseGigs: @escaping @MainActor () -> Void = {},
+        onOpenVacationHold: @escaping @MainActor () -> Void = {},
         dataProvider: @escaping (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
             = MailboxRootSampleData.sections,
         seededState: ListOfRowsState? = nil
@@ -193,8 +198,16 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         self.onOpenMap = onOpenMap
         self.onOpenMailDay = onOpenMailDay
         self.onBrowseGigs = onBrowseGigs
+        onOpenVacationHoldHandler = onOpenVacationHold
         self.dataProvider = dataProvider
         self.seededState = seededState
+    }
+
+    /// A14.8 — invoked from `MailboxRootView`'s overflow menu when the
+    /// user taps "Vacation hold". Exposed publicly so the SwiftUI Menu
+    /// in the view layer can call it directly.
+    public func openVacationHold() {
+        onOpenVacationHoldHandler()
     }
 
     // MARK: - Lifecycle

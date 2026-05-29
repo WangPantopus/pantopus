@@ -466,9 +466,9 @@ that goes beyond the standard chevron/toggle row.
   - **Stealth banner** in stealth mode: dark `#0b1220` bg, sky-tinted eye-off icon disc, "Stealth mode is on" + "Your profile is hidden from search. Existing connections still see you." — pinned above the radios.
 
 ### A14.8 — Vacation hold (`/mailbox/vacation.tsx`)
-- **iOS:** **MISSING** — no `Mailbox/Vacation/` folder.
-- **Android:** **MISSING**.
-- **Status:** **BUILD**
+- **iOS:** `Features/Mailbox/Vacation/` (P5.3).
+- **Android:** `ui/screens/mailbox/vacation/` (P5.3).
+- **Status:** **POLISH** (P5.3 BUILD landed)
 - **Designed frames:** scheduling (13-day range · `DateSpan` strip · scope toggles all on · civic locked · forwarding · emergency contact · `Save` in top bar primary-600) · active (sky-gradient `HoldStatusHero` · 5 days left · 3-cell stats · ledger of held items · top bar swaps Save for neutral `End hold`)
 - **Build dependencies:** `DateSpan` primitive + `HoldStatusHero` primitive.
 - **Required slots:**
