@@ -372,10 +372,14 @@ public extension MailItemSampleData {
     /// Forwards to the dedicated `MemorySampleData.memory` fixture so
     /// catalog-style call sites can reach memory data through the same
     /// `MailItemSampleData` entry point as the other A17 variants.
-    static var memoryFresh: MemoryDetailDTO { MemorySampleData.memory }
+    static var memoryFresh: MemoryDetailDTO {
+        MemorySampleData.memory
+    }
 
     /// A17.7 saved-state memory — same payload with `isSaved` flipped.
-    static var memorySaved: MemoryDetailDTO { MemorySampleData.savedMemory }
+    static var memorySaved: MemoryDetailDTO {
+        MemorySampleData.savedMemory
+    }
 
     /// A17.3 open/pre-signature certified mail state.
     static let certifiedUnread = CertifiedDetailDTO(
