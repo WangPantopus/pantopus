@@ -31,19 +31,31 @@ public enum ListOfRowsState: Sendable {
         public let subcopy: String
         public let ctaTitle: String?
         public let onCTA: (@Sendable () -> Void)?
+        /// Hero-circle background. `nil` keeps the `EmptyState` default
+        /// (personal-identity sky). A14.4 passes a neutral sunken tint so
+        /// the Blocked-users empty hero reads as a quiet grey disc.
+        public let tint: Color?
+        /// Icon stroke colour. `nil` keeps the `EmptyState` default
+        /// (`primary600`). A14.4 pairs the grey disc with a secondary-text
+        /// glyph.
+        public let accent: Color?
 
         public init(
             icon: PantopusIcon,
             headline: String,
             subcopy: String,
             ctaTitle: String? = nil,
-            onCTA: (@Sendable () -> Void)? = nil
+            onCTA: (@Sendable () -> Void)? = nil,
+            tint: Color? = nil,
+            accent: Color? = nil
         ) {
             self.icon = icon
             self.headline = headline
             self.subcopy = subcopy
             self.ctaTitle = ctaTitle
             self.onCTA = onCTA
+            self.tint = tint
+            self.accent = accent
         }
     }
 }

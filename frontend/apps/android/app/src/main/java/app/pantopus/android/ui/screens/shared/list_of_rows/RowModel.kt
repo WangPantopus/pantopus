@@ -215,6 +215,13 @@ sealed interface RowLeading {
  *  and [RowFooterAction]. */
 enum class CompactButtonVariant { Primary, Ghost, Destructive }
 
+/**
+ * Tone for [RowTrailing.PillButton] — mirrors the design's PillButton
+ * palette: [Neutral] (white bg · grey border · fg2 label), [Primary]
+ * (sky fill · white label), [Danger] (white bg · red border · red label).
+ */
+enum class RowPillTone { Neutral, Primary, Danger }
+
 /** Single action description for [RowTrailing.VerticalActions]. */
 data class VerticalAction(
     val label: String,
@@ -280,6 +287,20 @@ sealed interface RowTrailing {
     data class IconActions(
         val primary: RowIconAction,
         val secondary: RowIconAction,
+    ) : RowTrailing
+
+    /**
+     * A14.4 — single inline labelled pill (the design's PillButton
+     * primitive: 6×14 padding · capsule radius · 1px border · 13sp
+     * semibold label · no icon). Used by Blocked users ("Unblock" in
+     * [RowPillTone.Neutral]). Distinct from [VerticalActions] (a stacked
+     * pair) and [CircularAction] (icon-only): a single text pill with its
+     * own tap handler.
+     */
+    data class PillButton(
+        val label: String,
+        val tone: RowPillTone,
+        val onClick: () -> Unit,
     ) : RowTrailing
 }
 
@@ -500,6 +521,14 @@ enum class SectionStyle {
 data class RowSection(
     val id: String,
     val header: String? = null,
+    /**
+     * A14.4 — optional 11.5sp secondary caption rendered **below** the
+     * section (under the card for [SectionStyle.Card], under the rows for
+     * [SectionStyle.Flat]). Mirrors `GroupedListGroup.helper` so a
+     * single-card people list (Blocked users) can reaffirm the privacy
+     * contract beneath the card.
+     */
+    val footer: String? = null,
     val rows: List<RowModel>,
     // ─── T5 additions ──────────────────────────────────────────
     val count: Int? = null,

@@ -224,6 +224,8 @@ fun ListOfRowsScreen(
                             subcopy = state.subcopy,
                             ctaTitle = state.ctaTitle,
                             onCta = state.onCta,
+                            tint = state.tint ?: PantopusColors.personalBg,
+                            accent = state.accent ?: PantopusColors.primary600,
                         )
                     is ListOfRowsUiState.Error -> ErrorBanner(state.message, onRetry = onRefresh)
                 }
@@ -869,6 +871,11 @@ private fun LoadedList(
                         SectionCard(section)
                     }
             }
+            if (section.footer != null) {
+                item(key = "footer_${section.id}") {
+                    SectionFooter(sectionId = section.id, text = section.footer)
+                }
+            }
         }
         if (state.hasMore) {
             item(key = "end-sentinel") {
@@ -947,6 +954,28 @@ private fun SectionCard(section: RowSection) {
             }
         }
     }
+}
+
+/**
+ * A14.4 — 11.5sp secondary caption rendered below a section's card / rows.
+ * Mirrors the iOS `sectionFooter` + the design's helper-below-card line.
+ */
+@Composable
+private fun SectionFooter(
+    sectionId: String,
+    text: String,
+) {
+    // The LazyColumn's `spacedBy(Spacing.s2)` already provides the gap
+    // above this footer item, so no extra top padding here.
+    Text(
+        text = text,
+        fontSize = 11.5.sp,
+        color = PantopusColors.appTextSecondary,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .testTag("listOfRowsSectionFooter_$sectionId"),
+    )
 }
 
 @Composable
@@ -1521,6 +1550,62 @@ private fun TrailingView(
                 IconActionButton(action = trailing.primary)
                 IconActionButton(action = trailing.secondary)
             }
+        is RowTrailing.PillButton ->
+            PillTrailingButton(
+                label = trailing.label,
+                tone = trailing.tone,
+                rowTitle = rowTitle,
+                onClick = trailing.onClick,
+            )
+    }
+}
+
+/**
+ * A14.4 — single inline labelled pill matching the design's PillButton
+ * primitive: 6×14 padding · capsule radius · 1px border · 13sp semibold
+ * label. Used by Blocked users' `Unblock` action in [RowPillTone.Neutral].
+ */
+@Composable
+private fun PillTrailingButton(
+    label: String,
+    tone: RowPillTone,
+    rowTitle: String,
+    onClick: () -> Unit,
+) {
+    val background =
+        when (tone) {
+            RowPillTone.Neutral, RowPillTone.Danger -> PantopusColors.appSurface
+            RowPillTone.Primary -> PantopusColors.primary600
+        }
+    val border =
+        when (tone) {
+            RowPillTone.Neutral -> PantopusColors.appBorderStrong
+            RowPillTone.Primary -> PantopusColors.primary600
+            RowPillTone.Danger -> PantopusColors.errorBg
+        }
+    val foreground =
+        when (tone) {
+            RowPillTone.Neutral -> PantopusColors.appTextStrong
+            RowPillTone.Primary -> PantopusColors.appTextInverse
+            RowPillTone.Danger -> PantopusColors.error
+        }
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(background)
+                .border(1.dp, border, RoundedCornerShape(Radii.pill))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .semantics { contentDescription = "$label $rowTitle" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = foreground,
+        )
     }
 }
 

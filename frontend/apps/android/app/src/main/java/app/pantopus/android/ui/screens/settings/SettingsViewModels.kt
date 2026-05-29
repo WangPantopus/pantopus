@@ -185,9 +185,12 @@ class SettingsIndexViewModel
                         ),
                     )
                     add(
+                        // A14.3 — the design JSX titles the Help/Legal/About
+                        // group "About" (the `id` stays "support" so routing +
+                        // tests are unaffected).
                         GroupedListGroup(
                             id = "support",
-                            overline = "Support",
+                            overline = "About",
                             rows =
                                 listOf(
                                     GroupedListRow(id = "help", label = "Help", control = RowControl.Chevron),

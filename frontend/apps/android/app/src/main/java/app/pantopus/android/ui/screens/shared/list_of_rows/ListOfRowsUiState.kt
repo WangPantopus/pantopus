@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.shared.list_of_rows
 
+import androidx.compose.ui.graphics.Color
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /** Lifecycle state for the List-of-Rows shell. */
@@ -22,6 +23,18 @@ sealed interface ListOfRowsUiState {
         val subcopy: String,
         val ctaTitle: String? = null,
         val onCta: (() -> Unit)? = null,
+        /**
+         * Hero-circle background. `null` keeps the [EmptyState] default
+         * (personal-identity sky). A14.4 passes a neutral sunken tint so
+         * the Blocked-users empty hero reads as a quiet grey disc.
+         */
+        val tint: Color? = null,
+        /**
+         * Icon stroke colour. `null` keeps the [EmptyState] default
+         * (primary600). A14.4 pairs the grey disc with a secondary-text
+         * glyph.
+         */
+        val accent: Color? = null,
     ) : ListOfRowsUiState
 
     /** Transport / server error — render banner + retry. */

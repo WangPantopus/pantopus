@@ -238,6 +238,16 @@ public enum CompactButtonVariant: Sendable, Hashable {
     case destructive
 }
 
+/// Tone for `RowTrailing.pillButton` — mirrors the design's `PillButton`
+/// primitive palette: `neutral` (white bg · grey border · fg2 label),
+/// `primary` (sky fill · white label), `danger` (white bg · red border ·
+/// red label).
+public enum RowPillTone: Sendable, Hashable {
+    case neutral
+    case primary
+    case danger
+}
+
 /// Single action description for `RowTrailing.verticalActions` (Connections
 /// pending-request Accept / Ignore stack).
 public struct VerticalAction: Sendable {
@@ -302,6 +312,14 @@ public enum RowTrailing: Sendable {
     /// Both handlers are explicit so the kebab and copy can each have
     /// their own a11y label.
     case iconActions(primary: RowIconAction, secondary: RowIconAction)
+
+    /// A14.4 — single inline labelled pill (the design's `PillButton`
+    /// primitive: 6×14 padding · capsule radius · 1px border · 13pt
+    /// semibold label · no icon). Used by Blocked users ("Unblock" in
+    /// neutral tone). Distinct from `.verticalActions` (a stacked pair of
+    /// compact buttons) and `.circularAction` (icon-only): this is a
+    /// single text pill carrying its own tap handler.
+    case pillButton(label: String, tone: RowPillTone, handler: @Sendable () -> Void)
 }
 
 /// Single icon-only action used by `RowTrailing.iconActions`. Renders as a
@@ -649,6 +667,11 @@ public enum SectionStyle: Sendable {
 public struct RowSection: Identifiable, Sendable {
     public let id: String
     public let header: String?
+    /// A14.4 — optional 11.5pt secondary caption rendered **below** the
+    /// section (under the card for `.card`, under the rows for `.flat`).
+    /// Mirrors `GroupedListGroup.helper` so a single-card people list
+    /// (Blocked users) can reaffirm the privacy contract beneath the card.
+    public let footer: String?
     public let rows: [RowModel]
 
     // MARK: T5 additions
@@ -664,6 +687,7 @@ public struct RowSection: Identifiable, Sendable {
     public init(
         id: String = UUID().uuidString,
         header: String? = nil,
+        footer: String? = nil,
         rows: [RowModel],
         count: Int? = nil,
         onSeeAll: (@Sendable () -> Void)? = nil,
@@ -671,6 +695,7 @@ public struct RowSection: Identifiable, Sendable {
     ) {
         self.id = id
         self.header = header
+        self.footer = footer
         self.rows = rows
         self.count = count
         self.onSeeAll = onSeeAll

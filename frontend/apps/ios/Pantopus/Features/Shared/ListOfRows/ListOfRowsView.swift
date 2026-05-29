@@ -145,7 +145,9 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: Vi
                 cta: content.ctaTitle.flatMap { title in
                     guard let handler = content.onCTA else { return nil }
                     return EmptyState.CTA(title: title) { await MainActor.run { handler() } }
-                }
+                },
+                tint: content.tint ?? Theme.Color.personalBg,
+                accent: content.accent ?? Theme.Color.primary600
             )
         case let .error(message):
             ListOfRowsErrorBanner(message: message) { Task { await dataSource.load() } }
@@ -405,27 +407,46 @@ private struct LoadedList: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             }
+            if let footer = section.footer {
+                sectionFooter(section.id, text: footer)
+                    .listRowInsets(EdgeInsets(top: Spacing.s2, leading: Spacing.s4, bottom: 0, trailing: Spacing.s4))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
         case .card:
-            VStack(spacing: Spacing.s0) {
-                ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-                    RowView(row: row, cardContext: .grouped(isLast: index == section.rows.count - 1))
-                    if index < section.rows.count - 1 {
-                        Divider().background(Theme.Color.appBorder)
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                VStack(spacing: Spacing.s0) {
+                    ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
+                        RowView(row: row, cardContext: .grouped(isLast: index == section.rows.count - 1))
+                        if index < section.rows.count - 1 {
+                            Divider().background(Theme.Color.appBorder)
+                        }
                     }
                 }
+                .background(Theme.Color.appSurface)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                if let footer = section.footer {
+                    sectionFooter(section.id, text: footer)
+                }
             }
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
             .padding(.horizontal, Spacing.s4)
             .padding(.bottom, Spacing.s2)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
         }
+    }
+
+    private func sectionFooter(_ sectionId: String, text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11.5))
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("listOfRowsSectionFooter_\(sectionId)")
     }
 
     @ViewBuilder private func sectionHeader(_ section: RowSection) -> some View {
@@ -1026,6 +1047,7 @@ struct RowView: View {
         if let subtitle = row.subtitle { parts.append(subtitle) }
         if let body = row.body { parts.append(body) }
         if case let .statusChip(text, _) = row.trailing { parts.append(text) }
+        if case let .pillButton(label, _, _) = row.trailing { parts.append(label) }
         if let chips = row.chips {
             parts.append(contentsOf: chips.map(\.text))
         }
@@ -1273,6 +1295,56 @@ private struct TrailingView: View {
                 IconActionButton(action: primary)
                 IconActionButton(action: secondary)
             }
+        case let .pillButton(label, tone, handler):
+            PillTrailingButton(label: label, tone: tone, rowTitle: rowTitle, handler: handler)
+        }
+    }
+}
+
+/// A14.4 — single inline labelled pill matching the design's `PillButton`
+/// primitive: 6×14 padding · capsule radius · 1px border · 13pt semibold
+/// label. Used by Blocked users' `Unblock` action in `.neutral` tone.
+private struct PillTrailingButton: View {
+    let label: String
+    let tone: RowPillTone
+    let rowTitle: String
+    let handler: @Sendable () -> Void
+
+    var body: some View {
+        Button(action: handler) {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(foreground)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(background)
+                .overlay(Capsule().stroke(border, lineWidth: 1))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(label) \(rowTitle)")
+    }
+
+    private var background: Color {
+        switch tone {
+        case .neutral, .danger: Theme.Color.appSurface
+        case .primary: Theme.Color.primary600
+        }
+    }
+
+    private var border: Color {
+        switch tone {
+        case .neutral: Theme.Color.appBorderStrong
+        case .primary: Theme.Color.primary600
+        case .danger: Theme.Color.errorBg
+        }
+    }
+
+    private var foreground: Color {
+        switch tone {
+        case .neutral: Theme.Color.appTextStrong
+        case .primary: Theme.Color.appTextInverse
+        case .danger: Theme.Color.error
         }
     }
 }

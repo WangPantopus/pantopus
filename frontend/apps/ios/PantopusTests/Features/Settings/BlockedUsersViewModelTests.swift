@@ -54,13 +54,26 @@ final class BlockedUsersViewModelTests: XCTestCase {
         }
         XCTAssertFalse(hasMore)
         XCTAssertEqual(sections.count, 1)
+        // A14.4 — single card with a privacy-contract helper below it.
+        guard case .card = sections[0].style else {
+            XCTFail("Expected a .card section style")
+            return
+        }
+        XCTAssertNotNil(sections[0].footer)
         let rows = sections[0].rows
         XCTAssertEqual(rows.map(\.id), ["b1", "b2"])
         XCTAssertEqual(rows[0].title, "Alice")
-        // Block reason wins the subtitle when present.
-        XCTAssertEqual(rows[0].subtitle, "Spam")
-        // Fallback subtitle for blocks without a reason maps from scope.
-        XCTAssertEqual(rows[1].subtitle, "Hidden from search")
+        // A14.4 source-context line: "Blocked <date>" + scope context.
+        // `full` scope carries no suffix; `search_only` appends "Search only".
+        XCTAssertEqual(rows[0].subtitle, "Blocked May 1, 2026")
+        XCTAssertEqual(rows[1].subtitle, "Blocked May 2, 2026 · Search only")
+        // Trailing is the neutral Unblock pill (replaces the kebab).
+        guard case let .pillButton(label, tone, _) = rows[0].trailing else {
+            XCTFail("Expected a pillButton trailing")
+            return
+        }
+        XCTAssertEqual(label, "Unblock")
+        XCTAssertEqual(tone, .neutral)
     }
 
     func testLoadFailureProducesErrorState() async {

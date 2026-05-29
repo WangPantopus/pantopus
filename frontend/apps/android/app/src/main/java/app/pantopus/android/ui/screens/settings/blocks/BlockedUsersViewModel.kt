@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod")
 
 package app.pantopus.android.ui.screens.settings.blocks
 
@@ -12,9 +12,11 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowPillTone
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
+import app.pantopus.android.ui.screens.shared.list_of_rows.SectionStyle
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +24,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -82,11 +88,18 @@ class BlockedUsersViewModel
 
         private fun rebuild() {
             if (blocks.isEmpty()) {
+                // A14.4 empty hero — neutral grey disc + user-minus glyph
+                // (the design's `user-x`; `UserMinus` is the in-inventory
+                // person-with-negation glyph) + reassurance about silence.
                 _state.value =
                     ListOfRowsUiState.Empty(
-                        icon = PantopusIcon.Shield,
+                        icon = PantopusIcon.UserMinus,
                         headline = "No one blocked",
-                        subcopy = "When you block someone, they'll appear here. Unblock from this list anytime.",
+                        subcopy =
+                            "When you block someone, they'll appear here. " +
+                                "They won't be notified, and you can unblock them anytime.",
+                        tint = PantopusColors.appSurfaceSunken,
+                        accent = PantopusColors.appTextSecondary,
                     )
                 return
             }
@@ -96,34 +109,72 @@ class BlockedUsersViewModel
                         block.blocked?.name
                             ?: block.blocked?.username?.let { "@$it" }
                             ?: "Blocked user"
-                    val subtitle =
-                        block.reason?.trim()?.ifEmpty { null }
-                            ?: scopeLabel(block.blockScope)
                     val blockId = block.id
                     RowModel(
                         id = blockId,
                         title = name,
-                        subtitle = subtitle,
+                        subtitle = blockedSubtitle(block.createdAt, block.blockScope),
                         template = RowTemplate.AvatarKebab,
                         leading =
                             RowLeading.AvatarWithBadge(
                                 name = name,
                                 imageUrl = block.blocked?.profilePictureUrl,
                                 background = AvatarBackground.Solid(PantopusColors.appSurfaceSunken),
-                                size = AvatarBadgeSize.Medium,
+                                size = AvatarBadgeSize.Small,
                                 verified = false,
                             ),
-                        trailing = RowTrailing.Kebab,
-                        onSecondary = { unblock(blockId) },
+                        trailing =
+                            RowTrailing.PillButton(
+                                label = "Unblock",
+                                tone = RowPillTone.Neutral,
+                                onClick = { unblock(blockId) },
+                            ),
                     )
                 }
             _state.value =
                 ListOfRowsUiState.Loaded(
-                    sections = listOf(RowSection(id = "blocked", rows = rows)),
+                    sections =
+                        listOf(
+                            RowSection(
+                                id = "blocked",
+                                footer =
+                                    "Blocked people can't message you, see your profile, or bid on " +
+                                        "your tasks. Unblocking doesn't notify them.",
+                                rows = rows,
+                                style = SectionStyle.Card,
+                            ),
+                        ),
                     hasMore = false,
                 )
         }
 
+        /**
+         * `Blocked <date> · <context>` — the design's source-context line.
+         * `created_at` drives the date; `block_scope` drives the context
+         * suffix (the backend has no origin-surface column, so the scope
+         * the block was created with is the "source" context we surface).
+         */
+        private fun blockedSubtitle(
+            createdAt: String?,
+            scope: String?,
+        ): String {
+            val date = formatBlockedDate(createdAt) ?: return scopeLabel(scope)
+            val context = scopeContext(scope)
+            return if (context != null) "Blocked $date · $context" else "Blocked $date"
+        }
+
+        /** Context suffix from `block_scope`. `full` / `null` carry no
+         *  suffix (the block is account-wide); the scoped variants name
+         *  where it applies. */
+        private fun scopeContext(scope: String?): String? =
+            when (scope) {
+                "search_only" -> "Search only"
+                "business_context" -> "Business contexts"
+                "full", null -> null
+                else -> scope.replaceFirstChar { it.uppercase() }
+            }
+
+        /** Standalone scope label — used only when there's no parseable date. */
         private fun scopeLabel(scope: String?): String =
             when (scope) {
                 "search_only" -> "Hidden from search"
@@ -131,4 +182,19 @@ class BlockedUsersViewModel
                 "full", null -> "Blocked"
                 else -> scope.replaceFirstChar { it.uppercase() }
             }
+
+        private fun formatBlockedDate(iso: String?): String? {
+            if (iso.isNullOrBlank()) return null
+            val date =
+                runCatching { OffsetDateTime.parse(iso).toLocalDate() }
+                    .recoverCatching { LocalDate.parse(iso.take(10)) }
+                    .getOrNull()
+            return date?.format(BLOCKED_DATE_FORMATTER)
+        }
+
+        companion object {
+            /** Locale-pinned so the rendered day is deterministic. */
+            private val BLOCKED_DATE_FORMATTER: DateTimeFormatter =
+                DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+        }
     }
