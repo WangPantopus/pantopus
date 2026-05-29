@@ -153,8 +153,8 @@ public struct TransactionalDetailShell: View {
                 }
             }
             .scrollIndicators(.hidden)
-            if content.cover != nil {
-                topNav(trailing: trailingOverflow(transparent: true), transparent: true)
+            if let cover = content.cover {
+                topNav(trailing: glassTrailing(cover.glassActions), transparent: true)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             stickyDock(content.dock)
@@ -169,6 +169,29 @@ public struct TransactionalDetailShell: View {
         guard !overflowItems.isEmpty else { return nil }
         return AnyView(
             OverflowMenuButton(items: overflowItems, transparent: transparent)
+        )
+    }
+
+    /// Trailing chrome for the cover-overlay (transparent) top bar:
+    /// decorative glass action chips (share / bookmark) followed by any
+    /// overflow menu. Falls back to the overflow-only control when no
+    /// glass actions are wired.
+    @MainActor
+    private func glassTrailing(_ icons: [PantopusIcon]) -> AnyView? {
+        guard !icons.isEmpty else { return trailingOverflow(transparent: true) }
+        return AnyView(
+            HStack(spacing: 4) {
+                ForEach(Array(icons.enumerated()), id: \.offset) { _, icon in
+                    Icon(icon, size: 18, strokeWidth: 2, color: Theme.Color.appText)
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.85))
+                        .clipShape(Circle())
+                }
+                if !overflowItems.isEmpty {
+                    OverflowMenuButton(items: overflowItems, transparent: true)
+                }
+            }
+            .accessibilityIdentifier("contentDetailGlassActions")
         )
     }
 
@@ -222,26 +245,33 @@ public struct TransactionalDetailShell: View {
 
     private func coverView(_ cover: ContentDetailCover) -> some View {
         ZStack(alignment: .bottom) {
-            LinearGradient(
-                colors: [cover.gradient.start, cover.gradient.end],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 280)
-            if let url = cover.imageUrl {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case let .success(image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    default:
-                        Icon(cover.placeholderIcon, size: 56, strokeWidth: 1.6, color: .white.opacity(0.85))
+            ZStack {
+                LinearGradient(
+                    colors: [cover.gradient.start, cover.gradient.end],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .frame(height: 300)
+                if let url = cover.imageUrl {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case let .success(image):
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        default:
+                            Icon(cover.placeholderIcon, size: 56, strokeWidth: 1.6, color: .white.opacity(0.85))
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: 300)
+                    .clipped()
+                } else {
+                    Icon(cover.placeholderIcon, size: 56, strokeWidth: 1.6, color: .white.opacity(0.85))
+                        .frame(maxWidth: .infinity, maxHeight: 300)
                 }
-                .frame(maxWidth: .infinity, maxHeight: 280)
-                .clipped()
-            } else {
-                Icon(cover.placeholderIcon, size: 56, strokeWidth: 1.6, color: .white.opacity(0.85))
-                    .frame(maxWidth: .infinity, maxHeight: 280)
+            }
+            .grayscale(cover.sold ? 0.85 : 0)
+            .brightness(cover.sold ? -0.06 : 0)
+            if cover.sold {
+                soldStamp
             }
             if cover.pageCount > 1 {
                 HStack(spacing: 5) {
@@ -255,12 +285,44 @@ public struct TransactionalDetailShell: View {
             }
         }
         .frame(height: 280)
+        .clipped()
         .accessibilityIdentifier("contentDetailCover")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cover.sold ? "Sold" : "Photo")
+    }
+
+    /// Tilted "SOLD" stamp overlaid on the desaturated hero (listing sold).
+    private var soldStamp: some View {
+        Text("SOLD")
+            .font(.system(size: 28, weight: .black))
+            .kerning(4)
+            .foregroundStyle(Theme.Color.error.opacity(0.92))
+            .padding(.horizontal, 28)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(0.85))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(Theme.Color.error.opacity(0.85), lineWidth: 3)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .rotationEffect(.degrees(-12))
+            .accessibilityIdentifier("contentDetailSoldStamp")
     }
 
     // MARK: - Hero
 
+    @ViewBuilder
     private func heroBlock(_ content: ContentDetailContent) -> some View {
+        if content.kind == .listing {
+            listingHero(content)
+        } else {
+            standardHero(content)
+        }
+    }
+
+    /// Gig + invoice ordering: status pill → mono ref → title → subtitle →
+    /// price.
+    private func standardHero(_ content: ContentDetailContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
             if let pill = content.statusPill {
                 statusPillView(pill)
@@ -274,31 +336,96 @@ public struct TransactionalDetailShell: View {
                     .padding(.leading, Spacing.s5)
                     .padding(.top, 10)
             }
-            Text(content.hero.title)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .lineLimit(3)
-                .padding(.horizontal, Spacing.s5)
+            heroTitle(content.hero.title)
                 .padding(.top, content.hero.monoId == nil ? 4 : 6)
-                .accessibilityAddTraits(.isHeader)
             if content.hero.categoryChip != nil || content.hero.meta != nil {
                 heroSubtitle(content.hero)
                     .padding(.horizontal, Spacing.s5)
                     .padding(.top, 10)
             }
-            if let priceLine = content.hero.priceLine {
-                HStack(alignment: .lastTextBaseline, spacing: Spacing.s2) {
-                    Text(priceLine)
-                        .font(.system(size: 32, weight: .heavy))
-                        .foregroundStyle(content.kind == .listing ? Theme.Color.primary600 : Theme.Color.appText)
-                    if let caption = content.hero.priceCaption {
-                        Text(caption)
-                            .font(.system(size: 12, weight: .medium))
+            if content.hero.priceLine != nil {
+                priceBlock(content.hero, kind: content.kind)
+                    .padding(.horizontal, Spacing.s5)
+                    .padding(.top, 18)
+            }
+        }
+    }
+
+    /// Listing ordering: optional sold pill (+ age meta) → price (struck +
+    /// sale tag) → title → inline condition/pickup/distance pills.
+    private func listingHero(_ content: ContentDetailContent) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            if let pill = content.statusPill {
+                HStack(spacing: 10) {
+                    statusPillView(pill)
+                    if let meta = content.hero.meta {
+                        Text(meta)
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
+                .padding(.top, Spacing.s1)
+                .padding(.leading, Spacing.s5)
+            }
+            if content.hero.priceLine != nil {
+                priceBlock(content.hero, kind: content.kind)
+                    .padding(.horizontal, Spacing.s5)
+                    .padding(.top, content.statusPill == nil ? 18 : 12)
+            }
+            heroTitle(content.hero.title)
+                .padding(.top, 10)
+            if !content.hero.inlinePills.isEmpty {
+                FlowLayoutCompat(spacing: 6) {
+                    ForEach(content.hero.inlinePills) { statusPillView($0) }
+                }
                 .padding(.horizontal, Spacing.s5)
-                .padding(.top, 18)
+                .padding(.top, 10)
+            }
+        }
+    }
+
+    private func heroTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(Theme.Color.appText)
+            .lineLimit(3)
+            .padding(.horizontal, Spacing.s5)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func priceBlock(_ hero: ContentDetailHero, kind: ContentDetailKind) -> some View {
+        let priceColor: Color = {
+            if hero.priceStrikethrough { return Theme.Color.appTextSecondary }
+            if hero.priceTone == .success { return Theme.Color.success }
+            return kind == .listing ? Theme.Color.primary600 : Theme.Color.appText
+        }()
+        return HStack(alignment: hero.priceCheckDisc ? .center : .lastTextBaseline, spacing: Spacing.s2) {
+            Text(hero.priceLine ?? "")
+                .font(.system(size: 32, weight: .heavy).monospacedDigit())
+                .strikethrough(hero.priceStrikethrough, color: Theme.Color.appTextSecondary)
+                .foregroundStyle(priceColor)
+            if let saleTag = hero.saleTag {
+                Text(saleTag)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.success)
+            }
+            if hero.priceCheckDisc {
+                ZStack {
+                    Circle().fill(Theme.Color.success).frame(width: 28, height: 28)
+                    Icon(.check, size: 15, strokeWidth: 3, color: .white)
+                }
+                .accessibilityHidden(true)
+            }
+            if hero.saleTag == nil, let caption = hero.priceCaption {
+                Text(caption)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            if let trailing = hero.priceTrailingLabel {
+                Spacer(minLength: Spacing.s2)
+                Text(trailing)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
     }
@@ -344,6 +471,7 @@ public struct TransactionalDetailShell: View {
         case .warning: Theme.Color.warning
         case .business: Theme.Color.business
         case .neutral: Theme.Color.appTextSecondary
+        case .error: Theme.Color.error
         }
     }
 
@@ -354,6 +482,7 @@ public struct TransactionalDetailShell: View {
         case .warning: Theme.Color.warningBg
         case .business: Theme.Color.businessBg
         case .neutral: Theme.Color.appSurfaceSunken
+        case .error: Theme.Color.errorBg
         }
     }
 
@@ -495,6 +624,22 @@ public struct TransactionalDetailShell: View {
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+        case let .twoStop(m):
+            sectionCard(title: m.title, icon: m.icon) {
+                twoStopCard(m.stops)
+            }
+        case let .capsuleRow(m):
+            FlowLayoutCompat(spacing: 6) {
+                ForEach(m.capsules) { statusPillView($0) }
+            }
+            .padding(.horizontal, Spacing.s5)
+        case let .detailsGrid(m):
+            sectionCard(title: m.title, icon: m.icon) {
+                detailsGrid(m.rows)
+            }
+        case let .callout(m):
+            calloutCard(m)
+                .padding(.horizontal, Spacing.s5)
         case let .photoStrip(m):
             sectionCard(title: m.title, icon: m.icon, sub: m.countLabel) {
                 HStack(spacing: Spacing.s2) {
@@ -539,7 +684,7 @@ public struct TransactionalDetailShell: View {
                 }
             }
         case let .bids(m):
-            sectionCard(title: m.title, icon: nil) {
+            sectionCard(title: m.title, icon: nil, sub: m.sub) {
                 bidsTable(m.bids)
             }
         case let .fromTo(m):
@@ -550,7 +695,7 @@ public struct TransactionalDetailShell: View {
             .padding(.horizontal, Spacing.s5)
         case let .lineItems(m):
             sectionCard(title: m.title, icon: m.icon) {
-                lineItemsTable(m.rows)
+                lineItemsTable(m)
             }
         case let .summary(m):
             summaryCard(m)
@@ -585,26 +730,7 @@ public struct TransactionalDetailShell: View {
     private func bidsTable(_ rows: [ContentDetailBidRow]) -> some View {
         VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, bid in
-                HStack(spacing: 10) {
-                    AvatarView(initials: bid.initials, verified: bid.verified, size: 36)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(bid.displayName)
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appText)
-                        HStack(spacing: Spacing.s1) {
-                            Icon(.star, size: 9, color: Theme.Color.warning)
-                            Text(bid.ratingLine)
-                                .font(.system(size: 10.5, weight: .medium))
-                                .foregroundStyle(Theme.Color.appTextSecondary)
-                        }
-                    }
-                    Spacer()
-                    Text(bid.amount)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.Color.primary600)
-                }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, 10)
+                bidRow(bid)
                 if index < rows.count - 1 {
                     Divider().background(Theme.Color.appBorder.opacity(0.5))
                 }
@@ -616,6 +742,229 @@ public struct TransactionalDetailShell: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private func bidRow(_ bid: ContentDetailBidRow) -> some View {
+        let amountColor: Color = bid.won ? Theme.Color.success : (bid.dimmed ? Theme.Color.appTextSecondary : Theme.Color.primary600)
+        return HStack(spacing: 10) {
+            AvatarView(initials: bid.initials, verified: bid.verified, size: 36)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(bid.displayName)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    if bid.won {
+                        bidTagPill("Winner", foreground: Theme.Color.success, background: Theme.Color.successBg)
+                    } else if let tag = bid.tag {
+                        bidTagPill(tag, foreground: Theme.Color.primary700, background: Theme.Color.primary50)
+                    }
+                }
+                HStack(spacing: Spacing.s1) {
+                    Icon(.star, size: 9, color: Theme.Color.warning)
+                    Text(bid.ratingLine)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+            }
+            Spacer()
+            Text(bid.amount)
+                .font(.system(size: 14, weight: .bold))
+                .strikethrough(bid.dimmed)
+                .foregroundStyle(amountColor)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 10)
+        .background(bid.won ? Theme.Color.successBg : Color.clear)
+        .opacity(bid.dimmed ? 0.55 : 1)
+    }
+
+    private func bidTagPill(_ text: String, foreground: Color, background: Color) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
+    }
+
+    // MARK: - Two-stop / details grid / callout
+
+    private func twoStopCard(_ stops: [ContentDetailTwoStop.Stop]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
+                HStack(spacing: Spacing.s2) {
+                    Text(stop.letter)
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(stop.tone == .primary ? Theme.Color.primary700 : Theme.Color.success)
+                        .frame(width: 14, height: 14)
+                        .background(stop.tone == .primary ? Theme.Color.primary100 : Theme.Color.successBg)
+                        .clipShape(Circle())
+                    Text(stop.address)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Spacer(minLength: Spacing.s2)
+                    if let distance = stop.distance {
+                        Text(distance)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                    }
+                }
+                if index < stops.count - 1 {
+                    Rectangle()
+                        .fill(Theme.Color.appBorder)
+                        .frame(width: 1, height: 10)
+                        .padding(.leading, 6)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 10)
+        .background(Theme.Color.appSurfaceMuted)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func detailsGrid(_ rows: [ContentDetailDetailsGrid.Row]) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            ForEach(rows) { row in
+                HStack(alignment: .top, spacing: Spacing.s4) {
+                    Text(row.key)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .frame(width: 96, alignment: .leading)
+                    Text(row.value)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func calloutCard(_ callout: ContentDetailCallout) -> some View {
+        Group {
+            switch callout.style {
+            case .banner: calloutBanner(callout)
+            case .empty: calloutEmpty(callout)
+            }
+        }
+        .accessibilityIdentifier("contentDetailCallout_\(callout.identifier)")
+    }
+
+    private func calloutBanner(_ callout: ContentDetailCallout) -> some View {
+        HStack(spacing: 10) {
+            calloutIconDisc(callout.iconTone, icon: callout.icon)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(callout.title)
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(callout.tone == .success ? Theme.Color.success : Theme.Color.appText)
+                if let subtitle = callout.subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .medium, design: callout.subtitleMono ? .monospaced : .default))
+                        .foregroundStyle(callout.tone == .success ? Theme.Color.success : Theme.Color.appTextSecondary)
+                }
+            }
+            Spacer(minLength: Spacing.s2)
+            if let action = callout.trailingActionLabel {
+                Text(action)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .padding(.horizontal, Spacing.s3)
+                    .frame(height: 30)
+                    .background(Theme.Color.appSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, Spacing.s3)
+        .background(calloutBackground(callout.tone))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(callout.tone == .success ? Theme.Color.success.opacity(0.4) : Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private func calloutEmpty(_ callout: ContentDetailCallout) -> some View {
+        VStack(spacing: Spacing.s1) {
+            calloutIconDisc(callout.iconTone, icon: callout.icon, size: 42)
+                .padding(.bottom, Spacing.s1)
+            Text(callout.title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            if let subtitle = callout.subtitle {
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 240)
+            }
+            if let footer = callout.footerPill {
+                HStack(spacing: 5) {
+                    Icon(.eye, size: 11, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                    Text(footer)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, Spacing.s1)
+                .background(Theme.Color.appSurface)
+                .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+                .clipShape(Capsule())
+                .padding(.top, Spacing.s2)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 20)
+        .background(Theme.Color.appSurfaceMuted)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.appBorder, style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private func calloutBackground(_ tone: ContentDetailCallout.Tone) -> Color {
+        switch tone {
+        case .success: Theme.Color.successBg
+        case .neutral, .dashed: Theme.Color.appSurfaceMuted
+        }
+    }
+
+    @ViewBuilder
+    private func calloutIconDisc(_ tone: ContentDetailCallout.IconTone, icon: PantopusIcon, size: CGFloat = 30) -> some View {
+        switch tone {
+        case .success:
+            ZStack {
+                Circle().fill(Theme.Color.success)
+                Icon(icon, size: size * 0.5, strokeWidth: 2.6, color: .white)
+            }
+            .frame(width: size, height: size)
+        case .successOutline:
+            ZStack {
+                Circle().fill(Theme.Color.appSurface)
+                    .overlay(Circle().stroke(Theme.Color.success, lineWidth: 1.5))
+                Icon(icon, size: size * 0.47, strokeWidth: 2.4, color: Theme.Color.success)
+            }
+            .frame(width: size, height: size)
+        case .primary:
+            ZStack {
+                Circle().fill(Theme.Color.primary50)
+                Icon(icon, size: size * 0.47, strokeWidth: 2, color: Theme.Color.primary600)
+            }
+            .frame(width: size, height: size)
+        }
     }
 
     private func partyCard(_ party: ContentDetailParty) -> some View {
@@ -649,7 +998,7 @@ public struct TransactionalDetailShell: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
-    private func lineItemsTable(_ rows: [ContentDetailLineItem]) -> some View {
+    private func lineItemsTable(_ module: ContentDetailLineItems) -> some View {
         VStack(spacing: Spacing.s0) {
             HStack {
                 Text("Item")
@@ -666,8 +1015,8 @@ public struct TransactionalDetailShell: View {
             .padding(.horizontal, Spacing.s3)
             .padding(.vertical, Spacing.s2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.Color.appSurfaceSunken)
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+            .background(Theme.Color.appSurfaceMuted)
+            ForEach(Array(module.rows.enumerated()), id: \.element.id) { index, row in
                 HStack(spacing: Spacing.s0) {
                     Text(row.item)
                         .font(.system(size: 12, weight: .medium))
@@ -688,9 +1037,10 @@ public struct TransactionalDetailShell: View {
                 }
                 .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, 10)
-                if index < rows.count - 1 {
-                    Divider().background(Theme.Color.appBorder.opacity(0.5))
-                }
+                Divider().background(Theme.Color.appBorder.opacity(0.5))
+            }
+            if !module.fees.isEmpty || module.totalValue != nil {
+                lineItemsFooter(module)
             }
         }
         .background(Theme.Color.appSurface)
@@ -699,6 +1049,40 @@ public struct TransactionalDetailShell: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    /// Fees / tax block + grand-total row, rendered in the muted footer of
+    /// the line-items card per the A09.4 design.
+    private func lineItemsFooter(_ module: ContentDetailLineItems) -> some View {
+        VStack(spacing: Spacing.s0) {
+            ForEach(module.fees) { fee in
+                HStack {
+                    Text(fee.label)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                    Spacer()
+                    Text(fee.value)
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                }
+                .padding(.vertical, 4)
+            }
+            if let totalValue = module.totalValue {
+                Rectangle().fill(Theme.Color.appBorder).frame(height: 1).padding(.vertical, Spacing.s1)
+                HStack(alignment: .lastTextBaseline) {
+                    Text(module.totalLabel ?? "Total")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Spacer()
+                    Text(totalValue)
+                        .font(.system(size: 16, weight: .heavy).monospacedDigit())
+                        .foregroundStyle(module.totalTone == .success ? Theme.Color.success : Theme.Color.primary600)
+                }
+            }
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.appSurfaceMuted)
     }
 
     private func summaryCard(_ summary: ContentDetailSummary) -> some View {
@@ -722,7 +1106,7 @@ public struct TransactionalDetailShell: View {
                 Spacer()
                 Text(summary.totalValue)
                     .font(.system(size: 16, weight: .bold).monospacedDigit())
-                    .foregroundStyle(Theme.Color.primary600)
+                    .foregroundStyle(summary.totalTone == .success ? Theme.Color.success : Theme.Color.primary600)
             }
         }
         .padding(.horizontal, 14)
@@ -771,22 +1155,35 @@ public struct TransactionalDetailShell: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("contentDetailDockSecondary")
             }
-            Button(action: onPrimaryAction) {
+            Button(action: { if dock.primary.enabled { onPrimaryAction() } }) {
                 HStack(spacing: 6) {
                     if let icon = dock.primary.icon {
-                        Icon(icon, size: 16, strokeWidth: 2.2, color: Theme.Color.appTextInverse)
+                        Icon(
+                            icon,
+                            size: 16,
+                            strokeWidth: 2.2,
+                            color: dock.primary.enabled ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary
+                        )
                     }
                     Text(dock.primary.label)
                         .font(.system(size: 14.5, weight: .bold))
-                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .foregroundStyle(dock.primary.enabled ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
-                .background(Theme.Color.primary600)
+                .background(dock.primary.enabled ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .stroke(dock.primary.enabled ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-                .shadow(color: Theme.Color.primary600.opacity(0.30), radius: 8, x: 0, y: 6)
+                .shadow(
+                    color: dock.primary.enabled ? Theme.Color.primary600.opacity(0.30) : Color.clear,
+                    radius: 8, x: 0, y: 6
+                )
             }
             .buttonStyle(.plain)
+            .disabled(!dock.primary.enabled)
             .accessibilityIdentifier("contentDetailDockPrimary")
         }
         .padding(.horizontal, Spacing.s4)

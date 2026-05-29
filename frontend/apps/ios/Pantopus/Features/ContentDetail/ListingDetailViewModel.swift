@@ -87,23 +87,50 @@ public final class ListingDetailViewModel {
             else { return false }
             return owner == viewer
         }()
+        let sold = isSold(listing)
         return ContentDetailContent(
             kind: .listing,
-            cover: cover(for: listing),
-            statusPill: nil,
+            cover: cover(for: listing, sold: sold),
+            statusPill: sold ? ContentDetailPill(label: "Sold", icon: .alertCircle, tone: .error) : nil,
             hero: ContentDetailHero(
                 title: listing.title ?? "Listing",
                 categoryChip: nil,
                 meta: nil,
                 priceLine: priceLine(for: listing),
-                priceCaption: listing.layer == "rentals" ? "per week" : nil
+                priceCaption: listing.layer == "rentals" ? "per week" : nil,
+                priceStrikethrough: sold,
+                inlinePills: inlinePills(for: listing)
             ),
             statStrip: [],
             counterparty: counterparty(for: listing),
-            modules: modules(for: listing),
-            trustCapsules: trustCapsules(for: listing),
-            dock: dock(isViewerOwner: isViewerOwner)
+            modules: modules(for: listing, sold: sold),
+            trustCapsules: [],
+            dock: dock(isViewerOwner: isViewerOwner, sold: sold)
         )
+    }
+
+    private static func isSold(_ listing: ListingDTO) -> Bool {
+        (listing.soldAt != nil) || listing.status == "sold"
+    }
+
+    /// Condition · pickup · distance pill row rendered directly under the
+    /// price (replaces the old bottom trust-capsule row for listings).
+    private static func inlinePills(for listing: ListingDTO) -> [ContentDetailPill] {
+        var pills: [ContentDetailPill] = []
+        if let condition = conditionLabel(listing.condition) {
+            pills.append(ContentDetailPill(label: condition, icon: .sparkles, tone: .success))
+        }
+        if listing.layer == "rentals" {
+            pills.append(ContentDetailPill(label: "Rental", icon: .calendar, tone: .business))
+        } else if listing.isFree ?? false {
+            pills.append(ContentDetailPill(label: "Free", icon: .heart, tone: .success))
+        } else {
+            pills.append(ContentDetailPill(label: "Pickup", icon: .hand, tone: .neutral))
+        }
+        if let distance = distanceLabel(listing.distanceMeters) {
+            pills.append(ContentDetailPill(label: distance, icon: nil, tone: .neutral))
+        }
+        return pills
     }
 
     private static func priceLine(for listing: ListingDTO) -> String {
@@ -114,29 +141,16 @@ public final class ListingDetailViewModel {
             : String(format: "$%.2f", price)
     }
 
-    private static func cover(for listing: ListingDTO) -> ContentDetailCover {
+    private static func cover(for listing: ListingDTO, sold: Bool) -> ContentDetailCover {
         ContentDetailCover(
             imageUrl: (listing.firstImage ?? listing.mediaUrls?.first).flatMap(URL.init(string:)),
             gradient: ListingGradient.from(id: listing.id),
             placeholderIcon: placeholderIcon(category: listing.category, layer: listing.layer),
             pageCount: max(listing.mediaUrls?.count ?? 1, 1),
-            activePage: 0
+            activePage: 0,
+            sold: sold,
+            glassActions: [.share, .bookmark]
         )
-    }
-
-    private static func trustCapsules(for listing: ListingDTO) -> [ContentDetailTrustCapsule] {
-        var trust: [ContentDetailTrustCapsule] = []
-        if let condition = conditionLabel(listing.condition) {
-            trust.append(ContentDetailPill(label: condition, icon: .star, tone: .success))
-        }
-        if listing.layer == "rentals" {
-            trust.append(ContentDetailPill(label: "Rental", icon: .calendar, tone: .business))
-        } else if listing.isFree ?? false {
-            trust.append(ContentDetailPill(label: "Free", icon: .heart, tone: .success))
-        } else {
-            trust.append(ContentDetailPill(label: "Pickup", icon: .mapPin, tone: .neutral))
-        }
-        return trust
     }
 
     private static func counterparty(for listing: ListingDTO) -> ContentDetailCounterparty {
@@ -151,29 +165,48 @@ public final class ListingDetailViewModel {
         )
     }
 
-    private static func modules(for listing: ListingDTO) -> [ContentDetailModule] {
+    private static func modules(for listing: ListingDTO, sold: Bool) -> [ContentDetailModule] {
         var modules: [ContentDetailModule] = []
         if let body = listing.description, !body.isEmpty {
             modules.append(.description(ContentDetailDescription(
                 title: "Description",
-                icon: .file,
+                icon: nil,
                 body: body
             )))
         }
+        var detailRows: [ContentDetailDetailsGrid.Row] = []
+        if let condition = conditionLabel(listing.condition) {
+            detailRows.append(ContentDetailDetailsGrid.Row(key: "Condition", value: condition))
+        }
         if let where_ = listing.locationName, !where_.isEmpty {
-            modules.append(.detailRow(ContentDetailDetailRow(
-                title: "Where",
-                sectionIcon: .mapPin,
-                rowIcon: .mapPin,
-                label: where_,
-                trailing: distanceLabel(listing.distanceMeters)
+            detailRows.append(ContentDetailDetailsGrid.Row(key: "Location", value: where_))
+        }
+        if !detailRows.isEmpty {
+            modules.append(.detailsGrid(ContentDetailDetailsGrid(title: "Details", icon: .info, rows: detailRows)))
+        }
+        if sold {
+            modules.append(.callout(ContentDetailCallout(
+                identifier: "alert-similar",
+                style: .banner,
+                tone: .neutral,
+                icon: .bell,
+                iconTone: .primary,
+                title: "Alert me when similar appears",
+                subtitle: listing.title,
+                trailingActionLabel: "Set"
             )))
         }
         return modules
     }
 
-    private static func dock(isViewerOwner: Bool) -> ContentDetailDock {
-        ContentDetailDock(
+    private static func dock(isViewerOwner: Bool, sold: Bool) -> ContentDetailDock {
+        if sold {
+            return ContentDetailDock(
+                secondary: ContentDetailDockButton(label: "Seller", icon: .shoppingBag),
+                primary: ContentDetailDockButton(label: "Find similar", icon: .search)
+            )
+        }
+        return ContentDetailDock(
             secondary: ContentDetailDockButton(label: "Message", icon: .send),
             primary: ContentDetailDockButton(label: isViewerOwner ? "View offers" : "Make offer", icon: nil)
         )

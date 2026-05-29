@@ -93,6 +93,7 @@ class ListingDetailViewModel
                 isViewerOwner: Boolean = false,
             ): ContentDetailContent {
                 val isFree = listing.isFree ?: false
+                val sold = listing.soldAt != null || listing.status == "sold"
                 val priceLine =
                     when {
                         isFree -> "Free"
@@ -108,50 +109,9 @@ class ListingDetailViewModel
                         placeholderIcon = placeholderIcon(listing.category, listing.layer),
                         pageCount = (listing.mediaUrls?.size ?: 1).coerceAtLeast(1),
                         activePage = 0,
+                        sold = sold,
+                        glassActions = listOf(PantopusIcon.Share, PantopusIcon.Bookmark),
                     )
-                val condition = conditionLabel(listing.condition)
-                val trust =
-                    buildList {
-                        condition?.let {
-                            add(
-                                ContentDetailPill(
-                                    id = "cond",
-                                    label = it,
-                                    icon = PantopusIcon.Star,
-                                    tone = ContentDetailPill.Tone.Success,
-                                ),
-                            )
-                        }
-                        when {
-                            listing.layer == "rentals" ->
-                                add(
-                                    ContentDetailPill(
-                                        id = "rental",
-                                        label = "Rental",
-                                        icon = PantopusIcon.Calendar,
-                                        tone = ContentDetailPill.Tone.Business,
-                                    ),
-                                )
-                            isFree ->
-                                add(
-                                    ContentDetailPill(
-                                        id = "free",
-                                        label = "Free",
-                                        icon = PantopusIcon.Heart,
-                                        tone = ContentDetailPill.Tone.Success,
-                                    ),
-                                )
-                            else ->
-                                add(
-                                    ContentDetailPill(
-                                        id = "pickup",
-                                        label = "Pickup",
-                                        icon = PantopusIcon.MapPin,
-                                        tone = ContentDetailPill.Tone.Neutral,
-                                    ),
-                                )
-                        }
-                    }
                 val counterparty =
                     ContentDetailCounterparty(
                         displayName = "Seller",
@@ -164,52 +124,82 @@ class ListingDetailViewModel
                 val modules =
                     buildList {
                         listing.description?.takeIf { it.isNotEmpty() }?.let {
-                            add(
-                                ContentDetailModule.Description(
-                                    id = "desc",
-                                    title = "Description",
-                                    icon = PantopusIcon.File,
-                                    body = it,
-                                ),
-                            )
+                            add(ContentDetailModule.Description(id = "desc", title = "Description", icon = null, body = it))
                         }
-                        listing.locationName?.takeIf { it.isNotEmpty() }?.let { where ->
+                        val detailRows =
+                            buildList {
+                                conditionLabel(listing.condition)?.let { add(ContentDetailModule.DetailsGrid.Row("Condition", it)) }
+                                listing.locationName?.takeIf { it.isNotEmpty() }?.let { add(ContentDetailModule.DetailsGrid.Row("Location", it)) }
+                            }
+                        if (detailRows.isNotEmpty()) {
+                            add(ContentDetailModule.DetailsGrid(id = "details", title = "Details", icon = PantopusIcon.AlertCircle, rows = detailRows))
+                        }
+                        if (sold) {
                             add(
-                                ContentDetailModule.DetailRow(
-                                    id = "where",
-                                    title = "Where",
-                                    sectionIcon = PantopusIcon.MapPin,
-                                    rowIcon = PantopusIcon.MapPin,
-                                    label = where,
-                                    trailing = distanceLabel(listing.distanceMeters),
+                                ContentDetailModule.Callout(
+                                    id = "alert-similar",
+                                    style = ContentDetailModule.Callout.Style.Banner,
+                                    tone = ContentDetailModule.Callout.Tone.Neutral,
+                                    icon = PantopusIcon.Bell,
+                                    iconTone = ContentDetailModule.Callout.IconTone.Primary,
+                                    title = "Alert me when similar appears",
+                                    subtitle = listing.title,
+                                    trailingActionLabel = "Set",
                                 ),
                             )
                         }
                     }
                 val dock =
-                    ContentDetailDock(
-                        secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
-                        primary =
-                            ContentDetailDockButton(
-                                label = if (isViewerOwner) "View offers" else "Make offer",
-                            ),
-                    )
+                    if (sold) {
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Seller", icon = PantopusIcon.ShoppingBag),
+                            primary = ContentDetailDockButton(label = "Find similar", icon = PantopusIcon.Search),
+                        )
+                    } else {
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                            primary = ContentDetailDockButton(label = if (isViewerOwner) "View offers" else "Make offer"),
+                        )
+                    }
                 return ContentDetailContent(
                     kind = ContentDetailKind.Listing,
                     cover = cover,
-                    statusPill = null,
+                    statusPill = if (sold) ContentDetailPill(id = "status", label = "Sold", icon = PantopusIcon.AlertCircle, tone = ContentDetailPill.Tone.Error) else null,
                     hero =
                         ContentDetailHero(
                             title = listing.title ?: "Listing",
                             priceLine = priceLine,
                             priceCaption = if (listing.layer == "rentals") "per week" else null,
+                            priceStrikethrough = sold,
+                            inlinePills = inlinePills(listing, isFree),
                         ),
                     counterparty = counterparty,
                     modules = modules,
-                    trustCapsules = trust,
+                    trustCapsules = emptyList(),
                     dock = dock,
                 )
             }
+
+            private fun inlinePills(
+                listing: ListingDto,
+                isFree: Boolean,
+            ): List<ContentDetailPill> =
+                buildList {
+                    conditionLabel(listing.condition)?.let {
+                        add(ContentDetailPill(id = "cond", label = it, icon = PantopusIcon.Sparkles, tone = ContentDetailPill.Tone.Success))
+                    }
+                    when {
+                        listing.layer == "rentals" ->
+                            add(ContentDetailPill(id = "rental", label = "Rental", icon = PantopusIcon.Calendar, tone = ContentDetailPill.Tone.Business))
+                        isFree ->
+                            add(ContentDetailPill(id = "free", label = "Free", icon = PantopusIcon.Heart, tone = ContentDetailPill.Tone.Success))
+                        else ->
+                            add(ContentDetailPill(id = "pickup", label = "Pickup", icon = PantopusIcon.Hand, tone = ContentDetailPill.Tone.Neutral))
+                    }
+                    distanceLabel(listing.distanceMeters)?.let {
+                        add(ContentDetailPill(id = "dist", label = it, tone = ContentDetailPill.Tone.Neutral))
+                    }
+                }
 
             private fun placeholderIcon(
                 category: String?,

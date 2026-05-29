@@ -30,6 +30,11 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     public let scheduleType: String?
     public let payType: String?
     public let taskArchetype: String?
+    /// Explicit V2 ("Magic Task") discriminator. When `true` the detail
+    /// renders the rich V2 surface (stat strip, Magic Task modules, bid
+    /// tags); otherwise it falls back to the sparse V1 legacy layout.
+    /// Backend may omit it on legacy gigs — treat `nil` as V1.
+    public let isV2: Bool?
     public let pickupAddress: String?
     public let dropoffAddress: String?
     public let bidCount: Int?
@@ -55,6 +60,7 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case scheduleType = "schedule_type"
         case payType = "pay_type"
         case taskArchetype = "task_archetype"
+        case isV2 = "is_v2"
         case pickupAddress = "pickup_address"
         case dropoffAddress = "dropoff_address"
         case bidCount = "bid_count"
