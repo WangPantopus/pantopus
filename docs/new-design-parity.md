@@ -513,10 +513,10 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
 - **Status:** **POLISH**
 
 ### A17.5 — Coupon
-- **iOS:** **MISSING** — falls through to GenericMailDetailLayout.
-- **Android:** has `mailbox/item_detail/bodies/CouponBody.kt` + `CouponBodyState.kt` + `components/CouponHero.kt` + `components/BarcodeView.kt` — but check if dispatched.
-- **Status:** **BUILD** (iOS) · **POLISH** (Android — verify dispatch)
-- **Required slots (iOS only):** CouponHero (gradient hero + brand + discount % + expiry · barcode), KeyFacts (terms · valid through · redemptions left · where), BodyCard (fine print), `Redeem` CTA in dock.
+- **iOS:** `Mailbox/MailDetail/Variants/CouponDetailLayout.swift` (composes `MailItemDetailShell` with `Mailbox/ItemDetail/Bodies/CouponBody.swift` + `Bodies/Components/CouponHero.swift` + `Bodies/Components/BarcodeView.swift`).
+- **Android:** `mailbox/mail_detail/variants/CouponDetailLayout.kt` (composes the parity shell with `mailbox/item_detail/bodies/CouponBody.kt` + `bodies/components/CouponHero.kt` + `bodies/components/BarcodeView.kt`).
+- **Status:** **POLISH** (BUILD landed in PR #138 — A17.5–A17.8 ceremonial detail variants; dispatch wired through `MailDetailView` / `MailDetailScreen` and `MailDetailContent.couponDetail`).
+- **Per-frame deltas:** verify ticket-style `CouponHero` (amber gradient + brand chip + 42pt discount + dashed code capsule + ticket-stub barcode), `KeyFacts` (Merchant · Code · Min. spend · Expires), `FinePrintCard` (bulleted terms + fine print), `StoreBarcodeCard` with show-in-store expand toggle, redemption-state CTA (`Mark redeemed` primary → `Already redeemed` success pill → `This offer has expired` terminal). Sample fixtures live in `MailItemSampleData.coupon{Unused,Redeemed,Expired}`; snapshot coverage in `CouponBodySnapshotTests` (4 cases) + `CeremonialVariantsSnapshotTests` (layout unused / redeemed).
 
 ### A17.6 — Gig mail
 - **iOS:** **MISSING** — falls through to GenericMailDetailLayout.
