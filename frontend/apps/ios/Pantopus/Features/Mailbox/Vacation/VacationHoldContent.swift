@@ -188,7 +188,8 @@ public struct VacationScheduleDraft: Sendable, Hashable {
     /// labels the strip "13 days" for May 28 → Jun 9, so the count is
     /// inclusive of both endpoints.
     public var spanDays: Int {
-        let calendar = Calendar(identifier: .gregorian)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
         let from = calendar.startOfDay(for: fromDate)
         let to = calendar.startOfDay(for: toDate)
         let components = calendar.dateComponents([.day], from: from, to: to)

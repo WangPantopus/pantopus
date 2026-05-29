@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
@@ -492,6 +493,10 @@ enum class PantopusIcon(
     Cpu("cpu"),
     Truck("truck"),
 
+    // P5.2 / A14.6 Payments — the inline-empty hero disc inside the
+    // Payment methods card uses Lucide's `credit-card` glyph.
+    CreditCard("credit-card"),
+
     // A13.13 Manage train — Organize row glyphs. `bar-chart-3` paints the
     // Analytics row's icon tile; `calendar-cog` paints the Edit-dates row.
     BarChart3("bar-chart-3"),
@@ -798,6 +803,9 @@ internal fun PantopusIcon.source(): IconSource =
         // closest Lucide `truck` analogue.
         PantopusIcon.Cpu -> IconSource.Material(Icons.Filled.Memory)
         PantopusIcon.Truck -> IconSource.Material(Icons.Filled.LocalShipping)
+        // P5.2 / A14.6 Payments — Material's `CreditCard` filled glyph
+        // backs the inline-empty disc + brand-row fallbacks.
+        PantopusIcon.CreditCard -> IconSource.Material(Icons.Filled.CreditCard)
         // A13.13 Manage train. Material ships `BarChart` for analytics
         // (vertical-bars glyph); `calendar-cog` reuses `EditCalendar`
         // (the gear-on-calendar Material glyph already mapped for

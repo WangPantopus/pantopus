@@ -80,7 +80,9 @@ final class IconTests: XCTestCase {
         // A13.4 Transfer ownership — Face ID gate and ownership-diff controls.
         "scan-face", "arrow-right-left", "arrow-down",
         // A13.13 Manage train — Organize row glyphs.
-        "bar-chart-3", "calendar-cog"
+        "bar-chart-3", "calendar-cog",
+        // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
+        "credit-card"
     ]
 
     func testInventoryMatches() {

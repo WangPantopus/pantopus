@@ -230,6 +230,8 @@ public enum HubRoute: Hashable {
     case recentActivity
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
+    /// A14.6 — Settings → Payments deep-link target.
+    case paymentsSettings
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
     case editProfile
     /// Mailbox search target (P4.2). Client-side filter over the user's
@@ -451,6 +453,9 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case .wallet:
             path.append(.wallet)
+            _ = router.consume()
+        case .paymentsSettings:
+            path.append(.paymentsSettings)
             _ = router.consume()
         case .createBusiness:
             path.append(.createBusiness)
@@ -1723,6 +1728,25 @@ public struct HubTabRoot: View {
                     // Same close-then-push pattern as reviewClaims: the
                     // wallet is a top-level destination, not a sub-route
                     // of Settings, so back from it returns to the Hub.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.wallet)
+                    }
+                },
+                onSignedOut: { Task { @MainActor in pop() } }
+            )
+        case .paymentsSettings:
+            SettingsView(
+                initialRoute: .payments,
+                onClose: { Task { @MainActor in pop() } },
+                onEditProfile: { Task { @MainActor in push(.editProfile) } },
+                onOpenReviewClaims: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.reviewClaims)
+                    }
+                },
+                onOpenWallet: {
                     Task { @MainActor in
                         if !path.isEmpty { path.removeLast() }
                         push(.wallet)

@@ -161,9 +161,9 @@ All four A09 screens render through the shared `TransactionalDetailShell`
 - **Routing (post-P3.1):** `DeepLinkRouter` `.supportTrain(id:)` now lands on `SupportTrainDetailView` (iOS) / `SupportTrainDetailScreen` (Android); organizers reach `ReviewSignupsView` via the dock-overflow `Manage signups` action or the new `pantopus://support-trains/:id/manage` deep link (`.supportTrainManage(id:)`). The `SupportTrains` list row tap and the `StartSupportTrainWizard` success path both push the participant detail.
 
 ### A10.10 — Wallet (`/wallet.tsx`)
-- **iOS:** **MISSING** — no `Features/Wallet/` folder. Currently `Settings/SettingsView.swift:148` maps to `placeholder(label: "Payments & payouts")`.
-- **Android:** **MISSING** — same.
-- **Status:** **BUILD** (both platforms)
+- **iOS:** `Features/Wallet/WalletView.swift` + `WalletViewModel` (P3.2).
+- **Android:** `ui/screens/wallet/WalletScreen.kt` + `WalletViewModel`.
+- **Status:** **POLISH** (both platforms)
 - **Designed frames:** populated ($847.50 available · $186 pending · 22% above October) · payout on hold (bank verification expired · withdraw locked · re-verify card · 1099-ready chip)
 - **Build dependencies:** `BalanceHero` primitive.
 - **Required slots:**
@@ -173,7 +173,7 @@ All four A09 screens render through the shared `TransactionalDetailShell`
   - **`Taxes` overline + `TaxDocsRow`** — file-text icon tile + "Tax documents" + YTD line + chevron. Ready variant: home-green icon bg + `New` chip + "1099-NEC for 2025 ready · $9,847 reported".
   - **`BottomBar` with gradient fade** (linear `app-bg`-alpha 0 → 0.92 → 1) — *not* a solid frosted dock. **`WithdrawCTA`** showing icon + "Withdraw" left + amount tabular-nums right. Hold variant: greyed locked button + "Re-verify your bank above to unlock payouts" footnote in `appTextSecondary` 10.5pt center-aligned.
   - **Hold variant additions:** amber `HoldBanner` at top of scroll (shield-alert icon disc + "Bank verification expired" + body copy + "earnings keep landing — they're safe" reassurance), `BalanceHero` gets `holdTone` (yellow inset banner under split strip).
-- **Routing:** new `WalletView` (iOS) / `WalletScreen` (Android), wired from settings index `Payments` row (replacing the placeholder) and from a `pantopus://wallet` deep link.
+- **Routing:** `WalletView` (iOS) / `WalletScreen` (Android), reached via the `pantopus://wallet` deep link and the host's wallet tab/route entry. (P5.2 reclaimed the Settings → `Payments & payouts` row for A14.6 Payments — distinct payments-out surface; Wallet still owns the earnings-in flow.)
 
 ---
 
@@ -437,9 +437,9 @@ that goes beyond the standard chevron/toggle row.
   - **Paused secondary**: master card replaced with `PauseBanner` — warm amber bg + warning-tinted bell-off icon + "Paused for 1h 24m left" + `Resume` neutral pill. Category cards stay rendered at 0.5 opacity.
 
 ### A14.6 — Payments (`/settings/payments.tsx`)
-- **iOS:** **MISSING from settings sub-routes** — `SettingsView.swift:148-150` maps `.paymentsPayouts` to `NotYetAvailableView`.
-- **Android:** **MISSING** — same placeholder pattern.
-- **Status:** **BUILD** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
+- **iOS:** `Features/Settings/Payments/PaymentsView.swift` + `PaymentsViewModel` (P5.2 — fixture-driven; Stripe Connect onboarding deep-link is a follow-up).
+- **Android:** `ui/screens/settings/payments/PaymentsScreen.kt` + `PaymentsViewModel`.
+- **Status:** **POLISH** (note: overlaps with A10.10 Wallet — different surface for different intent: this is settings-side payments, Wallet is earnings-side).
 - **Designed frames:** populated (balance hero · 3 methods · Stripe connected · payouts to Chase weekly · YTD activity) · empty (no balance hero · inline empty in Methods card · Stripe `Connect` chip · gated payout method + tax rows)
 - **Required slots:**
   - **Balance hero** (same `BalanceHero` primitive as A10.10, but with `next-payout-date` + frequency pill chip on right of the available amount instead of the "USD" chip).

@@ -303,6 +303,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case cpu
     case truck
 
+    /// P5.2 / A14.6 Payments — the inline-empty hero disc inside the
+    /// Payment methods card uses Lucide's `credit-card` glyph.
+    case creditCard = "credit-card"
+
     // A13.13 — Manage train. `bar-chart-3` paints the Analytics row's icon
     // tile; `calendar-cog` paints the Edit-dates-&-slots row.
     case barChart3 = "bar-chart-3"
@@ -540,6 +544,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // `box.truck` glyphs.
         case .cpu: "cpu"
         case .truck: "box.truck"
+        // P5.2 / A14.6 Payments — SF Symbols ships `creditcard`.
+        case .creditCard: "creditcard"
         // A13.13 Manage train. `chart.bar` paints the analytics row;
         // `calendar.badge.clock` is the closest "calendar with gear" glyph
         // (no native `calendar.gearshape`), used on the Edit-dates row.

@@ -199,6 +199,28 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .createBusiness)
     }
 
+    // MARK: - P5.2 / A14.6 — Settings → Payments deep link
+
+    func testPaymentsSettingsCustomScheme() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://settings/payments")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .paymentsSettings)
+    }
+
+    func testPaymentsSettingsHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/settings/payments")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .paymentsSettings)
+    }
+
+    func testSettingsWithoutSubrouteFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://settings"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case let .unknown(captured) = DeepLinkRouter.shared.pending {
+            XCTAssertEqual(captured, url)
+        } else {
+            XCTFail("Bare /settings should fall back to .unknown")
+        }
+    }
+
     // MARK: - A14.8 Vacation hold
 
     func testVacationHoldRoute() throws {

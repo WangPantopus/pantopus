@@ -113,7 +113,7 @@ public struct RootTabView: View {
              .homeOwnersTransfer,
              .verifyLandlord, .postcardVerification,
              .notifications, .createBusiness, .businessProfile, .editBusinessPage,
-             .vacationHold, .wallet, .mailDay:
+             .vacationHold, .wallet, .mailDay, .paymentsSettings:
             model.selected = .hub
         case .conversation:
             model.selected = .inbox
