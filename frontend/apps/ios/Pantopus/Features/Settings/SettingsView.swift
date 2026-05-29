@@ -99,10 +99,7 @@ public struct SettingsView: View {
                 }
             )
         case .audienceProfile:
-            AudienceProfileView(
-                onBack: popLast,
-                onOpenBeacons: { path.append(.beaconsFeed) }
-            )
+            AudienceProfileView(onBack: popLast) { path.append(.beaconsFeed) }
         case .beaconsFeed:
             BeaconsFeedView(
                 onOpenPost: { _ in path.append(.placeholder(label: "Post")) },

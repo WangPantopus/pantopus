@@ -108,7 +108,7 @@ public struct RootTabView: View {
             pendingInviteToken = token
             _ = router.consume()
         case .feed, .post, .supportTrain, .supportTrainManage, .user,
-             .connections, .discoverHub,
+             .connections, .beacons, .discoverHub,
              .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests,
              .homeOwnersTransfer,
              .verifyLandlord, .postcardVerification,
