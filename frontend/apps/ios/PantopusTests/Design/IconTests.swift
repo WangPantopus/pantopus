@@ -75,14 +75,14 @@ final class IconTests: XCTestCase {
         "sun-dim", "flower", "snowflake", "wind", "bus", "droplets",
         // A13.1 Add Guest — allowed-area chips.
         "door-open", "car", "warehouse",
+        // A13.15 Disambiguate — quick actions + fallback rows.
+        "user-check", "forward", "keyboard", "undo-2",
         // A15.3 AI Assistant — avatar/reply glyph.
         "bot",
         // A13.4 Transfer ownership — Face ID gate and ownership-diff controls.
         "scan-face", "arrow-right-left", "arrow-down",
         // A13.13 Manage train — Organize row glyphs.
         "bar-chart-3", "calendar-cog",
-        // A13.15 Disambiguate — quick actions + fallback rows.
-        "user-check", "forward", "keyboard", "undo-2"
         // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
         "credit-card"
     ]
