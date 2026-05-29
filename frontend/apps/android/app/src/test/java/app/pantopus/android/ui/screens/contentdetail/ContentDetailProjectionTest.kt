@@ -24,7 +24,7 @@ import org.junit.Test
 class ContentDetailProjectionTest {
     @Test fun task_v2_projection_fills_status_hero_bids_and_two_stop() {
         val gig =
-            gig(
+            baseGig.copy(
                 title = "Move queen mattress + frame",
                 price = 85.0,
                 category = "moving",
@@ -50,7 +50,8 @@ class ContentDetailProjectionTest {
     }
 
     @Test fun task_v2_no_bids_renders_be_first_callout() {
-        val gig = gig(title = "Move queen mattress", price = 85.0, category = "moving", status = "open", isV2 = true, bidCount = 0)
+        val gig =
+            baseGig.copy(title = "Move queen mattress", price = 85.0, category = "moving", status = "open", isV2 = true)
         val content = GigDetailViewModel.Projection.project(gig, emptyList())
         assertEquals("Open · No bids yet", content.statusPill?.label)
         assertNull(content.modules.filterIsInstance<ContentDetailModule.Bids>().firstOrNull())
@@ -61,7 +62,7 @@ class ContentDetailProjectionTest {
 
     @Test fun gig_v1_projection_is_sparse() {
         val gig =
-            gig(
+            baseGig.copy(
                 title = "Dog walk · 45 min",
                 description = "Walk Biscuit.",
                 price = 22.0,
@@ -82,7 +83,7 @@ class ContentDetailProjectionTest {
 
     @Test fun gig_v1_awarded_dims_losers_and_locks_dock() {
         val gig =
-            gig(
+            baseGig.copy(
                 title = "Dog walk · 45 min",
                 price = 22.0,
                 category = "petcare",
@@ -113,7 +114,7 @@ class ContentDetailProjectionTest {
 
     @Test fun listing_projection_carries_cover_inline_pills_and_offer_dock() {
         val listing =
-            listing(
+            baseListing.copy(
                 title = "Mid-century sofa",
                 price = 320.0,
                 condition = "like_new",
@@ -132,7 +133,8 @@ class ContentDetailProjectionTest {
     }
 
     @Test fun listing_sold_desaturates_strikes_price_and_pivots_dock() {
-        val listing = listing(title = "Bianchi", price = 410.0, condition = "good", status = "sold", soldAt = "2025-12-14T10:00:00Z")
+        val listing =
+            baseListing.copy(title = "Bianchi", price = 410.0, condition = "good", status = "sold", soldAt = "2025-12-14T10:00:00Z")
         val content = ListingDetailViewModel.Projection.project(listing)
         assertTrue(content.cover!!.sold)
         assertEquals("Sold", content.statusPill?.label)
@@ -144,7 +146,8 @@ class ContentDetailProjectionTest {
     }
 
     @Test fun listing_free_renders_free_price() {
-        val listing = listing(title = "Moving boxes", price = 0.0, isFree = true, category = "free_stuff", layer = "goods")
+        val listing =
+            baseListing.copy(title = "Moving boxes", price = 0.0, isFree = true, category = "free_stuff", layer = "goods")
         val content = ListingDetailViewModel.Projection.project(listing)
         assertEquals("Free", content.hero.priceLine)
         assertTrue(content.hero.inlinePills.any { it.label == "Free" })
@@ -197,38 +200,40 @@ class ContentDetailProjectionTest {
         assertEquals("Sold for $385", ListingDetailSampleData.sold.hero.saleTag)
     }
 
-    // Fixtures
+    // Fixtures — base DTOs that each test customises with `.copy(...)`,
+    // keeping the helpers free of long parameter lists.
 
-    private fun gig(
-        title: String,
-        description: String? = null,
-        price: Double?,
-        category: String?,
-        status: String?,
-        isV2: Boolean?,
-        acceptedBy: String? = null,
-        acceptedAt: String? = null,
-        pickupAddress: String? = null,
-        dropoffAddress: String? = null,
-        bidCount: Int?,
-        distanceMiles: Double? = null,
-    ): GigDto =
+    private val baseGig =
         GigDto(
             id = "g1",
-            title = title,
-            description = description,
-            price = price,
-            category = category,
-            status = status,
+            title = "Task",
+            price = null,
+            category = null,
+            status = "open",
             userId = "owner",
-            acceptedBy = acceptedBy,
-            acceptedAt = acceptedAt,
-            isV2 = isV2,
-            pickupAddress = pickupAddress,
-            dropoffAddress = dropoffAddress,
-            bidCount = bidCount,
-            distanceMiles = distanceMiles,
+            isV2 = false,
+            bidCount = 0,
             creator = GigCreator(id = "owner", username = "hana", name = "Hana O.", verified = true),
+        )
+
+    private val baseListing =
+        ListingDto(
+            id = "l1",
+            userId = "u1",
+            title = "Listing",
+            description = "Sample description.",
+            price = null,
+            isFree = false,
+            category = "furniture",
+            condition = null,
+            status = "active",
+            mediaUrls = listOf("https://example.com/a.jpg", "https://example.com/b.jpg"),
+            firstImage = "https://example.com/a.jpg",
+            layer = "goods",
+            listingType = "sell_item",
+            locationName = null,
+            distanceMeters = null,
+            soldAt = null,
         )
 
     private fun bid(
@@ -243,36 +248,5 @@ class ContentDetailProjectionTest {
             bidAmount = amount,
             status = "pending",
             bidder = GigCreator(id = userId, username = userId, name = name, verified = true),
-        )
-
-    private fun listing(
-        title: String,
-        price: Double?,
-        isFree: Boolean = false,
-        category: String = "furniture",
-        condition: String? = null,
-        status: String = "active",
-        layer: String = "goods",
-        locationName: String? = null,
-        distanceMeters: Double? = null,
-        soldAt: String? = null,
-    ): ListingDto =
-        ListingDto(
-            id = "l1",
-            userId = "u1",
-            title = title,
-            description = "Sample description.",
-            price = price,
-            isFree = isFree,
-            category = category,
-            condition = condition,
-            status = status,
-            mediaUrls = listOf("https://example.com/a.jpg", "https://example.com/b.jpg"),
-            firstImage = "https://example.com/a.jpg",
-            layer = layer,
-            listingType = "sell_item",
-            locationName = locationName,
-            distanceMeters = distanceMeters,
-            soldAt = soldAt,
         )
 }
