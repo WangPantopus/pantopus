@@ -92,32 +92,28 @@ class GigDetailViewModel
         fun currentGigId(): String = gigId
 
         object Projection {
+            /**
+             * Splits on the explicit `is_v2` discriminator: V2 ("Magic Task")
+             * gets the rich surface, legacy V1 gets the sparse layout (which
+             * also carries the awarded terminal state). The full design-spec
+             * V2 frame is rendered from [GigDetailSampleData] until the Magic
+             * Task JSONB is wired through the backend (out of scope per P8.2).
+             */
             fun project(
+                gig: GigDto,
+                bids: List<GigBidDto>,
+            ): ContentDetailContent = if (gig.isV2 == true) projectTaskV2(gig, bids) else projectGigV1(gig, bids)
+
+            private fun projectTaskV2(
                 gig: GigDto,
                 bids: List<GigBidDto>,
             ): ContentDetailContent {
                 val category = GigsCategory.fromBackendKey(gig.category)
                 val bidCount = gig.bidCount ?: bids.size
-                val statusLabel =
-                    when (gig.status) {
-                        "open", null ->
-                            if (bidCount > 0) "Open · $bidCount ${if (bidCount == 1) "bid" else "bids"}" else "Open"
-                        "accepted" -> "Accepted"
-                        "completed" -> "Completed"
-                        "cancelled" -> "Cancelled"
-                        else -> gig.status.replaceFirstChar { it.uppercase() }
-                    }
-                val tone =
-                    when (gig.status) {
-                        "open", null -> ContentDetailPill.Tone.Warning
-                        "completed" -> ContentDetailPill.Tone.Success
-                        "cancelled" -> ContentDetailPill.Tone.Neutral
-                        else -> ContentDetailPill.Tone.Info
-                    }
                 val metaPieces =
                     listOfNotNull(
                         distanceLabel(gig.distanceMiles),
-                        relativeAge(gig.createdAt)?.let { "$it ago" },
+                        relativeAge(gig.createdAt)?.let { "posted $it ago" },
                     )
                 val priceLine = gig.price?.let { priceLabel(it, gig.payType) }
                 val hero =
@@ -147,23 +143,12 @@ class GigDetailViewModel
                                 ContentDetailModule.Description(
                                     id = "desc",
                                     title = "What needs doing",
-                                    icon = PantopusIcon.File,
+                                    icon = PantopusIcon.ClipboardList,
                                     body = it,
                                 ),
                             )
                         }
-                        gig.pickupAddress?.takeIf { it.isNotEmpty() }?.let { pickup ->
-                            add(
-                                ContentDetailModule.DetailRow(
-                                    id = "where",
-                                    title = "Where",
-                                    sectionIcon = PantopusIcon.MapPin,
-                                    rowIcon = PantopusIcon.MapPin,
-                                    label = pickup,
-                                    trailing = distanceLabel(gig.distanceMiles),
-                                ),
-                            )
-                        }
+                        addAll(locationModules(gig))
                         gig.scheduledStart?.takeIf { it.isNotEmpty() }?.let { iso ->
                             add(
                                 ContentDetailModule.CaptionedText(
@@ -174,54 +159,238 @@ class GigDetailViewModel
                                 ),
                             )
                         }
+                        add(
+                            ContentDetailModule.CapsuleRow(
+                                id = "trust",
+                                capsules =
+                                    listOf(
+                                        ContentDetailPill(
+                                            id = "addr",
+                                            label = "Verified address",
+                                            icon = PantopusIcon.ShieldCheck,
+                                            tone = ContentDetailPill.Tone.Info,
+                                        ),
+                                        ContentDetailPill(
+                                            id = "local",
+                                            label = "Local Pantopus job",
+                                            icon = PantopusIcon.Check,
+                                            tone = ContentDetailPill.Tone.Success,
+                                        ),
+                                    ),
+                            ),
+                        )
+                        if (bidCount > 0 && bids.isNotEmpty()) {
+                            add(ContentDetailModule.Bids(id = "bids", title = "$bidCount bids", bids = bids.map { projectBid(it) }))
+                        } else {
+                            add(
+                                ContentDetailModule.Callout(
+                                    id = "be-first",
+                                    style = ContentDetailModule.Callout.Style.Empty,
+                                    tone = ContentDetailModule.Callout.Tone.Dashed,
+                                    icon = PantopusIcon.HandCoins,
+                                    iconTone = ContentDetailModule.Callout.IconTone.Primary,
+                                    title = "Be the first to bid",
+                                    subtitle =
+                                        "Fresh posts usually get a hire in the first hour. " +
+                                            "First three bids land at the top of the list.",
+                                    footerPill = "neighbors viewing",
+                                ),
+                            )
+                        }
+                    }
+                val statusLabel =
+                    if (bidCount > 0) {
+                        "Open · $bidCount ${if (bidCount == 1) "bid" else "bids"}"
+                    } else {
+                        "Open · No bids yet"
+                    }
+                return ContentDetailContent(
+                    kind = ContentDetailKind.Gig,
+                    statusPill =
+                        ContentDetailPill(
+                            id = "status",
+                            label = statusLabel,
+                            icon = PantopusIcon.Circle,
+                            tone = ContentDetailPill.Tone.Warning,
+                        ),
+                    hero = hero,
+                    statStrip = statStrip,
+                    modules = modules,
+                    trustCapsules = emptyList(),
+                    dock =
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                            primary = ContentDetailDockButton(label = "Place bid"),
+                        ),
+                )
+            }
+
+            private fun locationModules(gig: GigDto): List<ContentDetailModule> {
+                val pickup = gig.pickupAddress?.takeIf { it.isNotEmpty() }
+                val dropoff = gig.dropoffAddress?.takeIf { it.isNotEmpty() }
+                if (pickup != null && dropoff != null) {
+                    return listOf(
+                        ContentDetailModule.TwoStop(
+                            id = "stops",
+                            title = "Pickup → drop-off",
+                            icon = PantopusIcon.MapPin,
+                            stops =
+                                listOf(
+                                    ContentDetailModule.TwoStop.Stop(
+                                        letter = "A",
+                                        tone = ContentDetailModule.TwoStop.StopTone.Primary,
+                                        address = pickup,
+                                        distance = distanceLabel(gig.distanceMiles),
+                                    ),
+                                    ContentDetailModule.TwoStop.Stop(
+                                        letter = "B",
+                                        tone = ContentDetailModule.TwoStop.StopTone.Success,
+                                        address = dropoff,
+                                        distance = null,
+                                    ),
+                                ),
+                        ),
+                    )
+                }
+                if (pickup != null) {
+                    return listOf(
+                        ContentDetailModule.DetailRow(
+                            id = "where",
+                            title = "Where",
+                            sectionIcon = PantopusIcon.MapPin,
+                            rowIcon = PantopusIcon.MapPin,
+                            label = pickup,
+                            trailing = distanceLabel(gig.distanceMiles),
+                        ),
+                    )
+                }
+                return emptyList()
+            }
+
+            private fun projectGigV1(
+                gig: GigDto,
+                bids: List<GigBidDto>,
+            ): ContentDetailContent {
+                val awarded = isAwarded(gig)
+                val bidCount = gig.bidCount ?: bids.size
+                val metaPieces =
+                    listOfNotNull(
+                        distanceLabel(gig.distanceMiles),
+                        gig.scheduledStart?.takeIf { it.isNotEmpty() },
+                    )
+                val priceLine = gig.price?.let { priceLabel(it, gig.payType) }
+                val hero =
+                    ContentDetailHero(
+                        title = gig.title,
+                        categoryChip = null,
+                        meta = metaPieces.takeIf { it.isNotEmpty() }?.joinToString(" · "),
+                        priceLine = priceLine,
+                        priceCaption = gigV1PriceCaption(priceLine, awarded),
+                    )
+                val modules =
+                    buildList {
+                        if (awarded) {
+                            add(
+                                ContentDetailModule.Callout(
+                                    id = "awarded",
+                                    style = ContentDetailModule.Callout.Style.Banner,
+                                    tone = ContentDetailModule.Callout.Tone.Success,
+                                    icon = PantopusIcon.Check,
+                                    iconTone = ContentDetailModule.Callout.IconTone.Success,
+                                    title = awardWinnerName(gig, bids)?.let { "Awarded to $it" } ?: "Awarded",
+                                    subtitle =
+                                        listOfNotNull(relativeAge(gig.acceptedAt)?.let { "$it ago" }, "bidding now closed")
+                                            .joinToString(" · "),
+                                ),
+                            )
+                        }
+                        gig.description?.takeIf { it.isNotEmpty() }?.let {
+                            add(ContentDetailModule.Description(id = "desc", title = "Description", icon = null, body = it))
+                        }
+                        (gig.creator?.name ?: gig.creator?.username)?.let { poster ->
+                            val posted = relativeAge(gig.createdAt)?.let { " · $it ago" } ?: ""
+                            add(
+                                ContentDetailModule.CaptionedText(
+                                    id = "postedby",
+                                    title = "Posted by",
+                                    icon = null,
+                                    label = "$poster$posted",
+                                ),
+                            )
+                        }
                         if (bids.isNotEmpty()) {
                             add(
                                 ContentDetailModule.Bids(
                                     id = "bids",
                                     title = "$bidCount bids",
-                                    bids = bids.map(::projectBid),
+                                    sub = if (awarded) "closed" else null,
+                                    bids = bids.map { projectBid(it, if (awarded) gig.acceptedBy else null) },
                                 ),
                             )
                         }
                     }
-                val trust =
-                    listOf(
-                        ContentDetailPill(
-                            id = "addr",
-                            label = "Verified address",
-                            icon = PantopusIcon.ShieldCheck,
-                            tone = ContentDetailPill.Tone.Info,
-                        ),
-                        ContentDetailPill(
-                            id = "local",
-                            label = "Local Pantopus job",
-                            icon = PantopusIcon.Check,
-                            tone = ContentDetailPill.Tone.Success,
-                        ),
-                    )
-                val dock =
-                    ContentDetailDock(
-                        secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
-                        primary = ContentDetailDockButton(label = "Place bid"),
-                    )
                 return ContentDetailContent(
                     kind = ContentDetailKind.Gig,
-                    statusPill = ContentDetailPill(id = "status", label = statusLabel, icon = PantopusIcon.Circle, tone = tone),
+                    statusPill =
+                        if (awarded) {
+                            ContentDetailPill(
+                                id = "status",
+                                label = "Awarded",
+                                icon = PantopusIcon.Check,
+                                tone = ContentDetailPill.Tone.Success,
+                            )
+                        } else {
+                            ContentDetailPill(
+                                id = "status",
+                                label = "Open",
+                                icon = PantopusIcon.Circle,
+                                tone = ContentDetailPill.Tone.Warning,
+                            )
+                        },
                     hero = hero,
-                    statStrip = statStrip,
+                    statStrip = emptyList(),
                     modules = modules,
-                    trustCapsules = trust,
-                    dock = dock,
+                    trustCapsules = emptyList(),
+                    dock =
+                        if (awarded) {
+                            ContentDetailDock(
+                                secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                                primary = ContentDetailDockButton(label = "Bidding closed", icon = PantopusIcon.Lock, enabled = false),
+                            )
+                        } else {
+                            ContentDetailDock(
+                                secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                                primary = ContentDetailDockButton(label = "Place bid"),
+                            )
+                        },
                 )
             }
 
-            private fun projectBid(bid: GigBidDto): ContentDetailBidRow {
+            private fun isAwarded(gig: GigDto): Boolean {
+                if (gig.acceptedBy.isNullOrEmpty()) return false
+                return gig.status in listOf("accepted", "awarded", "completed", "in_progress")
+            }
+
+            private fun awardWinnerName(
+                gig: GigDto,
+                bids: List<GigBidDto>,
+            ): String? {
+                val winner = bids.firstOrNull { it.userId == gig.acceptedBy }
+                return winner?.bidder?.name ?: winner?.bidder?.username
+            }
+
+            private fun projectBid(
+                bid: GigBidDto,
+                acceptedBy: String? = null,
+            ): ContentDetailBidRow {
                 val name = bid.bidder?.name ?: bid.bidder?.username ?: "Bidder"
                 val initials =
                     name.split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
                 val amount = bid.bidAmount ?: bid.amount ?: 0.0
                 val amountLabel =
                     if (amount % 1.0 == 0.0) "$${amount.toInt()}" else String.format("$%.2f", amount)
+                val won = acceptedBy != null && bid.userId == acceptedBy
+                val dimmed = acceptedBy != null && !won
                 return ContentDetailBidRow(
                     id = bid.id,
                     initials = initials.ifEmpty { "?" },
@@ -229,6 +398,8 @@ class GigDetailViewModel
                     ratingLine = "verified neighbor",
                     amount = amountLabel,
                     verified = bid.bidder?.verified ?: false,
+                    won = won,
+                    dimmed = dimmed,
                 )
             }
 
@@ -270,4 +441,14 @@ class GigDetailViewModel
                 }.getOrNull()
             }
         }
+    }
+
+private fun gigV1PriceCaption(
+    priceLine: String?,
+    awarded: Boolean,
+): String? =
+    when {
+        priceLine == null -> null
+        awarded -> "winning bid"
+        else -> "budget"
     }

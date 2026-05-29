@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.contentdetail
 
@@ -35,10 +35,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -47,6 +56,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -217,7 +227,12 @@ private fun LoadedFrame(
             Spacer(modifier = Modifier.height(120.dp))
         }
         if (content.cover != null) {
-            TopNav(onBack = onBack, transparent = true, overflowItems = overflowItems)
+            TopNav(
+                onBack = onBack,
+                transparent = true,
+                overflowItems = overflowItems,
+                glassActions = content.cover.glassActions,
+            )
         }
         StickyDock(
             dock = content.dock,
@@ -235,6 +250,7 @@ private fun TopNav(
     onBack: () -> Unit,
     transparent: Boolean,
     overflowItems: List<ContentDetailOverflowItem> = emptyList(),
+    glassActions: List<PantopusIcon> = emptyList(),
 ) {
     Row(
         modifier =
@@ -263,7 +279,35 @@ private fun TopNav(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
-        if (overflowItems.isNotEmpty()) {
+        if (glassActions.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.testTag("contentDetailGlassActions"),
+            ) {
+                glassActions.forEach { icon ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.85f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        PantopusIconImage(
+                            icon = icon,
+                            contentDescription = null,
+                            size = 18.dp,
+                            strokeWidth = 2f,
+                            tint = PantopusColors.appText,
+                        )
+                    }
+                }
+                if (overflowItems.isNotEmpty()) {
+                    OverflowMenu(items = overflowItems, transparent = transparent)
+                }
+            }
+        } else if (overflowItems.isNotEmpty()) {
             OverflowMenu(items = overflowItems, transparent = transparent)
         }
     }
@@ -317,14 +361,18 @@ private fun OverflowMenu(
 
 @Composable
 private fun CoverImage(cover: ContentDetailCover) {
+    val gradientColors =
+        if (cover.sold) {
+            listOf(desaturate(cover.gradient.start), desaturate(cover.gradient.end))
+        } else {
+            listOf(cover.gradient.start, cover.gradient.end)
+        }
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(280.dp)
-                .background(
-                    Brush.linearGradient(colors = listOf(cover.gradient.start, cover.gradient.end)),
-                )
+                .height(300.dp)
+                .background(Brush.linearGradient(colors = gradientColors))
                 .testTag("contentDetailCover"),
         contentAlignment = Alignment.Center,
     ) {
@@ -334,6 +382,12 @@ private fun CoverImage(cover: ContentDetailCover) {
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
+                colorFilter =
+                    if (cover.sold) {
+                        ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0.15f) })
+                    } else {
+                        null
+                    },
             )
         } else {
             PantopusIconImage(
@@ -343,6 +397,9 @@ private fun CoverImage(cover: ContentDetailCover) {
                 strokeWidth = 1.6f,
                 tint = Color.White.copy(alpha = 0.85f),
             )
+        }
+        if (cover.sold) {
+            SoldStamp()
         }
         if (cover.pageCount > 1) {
             Row(
@@ -366,10 +423,49 @@ private fun CoverImage(cover: ContentDetailCover) {
     }
 }
 
+/** Tilted "SOLD" stamp overlaid on the desaturated hero (listing sold). */
+@Composable
+private fun SoldStamp() {
+    Box(
+        modifier =
+            Modifier
+                .rotate(-12f)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White.copy(alpha = 0.85f))
+                .border(3.dp, PantopusColors.error.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 28.dp, vertical = 10.dp)
+                .testTag("contentDetailSoldStamp"),
+    ) {
+        Text(
+            text = "SOLD",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 4.sp,
+            color = PantopusColors.error.copy(alpha = 0.92f),
+        )
+    }
+}
+
+/** Per-channel desaturation toward luminance (mirrors iOS `.grayscale(0.85)`). */
+private fun desaturate(color: Color): Color {
+    val luminance = 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
+    return lerp(color, Color(luminance, luminance, luminance, color.alpha), 0.85f)
+}
+
 // MARK: - Hero
 
 @Composable
 private fun HeroBlock(content: ContentDetailContent) {
+    if (content.kind == ContentDetailKind.Listing) {
+        ListingHero(content)
+    } else {
+        StandardHero(content)
+    }
+}
+
+/** Gig + invoice ordering: status pill → mono ref → title → subtitle → price. */
+@Composable
+private fun StandardHero(content: ContentDetailContent) {
     Column(modifier = Modifier.fillMaxWidth()) {
         content.statusPill?.let {
             Row(
@@ -386,78 +482,158 @@ private fun HeroBlock(content: ContentDetailContent) {
                 modifier = Modifier.padding(start = Spacing.s5, top = 10.dp),
             )
         }
-        Text(
-            text = content.hero.title,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appText,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier =
-                Modifier
-                    .padding(horizontal = Spacing.s5)
-                    .padding(top = if (content.hero.monoId == null) 4.dp else 6.dp)
-                    .semantics { heading() },
-        )
+        HeroTitle(content.hero.title, topPadding = if (content.hero.monoId == null) 4.dp else 6.dp)
         if (content.hero.categoryChip != null || content.hero.meta != null) {
+            HeroSubtitle(content.hero)
+        }
+        if (content.hero.priceLine != null) {
+            PriceBlock(
+                content.hero,
+                content.kind,
+                modifier = Modifier.padding(start = Spacing.s5, end = Spacing.s5, top = 18.dp),
+            )
+        }
+    }
+}
+
+/** Listing ordering: sold pill (+ age) → price (struck + sale tag) → title → inline pills. */
+@Composable
+private fun ListingHero(content: ContentDetailContent) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        content.statusPill?.let { pill ->
             Row(
-                modifier = Modifier.padding(horizontal = Spacing.s5, vertical = 10.dp),
+                modifier = Modifier.padding(start = Spacing.s5, top = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                content.hero.categoryChip?.let { chip ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(Radii.pill))
-                                .background(chip.category.color.copy(alpha = 0.12f))
-                                .padding(horizontal = Spacing.s2, vertical = 2.dp),
-                    ) {
-                        Text(
-                            text = chip.label.uppercase(),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = chip.category.color,
-                            letterSpacing = 0.6.sp,
-                        )
-                    }
-                }
+                PillView(pill)
                 content.hero.meta?.let {
-                    Text(
-                        text = it,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = PantopusColors.appTextSecondary,
-                    )
+                    Text(text = it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
                 }
             }
         }
-        content.hero.priceLine?.let { price ->
+        if (content.hero.priceLine != null) {
+            PriceBlock(
+                content.hero,
+                content.kind,
+                modifier =
+                    Modifier.padding(
+                        start = Spacing.s5,
+                        end = Spacing.s5,
+                        top = if (content.statusPill == null) 18.dp else 12.dp,
+                    ),
+            )
+        }
+        HeroTitle(content.hero.title, topPadding = 10.dp)
+        if (content.hero.inlinePills.isNotEmpty()) {
             Row(
-                modifier = Modifier.padding(horizontal = Spacing.s5, vertical = Spacing.s2),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                modifier =
+                    Modifier
+                        .padding(horizontal = Spacing.s5)
+                        .padding(top = 10.dp)
+                        .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                content.hero.inlinePills.forEach { PillView(it) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroTitle(
+    title: String,
+    topPadding: androidx.compose.ui.unit.Dp,
+) {
+    Text(
+        text = title,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        color = PantopusColors.appText,
+        maxLines = 3,
+        overflow = TextOverflow.Ellipsis,
+        modifier =
+            Modifier
+                .padding(horizontal = Spacing.s5)
+                .padding(top = topPadding)
+                .semantics { heading() },
+    )
+}
+
+@Composable
+private fun HeroSubtitle(hero: ContentDetailHero) {
+    Row(
+        modifier = Modifier.padding(horizontal = Spacing.s5, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        hero.categoryChip?.let { chip ->
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(chip.category.color.copy(alpha = 0.12f))
+                        .padding(horizontal = Spacing.s2, vertical = 2.dp),
             ) {
                 Text(
-                    text = price,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color =
-                        if (content.kind == ContentDetailKind.Listing) {
-                            PantopusColors.primary600
-                        } else {
-                            PantopusColors.appText
-                        },
+                    text = chip.label.uppercase(),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = chip.category.color,
+                    letterSpacing = 0.6.sp,
                 )
-                content.hero.priceCaption?.let {
-                    Text(
-                        text = it,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = PantopusColors.appTextSecondary,
-                    )
-                }
             }
+        }
+        hero.meta?.let {
+            Text(text = it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun PriceBlock(
+    hero: ContentDetailHero,
+    kind: ContentDetailKind,
+    modifier: Modifier = Modifier,
+) {
+    val priceColor =
+        when {
+            hero.priceStrikethrough -> PantopusColors.appTextSecondary
+            hero.priceTone == ContentDetailHero.PriceTone.Success -> PantopusColors.success
+            kind == ContentDetailKind.Listing -> PantopusColors.primary600
+            else -> PantopusColors.appText
+        }
+    Row(
+        modifier = modifier,
+        verticalAlignment = if (hero.priceCheckDisc) Alignment.CenterVertically else Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = hero.priceLine ?: "",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = priceColor,
+            textDecoration = if (hero.priceStrikethrough) TextDecoration.LineThrough else null,
+        )
+        hero.saleTag?.let {
+            Text(text = it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.success)
+        }
+        if (hero.priceCheckDisc) {
+            Box(
+                modifier = Modifier.size(28.dp).clip(CircleShape).background(PantopusColors.success),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 15.dp, strokeWidth = 3f, tint = Color.White)
+            }
+        }
+        if (hero.saleTag == null) {
+            hero.priceCaption?.let {
+                Text(text = it, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
+            }
+        }
+        hero.priceTrailingLabel?.let {
+            Spacer(modifier = Modifier.weight(1f))
+            Text(text = it, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
         }
     }
 }
@@ -471,6 +647,7 @@ private fun PillView(pill: ContentDetailPill) {
             ContentDetailPill.Tone.Warning -> PantopusColors.warning
             ContentDetailPill.Tone.Business -> PantopusColors.business
             ContentDetailPill.Tone.Neutral -> PantopusColors.appTextSecondary
+            ContentDetailPill.Tone.Error -> PantopusColors.error
         }
     val bg =
         when (pill.tone) {
@@ -479,6 +656,7 @@ private fun PillView(pill: ContentDetailPill) {
             ContentDetailPill.Tone.Warning -> PantopusColors.warningBg
             ContentDetailPill.Tone.Business -> PantopusColors.businessBg
             ContentDetailPill.Tone.Neutral -> PantopusColors.appSurfaceSunken
+            ContentDetailPill.Tone.Error -> PantopusColors.errorBg
         }
     Row(
         modifier =
@@ -676,6 +854,26 @@ private fun ModuleView(module: ContentDetailModule) {
                     color = PantopusColors.appTextStrong,
                 )
             }
+        is ContentDetailModule.TwoStop ->
+            SectionCard(title = module.title, icon = module.icon) {
+                TwoStopCard(module.stops)
+            }
+        is ContentDetailModule.CapsuleRow ->
+            Row(
+                modifier =
+                    Modifier
+                        .padding(horizontal = Spacing.s5)
+                        .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                module.capsules.forEach { PillView(it) }
+            }
+        is ContentDetailModule.DetailsGrid ->
+            SectionCard(title = module.title, icon = module.icon) {
+                DetailsGrid(module.rows)
+            }
+        is ContentDetailModule.Callout ->
+            CalloutCard(module, modifier = Modifier.padding(horizontal = Spacing.s5))
         is ContentDetailModule.PhotoStrip ->
             SectionCard(title = module.title, icon = module.icon, sub = module.countLabel) {
                 Row(
@@ -738,7 +936,7 @@ private fun ModuleView(module: ContentDetailModule) {
                 }
             }
         is ContentDetailModule.Bids ->
-            SectionCard(title = module.title, icon = null) {
+            SectionCard(title = module.title, icon = null, sub = module.sub) {
                 Column(
                     modifier =
                         Modifier
@@ -748,44 +946,7 @@ private fun ModuleView(module: ContentDetailModule) {
                             .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
                 ) {
                     module.bids.forEachIndexed { index, bid ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            AvatarView(initials = bid.initials, verified = bid.verified, size = 36.dp)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = bid.displayName,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = PantopusColors.appText,
-                                )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-                                ) {
-                                    PantopusIconImage(
-                                        icon = PantopusIcon.Star,
-                                        contentDescription = null,
-                                        size = 9.dp,
-                                        tint = PantopusColors.warning,
-                                    )
-                                    Text(
-                                        text = bid.ratingLine,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = PantopusColors.appTextSecondary,
-                                    )
-                                }
-                            }
-                            Text(
-                                text = bid.amount,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = PantopusColors.primary600,
-                            )
-                        }
+                        BidRow(bid)
                         if (index < module.bids.size - 1) {
                             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder.copy(alpha = 0.5f)))
                         }
@@ -802,7 +963,7 @@ private fun ModuleView(module: ContentDetailModule) {
             }
         is ContentDetailModule.LineItems ->
             SectionCard(title = module.title, icon = module.icon) {
-                LineItemsTable(rows = module.rows)
+                LineItemsTable(module)
             }
         is ContentDetailModule.Summary ->
             SummaryCard(summary = module, modifier = Modifier.padding(horizontal = Spacing.s5))
@@ -870,7 +1031,23 @@ private fun PartyCard(
 }
 
 @Composable
-private fun LineItemsTable(rows: List<ContentDetailLineItem>) {
+private fun ColumnHeader(
+    text: String,
+    modifier: Modifier,
+    textAlign: TextAlign,
+) {
+    Text(
+        text = text,
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Bold,
+        color = PantopusColors.appTextMuted,
+        textAlign = textAlign,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun LineItemsTable(module: ContentDetailModule.LineItems) {
     Column(
         modifier =
             Modifier
@@ -883,42 +1060,15 @@ private fun LineItemsTable(rows: List<ContentDetailLineItem>) {
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(PantopusColors.appSurfaceSunken)
+                    .background(PantopusColors.appSurfaceMuted)
                     .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         ) {
-            Text(
-                text = "ITEM",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextMuted,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "QTY",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextMuted,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.width(36.dp),
-            )
-            Text(
-                text = "UNIT",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextMuted,
-                textAlign = TextAlign.End,
-                modifier = Modifier.width(60.dp),
-            )
-            Text(
-                text = "TOTAL",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextMuted,
-                textAlign = TextAlign.End,
-                modifier = Modifier.width(60.dp),
-            )
+            ColumnHeader("ITEM", Modifier.weight(1f), TextAlign.Start)
+            ColumnHeader("QTY", Modifier.width(36.dp), TextAlign.Center)
+            ColumnHeader("UNIT", Modifier.width(60.dp), TextAlign.End)
+            ColumnHeader("TOTAL", Modifier.width(60.dp), TextAlign.End)
         }
-        rows.forEachIndexed { index, row ->
+        module.rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -953,8 +1103,54 @@ private fun LineItemsTable(rows: List<ContentDetailLineItem>) {
                     modifier = Modifier.width(60.dp),
                 )
             }
-            if (index < rows.size - 1) {
-                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder.copy(alpha = 0.5f)))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder.copy(alpha = 0.5f)))
+        }
+        if (module.fees.isNotEmpty() || module.totalValue != null) {
+            LineItemsFooter(module)
+        }
+    }
+}
+
+/** Fees / tax block + grand-total row in the muted footer of the line-items card. */
+@Composable
+private fun LineItemsFooter(module: ContentDetailModule.LineItems) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurfaceMuted)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+    ) {
+        module.fees.forEach { fee ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(text = fee.label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextStrong)
+                Text(text = fee.value, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextStrong)
+            }
+        }
+        module.totalValue?.let { totalValue ->
+            Spacer(modifier = Modifier.height(Spacing.s1))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+            Spacer(modifier = Modifier.height(Spacing.s1))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Text(text = module.totalLabel ?: "Total", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+                Text(
+                    text = totalValue,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    color =
+                        if (module.totalTone == ContentDetailModule.LineItems.TotalTone.Success) {
+                            PantopusColors.success
+                        } else {
+                            PantopusColors.primary600
+                        },
+                )
             }
         }
     }
@@ -984,8 +1180,340 @@ private fun SummaryCard(
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(text = summary.totalLabel, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-            Text(text = summary.totalValue, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = PantopusColors.primary600)
+            Text(
+                text = summary.totalValue,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color =
+                    if (summary.totalTone == ContentDetailModule.Summary.TotalTone.Success) {
+                        PantopusColors.success
+                    } else {
+                        PantopusColors.primary600
+                    },
+            )
         }
+    }
+}
+
+// MARK: - Two-stop / details grid / callout / bid row
+
+@Composable
+private fun TwoStopCard(stops: List<ContentDetailModule.TwoStop.Stop>) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.appSurfaceMuted)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
+                .padding(horizontal = Spacing.s3, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        stops.forEachIndexed { index, stop ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (stop.tone == ContentDetailModule.TwoStop.StopTone.Primary) {
+                                    PantopusColors.primary100
+                                } else {
+                                    PantopusColors.successBg
+                                },
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val letterColor =
+                        if (stop.tone == ContentDetailModule.TwoStop.StopTone.Primary) {
+                            PantopusColors.primary700
+                        } else {
+                            PantopusColors.success
+                        }
+                    Text(
+                        text = stop.letter,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = letterColor,
+                    )
+                }
+                Text(text = stop.address, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                Spacer(modifier = Modifier.weight(1f))
+                stop.distance?.let {
+                    Text(text = it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
+                }
+            }
+            if (index < stops.size - 1) {
+                Box(modifier = Modifier.padding(start = 6.dp).width(1.dp).height(10.dp).background(PantopusColors.appBorder))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailsGrid(rows: List<ContentDetailModule.DetailsGrid.Row>) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        rows.forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                Text(
+                    text = row.key,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.width(96.dp),
+                )
+                Text(
+                    text = row.value,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalloutCard(
+    callout: ContentDetailModule.Callout,
+    modifier: Modifier = Modifier,
+) {
+    val tagged = modifier.testTag("contentDetailCallout_${callout.id}")
+    when (callout.style) {
+        ContentDetailModule.Callout.Style.Banner -> CalloutBanner(callout, tagged)
+        ContentDetailModule.Callout.Style.Empty -> CalloutEmpty(callout, tagged)
+    }
+}
+
+@Composable
+private fun CalloutBanner(
+    callout: ContentDetailModule.Callout,
+    modifier: Modifier,
+) {
+    val isSuccess = callout.tone == ContentDetailModule.Callout.Tone.Success
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(if (isSuccess) PantopusColors.successBg else PantopusColors.appSurfaceMuted)
+                .border(
+                    1.dp,
+                    if (isSuccess) PantopusColors.success.copy(alpha = 0.4f) else PantopusColors.appBorder,
+                    RoundedCornerShape(Radii.lg),
+                )
+                .padding(horizontal = 14.dp, vertical = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        CalloutIconDisc(callout.iconTone, callout.icon, 30.dp)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = callout.title,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isSuccess) PantopusColors.success else PantopusColors.appText,
+            )
+            callout.subtitle?.let {
+                Text(
+                    text = it,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = if (callout.subtitleMono) FontFamily.Monospace else FontFamily.Default,
+                    color = if (isSuccess) PantopusColors.success else PantopusColors.appTextSecondary,
+                )
+            }
+        }
+        callout.trailingActionLabel?.let { action ->
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                        .padding(horizontal = Spacing.s3, vertical = 6.dp),
+            ) {
+                Text(text = action, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalloutEmpty(
+    callout: ContentDetailModule.Callout,
+    modifier: Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceMuted)
+                .drawBehind {
+                    drawRoundRect(
+                        color = PantopusColors.appBorder,
+                        cornerRadius = CornerRadius(Radii.lg.toPx(), Radii.lg.toPx()),
+                        style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f))),
+                    )
+                }
+                .padding(horizontal = 18.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        CalloutIconDisc(callout.iconTone, callout.icon, 42.dp)
+        Spacer(modifier = Modifier.height(Spacing.s1))
+        Text(text = callout.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+        callout.subtitle?.let {
+            Text(
+                text = it,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = PantopusColors.appTextSecondary,
+                textAlign = TextAlign.Center,
+            )
+        }
+        callout.footerPill?.let { footer ->
+            Spacer(modifier = Modifier.height(Spacing.s2))
+            Row(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                        .padding(horizontal = 10.dp, vertical = Spacing.s1),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Eye,
+                    contentDescription = null,
+                    size = 11.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextSecondary,
+                )
+                Text(
+                    text = footer,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalloutIconDisc(
+    tone: ContentDetailModule.Callout.IconTone,
+    icon: PantopusIcon,
+    size: androidx.compose.ui.unit.Dp,
+) {
+    when (tone) {
+        ContentDetailModule.Callout.IconTone.Success ->
+            Box(
+                modifier = Modifier.size(size).clip(CircleShape).background(PantopusColors.success),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = icon, contentDescription = null, size = size * 0.5f, strokeWidth = 2.6f, tint = Color.White)
+            }
+        ContentDetailModule.Callout.IconTone.SuccessOutline ->
+            Box(
+                modifier =
+                    Modifier
+                        .size(size)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurface)
+                        .border(1.5.dp, PantopusColors.success, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = icon,
+                    contentDescription = null,
+                    size = size * 0.47f,
+                    strokeWidth = 2.4f,
+                    tint = PantopusColors.success,
+                )
+            }
+        ContentDetailModule.Callout.IconTone.Primary ->
+            Box(
+                modifier = Modifier.size(size).clip(CircleShape).background(PantopusColors.primary50),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = icon,
+                    contentDescription = null,
+                    size = size * 0.47f,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.primary600,
+                )
+            }
+    }
+}
+
+@Composable
+private fun BidRow(bid: ContentDetailBidRow) {
+    val amountColor =
+        when {
+            bid.won -> PantopusColors.success
+            bid.dimmed -> PantopusColors.appTextSecondary
+            else -> PantopusColors.primary600
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(if (bid.won) PantopusColors.successBg else Color.Transparent)
+                .alpha(if (bid.dimmed) 0.55f else 1f)
+                .padding(horizontal = Spacing.s3, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        AvatarView(initials = bid.initials, verified = bid.verified, size = 36.dp)
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(text = bid.displayName, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                if (bid.won) {
+                    BidTagPill("Winner", PantopusColors.success, PantopusColors.successBg)
+                } else {
+                    bid.tag?.let { BidTagPill(it, PantopusColors.primary700, PantopusColors.primary50) }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                PantopusIconImage(icon = PantopusIcon.Star, contentDescription = null, size = 9.dp, tint = PantopusColors.warning)
+                Text(text = bid.ratingLine, fontSize = 10.5.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
+            }
+        }
+        Text(
+            text = bid.amount,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = amountColor,
+            textDecoration = if (bid.dimmed) TextDecoration.LineThrough else null,
+        )
+    }
+}
+
+@Composable
+private fun BidTagPill(
+    text: String,
+    foreground: Color,
+    background: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.xs))
+                .background(background)
+                .padding(horizontal = 5.dp, vertical = 1.dp),
+    ) {
+        Text(text = text.uppercase(), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = foreground)
     }
 }
 
@@ -1051,14 +1579,25 @@ private fun StickyDock(
                     Text(text = secondary.label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
                 }
             }
+            val primaryEnabled = dock.primary.enabled
+            val primaryFg = if (primaryEnabled) PantopusColors.appTextInverse else PantopusColors.appTextSecondary
             Row(
                 modifier =
                     Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(Radii.lg))
-                        .background(PantopusColors.primary600)
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.lg))
-                        .clickable(onClick = onPrimary)
+                        .then(
+                            if (primaryEnabled) {
+                                Modifier
+                                    .background(PantopusColors.primary600)
+                                    .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.lg))
+                                    .clickable(onClick = onPrimary)
+                            } else {
+                                Modifier
+                                    .background(PantopusColors.appSurfaceSunken)
+                                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                            },
+                        )
                         .heightIn(min = 48.dp)
                         .testTag("contentDetailDockPrimary"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1070,11 +1609,11 @@ private fun StickyDock(
                         contentDescription = null,
                         size = Radii.xl,
                         strokeWidth = 2.2f,
-                        tint = PantopusColors.appTextInverse,
+                        tint = primaryFg,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                 }
-                Text(text = dock.primary.label, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
+                Text(text = dock.primary.label, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = primaryFg)
             }
         }
     }

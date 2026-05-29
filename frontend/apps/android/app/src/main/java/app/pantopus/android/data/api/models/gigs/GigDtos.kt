@@ -48,6 +48,9 @@ data class GigDto(
     @Json(name = "schedule_type") val scheduleType: String? = null,
     @Json(name = "pay_type") val payType: String? = null,
     @Json(name = "task_archetype") val taskArchetype: String? = null,
+    // Explicit V2 ("Magic Task") discriminator. `true` → rich V2 surface;
+    // `null`/`false` → sparse V1 legacy layout. Backend may omit on legacy gigs.
+    @Json(name = "is_v2") val isV2: Boolean? = null,
     @Json(name = "pickup_address") val pickupAddress: String? = null,
     @Json(name = "dropoff_address") val dropoffAddress: String? = null,
     @Json(name = "bid_count") val bidCount: Int? = null,

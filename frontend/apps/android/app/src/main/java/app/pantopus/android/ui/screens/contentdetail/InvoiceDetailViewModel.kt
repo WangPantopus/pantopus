@@ -36,71 +36,141 @@ class InvoiceDetailViewModel
         }
 
         object Projection {
-            fun fixture(invoiceId: String): ContentDetailContent {
-                val lineItems =
-                    listOf(
-                        ContentDetailLineItem("l1", "Demo + haul", "1", "$60", "$60"),
-                        ContentDetailLineItem("l2", "12\" porcelain tile", "48", "$2.10", "$100.80"),
-                        ContentDetailLineItem("l3", "Thinset + grout", "1", "$32", "$32"),
-                        ContentDetailLineItem("l4", "Labor · 4h", "4", "$45", "$180"),
-                    )
-                val modules =
-                    listOf<ContentDetailModule>(
-                        ContentDetailModule.FromTo(
-                            id = "fromto",
-                            from =
-                                ContentDetailParty(
-                                    label = "From",
-                                    name = "Lopez Tile Co.",
-                                    sub = "Business · Verified",
-                                    accent = ContentDetailParty.Accent.Business,
-                                ),
-                            to =
-                                ContentDetailParty(
-                                    label = "To",
-                                    name = "Maria Kowalski",
-                                    sub = "Personal",
-                                    accent = ContentDetailParty.Accent.Personal,
-                                ),
-                        ),
-                        ContentDetailModule.LineItems(
-                            id = "items",
-                            title = "Line items",
-                            icon = PantopusIcon.File,
-                            rows = lineItems,
-                        ),
-                        ContentDetailModule.Summary(
-                            id = "summary",
-                            rows =
-                                listOf(
-                                    ContentDetailSummaryRow("sub", "Subtotal", "$372.80"),
-                                    ContentDetailSummaryRow("tax", "Tax (8.6%)", "$32.06"),
-                                ),
-                            totalLabel = "Total",
-                            totalValue = "$404.86",
-                        ),
-                    )
-                return ContentDetailContent(
+            /** A09.4 · due state. */
+            fun fixture(invoiceId: String): ContentDetailContent =
+                ContentDetailContent(
                     kind = ContentDetailKind.Invoice,
                     statusPill =
                         ContentDetailPill(
                             id = "status",
-                            label = "Due in 3 days",
-                            icon = PantopusIcon.Calendar,
+                            label = "Due in 7 days",
+                            icon = PantopusIcon.Clock,
                             tone = ContentDetailPill.Tone.Warning,
                         ),
                     hero =
                         ContentDetailHero(
-                            title = "Bathroom retile",
-                            monoId = "${invoiceId.uppercase()} · Nov 6, 2025",
+                            title = "Holiday lighting · install + takedown",
+                            monoId = "${invoiceId.uppercase()} · issued Dec 4 · due Dec 18",
+                            priceLine = "$642.85",
+                            priceCaption = "total · USD",
                         ),
-                    modules = modules,
+                    modules =
+                        listOf(
+                            payerPayee,
+                            lineItems(totalLabel = "Total", totalTone = ContentDetailModule.LineItems.TotalTone.Primary),
+                            ContentDetailModule.CaptionedText(
+                                id = "terms",
+                                title = "Payment terms",
+                                icon = PantopusIcon.File,
+                                label =
+                                    "Net 14 from issue. Pantopus Pay (instant), card, or ACH. " +
+                                        "Late fee 1.5%/mo applies after due date.",
+                            ),
+                            noteFromSender,
+                        ),
                     dock =
                         ContentDetailDock(
                             secondary = null,
-                            primary = ContentDetailDockButton(label = "Pay $404.86", icon = PantopusIcon.Check),
+                            primary = ContentDetailDockButton(label = "Pay $642.85", icon = PantopusIcon.CreditCard),
                         ),
                 )
-            }
+
+            /** A09.4 · paid state (paid 4 days early via Pantopus Pay). */
+            fun paidFixture(invoiceId: String): ContentDetailContent =
+                ContentDetailContent(
+                    kind = ContentDetailKind.Invoice,
+                    statusPill =
+                        ContentDetailPill(
+                            id = "status",
+                            label = "Paid · Dec 14",
+                            icon = PantopusIcon.CheckCircle,
+                            tone = ContentDetailPill.Tone.Success,
+                        ),
+                    hero =
+                        ContentDetailHero(
+                            title = "Holiday lighting · install + takedown",
+                            monoId = "${invoiceId.uppercase()} · issued Dec 4 · paid Dec 14",
+                            priceLine = "$642.85",
+                            priceTone = ContentDetailHero.PriceTone.Success,
+                            priceTrailingLabel = "paid in full",
+                            priceCheckDisc = true,
+                        ),
+                    modules =
+                        listOf(
+                            payerPayee,
+                            ContentDetailModule.Callout(
+                                id = "pantopus-pay-receipt",
+                                style = ContentDetailModule.Callout.Style.Banner,
+                                tone = ContentDetailModule.Callout.Tone.Success,
+                                icon = PantopusIcon.Zap,
+                                iconTone = ContentDetailModule.Callout.IconTone.SuccessOutline,
+                                title = "Paid via Pantopus Pay",
+                                subtitle = "txn_3p4q9m · Dec 14",
+                                subtitleMono = true,
+                            ),
+                            lineItems(totalLabel = "Paid", totalTone = ContentDetailModule.LineItems.TotalTone.Success),
+                            noteFromSender,
+                        ),
+                    dock =
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Share", icon = PantopusIcon.Share),
+                            primary = ContentDetailDockButton(label = "Download receipt", icon = PantopusIcon.Receipt),
+                        ),
+                )
+
+            private val payerPayee =
+                ContentDetailModule.FromTo(
+                    id = "fromto",
+                    from =
+                        ContentDetailParty(
+                            label = "From",
+                            name = "Brightside Outdoor",
+                            sub = "Business · Verified",
+                            accent = ContentDetailParty.Accent.Business,
+                        ),
+                    to =
+                        ContentDetailParty(
+                            label = "To",
+                            name = "Marcus Chen",
+                            sub = "Personal",
+                            accent = ContentDetailParty.Accent.Personal,
+                        ),
+                )
+
+            private fun lineItems(
+                totalLabel: String,
+                totalTone: ContentDetailModule.LineItems.TotalTone,
+            ): ContentDetailModule.LineItems =
+                ContentDetailModule.LineItems(
+                    id = "items",
+                    title = "Line items",
+                    icon = PantopusIcon.File,
+                    rows =
+                        listOf(
+                            ContentDetailLineItem("l1", "Install labor · 3.5h", "3.5", "$65", "$227.50"),
+                            ContentDetailLineItem("l2", "LED string lights", "8", "$28", "$224.00"),
+                            ContentDetailLineItem("l3", "Clips, timer, splitters", "1", "$45", "$45.00"),
+                            ContentDetailLineItem("l4", "Takedown · scheduled Jan 6", "1", "$95", "$95.00"),
+                        ),
+                    fees =
+                        listOf(
+                            ContentDetailSummaryRow("sub", "Subtotal", "$591.50"),
+                            ContentDetailSummaryRow("svc", "Service fee (3%)", "$17.75"),
+                            ContentDetailSummaryRow("tax", "Tax (5.7%)", "$33.60"),
+                        ),
+                    totalLabel = totalLabel,
+                    totalValue = "$642.85",
+                    totalTone = totalTone,
+                )
+
+            private val noteFromSender =
+                ContentDetailModule.Description(
+                    id = "note",
+                    title = "Note from sender",
+                    icon = null,
+                    body =
+                        "“Takedown is on the schedule for the first Tuesday in January — no need " +
+                            "to be home. Thanks again Marcus, happy holidays.”",
+                )
         }
     }

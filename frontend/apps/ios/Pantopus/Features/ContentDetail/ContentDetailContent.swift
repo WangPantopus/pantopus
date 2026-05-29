@@ -30,25 +30,34 @@ public struct ContentDetailCover: Sendable, Hashable {
     public let placeholderIcon: PantopusIcon
     public let pageCount: Int
     public let activePage: Int
+    /// Sold treatment: desaturates the hero + stamps a tilted SOLD badge.
+    public let sold: Bool
+    /// Decorative glass action chips overlaid top-right (share / bookmark).
+    /// Render-only for now — live wiring lands with the share + save flows.
+    public let glassActions: [PantopusIcon]
 
     public init(
         imageUrl: URL?,
         gradient: ListingGradient,
         placeholderIcon: PantopusIcon,
         pageCount: Int = 1,
-        activePage: Int = 0
+        activePage: Int = 0,
+        sold: Bool = false,
+        glassActions: [PantopusIcon] = []
     ) {
         self.imageUrl = imageUrl
         self.gradient = gradient
         self.placeholderIcon = placeholderIcon
         self.pageCount = pageCount
         self.activePage = activePage
+        self.sold = sold
+        self.glassActions = glassActions
     }
 }
 
 /// Top-of-content status pill — "Open · 4 bids", "Due in 3 days", etc.
 public struct ContentDetailPill: Sendable, Hashable, Identifiable {
-    public enum Tone: Sendable, Hashable { case info, success, warning, business, neutral }
+    public enum Tone: Sendable, Hashable { case info, success, warning, business, neutral, error }
 
     public let id: String
     public let label: String
@@ -67,12 +76,28 @@ public struct ContentDetailPill: Sendable, Hashable, Identifiable {
 /// meta line; `priceLine` is the big number; `priceCaption` is the
 /// faded suffix ("budget", "due", etc).
 public struct ContentDetailHero: Sendable, Hashable {
+    /// Drives the colour of the big price number. `auto` resolves to
+    /// `primary600` for listings and `appText` elsewhere; `success`
+    /// recolours it green for the invoice paid state.
+    public enum PriceTone: Sendable, Hashable { case auto, success }
+
     public let title: String
     public let categoryChip: ContentDetailCategoryChip?
     public let meta: String?
     public let monoId: String?
     public let priceLine: String?
     public let priceCaption: String?
+    public let priceTone: PriceTone
+    /// Strikes through the price (listing sold — original asking price).
+    public let priceStrikethrough: Bool
+    /// Green sale tag rendered next to a struck-through price ("Sold for $385").
+    public let saleTag: String?
+    /// Right-aligned faded label trailing the price ("paid in full").
+    public let priceTrailingLabel: String?
+    /// Green check disc rendered after the price (invoice paid).
+    public let priceCheckDisc: Bool
+    /// Pill row rendered directly under the price (listing condition / pickup / distance).
+    public let inlinePills: [ContentDetailPill]
 
     public init(
         title: String,
@@ -80,7 +105,13 @@ public struct ContentDetailHero: Sendable, Hashable {
         meta: String? = nil,
         monoId: String? = nil,
         priceLine: String? = nil,
-        priceCaption: String? = nil
+        priceCaption: String? = nil,
+        priceTone: PriceTone = .auto,
+        priceStrikethrough: Bool = false,
+        saleTag: String? = nil,
+        priceTrailingLabel: String? = nil,
+        priceCheckDisc: Bool = false,
+        inlinePills: [ContentDetailPill] = []
     ) {
         self.title = title
         self.categoryChip = categoryChip
@@ -88,6 +119,12 @@ public struct ContentDetailHero: Sendable, Hashable {
         self.monoId = monoId
         self.priceLine = priceLine
         self.priceCaption = priceCaption
+        self.priceTone = priceTone
+        self.priceStrikethrough = priceStrikethrough
+        self.saleTag = saleTag
+        self.priceTrailingLabel = priceTrailingLabel
+        self.priceCheckDisc = priceCheckDisc
+        self.inlinePills = inlinePills
     }
 }
 
@@ -152,14 +189,18 @@ public struct ContentDetailCounterparty: Sendable, Hashable {
 /// status-pill enum.
 public typealias ContentDetailTrustCapsule = ContentDetailPill
 
-/// Sticky dock button.
+/// Sticky dock button. `enabled == false` renders the disabled treatment
+/// (sunken fill, muted text, no shadow) — used for the awarded gig's
+/// "Bidding closed" lock CTA.
 public struct ContentDetailDockButton: Sendable, Hashable {
     public let label: String
     public let icon: PantopusIcon?
+    public let enabled: Bool
 
-    public init(label: String, icon: PantopusIcon? = nil) {
+    public init(label: String, icon: PantopusIcon? = nil, enabled: Bool = true) {
         self.label = label
         self.icon = icon
+        self.enabled = enabled
     }
 }
 
@@ -171,254 +212,6 @@ public struct ContentDetailDock: Sendable, Hashable {
     public init(secondary: ContentDetailDockButton? = nil, primary: ContentDetailDockButton) {
         self.secondary = secondary
         self.primary = primary
-    }
-}
-
-// MARK: - Module variants
-
-/// One row in the variable middle section. Open enum so the
-/// backend's `jsonb_modules[]` can extend without touching the shell.
-public enum ContentDetailModule: Sendable, Hashable, Identifiable {
-    case description(ContentDetailDescription)
-    case detailRow(ContentDetailDetailRow)
-    case captionedText(ContentDetailCaptionedText)
-    case photoStrip(ContentDetailPhotoStrip)
-    case similarItems(ContentDetailSimilarStrip)
-    case bids(ContentDetailBidsModule)
-    case fromTo(ContentDetailFromTo)
-    case lineItems(ContentDetailLineItems)
-    case summary(ContentDetailSummary)
-
-    public var id: String {
-        switch self {
-        case let .description(m): "description_\(m.title)"
-        case let .detailRow(m): "detail_\(m.title)"
-        case let .captionedText(m): "caption_\(m.title)"
-        case let .photoStrip(m): "photos_\(m.title)"
-        case let .similarItems(m): "similar_\(m.title)"
-        case let .bids(m): "bids_\(m.title)"
-        case let .fromTo(m): "fromto_\(m.from.name)"
-        case let .lineItems(m): "lineitems_\(m.title)"
-        case .summary: "summary"
-        }
-    }
-}
-
-/// Long paragraph with section title. Used for gigs "What needs doing"
-/// and listings "Description".
-public struct ContentDetailDescription: Sendable, Hashable {
-    public let title: String
-    public let icon: PantopusIcon?
-    public let body: String
-
-    public init(title: String, icon: PantopusIcon?, body: String) {
-        self.title = title
-        self.icon = icon
-        self.body = body
-    }
-}
-
-/// One-line row with map-pin / icon and trailing label (e.g. "Where").
-public struct ContentDetailDetailRow: Sendable, Hashable {
-    public let title: String
-    public let sectionIcon: PantopusIcon?
-    public let rowIcon: PantopusIcon
-    public let label: String
-    public let trailing: String?
-
-    public init(title: String, sectionIcon: PantopusIcon?, rowIcon: PantopusIcon, label: String, trailing: String?) {
-        self.title = title
-        self.sectionIcon = sectionIcon
-        self.rowIcon = rowIcon
-        self.label = label
-        self.trailing = trailing
-    }
-}
-
-/// Free-text caption ("Sat Nov 9 — Sun Nov 10 · flexible morning").
-public struct ContentDetailCaptionedText: Sendable, Hashable {
-    public let title: String
-    public let icon: PantopusIcon?
-    public let label: String
-
-    public init(title: String, icon: PantopusIcon?, label: String) {
-        self.title = title
-        self.icon = icon
-        self.label = label
-    }
-}
-
-/// Horizontal strip of square gradient tiles (no real images yet).
-public struct ContentDetailPhotoStrip: Sendable, Hashable {
-    public let title: String
-    public let icon: PantopusIcon?
-    public let countLabel: String?
-    public let tiles: [ContentDetailPhotoTile]
-
-    public init(title: String, icon: PantopusIcon? = .camera, countLabel: String? = nil, tiles: [ContentDetailPhotoTile]) {
-        self.title = title
-        self.icon = icon
-        self.countLabel = countLabel
-        self.tiles = tiles
-    }
-}
-
-public struct ContentDetailPhotoTile: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let gradient: ListingGradient
-    public let icon: PantopusIcon
-
-    public init(id: String = UUID().uuidString, gradient: ListingGradient, icon: PantopusIcon) {
-        self.id = id
-        self.gradient = gradient
-        self.icon = icon
-    }
-}
-
-/// Horizontal carousel of similar items (listing detail).
-public struct ContentDetailSimilarStrip: Sendable, Hashable {
-    public let title: String
-    public let sub: String?
-    public let items: [ContentDetailSimilarItem]
-
-    public init(title: String, sub: String? = nil, items: [ContentDetailSimilarItem]) {
-        self.title = title
-        self.sub = sub
-        self.items = items
-    }
-}
-
-public struct ContentDetailSimilarItem: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let title: String
-    public let price: String
-    public let gradient: ListingGradient
-
-    public init(id: String, title: String, price: String, gradient: ListingGradient) {
-        self.id = id
-        self.title = title
-        self.price = price
-        self.gradient = gradient
-    }
-}
-
-/// Bid list (gig detail, owner-only — empty array hides the section).
-public struct ContentDetailBidsModule: Sendable, Hashable {
-    public let title: String
-    public let bids: [ContentDetailBidRow]
-
-    public init(title: String, bids: [ContentDetailBidRow]) {
-        self.title = title
-        self.bids = bids
-    }
-}
-
-public struct ContentDetailBidRow: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let initials: String
-    public let displayName: String
-    public let avatarColor: String
-    public let ratingLine: String
-    public let amount: String
-    public let verified: Bool
-
-    public init(
-        id: String,
-        initials: String,
-        displayName: String,
-        avatarColor: String,
-        ratingLine: String,
-        amount: String,
-        verified: Bool
-    ) {
-        self.id = id
-        self.initials = initials
-        self.displayName = displayName
-        self.avatarColor = avatarColor
-        self.ratingLine = ratingLine
-        self.amount = amount
-        self.verified = verified
-    }
-}
-
-/// Invoice-only — two side-by-side party cards (From / To).
-public struct ContentDetailFromTo: Sendable, Hashable {
-    public let from: ContentDetailParty
-    public let to: ContentDetailParty
-
-    public init(from: ContentDetailParty, to: ContentDetailParty) {
-        self.from = from
-        self.to = to
-    }
-}
-
-public struct ContentDetailParty: Sendable, Hashable {
-    public enum Accent: Sendable, Hashable { case business, personal, neutral }
-
-    public let label: String
-    public let name: String
-    public let sub: String
-    public let accent: Accent
-
-    public init(label: String, name: String, sub: String, accent: Accent) {
-        self.label = label
-        self.name = name
-        self.sub = sub
-        self.accent = accent
-    }
-}
-
-/// Invoice-only — line items table.
-public struct ContentDetailLineItems: Sendable, Hashable {
-    public let title: String
-    public let icon: PantopusIcon?
-    public let rows: [ContentDetailLineItem]
-
-    public init(title: String, icon: PantopusIcon? = .file, rows: [ContentDetailLineItem]) {
-        self.title = title
-        self.icon = icon
-        self.rows = rows
-    }
-}
-
-public struct ContentDetailLineItem: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let item: String
-    public let qty: String
-    public let unit: String
-    public let total: String
-
-    public init(id: String = UUID().uuidString, item: String, qty: String, unit: String, total: String) {
-        self.id = id
-        self.item = item
-        self.qty = qty
-        self.unit = unit
-        self.total = total
-    }
-}
-
-/// Invoice-only — subtotal / tax / total summary card.
-public struct ContentDetailSummary: Sendable, Hashable {
-    public let rows: [ContentDetailSummaryRow]
-    public let totalLabel: String
-    public let totalValue: String
-
-    public init(rows: [ContentDetailSummaryRow], totalLabel: String, totalValue: String) {
-        self.rows = rows
-        self.totalLabel = totalLabel
-        self.totalValue = totalValue
-    }
-}
-
-public struct ContentDetailSummaryRow: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let label: String
-    public let value: String
-
-    public init(id: String = UUID().uuidString, label: String, value: String) {
-        self.id = id
-        self.label = label
-        self.value = value
     }
 }
 

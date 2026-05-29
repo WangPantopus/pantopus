@@ -18,6 +18,10 @@ data class ContentDetailCover(
     val placeholderIcon: PantopusIcon,
     val pageCount: Int = 1,
     val activePage: Int = 0,
+    /** Sold treatment: desaturates the hero + stamps a tilted SOLD badge. */
+    val sold: Boolean = false,
+    /** Decorative glass action chips overlaid top-right (share / bookmark). */
+    val glassActions: List<PantopusIcon> = emptyList(),
 )
 
 /** Status / trust pill. */
@@ -28,7 +32,7 @@ data class ContentDetailPill(
     val icon: PantopusIcon? = null,
     val tone: Tone = Tone.Info,
 ) {
-    enum class Tone { Info, Success, Warning, Business, Neutral }
+    enum class Tone { Info, Success, Warning, Business, Neutral, Error }
 }
 
 @Immutable
@@ -45,7 +49,21 @@ data class ContentDetailHero(
     val monoId: String? = null,
     val priceLine: String? = null,
     val priceCaption: String? = null,
-)
+    /** `Auto` → primary600 for listings / appText elsewhere; `Success` → green. */
+    val priceTone: PriceTone = PriceTone.Auto,
+    /** Strikes through the price (listing sold). */
+    val priceStrikethrough: Boolean = false,
+    /** Green sale tag next to a struck price ("Sold for $385"). */
+    val saleTag: String? = null,
+    /** Right-aligned faded label trailing the price ("paid in full"). */
+    val priceTrailingLabel: String? = null,
+    /** Green check disc after the price (invoice paid). */
+    val priceCheckDisc: Boolean = false,
+    /** Pill row under the price (listing condition / pickup / distance). */
+    val inlinePills: List<ContentDetailPill> = emptyList(),
+) {
+    enum class PriceTone { Auto, Success }
+}
 
 @Immutable
 data class ContentDetailStat(
@@ -68,6 +86,8 @@ data class ContentDetailCounterparty(
 data class ContentDetailDockButton(
     val label: String,
     val icon: PantopusIcon? = null,
+    /** `false` renders the disabled treatment (sunken fill, muted text). */
+    val enabled: Boolean = true,
 )
 
 @Immutable
@@ -116,6 +136,68 @@ sealed interface ContentDetailModule {
         val tiles: List<ContentDetailPhotoTile>,
     ) : ContentDetailModule
 
+    /** Pickup → drop-off two-stop card (Magic Task V2). */
+    @Immutable
+    data class TwoStop(
+        override val id: String,
+        val title: String,
+        val icon: PantopusIcon? = PantopusIcon.MapPin,
+        val stops: List<Stop>,
+    ) : ContentDetailModule {
+        enum class StopTone { Primary, Success }
+
+        @Immutable
+        data class Stop(
+            val letter: String,
+            val tone: StopTone,
+            val address: String,
+            val distance: String?,
+        )
+    }
+
+    /** Inline wrap of trust/status capsules placed mid-flow. */
+    @Immutable
+    data class CapsuleRow(
+        override val id: String,
+        val capsules: List<ContentDetailPill>,
+    ) : ContentDetailModule
+
+    /** Key/value detail grid (listing "Details"). */
+    @Immutable
+    data class DetailsGrid(
+        override val id: String,
+        val title: String,
+        val icon: PantopusIcon? = PantopusIcon.AlertCircle,
+        val rows: List<Row>,
+    ) : ContentDetailModule {
+        @Immutable
+        data class Row(val key: String, val value: String)
+    }
+
+    /**
+     * Flexible callout card — awarded banner, Pantopus Pay receipt
+     * capsule, "Alert me when similar appears" row, no-bids empty capsule.
+     */
+    @Immutable
+    data class Callout(
+        override val id: String,
+        val style: Style = Style.Banner,
+        val tone: Tone = Tone.Success,
+        val icon: PantopusIcon,
+        val iconTone: IconTone = IconTone.Success,
+        val title: String,
+        val subtitle: String? = null,
+        val subtitleMono: Boolean = false,
+        val trailingActionLabel: String? = null,
+        val footerPill: String? = null,
+    ) : ContentDetailModule {
+        enum class Style { Banner, Empty }
+
+        enum class Tone { Success, Neutral, Dashed }
+
+        enum class IconTone { Success, SuccessOutline, Primary }
+    }
+
     @Immutable
     data class SimilarStrip(
         override val id: String,
@@ -128,6 +210,7 @@ sealed interface ContentDetailModule {
     data class Bids(
         override val id: String,
         val title: String,
+        val sub: String? = null,
         val bids: List<ContentDetailBidRow>,
     ) : ContentDetailModule
 
@@ -144,7 +227,13 @@ sealed interface ContentDetailModule {
         val title: String,
         val icon: PantopusIcon? = PantopusIcon.File,
         val rows: List<ContentDetailLineItem>,
-    ) : ContentDetailModule
+        val fees: List<ContentDetailSummaryRow> = emptyList(),
+        val totalLabel: String? = null,
+        val totalValue: String? = null,
+        val totalTone: TotalTone = TotalTone.Primary,
+    ) : ContentDetailModule {
+        enum class TotalTone { Primary, Success }
+    }
 
     @Immutable
     data class Summary(
@@ -152,7 +241,10 @@ sealed interface ContentDetailModule {
         val rows: List<ContentDetailSummaryRow>,
         val totalLabel: String,
         val totalValue: String,
-    ) : ContentDetailModule
+        val totalTone: TotalTone = TotalTone.Primary,
+    ) : ContentDetailModule {
+        enum class TotalTone { Primary, Success }
+    }
 }
 
 @Immutable
@@ -178,6 +270,12 @@ data class ContentDetailBidRow(
     val ratingLine: String,
     val amount: String,
     val verified: Boolean,
+    /** Optional tag pill ("fastest reply" / "has van"). */
+    val tag: String? = null,
+    /** Winning bid (awarded) — green tint + Winner pill + green amount. */
+    val won: Boolean = false,
+    /** Losing bid (awarded) — 55% opacity + struck-through amount. */
+    val dimmed: Boolean = false,
 )
 
 @Immutable

@@ -8,8 +8,6 @@
 //  via `POST /api/gigs/:gigId/bids`.
 //
 
-// swiftlint:disable function_body_length
-
 import Foundation
 import Observation
 
@@ -79,31 +77,25 @@ public final class GigDetailViewModel {
 
     // MARK: - Projection
 
+    /// Top-level projection. Splits on the explicit `is_v2` discriminator
+    /// (`GigDTO.isV2`): V2 ("Magic Task") gets the rich surface, legacy V1
+    /// gets the sparse layout (which also carries the awarded terminal
+    /// state). The full design-spec V2 frame — 3-photo strip, trust
+    /// capsules with ratings, per-bid tags — is rendered from
+    /// `GigDetailSampleData` until the Magic Task JSONB is wired through
+    /// the backend (out of scope per P8.2).
     static func project(gig: GigDTO, bids: [GigBidDTO]) -> ContentDetailContent {
+        (gig.isV2 == true) ? projectTaskV2(gig: gig, bids: bids) : projectGigV1(gig: gig, bids: bids)
+    }
+
+    // MARK: V2 (Task) — Magic Task surface
+
+    private static func projectTaskV2(gig: GigDTO, bids: [GigBidDTO]) -> ContentDetailContent {
         let category = GigsCategory.from(backendKey: gig.category)
         let bidCount = gig.bidCount ?? bids.count
-        let statusLabel: String
-        let statusTone: ContentDetailPill.Tone
-        switch gig.status {
-        case "open", nil:
-            statusLabel = bidCount > 0 ? "Open · \(bidCount) \(bidCount == 1 ? "bid" : "bids")" : "Open"
-            statusTone = .warning
-        case "accepted":
-            statusLabel = "Accepted"
-            statusTone = .info
-        case "completed":
-            statusLabel = "Completed"
-            statusTone = .success
-        case "cancelled":
-            statusLabel = "Cancelled"
-            statusTone = .neutral
-        default:
-            statusLabel = gig.status?.capitalized ?? "Open"
-            statusTone = .neutral
-        }
         let metaPieces: [String] = [
             distanceLabel(gig.distanceMiles),
-            relativeAge(gig.createdAt).map { "\($0) ago" }
+            relativeAge(gig.createdAt).map { "posted \($0) ago" }
         ].compactMap { $0 }
         let priceLine = gig.price.map { gigPriceLabel($0, payType: gig.payType) }
         let hero = ContentDetailHero(
@@ -113,65 +105,166 @@ public final class GigDetailViewModel {
             priceLine: priceLine,
             priceCaption: gig.price != nil ? "budget" : nil
         )
-        let stats: [ContentDetailStat] = statRows(gig)
         var modules: [ContentDetailModule] = []
         if let body = gig.description, !body.isEmpty {
-            modules.append(.description(ContentDetailDescription(
-                title: "What needs doing",
-                icon: .file,
-                body: body
+            modules.append(.description(ContentDetailDescription(title: "What needs doing", icon: .clipboardList, body: body)))
+        }
+        modules.append(contentsOf: locationModules(gig))
+        if let scheduledStart = gig.scheduledStart, !scheduledStart.isEmpty {
+            modules.append(.captionedText(ContentDetailCaptionedText(
+                title: "When", icon: .calendar, label: formatScheduledStart(scheduledStart)
+            )))
+        } else if let deadline = gig.deadline, !deadline.isEmpty {
+            modules.append(.captionedText(ContentDetailCaptionedText(
+                title: "By", icon: .calendar, label: formatScheduledStart(deadline)
             )))
         }
+        modules.append(.capsuleRow(ContentDetailCapsuleRow(capsules: [
+            ContentDetailPill(label: "Verified address", icon: .shieldCheck, tone: .info),
+            ContentDetailPill(label: "Local Pantopus job", icon: .check, tone: .success)
+        ])))
+        if bidCount > 0, !bids.isEmpty {
+            modules.append(.bids(ContentDetailBidsModule(title: "\(bidCount) bids", bids: bids.map { projectBid($0) })))
+        } else {
+            modules.append(.callout(ContentDetailCallout(
+                identifier: "be-first",
+                style: .empty,
+                tone: .dashed,
+                icon: .handCoins,
+                iconTone: .primary,
+                title: "Be the first to bid",
+                subtitle: "Fresh posts usually get a hire in the first hour. First three bids land at the top of the list.",
+                footerPill: "neighbors viewing"
+            )))
+        }
+        let statusLabel = bidCount > 0 ? "Open · \(bidCount) \(bidCount == 1 ? "bid" : "bids")" : "Open · No bids yet"
+        return ContentDetailContent(
+            kind: .gig,
+            statusPill: ContentDetailPill(label: statusLabel, icon: .circle, tone: .warning),
+            hero: hero,
+            statStrip: statRows(gig),
+            modules: modules,
+            trustCapsules: [],
+            dock: ContentDetailDock(
+                secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                primary: ContentDetailDockButton(label: "Place bid")
+            )
+        )
+    }
+
+    /// Pickup → drop-off two-stop card when both ends are known, else the
+    /// single-address "Where" row.
+    private static func locationModules(_ gig: GigDTO) -> [ContentDetailModule] {
+        if let pickup = gig.pickupAddress, !pickup.isEmpty,
+           let dropoff = gig.dropoffAddress, !dropoff.isEmpty {
+            let stops = [
+                ContentDetailTwoStop.Stop(
+                    letter: "A", tone: .primary, address: pickup, distance: distanceLabel(gig.distanceMiles)
+                ),
+                ContentDetailTwoStop.Stop(letter: "B", tone: .success, address: dropoff, distance: nil)
+            ]
+            let card = ContentDetailTwoStop(title: "Pickup → drop-off", icon: .mapPin, stops: stops)
+            return [.twoStop(card)]
+        }
         if let pickup = gig.pickupAddress, !pickup.isEmpty {
-            modules.append(.detailRow(ContentDetailDetailRow(
+            let row = ContentDetailDetailRow(
                 title: "Where",
                 sectionIcon: .mapPin,
                 rowIcon: .mapPin,
                 label: pickup,
                 trailing: distanceLabel(gig.distanceMiles)
-            )))
+            )
+            return [.detailRow(row)]
         }
-        if let scheduledStart = gig.scheduledStart, !scheduledStart.isEmpty {
-            modules.append(.captionedText(ContentDetailCaptionedText(
-                title: "When",
-                icon: .calendar,
-                label: formatScheduledStart(scheduledStart)
-            )))
-        } else if let deadline = gig.deadline, !deadline.isEmpty {
-            modules.append(.captionedText(ContentDetailCaptionedText(
-                title: "By",
-                icon: .calendar,
-                label: formatScheduledStart(deadline)
-            )))
-        }
-        if bidCount > 0 && !bids.isEmpty {
-            let rows = bids.map(Self.projectBid)
-            modules.append(.bids(ContentDetailBidsModule(title: "\(bidCount) bids", bids: rows)))
-        }
-        let trust: [ContentDetailTrustCapsule] = [
-            ContentDetailPill(label: "Verified address", icon: .shieldCheck, tone: .info),
-            ContentDetailPill(label: "Local Pantopus job", icon: .check, tone: .success)
-        ]
-        let dock = ContentDetailDock(
-            secondary: ContentDetailDockButton(label: "Message", icon: .send),
-            primary: ContentDetailDockButton(label: "Place bid", icon: nil)
+        return []
+    }
+
+    // MARK: V1 (legacy Gig) — sparse + awarded terminal state
+
+    private static func projectGigV1(gig: GigDTO, bids: [GigBidDTO]) -> ContentDetailContent {
+        let awarded = isAwarded(gig)
+        let bidCount = gig.bidCount ?? bids.count
+        let metaPieces: [String] = [
+            distanceLabel(gig.distanceMiles),
+            gig.scheduledStart.flatMap { $0.isEmpty ? nil : formatScheduledStart($0) }
+        ].compactMap { $0 }
+        let priceLine = gig.price.map { gigPriceLabel($0, payType: gig.payType) }
+        let hero = ContentDetailHero(
+            title: gig.title,
+            categoryChip: nil,
+            meta: metaPieces.isEmpty ? nil : metaPieces.joined(separator: " · "),
+            priceLine: priceLine,
+            priceCaption: gig.price == nil ? nil : (awarded ? "winning bid" : "budget")
         )
+        var modules: [ContentDetailModule] = []
+        if awarded {
+            let awardTitle = awardWinnerName(gig: gig, bids: bids).map { "Awarded to \($0)" } ?? "Awarded"
+            let awardSubtitle = [relativeAge(gig.acceptedAt).map { "\($0) ago" }, "bidding now closed"]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+            modules.append(.callout(ContentDetailCallout(
+                identifier: "awarded",
+                style: .banner,
+                tone: .success,
+                icon: .check,
+                iconTone: .success,
+                title: awardTitle,
+                subtitle: awardSubtitle
+            )))
+        }
+        if let body = gig.description, !body.isEmpty {
+            modules.append(.description(ContentDetailDescription(title: "Description", icon: nil, body: body)))
+        }
+        if let poster = gig.creator?.name ?? gig.creator?.username {
+            let posted = relativeAge(gig.createdAt).map { " · \($0) ago" } ?? ""
+            modules.append(.captionedText(ContentDetailCaptionedText(title: "Posted by", icon: nil, label: "\(poster)\(posted)")))
+        }
+        if !bids.isEmpty {
+            modules.append(.bids(ContentDetailBidsModule(
+                title: "\(bidCount) bids",
+                sub: awarded ? "closed" : nil,
+                bids: bids.map { projectBid($0, acceptedBy: awarded ? gig.acceptedBy : nil) }
+            )))
+        }
         return ContentDetailContent(
             kind: .gig,
-            cover: nil,
-            statusPill: ContentDetailPill(label: statusLabel, icon: .circle, tone: statusTone),
+            statusPill: awarded
+                ? ContentDetailPill(label: "Awarded", icon: .check, tone: .success)
+                : ContentDetailPill(label: "Open", icon: .circle, tone: .warning),
             hero: hero,
-            statStrip: stats,
-            counterparty: nil,
+            statStrip: [],
             modules: modules,
-            trustCapsules: trust,
-            dock: dock
+            trustCapsules: [],
+            dock: awarded
+                ? ContentDetailDock(
+                    secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                    primary: ContentDetailDockButton(label: "Bidding closed", icon: .lock, enabled: false)
+                )
+                : ContentDetailDock(
+                    secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                    primary: ContentDetailDockButton(label: "Place bid")
+                )
         )
+    }
+
+    private static func isAwarded(_ gig: GigDTO) -> Bool {
+        guard let accepted = gig.acceptedBy, !accepted.isEmpty else { return false }
+        switch gig.status {
+        case "accepted", "awarded", "completed", "in_progress": return true
+        default: return false
+        }
+    }
+
+    private static func awardWinnerName(gig: GigDTO, bids: [GigBidDTO]) -> String? {
+        let winner = bids.first { $0.userId == gig.acceptedBy }
+        return winner?.bidder?.name ?? winner?.bidder?.username
     }
 
     private static func statRows(_ gig: GigDTO) -> [ContentDetailStat] {
         var out: [ContentDetailStat] = []
-        if let schedule = gig.scheduleType, !schedule.isEmpty {
+        if let scheduled = gig.scheduledStart, !scheduled.isEmpty {
+            out.append(ContentDetailStat(top: formatScheduledDate(scheduled), bottom: "fixed date"))
+        } else if let schedule = gig.scheduleType, !schedule.isEmpty {
             out.append(ContentDetailStat(top: schedule.replacingOccurrences(of: "_", with: " ").capitalized, bottom: "schedule"))
         }
         if let archetype = gig.taskArchetype, !archetype.isEmpty {
@@ -183,11 +276,13 @@ public final class GigDetailViewModel {
         return Array(out.prefix(3))
     }
 
-    private static func projectBid(_ bid: GigBidDTO) -> ContentDetailBidRow {
+    private static func projectBid(_ bid: GigBidDTO, acceptedBy: String? = nil) -> ContentDetailBidRow {
         let name = bid.bidder?.name ?? bid.bidder?.username ?? "Bidder"
         let initials = name.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }.joined().uppercased()
         let amount = bid.bidAmount ?? bid.amount ?? 0
         let amountLabel = amount.truncatingRemainder(dividingBy: 1) == 0 ? "$\(Int(amount))" : String(format: "$%.2f", amount)
+        let won = acceptedBy != nil && bid.userId == acceptedBy
+        let dimmed = acceptedBy != nil && !won
         return ContentDetailBidRow(
             id: bid.id,
             initials: initials.isEmpty ? "?" : initials,
@@ -195,7 +290,9 @@ public final class GigDetailViewModel {
             avatarColor: "primary",
             ratingLine: "verified neighbor",
             amount: amountLabel,
-            verified: bid.bidder?.verified ?? false
+            verified: bid.bidder?.verified ?? false,
+            won: won,
+            dimmed: dimmed
         )
     }
 
@@ -238,6 +335,17 @@ public final class GigDetailViewModel {
         guard let date else { return iso }
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE MMM d · h:mm a"
+        return formatter.string(from: date)
+    }
+
+    /// Date-only variant used for the V2 stat strip's first cell.
+    private static func formatScheduledDate(_ iso: String) -> String {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+        guard let date else { return iso }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE MMM d"
         return formatter.string(from: date)
     }
 }

@@ -9,19 +9,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
-import app.pantopus.android.data.api.models.gigs.GigBidDto
-import app.pantopus.android.data.api.models.gigs.GigCreator
-import app.pantopus.android.data.api.models.gigs.GigDto
-import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTheme
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * Paparazzi baselines for the T2.6 ContentDetail shell. Three frames
- * proving the same canvas renders gig / listing / invoice from
- * different projected payloads.
+ * Paparazzi baselines for the A09 transactional-detail frames — all four
+ * screens × every designed state (gig V2 populated/no-bids, gig V1
+ * populated/awarded, listing populated/sold, invoice due/paid). Record
+ * with `./gradlew paparazziRecord`.
  */
 class ContentDetailShellSnapshotTest {
     @get:Rule
@@ -34,27 +31,27 @@ class ContentDetailShellSnapshotTest {
                 ),
         )
 
-    @Test
-    fun content_detail_gig_with_bids() {
-        paparazzi.snapshot {
-            Frame {
-                ContentDetailShell(
-                    state = ContentDetailUiState.Loaded(gigContent()),
-                    onBack = {},
-                    onPrimaryAction = {},
-                    onSecondaryAction = {},
-                    onMessageCounterparty = null,
-                )
-            }
-        }
-    }
+    @Test fun task_v2_populated() = snapshot(GigDetailSampleData.taskV2Populated)
 
-    @Test
-    fun content_detail_listing_with_cover_and_offer_dock() {
+    @Test fun task_v2_no_bids() = snapshot(GigDetailSampleData.taskV2NoBids)
+
+    @Test fun gig_v1_populated() = snapshot(GigDetailSampleData.gigV1Populated)
+
+    @Test fun gig_v1_awarded() = snapshot(GigDetailSampleData.gigV1Awarded)
+
+    @Test fun listing_populated() = snapshot(ListingDetailSampleData.populated)
+
+    @Test fun listing_sold() = snapshot(ListingDetailSampleData.sold)
+
+    @Test fun invoice_due() = snapshot(InvoiceDetailViewModel.Projection.fixture("INV-00318"))
+
+    @Test fun invoice_paid() = snapshot(InvoiceDetailViewModel.Projection.paidFixture("INV-00318"))
+
+    private fun snapshot(content: ContentDetailContent) {
         paparazzi.snapshot {
             Frame {
                 ContentDetailShell(
-                    state = ContentDetailUiState.Loaded(listingContent()),
+                    state = ContentDetailUiState.Loaded(content),
                     onBack = {},
                     onPrimaryAction = {},
                     onSecondaryAction = {},
@@ -62,76 +59,6 @@ class ContentDetailShellSnapshotTest {
                 )
             }
         }
-    }
-
-    @Test
-    fun content_detail_invoice_with_line_items_and_full_width_pay_dock() {
-        paparazzi.snapshot {
-            Frame {
-                ContentDetailShell(
-                    state = ContentDetailUiState.Loaded(InvoiceDetailViewModel.Projection.fixture("INV-00247")),
-                    onBack = {},
-                    onPrimaryAction = {},
-                    onSecondaryAction = null,
-                    onMessageCounterparty = null,
-                )
-            }
-        }
-    }
-
-    private fun gigContent(): ContentDetailContent {
-        val gig =
-            GigDto(
-                id = "g1",
-                title = "Hang 3 shelves",
-                description = "Three IKEA Lack shelves on drywall — studs already located and marked.",
-                price = 60.0,
-                category = "handyman",
-                status = "open",
-                userId = "u1",
-                bidCount = 4,
-                distanceMiles = 0.2,
-                pickupAddress = "Rose Court, Unit 4B",
-            )
-        val bids =
-            (1..4).map { i ->
-                GigBidDto(
-                    id = "b$i",
-                    userId = "u$i",
-                    bidAmount = (50 + i * 5).toDouble(),
-                    status = "pending",
-                    bidder =
-                        GigCreator(
-                            id = "u$i",
-                            username = "u$i",
-                            name = "Bidder $i",
-                            verified = true,
-                        ),
-                )
-            }
-        return GigDetailViewModel.Projection.project(gig, bids)
-    }
-
-    private fun listingContent(): ContentDetailContent {
-        val listing =
-            ListingDto(
-                id = "l1",
-                userId = "u1",
-                title = "Mid-century sofa",
-                description = "Walnut frame, original cushions in great shape. Pickup only from West Adams.",
-                price = 320.0,
-                isFree = false,
-                category = "furniture",
-                condition = "like_new",
-                status = "active",
-                mediaUrls = emptyList(),
-                firstImage = null,
-                layer = "goods",
-                listingType = "sell_item",
-                locationName = "West Adams",
-                distanceMeters = 644.0,
-            )
-        return ListingDetailViewModel.Projection.project(listing)
     }
 
     @Composable
