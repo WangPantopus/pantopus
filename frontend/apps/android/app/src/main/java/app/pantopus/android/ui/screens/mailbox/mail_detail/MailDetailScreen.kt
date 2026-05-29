@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "TooManyFunctions", "LongParameterList")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "TooManyFunctions", "LongParameterList", "CyclomaticComplexMethod")
 
 package app.pantopus.android.ui.screens.mailbox.mail_detail
 
@@ -40,6 +40,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GenericMailD
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GigDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.MemoryDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PackageDetailLayout
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.RecordsDetailLayout
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailTopBar
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarConfig
 import app.pantopus.android.ui.theme.PantopusColors
@@ -64,6 +65,7 @@ fun MailDetailScreen(
     val rsvpInFlight by viewModel.rsvpInFlight.collectAsStateWithLifecycle()
     val couponRedeemInFlight by viewModel.couponRedeemInFlight.collectAsStateWithLifecycle()
     val gigBidInFlight by viewModel.gigBidInFlight.collectAsStateWithLifecycle()
+    val recordsFileInFlight by viewModel.recordsFileInFlight.collectAsStateWithLifecycle()
     val saveToVaultInFlight by viewModel.saveToVaultInFlight.collectAsStateWithLifecycle()
     val showsSaveToVault by viewModel.showsSaveToVaultPicker.collectAsStateWithLifecycle()
     val vaultFolders by viewModel.saveToVaultFolders.collectAsStateWithLifecycle()
@@ -86,6 +88,7 @@ fun MailDetailScreen(
                     rsvpInFlight = rsvpInFlight,
                     couponRedeemInFlight = couponRedeemInFlight,
                     gigBidInFlight = gigBidInFlight,
+                    recordsFileInFlight = recordsFileInFlight,
                     saveToVaultInFlight = saveToVaultInFlight,
                     onBack = onBack,
                     onAcknowledge = viewModel::acknowledge,
@@ -93,6 +96,7 @@ fun MailDetailScreen(
                     onRedeemCoupon = viewModel::redeemCoupon,
                     onAcceptGigBid = viewModel::acceptGigBid,
                     onSaveMemory = viewModel::saveMemoryToVault,
+                    onFileRecord = viewModel::fileRecordToVault,
                     onOpenSenderProfile = onOpenSenderProfile,
                     onSaveToVault = viewModel::openSaveToVaultPicker,
                 )
@@ -164,6 +168,7 @@ private fun LoadedLayout(
     rsvpInFlight: Boolean,
     couponRedeemInFlight: Boolean,
     gigBidInFlight: Boolean,
+    recordsFileInFlight: Boolean,
     saveToVaultInFlight: Boolean,
     onBack: () -> Unit,
     onAcknowledge: () -> Unit,
@@ -171,6 +176,7 @@ private fun LoadedLayout(
     onRedeemCoupon: () -> Unit,
     onAcceptGigBid: () -> Unit,
     onSaveMemory: () -> Unit,
+    onFileRecord: () -> Unit,
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
 ) {
@@ -185,6 +191,7 @@ private fun LoadedLayout(
     val gig = content.gigDetail
     val memory = content.memoryDetail
     val pkg = content.packageDetail
+    val records = content.recordsDetail
     when {
         content.category == MailItemCategory.Booklet && booklet != null ->
             BookletDetailLayout(
@@ -252,6 +259,15 @@ private fun LoadedLayout(
                 onBack = onBack,
                 onAcknowledgeDelivery = onAcknowledge,
                 onOpenSenderProfile = onOpenSenderProfile,
+                onSaveToVault = onSaveToVault,
+            )
+        content.category == MailItemCategory.Records && records != null ->
+            RecordsDetailLayout(
+                content = content,
+                records = records,
+                fileInFlight = recordsFileInFlight,
+                onBack = onBack,
+                onFileInVault = onFileRecord,
                 onSaveToVault = onSaveToVault,
             )
         else ->

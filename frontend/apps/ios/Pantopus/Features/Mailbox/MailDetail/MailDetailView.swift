@@ -93,6 +93,8 @@ public struct MailDetailView: View {
             memory(content)
         case .package:
             package(content)
+        case .records:
+            records(content)
         default:
             generic(content)
         }
@@ -209,6 +211,23 @@ public struct MailDetailView: View {
                 ackInFlight: viewModel.ackInFlight,
                 onBack: { onBack() },
                 onAcknowledgeDelivery: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func records(_ content: MailDetailContent) -> some View {
+        if let records = content.recordsDetail {
+            RecordsDetailLayout(
+                content: content,
+                records: records,
+                fileInFlight: viewModel.recordsFileInFlight,
+                onBack: { onBack() },
+                onFileInVault: { Task { await viewModel.fileRecordToVault() } },
                 onOpenSenderProfile: onOpenSenderProfile,
                 onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )

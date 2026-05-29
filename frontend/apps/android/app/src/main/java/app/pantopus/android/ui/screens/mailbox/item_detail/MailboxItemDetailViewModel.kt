@@ -476,6 +476,10 @@ class MailboxItemDetailViewModel
                 is MailboxCategoryPayload.Community -> projectCommunity(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Gig -> projectGig(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Memory -> projectMemory(item, category, payload.detail)
+                // Records (A17.10) is rendered on the live `mail_detail` path
+                // (MailDetailScreen → RecordsDetailLayout). This parallel
+                // item_detail surface treats it as a generic item.
+                is MailboxCategoryPayload.Records -> projectBase(item, category)
                 MailboxCategoryPayload.Other -> projectBase(item, category)
             }
         }
