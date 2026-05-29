@@ -118,14 +118,17 @@ public struct PasswordChangeView: View {
                 identifier: "field_current"
             )
             if viewModel.fields[.current]?.error != nil {
-                Button(action: { viewModel.requestResetLink() }) {
-                    HStack(spacing: Spacing.s1) {
-                        Icon(.mail, size: 12, color: Theme.Color.primary600)
-                        Text("Email me a reset link instead")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.Color.primary600)
+                Button(
+                    action: { viewModel.requestResetLink() },
+                    label: {
+                        HStack(spacing: Spacing.s1) {
+                            Icon(.mail, size: 12, color: Theme.Color.primary600)
+                            Text("Email me a reset link instead")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.Color.primary600)
+                        }
                     }
-                }
+                )
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("passwordChangeResetLink")
             }
@@ -177,25 +180,28 @@ public struct PasswordChangeView: View {
     }
 
     private var updateButton: some View {
-        Button(action: { Task { await viewModel.save() } }) {
-            Group {
-                if viewModel.isSaving {
-                    ProgressView().tint(Theme.Color.appTextInverse)
-                } else {
-                    HStack(spacing: Spacing.s2) {
-                        Icon(
-                            viewModel.isValid ? .keyRound : .lock,
-                            size: 16,
-                            color: viewModel.isValid ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
-                        )
-                        Text("Update password")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(viewModel.isValid ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
+        Button(
+            action: { Task { await viewModel.save() } },
+            label: {
+                Group {
+                    if viewModel.isSaving {
+                        ProgressView().tint(Theme.Color.appTextInverse)
+                    } else {
+                        HStack(spacing: Spacing.s2) {
+                            Icon(
+                                viewModel.isValid ? .keyRound : .lock,
+                                size: 16,
+                                color: viewModel.isValid ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
+                            )
+                            Text("Update password")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(viewModel.isValid ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, minHeight: 50)
             }
-            .frame(maxWidth: .infinity, minHeight: 50)
-        }
+        )
         .background(viewModel.isValid ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .disabled(!viewModel.isValid || viewModel.isSaving)

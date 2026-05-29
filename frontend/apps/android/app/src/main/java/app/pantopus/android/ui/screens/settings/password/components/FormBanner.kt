@@ -28,9 +28,6 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
-/** Tone of a [FormBanner]. */
-enum class FormBannerTone { Error, Info }
-
 /**
  * A13.14 — form-level alert banner pinned to the top of a form body: title +
  * supporting line in a tinted, bordered card with a leading status icon.
