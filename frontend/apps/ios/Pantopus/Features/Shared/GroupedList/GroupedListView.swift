@@ -18,13 +18,20 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     @State private var dataSource: DataSource
     @State private var optimisticOverrides: [String: RowControl] = [:]
     private let onBack: (@MainActor () -> Void)?
+    /// Optional hero / identity strip rendered above the first group
+    /// inside the scrollable area. Used by per-home settings screens
+    /// (A14.1) to host an identity card; nil for vanilla settings
+    /// surfaces.
+    private let headerView: AnyView?
 
     public init(
         dataSource: DataSource,
-        onBack: (@MainActor () -> Void)? = nil
+        onBack: (@MainActor () -> Void)? = nil,
+        headerView: AnyView? = nil
     ) {
         _dataSource = State(initialValue: dataSource)
         self.onBack = onBack
+        self.headerView = headerView
     }
 
     public var body: some View {
@@ -116,6 +123,12 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
     private func loadedFrame(_ groups: [GroupedListGroup]) -> some View {
         ScrollView {
             VStack(spacing: Spacing.s0) {
+                if let headerView {
+                    headerView
+                        .padding(.horizontal, Spacing.s3)
+                        .padding(.top, Spacing.s3)
+                        .accessibilityIdentifier("groupedListHeader")
+                }
                 ForEach(groups) { group in
                     let destructiveRows = group.rows.filter(\.destructive)
                     let regularRows = group.rows.filter { !$0.destructive }

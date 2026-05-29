@@ -61,6 +61,13 @@ object DeepLinkRouter {
         data class HomeMemberRequests(val id: String) : Destination
 
         /**
+         * `pantopus://homes/:id/owners/transfer` — A13.4 Transfer
+         * Ownership form. Lands on the populated state; the form owns
+         * its own biometric bottom sheet.
+         */
+        data class HomeOwnersTransfer(val id: String) : Destination
+
+        /**
          * `pantopus://homes/:id/verify-landlord` — opens the A12.5 /
          * A12.6 wizard.
          */
@@ -94,10 +101,33 @@ object DeepLinkRouter {
         data class VerifyEmail(val token: String, val email: String?) : Destination
 
         /**
+         * `pantopus://mailbox/mailday` — the A13.16 My Mail Day editor.
+         * Routed via the mailbox stack so Back returns to the mailbox
+         * root.
+         */
+        data object MailDay : Destination
+
+        /**
          * `pantopus://businesses/new` — open the A12.10 Create Business
          * wizard inside the active tab's nav stack.
          */
         data object CreateBusiness : Destination
+
+        /**
+         * `pantopus://settings/payments` — A14.6 Settings → Payments
+         * (payments-out · Stripe setup · payout routing). Distinct
+         * from `pantopus://wallet` (earnings-in). Consumed by the
+         * active tab's deep-link router which pushes Settings then
+         * forwards into the Payments route.
+         */
+        data object PaymentsSettings : Destination
+
+        /**
+         * A14.8 — `pantopus://mailbox/vacation` opens the Vacation hold
+         * screen (scheduling or active variant depending on server state
+         * once the persistence layer lands).
+         */
+        data object VacationHold : Destination
 
         data class Unknown(val uri: String) : Destination
     }
@@ -218,6 +248,12 @@ object DeepLinkRouter {
                         } else {
                             Destination.HomeDetail(id)
                         }
+                    "owners" ->
+                        if (trailing.getOrNull(1) == "transfer") {
+                            Destination.HomeOwnersTransfer(id)
+                        } else {
+                            Destination.HomeDetail(id)
+                        }
                     "verify-landlord", "verify_landlord" -> Destination.VerifyLandlord(id)
                     "verify-postcard", "verify_postcard" -> Destination.PostcardVerification(id)
                     else -> Destination.HomeDetail(id)
@@ -243,6 +279,17 @@ object DeepLinkRouter {
             "invite" -> {
                 val token = segments.getOrNull(1)
                 if (token.isNullOrBlank()) Destination.Unknown(raw) else Destination.Invite(token)
+            }
+            "mailbox" -> {
+                // `pantopus://mailbox/vacation` opens A14.8;
+                // `pantopus://mailbox/mailday` opens the A13.16 My Mail Day
+                // editor. Other mailbox paths fall through to Unknown until
+                // they have routes.
+                when (segments.getOrNull(1)) {
+                    "vacation" -> Destination.VacationHold
+                    "mailday" -> Destination.MailDay
+                    else -> Destination.Unknown(raw)
+                }
             }
             "auth" -> {
                 when (segments.getOrNull(1)) {
@@ -275,6 +322,15 @@ object DeepLinkRouter {
                     Destination.Unknown(raw)
                 } else {
                     Destination.VerifyEmail(token = tokenQuery, email = emailQuery)
+                }
+            "settings" ->
+                // `pantopus://settings/payments` — A14.6. Other settings
+                // sub-routes aren't deep-linkable yet; the bare host
+                // `pantopus://settings` falls through to `.Unknown`.
+                if (segments.getOrNull(1) == "payments") {
+                    Destination.PaymentsSettings
+                } else {
+                    Destination.Unknown(raw)
                 }
             else -> Destination.Unknown(raw)
         }

@@ -11,16 +11,50 @@
 import SwiftUI
 
 /// Drawer chips + segmented tab bar, stacked. Sits between the navigation
-/// bar and the list body.
+/// bar and the list body. Above the drawer row sits the A13.16
+/// "My mail day" call-to-action — the host-supplied entry point into
+/// today's triage editor.
 struct MailboxRootHeader: View {
     let viewModel: MailboxRootViewModel
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
+            mailDayCTA
             drawerRow
             tabBar
         }
         .background(Theme.Color.appSurface)
+    }
+
+    private var mailDayCTA: some View {
+        Button(action: viewModel.onOpenMailDay) {
+            HStack(spacing: Spacing.s3) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .fill(Theme.Color.primary50)
+                    Icon(.mailbox, size: 16, strokeWidth: 2.2, color: Theme.Color.primary700)
+                }
+                .frame(width: 32, height: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("My mail day")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Triage today's stack")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: Spacing.s0)
+                Icon(.chevronRight, size: 15, strokeWidth: 2.2, color: Theme.Color.appTextMuted)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Color.appSurface)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("My mail day — triage today's stack")
+        .accessibilityIdentifier("mailboxRootMailDayCTA")
     }
 
     private var drawerRow: some View {

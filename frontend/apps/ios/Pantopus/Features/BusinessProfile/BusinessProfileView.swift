@@ -21,6 +21,9 @@ public struct BusinessProfileView: View {
     private let onShare: @MainActor () -> Void
     private let onOpenReport: @MainActor () -> Void
     private let onOpenWebsite: @MainActor (URL) -> Void
+    /// P4.2 — A13.10 Edit Business Page. Surfaced via the top-bar
+    /// overflow menu when the loaded payload's `viewerIsOwner` is true.
+    private let onEdit: @MainActor () -> Void
 
     public init(
         businessId: String,
@@ -28,7 +31,8 @@ public struct BusinessProfileView: View {
         onOpenMessages: @escaping @MainActor () -> Void = {},
         onShare: @escaping @MainActor () -> Void = {},
         onOpenReport: @escaping @MainActor () -> Void = {},
-        onOpenWebsite: @escaping @MainActor (URL) -> Void = { _ in }
+        onOpenWebsite: @escaping @MainActor (URL) -> Void = { _ in },
+        onEdit: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: BusinessProfileViewModel(businessId: businessId))
         self.onBack = onBack
@@ -36,6 +40,7 @@ public struct BusinessProfileView: View {
         self.onShare = onShare
         self.onOpenReport = onOpenReport
         self.onOpenWebsite = onOpenWebsite
+        self.onEdit = onEdit
     }
 
     public var body: some View {
@@ -60,12 +65,22 @@ public struct BusinessProfileView: View {
             ),
             titleVisibility: .hidden
         ) {
+            if viewerOwnsLoadedBusiness {
+                Button("Edit business page") { onEdit() }
+            }
             Button("Share business") { onShare() }
             Button("Report", role: .destructive) { onOpenReport() }
             Button("Cancel", role: .cancel) {}
         }
         .accessibilityIdentifier("businessProfile")
         .task { await viewModel.load() }
+    }
+
+    private var viewerOwnsLoadedBusiness: Bool {
+        if case let .loaded(payload) = viewModel.state {
+            return payload.viewerIsOwner
+        }
+        return false
     }
 
     @ViewBuilder private var content: some View {

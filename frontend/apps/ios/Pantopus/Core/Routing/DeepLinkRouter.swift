@@ -35,6 +35,10 @@ final class DeepLinkRouter {
         case homeDetail(id: String)
         case homeDashboard(id: String)
         case homeMemberRequests(id: String)
+        /// `pantopus://homes/:id/owners/transfer` — A13.4 Transfer Ownership
+        /// form. Lands on the populated state; the form owns the Face ID
+        /// bottom sheet.
+        case homeOwnersTransfer(id: String)
         /// `pantopus://homes/:id/verify-landlord` — opens A12.5 / A12.6.
         case verifyLandlord(id: String)
         /// `pantopus://homes/:id/verify-postcard` — opens the A12.7
@@ -48,6 +52,12 @@ final class DeepLinkRouter {
         /// wizard inside the active tab's nav stack.
         case createBusiness
         case invite(token: String)
+        /// P4.2 — A13.10 Edit Business Page (owner-only).
+        /// `pantopus://businesses/:id/page-editor`.
+        case editBusinessPage(businessId: String)
+        /// Public business profile reached from a share / push.
+        /// `pantopus://businesses/:id`.
+        case businessProfile(businessId: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
         /// token; the caller invokes `AuthManager.resetPassword` on submit.
@@ -57,9 +67,23 @@ final class DeepLinkRouter {
         /// (the link from the resend / signup flow carries `&email=` so
         /// the screen can render the recipient).
         case verifyEmail(token: String, email: String?)
+        /// A14.8 — `pantopus://mailbox/vacation` opens the Vacation
+        /// hold screen (scheduling or active variant depending on
+        /// server state once the persistence layer lands; today the
+        /// view-model seeds the scheduling form).
+        case vacationHold
+        /// `pantopus://mailbox/mailday` — the A13.16 My Mail Day editor.
+        /// Routed via the mailbox stack so Back returns to the mailbox
+        /// root.
+        case mailDay
         /// `pantopus://wallet` — A10.10 earnings wallet (distinct from
         /// Settings → Payments; this is the earnings-side surface).
         case wallet
+        /// `pantopus://settings/payments` — A14.6 Settings → Payments.
+        /// Distinct from `pantopus://wallet` (earnings-in surface).
+        /// Consumed by the active tab's deep-link router which pushes
+        /// `.menu` then forwards into the Payments stack route.
+        case paymentsSettings
         case unknown(URL)
     }
 
@@ -146,13 +170,17 @@ final class DeepLinkRouter {
             return homeDestination(url: url, segments: segments, tabQuery: tabQuery)
         case "businesses", "business":
             // `pantopus://businesses/new` opens the Create Business wizard.
-            // Other `businesses/:id` paths are owned by the businessProfile
-            // route which lives behind a different host today; fall through
-            // to `.unknown` so they don't silently mis-route.
-            if segments.dropFirst().first == "new" {
+            // `pantopus://businesses/:id/page-editor` opens A13.10 (owner-only).
+            // `pantopus://businesses/:id` opens the public business profile.
+            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            if id == "new" {
                 return .createBusiness
             }
-            return .unknown(url)
+            let trailing = Array(segments.dropFirst(2))
+            if trailing.first == "page-editor" || trailing.first == "page_editor" {
+                return .editBusinessPage(businessId: id)
+            }
+            return .businessProfile(businessId: id)
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
@@ -163,6 +191,8 @@ final class DeepLinkRouter {
             return .connections
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
+        case "mailbox":
+            return mailboxDestination(url: url, segments: segments)
         case "wallet":
             return .wallet
         case "invite":
@@ -178,6 +208,14 @@ final class DeepLinkRouter {
             return resetPasswordDestination(url: url, token: tokenQuery)
         case "verify-email", "verify_email":
             return verifyEmailDestination(url: url, token: tokenQuery, email: emailQuery)
+        case "settings":
+            // `pantopus://settings/payments` — A14.6. Other settings
+            // sub-routes aren't deep-linkable yet; the bare host
+            // `pantopus://settings` falls through to `.unknown`.
+            if segments.dropFirst().first == "payments" {
+                return .paymentsSettings
+            }
+            return .unknown(url)
         default:
             return .unknown(url)
         }
@@ -205,6 +243,9 @@ final class DeepLinkRouter {
         if trailing.first == "members" && tabQuery == "requests" {
             return .homeMemberRequests(id: id)
         }
+        if trailing.first == "owners" && trailing.dropFirst().first == "transfer" {
+            return .homeOwnersTransfer(id: id)
+        }
         if trailing.first == "verify-landlord" || trailing.first == "verify_landlord" {
             return .verifyLandlord(id: id)
         }
@@ -212,6 +253,17 @@ final class DeepLinkRouter {
             return .postcardVerification(id: id)
         }
         return .homeDetail(id: id)
+    }
+
+    private func mailboxDestination(url: URL, segments: [String]) -> Destination {
+        // `pantopus://mailbox/vacation` opens A14.8; `pantopus://mailbox/mailday`
+        // opens the A13.16 My Mail Day editor. Other mailbox paths fall through
+        // to `.unknown` until they have routes.
+        switch segments.dropFirst().first {
+        case "vacation": .vacationHold
+        case "mailday": .mailDay
+        default: .unknown(url)
+        }
     }
 
     private func authDestination(

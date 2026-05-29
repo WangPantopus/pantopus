@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
+import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
 import app.pantopus.android.ui.screens.shared.content_detail.FabCreateCTA
 import app.pantopus.android.ui.screens.shared.content_detail.FabSheetAction
 import app.pantopus.android.ui.screens.shared.content_detail.GridTabsBody
@@ -83,6 +84,9 @@ fun HomeDashboardScreen(
      *  (which owns its own invite FAB) instead of opening the legacy
      *  InviteOwner form. */
     onOpenMembers: ((String) -> Unit)? = null,
+    /** A14.1 (P5.1) — push to the per-home Settings index. Wired from
+     *  the dashboard's top-bar settings affordance. */
+    onOpenSettings: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -216,6 +220,12 @@ fun HomeDashboardScreen(
                             onOpenPropertyDetails?.invoke(homeId) ?: openPlaceholder("property_details")
                         }
                     },
+                    onOpenSettings =
+                        onOpenSettings?.let { handler ->
+                            {
+                                viewModel.currentHomeId()?.let { homeId -> handler(homeId) }
+                            }
+                        },
                 )
             is HomeDashboardUiState.Empty ->
                 DashboardLayout(
@@ -237,6 +247,12 @@ fun HomeDashboardScreen(
                             onOpenPropertyDetails?.invoke(homeId) ?: openPlaceholder("property_details")
                         }
                     },
+                    onOpenSettings =
+                        onOpenSettings?.let { handler ->
+                            {
+                                viewModel.currentHomeId()?.let { homeId -> handler(homeId) }
+                            }
+                        },
                 )
             is HomeDashboardUiState.NeedsAttention ->
                 DashboardLayout(
@@ -258,6 +274,12 @@ fun HomeDashboardScreen(
                             onOpenPropertyDetails?.invoke(homeId) ?: openPlaceholder("property_details")
                         }
                     },
+                    onOpenSettings =
+                        onOpenSettings?.let { handler ->
+                            {
+                                viewModel.currentHomeId()?.let { homeId -> handler(homeId) }
+                            }
+                        },
                 )
             is HomeDashboardUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -335,10 +357,19 @@ private fun DashboardLayout(
     onClaim: () -> Unit,
     onViewClaims: () -> Unit,
     onOpenPropertyDetails: () -> Unit,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
     ContentDetailShell(
         title = "Home",
         onBack = onBack,
+        topBarAction =
+            onOpenSettings?.let {
+                ContentDetailTopBarAction(
+                    icon = PantopusIcon.SlidersHorizontal,
+                    contentDescription = "Home settings",
+                    onClick = it,
+                )
+            },
         cta = {
             FabCreateCTA(
                 actions =

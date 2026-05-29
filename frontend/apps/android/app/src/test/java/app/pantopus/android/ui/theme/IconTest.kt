@@ -225,9 +225,16 @@ class IconTest {
             "warehouse",
             // A15.3 — AI Assistant avatar/reply glyph.
             "bot",
+            // A13.4 — Transfer ownership (biometric face, bidirectional
+            // CTA arrow, "after" caret).
+            "scan-face",
+            "arrow-right-left",
+            "arrow-down",
             // A13.13 — Manage train Organize row glyphs.
             "bar-chart-3",
             "calendar-cog",
+            // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
+            "credit-card",
         )
 
     @Test

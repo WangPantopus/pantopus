@@ -67,7 +67,7 @@ final class CeremonialVariantsSnapshotTests: XCTestCase {
 
     func test_gig_layout_received_renders() {
         assertRenders(
-            GigDetailLayout(
+            GigMailDetailLayout(
                 content: makeContent(category: .gig, title: "Sofa move — bid received"),
                 gig: MailItemSampleData.gigReceived,
                 bidInFlight: false,
@@ -81,7 +81,7 @@ final class CeremonialVariantsSnapshotTests: XCTestCase {
 
     func test_gig_layout_accepted_renders() {
         assertRenders(
-            GigDetailLayout(
+            GigMailDetailLayout(
                 content: makeContent(category: .gig, title: "Sofa move — accepted"),
                 gig: MailItemSampleData.gigAccepted,
                 bidInFlight: false,
@@ -148,6 +148,24 @@ final class CeremonialVariantsSnapshotTests: XCTestCase {
             PackageDetailLayout(
                 content: content,
                 package: MailItemSampleData.packageDelivered,
+                ackInFlight: false,
+                onBack: {},
+                onAcknowledgeDelivery: {},
+                onOpenSenderProfile: { _ in },
+                onSaveToVault: {}
+            )
+        )
+    }
+
+    func test_package_layout_ups_delivered_renders() {
+        let content = MailDetailContent.replacingAck(
+            makeContent(category: .package, title: "UPS package delivered"),
+            with: true
+        )
+        assertRenders(
+            PackageDetailLayout(
+                content: content,
+                package: MailItemSampleData.packageUpsDelivered,
                 ackInFlight: false,
                 onBack: {},
                 onAcknowledgeDelivery: {},

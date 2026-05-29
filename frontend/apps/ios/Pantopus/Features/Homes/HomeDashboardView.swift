@@ -76,6 +76,12 @@ struct HomeDashboardView: View {
     /// "Property details" affordance in the Overview section. Receives
     /// this home's id so the destination can resolve the property.
     private let onOpenPropertyDetails: ((String) -> Void)?
+    /// A14.1 (P5.1) — Push onto the host stack when the user taps the
+    /// top-bar settings affordance. Routes to the per-home Settings
+    /// index. Typed `@MainActor @Sendable` because the closure is
+    /// captured inside the `ContentDetailTopBarAction`'s Sendable
+    /// handler.
+    private let onOpenSettings: (@MainActor @Sendable (String) -> Void)?
 
     init(
         homeId: String,
@@ -94,7 +100,8 @@ struct HomeDashboardView: View {
         onOpenTasks: ((String) -> Void)? = nil,
         onOpenMaintenance: ((String) -> Void)? = nil,
         onOpenMembers: ((String) -> Void)? = nil,
-        onOpenPropertyDetails: ((String) -> Void)? = nil
+        onOpenPropertyDetails: ((String) -> Void)? = nil,
+        onOpenSettings: (@MainActor @Sendable (String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -114,6 +121,7 @@ struct HomeDashboardView: View {
         self.onOpenMaintenance = onOpenMaintenance
         self.onOpenMembers = onOpenMembers
         self.onOpenPropertyDetails = onOpenPropertyDetails
+        self.onOpenSettings = onOpenSettings
     }
 
     /// Current signed-in user's email; used by the Invite Owner form
@@ -151,6 +159,15 @@ struct HomeDashboardView: View {
         ContentDetailShell(
             title: "Home",
             onBack: onBack,
+            topBarAction: onOpenSettings.map { handler in
+                let id = homeId
+                return ContentDetailTopBarAction(
+                    icon: .slidersHorizontal,
+                    accessibilityLabel: "Home settings"
+                ) {
+                    Task { @MainActor in handler(id) }
+                }
+            },
             header: {
                 HomeHeroHeader(
                     address: content.address,
