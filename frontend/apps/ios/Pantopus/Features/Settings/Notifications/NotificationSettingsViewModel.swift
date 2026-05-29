@@ -111,12 +111,12 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
 
     private func groups() -> [GroupedListGroup] {
         var result: [GroupedListGroup] = []
-        if !isPaused { result.append(masterGroup()) }
+        if !isPaused { result.append(globalGroup()) }
         result.append(contentsOf: Self.categories.map(categoryGroup))
         return result
     }
 
-    private func masterGroup() -> GroupedListGroup {
+    private func globalGroup() -> GroupedListGroup {
         GroupedListGroup(
             id: "master",
             overline: "Master",
@@ -205,10 +205,30 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
             title: "Tasks",
             helper: "Push only for things that need a fast reply. Receipts go to email so they're searchable.",
             rows: [
-                CategoryRowSpec(id: "tasks.bids", label: "Bids on my tasks", sub: "Within 5 minutes of posting", seed: ChannelPattern(p: true, e: false, s: false)),
-                CategoryRowSpec(id: "tasks.messages", label: "New messages", sub: "From clients & taskers", seed: ChannelPattern(p: true, e: true, s: false)),
-                CategoryRowSpec(id: "tasks.status", label: "Status updates", sub: "Accepted, on the way, done", seed: ChannelPattern(p: true, e: false, s: false)),
-                CategoryRowSpec(id: "tasks.receipts", label: "Payment receipts", sub: nil, seed: ChannelPattern(p: false, e: true, s: false))
+                CategoryRowSpec(
+                    id: "tasks.bids",
+                    label: "Bids on my tasks",
+                    sub: "Within 5 minutes of posting",
+                    seed: ChannelPattern(p: true, e: false, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "tasks.messages",
+                    label: "New messages",
+                    sub: "From clients & taskers",
+                    seed: ChannelPattern(p: true, e: true, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "tasks.status",
+                    label: "Status updates",
+                    sub: "Accepted, on the way, done",
+                    seed: ChannelPattern(p: true, e: false, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "tasks.receipts",
+                    label: "Payment receipts",
+                    sub: nil,
+                    seed: ChannelPattern(p: false, e: true, s: false)
+                )
             ]
         ),
         Category(
@@ -216,10 +236,30 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
             title: "Pulse",
             helper: "Pulse is quiet by default. Mentions break through, browsing doesn't.",
             rows: [
-                CategoryRowSpec(id: "pulse.replies", label: "Replies to my posts", sub: nil, seed: ChannelPattern(p: true, e: false, s: false)),
-                CategoryRowSpec(id: "pulse.mentions", label: "Mentions", sub: "When a neighbor @s you", seed: ChannelPattern(p: true, e: false, s: false)),
-                CategoryRowSpec(id: "pulse.lostFound", label: "Nearby Lost & Found", sub: "Within 0.5 mi of your address", seed: ChannelPattern(p: false, e: false, s: false)),
-                CategoryRowSpec(id: "pulse.digest", label: "Weekly digest", sub: "Sundays, 8am", seed: ChannelPattern(p: false, e: true, s: false))
+                CategoryRowSpec(
+                    id: "pulse.replies",
+                    label: "Replies to my posts",
+                    sub: nil,
+                    seed: ChannelPattern(p: true, e: false, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "pulse.mentions",
+                    label: "Mentions",
+                    sub: "When a neighbor @s you",
+                    seed: ChannelPattern(p: true, e: false, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "pulse.lostFound",
+                    label: "Nearby Lost & Found",
+                    sub: "Within 0.5 mi of your address",
+                    seed: ChannelPattern(p: false, e: false, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "pulse.digest",
+                    label: "Weekly digest",
+                    sub: "Sundays, 8am",
+                    seed: ChannelPattern(p: false, e: true, s: false)
+                )
             ]
         ),
         Category(
@@ -227,10 +267,30 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
             title: "Marketplace",
             helper: nil,
             rows: [
-                CategoryRowSpec(id: "marketplace.offers", label: "Offers on my listings", sub: nil, seed: ChannelPattern(p: true, e: true, s: false)),
-                CategoryRowSpec(id: "marketplace.buyerMessages", label: "Buyer messages", sub: nil, seed: ChannelPattern(p: true, e: false, s: false)),
-                CategoryRowSpec(id: "marketplace.priceDrops", label: "Price drops on saved items", sub: nil, seed: ChannelPattern(p: false, e: true, s: false)),
-                CategoryRowSpec(id: "marketplace.expiring", label: "Listing expiring soon", sub: "48h before auto-pause", seed: ChannelPattern(p: false, e: true, s: false))
+                CategoryRowSpec(
+                    id: "marketplace.offers",
+                    label: "Offers on my listings",
+                    sub: nil,
+                    seed: ChannelPattern(p: true, e: true, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "marketplace.buyerMessages",
+                    label: "Buyer messages",
+                    sub: nil,
+                    seed: ChannelPattern(p: true, e: false, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "marketplace.priceDrops",
+                    label: "Price drops on saved items",
+                    sub: nil,
+                    seed: ChannelPattern(p: false, e: true, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "marketplace.expiring",
+                    label: "Listing expiring soon",
+                    sub: "48h before auto-pause",
+                    seed: ChannelPattern(p: false, e: true, s: false)
+                )
             ]
         ),
         Category(
@@ -238,10 +298,30 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
             title: "Home & Mailbox",
             helper: "Emergency alerts can't be muted on push.",
             rows: [
-                CategoryRowSpec(id: "home.package", label: "Package arrived", sub: "When carrier scans \"delivered\"", seed: ChannelPattern(p: true, e: true, s: true)),
-                CategoryRowSpec(id: "home.member", label: "Member activity", sub: "Check-ins, new passes, edits", seed: ChannelPattern(p: true, e: false, s: false)),
-                CategoryRowSpec(id: "home.civic", label: "Civic notices", sub: "Permits, service alerts", seed: ChannelPattern(p: true, e: true, s: false)),
-                CategoryRowSpec(id: RowID.emergency, label: "Emergency alerts", sub: nil, seed: ChannelPattern(p: true, e: true, s: true))
+                CategoryRowSpec(
+                    id: "home.package",
+                    label: "Package arrived",
+                    sub: "When carrier scans \"delivered\"",
+                    seed: ChannelPattern(p: true, e: true, s: true)
+                ),
+                CategoryRowSpec(
+                    id: "home.member",
+                    label: "Member activity",
+                    sub: "Check-ins, new passes, edits",
+                    seed: ChannelPattern(p: true, e: false, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "home.civic",
+                    label: "Civic notices",
+                    sub: "Permits, service alerts",
+                    seed: ChannelPattern(p: true, e: true, s: false)
+                ),
+                CategoryRowSpec(
+                    id: RowID.emergency,
+                    label: "Emergency alerts",
+                    sub: nil,
+                    seed: ChannelPattern(p: true, e: true, s: true)
+                )
             ]
         ),
         Category(
@@ -249,9 +329,24 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
             title: "Account & security",
             helper: "Security alerts always come through. You can choose how.",
             rows: [
-                CategoryRowSpec(id: "account.signIn", label: "New sign-in", sub: nil, seed: ChannelPattern(p: true, e: true, s: true)),
-                CategoryRowSpec(id: "account.verification", label: "Verification status", sub: nil, seed: ChannelPattern(p: true, e: true, s: false)),
-                CategoryRowSpec(id: "account.billing", label: "Billing & receipts", sub: nil, seed: ChannelPattern(p: false, e: true, s: false))
+                CategoryRowSpec(
+                    id: "account.signIn",
+                    label: "New sign-in",
+                    sub: nil,
+                    seed: ChannelPattern(p: true, e: true, s: true)
+                ),
+                CategoryRowSpec(
+                    id: "account.verification",
+                    label: "Verification status",
+                    sub: nil,
+                    seed: ChannelPattern(p: true, e: true, s: false)
+                ),
+                CategoryRowSpec(
+                    id: "account.billing",
+                    label: "Billing & receipts",
+                    sub: nil,
+                    seed: ChannelPattern(p: false, e: true, s: false)
+                )
             ]
         )
     ]

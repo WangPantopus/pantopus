@@ -426,8 +426,7 @@ internal object NotificationCatalog {
     )
 
     /** Channels that can't be muted — Emergency keeps push locked on. */
-    fun lockedFor(rowId: String): Set<ChannelGlyph> =
-        if (rowId == EMERGENCY) setOf(ChannelGlyph.P) else emptySet()
+    fun lockedFor(rowId: String): Set<ChannelGlyph> = if (rowId == EMERGENCY) setOf(ChannelGlyph.P) else emptySet()
 
     fun seed(): Map<String, Pattern> = categories.flatMap { it.rows }.associate { it.id to it.seed }
 
@@ -763,4 +762,3 @@ internal object PrivacyCatalog {
 
     fun seedActivity(stealth: Boolean): Map<String, Boolean> = activitySpecs.associate { it.key to !stealth }
 }
-

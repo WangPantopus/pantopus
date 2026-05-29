@@ -10,7 +10,7 @@
 //  failure by emitting a new state.
 //
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 
 import SwiftUI
 
@@ -327,7 +327,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                 e: channelState(on: e, glyph: .e, locked: locked),
                 s: channelState(on: s, glyph: .s, locked: locked),
                 onTap: dataSource.contentDimmed ? nil : { glyph in
-                    flipChannel(rowId: rowId, p: p, e: e, s: s, locked: locked, glyph: glyph)
+                    flipChannel(rowId: rowId, control: control, glyph: glyph)
                 }
             )
             .accessibilityIdentifier("groupedListTriad_\(rowId)")
@@ -486,14 +486,8 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         Task { await dataSource.setSlider(rowId, index: newIndex) }
     }
 
-    private func flipChannel(
-        rowId: String,
-        p: Bool,
-        e: Bool,
-        s: Bool,
-        locked: Set<ChannelGlyph>,
-        glyph: ChannelGlyph
-    ) {
+    private func flipChannel(rowId: String, control: RowControl, glyph: ChannelGlyph) {
+        guard case let .channelTriad(p, e, s, locked) = control else { return }
         guard !locked.contains(glyph) else { return }
         var newP = p, newE = e, newS = s
         let newValue: Bool

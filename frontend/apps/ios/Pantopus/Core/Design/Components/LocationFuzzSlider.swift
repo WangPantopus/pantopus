@@ -10,6 +10,9 @@
 //  Neighborhood. Lives beside `FuzzMap` so the shared `GroupedListView`
 //  can render it without reaching into a feature folder.
 //
+//  Each piece is a small `some View` helper so the SwiftUI type-checker
+//  resolves the nested track/tick/thumb geometry without timing out.
+//
 
 import SwiftUI
 
@@ -33,89 +36,133 @@ public struct LocationFuzzSlider: View {
 
     private var index: Int { stops.firstIndex(of: stop) ?? 0 }
 
+    private var activeFraction: CGFloat {
+        stops.count > 1 ? CGFloat(index) / CGFloat(stops.count - 1) : 0
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
-            Text(leadIn)
-                .font(.system(size: 13.5, weight: .medium))
-                .foregroundStyle(Theme.Color.appTextStrong)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, Spacing.s4)
-                .padding(.top, 14)
-                .padding(.bottom, Spacing.s1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            slider
-                .padding(.horizontal, Spacing.s5)
-                .padding(.top, 14)
-                .padding(.bottom, 18)
-
-            Rectangle()
-                .fill(Theme.Color.appBorder.opacity(0.6))
-                .frame(height: 1)
-                .padding(.leading, Spacing.s4)
-
-            FuzzMap(stop: stop)
-                .padding(.horizontal, Spacing.s4)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity)
+            leadInText
+            sliderSection
+            divider
+            mapSection
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("locationFuzzSlider")
     }
 
-    private var slider: some View {
+    private var leadInText: some View {
+        Text(leadIn)
+            .font(.system(size: 13.5, weight: .medium))
+            .foregroundStyle(Theme.Color.appTextStrong)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, 14)
+            .padding(.bottom, Spacing.s1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var sliderSection: some View {
         VStack(spacing: Spacing.s2) {
             GeometryReader { proxy in
-                let width = proxy.size.width
-                let activeFraction = stops.count > 1 ? CGFloat(index) / CGFloat(stops.count - 1) : 0
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Theme.Color.appBorder)
-                        .frame(height: 4)
-                    Capsule()
-                        .fill(Theme.Color.primary600)
-                        .frame(width: width * activeFraction, height: 4)
-                    ForEach(Array(stops.enumerated()), id: \.offset) { i, _ in
-                        let fraction = stops.count > 1 ? CGFloat(i) / CGFloat(stops.count - 1) : 0
-                        Circle()
-                            .fill(i <= index ? Theme.Color.appSurface : Theme.Color.appBorderStrong)
-                            .frame(width: 6, height: 6)
-                            .overlay(
-                                Circle().stroke(
-                                    i <= index ? Theme.Color.primary600 : Theme.Color.clear,
-                                    lineWidth: 1.5
-                                )
-                            )
-                            .offset(x: width * fraction - 3)
-                    }
-                    Circle()
-                        .fill(Theme.Color.appSurface)
-                        .frame(width: 24, height: 24)
-                        .overlay(Circle().stroke(Theme.Color.primary600, lineWidth: 2))
-                        .shadow(color: .black.opacity(0.18), radius: 3, x: 0, y: 2)
-                        .offset(x: width * activeFraction - 12)
-                }
-                .frame(maxHeight: .infinity, alignment: .center)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in updateStop(locationX: value.location.x, width: width) }
-                )
+                trackStack(width: proxy.size.width)
             }
             .frame(height: 24)
+            stopLabels
+        }
+        .padding(.horizontal, Spacing.s5)
+        .padding(.top, 14)
+        .padding(.bottom, 18)
+    }
 
-            HStack(spacing: Spacing.s0) {
-                ForEach(Array(stops.enumerated()), id: \.offset) { i, fuzzStop in
-                    Text(fuzzStop.label)
-                        .font(.system(size: 10.5, weight: i == index ? .bold : .medium))
-                        .foregroundStyle(i == index ? Theme.Color.appText : Theme.Color.appTextMuted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .multilineTextAlignment(.center)
-                    if i < stops.count - 1 { Spacer(minLength: Spacing.s1) }
+    private func trackStack(width: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            trackBar
+            fillBar(width: width)
+            tickDots(width: width)
+            thumb(width: width)
+        }
+        .frame(maxHeight: .infinity, alignment: .center)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in updateStop(locationX: value.location.x, width: width) }
+        )
+    }
+
+    private var trackBar: some View {
+        Capsule()
+            .fill(Theme.Color.appBorder)
+            .frame(height: 4)
+    }
+
+    private func fillBar(width: CGFloat) -> some View {
+        Capsule()
+            .fill(Theme.Color.primary600)
+            .frame(width: width * activeFraction, height: 4)
+    }
+
+    private func tickDots(width: CGFloat) -> some View {
+        ForEach(Array(stops.enumerated()), id: \.offset) { offset, _ in
+            tickDot(at: offset, width: width)
+        }
+    }
+
+    private func tickDot(at offset: Int, width: CGFloat) -> some View {
+        let fraction = stops.count > 1 ? CGFloat(offset) / CGFloat(stops.count - 1) : 0
+        let filled = offset <= index
+        return Circle()
+            .fill(filled ? Theme.Color.appSurface : Theme.Color.appBorderStrong)
+            .frame(width: 6, height: 6)
+            .overlay(tickRing(filled: filled))
+            .offset(x: width * fraction - 3)
+    }
+
+    private func tickRing(filled: Bool) -> some View {
+        Circle().stroke(filled ? Theme.Color.primary600 : Color.clear, lineWidth: 1.5)
+    }
+
+    private func thumb(width: CGFloat) -> some View {
+        Circle()
+            .fill(Theme.Color.appSurface)
+            .frame(width: 24, height: 24)
+            .overlay(Circle().stroke(Theme.Color.primary600, lineWidth: 2))
+            .shadow(color: .black.opacity(0.18), radius: 3, x: 0, y: 2)
+            .offset(x: width * activeFraction - 12)
+    }
+
+    private var stopLabels: some View {
+        HStack(spacing: Spacing.s0) {
+            ForEach(Array(stops.enumerated()), id: \.offset) { offset, fuzzStop in
+                stopLabel(at: offset, label: fuzzStop.label)
+                if offset < stops.count - 1 {
+                    Spacer(minLength: Spacing.s1)
                 }
             }
         }
+    }
+
+    private func stopLabel(at offset: Int, label: String) -> some View {
+        Text(label)
+            .font(.system(size: 10.5, weight: offset == index ? .bold : .medium))
+            .foregroundStyle(offset == index ? Theme.Color.appText : Theme.Color.appTextMuted)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .multilineTextAlignment(.center)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Theme.Color.appBorder.opacity(0.6))
+            .frame(height: 1)
+            .padding(.leading, Spacing.s4)
+    }
+
+    private var mapSection: some View {
+        FuzzMap(stop: stop)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
     }
 
     private func updateStop(locationX: CGFloat, width: CGFloat) {
@@ -128,28 +175,11 @@ public struct LocationFuzzSlider: View {
 }
 
 #Preview("Location fuzz slider") {
-    StatefulPreviewWrapper(FuzzStop.blockDefault) { binding in
-        LocationFuzzSlider(
-            leadIn: "How exact your task and listing pins appear on the map.",
-            stop: binding.wrappedValue,
-            onChange: { binding.wrappedValue = $0 }
-        )
+    LocationFuzzSlider(
+        leadIn: "How exact your task and listing pins appear on the map.",
+        stop: .blockDefault
+    ) { _ in }
         .background(Theme.Color.appSurface)
         .padding(Spacing.s3)
         .background(Theme.Color.appBg)
-    }
-}
-
-/// Tiny preview helper so the slider's `onChange` drives a live `@State`
-/// in the Xcode canvas. Test-only — never shipped in a real screen.
-private struct StatefulPreviewWrapper<Value, Content: View>: View {
-    @State private var value: Value
-    private let content: (Binding<Value>) -> Content
-
-    init(_ initial: Value, @ViewBuilder content: @escaping (Binding<Value>) -> Content) {
-        _value = State(initialValue: initial)
-        self.content = content
-    }
-
-    var body: some View { content($value) }
 }

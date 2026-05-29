@@ -28,7 +28,7 @@ final class NotificationSettingsViewModelTests: XCTestCase {
 
     // MARK: - Populated frame
 
-    func testPopulatedProducesMasterPlusFiveCategories() async {
+    func testPopulatedProducesGlobalPlusFiveCategories() async {
         let vm = NotificationSettingsViewModel(variant: .populated)
         let groups = await loadedGroups(vm)
         XCTAssertEqual(
@@ -55,11 +55,11 @@ final class NotificationSettingsViewModelTests: XCTestCase {
         }
     }
 
-    func testMasterCardIsToggleAndChevron() async {
+    func testGlobalCardIsToggleAndChevron() async {
         let vm = NotificationSettingsViewModel(variant: .populated)
         let groups = await loadedGroups(vm)
-        let master = groups.first { $0.id == "master" }
-        XCTAssertEqual(master?.showsChannelHeader, false)
+        let globalCard = groups.first { $0.id == "master" }
+        XCTAssertEqual(globalCard?.showsChannelHeader, false)
         guard case .toggle(false)? = row(groups, NotificationSettingsViewModel.RowID.pauseAll)?.control else {
             return XCTFail("Pause-all should be an off toggle in the populated frame")
         }
@@ -115,7 +115,7 @@ final class NotificationSettingsViewModelTests: XCTestCase {
 
     // MARK: - Paused frame
 
-    func testPauseAllSwapsMasterForBannerAndDims() async {
+    func testPauseAllSwapsGlobalForBannerAndDims() async {
         let vm = NotificationSettingsViewModel(variant: .populated)
         _ = await loadedGroups(vm)
         await vm.toggleRow(NotificationSettingsViewModel.RowID.pauseAll, isOn: true)
@@ -139,7 +139,7 @@ final class NotificationSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(groups.map(\.id), ["tasks", "pulse", "marketplace", "homeMailbox", "accountSecurity"])
     }
 
-    func testResumeRestoresMaster() async {
+    func testResumeRestoresGlobal() async {
         let vm = NotificationSettingsViewModel(variant: .paused)
         _ = await loadedGroups(vm)
         await vm.tapBanner()

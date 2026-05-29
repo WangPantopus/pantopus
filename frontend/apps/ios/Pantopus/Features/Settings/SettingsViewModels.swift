@@ -10,7 +10,7 @@
 //  files under `Features/Settings/{Notifications,Privacy}/`.
 //
 
-// swiftlint:disable cyclomatic_complexity file_length large_tuple
+// swiftlint:disable cyclomatic_complexity
 
 import Foundation
 import Observation
@@ -234,4 +234,3 @@ public enum SettingsRoute: Sendable, Hashable {
     case reviewClaims
     case didSignOut
 }
-
