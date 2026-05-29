@@ -23,7 +23,7 @@ struct VaultBreadcrumb: View {
     let trail: [RecordsVaultCrumb]
     let retentionLine: String
     let isFiled: Bool
-    var onChangeFolder: (@MainActor () -> Void)? = nil
+    var onChangeFolder: (@MainActor () -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -156,9 +156,8 @@ struct VaultBreadcrumb: View {
     VaultBreadcrumb(
         trail: RecordsSampleData.record.vaultTrail,
         retentionLine: RecordsSampleData.record.retentionLine,
-        isFiled: false,
-        onChangeFolder: {}
-    )
+        isFiled: false
+    ) {}
     .padding(Spacing.s4)
     .background(Theme.Color.appBg)
 }

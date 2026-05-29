@@ -20,12 +20,24 @@ data class RecordsIssuer(
         @Suppress("UNCHECKED_CAST")
         fun decode(value: Any?): RecordsIssuer? {
             val map = value as? Map<String, Any?> ?: return null
-            val initials = map["initials"] as? String ?: return null
-            val name = map["name"] as? String ?: return null
-            val dept = map["dept"] as? String ?: return null
-            val identifier = map["identifier"] as? String ?: return null
-            val trustNote = map["trust_note"] as? String ?: return null
-            return RecordsIssuer(initials, name, dept, identifier, trustNote)
+            val initials = map["initials"] as? String
+            val name = map["name"] as? String
+            val dept = map["dept"] as? String
+            val identifier = map["identifier"] as? String
+            val trustNote = map["trust_note"] as? String
+
+            val requiredFields = listOf(initials, name, dept, identifier, trustNote)
+            if (requiredFields.any { it == null }) {
+                return null
+            }
+
+            return RecordsIssuer(
+                initials = requireNotNull(initials),
+                name = requireNotNull(name),
+                dept = requireNotNull(dept),
+                identifier = requireNotNull(identifier),
+                trustNote = requireNotNull(trustNote),
+            )
         }
     }
 }

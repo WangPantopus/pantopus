@@ -39,8 +39,11 @@ public struct RecordsIssuer: Sendable, Hashable {
               let trustNote = dict["trust_note"]?.stringValue
         else { return nil }
         return RecordsIssuer(
-            initials: initials, name: name, dept: dept,
-            identifier: identifier, trustNote: trustNote
+            initials: initials,
+            name: name,
+            dept: dept,
+            identifier: identifier,
+            trustNote: trustNote
         )
     }
 }

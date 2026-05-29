@@ -217,7 +217,6 @@ class CeremonialVariantsSnapshotTest {
                     fileInFlight = false,
                     onBack = {},
                     onFileInVault = {},
-                    onOpenSenderProfile = {},
                     onSaveToVault = {},
                 )
             }
@@ -234,6 +233,13 @@ class CeremonialVariantsSnapshotTest {
                     fileInFlight = false,
                     onBack = {},
                     onFileInVault = {},
+                    onSaveToVault = {},
+                )
+            }
+        }
+    }
+
+    @Test
     fun package_layout_ups_delivered() {
         paparazzi.snapshot {
             Root {

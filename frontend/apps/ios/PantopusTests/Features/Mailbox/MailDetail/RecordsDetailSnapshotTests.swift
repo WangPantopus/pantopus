@@ -58,9 +58,8 @@ final class RecordsDetailSnapshotTests: XCTestCase {
             VaultBreadcrumb(
                 trail: MailItemSampleData.recordsOpen.vaultTrail,
                 retentionLine: MailItemSampleData.recordsOpen.retentionLine,
-                isFiled: false,
-                onChangeFolder: {}
-            )
+                isFiled: false
+            ) {}
         )
         assertRenders(
             RelatedRecords(records: MailItemSampleData.recordsFiled.related, total: 8)

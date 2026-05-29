@@ -81,7 +81,6 @@ fun RecordsDetailLayout(
     fileInFlight: Boolean,
     onBack: () -> Unit,
     onFileInVault: () -> Unit,
-    onOpenSenderProfile: (String) -> Unit = {},
     onSaveToVault: () -> Unit = {},
 ) {
     Box(modifier = Modifier.testTag("mailDetail_records")) {
@@ -265,8 +264,16 @@ private fun PaperStackPreview(records: RecordsDetailDto) {
                 modifier = Modifier.fillMaxSize().clip(RectangleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(modifier = Modifier.graphicsLayer { scaleX = 0.55f; scaleY = 0.55f }) {
-                    PaperStack { Letterhead(records = records) }
+                Box(
+                    modifier =
+                        Modifier.graphicsLayer {
+                            scaleX = 0.55f
+                            scaleY = 0.55f
+                        },
+                ) {
+                    PaperStack {
+                        Letterhead(records = records)
+                    }
                 }
             }
             PageCountChip(pageCount = records.pageCount, modifier = Modifier.align(Alignment.TopEnd))

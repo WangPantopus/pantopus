@@ -44,9 +44,8 @@ struct RecordsDetailLayout: View {
                     VaultBreadcrumb(
                         trail: records.vaultTrail,
                         retentionLine: records.retentionLine,
-                        isFiled: records.isFiled,
-                        onChangeFolder: {}
-                    )
+                        isFiled: records.isFiled
+                    ) {}
                     if records.isFiled, !records.related.isEmpty {
                         RelatedRecords(records: records.related, total: 8)
                     }
