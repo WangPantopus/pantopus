@@ -524,7 +524,6 @@ enum class PantopusIcon(
     BellOff("bell-off"),
     Minus("minus"),
     UserMinus("user-minus"),
-    CalendarCheck("calendar-check"),
     CalendarPlus("calendar-plus"),
     ;
 
@@ -851,7 +850,6 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.BellOff -> IconSource.Material(Icons.Filled.NotificationsOff)
         PantopusIcon.Minus -> IconSource.Material(Icons.Filled.Remove)
         PantopusIcon.UserMinus -> IconSource.Material(Icons.Filled.PersonRemove)
-        PantopusIcon.CalendarCheck -> IconSource.Material(Icons.Filled.EventAvailable)
         PantopusIcon.CalendarPlus -> IconSource.Material(Icons.Filled.EventNote)
     }
 
