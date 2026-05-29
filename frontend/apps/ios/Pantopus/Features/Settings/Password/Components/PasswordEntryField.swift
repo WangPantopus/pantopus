@@ -117,7 +117,7 @@ public struct PasswordEntryField: View {
         }
     }
 
-    @ViewBuilder private var trailing: some View {
+    private var trailing: some View {
         HStack(spacing: Spacing.s2) {
             switch state {
             case .valid: Icon(.checkCircle, size: 18, color: Theme.Color.success)
