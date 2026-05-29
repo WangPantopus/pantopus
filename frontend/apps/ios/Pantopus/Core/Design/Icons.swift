@@ -316,7 +316,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
 
     // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
     // dress / forecast vibe rows, ± plus-one stepper, RSVP cluster Can't
-    // chip, calendar-hold CTA, and the bell-off mute affordance.
+    // chip, calendar-plus CTA, and the bell-off mute affordance.
     case quote
     case cloudSun = "cloud-sun"
     case shirt
@@ -324,7 +324,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case bellOff = "bell-off"
     case minus
     case userMinus = "user-minus"
-    case calendarCheck = "calendar-check"
     case calendarPlus = "calendar-plus"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
@@ -570,8 +569,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .calendarCog: "calendar.badge.clock"
         // A17.9 Party. SF Symbols ships direct quote / cloud.sun /
         // tshirt.fill / xmark.circle / bell.slash / minus glyphs;
-        // user-minus collapses to `person.badge.minus`, and the
-        // calendar-check / calendar-plus pair maps onto the badge variants.
+        // user-minus collapses to `person.badge.minus`; calendar-plus maps
+        // onto the badge-plus variant.
         case .quote: "quote.bubble"
         case .cloudSun: "cloud.sun"
         case .shirt: "tshirt.fill"
@@ -579,7 +578,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .bellOff: "bell.slash"
         case .minus: "minus"
         case .userMinus: "person.badge.minus"
-        case .calendarCheck: "calendar.badge.checkmark"
         case .calendarPlus: "calendar.badge.plus"
         }
     }
