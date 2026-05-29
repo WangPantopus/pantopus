@@ -95,6 +95,8 @@ public struct MailDetailView: View {
             package(content)
         case .party:
             party(content)
+        case .records:
+            records(content)
         default:
             generic(content)
         }
@@ -231,6 +233,23 @@ public struct MailDetailView: View {
                 onAdjustPlusOne: { count in Task { await viewModel.setPartyPlusOneCount(count) } },
                 onClaimBring: { index in Task { await viewModel.togglePartyBringClaim(at: index, byName: "You") } },
                 onReleaseBring: { index in Task { await viewModel.togglePartyBringClaim(at: index, byName: nil) } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            )
+        } else {
+            generic(content)
+        }
+    }
+
+    @ViewBuilder
+    private func records(_ content: MailDetailContent) -> some View {
+        if let records = content.recordsDetail {
+            RecordsDetailLayout(
+                content: content,
+                records: records,
+                fileInFlight: viewModel.recordsFileInFlight,
+                onBack: { onBack() },
+                onFileInVault: { Task { await viewModel.fileRecordToVault() } },
                 onOpenSenderProfile: onOpenSenderProfile,
                 onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )

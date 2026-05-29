@@ -90,6 +90,20 @@ extension MailDetailContent {
         return rebuild(content, partyDetail: party.withBringClaim(at: index, by: name))
     }
 
+    /// Return a copy of `content` with the records detail's `isFiled`
+    /// flag flipped. Used by the optimistic `fileRecordToVault` flow.
+    static func replacingRecordsFiled(
+        _ content: MailDetailContent,
+        with value: Bool,
+        filedAtLabel: String? = nil
+    ) -> MailDetailContent {
+        guard let records = content.recordsDetail else { return content }
+        return rebuild(
+            content,
+            recordsDetail: records.withFiled(value, filedAtLabel: filedAtLabel)
+        )
+    }
+
     /// Shared rebuilder so the per-field mutations stay one line each.
     /// Every parameter defaults to "keep the existing field"; pass only
     /// the field(s) you intend to flip.
@@ -104,7 +118,8 @@ extension MailDetailContent {
         gigDetail: GigDetailDTO?? = nil,
         memoryDetail: MemoryDetailDTO?? = nil,
         packageDetail: PackageBodyContent?? = nil,
-        partyDetail: PartyDetailDTO?? = nil
+        partyDetail: PartyDetailDTO?? = nil,
+        recordsDetail: RecordsDetailDTO?? = nil
     ) -> MailDetailContent {
         MailDetailContent(
             mailId: content.mailId,
@@ -136,7 +151,8 @@ extension MailDetailContent {
             gigDetail: gigDetail ?? content.gigDetail,
             memoryDetail: memoryDetail ?? content.memoryDetail,
             packageDetail: packageDetail ?? content.packageDetail,
-            partyDetail: partyDetail ?? content.partyDetail
+            partyDetail: partyDetail ?? content.partyDetail,
+            recordsDetail: recordsDetail ?? content.recordsDetail
         )
     }
 }

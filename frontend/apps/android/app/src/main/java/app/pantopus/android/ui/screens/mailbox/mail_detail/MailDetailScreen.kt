@@ -1,11 +1,4 @@
-@file:Suppress(
-    "PackageNaming",
-    "MagicNumber",
-    "LongMethod",
-    "TooManyFunctions",
-    "LongParameterList",
-    "CyclomaticComplexMethod",
-)
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "TooManyFunctions", "LongParameterList", "CyclomaticComplexMethod")
 
 package app.pantopus.android.ui.screens.mailbox.mail_detail
 
@@ -49,6 +42,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GigDetailLay
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.MemoryDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PackageDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PartyDetailLayout
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.RecordsDetailLayout
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailTopBar
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarConfig
 import app.pantopus.android.ui.theme.PantopusColors
@@ -74,6 +68,7 @@ fun MailDetailScreen(
     val couponRedeemInFlight by viewModel.couponRedeemInFlight.collectAsStateWithLifecycle()
     val gigBidInFlight by viewModel.gigBidInFlight.collectAsStateWithLifecycle()
     val partyRsvpInFlight by viewModel.partyRsvpInFlight.collectAsStateWithLifecycle()
+    val recordsFileInFlight by viewModel.recordsFileInFlight.collectAsStateWithLifecycle()
     val saveToVaultInFlight by viewModel.saveToVaultInFlight.collectAsStateWithLifecycle()
     val showsSaveToVault by viewModel.showsSaveToVaultPicker.collectAsStateWithLifecycle()
     val vaultFolders by viewModel.saveToVaultFolders.collectAsStateWithLifecycle()
@@ -97,6 +92,7 @@ fun MailDetailScreen(
                     couponRedeemInFlight = couponRedeemInFlight,
                     gigBidInFlight = gigBidInFlight,
                     partyRsvpInFlight = partyRsvpInFlight,
+                    recordsFileInFlight = recordsFileInFlight,
                     saveToVaultInFlight = saveToVaultInFlight,
                     onBack = onBack,
                     onAcknowledge = viewModel::acknowledge,
@@ -108,6 +104,7 @@ fun MailDetailScreen(
                     onPartyAdjustPlusOne = viewModel::setPartyPlusOneCount,
                     onPartyClaimBring = { index -> viewModel.togglePartyBringClaim(index, "You") },
                     onPartyReleaseBring = { index -> viewModel.togglePartyBringClaim(index, null) },
+                    onFileRecord = viewModel::fileRecordToVault,
                     onOpenSenderProfile = onOpenSenderProfile,
                     onSaveToVault = viewModel::openSaveToVaultPicker,
                 )
@@ -180,6 +177,7 @@ private fun LoadedLayout(
     couponRedeemInFlight: Boolean,
     gigBidInFlight: Boolean,
     partyRsvpInFlight: Boolean,
+    recordsFileInFlight: Boolean,
     saveToVaultInFlight: Boolean,
     onBack: () -> Unit,
     onAcknowledge: () -> Unit,
@@ -191,6 +189,7 @@ private fun LoadedLayout(
     onPartyAdjustPlusOne: (Int) -> Unit,
     onPartyClaimBring: (Int) -> Unit,
     onPartyReleaseBring: (Int) -> Unit,
+    onFileRecord: () -> Unit,
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
 ) {
@@ -206,6 +205,7 @@ private fun LoadedLayout(
     val memory = content.memoryDetail
     val pkg = content.packageDetail
     val party = content.partyDetail
+    val records = content.recordsDetail
     when {
         content.category == MailItemCategory.Booklet && booklet != null ->
             BookletDetailLayout(
@@ -286,6 +286,15 @@ private fun LoadedLayout(
                 onClaimBring = onPartyClaimBring,
                 onReleaseBring = onPartyReleaseBring,
                 onOpenSenderProfile = onOpenSenderProfile,
+                onSaveToVault = onSaveToVault,
+            )
+        content.category == MailItemCategory.Records && records != null ->
+            RecordsDetailLayout(
+                content = content,
+                records = records,
+                fileInFlight = recordsFileInFlight,
+                onBack = onBack,
+                onFileInVault = onFileRecord,
                 onSaveToVault = onSaveToVault,
             )
         else ->

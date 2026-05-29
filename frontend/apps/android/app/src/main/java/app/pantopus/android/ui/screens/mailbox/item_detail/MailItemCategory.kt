@@ -8,7 +8,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
- * 18-category enum for mailbox items. Maps 1:1 to the backend
+ * 20-category enum for mailbox items. Maps 1:1 to the backend
  * `mail.mail_type` string — unknown values fall through to [General].
  *
  * T6.5b extends each case with the per-category icon, rowBackground,
@@ -179,6 +179,15 @@ enum class MailItemCategory(
         rowBackground = PantopusColors.errorBg,
         label = "Party",
         detailTrust = MailDetailTrust.Celebration,
+    ),
+    Records(
+        raw = "records",
+        // Slate-600 per A17.10 archival accent — institutional, archival.
+        accent = PantopusColors.categoryRecords,
+        icon = PantopusIcon.Archive,
+        rowBackground = PantopusColors.categoryRecordsBg,
+        label = "Records",
+        detailTrust = MailDetailTrust.Verified,
     ),
     General(
         raw = "general",

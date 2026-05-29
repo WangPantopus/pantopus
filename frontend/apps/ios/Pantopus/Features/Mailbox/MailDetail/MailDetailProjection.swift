@@ -33,7 +33,7 @@ extension MailDetailViewModel {
         let variants = decodeVariantDetails(category: category, object: detail.object)
         let resolvedAck = isAcknowledged || (variants.certified?.isAcknowledged ?? false)
         let detailTrust: MailDetailTrust = switch category {
-        case .certified, .community, .legal, .tax: .verified
+        case .certified, .community, .legal, .tax, .records: .verified
         case .party: .celebration
         default: trust.detailTrust
         }
@@ -67,7 +67,8 @@ extension MailDetailViewModel {
             gigDetail: variants.gig,
             memoryDetail: variants.memory,
             packageDetail: variants.package,
-            partyDetail: variants.party
+            partyDetail: variants.party,
+            recordsDetail: variants.records
         )
     }
 
@@ -136,6 +137,7 @@ private struct MailVariantDetails {
     let memory: MemoryDetailDTO?
     let package: PackageBodyContent?
     let party: PartyDetailDTO?
+    let records: RecordsDetailDTO?
 }
 
 private func bodyParagraphs(from content: String?) -> [String] {
@@ -165,6 +167,7 @@ private func decodeVariantDetails(
         // this fallback becomes dead code we can drop.
         party: category == .party
             ? (PartyDetailDTO.decode(from: object) ?? MailItemSampleData.partyInvite)
-            : nil
+            : nil,
+        records: category == .records ? RecordsDetailDTO.decode(from: object) : nil
     )
 }

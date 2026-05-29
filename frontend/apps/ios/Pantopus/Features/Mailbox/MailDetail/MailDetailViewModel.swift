@@ -43,6 +43,9 @@ public final class MailDetailViewModel {
     public private(set) var gigBidInFlight: Bool = false
     /// Party RSVP mutation is in-flight; disables the three-way cluster.
     public private(set) var partyRsvpInFlight: Bool = false
+    /// A17.10 — Records file-to-vault mutation in-flight; disables the
+    /// "File in vault" CTA while the optimistic flip is rolling.
+    public private(set) var recordsFileInFlight: Bool = false
     /// T6.5e — Save-to-vault picker visibility. The view binds a
     /// confirmation dialog to this flag; tapping a folder calls
     /// `saveToVault(folderId:)`.
@@ -278,6 +281,39 @@ public final class MailDetailViewModel {
             return
         }
         await saveToVault(folderId: folderId)
+    }
+
+    /// A17.10 — File the archival record straight to its suggested vault
+    /// folder. Stub: flips the local `isFiled` flag and surfaces a toast;
+    /// the real backend vault-filing route is out of scope for this PR
+    /// (per the task brief). When the route lands, swap the optimistic
+    /// flip for an awaited request and keep the rollback shape from the
+    /// other ceremonial variants.
+    public func fileRecordToVault() async {
+        guard case let .loaded(content) = state,
+              content.category == .records,
+              let records = content.recordsDetail,
+              !records.isFiled,
+              !recordsFileInFlight else { return }
+        recordsFileInFlight = true
+        defer { recordsFileInFlight = false }
+        let filedLabel = Self.formatFiledAtNow()
+        let optimistic = MailDetailContent.replacingRecordsFiled(
+            content,
+            with: true,
+            filedAtLabel: filedLabel
+        )
+        state = .loaded(optimistic)
+        toast = "Filed in Vault"
+    }
+
+    /// Format the "filed at" stamp for the optimistic local flip.
+    /// "Today 2:14 PM · retention 7y" — matches the design's stamp copy.
+    private static func formatFiledAtNow() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        return "Today \(formatter.string(from: Date())) · retention 7y"
     }
 
     // MARK: - Save to vault (T6.5e / P19.5)

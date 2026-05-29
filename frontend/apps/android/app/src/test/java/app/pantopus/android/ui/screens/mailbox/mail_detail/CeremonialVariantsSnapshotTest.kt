@@ -18,6 +18,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GenericMailD
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.GigDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.MemoryDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PackageDetailLayout
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.RecordsDetailLayout
 import app.pantopus.android.ui.theme.PantopusColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -196,6 +197,57 @@ class CeremonialVariantsSnapshotTest {
                         makeContent(category = MailItemCategory.Package, title = "Delivered")
                             .copy(isAcknowledged = true),
                     packageDetail = MailItemSampleData.packageDelivered,
+                    ackInFlight = false,
+                    onBack = {},
+                    onAcknowledgeDelivery = {},
+                    onOpenSenderProfile = {},
+                    onSaveToVault = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun records_layout_open() {
+        paparazzi.snapshot {
+            Root {
+                RecordsDetailLayout(
+                    content = makeContent(category = MailItemCategory.Records, title = "Q1 2026 Statement"),
+                    records = MailItemSampleData.recordsOpen,
+                    fileInFlight = false,
+                    onBack = {},
+                    onFileInVault = {},
+                    onSaveToVault = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun records_layout_filed() {
+        paparazzi.snapshot {
+            Root {
+                RecordsDetailLayout(
+                    content = makeContent(category = MailItemCategory.Records, title = "Filed statement"),
+                    records = MailItemSampleData.recordsFiled,
+                    fileInFlight = false,
+                    onBack = {},
+                    onFileInVault = {},
+                    onSaveToVault = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun package_layout_ups_delivered() {
+        paparazzi.snapshot {
+            Root {
+                PackageDetailLayout(
+                    content =
+                        makeContent(category = MailItemCategory.Package, title = "UPS package delivered")
+                            .copy(isAcknowledged = true),
+                    packageDetail = MailItemSampleData.packageUpsDelivered,
                     ackInFlight = false,
                     onBack = {},
                     onAcknowledgeDelivery = {},

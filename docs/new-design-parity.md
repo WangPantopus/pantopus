@@ -531,10 +531,11 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
 - **Per-frame deltas:** verify hero card (polaroid frame + caption + date-from line) and the Save-to-Vault / saved-pill action swap.
 
 ### A17.8 — Package
-- **iOS:** **MISSING**
-- **Android:** **MISSING** (no PackageBody body file).
-- **Status:** **BUILD** (both platforms)
-- **Required slots:** Package hero (carrier badge · tracking number mono · status pill), Tracking timeline, KeyFacts (carrier · service · dimensions · weight), package photo (front-door snapshot if delivered), `Track on carrier` + `Confirm pickup` split dock.
+- **iOS:** `Mailbox/MailDetail/Variants/PackageDetailLayout.swift` (ceremonial) + `Mailbox/ItemDetail/Bodies/CategoryBodies.swift` `PackageBody` (shared body). New components: `Variants/Components/CarrierBadge.swift`, `Variants/Components/PackageTrackingTimeline.swift`.
+- **Android:** `mailbox/item_detail/bodies/PackageBody.kt` (shared body, extracted from `CategoryBodies.kt`) + `mailbox/mail_detail/variants/PackageDetailLayout.kt` (ceremonial). New components: `bodies/components/CarrierBadge.kt`, `bodies/components/PackageTrackingTimeline.kt`.
+- **Status:** **POLISH**
+- **Slots delivered:** Package hero (`CarrierBadge` + tracking number mono + status pill), `PackageTrackingTimeline` (Shipped → In transit → Out for delivery → Delivered), KeyFacts (carrier · service · dimensions · weight · tracking · ETA), proof photo (front-door snapshot when delivered), split dock `Track on carrier` (opens carrier URL) + `Confirm pickup` primary.
+- **Fixtures:** USPS (`packageInTransit` / `packageOutForDelivery` / `packageDelivered`) + UPS (`packageUpsInTransit` / `packageUpsDelivered`) in both `MailItemSampleData`. `PackageBodyContent` carries `service` / `dimensions` / `weight` / `trackingUrl`; decoders on both platforms project them from the backend payload.
 
 ### A17.9 — Party (event invite)
 - **iOS:** **MISSING**
@@ -553,10 +554,10 @@ All A17 variants plug into `MailItemDetailShell` (iOS) / `MailboxItemDetailShell
   - **RsvpCluster** — 3-way Going / Maybe / Can't make it (Going = rose primary in open state, green check in going state) + PlusOneStepper visible only in going state.
 
 ### A17.10 — Records
-- **iOS:** **MISSING**
-- **Android:** **MISSING**
-- **Status:** **BUILD** (both platforms)
-- **Build dependencies:** `PaperStack` primitive (multi-page tilted sheets — 3 PaperSheets at z-stacked rotations, slate `#475569` accent).
+- **iOS:** `MailDetail/Variants/RecordsDetailLayout.swift` (+ `Variants/Components/IssuerCard.swift`, `VaultBreadcrumb.swift`, `RelatedRecords.swift`) — wired in `MailDetailView.swift` `.records` branch.
+- **Android:** `mail_detail/variants/RecordsDetailLayout.kt` (+ `item_detail/bodies/RecordsBody.kt` & `bodies/components/{IssuerCard,VaultBreadcrumb,RelatedRecords}.kt`) — wired in `MailDetailScreen.kt` `Records` branch.
+- **Status:** **BUILT** (both platforms, P6.6). Open + filed states snapshot-locked. Vault filing stubbed to local state; PDF thumbnail is the decorative PaperStack.
+- **Build dependencies:** `PaperStack` primitive (multi-page tilted sheets — 3 PaperSheets at z-stacked rotations, slate `#475569` accent). Slate token added as `categoryRecords` (`#475569`) + `categoryRecordsBg`/`Border`/`Deep` per open question #4.
 - **Required slots:**
   - **RecordsNav** — slate `#475569` dot in eyebrow chip.
   - **RecordsHero** — `HeroCard` variant with slate accent strip + "Q1 2026 Investment Statement — Roth IRA" + reference mono ("Statement MWM-2026-Q1-9981842 · 4 pages · PDF + structured data") + green `Filed in Vault` stamp when filed.
@@ -671,8 +672,8 @@ Add 13 primitives listed in the Summary table to `Core/Design/Components/` (iOS)
 3. A14.8 Vacation hold (`Mailbox/Vacation/`).
 
 **Phase 6 — BUILD batch E (mail variants)** (one PR per variant):
-1. iOS: A17.5 Coupon, A17.6 Gig mail, A17.7 Memory, A17.8 Package (iOS+Android), A17.9 Party (iOS+Android), A17.10 Records (iOS+Android).
-2. Android: A17.8 Package, A17.9 Party, A17.10 Records (Android catches up).
+1. iOS: A17.5 Coupon, A17.6 Gig mail, A17.7 Memory, ~~A17.8 Package (iOS+Android)~~ ✅ done, A17.9 Party (iOS+Android), A17.10 Records (iOS+Android).
+2. Android: ~~A17.8 Package~~ ✅ done, A17.9 Party, A17.10 Records (Android catches up).
 
 **Phase 7 — RESHAPE batch** (per-screen PRs):
 1. A13.14 Change Password (move Save inline, add strength meter, breach detection, context band).
@@ -700,6 +701,7 @@ Add 13 primitives listed in the Summary table to `Core/Design/Components/` (iOS)
 2. **A14.6 Payments vs A10.10 Wallet** — these are two distinct surfaces for adjacent intents (payments-out vs earnings-in). Confirm they should both exist, with the Wallet hosted under the `Wallet` tab/route and Payments hosted under Settings.
 3. **A12.10 Create Business** — the new design adds a typeahead/search frame with "Add as custom category" fallback. Confirm the back-end supports custom-category submissions (review-required) or whether we should hide the fallback until backend is ready.
 4. **A17.9 Party + A17.10 Records** — design uses `db2777` rose-magenta + `475569` slate accents that are **not** currently in `Colors.swift` / `Color.kt`. Confirm we extend the token system with `category-party` and `category-records`, or use raw hex (currently 158 hex literals already in allowed exceptions for category palettes).
+   - **Resolved (P6.6, Records):** extended the token system — added `categoryRecords` (`#475569`) + `categoryRecordsBg` (`#f8fafc`) / `categoryRecordsBorder` (`#e2e8f0`) / `categoryRecordsDeep` (`#1e293b`) to `Colors.swift` (asset catalog) and `Color.kt`. Party's rose-magenta still pending its build.
 5. **A18.3 Verification submitted** primary CTA — design uses "Back to home" as primary. Confirm this isn't a typo and we shouldn't surface "View status" as primary.
 
 ---
