@@ -312,6 +312,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case barChart3 = "bar-chart-3"
     case calendarCog = "calendar-cog"
 
+    // A13.15 — Disambiguate. `user-check` backs the "This is me" quick-action
+    // chip; `forward` backs "Route to…"; `keyboard` + `undo-2` back the
+    // unclear-frame fallback rows (Type recipient name / Return to sender).
+    case userCheck = "user-check"
+    case forward
+    case keyboard
+    case undo2 = "undo-2"
     // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
     // dress / forecast vibe rows, ± plus-one stepper, RSVP cluster Can't
     // chip, calendar-hold CTA, and the bell-off mute affordance.
@@ -564,6 +571,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // (no native `calendar.gearshape`), used on the Edit-dates row.
         case .barChart3: "chart.bar"
         case .calendarCog: "calendar.badge.clock"
+        // A13.15 Disambiguate. SF Symbols ships direct equivalents:
+        // `person.crop.circle.badge.checkmark` for user-check, the share /
+        // forward turn-arrow for `forward`, `keyboard`, and the u-turn
+        // backward arrow for `undo-2`.
+        case .userCheck: "person.crop.circle.badge.checkmark"
+        case .forward: "arrowshape.turn.up.right"
+        case .keyboard: "keyboard"
+        case .undo2: "arrow.uturn.backward"
         // A17.9 Party. SF Symbols ships direct quote / cloud.sun /
         // tshirt.fill / xmark.circle / bell.slash / minus glyphs;
         // user-minus collapses to `person.badge.minus`, and the

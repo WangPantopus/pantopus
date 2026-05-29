@@ -75,6 +75,8 @@ final class IconTests: XCTestCase {
         "sun-dim", "flower", "snowflake", "wind", "bus", "droplets",
         // A13.1 Add Guest — allowed-area chips.
         "door-open", "car", "warehouse",
+        // A13.15 Disambiguate — quick actions + fallback rows.
+        "user-check", "forward", "keyboard", "undo-2",
         // A15.3 AI Assistant — avatar/reply glyph.
         "bot",
         // A13.4 Transfer ownership — Face ID gate and ownership-diff controls.

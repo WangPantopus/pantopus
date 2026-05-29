@@ -100,11 +100,13 @@ import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.HowToReg
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.InsertEmoticon
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
@@ -510,6 +512,14 @@ enum class PantopusIcon(
     BarChart3("bar-chart-3"),
     CalendarCog("calendar-cog"),
 
+    // A13.15 Disambiguate — `user-check` backs the "This is me" quick-action
+    // chip; `forward` backs "Route to…"; `keyboard` + `undo-2` back the
+    // unclear-frame fallback rows (Type recipient name / Return to sender).
+    UserCheck("user-check"),
+    Forward("forward"),
+    Keyboard("keyboard"),
+    Undo2("undo-2"),
+
     // A17.9 Party — invite chrome glyphs that weren't on the icon menu yet:
     // handwritten-note open-quote, dress / forecast vibe rows, ± plus-one
     // stepper, RSVP cluster "Can't" chip, calendar-hold + calendar-saved
@@ -835,6 +845,14 @@ internal fun PantopusIcon.source(): IconSource =
         // calendar-cog glyph.
         PantopusIcon.BarChart3 -> IconSource.Material(Icons.Filled.BarChart)
         PantopusIcon.CalendarCog -> IconSource.Material(Icons.Filled.EditCalendar)
+        // A13.15 Disambiguate. `HowToReg` is Material's person-with-check
+        // (user-check); `forward` reuses the automirrored ArrowForward
+        // (route-to glyph); `Keyboard` maps directly; `undo-2` reuses the
+        // automirrored ArrowBack (return-to-sender glyph).
+        PantopusIcon.UserCheck -> IconSource.Material(Icons.Filled.HowToReg)
+        PantopusIcon.Forward -> IconSource.Material(Icons.AutoMirrored.Filled.ArrowForward)
+        PantopusIcon.Keyboard -> IconSource.Material(Icons.Filled.Keyboard)
+        PantopusIcon.Undo2 -> IconSource.Material(Icons.AutoMirrored.Filled.ArrowBack)
         // A17.9 Party — Material ships direct glyphs for all but
         // `cloud-sun` (which uses Material's `WbSunny` sun-with-rays as the
         // closest weather analogue) and `shirt` (which uses `Checkroom`'s
