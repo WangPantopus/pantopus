@@ -34,6 +34,7 @@ public struct CameraScanner: View {
     private let detectedLabel: String?
     private let onGallery: (() -> Void)?
     private let onFlip: (() -> Void)?
+    private let reduceMotionOverride: Bool?
     private let onCapture: (UIImage) -> Void
 
     @State private var authorization = AVCaptureDevice.authorizationStatus(for: .video)
@@ -46,18 +47,22 @@ public struct CameraScanner: View {
     ///   - detectedLabel: Text for the live "detected" pill; pass `nil` to hide it.
     ///   - onGallery: Tap handler for the left rail (pick from library); `nil` disables it.
     ///   - onFlip: Tap handler for the right rail (flip camera); `nil` disables it.
+    ///   - reduceMotionOverride: Force the scan-line static regardless of the
+    ///     environment trait. Used by snapshot tests; leave `nil` in production.
     ///   - onCapture: Called with the still image when the shutter fires.
     public init(
         accent: Color,
         detectedLabel: String? = "Item detected",
         onGallery: (() -> Void)? = nil,
         onFlip: (() -> Void)? = nil,
+        reduceMotionOverride: Bool? = nil,
         onCapture: @escaping (UIImage) -> Void
     ) {
         self.accent = accent
         self.detectedLabel = detectedLabel
         self.onGallery = onGallery
         self.onFlip = onFlip
+        self.reduceMotionOverride = reduceMotionOverride
         self.onCapture = onCapture
     }
 
@@ -71,6 +76,9 @@ public struct CameraScanner: View {
 
     /// Whether a real live feed can be shown.
     private var isLive: Bool { authorization == .authorized && !isSimulator }
+
+    /// Reduce-motion, honoring the test override before the environment trait.
+    private var effectiveReduceMotion: Bool { reduceMotionOverride ?? reduceMotion }
 
     public var body: some View {
         VStack(spacing: Spacing.s0) {
@@ -149,7 +157,7 @@ public struct CameraScanner: View {
         }
         .allowsHitTesting(false)
         .onAppear {
-            guard !reduceMotion else { return }
+            guard !effectiveReduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
                 scanPhase = 1
             }
@@ -534,9 +542,8 @@ private struct AddTile: View {
                 CameraScannerShot(tag: "BOX", label: "Box + barcode"),
                 CameraScannerShot(tag: "RECEIPT", label: "Store receipt"),
                 CameraScannerShot(tag: "LABEL", label: "Serial label")
-            ],
-            onAdd: {}
-        )
+            ]
+        ) {}
     }
     .padding(Spacing.s4)
     .background(Theme.Color.appBg)

@@ -58,7 +58,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -70,6 +69,7 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import app.pantopus.android.ui.theme.rememberReduceMotion
+import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 
 private val FEED_HEIGHT = 208.dp
 
@@ -425,6 +425,7 @@ private fun FramingBrackets(modifier: Modifier = Modifier) {
         val color = Color.White.copy(alpha = 0.9f)
         val len = 18.dp.toPx()
         val stroke = 2.5.dp.toPx()
+
         fun corner(
             x: Float,
             y: Float,

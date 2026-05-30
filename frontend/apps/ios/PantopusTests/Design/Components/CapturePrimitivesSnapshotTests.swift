@@ -23,7 +23,6 @@ import XCTest
 final class CapturePrimitivesSnapshotTests: XCTestCase {
     private func assertRenders(
         _ label: String,
-        traitCollection: UITraitCollection? = nil,
         @ViewBuilder _ view: () -> some View,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -31,9 +30,6 @@ final class CapturePrimitivesSnapshotTests: XCTestCase {
         let host = UIHostingController(rootView: view())
         host.overrideUserInterfaceStyle = .light
         host.view.frame = CGRect(x: 0, y: 0, width: 375, height: 320)
-        if let traitCollection {
-            host.setOverrideTraitCollection(traitCollection, forChild: host)
-        }
         host.loadViewIfNeeded()
         XCTAssertNotNil(host.view, "\(label) failed to build", file: file, line: line)
     }
@@ -99,9 +95,8 @@ final class CapturePrimitivesSnapshotTests: XCTestCase {
                     CameraScannerShot(tag: "BOX", label: "Box + barcode"),
                     CameraScannerShot(tag: "RECEIPT", label: "Store receipt"),
                     CameraScannerShot(tag: "LABEL", label: "Serial label")
-                ],
-                onAdd: {}
-            )
+                ]
+            ) {}
             .padding()
         }
     }
@@ -116,14 +111,11 @@ final class CapturePrimitivesSnapshotTests: XCTestCase {
     }
 
     /// Reduce-motion contract — the scan-line must not start its repeating
-    /// animation. We assert the view still builds with the trait applied;
+    /// animation. We assert the view still builds with the override applied;
     /// visual verification lives in #Preview.
     func testCameraScannerRespectsReduceMotion() {
-        assertRenders(
-            "CameraScanner reduce-motion",
-            traitCollection: UITraitCollection(accessibilityReduceMotion: .reduce)
-        ) {
-            CameraScanner(accent: Theme.Color.success) { _ in }
+        assertRenders("CameraScanner reduce-motion") {
+            CameraScanner(accent: Theme.Color.success, reduceMotionOverride: true) { _ in }
                 .padding()
         }
     }
