@@ -9,7 +9,9 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.privacy.PrivacyRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowPillTone
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
+import app.pantopus.android.ui.screens.shared.list_of_rows.SectionStyle
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -77,15 +80,20 @@ class BlockedUsersViewModelTest {
             vm.load()
             val loaded = vm.state.value as ListOfRowsUiState.Loaded
             assertEquals(1, loaded.sections.size)
+            // A14.4 — single card with a privacy-contract helper below it.
+            assertEquals(SectionStyle.Card, loaded.sections[0].style)
+            assertNotNull(loaded.sections[0].footer)
             val rows = loaded.sections[0].rows
             assertEquals(listOf("b1", "b2"), rows.map { it.id })
             assertEquals("Alice", rows[0].title)
-            // Block reason wins the subtitle when present.
-            assertEquals("Spam", rows[0].subtitle)
-            // Without a reason, the scope label is the subtitle.
-            assertEquals("Hidden from search", rows[1].subtitle)
-            // Trailing is always Kebab so the row's unblock action fires.
-            assertEquals(RowTrailing.Kebab, rows[0].trailing)
+            // A14.4 source-context line: "Blocked <date>" + scope context.
+            // `full` scope carries no suffix; `search_only` appends "Search only".
+            assertEquals("Blocked May 1, 2026", rows[0].subtitle)
+            assertEquals("Blocked May 2, 2026 · Search only", rows[1].subtitle)
+            // Trailing is the neutral Unblock pill (replaces the kebab).
+            val pill = rows[0].trailing as RowTrailing.PillButton
+            assertEquals("Unblock", pill.label)
+            assertEquals(RowPillTone.Neutral, pill.tone)
         }
 
     @Test fun loadFailureProducesErrorState() =

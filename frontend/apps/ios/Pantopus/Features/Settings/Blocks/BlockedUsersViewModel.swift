@@ -79,10 +79,16 @@ public final class BlockedUsersViewModel: ListOfRowsDataSource {
 
     private func rebuild() {
         guard !blocks.isEmpty else {
+            // A14.4 empty hero — neutral grey disc + user-minus glyph
+            // (the design's `user-x`; `userMinus` is the in-inventory
+            // person-with-negation glyph) + reassurance about silence.
             state = .empty(.init(
-                icon: .shield,
+                icon: .userMinus,
                 headline: "No one blocked",
-                subcopy: "When you block someone, they'll appear here. Unblock from this list anytime."
+                subcopy: "When you block someone, they'll appear here. "
+                    + "They won't be notified, and you can unblock them anytime.",
+                tint: Theme.Color.appSurfaceSunken,
+                accent: Theme.Color.appTextSecondary
             ))
             return
         }
@@ -91,31 +97,66 @@ public final class BlockedUsersViewModel: ListOfRowsDataSource {
                 ?? block.blocked?.username.map { "@\($0)" }
                 ?? "Blocked user"
             let avatarURL = block.blocked?.profilePictureUrl.flatMap(URL.init(string:))
-            let subtitle = block.reason?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                ?? Self.scopeLabel(block.blockScope)
             let blockId = block.id
             return RowModel(
                 id: blockId,
                 title: name,
-                subtitle: subtitle,
+                subtitle: Self.blockedSubtitle(createdAt: block.createdAt, scope: block.blockScope),
                 template: .avatarKebab,
                 leading: .avatarWithBadge(
                     name: name,
                     imageURL: avatarURL,
                     background: .solid(Theme.Color.appSurfaceSunken),
-                    size: .medium,
+                    size: .small,
                     verified: false
                 ),
-                trailing: .kebab,
-                onTap: {},
-                onSecondary: { [weak self] in
+                trailing: .pillButton(label: "Unblock", tone: .neutral) { [weak self] in
                     Task { @MainActor in await self?.unblock(blockId) }
                 }
-            )
+            ) {}
         }
-        state = .loaded(sections: [RowSection(id: "blocked", rows: rows)], hasMore: false)
+        state = .loaded(
+            sections: [
+                RowSection(
+                    id: "blocked",
+                    footer: "Blocked people can't message you, see your profile, or bid on "
+                        + "your tasks. Unblocking doesn't notify them.",
+                    rows: rows,
+                    style: .card
+                )
+            ],
+            hasMore: false
+        )
     }
 
+    /// `Blocked <date> · <context>` — the design's source-context line.
+    /// `created_at` drives the date; `block_scope` drives the context
+    /// suffix (the backend has no origin-surface column, so the scope the
+    /// block was created with is the "source" context we can surface).
+    private static func blockedSubtitle(createdAt: String?, scope: String?) -> String? {
+        guard let date = formattedBlockedDate(createdAt) else {
+            // No parseable date — fall back to the scope label alone.
+            return scopeLabel(scope)
+        }
+        if let context = scopeContext(scope) {
+            return "Blocked \(date) · \(context)"
+        }
+        return "Blocked \(date)"
+    }
+
+    /// Context suffix from `block_scope`. `full` / `nil` carry no suffix
+    /// (the block is account-wide); the scoped variants name where it
+    /// applies.
+    private static func scopeContext(_ scope: String?) -> String? {
+        switch scope {
+        case "search_only": "Search only"
+        case "business_context": "Business contexts"
+        case "full", nil: nil
+        default: scope?.capitalized
+        }
+    }
+
+    /// Standalone scope label — used only when there's no parseable date.
     private static func scopeLabel(_ scope: String?) -> String? {
         switch scope {
         case "search_only": "Hidden from search"
@@ -124,10 +165,36 @@ public final class BlockedUsersViewModel: ListOfRowsDataSource {
         default: scope?.capitalized
         }
     }
-}
 
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
+    private static let isoParser: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    /// UTC-pinned so the rendered day matches the stored calendar date
+    /// (and stays deterministic across CI time zones).
+    private static let blockedDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }()
+
+    private static func formattedBlockedDate(_ iso: String?) -> String? {
+        guard let iso, !iso.isEmpty else { return nil }
+        if let date = isoParser.date(from: iso) {
+            return blockedDateFormatter.string(from: date)
+        }
+        // Date-only fallback ("yyyy-MM-dd").
+        let dateOnly = DateFormatter()
+        dateOnly.locale = Locale(identifier: "en_US_POSIX")
+        dateOnly.timeZone = TimeZone(secondsFromGMT: 0)
+        dateOnly.dateFormat = "yyyy-MM-dd"
+        if let date = dateOnly.date(from: String(iso.prefix(10))) {
+            return blockedDateFormatter.string(from: date)
+        }
+        return nil
     }
 }

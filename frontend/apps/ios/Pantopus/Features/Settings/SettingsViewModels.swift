@@ -142,9 +142,11 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     }
 
     private func supportGroup() -> GroupedListGroup {
+        // A14.3 — the design JSX titles the Help/Legal/About group "About"
+        // (the `id` stays "support" so routing + tests are unaffected).
         GroupedListGroup(
             id: "support",
-            overline: "Support",
+            overline: "About",
             rows: [
                 GroupedListRow(id: "help", label: "Help", control: .chevron),
                 GroupedListRow(id: "legal", label: "Legal", control: .chevron),
