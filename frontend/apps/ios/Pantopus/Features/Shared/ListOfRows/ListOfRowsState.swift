@@ -17,6 +17,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 /// Lifecycle state for the List-of-Rows shell.
 public enum ListOfRowsState: Sendable {
     case loading
