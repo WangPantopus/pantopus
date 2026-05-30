@@ -19,7 +19,7 @@ enum class StatusPillTone { Neutral, Success, Warning, Primary }
 
 /** The pill under the headline (formerly `etaChip`). */
 @Immutable
-data class StatusPill(
+data class StatusWaitingPill(
     val text: String,
     val icon: PantopusIcon? = null,
     val tone: StatusPillTone = StatusPillTone.Warning,
@@ -74,7 +74,7 @@ data class StatusWaitingContent(
     val subcopy: String,
     val bodyEmphasis: String? = null,
     val addressChip: String? = null,
-    val statusPill: StatusPill? = null,
+    val statusPill: StatusWaitingPill? = null,
     val timeline: List<StatusTimelineStage> = emptyList(),
     val currentStageId: String? = null,
     val actionCards: List<StatusActionCard> = emptyList(),
@@ -113,7 +113,7 @@ data class StatusWaitingContent(
                         "Your ownership claim was approved. The Home badge now shows on your profile and household.",
                     addressChip = chip,
                     statusPill =
-                        StatusPill(
+                        StatusWaitingPill(
                             text = "Approved · 3 days ago",
                             icon = PantopusIcon.CheckCircle,
                             tone = StatusPillTone.Success,
@@ -135,7 +135,7 @@ data class StatusWaitingContent(
                 subcopy = "We'll review your deed and address match within 3 business days and send you a decision.",
                 addressChip = chip,
                 statusPill =
-                    StatusPill(
+                    StatusWaitingPill(
                         text = "Decision expected by Oct 17",
                         icon = PantopusIcon.CalendarClock,
                         tone = StatusPillTone.Success,
@@ -180,7 +180,7 @@ data class StatusWaitingContent(
                     bodyEmphasis = who,
                     addressChip = chip,
                     statusPill =
-                        StatusPill(
+                        StatusWaitingPill(
                             text = "Decision expected today",
                             icon = PantopusIcon.CalendarClock,
                             tone = StatusPillTone.Primary,
@@ -203,7 +203,7 @@ data class StatusWaitingContent(
                 bodyEmphasis = landlordEmail.ifBlank { null },
                 addressChip = chip,
                 statusPill =
-                    StatusPill(
+                    StatusWaitingPill(
                         text = "Most landlords confirm in 1–2 days",
                         icon = PantopusIcon.CalendarClock,
                         tone = StatusPillTone.Success,
@@ -234,7 +234,7 @@ data class StatusWaitingContent(
                 headline = "Under review",
                 subcopy = subcopy,
                 statusPill =
-                    StatusPill(
+                    StatusWaitingPill(
                         text = "Usually resolved in 2–3 days",
                         icon = PantopusIcon.AlertCircle,
                         tone = StatusPillTone.Warning,
@@ -347,13 +347,13 @@ data class StatusWaitingContent(
                 bodyEmphasis = email?.takeIf { it.isNotBlank() },
                 statusPill =
                     if (resent) {
-                        StatusPill(
+                        StatusWaitingPill(
                             text = "New link sent · just now",
                             icon = PantopusIcon.CheckCircle,
                             tone = StatusPillTone.Success,
                         )
                     } else {
-                        StatusPill(
+                        StatusWaitingPill(
                             text = "Waiting for link click…",
                             icon = PantopusIcon.Hourglass,
                             tone = StatusPillTone.Neutral,

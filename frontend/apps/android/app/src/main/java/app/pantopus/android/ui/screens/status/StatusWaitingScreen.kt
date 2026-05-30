@@ -230,7 +230,7 @@ private fun AddressChip(text: String) {
 private data class PillPalette(val bg: Color, val fg: Color, val border: Color)
 
 @Composable
-private fun StatusPillView(pill: StatusPill) {
+private fun StatusPillView(pill: StatusWaitingPill) {
     val palette =
         when (pill.tone) {
             StatusPillTone.Neutral ->

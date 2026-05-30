@@ -45,7 +45,7 @@ public enum StatusPillTone: String, Sendable, Hashable {
 
 /// The pill under the headline (formerly `etaChip`). Optional spinning
 /// glyph drives the A18.1 hourglass.
-public struct StatusPill: Sendable, Hashable {
+public struct StatusWaitingPill: Sendable, Hashable {
     public let text: String
     public let icon: PantopusIcon?
     public let tone: StatusPillTone
@@ -163,7 +163,7 @@ public struct StatusWaitingContent: Sendable, Hashable {
     public let bodyEmphasis: String?
     /// Muted home-pin chip naming what was claimed. `nil` omits the chip.
     public let addressChip: String?
-    public let statusPill: StatusPill?
+    public let statusPill: StatusWaitingPill?
     public let timeline: [StatusTimelineStage]
     public let currentStageId: String?
     public let actionCards: [StatusActionCard]
@@ -182,7 +182,7 @@ public struct StatusWaitingContent: Sendable, Hashable {
         subcopy: String,
         bodyEmphasis: String? = nil,
         addressChip: String? = nil,
-        statusPill: StatusPill? = nil,
+        statusPill: StatusWaitingPill? = nil,
         timeline: [StatusTimelineStage] = [],
         currentStageId: String? = nil,
         actionCards: [StatusActionCard] = [],
@@ -237,7 +237,7 @@ public extension StatusWaitingContent {
                 headline: "You're the owner",
                 subcopy: "Your ownership claim was approved. The Home badge now shows on your profile and household.",
                 addressChip: chip,
-                statusPill: StatusPill(
+                statusPill: StatusWaitingPill(
                     text: "Approved · 3 days ago",
                     icon: .checkCircle,
                     tone: .success
@@ -256,7 +256,7 @@ public extension StatusWaitingContent {
             headline: "Claim submitted",
             subcopy: "We'll review your deed and address match within 3 business days and send you a decision.",
             addressChip: chip,
-            statusPill: StatusPill(
+            statusPill: StatusWaitingPill(
                 text: "Decision expected by Oct 17",
                 icon: .calendarClock,
                 tone: .success
@@ -295,7 +295,7 @@ public extension StatusWaitingContent {
                     "Pantopus is doing a final review before your Resident badge goes live.",
                 bodyEmphasis: who,
                 addressChip: chip,
-                statusPill: StatusPill(
+                statusPill: StatusWaitingPill(
                     text: "Decision expected today",
                     icon: .calendarClock,
                     tone: .primary
@@ -316,7 +316,7 @@ public extension StatusWaitingContent {
             subcopy: "We emailed your landlord at \(email) to confirm. You'll get a push when they do.",
             bodyEmphasis: landlordEmail.isEmpty ? nil : landlordEmail,
             addressChip: chip,
-            statusPill: StatusPill(
+            statusPill: StatusWaitingPill(
                 text: "Most landlords confirm in 1–2 days",
                 icon: .calendarClock,
                 tone: .success
@@ -348,7 +348,7 @@ public extension StatusWaitingContent {
             halo: StatusHalo(tone: .warning, icon: .hourglass),
             headline: "Under review",
             subcopy: subcopy,
-            statusPill: StatusPill(text: "Usually resolved in 2–3 days", icon: .alertCircle, tone: .warning),
+            statusPill: StatusWaitingPill(text: "Usually resolved in 2–3 days", icon: .alertCircle, tone: .warning),
             timeline: homesClaimTimeline,
             currentStageId: "review",
             actionCards: [
@@ -450,8 +450,8 @@ public extension StatusWaitingContent {
             subcopy: "We sent a link to \(recipient). Tap it to finish setting up your account.",
             bodyEmphasis: email?.isEmpty == false ? email : nil,
             statusPill: resent
-                ? StatusPill(text: "New link sent · just now", icon: .checkCircle, tone: .success)
-                : StatusPill(text: "Waiting for link click…", icon: .hourglass, tone: .neutral, isSpinning: true),
+                ? StatusWaitingPill(text: "New link sent · just now", icon: .checkCircle, tone: .success)
+                : StatusWaitingPill(text: "Waiting for link click…", icon: .hourglass, tone: .neutral, isSpinning: true),
             actionStack: [openMail, resend, useDifferent],
             footnote: resent
                 ? "Still nothing? Double-check the spelling, or use a different email."

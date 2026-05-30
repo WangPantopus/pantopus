@@ -14,7 +14,7 @@ import SwiftUI
 // MARK: - Status pill (tone + optional spinning glyph)
 
 struct StatusPillView: View {
-    let pill: StatusPill
+    let pill: StatusWaitingPill
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spin = false
@@ -43,7 +43,9 @@ struct StatusPillView: View {
         .onAppear { if spinningEnabled { spin = true } }
     }
 
-    private var spinningEnabled: Bool { pill.isSpinning && !reduceMotion }
+    private var spinningEnabled: Bool {
+        pill.isSpinning && !reduceMotion
+    }
 }
 
 private struct StatusPillPalette {
@@ -261,7 +263,9 @@ private struct TimelineDot: View {
         .onAppear { if pulseEnabled { pulse = true } }
     }
 
-    private var pulseEnabled: Bool { state == .current && !reduceMotion }
+    private var pulseEnabled: Bool {
+        state == .current && !reduceMotion
+    }
 
     private var fill: Color {
         switch state {
