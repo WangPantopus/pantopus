@@ -284,7 +284,7 @@ fun Postmark(modifier: Modifier = Modifier) {
                         val controlY = waveY + if (dipUp) -5f else 5f
                         val control = at(x + 11f, controlY)
                         val end = at(x + 22f, waveY)
-                        quadraticBezierTo(control.x, control.y, end.x, end.y)
+                        quadraticTo(control.x, control.y, end.x, end.y)
                         x += 22f
                         dipUp = !dipUp
                     }

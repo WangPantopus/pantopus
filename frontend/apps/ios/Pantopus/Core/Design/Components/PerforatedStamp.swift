@@ -48,7 +48,7 @@ public struct PerforatedStamp<Content: View>: View {
 
     /// Engraved inner-frame inset — fixed at 7pt per the design's
     /// `inset: 7` regardless of stamp size.
-    private static var frameInset: CGFloat { 7 }
+    private static let frameInset: CGFloat = 7
 
     public init(
         ink: Color,

@@ -39,7 +39,7 @@ final class PerforatedStampSnapshotTests: XCTestCase {
             ("rose", Theme.Color.rose),
             ("magic", Theme.Color.magic),
             ("home", Theme.Color.home),
-            ("warmAmber", Theme.Color.warmAmber),
+            ("warmAmber", Theme.Color.warmAmber)
         ]
         for (name, ink) in inks {
             assertRenders("PerforatedStamp ink \(name)") {
