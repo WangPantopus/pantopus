@@ -432,4 +432,99 @@ class DeepLinkRouterTest {
     fun bare_settings_falls_back() {
         assertTrue(DeepLinkRouter.resolveString("pantopus://settings") is DeepLinkRouter.Destination.Unknown)
     }
+
+    // MARK: - B1.6 batch-2 routing seam
+
+    @Test
+    fun stamps_route() {
+        assertEquals(DeepLinkRouter.Destination.Stamps, DeepLinkRouter.resolveString("pantopus://mailbox/stamps"))
+        assertEquals(
+            DeepLinkRouter.Destination.Stamps,
+            DeepLinkRouter.resolveString("https://pantopus.app/mailbox/stamps"),
+        )
+    }
+
+    @Test
+    fun mail_task_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.MailTask("t_7"),
+            DeepLinkRouter.resolveString("pantopus://mailbox/tasks/t_7"),
+        )
+    }
+
+    @Test
+    fun mail_task_without_id_falls_back() {
+        assertTrue(DeepLinkRouter.resolveString("pantopus://mailbox/tasks") is DeepLinkRouter.Destination.Unknown)
+    }
+
+    @Test
+    fun mail_translation_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.MailTranslation("m_3"),
+            DeepLinkRouter.resolveString("pantopus://mailbox/translation?id=m_3"),
+        )
+    }
+
+    @Test
+    fun unboxing_route_without_id() {
+        assertEquals(
+            DeepLinkRouter.Destination.Unboxing(null),
+            DeepLinkRouter.resolveString("pantopus://mailbox/unboxing"),
+        )
+    }
+
+    @Test
+    fun unboxing_route_with_id() {
+        assertEquals(
+            DeepLinkRouter.Destination.Unboxing("m_9"),
+            DeepLinkRouter.resolveString("pantopus://mailbox/unboxing?id=m_9"),
+        )
+    }
+
+    @Test
+    fun earn_route() {
+        assertEquals(DeepLinkRouter.Destination.Earn, DeepLinkRouter.resolveString("pantopus://mailbox/earn"))
+        assertEquals(
+            DeepLinkRouter.Destination.Earn,
+            DeepLinkRouter.resolveString("https://pantopus.app/mailbox/earn"),
+        )
+    }
+
+    /**
+     * A10.7 — plural `businesses/:id` resolves to the owner view; `new` keeps
+     * its Create Business meaning. (The public profile A10.6 is the singular
+     * `business/:username`, which has no typed Android deep-link destination.)
+     */
+    @Test
+    fun business_owner_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.BusinessOwner("biz_42"),
+            DeepLinkRouter.resolveString("pantopus://businesses/biz_42"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.BusinessOwner("biz_42"),
+            DeepLinkRouter.resolveString("https://pantopus.app/businesses/biz_42"),
+        )
+    }
+
+    @Test
+    fun view_as_route() {
+        assertEquals(DeepLinkRouter.Destination.ViewAs, DeepLinkRouter.resolveString("pantopus://identity/preview"))
+        assertEquals(
+            DeepLinkRouter.Destination.ViewAs,
+            DeepLinkRouter.resolveString("https://pantopus.app/identity/preview"),
+        )
+    }
+
+    @Test
+    fun waiting_room_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.WaitingRoom("h_5"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_5/waiting-room"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.WaitingRoom("h_5"),
+            DeepLinkRouter.resolveString("https://pantopus.app/homes/h_5/waiting-room"),
+        )
+    }
 }
