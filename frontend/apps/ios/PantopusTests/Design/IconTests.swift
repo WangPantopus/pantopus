@@ -89,7 +89,9 @@ final class IconTests: XCTestCase {
         "quote", "cloud-sun", "shirt", "x-circle", "bell-off", "minus",
         "user-minus", "calendar-plus",
         // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
-        "credit-card"
+        "credit-card",
+        // B1.4 / A19 Legal — collapsible "Jump to section" TOC header.
+        "list"
     ]
 
     func testInventoryMatches() {

@@ -93,6 +93,10 @@ final class ColorTokenTests: XCTestCase {
         assertColor(Theme.Color.vehicles, hex: "#dc2626")
     }
 
+    func testRating() {
+        assertColor(Theme.Color.star, hex: "#f59e0b")
+    }
+
     // MARK: - Helpers
 
     private func assertColor(

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Reply
@@ -390,6 +391,9 @@ enum class PantopusIcon(
     FlaskConical("flask-conical"),
     FlameKindling("flame-kindling"),
     Printer("printer"),
+
+    /** Plain bulleted list — the A19 legal "Jump to section" TOC header. */
+    List("list"),
     ListChecks("list-checks"),
     AlertTriangle("alert-triangle"),
 
@@ -732,6 +736,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.FlaskConical -> IconSource.Material(Icons.Filled.Science)
         PantopusIcon.FlameKindling -> IconSource.Material(Icons.Filled.Whatshot)
         PantopusIcon.Printer -> IconSource.Material(Icons.Filled.Print)
+        PantopusIcon.List -> IconSource.Material(Icons.AutoMirrored.Filled.FormatListBulleted)
         PantopusIcon.ListChecks -> IconSource.Material(Icons.Filled.Checklist)
         PantopusIcon.AlertTriangle -> IconSource.Material(Icons.Filled.Warning)
 

@@ -136,6 +136,16 @@ public extension Theme.Color {
     /// behind the `Announce` intent chip.
     static let slateBg = SwiftUI.Color("Accent/SlateBg", bundle: Theme.bundle)
 
+    // MARK: - Rating
+
+    /// Star / rating amber — `#F59E0B` (Tailwind amber-500). Fills the
+    /// review-histogram bars and the star-rating glyphs on
+    /// `RatingDistribution` and the business / listing review summaries
+    /// (A10.6, A10.7). Distinct from `warning` (#D97706) — a rating is not
+    /// a warning state, and the lighter amber reads better against white
+    /// review cards.
+    static let star = SwiftUI.Color("Accent/Star", bundle: Theme.bundle)
+
     // MARK: - App shell / neutrals
 
     /// App background — `#f6f7f9`.
