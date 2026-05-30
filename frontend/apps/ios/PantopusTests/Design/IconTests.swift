@@ -63,6 +63,8 @@ final class IconTests: XCTestCase {
         "wrench", "fan", "cloud-rain", "refrigerator", "bug", "trees", "paint-roller", "bell-ring",
         // T6.5e Mailbox Vault — envelope state + folder palette + chrome.
         "mail", "mail-open", "folder-plus", "piggy-bank", "plane", "receipt-text", "paperclip", "arrow-down-up",
+        // A18.1 Verify email sent — envelope-with-check halo glyph.
+        "mail-check",
         // T6.6b Chat conversation refresh — header + composer.
         "video", "more-vertical", "hand", "smile", "arrow-up",
         // P1.3 Broadcast detail — sticky footer + analytics.

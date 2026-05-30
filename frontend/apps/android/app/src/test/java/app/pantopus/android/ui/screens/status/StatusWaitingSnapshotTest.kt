@@ -15,8 +15,10 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Paparazzi snapshots for T3.6 Status / Waiting. Three frames mirror
- * the design prompt: claim submitted, under review, check your email.
+ * Paparazzi snapshots for the A18 Status / Waiting frames. Each design
+ * frame + its secondary state is pinned: A18.1 sent/resent, A18.2
+ * submitted/approved, A18.3 waiting/confirmed, plus the retained
+ * under-review recipe.
  */
 class StatusWaitingSnapshotTest {
     @get:Rule
@@ -29,14 +31,91 @@ class StatusWaitingSnapshotTest {
                 ),
         )
 
+    // ── A18.2 Claim submitted ─────────────────────────────────────────────
+
     @Test
     fun status_claim_submitted() {
         paparazzi.snapshot {
             Frame {
-                StatusWaitingScreen(content = StatusWaitingContent.claimSubmitted(homeName = "412 Elm St"))
+                StatusWaitingScreen(
+                    content = StatusWaitingContent.claimSubmitted(homeName = "418 Linden Ave, Oakland CA"),
+                )
             }
         }
     }
+
+    @Test
+    fun status_claim_approved() {
+        paparazzi.snapshot {
+            Frame {
+                StatusWaitingScreen(
+                    content =
+                        StatusWaitingContent.claimSubmitted(
+                            homeName = "418 Linden Ave, Oakland CA",
+                            approved = true,
+                        ),
+                )
+            }
+        }
+    }
+
+    // ── A18.3 Verification submitted ──────────────────────────────────────
+
+    @Test
+    fun status_verification_submitted() {
+        paparazzi.snapshot {
+            Frame {
+                StatusWaitingScreen(
+                    content =
+                        StatusWaitingContent.verificationSubmitted(
+                            homeName = "418 Linden Ave · Apt 3B",
+                            landlordEmail = "r.osman@acme-realty.com",
+                        ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun status_verification_confirmed() {
+        paparazzi.snapshot {
+            Frame {
+                StatusWaitingScreen(
+                    content =
+                        StatusWaitingContent.verificationSubmitted(
+                            homeName = "418 Linden Ave · Apt 3B",
+                            landlordEmail = "r.osman@acme-realty.com",
+                            landlordName = "Rashida Osman",
+                            confirmed = true,
+                        ),
+                )
+            }
+        }
+    }
+
+    // ── A18.1 Check your email ────────────────────────────────────────────
+
+    @Test
+    fun status_check_your_email() {
+        paparazzi.snapshot {
+            Frame {
+                StatusWaitingScreen(content = StatusWaitingContent.checkYourEmail(email = "maria.k@email.com"))
+            }
+        }
+    }
+
+    @Test
+    fun status_check_your_email_resent() {
+        paparazzi.snapshot {
+            Frame {
+                StatusWaitingScreen(
+                    content = StatusWaitingContent.checkYourEmail(email = "maria.k@email.com", resent = true),
+                )
+            }
+        }
+    }
+
+    // ── Under review (retained) ───────────────────────────────────────────
 
     @Test
     fun status_under_review() {
@@ -49,15 +128,6 @@ class StatusWaitingSnapshotTest {
                             submittedAgo = "2 days ago",
                         ),
                 )
-            }
-        }
-    }
-
-    @Test
-    fun status_check_your_email() {
-        paparazzi.snapshot {
-            Frame {
-                StatusWaitingScreen(content = StatusWaitingContent.checkYourEmail(email = "alice@example.com"))
             }
         }
     }

@@ -200,6 +200,8 @@ class IconTest {
             // T6.5e — Mailbox Vault envelope/folder palette.
             "mail",
             "mail-open",
+            // A18.1 — Verify email sent envelope-with-check halo glyph.
+            "mail-check",
             "folder-plus",
             "piggy-bank",
             "plane",

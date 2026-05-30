@@ -226,6 +226,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     // states from the design palette.
     case mail
     case mailOpen = "mail-open"
+    // A18.1 Verify email sent — envelope-with-check halo glyph.
+    case mailCheck = "mail-check"
     case folderPlus = "folder-plus"
     case piggyBank = "piggy-bank"
     case plane
@@ -508,6 +510,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // back to `dollarsign.circle` and `arrow.up.arrow.down` glyphs.
         case .mail: "envelope"
         case .mailOpen: "envelope.open"
+        case .mailCheck: "envelope.badge"
         case .folderPlus: "folder.badge.plus"
         case .piggyBank: "dollarsign.circle"
         case .plane: "airplane"

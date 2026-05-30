@@ -118,6 +118,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MarkAsUnread
+import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MeetingRoom
@@ -442,6 +443,9 @@ enum class PantopusIcon(
     // the correct envelope state per design.
     Mail("mail"),
     MailOpen("mail-open"),
+
+    // A18.1 Verify email sent — envelope-with-check halo glyph.
+    MailCheck("mail-check"),
     FolderPlus("folder-plus"),
     PiggyBank("piggy-bank"),
     Plane("plane"),
@@ -786,6 +790,7 @@ internal fun PantopusIcon.source(): IconSource =
         // arrow-down-up, `Description` for receipt-text.
         PantopusIcon.Mail -> IconSource.Material(Icons.Filled.Email)
         PantopusIcon.MailOpen -> IconSource.Material(Icons.Filled.MarkAsUnread)
+        PantopusIcon.MailCheck -> IconSource.Material(Icons.Filled.MarkEmailRead)
         PantopusIcon.FolderPlus -> IconSource.Material(Icons.Filled.CreateNewFolder)
         PantopusIcon.PiggyBank -> IconSource.Material(Icons.Filled.Savings)
         PantopusIcon.Plane -> IconSource.Material(Icons.Filled.Flight)
