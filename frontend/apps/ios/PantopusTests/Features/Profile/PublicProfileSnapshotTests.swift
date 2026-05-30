@@ -171,7 +171,8 @@ private struct LoadedFixtureView: View {
                     PublicProfilePostsFeed(
                         kind: content.kind,
                         posts: content.posts,
-                        onUnlock: { _ in }
+                        onUnlock: { _ in },
+                        onEmptyCTA: {}
                     )
                 }
             }

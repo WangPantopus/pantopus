@@ -324,10 +324,22 @@ struct BeaconHeaderPrimaryButton: View {
 /// it renders as a 36pt square icon-only button (the share kebab).
 @MainActor
 struct BeaconHeaderGhostButton: View {
-    var title: String? = nil
+    let title: String?
     let icon: PantopusIcon
     let accessibilityLabel: String
     let action: @MainActor () -> Void
+
+    init(
+        title: String? = nil,
+        icon: PantopusIcon,
+        accessibilityLabel: String,
+        action: @escaping @MainActor () -> Void
+    ) {
+        self.title = title
+        self.icon = icon
+        self.accessibilityLabel = accessibilityLabel
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
