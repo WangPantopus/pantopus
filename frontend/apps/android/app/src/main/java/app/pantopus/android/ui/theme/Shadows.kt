@@ -53,6 +53,9 @@ object PantopusElevations {
 
     /** `0 6px 16px rgba(2,132,199,0.18)`. */
     val primary = PantopusElevation(PantopusColors.primary600, 0.18f, 16.dp, 0.dp, 6.dp)
+
+    /** `0 6px 16px rgba(17,24,39,0.12)` — the A19 legal `BackToTopFab` drop shadow. */
+    val fab = PantopusElevation(PantopusColors.appText, 0.12f, 16.dp, 0.dp, 6.dp)
 }
 
 /**

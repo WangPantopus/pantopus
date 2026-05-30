@@ -180,6 +180,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case flaskConical = "flask-conical"
     case flameKindling = "flame-kindling"
     case printer
+    /// Plain bulleted list — the A19 legal "Jump to section" TOC header.
+    case list
     case listChecks = "list-checks"
     case alertTriangle = "alert-triangle"
 
@@ -475,6 +477,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .flaskConical: "testtube.2"
         case .flameKindling: "flame.fill"
         case .printer: "printer"
+        case .list: "list.bullet"
         case .listChecks: "checklist"
         case .alertTriangle: "exclamationmark.triangle"
         // T6.4b Documents
