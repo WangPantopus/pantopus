@@ -227,4 +227,9 @@ public extension Theme.Color {
     /// dark stop for letterhead bars, breadcrumb-current chip, and the
     /// "File in Vault" primary CTA.
     static let categoryRecordsDeep = SwiftUI.Color("Category/RecordsDeep", bundle: Theme.bundle)
+    /// Category: stamps — `#0e7490` cyan-700 ("philatelic teal"). The
+    /// postage accent for A17.11 Stamps: the eyebrow / `CategoryChip` dot,
+    /// the `PerforatedStamp` Forever-series ink, and the book balance ring.
+    /// Mirrored on Android as `PantopusColors.categoryStamps`.
+    static let categoryStamps = SwiftUI.Color("Category/Stamps", bundle: Theme.bundle)
 }
