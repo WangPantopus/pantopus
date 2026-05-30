@@ -96,6 +96,7 @@ public struct StatsTabsContent: Sendable, Hashable {
 public struct StatsTabsBody: View {
     private let content: StatsTabsContent
     @Binding private var selectedTab: ProfileTab
+    private let showStats: Bool
     private let showActionRow: Bool
     private let onMessage: @MainActor () -> Void
     private let onConnect: @MainActor () -> Void
@@ -104,6 +105,7 @@ public struct StatsTabsBody: View {
     public init(
         content: StatsTabsContent,
         selectedTab: Binding<ProfileTab>,
+        showStats: Bool = true,
         showActionRow: Bool = true,
         onMessage: @escaping @MainActor () -> Void = {},
         onConnect: @escaping @MainActor () -> Void = {},
@@ -111,6 +113,7 @@ public struct StatsTabsBody: View {
     ) {
         self.content = content
         _selectedTab = selectedTab
+        self.showStats = showStats
         self.showActionRow = showActionRow
         self.onMessage = onMessage
         self.onConnect = onConnect
@@ -119,10 +122,15 @@ public struct StatsTabsBody: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            statsStrip
-                .padding(.horizontal, Spacing.s4)
-                .offset(y: -16) // overlap the header per FrameProfile spec
-                .padding(.bottom, -16)
+            // P8.6 — the A21 Beacon profile relocates the stat row into
+            // the identity block; `showStats: false` suppresses the
+            // raised strip so it isn't rendered twice.
+            if showStats {
+                statsStrip
+                    .padding(.horizontal, Spacing.s4)
+                    .offset(y: -16) // overlap the header per FrameProfile spec
+                    .padding(.bottom, -16)
+            }
 
             if showActionRow {
                 actionRow.padding(.horizontal, Spacing.s4)

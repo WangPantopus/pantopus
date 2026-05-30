@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -27,8 +29,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.components.BeaconBanner
+import app.pantopus.android.ui.components.BeaconIdentity
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -52,35 +57,24 @@ import app.pantopus.android.ui.theme.Spacing
 // MARK: - Banner
 
 /**
- * Flat, kind-tinted banner above the profile header. The design pack
- * sketches a gradient, but the mobile spec pins us to flat surfaces
- * (the only gradient in the app is the marketing landing hero).
- * Persona uses `primary50` + `primary600` trim; Local uses `homeBg` +
- * `home` trim.
+ * Kind-tinted hero band above the identity block. P8.6 adopts the shared
+ * [BeaconBanner] primitive (120dp identity-tinted gradient + signature
+ * diagonal stripes): Persona → [BeaconIdentity.Personal] (sky), Local →
+ * [BeaconIdentity.Home] (green). The wrapper Box keeps the existing
+ * `publicProfile…Banner` test tag alongside the primitive's own tag.
  */
 @Composable
 fun PublicProfileBanner(kind: PublicProfileKind) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(Spacing.s16)
-                    .background(if (kind == PublicProfileKind.Persona) PantopusColors.primary50 else PantopusColors.homeBg)
-                    .testTag(
-                        if (kind == PublicProfileKind.Persona) {
-                            "publicProfilePersonaBanner"
-                        } else {
-                            "publicProfileLocalBanner"
-                        },
-                    ),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(if (kind == PublicProfileKind.Persona) PantopusColors.primary600 else PantopusColors.home),
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .testTag(
+                    if (kind == PublicProfileKind.Persona) "publicProfilePersonaBanner" else "publicProfileLocalBanner",
+                ),
+    ) {
+        BeaconBanner(
+            identity = if (kind == PublicProfileKind.Persona) BeaconIdentity.Personal else BeaconIdentity.Home,
         )
     }
 }
@@ -372,34 +366,26 @@ fun PublicProfilePostsFeed(
     kind: PublicProfileKind,
     posts: List<PublicProfilePost>,
     onUnlock: (PublicProfilePost) -> Unit,
+    onEmptyCta: () -> Unit = {},
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        Text(
-            text = if (kind == PublicProfileKind.Persona) "RECENT BROADCASTS" else "RECENT POSTS",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appTextSecondary,
-            modifier = Modifier.semantics { heading() },
+    if (posts.isEmpty()) {
+        BeaconPostsEmptyState(
+            kind = kind,
+            onCta = onEmptyCta,
+            modifier = Modifier.padding(horizontal = Spacing.s4),
         )
-        if (posts.isEmpty()) {
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
             Text(
-                text =
-                    if (kind == PublicProfileKind.Persona) {
-                        "No broadcasts yet — check back soon."
-                    } else {
-                        "No posts from this neighbor yet."
-                    },
-                fontSize = 14.sp,
+                text = if (kind == PublicProfileKind.Persona) "RECENT BROADCASTS" else "RECENT POSTS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = PantopusColors.appTextSecondary,
-                modifier =
-                    Modifier
-                        .testTag("publicProfilePostsEmpty")
-                        .padding(vertical = Spacing.s3),
+                modifier = Modifier.semantics { heading() },
             )
-        } else {
             posts.forEach { post ->
                 when (kind) {
                     PublicProfileKind.Persona ->
@@ -408,6 +394,100 @@ fun PublicProfilePostsFeed(
                         PublicProfileLocalPostCard(post = post)
                 }
             }
+        }
+    }
+}
+
+/**
+ * P8.6 — Full empty-state card for the posts feed: a 72dp identity-
+ * tinted disc + icon + headline + body + a primary CTA wired to the
+ * kind's first-touch action (Follow for personas, Send a message for
+ * locals). Replaces the previous single-line caption.
+ */
+@Composable
+private fun BeaconPostsEmptyState(
+    kind: PublicProfileKind,
+    onCta: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val persona = kind == PublicProfileKind.Persona
+    val disc = if (persona) PantopusColors.primary50 else PantopusColors.homeBg
+    val accent = if (persona) PantopusColors.primary600 else PantopusColors.home
+    val icon = if (persona) PantopusIcon.RadioTower else PantopusIcon.Home
+    val headline = if (persona) "No broadcasts yet" else "Quiet for now"
+    val body =
+        if (persona) {
+            "Be the first to follow — you'll get a ping the moment they go live."
+        } else {
+            "No posts yet — say hi or send a message to break the ice."
+        }
+    val ctaLabel = if (persona) "Follow" else "Send a message"
+    val ctaIcon = if (persona) PantopusIcon.Plus else PantopusIcon.MessageSquare
+
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.s12, bottom = Spacing.s5)
+                .testTag("publicProfilePostsEmpty"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier.size(72.dp).clip(CircleShape).background(disc),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 32.dp,
+                strokeWidth = 1.6f,
+                tint = accent,
+            )
+        }
+        Spacer(Modifier.size(18.dp))
+        Text(
+            text = headline,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.size(Spacing.s2))
+        Text(
+            text = body,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+            color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(max = 260.dp),
+        )
+        Spacer(Modifier.size(Spacing.s4))
+        Row(
+            modifier =
+                Modifier
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(accent)
+                    .clickable(onClick = onCta)
+                    .padding(horizontal = Spacing.s4)
+                    .testTag("publicProfilePostsEmptyCTA")
+                    .semantics { contentDescription = ctaLabel },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            PantopusIconImage(
+                icon = ctaIcon,
+                contentDescription = null,
+                size = 14.dp,
+                strokeWidth = 2.4f,
+                tint = PantopusColors.appTextInverse,
+            )
+            Text(
+                text = ctaLabel,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
         }
     }
 }
