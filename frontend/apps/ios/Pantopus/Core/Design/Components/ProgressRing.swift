@@ -57,7 +57,7 @@ public struct ProgressRing: View {
         self.trackColor = trackColor
         self.label = label
         self.sublabel = sublabel
-        self.accessibilityLabelText = accessibilityLabel
+        accessibilityLabelText = accessibilityLabel
     }
 
     public var body: some View {
@@ -103,8 +103,13 @@ public struct ProgressRing: View {
 
     /// Scale the center headline with the ring so small rings stay legible
     /// and large goal donuts read as a hero number.
-    private var labelSize: CGFloat { max(13, diameter * 0.24) }
-    private var sublabelSize: CGFloat { max(8, diameter * 0.11) }
+    private var labelSize: CGFloat {
+        max(13, diameter * 0.24)
+    }
+
+    private var sublabelSize: CGFloat {
+        max(8, diameter * 0.11)
+    }
 
     private var resolvedAccessibilityLabel: String {
         if let accessibilityLabelText { return accessibilityLabelText }

@@ -1,5 +1,5 @@
 //
-//  MapPreview.swift
+//  EditBusinessMapPreview.swift
 //  Pantopus
 //
 //  P4.2 — A13.10 Edit Business Page. Stylized map preview tile —

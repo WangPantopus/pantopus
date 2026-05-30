@@ -101,7 +101,7 @@ public struct GalleryStrip: View {
             .accessibilityLabel(tile.moreCount.map { "See \($0) more photos" } ?? (tile.label ?? "Photo"))
     }
 
-    @ViewBuilder private func tileVisual(_ tile: GalleryTile) -> some View {
+    private func tileVisual(_ tile: GalleryTile) -> some View {
         ZStack {
             tileBackground(tile)
             if let moreCount = tile.moreCount {

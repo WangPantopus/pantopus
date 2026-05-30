@@ -35,7 +35,9 @@ public struct RatingDistribution: View {
         self.distribution = padded.map { max(0, min(1, $0)) }
     }
 
-    private var hasReviews: Bool { count > 0 }
+    private var hasReviews: Bool {
+        count >= 1
+    }
 
     public var body: some View {
         HStack(alignment: .center, spacing: 14) {

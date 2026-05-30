@@ -32,8 +32,13 @@ public struct BizStatusBadge: Hashable, Sendable {
         self.tone = tone
     }
 
-    public static func open(_ label: String) -> BizStatusBadge { .init(label: label, tone: .open) }
-    public static func closed(_ label: String) -> BizStatusBadge { .init(label: label, tone: .closed) }
+    public static func open(_ label: String) -> BizStatusBadge {
+        .init(label: label, tone: .open)
+    }
+
+    public static func closed(_ label: String) -> BizStatusBadge {
+        .init(label: label, tone: .closed)
+    }
 
     var background: Color {
         switch tone {
