@@ -193,4 +193,15 @@ object PantopusColors {
      * "File in Vault" primary CTA.
      */
     val categoryRecordsDeep = Color(0xFF1E293B)
+
+    // Rating
+    /**
+     * Star / rating amber — `#F59E0B` (Tailwind amber-500). Fills the
+     * review-histogram bars and the star-rating glyphs on
+     * [app.pantopus.android.ui.components.RatingDistribution] and the
+     * business / listing review summaries (A10.6, A10.7). Distinct from
+     * [warning] (#D97706) — a rating is not a warning state. Mirrored on
+     * iOS as `Theme.Color.star`.
+     */
+    val star = Color(0xFFF59E0B)
 }
