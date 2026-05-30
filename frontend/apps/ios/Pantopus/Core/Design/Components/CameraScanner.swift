@@ -75,10 +75,14 @@ public struct CameraScanner: View {
     }
 
     /// Whether a real live feed can be shown.
-    private var isLive: Bool { authorization == .authorized && !isSimulator }
+    private var isLive: Bool {
+        authorization == .authorized && !isSimulator
+    }
 
     /// Reduce-motion, honoring the test override before the environment trait.
-    private var effectiveReduceMotion: Bool { reduceMotionOverride ?? reduceMotion }
+    private var effectiveReduceMotion: Bool {
+        reduceMotionOverride ?? reduceMotion
+    }
 
     public var body: some View {
         VStack(spacing: Spacing.s0) {

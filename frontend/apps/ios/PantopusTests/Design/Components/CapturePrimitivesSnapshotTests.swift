@@ -97,7 +97,7 @@ final class CapturePrimitivesSnapshotTests: XCTestCase {
                     CameraScannerShot(tag: "LABEL", label: "Serial label")
                 ]
             ) {}
-            .padding()
+                .padding()
         }
     }
 
