@@ -86,6 +86,10 @@ class ColorTokenTest {
         assertHex(0xFFDC2626, PantopusColors.vehicles)
     }
 
+    @Test fun rating() {
+        assertHex(0xFFF59E0B, PantopusColors.star)
+    }
+
     private fun assertHex(
         expected: Long,
         actual: Color,
