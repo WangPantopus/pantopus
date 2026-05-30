@@ -193,4 +193,13 @@ object PantopusColors {
      * "File in Vault" primary CTA.
      */
     val categoryRecordsDeep = Color(0xFF1E293B)
+
+    /**
+     * Category: stamps — `#0E7490` cyan-700 ("philatelic teal"). The
+     * postage accent for A17.11 Stamps: the eyebrow / CategoryChip dot,
+     * the [app.pantopus.android.ui.components.PerforatedStamp] Forever-series
+     * ink, and the book balance ring. Mirrored on iOS as
+     * `Theme.Color.categoryStamps`.
+     */
+    val categoryStamps = Color(0xFF0E7490)
 }
