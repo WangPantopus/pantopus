@@ -259,7 +259,7 @@ fun Postmark(modifier: Modifier = Modifier) {
         val scale = min(size.width / 90f, size.height / 70f)
         val originX = (size.width - 90f * scale) / 2f
         val originY = (size.height - 70f * scale) / 2f
-        fun at(x: Float, y: Float) = Offset(originX + x * scale, originY + y * scale)
+        val at = { x: Float, y: Float -> Offset(originX + x * scale, originY + y * scale) }
         val ink = Color.White
 
         // Concentric date-ring (r 22 + r 16, centred at 45,35).

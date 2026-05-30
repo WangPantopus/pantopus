@@ -89,10 +89,10 @@ public struct PerforatedStamp<Content: View>: View {
     /// half-circle bites where edge circles overlap the paper; the outer
     /// halves fall outside the `width × height` ink and are inert.
     private var inkLayer: some View {
-        ink.mask(
+        ink.mask {
             PerforatedStampShape(toothRadius: toothRadius, toothGap: toothGap)
                 .fill(Color.black, style: FillStyle(eoFill: true, antialiased: true))
-        )
+        }
     }
 
     /// Engraved hairline double-frame — a barely-rounded white 30% stroke
@@ -286,11 +286,13 @@ public struct Postmark: View {
             // Cancellation text.
             context.draw(
                 Text("PANTOPUS").font(.system(size: 6.5 * scale, weight: .bold)).foregroundColor(ink),
-                at: point(45, 31), anchor: .center
+                at: point(45, 31),
+                anchor: .center
             )
             context.draw(
                 Text("USED").font(.system(size: 5.5 * scale, weight: .regular)).foregroundColor(ink),
-                at: point(45, 41), anchor: .center
+                at: point(45, 41),
+                anchor: .center
             )
         }
         .opacity(0.55)
