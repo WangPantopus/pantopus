@@ -29,15 +29,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.BeaconIdentity
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
+import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileTab
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.StatsTabsBody
-import app.pantopus.android.ui.screens.shared.content_detail.ctas.ActionRowCta
-import app.pantopus.android.ui.screens.shared.content_detail.ctas.ActionRowCtaKind
-import app.pantopus.android.ui.screens.shared.content_detail.headers.ProfileHeader
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTextStyle
@@ -198,55 +197,68 @@ internal fun PublicProfileLoadedFrame(
     onOverflow: () -> Unit,
     onUnlock: () -> Unit,
 ) {
+    val persona = content.kind == PublicProfileKind.Persona
     ContentDetailShell(
         title = null,
         onBack = onBack,
-        cta = {
-            when (content.kind) {
-                PublicProfileKind.Persona ->
-                    ActionRowCta(
-                        kind =
-                            ActionRowCtaKind.Persona(
-                                followInFlight = followState is PublicProfileActionState.InFlight,
-                                isFollowing = followState is PublicProfileActionState.Succeeded,
-                                onFollow = onFollow,
-                            ),
-                    )
-                PublicProfileKind.Local ->
-                    ActionRowCta(
-                        kind =
-                            ActionRowCtaKind.Local(
-                                messageInFlight = false,
-                                connectInFlight = connectState is PublicProfileActionState.InFlight,
-                                isConnectRequested = connectState is PublicProfileActionState.Succeeded,
-                                onMessage = onMessage,
-                                onConnect = onConnect,
-                            ),
-                    )
-            }
-        },
+        topBarAction =
+            ContentDetailTopBarAction(
+                icon = PantopusIcon.MoreHorizontal,
+                contentDescription = "More",
+                onClick = onOverflow,
+            ),
         header = {
-            Column(
+            // Box stacks the 120dp banner with the identity block pulled
+            // down to overlap the banner's lower 40dp (banner − overlap).
+            Box(
                 modifier =
-                    Modifier.testTag(
-                        if (content.kind == PublicProfileKind.Persona) {
-                            "publicProfilePersonaHeader"
-                        } else {
-                            "publicProfileLocalHeader"
-                        },
-                    ),
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag(if (persona) "publicProfilePersonaHeader" else "publicProfileLocalHeader"),
             ) {
                 PublicProfileBanner(kind = content.kind)
-                ProfileHeader(
-                    displayName = content.header.displayName,
-                    handle = content.header.handle,
-                    locality = content.header.locality,
-                    avatarUrl = content.header.avatarUrl,
-                    isVerified = content.header.isVerified,
-                    identityBadges = content.header.identityBadges,
-                    tierLabel = content.header.tierLabel,
-                    isVerifiedNeighbor = content.header.isVerifiedNeighbor,
-                )
+                Box(modifier = Modifier.padding(top = 80.dp)) {
+                    BeaconIdentityBlock(
+                        identity = if (persona) BeaconIdentity.Personal else BeaconIdentity.Home,
+                        name = content.header.displayName,
+                        handle = content.header.handle,
+                        tierLabel = content.header.tierLabel,
+                        isVerifiedNeighbor = content.header.isVerifiedNeighbor,
+                        locality = content.header.locality,
+                        bio = content.stats.bio,
+                        isVerified = content.header.isVerified,
+                        avatarUrl = content.header.avatarUrl,
+                        stats = content.stats.stats,
+                    ) {
+                        if (persona) {
+                            val following = followState is PublicProfileActionState.Succeeded
+                            BeaconHeaderGhostButton(
+                                icon = PantopusIcon.Share,
+                                actionLabel = "Share profile",
+                                onClick = onOverflow,
+                            )
+                            BeaconHeaderPrimaryButton(
+                                title = if (following) "Following" else "Follow",
+                                icon = PantopusIcon.Plus,
+                                onClick = onFollow,
+                                isProminent = !following,
+                            )
+                        } else {
+                            val requested = connectState is PublicProfileActionState.Succeeded
+                            BeaconHeaderGhostButton(
+                                icon = PantopusIcon.UserPlus,
+                                actionLabel = if (requested) "Requested" else "Connect",
+                                onClick = onConnect,
+                                title = if (requested) "Requested" else "Connect",
+                            )
+                            BeaconHeaderPrimaryButton(
+                                title = "Message",
+                                icon = PantopusIcon.MessageSquare,
+                                onClick = onMessage,
+                            )
+                        }
+                    }
+                }
             }
         },
         body = {
@@ -255,6 +267,7 @@ internal fun PublicProfileLoadedFrame(
                     content = content.stats,
                     selectedTab = selectedTab,
                     onSelectTab = onSelectTab,
+                    showStats = false,
                     showActionRow = false,
                     onMessage = onMessage,
                     onConnect = onConnect,
@@ -264,6 +277,7 @@ internal fun PublicProfileLoadedFrame(
                     kind = content.kind,
                     posts = content.posts,
                     onUnlock = { onUnlock() },
+                    onEmptyCta = if (persona) onFollow else onMessage,
                 )
             }
         },

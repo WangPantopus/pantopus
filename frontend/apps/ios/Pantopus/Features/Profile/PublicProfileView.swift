@@ -3,19 +3,20 @@
 //  Pantopus
 //
 //  Public profile screen wired through `ContentDetailShell` with
-//  `ProfileHeader` + `StatsTabsBody` + `ActionRowCTA`.
+//  `BeaconBanner` + `BeaconIdentityBlock` + `StatsTabsBody`.
 //
 //  P6.5 — Differentiates between Persona (creator) and Local (verified
 //  neighbor) profiles. The view-model picks the kind from the loaded
 //  profile's metadata, then this view swaps:
 //
-//    - banner color (sky vs green) above the header,
+//    - `BeaconBanner` identity tint (sky `.personal` vs green `.home`),
 //    - in-header chips ("Persona · Verified" gold tier vs "Verified
 //      neighbor" green shield),
-//    - sticky footer CTAs (single Follow vs Message + Connect),
-//    - post styling beneath the stats/tabs body (broadcasts with a
-//      tier visibility chip + locked-paywall overlay vs Pulse-style
-//      posts with an intent chip).
+//    - `BeaconIdentityBlock` action area (share + Follow vs Connect +
+//      Message — P8.6 moved these in-header from the old sticky footer),
+//    - post styling beneath the identity block (broadcasts with a tier
+//      visibility chip + locked-paywall overlay vs Pulse-style posts
+//      with an intent chip), incl. the full empty-state card.
 //
 
 import SwiftUI
@@ -127,19 +128,29 @@ public struct PublicProfileView: View {
         ContentDetailShell(
             title: nil,
             onBack: onBack,
+            topBarAction: ContentDetailTopBarAction(
+                icon: .moreHorizontal,
+                accessibilityLabel: "More"
+            ) {
+                Task { @MainActor in viewModel.showOverflow = true }
+            },
             header: {
                 VStack(spacing: Spacing.s0) {
                     PublicProfileBanner(kind: payload.kind)
-                    ProfileHeader(
-                        displayName: payload.header.displayName,
+                    BeaconIdentityBlock(
+                        identity: payload.kind == .persona ? .personal : .home,
+                        name: payload.header.displayName,
                         handle: payload.header.handle,
-                        locality: payload.header.locality,
-                        avatarURL: payload.header.avatarURL,
-                        isVerified: payload.header.isVerified,
-                        identityBadges: payload.header.identityBadges,
                         tierLabel: payload.header.tierLabel,
-                        isVerifiedNeighbor: payload.header.isVerifiedNeighbor
-                    )
+                        isVerifiedNeighbor: payload.header.isVerifiedNeighbor,
+                        locality: payload.header.locality,
+                        bio: payload.stats.bio,
+                        isVerified: payload.header.isVerified,
+                        avatarURL: payload.header.avatarURL,
+                        stats: payload.stats.stats
+                    ) {
+                        identityActions(for: payload)
+                    }
                 }
                 .accessibilityIdentifier(
                     payload.kind == .persona
@@ -155,6 +166,7 @@ public struct PublicProfileView: View {
                             get: { viewModel.selectedTab },
                             set: { viewModel.selectedTab = $0 }
                         ),
+                        showStats: false,
                         showActionRow: false,
                         onMessage: { onOpenMessages(payload.profile) },
                         onConnect: { Task { await viewModel.connect() } },
@@ -162,28 +174,52 @@ public struct PublicProfileView: View {
                     )
                     PublicProfilePostsFeed(
                         kind: payload.kind,
-                        posts: payload.posts
-                    ) { _ in viewModel.toastMessage = "Subscribe flow coming soon" }
+                        posts: payload.posts,
+                        onUnlock: { _ in viewModel.toastMessage = "Subscribe flow coming soon" },
+                        onEmptyCTA: { emptyCTAAction(for: payload) }
+                    )
                 }
-            },
-            cta: { stickyFooter(for: payload) }
+            }
         )
     }
 
+    /// Kind-aware action buttons rendered top-right inside the
+    /// `BeaconIdentityBlock` (replacing the former sticky footer).
     @ViewBuilder
-    private func stickyFooter(for payload: PublicProfileContent) -> some View {
+    private func identityActions(for payload: PublicProfileContent) -> some View {
         switch payload.kind {
         case .persona:
-            ActionRowCTA(kind: .persona(followState: viewModel.followState) {
+            BeaconHeaderGhostButton(icon: .share, accessibilityLabel: "Share profile") {
+                viewModel.showOverflow = true
+            }
+            BeaconHeaderPrimaryButton(
+                title: viewModel.followState == .succeeded ? "Following" : "Follow",
+                icon: .plus,
+                isProminent: viewModel.followState != .succeeded
+            ) {
                 Task { await viewModel.follow() }
-            })
+            }
         case .local:
-            ActionRowCTA(kind: .local(
-                messageState: .idle,
-                connectState: viewModel.connectState,
-                onMessage: { onOpenMessages(payload.profile) },
-                onConnect: { Task { await viewModel.connect() } }
-            ))
+            BeaconHeaderGhostButton(
+                title: viewModel.connectState == .succeeded ? "Requested" : "Connect",
+                icon: .userPlus,
+                accessibilityLabel: viewModel.connectState == .succeeded ? "Requested" : "Connect"
+            ) {
+                Task { await viewModel.connect() }
+            }
+            BeaconHeaderPrimaryButton(title: "Message", icon: .messageSquare) {
+                onOpenMessages(payload.profile)
+            }
+        }
+    }
+
+    /// First-touch action behind the posts-feed empty-state CTA.
+    private func emptyCTAAction(for payload: PublicProfileContent) {
+        switch payload.kind {
+        case .persona:
+            Task { await viewModel.follow() }
+        case .local:
+            onOpenMessages(payload.profile)
         }
     }
 }

@@ -96,6 +96,7 @@ fun StatsTabsBody(
     content: StatsTabsContent,
     selectedTab: ProfileTab,
     onSelectTab: (ProfileTab) -> Unit,
+    showStats: Boolean = true,
     showActionRow: Boolean = true,
     onMessage: () -> Unit = {},
     onConnect: () -> Unit = {},
@@ -105,13 +106,18 @@ fun StatsTabsBody(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        StatsStrip(
-            cells = content.stats,
-            modifier =
-                Modifier
-                    .padding(horizontal = Spacing.s4)
-                    .offset(y = (-16).dp),
-        )
+        // P8.6 — the A21 Beacon profile relocates the stat row into the
+        // identity block; `showStats = false` suppresses the raised strip
+        // so it isn't rendered twice.
+        if (showStats) {
+            StatsStrip(
+                cells = content.stats,
+                modifier =
+                    Modifier
+                        .padding(horizontal = Spacing.s4)
+                        .offset(y = (-16).dp),
+            )
+        }
         if (showActionRow) {
             ActionRow(
                 onMessage = onMessage,

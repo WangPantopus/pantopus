@@ -19,43 +19,27 @@ import SwiftUI
 
 // MARK: - Banner
 
-/// Flat, kind-tinted banner sitting above the profile header. The design
-/// references a sky/green gradient for visual richness, but the spec
-/// pins us to flat surfaces on mobile (the only gradient in the app is
-/// the marketing landing hero). Persona uses `primary50` with a
-/// `primary600` trim; Local uses `homeBg` with a `home` trim.
+/// Kind-tinted hero band above the identity block. P8.6 adopts the
+/// shared `BeaconBanner` primitive (120pt identity-tinted gradient with
+/// the signature diagonal stripes) for the A21 public Beacon profiles:
+/// Persona → `.personal` (sky), Local → `.home` (green).
 @MainActor
 struct PublicProfileBanner: View {
     let kind: PublicProfileKind
 
     var body: some View {
-        VStack(spacing: Spacing.s0) {
-            Rectangle()
-                .fill(fillColor)
-                .frame(height: Spacing.s16)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(trimColor).frame(height: 2)
-                }
-        }
-        .accessibilityIdentifier(
-            kind == .persona
-                ? "publicProfilePersonaBanner"
-                : "publicProfileLocalBanner"
-        )
-        .accessibilityHidden(true)
+        BeaconBanner(identity: bannerIdentity) { EmptyView() }
+            .accessibilityIdentifier(
+                kind == .persona
+                    ? "publicProfilePersonaBanner"
+                    : "publicProfileLocalBanner"
+            )
     }
 
-    private var fillColor: Color {
+    private var bannerIdentity: BeaconIdentity {
         switch kind {
-        case .persona: Theme.Color.primary50
-        case .local: Theme.Color.homeBg
-        }
-    }
-
-    private var trimColor: Color {
-        switch kind {
-        case .persona: Theme.Color.primary600
-        case .local: Theme.Color.home
+        case .persona: .personal
+        case .local: .home
         }
     }
 }
@@ -375,32 +359,34 @@ private struct IntentChip: View {
 // MARK: - Posts feed wrapper
 
 /// Container that renders either persona broadcasts or local posts
-/// beneath the stats/tabs body. Empty state is a single-line caption so
-/// it doesn't fight with the tab's own empty UI (Reviews/Gigs tabs ship
-/// their own `EmptyState`).
+/// beneath the identity block. P8.6 swaps the previous single-line empty
+/// caption for the full `EmptyState` card the design pins: a 72pt
+/// identity-tinted disc + icon + headline + body + a primary CTA wired
+/// to the kind's first-touch action (Follow for personas, Send a message
+/// for locals).
 @MainActor
 struct PublicProfilePostsFeed: View {
     let kind: PublicProfileKind
     let posts: [PublicProfilePost]
     let onUnlock: @MainActor (PublicProfilePost) -> Void
+    /// Kind-appropriate first-touch action behind the empty-state CTA —
+    /// the host wires this to `follow()` (persona) or open-messages
+    /// (local). Defaults to a no-op so previews / tests can opt out.
+    var onEmptyCTA: @MainActor () -> Void = {}
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            Text(headerLabel)
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .textCase(.uppercase)
-                .accessibilityAddTraits(.isHeader)
-
-            if posts.isEmpty {
-                Text(emptyCopy)
-                    .font(.system(size: PantopusTextStyle.small.size))
+        if posts.isEmpty {
+            emptyState
+                .padding(.horizontal, Spacing.s4)
+        } else {
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                Text(headerLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.6)
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, Spacing.s3)
-                    .accessibilityIdentifier("publicProfilePostsEmpty")
-            } else {
+                    .textCase(.uppercase)
+                    .accessibilityAddTraits(.isHeader)
+
                 ForEach(posts) { post in
                     switch kind {
                     case .persona:
@@ -412,17 +398,94 @@ struct PublicProfilePostsFeed: View {
                     }
                 }
             }
+            .padding(.horizontal, Spacing.s4)
         }
-        .padding(.horizontal, Spacing.s4)
+    }
+
+    // MARK: Empty state
+
+    private var emptyState: some View {
+        VStack(spacing: Spacing.s0) {
+            ZStack {
+                Circle()
+                    .fill(emptyDiscColor)
+                    .frame(width: 72, height: 72)
+                Icon(emptyIcon, size: 32, strokeWidth: 1.6, color: emptyAccentColor)
+            }
+            .padding(.bottom, 18)
+
+            Text(emptyHeadline)
+                .font(.system(size: 17, weight: .bold))
+                .tracking(-0.2)
+                .foregroundStyle(Theme.Color.appText)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+
+            Text(emptyBody)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .frame(maxWidth: 260)
+                .padding(.top, Spacing.s2)
+
+            Button(action: onEmptyCTA) {
+                HStack(spacing: 6) {
+                    Icon(emptyCTAIcon, size: 14, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                    Text(emptyCTALabel)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .padding(.horizontal, Spacing.s4)
+                .frame(height: 40)
+                .background(emptyAccentColor)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, Spacing.s4)
+            .accessibilityLabel(emptyCTALabel)
+            .accessibilityIdentifier("publicProfilePostsEmptyCTA")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, Spacing.s12)
+        .padding(.bottom, Spacing.s5)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("publicProfilePostsEmpty")
     }
 
     private var headerLabel: String {
         kind == .persona ? "Recent broadcasts" : "Recent posts"
     }
 
-    private var emptyCopy: String {
+    // MARK: Empty-state palette + copy (per kind)
+
+    private var emptyDiscColor: Color {
+        kind == .persona ? Theme.Color.primary50 : Theme.Color.homeBg
+    }
+
+    private var emptyAccentColor: Color {
+        kind == .persona ? Theme.Color.primary600 : Theme.Color.home
+    }
+
+    private var emptyIcon: PantopusIcon {
+        kind == .persona ? .radioTower : .home
+    }
+
+    private var emptyHeadline: String {
+        kind == .persona ? "No broadcasts yet" : "Quiet for now"
+    }
+
+    private var emptyBody: String {
         kind == .persona
-            ? "No broadcasts yet — check back soon."
-            : "No posts from this neighbor yet."
+            ? "Be the first to follow — you'll get a ping the moment they go live."
+            : "No posts yet — say hi or send a message to break the ice."
+    }
+
+    private var emptyCTALabel: String {
+        kind == .persona ? "Follow" : "Send a message"
+    }
+
+    private var emptyCTAIcon: PantopusIcon {
+        kind == .persona ? .plus : .messageSquare
     }
 }

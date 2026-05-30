@@ -142,18 +142,22 @@ private struct LoadedFixtureView: View {
             title: nil,
             onBack: nil,
             header: {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     PublicProfileBanner(kind: content.kind)
-                    ProfileHeader(
-                        displayName: content.header.displayName,
+                    BeaconIdentityBlock(
+                        identity: content.kind == .persona ? .personal : .home,
+                        name: content.header.displayName,
                         handle: content.header.handle,
-                        locality: content.header.locality,
-                        avatarURL: content.header.avatarURL,
-                        isVerified: content.header.isVerified,
-                        identityBadges: content.header.identityBadges,
                         tierLabel: content.header.tierLabel,
-                        isVerifiedNeighbor: content.header.isVerifiedNeighbor
-                    )
+                        isVerifiedNeighbor: content.header.isVerifiedNeighbor,
+                        locality: content.header.locality,
+                        bio: content.stats.bio,
+                        isVerified: content.header.isVerified,
+                        avatarURL: content.header.avatarURL,
+                        stats: content.stats.stats
+                    ) {
+                        identityActions
+                    }
                 }
             },
             body: {
@@ -161,28 +165,37 @@ private struct LoadedFixtureView: View {
                     StatsTabsBody(
                         content: content.stats,
                         selectedTab: $selectedTab,
+                        showStats: false,
                         showActionRow: false
                     )
                     PublicProfilePostsFeed(
                         kind: content.kind,
-                        posts: content.posts
-                    ) { _ in }
-                }
-            },
-            cta: {
-                switch content.kind {
-                case .persona:
-                    ActionRowCTA(kind: .persona(followState: followState) {})
-                case .local:
-                    ActionRowCTA(kind: .local(
-                        messageState: .idle,
-                        connectState: connectState,
-                        onMessage: {},
-                        onConnect: {}
-                    ))
+                        posts: content.posts,
+                        onUnlock: { _ in },
+                        onEmptyCTA: {}
+                    )
                 }
             }
         )
+    }
+
+    @ViewBuilder private var identityActions: some View {
+        switch content.kind {
+        case .persona:
+            BeaconHeaderGhostButton(icon: .share, accessibilityLabel: "Share profile") {}
+            BeaconHeaderPrimaryButton(
+                title: followState == .succeeded ? "Following" : "Follow",
+                icon: .plus,
+                isProminent: followState != .succeeded
+            ) {}
+        case .local:
+            BeaconHeaderGhostButton(
+                title: connectState == .succeeded ? "Requested" : "Connect",
+                icon: .userPlus,
+                accessibilityLabel: "Connect"
+            ) {}
+            BeaconHeaderPrimaryButton(title: "Message", icon: .messageSquare) {}
+        }
     }
 }
 
