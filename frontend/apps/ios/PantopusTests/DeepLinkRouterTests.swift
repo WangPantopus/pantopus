@@ -379,8 +379,16 @@ final class DeepLinkRouterTests: XCTestCase {
         DeepLinkRouter.shared.handle(url: url)
         XCTAssertEqual(DeepLinkRouter.shared.pending, .verifyLandlord(id: "h_42"))
     }
+}
 
-    // MARK: - B1.6 batch-2 routing seam
+/// B1.6 batch-2 routing seam — split into its own class so the original
+/// `DeepLinkRouterTests` body stays under SwiftLint's `type_body_length`.
+@MainActor
+final class DeepLinkRouterBatch2Tests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        _ = DeepLinkRouter.shared.consume() // clear any leftover state
+    }
 
     func testStampsRoute() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/stamps")))
