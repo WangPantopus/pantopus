@@ -136,7 +136,7 @@ public struct LegalTOCCard: View {
     LegalTOCCard(
         items: [
             "Overview", "Information we collect", "How we use it",
-            "Identity pillars & privacy", "Sharing & disclosure",
+            "Identity pillars & privacy", "Sharing & disclosure"
         ],
         isOpen: true,
         onToggle: {},

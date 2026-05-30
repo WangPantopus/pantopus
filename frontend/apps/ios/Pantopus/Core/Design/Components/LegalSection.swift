@@ -25,7 +25,9 @@ public struct LegalSection: View {
 
     /// Stable scroll anchor — the native mirror of the design's `id="sec-{n}"`.
     /// A parent `ScrollViewReader` jumps here with `proxy.scrollTo(anchorID)`.
-    public var anchorID: String { "sec-\(number)" }
+    public var anchorID: String {
+        "sec-\(number)"
+    }
 
     public var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {

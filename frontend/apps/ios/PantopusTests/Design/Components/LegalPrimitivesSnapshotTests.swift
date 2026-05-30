@@ -30,7 +30,7 @@ final class LegalPrimitivesSnapshotTests: XCTestCase {
         "Data retention",
         "Children & teens",
         "International transfers",
-        "Changes to this policy",
+        "Changes to this policy"
     ]
 
     private func assertRenders(
