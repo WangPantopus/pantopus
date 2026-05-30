@@ -3,19 +3,38 @@
 package app.pantopus.android.ui.screens.status
 
 import androidx.compose.runtime.Immutable
+import app.pantopus.android.ui.components.HaloCircleTone
 import app.pantopus.android.ui.theme.PantopusIcon
 
-/** Hero illustration tone. The view picks an icon + tint per case. */
-enum class StatusIllustration(val key: String) {
-    Success("success"),
-    Waiting("waiting"),
-    Email("email"),
-}
+/** Hero halo: which ceremonial tone + glyph the [HaloCircle] paints. */
+@Immutable
+data class StatusHalo(
+    val tone: HaloCircleTone,
+    val icon: PantopusIcon? = null,
+    val isPulsing: Boolean = false,
+)
+
+/** Tone for the status pill under the headline. */
+enum class StatusPillTone { Neutral, Success, Warning, Primary }
+
+/** The pill under the headline (formerly `etaChip`). */
+@Immutable
+data class StatusWaitingPill(
+    val text: String,
+    val icon: PantopusIcon? = null,
+    val tone: StatusPillTone = StatusPillTone.Warning,
+    val isSpinning: Boolean = false,
+)
+
+/** State of a single timeline step. When null, derived from `currentStageId`. */
+enum class StatusStepState { Done, Current, Pending }
 
 @Immutable
 data class StatusTimelineStage(
     val id: String,
     val label: String,
+    val sub: String? = null,
+    val state: StatusStepState? = null,
 )
 
 @Immutable
@@ -26,29 +45,47 @@ data class StatusActionCard(
     val subtitle: String? = null,
 )
 
-/** CTA that carries a label and an opaque key so tests can verify
- *  which CTA fired without inspecting closure identity. */
+/** Visual weight of an in-body action button (A18.1's button stack). */
+enum class StatusActionButtonStyle { Primary, Outline, Underline }
+
+/** A button in the in-body action stack (A18.1). */
+@Immutable
+data class StatusActionButton(
+    val id: String,
+    val label: String,
+    val actionKey: String,
+    val icon: PantopusIcon? = null,
+    val style: StatusActionButtonStyle,
+    val isDisabled: Boolean = false,
+)
+
+/** CTA that carries a label, an opaque key, and an optional leading glyph. */
 @Immutable
 data class StatusCta(
     val label: String,
     val actionKey: String,
+    val icon: PantopusIcon? = null,
 )
 
 @Immutable
 data class StatusWaitingContent(
-    val illustration: StatusIllustration,
+    val halo: StatusHalo,
     val headline: String,
     val subcopy: String,
+    val bodyEmphasis: String? = null,
+    val addressChip: String? = null,
+    val statusPill: StatusWaitingPill? = null,
     val timeline: List<StatusTimelineStage> = emptyList(),
     val currentStageId: String? = null,
-    val etaChip: String? = null,
     val actionCards: List<StatusActionCard> = emptyList(),
     val explainerBullets: List<String> = emptyList(),
+    val actionStack: List<StatusActionButton> = emptyList(),
+    val footnote: String? = null,
     val primaryCta: StatusCta? = null,
     val secondaryCta: StatusCta? = null,
 ) {
     companion object {
-        /** Three-stage progress used by every Homes flow. */
+        /** Three-stage progress used by the Homes claim flow. */
         val homesClaimTimeline: List<StatusTimelineStage> =
             listOf(
                 StatusTimelineStage(id = "submitted", label = "Submitted"),
@@ -56,46 +93,134 @@ data class StatusWaitingContent(
                 StatusTimelineStage(id = "complete", label = "Complete"),
             )
 
-        /** Frame 1 — Claim submitted (success). */
+        // ── A18.2 Claim submitted ────────────────────────────────────────
+
+        /**
+         * A18.2 — right after a claim POST (`approved == false`) or revisited
+         * once it resolves (`approved == true`). Timeline dates mirror the
+         * design sample frames pending backend date wiring.
+         */
         fun claimSubmitted(
             homeName: String? = null,
-            eta: String? = "2–3 days",
+            approved: Boolean = false,
         ): StatusWaitingContent {
-            val venue = homeName?.takeIf { it.isNotBlank() } ?: "this home"
+            val chip = homeName?.takeIf { it.isNotBlank() }
+            if (approved) {
+                return StatusWaitingContent(
+                    halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.BadgeCheck),
+                    headline = "You're the owner",
+                    subcopy =
+                        "Your ownership claim was approved. The Home badge now shows on your profile and household.",
+                    addressChip = chip,
+                    statusPill =
+                        StatusWaitingPill(
+                            text = "Approved · 3 days ago",
+                            icon = PantopusIcon.CheckCircle,
+                            tone = StatusPillTone.Success,
+                        ),
+                    timeline =
+                        listOf(
+                            StatusTimelineStage("submitted", "Submitted", "Oct 10", StatusStepState.Done),
+                            StatusTimelineStage("review", "Under review", "Oct 11", StatusStepState.Done),
+                            StatusTimelineStage("decision", "Approved", "Oct 14", StatusStepState.Done),
+                        ),
+                    primaryCta =
+                        StatusCta(label = "Open your home", actionKey = "open_home", icon = PantopusIcon.ArrowRight),
+                    secondaryCta = StatusCta(label = "See your Home badge", actionKey = "view_badge"),
+                )
+            }
             return StatusWaitingContent(
-                illustration = StatusIllustration.Success,
+                halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.Check),
                 headline = "Claim submitted",
-                subcopy = "We'll review your evidence and email you when $venue is verified.",
-                timeline = homesClaimTimeline,
-                currentStageId = "submitted",
-                etaChip = eta,
-                actionCards =
-                    listOf(
-                        StatusActionCard(
-                            id = "checkInbox",
-                            icon = PantopusIcon.Mailbox,
-                            title = "Check your inbox",
-                            subtitle = "We'll send a verification email shortly.",
-                        ),
-                        StatusActionCard(
-                            id = "viewClaim",
-                            icon = PantopusIcon.File,
-                            title = "View claim details",
-                            subtitle = "See what you submitted and add more evidence.",
-                        ),
+                subcopy = "We'll review your deed and address match within 3 business days and send you a decision.",
+                addressChip = chip,
+                statusPill =
+                    StatusWaitingPill(
+                        text = "Decision expected by Oct 17",
+                        icon = PantopusIcon.CalendarClock,
+                        tone = StatusPillTone.Success,
                     ),
-                explainerBullets =
+                timeline =
                     listOf(
-                        "We compare your evidence against any prior claims.",
-                        "If we need more, we'll ask via email — never SMS.",
-                        "Most claims resolve in 2–3 days.",
+                        StatusTimelineStage("submitted", "Submitted", "Oct 10", StatusStepState.Done),
+                        StatusTimelineStage("review", "Under review", state = StatusStepState.Pending),
+                        StatusTimelineStage("decision", "Decision", state = StatusStepState.Pending),
                     ),
-                primaryCta = StatusCta(label = "Back to Hub", actionKey = "back_to_hub"),
-                secondaryCta = StatusCta(label = "View claim", actionKey = "view_claim"),
+                primaryCta =
+                    StatusCta(label = "View status", actionKey = "view_status", icon = PantopusIcon.ArrowRight),
+                secondaryCta = StatusCta(label = "Back to home", actionKey = "back_to_home"),
             )
         }
 
-        /** Frame 2 — Under review (mid-process). */
+        // ── A18.3 Verification submitted (tenant verifying landlord) ──────
+
+        /**
+         * A18.3 — tenant submitted lease + ID, now waiting on the landlord
+         * (`confirmed == false`) or the landlord signed off and Pantopus is
+         * doing the final review (`confirmed == true`). Primary CTA is "Back
+         * to home" (the user can't speed this up), inverting A18.2.
+         */
+        fun verificationSubmitted(
+            homeName: String? = null,
+            landlordEmail: String,
+            landlordName: String? = null,
+            confirmed: Boolean = false,
+        ): StatusWaitingContent {
+            val chip = homeName?.takeIf { it.isNotBlank() }
+            val backToHome = StatusCta(label = "Back to home", actionKey = "back_to_home", icon = PantopusIcon.Home)
+            val viewStatus = StatusCta(label = "View status", actionKey = "view_status")
+            if (confirmed) {
+                val who = landlordName?.takeIf { it.isNotBlank() } ?: "Your landlord"
+                return StatusWaitingContent(
+                    halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.UserCheck),
+                    headline = "Landlord confirmed",
+                    subcopy =
+                        "$who confirmed your tenancy. " +
+                            "Pantopus is doing a final review before your Resident badge goes live.",
+                    bodyEmphasis = who,
+                    addressChip = chip,
+                    statusPill =
+                        StatusWaitingPill(
+                            text = "Decision expected today",
+                            icon = PantopusIcon.CalendarClock,
+                            tone = StatusPillTone.Primary,
+                        ),
+                    timeline =
+                        listOf(
+                            StatusTimelineStage("lease", "Lease + ID", "Oct 10", StatusStepState.Done),
+                            StatusTimelineStage("landlord", "Landlord confirms", "Oct 11", StatusStepState.Done),
+                            StatusTimelineStage("verified", "Verified", "In review", StatusStepState.Current),
+                        ),
+                    primaryCta = backToHome,
+                    secondaryCta = viewStatus,
+                )
+            }
+            val email = landlordEmail.ifBlank { "your landlord" }
+            return StatusWaitingContent(
+                halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.Check),
+                headline = "Verification submitted",
+                subcopy = "We emailed your landlord at $email to confirm. You'll get a push when they do.",
+                bodyEmphasis = landlordEmail.ifBlank { null },
+                addressChip = chip,
+                statusPill =
+                    StatusWaitingPill(
+                        text = "Most landlords confirm in 1–2 days",
+                        icon = PantopusIcon.CalendarClock,
+                        tone = StatusPillTone.Success,
+                    ),
+                timeline =
+                    listOf(
+                        StatusTimelineStage("lease", "Lease + ID", "Oct 10", StatusStepState.Done),
+                        StatusTimelineStage("landlord", "Landlord confirms", state = StatusStepState.Pending),
+                        StatusTimelineStage("verified", "Verified", state = StatusStepState.Pending),
+                    ),
+                primaryCta = backToHome,
+                secondaryCta = viewStatus,
+            )
+        }
+
+        // ── Under review (homes claim, mid-process) ──────────────────────
+
         fun underReview(
             homeName: String? = null,
             submittedAgo: String? = null,
@@ -105,12 +230,17 @@ data class StatusWaitingContent(
             val subcopy =
                 if (!submittedAgo.isNullOrBlank()) "$baseSubcopy Submitted $submittedAgo." else baseSubcopy
             return StatusWaitingContent(
-                illustration = StatusIllustration.Waiting,
+                halo = StatusHalo(tone = HaloCircleTone.Warning, icon = PantopusIcon.Hourglass),
                 headline = "Under review",
                 subcopy = subcopy,
+                statusPill =
+                    StatusWaitingPill(
+                        text = "Usually resolved in 2–3 days",
+                        icon = PantopusIcon.AlertCircle,
+                        tone = StatusPillTone.Warning,
+                    ),
                 timeline = homesClaimTimeline,
                 currentStageId = "review",
-                etaChip = "Usually resolved in 2–3 days",
                 actionCards =
                     listOf(
                         StatusActionCard(
@@ -137,71 +267,106 @@ data class StatusWaitingContent(
             )
         }
 
-        /**
-         * Frame 4 — Reset link sent. Status frame for the Forgot-password
-         * success state — used by `ForgotPasswordScreen`. Primary CTA is
-         * "Resend"; ghost CTA is "Back to login". Body interpolates the
-         * caller's email so the user can visually confirm where the link
-         * went.
-         */
+        // ── Auth frames (password reset) ─────────────────────────────────
+
+        /** Reset link sent — Forgot-password success state. */
         fun resetLinkSent(email: String): StatusWaitingContent {
             val recipient = email.ifBlank { "your email" }
             return StatusWaitingContent(
-                illustration = StatusIllustration.Email,
+                halo = StatusHalo(tone = HaloCircleTone.Info, icon = PantopusIcon.MailCheck),
                 headline = "Check your email",
                 subcopy = "We sent a reset link to $recipient. Click it to set a new password.",
+                bodyEmphasis = email.ifBlank { null },
                 primaryCta = StatusCta(label = "Resend", actionKey = "resend_reset"),
                 secondaryCta = StatusCta(label = "Back to login", actionKey = "back_to_login"),
             )
         }
 
-        /**
-         * Frame 5 — Password reset success. Reached after `ResetPasswordScreen`
-         * submits a valid token + new password. Auto-redirects to login
-         * after 3 seconds (caller wires the timer).
-         */
+        /** Password reset success. */
         fun passwordReset(): StatusWaitingContent =
             StatusWaitingContent(
-                illustration = StatusIllustration.Success,
+                halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.Check),
                 headline = "Password reset",
                 subcopy = "You can now log in with your new password.",
                 primaryCta = StatusCta(label = "Back to login", actionKey = "back_to_login"),
             )
 
-        /** Frame 3 — Check your email (info). */
-        fun checkYourEmail(email: String? = null): StatusWaitingContent {
-            val recipient =
-                email?.let { "We just sent a link to $it." }
-                    ?: "We just sent a verification link to your email."
+        // ── A18.1 Check your email (verify-email-sent) ───────────────────
+
+        /**
+         * A18.1 — fire-and-wait state after sign-up. `resent == false` shows
+         * the neutral "Waiting for link click…" pill with a spinning hourglass
+         * and an enabled Resend; `resent == true` swaps in a green "New link
+         * sent" pill, disables Resend with a cooldown countdown, and pivots the
+         * footer hint.
+         */
+        fun checkYourEmail(
+            email: String? = null,
+            resent: Boolean = false,
+            resendCountdown: String = "0:42",
+        ): StatusWaitingContent {
+            val recipient = email?.takeIf { it.isNotBlank() } ?: "your email"
+            val openMail =
+                StatusActionButton(
+                    id = "openMail",
+                    label = "Open Mail app",
+                    actionKey = "open_mail",
+                    icon = PantopusIcon.ExternalLink,
+                    style = StatusActionButtonStyle.Primary,
+                )
+            val useDifferent =
+                StatusActionButton(
+                    id = "changeEmail",
+                    label = "Use a different email",
+                    actionKey = "change_email",
+                    style = StatusActionButtonStyle.Underline,
+                )
+            val resend =
+                if (resent) {
+                    StatusActionButton(
+                        id = "resendEmail",
+                        label = "Resend in $resendCountdown",
+                        actionKey = "resend_email",
+                        icon = PantopusIcon.Timer,
+                        style = StatusActionButtonStyle.Outline,
+                        isDisabled = true,
+                    )
+                } else {
+                    StatusActionButton(
+                        id = "resendEmail",
+                        label = "Resend email",
+                        actionKey = "resend_email",
+                        icon = PantopusIcon.RefreshCw,
+                        style = StatusActionButtonStyle.Outline,
+                    )
+                }
             return StatusWaitingContent(
-                illustration = StatusIllustration.Email,
+                halo = StatusHalo(tone = HaloCircleTone.Info, icon = PantopusIcon.MailCheck),
                 headline = "Check your email",
-                subcopy = "$recipient Tap the link to finish setting up your account.",
-                timeline = emptyList(),
-                etaChip = "Should arrive in under a minute",
-                actionCards =
-                    listOf(
-                        StatusActionCard(
-                            id = "openMail",
-                            icon = PantopusIcon.Mailbox,
-                            title = "Open Mail",
-                            subtitle = "Jump straight to your inbox.",
-                        ),
-                        StatusActionCard(
-                            id = "resendEmail",
-                            icon = PantopusIcon.Send,
-                            title = "Resend verification",
-                            subtitle = "Didn't get it? We'll send another.",
-                        ),
-                    ),
-                explainerBullets =
-                    listOf(
-                        "Links expire 30 minutes after they're sent.",
-                        "Check your spam folder if it doesn't arrive.",
-                        "You can change your email below if it was wrong.",
-                    ),
-                primaryCta = StatusCta(label = "Resend email", actionKey = "resend_email"),
-                secondaryCta = StatusCta(label = "Change email", actionKey = "change_email"),
+                subcopy = "We sent a link to $recipient. Tap it to finish setting up your account.",
+                bodyEmphasis = email?.takeIf { it.isNotBlank() },
+                statusPill =
+                    if (resent) {
+                        StatusWaitingPill(
+                            text = "New link sent · just now",
+                            icon = PantopusIcon.CheckCircle,
+                            tone = StatusPillTone.Success,
+                        )
+                    } else {
+                        StatusWaitingPill(
+                            text = "Waiting for link click…",
+                            icon = PantopusIcon.Hourglass,
+                            tone = StatusPillTone.Neutral,
+                            isSpinning = true,
+                        )
+                    },
+                actionStack = listOf(openMail, resend, useDifferent),
+                footnote =
+                    if (resent) {
+                        "Still nothing? Double-check the spelling, or use a different email."
+                    } else {
+                        "Can't find it? Check spam or your “Promotions” tab."
+                    },
             )
         }
     }

@@ -206,14 +206,18 @@ private struct SuccessStep: View {
 private extension StatusWaitingContent {
     func withHeadline(_ headline: String) -> StatusWaitingContent {
         StatusWaitingContent(
-            illustration: illustration,
+            halo: halo,
             headline: headline,
             subcopy: subcopy,
+            bodyEmphasis: bodyEmphasis,
+            addressChip: addressChip,
+            statusPill: statusPill,
             timeline: timeline,
             currentStageId: currentStageId,
-            etaChip: etaChip,
             actionCards: actionCards,
             explainerBullets: explainerBullets,
+            actionStack: actionStack,
+            footnote: footnote,
             primaryCta: primaryCta,
             secondaryCta: secondaryCta
         )
@@ -221,14 +225,18 @@ private extension StatusWaitingContent {
 
     func withSubcopy(_ subcopy: String) -> StatusWaitingContent {
         StatusWaitingContent(
-            illustration: illustration,
+            halo: halo,
             headline: headline,
             subcopy: subcopy,
+            bodyEmphasis: bodyEmphasis,
+            addressChip: addressChip,
+            statusPill: statusPill,
             timeline: timeline,
             currentStageId: currentStageId,
-            etaChip: etaChip,
             actionCards: actionCards,
             explainerBullets: explainerBullets,
+            actionStack: actionStack,
+            footnote: footnote,
             primaryCta: primaryCta,
             secondaryCta: secondaryCta
         )
