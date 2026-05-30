@@ -279,7 +279,7 @@ function StickyDockWR({ primary, primaryIcon, secondary }) {
 }
 
 // Shared chunk: address row with claim ref id
-function AddressRowWR({ addr, ref }) {
+function AddressRowWR({ addr, claimRef }) {
   return (
     <div style={{
       display:'inline-flex', alignItems:'center', gap:8,
@@ -294,7 +294,7 @@ function AddressRowWR({ addr, ref }) {
         marginLeft:2, paddingLeft:8, borderLeft:`1px solid ${ST.border}`,
         color:ST.fg3, fontSize:10.5, fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',
         fontWeight:600, letterSpacing:0.02,
-      }}>{ref}</span>
+      }}>{claimRef}</span>
     </div>
   );
 }
@@ -325,7 +325,7 @@ function FrameWaitingRoomActive() {
           </p>
         </div>
 
-        <AddressRowWR addr="418 Linden Ave · Apt 3B" ref="CLM-4F2A"/>
+        <AddressRowWR addr="418 Linden Ave · Apt 3B" claimRef="CLM-4F2A"/>
 
         {/* Timeline card */}
         <div style={{
@@ -398,7 +398,7 @@ function FrameWaitingRoomMoreInfo() {
           </p>
         </div>
 
-        <AddressRowWR addr="418 Linden Ave · Apt 3B" ref="CLM-4F2A"/>
+        <AddressRowWR addr="418 Linden Ave · Apt 3B" claimRef="CLM-4F2A"/>
 
         {/* Reviewer note card */}
         <div style={{
