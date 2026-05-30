@@ -115,7 +115,9 @@ public enum ViewerAudience: Sendable, CaseIterable, Identifiable, Hashable {
     }
 
     /// Pillar tint applied when this chip is selected.
-    public var pillar: IdentityPillar { group.pillar }
+    public var pillar: IdentityPillar {
+        group.pillar
+    }
 }
 
 /// One ordered cluster in the picker — a header plus its viewer chips.
@@ -123,7 +125,9 @@ public struct ViewerGroup: Identifiable, Sendable, Hashable {
     public let kind: ViewerAudienceGroup
     public let audiences: [ViewerAudience]
 
-    public var id: String { kind.id }
+    public var id: String {
+        kind.id
+    }
 
     public init(kind: ViewerAudienceGroup, audiences: [ViewerAudience]) {
         self.kind = kind
