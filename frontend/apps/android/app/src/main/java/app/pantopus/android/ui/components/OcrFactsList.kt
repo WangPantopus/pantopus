@@ -236,6 +236,7 @@ internal val sampleOcrFacts: List<OcrFact> =
         ),
     )
 
+@Suppress("UnusedPrivateMember")
 @Preview(showBackground = true, widthDp = 360)
 @Composable
 private fun OcrFactsListPreview() {

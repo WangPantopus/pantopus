@@ -111,6 +111,6 @@ private fun CameraScannerGallery() {
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         Text("CameraScanner (fallback)", style = PantopusTextStyle.caption)
-        CameraScanner(accent = PantopusColors.success, onCapture = {})
+        CameraScanner(accent = PantopusColors.success, onCapture = {}, cameraPreviewEnabled = false)
     }
 }

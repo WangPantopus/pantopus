@@ -51,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -90,6 +91,7 @@ private val FEED_HEIGHT = 208.dp
  * @param detectedLabel Text for the live "detected" pill; pass `null` to hide it.
  * @param onGallery Tap handler for the left rail (pick from library); `null` disables it.
  * @param onFlip Tap handler for the right rail (flip camera); `null` disables it.
+ * @param cameraPreviewEnabled Pass `false` for deterministic previews/snapshots that must not bind CameraX.
  */
 @Composable
 fun CameraScanner(
@@ -99,15 +101,17 @@ fun CameraScanner(
     detectedLabel: String? = "Item detected",
     onGallery: (() -> Unit)? = null,
     onFlip: (() -> Unit)? = null,
+    cameraPreviewEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
-    val inspection = LocalInspectionMode.current
+    val previewHost = LocalInspectionMode.current || LocalView.current.isInEditMode
+    val staticPreview = !cameraPreviewEnabled || previewHost
     // The primitive reflects current permission; the hosting screen (B2.4)
     // owns the system request. This keeps the activity-result plumbing out of
     // a reusable component and out of Paparazzi's composition.
-    val isLive = !inspection && cameraGranted(context)
+    val isLive = !staticPreview && cameraGranted(context)
     // Never build CameraX use cases under Paparazzi/preview.
-    val imageCapture = remember(inspection) { if (inspection) null else ImageCapture.Builder().build() }
+    val imageCapture = remember(staticPreview) { if (staticPreview) null else ImageCapture.Builder().build() }
 
     Column(
         modifier =
@@ -127,7 +131,7 @@ fun CameraScanner(
             } else {
                 val hint =
                     when {
-                        inspection -> "Camera preview unavailable here."
+                        staticPreview -> "Camera preview unavailable here."
                         !cameraGranted(context) -> "Camera access is off — enable it in Settings to scan."
                         else -> "Camera preview unavailable here."
                     }
@@ -615,6 +619,7 @@ private fun AddTile(
     }
 }
 
+@Suppress("UnusedPrivateMember")
 @ComposePreview(showBackground = true, widthDp = 360)
 @Composable
 private fun CameraScannerPreview() {
@@ -622,7 +627,7 @@ private fun CameraScannerPreview() {
         modifier = Modifier.background(PantopusColors.appBg).padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        CameraScanner(accent = PantopusColors.success, onCapture = {})
+        CameraScanner(accent = PantopusColors.success, onCapture = {}, cameraPreviewEnabled = false)
         CapturedFilmstrip(
             accent = PantopusColors.success,
             shots =
