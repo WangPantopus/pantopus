@@ -132,6 +132,42 @@ object DeepLinkRouter {
          */
         data object VacationHold : Destination
 
+        // ---- B1.6 batch-2 routing seam --------------------------------------
+        // Pre-registered for the batch-2 screens (B2–B5). Each resolves to the
+        // NotYetAvailableView placeholder today; the screen prompts swap in
+        // their real destinations without editing the route files.
+
+        /** `pantopus://mailbox/stamps` — A17.11 Stamps / postage wallet. */
+        data object Stamps : Destination
+
+        /** `pantopus://mailbox/tasks/:id` — A17.12 mail-derived task detail. */
+        data class MailTask(val taskId: String) : Destination
+
+        /** `pantopus://mailbox/translation?id=` — A17.13 auto-translated mail. */
+        data class MailTranslation(val mailId: String) : Destination
+
+        /**
+         * `pantopus://mailbox/unboxing` — A17.14 scan-first capture flow. The
+         * optional `?id=` seeds the originating mail item when present.
+         */
+        data class Unboxing(val mailId: String?) : Destination
+
+        /** `pantopus://mailbox/earn` — A10.11 Earn dashboard (Wallet sibling). */
+        data object Earn : Destination
+
+        /**
+         * `pantopus://businesses/:id` — A10.7 Business owner view. The public
+         * profile (A10.6) is the singular `pantopus://business/:username` and
+         * has no typed Android deep-link destination yet.
+         */
+        data class BusinessOwner(val businessId: String) : Destination
+
+        /** `pantopus://identity/preview` — A18.5 "View as" identity preview. */
+        data object ViewAs : Destination
+
+        /** `pantopus://homes/:id/waiting-room` — A18.4 persistent waiting room. */
+        data class WaitingRoom(val homeId: String) : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -210,6 +246,8 @@ object DeepLinkRouter {
                 ?: parseQueryParam(fragmentPart, "token_hash")
         val emailQuery =
             parseQueryParam(queryPart, "email") ?: parseQueryParam(fragmentPart, "email")
+        // B1.6 — `?id=` seeds the translation / unboxing mailbox sub-screens.
+        val idQuery = parseQueryParam(queryPart, "id")
 
         return when (segments.first()) {
             "feed" -> Destination.Feed
@@ -260,16 +298,22 @@ object DeepLinkRouter {
                         }
                     "verify-landlord", "verify_landlord" -> Destination.VerifyLandlord(id)
                     "verify-postcard", "verify_postcard" -> Destination.PostcardVerification(id)
+                    // B1.6 — A18.4 persistent waiting room.
+                    "waiting-room", "waiting_room" -> Destination.WaitingRoom(id)
                     else -> Destination.HomeDetail(id)
                 }
             }
-            "businesses", "business" -> {
+            "businesses" -> {
                 // `pantopus://businesses/new` opens the Create Business wizard.
-                // Other `businesses/:id` paths are not yet routed here.
-                if (segments.getOrNull(1) == "new") {
-                    Destination.CreateBusiness
-                } else {
-                    Destination.Unknown(raw)
+                // `pantopus://businesses/:id` opens the A10.7 Business owner
+                // view (B1.6). Trailing paths (e.g. `/page-editor`) have no
+                // typed Android destination yet, so they fall back to Unknown.
+                val id = segments.getOrNull(1)
+                when {
+                    id == "new" -> Destination.CreateBusiness
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    segments.drop(2).isNotEmpty() -> Destination.Unknown(raw)
+                    else -> Destination.BusinessOwner(id)
                 }
             }
             "chat", "message", "messages", "conversation" -> {
@@ -287,14 +331,25 @@ object DeepLinkRouter {
             "mailbox" -> {
                 // `pantopus://mailbox/vacation` opens A14.8;
                 // `pantopus://mailbox/mailday` opens the A13.16 My Mail Day
-                // editor. Other mailbox paths fall through to Unknown until
-                // they have routes.
+                // editor. B1.6 adds the batch-2 mailbox sub-screens. Other
+                // mailbox paths fall through to Unknown until they have routes.
                 when (segments.getOrNull(1)) {
                     "vacation" -> Destination.VacationHold
                     "mailday" -> Destination.MailDay
+                    "stamps" -> Destination.Stamps
+                    "earn" -> Destination.Earn
+                    "unboxing" -> Destination.Unboxing(idQuery)
+                    "translation" -> Destination.MailTranslation(idQuery ?: "")
+                    "tasks" -> {
+                        val taskId = segments.getOrNull(2)
+                        if (taskId.isNullOrBlank()) Destination.Unknown(raw) else Destination.MailTask(taskId)
+                    }
                     else -> Destination.Unknown(raw)
                 }
             }
+            "identity" ->
+                // `pantopus://identity/preview` — A18.5 "View as" preview.
+                if (segments.getOrNull(1) == "preview") Destination.ViewAs else Destination.Unknown(raw)
             "auth" -> {
                 when (segments.getOrNull(1)) {
                     "reset-password", "reset_password" ->

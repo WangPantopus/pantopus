@@ -591,12 +591,13 @@ private object ChildRoutes {
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
 
-    /** P1.6 — Typed Business Profile screen. `businessId` is the
-     *  business User UUID. */
-    const val BUSINESS_PROFILE = "businesses/{$BUSINESS_PROFILE_BUSINESS_ID_KEY}"
+    /** P1.6 — Typed Business **public** profile screen (A10.6). `businessId`
+     *  is the business User UUID. Lives at the singular `business/{id}` so the
+     *  plural `businesses/{id}` is free for the A10.7 owner view (B1.6). */
+    const val BUSINESS_PROFILE = "business/{$BUSINESS_PROFILE_BUSINESS_ID_KEY}"
 
     /** Build the concrete path for a Business Profile. */
-    fun businessProfile(businessId: String): String = "businesses/$businessId"
+    fun businessProfile(businessId: String): String = "business/$businessId"
 
     /** P4.2 — A13.10 Edit Business Page (owner-only). Pushed from the
      *  `BusinessProfileScreen` overflow when `viewerIsOwner` is true,
@@ -1191,6 +1192,50 @@ private object ChildRoutes {
     const val COMPOSE_BROADCAST = "personas/{$COMPOSE_BROADCAST_PERSONA_ID_KEY}/broadcast/new"
 
     fun composeBroadcast(personaId: String): String = "personas/$personaId/broadcast/new"
+
+    // ---- Batch 2 (B1.6) routing seam --------------------------------------
+    // Pre-staged so every batch-2 screen (B2–B5) lands its navigation without
+    // colliding on this file. Each is wired to NotYetAvailableView in the
+    // NavHost below; when an A.x screen ships, swap that one composable body
+    // for the real screen (the route + builder here are already correct).
+
+    /** A17.11 — Stamps / postage wallet. */
+    const val STAMPS = "mailbox/stamps"
+
+    /** A17.12 — Mail-derived task detail. `:taskId` is the Task UUID. */
+    const val MAIL_TASK_ID_KEY = "taskId"
+    const val MAIL_TASK = "mailbox/tasks/{$MAIL_TASK_ID_KEY}"
+
+    fun mailTask(taskId: String): String = "mailbox/tasks/$taskId"
+
+    /** A17.13 — Auto-translated mail view. `:mailId` is the source Mail UUID. */
+    const val TRANSLATION_MAIL_ID_KEY = "mailId"
+    const val TRANSLATION = "mailbox/translation/{$TRANSLATION_MAIL_ID_KEY}"
+
+    fun translation(mailId: String): String = "mailbox/translation/$mailId"
+
+    /** A17.14 — Scan-first capture (unboxing) flow. */
+    const val UNBOXING = "mailbox/unboxing"
+
+    /** A10.11 — Earn dashboard (Wallet sibling). */
+    const val EARN = "mailbox/earn"
+
+    /** A10.7 — Business owner view. `:businessId` is the business User UUID.
+     *  Plural `businesses/{id}`; the public profile (A10.6) is the singular
+     *  `business/{id}` (see [BUSINESS_PROFILE]). */
+    const val BUSINESS_OWNER_ID_KEY = "businessId"
+    const val BUSINESS_OWNER = "businesses/{$BUSINESS_OWNER_ID_KEY}"
+
+    fun businessOwner(businessId: String): String = "businesses/$businessId"
+
+    /** A18.5 — "View as" identity preview. */
+    const val VIEW_AS = "identity/preview"
+
+    /** A18.4 — Persistent "waiting for approval" room. `:homeId` is the home UUID. */
+    const val WAITING_ROOM_HOME_ID_KEY = "homeId"
+    const val WAITING_ROOM = "homes/{$WAITING_ROOM_HOME_ID_KEY}/waiting-room"
+
+    fun waitingRoom(homeId: String): String = "homes/$homeId/waiting-room"
 }
 
 /**
@@ -1356,6 +1401,49 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 // drawer view, then push the day editor on top.
                 navController.navigate(ChildRoutes.MAILBOX_ROOT)
                 navController.navigate(ChildRoutes.mailDay())
+                DeepLinkRouter.consume()
+            }
+            // ---- B1.6 batch-2 routing seam. The mailbox sub-screens push
+            // through MAILBOX_ROOT first so Back walks back through the
+            // mailbox, matching VacationHold / MailDay above. ----
+            DeepLinkRouter.Destination.Stamps -> {
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.STAMPS)
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.MailTask -> {
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.mailTask(pending.taskId))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.MailTranslation -> {
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.translation(pending.mailId))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Unboxing -> {
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.UNBOXING)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Earn -> {
+                navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                navController.navigate(ChildRoutes.EARN)
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.BusinessOwner -> {
+                navController.navigate(ChildRoutes.businessOwner(pending.businessId))
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.ViewAs -> {
+                navController.navigate(ChildRoutes.VIEW_AS)
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.WaitingRoom -> {
+                // Drop the home dashboard underneath so a back-tap from the
+                // waiting room lands on the home, mirroring HomeOwnersTransfer.
+                navController.navigate(ChildRoutes.homeDashboard(pending.homeId))
+                navController.navigate(ChildRoutes.waitingRoom(pending.homeId))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.ResetPassword,
@@ -3421,6 +3509,44 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onSeeHistory = { /* Out of scope */ },
                     onOpenNudge = { /* Out of scope */ },
                 )
+            }
+            // ---- Batch 2 (B1.6) routing seam. Swap each body for the real
+            // screen when the matching A.x screen ships. ----
+            composable(ChildRoutes.STAMPS) {
+                NotYetAvailableView(tabName = "Stamps", icon = PantopusIcon.Stamp)
+            }
+            composable(
+                route = ChildRoutes.MAIL_TASK,
+                arguments = listOf(navArgument(ChildRoutes.MAIL_TASK_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Task", icon = PantopusIcon.ListChecks)
+            }
+            composable(
+                route = ChildRoutes.TRANSLATION,
+                arguments = listOf(navArgument(ChildRoutes.TRANSLATION_MAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Translation", icon = PantopusIcon.Globe)
+            }
+            composable(ChildRoutes.UNBOXING) {
+                NotYetAvailableView(tabName = "Unboxing", icon = PantopusIcon.Camera)
+            }
+            composable(ChildRoutes.EARN) {
+                NotYetAvailableView(tabName = "Earn", icon = PantopusIcon.HandCoins)
+            }
+            composable(
+                route = ChildRoutes.BUSINESS_OWNER,
+                arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Business owner", icon = PantopusIcon.Briefcase)
+            }
+            composable(ChildRoutes.VIEW_AS) {
+                NotYetAvailableView(tabName = "View as", icon = PantopusIcon.Eye)
+            }
+            composable(
+                route = ChildRoutes.WAITING_ROOM,
+                arguments = listOf(navArgument(ChildRoutes.WAITING_ROOM_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Waiting room", icon = PantopusIcon.Hourglass)
             }
             composable(
                 route = ChildRoutes.MEMBERSHIP_DETAIL,

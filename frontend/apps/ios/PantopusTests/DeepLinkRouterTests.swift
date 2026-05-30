@@ -145,8 +145,11 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .homeOwnersTransfer(id: "h_2"))
     }
 
+    /// A10.6 — the **public** profile lives at the singular `business/:username`.
+    /// (Plural `businesses/:id` is the A10.7 owner view — see
+    /// `testBusinessOwnerRoute` in the B1.6 section.)
     func testBusinessProfileRoute() throws {
-        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/businesses/biz_42")))
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/business/biz_42")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .businessProfile(businessId: "biz_42"))
     }
 
@@ -375,5 +378,89 @@ final class DeepLinkRouterTests: XCTestCase {
         let url = try XCTUnwrap(URL(string: "https://pantopus.app/homes/h_42/verify-landlord"))
         DeepLinkRouter.shared.handle(url: url)
         XCTAssertEqual(DeepLinkRouter.shared.pending, .verifyLandlord(id: "h_42"))
+    }
+
+    // MARK: - B1.6 batch-2 routing seam
+
+    func testStampsRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/stamps")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .stamps)
+    }
+
+    func testStampsRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/mailbox/stamps")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .stamps)
+    }
+
+    func testMailTaskRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/tasks/t_7")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .mailTask(taskId: "t_7"))
+    }
+
+    func testMailTaskWithoutIdFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://mailbox/tasks"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case .unknown = DeepLinkRouter.shared.pending {
+            // ok — `mailbox/tasks` with no id has no typed destination.
+        } else {
+            XCTFail("Expected .unknown when /mailbox/tasks is missing the id")
+        }
+    }
+
+    func testMailTranslationRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/translation?id=m_3")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .mailTranslation(mailId: "m_3"))
+    }
+
+    func testUnboxingRouteWithoutId() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/unboxing")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .unboxing(mailId: nil))
+    }
+
+    func testUnboxingRouteWithId() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/unboxing?id=m_9")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .unboxing(mailId: "m_9"))
+    }
+
+    func testEarnRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://mailbox/earn")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .earn)
+    }
+
+    func testEarnRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/mailbox/earn")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .earn)
+    }
+
+    /// A10.7 — plural `businesses/:id` resolves to the owner view; `new` and
+    /// `:id/page-editor` keep their existing meanings.
+    func testBusinessOwnerRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://businesses/biz_42")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .businessOwner(businessId: "biz_42"))
+    }
+
+    func testBusinessOwnerRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/businesses/biz_42")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .businessOwner(businessId: "biz_42"))
+    }
+
+    func testViewAsRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://identity/preview")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .viewAs)
+    }
+
+    func testViewAsRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/identity/preview")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .viewAs)
+    }
+
+    func testWaitingRoomRoute() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://homes/h_5/waiting-room")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .waitingRoom(id: "h_5"))
+    }
+
+    func testWaitingRoomRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/homes/h_5/waiting-room")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .waitingRoom(id: "h_5"))
     }
 }

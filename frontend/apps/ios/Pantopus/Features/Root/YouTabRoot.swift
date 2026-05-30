@@ -261,6 +261,27 @@ public enum YouRoute: Hashable {
     case editPersona(personaId: String)
     /// A.7 — Compose broadcast from a persona.
     case composeBroadcast(personaId: String)
+    // MARK: - B1.6 batch-2 routing seam
+    // Pre-registered routes for the batch-2 screens (B2–B5) reached from the
+    // You tab (mailbox, My businesses, Identity Center, the home card). Each
+    // resolves to `NotYetAvailableView` until its screen prompt fills it in.
+    /// A17.11 — Stamps / postage wallet. `pantopus://mailbox/stamps`.
+    case stamps
+    /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
+    case mailTask(taskId: String)
+    /// A17.13 — Auto-translated mail view. `pantopus://mailbox/translation?id=`.
+    case mailTranslation(mailId: String)
+    /// A17.14 — Scan-first capture (unboxing) flow. `pantopus://mailbox/unboxing`.
+    case unboxing(mailId: String?)
+    /// A10.11 — Earn dashboard (Wallet sibling). `pantopus://mailbox/earn`.
+    case earn
+    /// A10.7 — Business owner view. `pantopus://businesses/:id`.
+    case businessOwner(businessId: String)
+    /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
+    case viewAs
+    /// A18.4 — Persistent "waiting for approval" room.
+    /// `pantopus://homes/:id/waiting-room`.
+    case waitingRoom(homeId: String)
     #if DEBUG
     case statusWaiting
     case ceremonialMail
@@ -1975,6 +1996,25 @@ public struct YouTabRoot: View {
                     personaHandle: personaHandle
                 ) { Task { @MainActor in pop() } }
             )
+        // MARK: - B1.6 batch-2 routing seam
+        // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
+        // line below for its real view without editing the route declarations.
+        case .stamps:
+            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+        case .mailTask:
+            NotYetAvailableView(tabName: "Task", icon: .listChecks)
+        case .mailTranslation:
+            NotYetAvailableView(tabName: "Translation", icon: .globe)
+        case .unboxing:
+            NotYetAvailableView(tabName: "Unboxing", icon: .camera)
+        case .earn:
+            NotYetAvailableView(tabName: "Earn", icon: .handCoins)
+        case .businessOwner:
+            NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
+        case .viewAs:
+            NotYetAvailableView(tabName: "View as", icon: .eye)
+        case .waitingRoom:
+            NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
         #if DEBUG
         case .statusWaiting:
             StatusWaitingView(

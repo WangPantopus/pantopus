@@ -86,6 +86,28 @@ final class DeepLinkRouter {
         /// Consumed by the active tab's deep-link router which pushes
         /// `.menu` then forwards into the Payments stack route.
         case paymentsSettings
+        // MARK: - B1.6 batch-2 routing seam
+        // Pre-registered for the batch-2 screens (B2–B5). Each resolves to
+        // the NotYetAvailableView placeholder today; the screen prompts swap
+        // in their real destinations without editing the route files.
+        /// `pantopus://mailbox/stamps` — A17.11 Stamps / postage wallet.
+        case stamps
+        /// `pantopus://mailbox/tasks/:id` — A17.12 mail-derived task detail.
+        case mailTask(taskId: String)
+        /// `pantopus://mailbox/translation?id=` — A17.13 auto-translated mail.
+        case mailTranslation(mailId: String)
+        /// `pantopus://mailbox/unboxing` — A17.14 scan-first capture flow. The
+        /// optional `?id=` seeds the originating mail item when present.
+        case unboxing(mailId: String?)
+        /// `pantopus://mailbox/earn` — A10.11 Earn dashboard (Wallet sibling).
+        case earn
+        /// `pantopus://businesses/:id` — A10.7 Business owner view. The public
+        /// profile (A10.6) lives at the singular `pantopus://business/:username`.
+        case businessOwner(businessId: String)
+        /// `pantopus://identity/preview` — A18.5 "View as" identity preview.
+        case viewAs
+        /// `pantopus://homes/:id/waiting-room` — A18.4 persistent waiting room.
+        case waitingRoom(id: String)
         case unknown(URL)
     }
 
@@ -138,6 +160,8 @@ final class DeepLinkRouter {
         let firstSegment = segments.first ?? ""
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let tabQuery = queryValue("tab", in: comps)
+        // B1.6 — `?id=` seeds the translation / unboxing mailbox sub-screens.
+        let idQuery = queryValue("id", in: comps)
         let tokenQuery = queryValue("token", in: comps)
             ?? queryValue("token_hash", in: comps)
             ?? fragmentParam(url.fragment, name: "token")
@@ -170,19 +194,16 @@ final class DeepLinkRouter {
             return .unknown(url)
         case "homes":
             return homeDestination(url: url, segments: segments, tabQuery: tabQuery)
-        case "businesses", "business":
-            // `pantopus://businesses/new` opens the Create Business wizard.
-            // `pantopus://businesses/:id/page-editor` opens A13.10 (owner-only).
-            // `pantopus://businesses/:id` opens the public business profile.
+        case "businesses":
+            return businessesDestination(url: url, segments: segments)
+        case "business":
+            // Singular `business/:username` is the A10.6 public profile.
             guard let id = segments.dropFirst().first else { return .unknown(url) }
-            if id == "new" {
-                return .createBusiness
-            }
-            let trailing = Array(segments.dropFirst(2))
-            if trailing.first == "page-editor" || trailing.first == "page_editor" {
-                return .editBusinessPage(businessId: id)
-            }
             return .businessProfile(businessId: id)
+        case "identity":
+            // `pantopus://identity/preview` — A18.5 "View as" preview.
+            if segments.dropFirst().first == "preview" { return .viewAs }
+            return .unknown(url)
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
@@ -196,7 +217,7 @@ final class DeepLinkRouter {
         case "discover-hub", "discover_hub", "discoverhub":
             return .discoverHub
         case "mailbox":
-            return mailboxDestination(url: url, segments: segments)
+            return mailboxDestination(url: url, segments: segments, idQuery: idQuery)
         case "wallet":
             return .wallet
         case "invite":
@@ -256,18 +277,52 @@ final class DeepLinkRouter {
         if trailing.first == "verify-postcard" || trailing.first == "verify_postcard" {
             return .postcardVerification(id: id)
         }
+        // B1.6 — `pantopus://homes/:id/waiting-room` opens the A18.4 room.
+        if trailing.first == "waiting-room" || trailing.first == "waiting_room" {
+            return .waitingRoom(id: id)
+        }
         return .homeDetail(id: id)
     }
 
-    private func mailboxDestination(url: URL, segments: [String]) -> Destination {
+    /// Plural `businesses/*` is the owner-side surface family.
+    /// `…/new` opens the Create Business wizard, `…/:id/page-editor` opens
+    /// A13.10 (owner-only), and `…/:id` opens the A10.7 Business owner view.
+    /// The singular `business/:username` (A10.6 public profile) is handled
+    /// separately in `resolve`.
+    private func businessesDestination(url: URL, segments: [String]) -> Destination {
+        guard let id = segments.dropFirst().first else { return .unknown(url) }
+        if id == "new" {
+            return .createBusiness
+        }
+        let trailing = Array(segments.dropFirst(2))
+        if trailing.first == "page-editor" || trailing.first == "page_editor" {
+            return .editBusinessPage(businessId: id)
+        }
+        return .businessOwner(businessId: id)
+    }
+
+    private func mailboxDestination(url: URL, segments: [String], idQuery: String?) -> Destination {
         // `pantopus://mailbox/vacation` opens A14.8; `pantopus://mailbox/mailday`
-        // opens the A13.16 My Mail Day editor. Other mailbox paths fall through
-        // to `.unknown` until they have routes.
+        // opens the A13.16 My Mail Day editor. B1.6 adds the batch-2 mailbox
+        // sub-screens (stamps / tasks / translation / unboxing / earn). Other
+        // mailbox paths fall through to `.unknown` until they have routes.
         switch segments.dropFirst().first {
         case "vacation": .vacationHold
         case "mailday": .mailDay
+        case "stamps": .stamps
+        case "earn": .earn
+        case "unboxing": .unboxing(mailId: idQuery)
+        case "translation": .mailTranslation(mailId: idQuery ?? "")
+        case "tasks": mailTaskDestination(url: url, segments: segments)
         default: .unknown(url)
         }
+    }
+
+    /// `pantopus://mailbox/tasks/:id` — A17.12 mail-derived task detail. The
+    /// task id rides as the third path segment.
+    private func mailTaskDestination(url: URL, segments: [String]) -> Destination {
+        guard let taskId = segments.dropFirst(2).first, !taskId.isEmpty else { return .unknown(url) }
+        return .mailTask(taskId: taskId)
     }
 
     private func authDestination(

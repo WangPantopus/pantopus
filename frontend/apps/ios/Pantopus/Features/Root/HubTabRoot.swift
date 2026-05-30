@@ -277,6 +277,27 @@ public enum HubRoute: Hashable {
     /// Settings → "Payments & payouts" row and the
     /// `pantopus://wallet` deep link.
     case wallet
+    // MARK: - B1.6 batch-2 routing seam
+    // Pre-registered routes for the batch-2 screens (B2–B5). Each resolves to
+    // `NotYetAvailableView` today; the screen prompts swap in their real
+    // destination view without touching this file.
+    /// A17.11 — Stamps / postage wallet. `pantopus://mailbox/stamps`.
+    case stamps
+    /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
+    case mailTask(taskId: String)
+    /// A17.13 — Auto-translated mail view. `pantopus://mailbox/translation?id=`.
+    case mailTranslation(mailId: String)
+    /// A17.14 — Scan-first capture (unboxing) flow. `pantopus://mailbox/unboxing`.
+    case unboxing(mailId: String?)
+    /// A10.11 — Earn dashboard (Wallet sibling). `pantopus://mailbox/earn`.
+    case earn
+    /// A10.7 — Business owner view. `pantopus://businesses/:id`.
+    case businessOwner(businessId: String)
+    /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
+    case viewAs
+    /// A18.4 — Persistent "waiting for approval" room.
+    /// `pantopus://homes/:id/waiting-room`.
+    case waitingRoom(homeId: String)
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -507,6 +528,41 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case let .editBusinessPage(businessId):
             path.append(.editBusinessPage(businessId: businessId))
+            _ = router.consume()
+        // MARK: - B1.6 batch-2 routing seam
+        // The mailbox sub-screens push through `.mailboxRoot` first so Back
+        // walks back through the mailbox, matching `.vacationHold` / `.mailDay`.
+        case .stamps:
+            path.append(.mailboxRoot)
+            path.append(.stamps)
+            _ = router.consume()
+        case let .mailTask(taskId):
+            path.append(.mailboxRoot)
+            path.append(.mailTask(taskId: taskId))
+            _ = router.consume()
+        case let .mailTranslation(mailId):
+            path.append(.mailboxRoot)
+            path.append(.mailTranslation(mailId: mailId))
+            _ = router.consume()
+        case let .unboxing(mailId):
+            path.append(.mailboxRoot)
+            path.append(.unboxing(mailId: mailId))
+            _ = router.consume()
+        case .earn:
+            path.append(.mailboxRoot)
+            path.append(.earn)
+            _ = router.consume()
+        case let .businessOwner(businessId):
+            path.append(.businessOwner(businessId: businessId))
+            _ = router.consume()
+        case .viewAs:
+            path.append(.viewAs)
+            _ = router.consume()
+        case let .waitingRoom(homeId):
+            // Drop the home dashboard underneath so a back-tap from the
+            // waiting room lands on the home, mirroring `.homeOwnersTransfer`.
+            path.append(.homeDashboard(homeId: homeId))
+            path.append(.waitingRoom(homeId: homeId))
             _ = router.consume()
         default:
             break
@@ -1894,6 +1950,25 @@ public struct HubTabRoot: View {
                 onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } },
                 onSeeAllActivity: { Task { @MainActor in push(.placeholder(label: "All activity")) } }
             )
+        // MARK: - B1.6 batch-2 routing seam
+        // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
+        // line below for its real view without editing the route declarations.
+        case .stamps:
+            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+        case .mailTask:
+            NotYetAvailableView(tabName: "Task", icon: .listChecks)
+        case .mailTranslation:
+            NotYetAvailableView(tabName: "Translation", icon: .globe)
+        case .unboxing:
+            NotYetAvailableView(tabName: "Unboxing", icon: .camera)
+        case .earn:
+            NotYetAvailableView(tabName: "Earn", icon: .handCoins)
+        case .businessOwner:
+            NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
+        case .viewAs:
+            NotYetAvailableView(tabName: "View as", icon: .eye)
+        case .waitingRoom:
+            NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to
