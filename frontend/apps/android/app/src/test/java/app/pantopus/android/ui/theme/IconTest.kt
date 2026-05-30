@@ -254,6 +254,8 @@ class IconTest {
             "calendar-plus",
             // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
             "credit-card",
+            // B1.4 / A19 Legal — collapsible "Jump to section" TOC header.
+            "list",
         )
 
     @Test

@@ -87,9 +87,9 @@ public struct LegalTOCCard: View {
     private var rows: some View {
         VStack(spacing: Spacing.s0) {
             ForEach(Array(items.enumerated()), id: \.offset) { index, title in
-                Button(action: { onJump(index) }) {
+                Button(action: { onJump(index) }, label: {
                     row(index: index, title: title)
-                }
+                })
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("legalTOCCard_row_\(index)")
                 .accessibilityLabel(title)
