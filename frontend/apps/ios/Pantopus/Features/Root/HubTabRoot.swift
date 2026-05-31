@@ -1924,6 +1924,7 @@ public struct HubTabRoot: View {
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
                     onOpenMailDay: { push(.mailDay(variant: .populated)) },
+                    onOpenEarn: { push(.earn) },
                     onBrowseGigs: { push(.gigsFeed) },
                     onOpenVacationHold: { push(.vacationHold) },
                     onOpenStamps: { push(.stamps) }
@@ -1964,7 +1965,18 @@ public struct HubTabRoot: View {
         case .unboxing:
             NotYetAvailableView(tabName: "Unboxing", icon: .camera)
         case .earn:
-            NotYetAvailableView(tabName: "Earn", icon: .handCoins)
+            EarnView(
+                onBack: pop,
+                onHelp: { Task { @MainActor in push(.placeholder(label: "Earn help")) } },
+                onCashOut: { Task { @MainActor in push(.paymentsSettings) } },
+                onBrowseTasks: { Task { @MainActor in push(.gigsFeed) } },
+                onReferNeighbor: { Task { @MainActor in push(.placeholder(label: "Refer a neighbor")) } },
+                onOfferService: { Task { @MainActor in push(.placeholder(label: "Offer a service")) } },
+                onManagePayout: { Task { @MainActor in push(.paymentsSettings) } },
+                onAddBank: { Task { @MainActor in push(.paymentsSettings) } },
+                onSeeAllEarnings: { Task { @MainActor in push(.placeholder(label: "All earnings")) } },
+                onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } }
+            )
         case .businessOwner:
             NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
         case .viewAs:

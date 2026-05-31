@@ -58,7 +58,7 @@ class MailboxRootViewModelTest {
         assertTrue(state is ListOfRowsUiState.Empty)
         state as ListOfRowsUiState.Empty
         assertEquals("No earn items yet", state.headline)
-        assertEquals("Browse gigs", state.ctaTitle)
+        assertEquals("Open Earn dashboard", state.ctaTitle)
     }
 
     @Test

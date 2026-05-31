@@ -43,7 +43,7 @@ fun MailboxRootScreen(
     onOpenSearch: () -> Unit = {},
     onOpenMap: () -> Unit = {},
     onOpenMailDay: () -> Unit = {},
-    onBrowseGigs: () -> Unit = {},
+    onOpenEarn: () -> Unit = {},
     onOpenVacationHold: () -> Unit = {},
     onOpenStamps: () -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -58,7 +58,7 @@ fun MailboxRootScreen(
             onOpenMail = onOpenMail,
             onOpenSearch = onOpenSearch,
             onOpenMap = onOpenMap,
-            onBrowseGigs = onBrowseGigs,
+            onOpenEarn = onOpenEarn,
         )
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenMailboxRootViewed)

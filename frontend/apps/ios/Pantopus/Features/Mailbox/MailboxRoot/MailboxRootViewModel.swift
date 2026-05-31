@@ -168,7 +168,10 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     private let onOpenSearch: @MainActor () -> Void
     private let onOpenMap: @MainActor () -> Void
     let onOpenMailDay: @MainActor () -> Void
-    private let onBrowseGigs: @MainActor () -> Void
+    /// A10.11 — opens the Earn dashboard. Surfaced as the Earn-drawer
+    /// empty-state CTA (the drawer is intentionally always-empty, so it
+    /// acts as the launchpad into the standalone Earn surface).
+    private let onOpenEarn: @MainActor () -> Void
     /// A14.8 — settings-menu entry for the Vacation hold screen. The
     /// Mailbox root top bar surfaces a `…` overflow that opens a menu
     /// containing this single entry today (more settings can land later).
@@ -187,7 +190,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenSearch: @escaping @MainActor () -> Void = {},
         onOpenMap: @escaping @MainActor () -> Void = {},
         onOpenMailDay: @escaping @MainActor () -> Void = {},
-        onBrowseGigs: @escaping @MainActor () -> Void = {},
+        onOpenEarn: @escaping @MainActor () -> Void = {},
         onOpenVacationHold: @escaping @MainActor () -> Void = {},
         onOpenStamps: @escaping @MainActor () -> Void = {},
         dataProvider: @escaping (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
@@ -200,7 +203,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         self.onOpenSearch = onOpenSearch
         self.onOpenMap = onOpenMap
         self.onOpenMailDay = onOpenMailDay
-        self.onBrowseGigs = onBrowseGigs
+        self.onOpenEarn = onOpenEarn
         onOpenVacationHoldHandler = onOpenVacationHold
         onOpenStampsHandler = onOpenStamps
         self.dataProvider = dataProvider
@@ -287,8 +290,8 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
                 icon: .wallet,
                 headline: "No earn items yet",
                 subcopy: "Complete gigs to see payouts, 1099s, and tax docs land here automatically.",
-                ctaTitle: "Browse gigs"
-            ) { [weak self] in Task { @MainActor in self?.onBrowseGigs() } }
+                ctaTitle: "Open Earn dashboard"
+            ) { [weak self] in Task { @MainActor in self?.onOpenEarn() } }
         case (.earn, .counter):
             ListOfRowsState.EmptyContent(
                 icon: .wallet,
