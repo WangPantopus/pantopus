@@ -261,10 +261,12 @@ public enum YouRoute: Hashable {
     case editPersona(personaId: String)
     /// A.7 — Compose broadcast from a persona.
     case composeBroadcast(personaId: String)
+
     // MARK: - B1.6 batch-2 routing seam
-    // Pre-registered routes for the batch-2 screens (B2–B5) reached from the
-    // You tab (mailbox, My businesses, Identity Center, the home card). Each
-    // resolves to `NotYetAvailableView` until its screen prompt fills it in.
+
+    /// Pre-registered routes for the batch-2 screens (B2–B5) reached from the
+    /// You tab (mailbox, My businesses, Identity Center, the home card). Each
+    /// resolves to `NotYetAvailableView` until its screen prompt fills it in.
     /// A17.11 — Stamps / postage wallet. `pantopus://mailbox/stamps`.
     case stamps
     /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
@@ -1999,6 +2001,7 @@ public struct YouTabRoot: View {
                     personaHandle: personaHandle
                 ) { Task { @MainActor in pop() } }
             )
+
         // MARK: - B1.6 batch-2 routing seam
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.

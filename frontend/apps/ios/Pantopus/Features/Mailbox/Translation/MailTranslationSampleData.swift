@@ -71,7 +71,7 @@ public enum MailTranslationSampleData {
             original: "Con cariño, su vecina Lucía.",
             english: "With love, your neighbor Lucía.",
             isSignoff: true
-        ),
+        )
     ]
 
     private static let glossary: [TranslationGlossaryNote] = [
@@ -87,7 +87,7 @@ public enum MailTranslationSampleData {
             term: "quiosco → gazebo",
             kind: "word choice",
             note: "Rendered as \u{201C}gazebo\u{201D} for the bandstand on the park lawn."
-        ),
+        )
     ]
 
     private static let sender = TranslationSender(
@@ -121,7 +121,7 @@ public enum MailTranslationSampleData {
                 icon: .listen,
                 label: "Listen in either language",
                 text: "tap play on a column"
-            ),
+            )
         ]
     )
 
@@ -148,7 +148,7 @@ public enum MailTranslationSampleData {
                 icon: .reply,
                 label: "Reply in English",
                 text: "we translate to Spanish on send"
-            ),
+            )
         ]
     )
 }

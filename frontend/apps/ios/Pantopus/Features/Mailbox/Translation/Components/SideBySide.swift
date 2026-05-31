@@ -17,31 +17,45 @@ private let hairlineThickness: CGFloat = 1
 // MARK: - Shared serif paragraph renderer
 
 enum TranslationLetterText {
+    /// Font-determining inputs grouped so `make` stays within the parameter
+    /// budget: the point size plus the two paragraph-role flags.
+    struct Style {
+        let size: CGFloat
+        let isHeading: Bool
+        let isSignoff: Bool
+
+        /// Build the style for a paragraph, using `lead` for heading /
+        /// sign-off lines and `body` for everything else.
+        init(paragraph: TranslationParagraph, body: CGFloat, lead: CGFloat) {
+            size = paragraph.isHeading || paragraph.isSignoff ? lead : body
+            isHeading = paragraph.isHeading
+            isSignoff = paragraph.isSignoff
+        }
+    }
+
     /// Build a serif `Text` for one paragraph, optionally highlighting the
     /// first occurrence of `highlight` in the translation accent.
     static func make(
         _ string: String,
         highlight: String?,
-        size: CGFloat,
-        isHeading: Bool,
-        isSignoff: Bool,
+        style: Style,
         baseColor: Color
     ) -> Text {
         var attributed = AttributedString(string)
-        attributed.font = baseFont(size: size, isHeading: isHeading, isSignoff: isSignoff)
+        attributed.font = baseFont(style: style)
         attributed.foregroundColor = baseColor
         if let highlight, !highlight.isEmpty, let range = attributed.range(of: highlight) {
             attributed[range].backgroundColor = Theme.Color.categoryTranslationBg
             attributed[range].foregroundColor = Theme.Color.categoryTranslationInk
-            attributed[range].font = .system(size: size, weight: .semibold, design: .serif).italic()
+            attributed[range].font = .system(size: style.size, weight: .semibold, design: .serif).italic()
         }
         return Text(attributed)
     }
 
-    private static func baseFont(size: CGFloat, isHeading: Bool, isSignoff: Bool) -> Font {
-        if isHeading { return .system(size: size, weight: .bold, design: .serif) }
-        if isSignoff { return .system(size: size, weight: .regular, design: .serif).italic() }
-        return .system(size: size, weight: .regular, design: .serif)
+    private static func baseFont(style: Style) -> Font {
+        if style.isHeading { return .system(size: style.size, weight: .bold, design: .serif) }
+        if style.isSignoff { return .system(size: style.size, weight: .regular, design: .serif).italic() }
+        return .system(size: style.size, weight: .regular, design: .serif)
     }
 }
 
@@ -110,9 +124,7 @@ struct SideBySideView: View {
                 TranslationLetterText.make(
                     paragraph.original,
                     highlight: nil,
-                    size: paragraph.isHeading || paragraph.isSignoff ? cellLeadSize : cellBodySize,
-                    isHeading: paragraph.isHeading,
-                    isSignoff: paragraph.isSignoff,
+                    style: .init(paragraph: paragraph, body: cellBodySize, lead: cellLeadSize),
                     baseColor: Theme.Color.appTextSecondary
                 )
             )
@@ -121,9 +133,7 @@ struct SideBySideView: View {
                 TranslationLetterText.make(
                     paragraph.english,
                     highlight: content.highlightTerm,
-                    size: paragraph.isHeading || paragraph.isSignoff ? cellLeadSize : cellBodySize,
-                    isHeading: paragraph.isHeading,
-                    isSignoff: paragraph.isSignoff,
+                    style: .init(paragraph: paragraph, body: cellBodySize, lead: cellLeadSize),
                     baseColor: Theme.Color.appText
                 )
             )
@@ -164,7 +174,9 @@ struct TranslationReadingView: View {
     private let leadSize: CGFloat = 15
     private let dotSize: CGFloat = 6
 
-    private var showingOriginal: Bool { showing == .original }
+    private var showingOriginal: Bool {
+        showing == .original
+    }
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
@@ -221,9 +233,7 @@ struct TranslationReadingView: View {
                 TranslationLetterText.make(
                     showingOriginal ? paragraph.original : paragraph.english,
                     highlight: showingOriginal ? nil : content.highlightTerm,
-                    size: paragraph.isHeading || paragraph.isSignoff ? leadSize : bodySize,
-                    isHeading: paragraph.isHeading,
-                    isSignoff: paragraph.isSignoff,
+                    style: .init(paragraph: paragraph, body: bodySize, lead: leadSize),
                     baseColor: Theme.Color.categoryTranslationPaperInk
                 )
                 .lineSpacing(4)

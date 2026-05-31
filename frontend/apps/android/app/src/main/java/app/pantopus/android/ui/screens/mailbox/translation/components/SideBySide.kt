@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -69,7 +71,7 @@ private fun letterText(
                 fontStyle = if (isSignoff) FontStyle.Italic else FontStyle.Normal,
             )
         val markStart = if (highlight.isNullOrEmpty()) -1 else string.indexOf(highlight)
-        if (markStart < 0) {
+        if (markStart < 0 || highlight == null) {
             withStyle(baseStyle) { append(string) }
         } else {
             withStyle(baseStyle) { append(string.substring(0, markStart)) }
@@ -80,7 +82,7 @@ private fun letterText(
                     fontStyle = FontStyle.Italic,
                     fontWeight = FontWeight.SemiBold,
                 ),
-            ) { append(highlight!!) }
+            ) { append(highlight) }
             withStyle(baseStyle) { append(string.substring(markStart + highlight.length)) }
         }
     }

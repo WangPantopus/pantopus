@@ -15,10 +15,16 @@ struct TranslationViewToggle: View {
 
     private let segmentHeight: CGFloat = 36
 
-    private static let options: [(mode: TranslationViewMode, label: String, icon: PantopusIcon)] = [
-        (.translated, "Translated", .globe),
-        (.original, "Original", .fileText),
-        (.side, "Side by side", .gripVertical),
+    private struct Option {
+        let mode: TranslationViewMode
+        let label: String
+        let icon: PantopusIcon
+    }
+
+    private static let options: [Option] = [
+        Option(mode: .translated, label: "Translated", icon: .globe),
+        Option(mode: .original, label: "Original", icon: .fileText),
+        Option(mode: .side, label: "Side by side", icon: .gripVertical)
     ]
 
     var body: some View {
@@ -34,7 +40,7 @@ struct TranslationViewToggle: View {
     }
 
     @ViewBuilder
-    private func segment(_ option: (mode: TranslationViewMode, label: String, icon: PantopusIcon)) -> some View {
+    private func segment(_ option: Option) -> some View {
         let isOn = option.mode == active
         Button {
             onSelect(option.mode)

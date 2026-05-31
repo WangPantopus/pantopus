@@ -39,7 +39,7 @@ struct LanguageBadge: View {
         .accessibilityIdentifier("translation_languageBadge")
     }
 
-    @ViewBuilder private var detectionLine: some View {
+    private var detectionLine: some View {
         HStack(spacing: Spacing.s1) {
             if confirmed {
                 Icon(.badgeCheck, size: 12, color: Theme.Color.success)

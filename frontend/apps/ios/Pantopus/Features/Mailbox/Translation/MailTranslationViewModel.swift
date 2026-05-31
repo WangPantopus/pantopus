@@ -28,7 +28,7 @@ public final class MailTranslationViewModel {
     private let api: APIClient
     private let seedConfirmed: Bool
 
-    public init(
+    init(
         mailId: String,
         api: APIClient = .shared,
         seedConfirmed: Bool = false

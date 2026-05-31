@@ -19,8 +19,6 @@
 
 import SwiftUI
 
-// swiftlint:disable file_length
-
 public struct MailTranslationView: View {
     @State private var viewModel: MailTranslationViewModel
     private let onBack: () -> Void
@@ -39,7 +37,7 @@ public struct MailTranslationView: View {
 
     public var body: some View {
         VStack(spacing: Spacing.s0) {
-            TranslationNav(onBack: onBack, onShare: { viewModel.toast = "Sharing translation…" })
+            TranslationNav(onBack: onBack) { viewModel.toast = "Sharing translation…" }
             Group {
                 switch viewModel.state {
                 case .loading:
@@ -71,7 +69,6 @@ public struct MailTranslationView: View {
         .pantopusAnimation(.componentState, value: viewModel.toast)
     }
 
-    @ViewBuilder
     private func loaded(_ content: MailTranslationContent) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
@@ -363,12 +360,29 @@ private extension TranslationSender {
     }
 }
 
+// MARK: - Toast
+
+private struct ToastBanner: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s2)
+            .background(Theme.Color.appText.opacity(0.9))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+            .accessibilityLabel(message)
+    }
+}
+
 #if DEBUG
 #Preview("A17.13 · machine") {
-    MailTranslationView(mailId: "preview", seedConfirmed: false, onBack: {})
+    MailTranslationView(mailId: "preview", seedConfirmed: false) {}
 }
 
 #Preview("A17.13 · confirmed") {
-    MailTranslationView(mailId: "preview", seedConfirmed: true, onBack: {})
+    MailTranslationView(mailId: "preview", seedConfirmed: true) {}
 }
 #endif

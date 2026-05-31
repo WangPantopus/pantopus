@@ -349,11 +349,19 @@ struct TranslationConfirmedActions: View {
             TranslationSenderCard(sender: MailTranslationSampleData.letter().sender)
             TranslationMachineActions(
                 confirmInFlight: false,
-                onConfirm: {}, onEdit: {}, onLanguage: {}, onListen: {}, onArchive: {}
+                onConfirm: {},
+                onEdit: {},
+                onLanguage: {},
+                onListen: {},
+                onArchive: {}
             )
             TranslationConfirmedActions(
                 replyName: "Lucía",
-                onReply: {}, onRetranslate: {}, onShowOriginal: {}, onShare: {}, onArchive: {}
+                onReply: {},
+                onRetranslate: {},
+                onShowOriginal: {},
+                onShare: {},
+                onArchive: {}
             )
         }
         .padding(Spacing.s4)
