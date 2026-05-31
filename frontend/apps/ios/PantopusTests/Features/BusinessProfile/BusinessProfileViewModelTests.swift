@@ -2,11 +2,11 @@
 //  BusinessProfileViewModelTests.swift
 //  PantopusTests
 //
-//  P1.6 — VM-projection regression suite. Covers the loaded path
-//  (detail + public + reviews-fallback all succeed), the not-found
-//  path (404 on the primary fetch), the unpublished path (public
-//  fetch 404s but detail succeeds — services tab empty), and tab
-//  switching (must not refetch).
+//  A10.6 — VM-projection regression suite for the single-scroll reshape.
+//  Covers the loaded path (detail + public + reviews-fallback), the
+//  not-found path, the unpublished path (public 404 absorbed), the
+//  newly-claimed projection (no reviews / no jobs → "New" stat + Call
+//  dock), the open/closed calculator, and the Save action.
 //
 
 import XCTest
@@ -60,7 +60,7 @@ final class BusinessProfileViewModelTests: XCTestCase {
         "website": "elmparkcoffee.test",
         "founded_year": 2021,
         "employee_count": "1-5",
-        "service_area": null,
+        "service_area": "Serves Cambridge & Somerville",
         "founding_badge": true,
         "is_published": true,
         "verification_status": "address_verified",
@@ -109,29 +109,17 @@ final class BusinessProfileViewModelTests: XCTestCase {
     }
     """
 
-    private static let publicEmptyServicesJSON = """
-    {
-      "hours": [],
-      "catalog": []
-    }
+    private static let publicEmptyJSON = """
+    { "hours": [], "catalog": [] }
     """
 
     private static let reviewsJSON = """
     {
       "id": "biz-1",
       "username": "elmpark-coffee",
-      "firstName": null,
-      "lastName": null,
       "name": "Elm Park Coffee",
-      "bio": null,
-      "tagline": null,
-      "avatar_url": null,
-      "profile_picture_url": null,
-      "city": "Cambridge",
-      "state": "MA",
       "accountType": "business",
       "verified": true,
-      "residency": null,
       "created_at": "2023-04-10T00:00:00.000Z",
       "gigs_posted": 0,
       "gigs_completed": 0,
@@ -156,9 +144,55 @@ final class BusinessProfileViewModelTests: XCTestCase {
     }
     """
 
+    /// Newly-claimed business: no reviews, no jobs, no published hours.
+    private static let detailNewJSON = """
+    {
+      "business": {
+        "id": "biz-new",
+        "username": "tidepool-pets",
+        "name": "Tide Pool Pet Care",
+        "account_type": "business",
+        "city": "Cedar Heights",
+        "state": "CA",
+        "verified": true,
+        "average_rating": null,
+        "review_count": 0,
+        "followers_count": 0,
+        "gigs_completed": 0,
+        "created_at": "2026-05-20T00:00:00.000Z"
+      },
+      "profile": {
+        "business_user_id": "biz-new",
+        "categories": ["Pet care", "Dog walking"],
+        "description": null,
+        "website": null,
+        "service_area": null,
+        "is_published": true,
+        "verification_status": "address_verified"
+      },
+      "locations": [],
+      "access": { "hasAccess": true, "isOwner": false }
+    }
+    """
+
+    private static let reviewsEmptyJSON = """
+    {
+      "id": "biz-new",
+      "username": "tidepool-pets",
+      "accountType": "business",
+      "verified": true,
+      "created_at": "2026-05-20T00:00:00.000Z",
+      "gigs_completed": 0,
+      "average_rating": null,
+      "review_count": 0,
+      "followers_count": 0,
+      "reviews": []
+    }
+    """
+
     // MARK: - Happy path
 
-    func testLoadedProjectsHeaderStatsAboutHoursAndServices() async {
+    func testLoadedProjectsHeaderStatsCategoriesHoursAndServices() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.detailJSON),
             .status(200, body: Self.publicJSON),
@@ -173,32 +207,45 @@ final class BusinessProfileViewModelTests: XCTestCase {
         XCTAssertEqual(content.header.handle, "elmpark-coffee")
         XCTAssertEqual(content.header.locality, "Cambridge, MA")
         XCTAssertTrue(content.header.isVerified)
-        XCTAssertEqual(content.header.categoryChips, ["Coffee", "Bakery"])
 
-        XCTAssertEqual(content.stats.map(\.label), ["Followers", "Reviews", "Years"])
-        XCTAssertEqual(content.stats.first?.value, "240")
+        XCTAssertEqual(content.categories.map(\.label), ["Coffee", "Bakery"])
+        XCTAssertEqual(content.categories.first?.accent, .business)
+        XCTAssertEqual(content.categories.last?.accent, .neutral)
 
+        // Reshaped stat strip: rating · jobs · followers.
+        XCTAssertEqual(content.stats.map(\.label), ["12 reviews", "Jobs done", "Followers"])
+        XCTAssertEqual(content.stats[0].value, "4.7")
+        XCTAssertTrue(content.stats[0].leadingStar)
+        XCTAssertEqual(content.stats[0].tint, .star)
+        XCTAssertEqual(content.stats[2].value, "240")
+
+        XCTAssertFalse(content.isNewlyClaimed)
         XCTAssertEqual(content.about, "Pour-over coffee and laminated pastry from the neighborhood.")
+
         XCTAssertEqual(content.hours.count, 3)
-        XCTAssertEqual(content.hours.map(\.dayLabel), ["Sun", "Mon", "Tue"])
+        XCTAssertEqual(content.hours.map(\.dayLabel), ["Sunday", "Monday", "Tuesday"])
         XCTAssertTrue(content.hours.first?.isClosed == true)
+
+        XCTAssertNotNil(content.serviceArea)
+        XCTAssertEqual(content.serviceArea?.serviceArea, "Serves Cambridge & Somerville")
 
         XCTAssertEqual(content.services.count, 1)
         XCTAssertEqual(content.services.first?.name, "Pour over")
         XCTAssertEqual(content.services.first?.priceLabel, "$5")
 
+        XCTAssertEqual(content.reviewSummary?.count, 12)
         XCTAssertEqual(content.reviews.count, 1)
         XCTAssertEqual(content.reviews.first?.reviewerName, "Sam")
 
         XCTAssertNotNil(content.websiteURL)
     }
 
-    // MARK: - Empty services
+    // MARK: - Empty services / hours → empty-section frames
 
-    func testEmptyServicesWhenPublicCatalogReturnsEmpty() async {
+    func testEmptyPublicResponseLeavesServicesAndHoursEmpty() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.detailJSON),
-            .status(200, body: Self.publicEmptyServicesJSON),
+            .status(200, body: Self.publicEmptyJSON),
             .status(200, body: Self.reviewsJSON)
         ]
         let vm = BusinessProfileViewModel(businessId: "biz-1", client: makeAPI())
@@ -208,8 +255,7 @@ final class BusinessProfileViewModelTests: XCTestCase {
         }
         XCTAssertTrue(content.services.isEmpty)
         XCTAssertTrue(content.hours.isEmpty)
-        // The Overview about + address still render — only Services
-        // hits the empty state in the view.
+        XCTAssertNil(content.status)
         XCTAssertNotNil(content.about)
     }
 
@@ -231,6 +277,29 @@ final class BusinessProfileViewModelTests: XCTestCase {
         XCTAssertEqual(content.reviews.count, 1)
     }
 
+    // MARK: - Newly claimed
+
+    func testNewlyClaimedProjectsNewStatAndCallDock() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.detailNewJSON),
+            .status(200, body: Self.publicEmptyJSON),
+            .status(200, body: Self.reviewsEmptyJSON)
+        ]
+        let vm = BusinessProfileViewModel(businessId: "biz-new", client: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            return XCTFail("Expected .loaded; got \(vm.state)")
+        }
+        XCTAssertTrue(content.isNewlyClaimed)
+        XCTAssertEqual(content.stats.map(\.label), ["No reviews yet", "Jobs done", "On Pantopus"])
+        XCTAssertEqual(content.stats[0].value, "—")
+        XCTAssertEqual(content.stats[0].tint, .muted)
+        XCTAssertEqual(content.stats[2].value, "New")
+        XCTAssertEqual(content.stats[2].tint, .business)
+        XCTAssertNil(content.reviewSummary)
+        XCTAssertEqual(content.dock.secondary, .call)
+    }
+
     // MARK: - Not found
 
     func testPrimary404EmitsNotFoundState() async {
@@ -241,24 +310,56 @@ final class BusinessProfileViewModelTests: XCTestCase {
         XCTFail("Expected .notFound; got \(vm.state)")
     }
 
-    // MARK: - Tab switching does not refetch
+    // MARK: - Open/closed calculator
 
-    func testTabSwitchingDoesNotRefetch() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.detailJSON),
-            .status(200, body: Self.publicJSON),
-            .status(200, body: Self.reviewsJSON)
-        ]
-        let vm = BusinessProfileViewModel(businessId: "biz-1", client: makeAPI())
-        await vm.load()
-        let initialRequestCount = SequencedURLProtocol.capturedRequests.count
-        vm.selectedTab = .services
-        vm.selectedTab = .reviews
-        XCTAssertEqual(
-            SequencedURLProtocol.capturedRequests.count,
-            initialRequestCount,
-            "Switching tabs must not trigger a network fetch."
-        )
+    private func hours(_ json: String) -> [BusinessHoursDTO] {
+        // swiftlint:disable:next force_try
+        try! JSONDecoder().decode([BusinessHoursDTO].self, from: Data(json.utf8))
+    }
+
+    private func utcCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
+        return calendar
+    }
+
+    /// 2024-01-01 00:00:00 UTC — a Monday.
+    private let mondayMidnightUTC = Date(timeIntervalSince1970: 1_704_067_200)
+
+    private static let mondayHours = """
+    [{ "id": "h", "location_id": null, "day_of_week": 1, "open_time": "09:00", "close_time": "17:00", "is_closed": false }]
+    """
+
+    func testComputeOpenStateOpenNow() {
+        let vm = BusinessProfileViewModel(businessId: "x", client: makeAPI())
+        let now = mondayMidnightUTC.addingTimeInterval(12 * 3600) // Mon noon
+        let status = vm.computeOpenState(hours(Self.mondayHours), now: now, calendar: utcCalendar())
+        XCTAssertEqual(status?.isOpen, true)
+        XCTAssertEqual(status?.statusLabel, "Open now")
+        XCTAssertEqual(status?.chipLabel, "Open now")
+    }
+
+    func testComputeOpenStateClosedBeforeOpening() {
+        let vm = BusinessProfileViewModel(businessId: "x", client: makeAPI())
+        let now = mondayMidnightUTC.addingTimeInterval(8 * 3600) // Mon 08:00
+        let status = vm.computeOpenState(hours(Self.mondayHours), now: now, calendar: utcCalendar())
+        XCTAssertEqual(status?.isOpen, false)
+        XCTAssertEqual(status?.statusLabel, "Closed now")
+        XCTAssertEqual(status?.chipLabel, "Closed · opens 9 AM")
+    }
+
+    func testComputeOpenStateClosedFindsNextDay() {
+        let vm = BusinessProfileViewModel(businessId: "x", client: makeAPI())
+        let now = mondayMidnightUTC.addingTimeInterval(36 * 3600) // Tue noon, only Monday has hours
+        let status = vm.computeOpenState(hours(Self.mondayHours), now: now, calendar: utcCalendar())
+        XCTAssertEqual(status?.isOpen, false)
+        XCTAssertEqual(status?.statusDetail, "Opens Monday at 9 AM")
+    }
+
+    func testComputeOpenStateNilWhenNoHours() {
+        let vm = BusinessProfileViewModel(businessId: "x", client: makeAPI())
+        let status = vm.computeOpenState([], now: Date(), calendar: utcCalendar())
+        XCTAssertNil(status)
     }
 
     // MARK: - Save action
