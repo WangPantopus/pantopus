@@ -104,9 +104,8 @@ public struct BusinessProfileView: View {
                 onShare: onShare,
                 onMore: { viewModel.showOverflow = true },
                 onContact: onOpenMessages,
-                onBook: onBook,
-                onCall: { callBusiness(payload) }
-            )
+                onBook: onBook
+            ) { callBusiness(payload) }
         case .notFound:
             NotFoundLayout(onBack: onBack) { Task { await viewModel.refresh() } }
         case let .error(message):
@@ -295,7 +294,7 @@ private struct BusinessProfileSections: View {
     @ViewBuilder private var reviewsSection: some View {
         let total = content.reviewSummary?.count ?? 0
         BizSectionHeader(title: "Reviews", seeAll: total > 0 ? "See all \(total)" : nil)
-        if let summary = content.reviewSummary, summary.count > 0 {
+        if let summary = content.reviewSummary, total > 0 {
             RatingDistribution(
                 average: summary.average,
                 count: summary.count,
@@ -694,13 +693,23 @@ private struct ErrorLayout: View {
 #Preview("Populated") {
     BusinessProfileLoadedView(
         content: BusinessProfileSampleData.populated,
-        onBack: {}, onShare: {}, onMore: {}, onContact: {}, onBook: {}, onCall: {}
+        onBack: {},
+        onShare: {},
+        onMore: {},
+        onContact: {},
+        onBook: {},
+        onCall: {}
     )
 }
 
 #Preview("Newly claimed + closed") {
     BusinessProfileLoadedView(
         content: BusinessProfileSampleData.newlyClaimed,
-        onBack: {}, onShare: {}, onMore: {}, onContact: {}, onBook: {}, onCall: {}
+        onBack: {},
+        onShare: {},
+        onMore: {},
+        onContact: {},
+        onBook: {},
+        onCall: {}
     )
 }

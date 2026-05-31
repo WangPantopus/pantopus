@@ -501,10 +501,10 @@ extension BusinessProfileViewModel {
         business: BusinessUserDetailDTO,
         reviewsResponse: PublicProfile?
     ) -> BusinessReviewSummary? {
-        let count = business.reviewCount ?? reviewsResponse?.reviewCount ?? 0
-        guard count > 0 else { return nil }
+        let reviewTotal = business.reviewCount ?? reviewsResponse?.reviewCount ?? 0
+        guard reviewTotal > 0 else { return nil }
         let average = business.averageRating ?? reviewsResponse?.averageRating ?? 0
-        return BusinessReviewSummary(average: average, count: count, distribution: [])
+        return BusinessReviewSummary(average: average, count: reviewTotal, distribution: [])
     }
 
     private func buildReview(_ raw: PublicProfileReview) -> BusinessReviewCard {

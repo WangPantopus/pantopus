@@ -107,11 +107,15 @@ struct ActionBar: View {
         Spacer()
         ActionBar(
             dock: BusinessActionDock(secondary: .book, note: nil),
-            onContact: {}, onBook: {}, onCall: {}
+            onContact: {},
+            onBook: {},
+            onCall: {}
         )
         ActionBar(
             dock: BusinessActionDock(secondary: .call, note: "Closed now — messages answered at 8 AM"),
-            onContact: {}, onBook: {}, onCall: {}
+            onContact: {},
+            onBook: {},
+            onCall: {}
         )
     }
     .background(Theme.Color.appBg)

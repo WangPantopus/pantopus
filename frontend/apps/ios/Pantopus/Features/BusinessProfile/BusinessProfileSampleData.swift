@@ -67,16 +67,28 @@ enum BusinessProfileSampleData {
         ),
         services: [
             BusinessServiceRow(
-                id: "standard", name: "Standard clean", detail: "2 hr · 2-person team",
-                priceLabel: "from $90", unit: "per visit", icon: .droplets
+                id: "standard",
+                name: "Standard clean",
+                detail: "2 hr · 2-person team",
+                priceLabel: "from $90",
+                unit: "per visit",
+                icon: .droplets
             ),
             BusinessServiceRow(
-                id: "deep", name: "Deep clean", detail: "4 hr · baseboards, inside oven",
-                priceLabel: "from $180", unit: "per visit", icon: .sparkles
+                id: "deep",
+                name: "Deep clean",
+                detail: "4 hr · baseboards, inside oven",
+                priceLabel: "from $180",
+                unit: "per visit",
+                icon: .sparkles
             ),
             BusinessServiceRow(
-                id: "moveout", name: "Move-out clean", detail: "Empty home · deposit-ready",
-                priceLabel: "from $240", unit: "flat", icon: .package
+                id: "moveout",
+                name: "Move-out clean",
+                detail: "Empty home · deposit-ready",
+                priceLabel: "from $240",
+                unit: "flat",
+                icon: .package
             )
         ],
         gallery: [
@@ -142,12 +154,20 @@ enum BusinessProfileSampleData {
         serviceArea: nil,
         services: [
             BusinessServiceRow(
-                id: "walk", name: "30-min dog walk", detail: "Solo walk · your route",
-                priceLabel: "$22", unit: "per walk", icon: .pawPrint
+                id: "walk",
+                name: "30-min dog walk",
+                detail: "Solo walk · your route",
+                priceLabel: "$22",
+                unit: "per walk",
+                icon: .pawPrint
             ),
             BusinessServiceRow(
-                id: "dropin", name: "Drop-in visit", detail: "Feed, water, playtime",
-                priceLabel: "$20", unit: "per visit", icon: .home
+                id: "dropin",
+                name: "Drop-in visit",
+                detail: "Feed, water, playtime",
+                priceLabel: "$20",
+                unit: "per visit",
+                icon: .home
             )
         ],
         gallery: [],

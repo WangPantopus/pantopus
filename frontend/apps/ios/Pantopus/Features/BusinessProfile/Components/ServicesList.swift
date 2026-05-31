@@ -77,12 +77,20 @@ struct ServicesList: View {
 #Preview("ServicesList") {
     ServicesList(services: [
         BusinessServiceRow(
-            id: "std", name: "Standard clean", detail: "2 hr · 2-person team",
-            priceLabel: "from $90", unit: "per visit", icon: .droplets
+            id: "std",
+            name: "Standard clean",
+            detail: "2 hr · 2-person team",
+            priceLabel: "from $90",
+            unit: "per visit",
+            icon: .droplets
         ),
         BusinessServiceRow(
-            id: "deep", name: "Deep clean", detail: "4 hr · baseboards, inside oven",
-            priceLabel: "from $180", unit: "per visit", icon: .sparkles
+            id: "deep",
+            name: "Deep clean",
+            detail: "4 hr · baseboards, inside oven",
+            priceLabel: "from $180",
+            unit: "per visit",
+            icon: .sparkles
         )
     ])
     .padding(Spacing.s4)
