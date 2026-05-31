@@ -21,6 +21,8 @@ struct GenericMailDetailLayout: View {
     let onAcknowledge: @MainActor () -> Void
     let onOpenSenderProfile: (@MainActor (String) -> Void)?
     let onSaveToVault: @MainActor () -> Void
+    /// When set, the overflow menu gains a "Translate" action (A17.13).
+    var onTranslate: (@MainActor () -> Void)?
 
     var body: some View {
         MailItemDetailShell(
@@ -61,15 +63,28 @@ struct GenericMailDetailLayout: View {
             ) { @Sendable in
                 Task { @MainActor in onSaveToVault() }
             },
-            overflowItems: [
-                MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
-                MailOverflowItem(id: "move", icon: .folderPlus, label: "Move") { @Sendable in
-                    Task { @MainActor in onSaveToVault() }
-                },
-                MailOverflowItem(id: "share", icon: .share, label: "Share") {},
-                MailOverflowItem(id: "unread", icon: .mailOpen, label: "Mark unread") {}
-            ]
+            overflowItems: overflowItems
         )
+    }
+
+    private var overflowItems: [MailOverflowItem] {
+        var items: [MailOverflowItem] = []
+        if let onTranslate {
+            items.append(
+                MailOverflowItem(id: "translate", icon: .globe, label: "Translate") { @Sendable in
+                    Task { @MainActor in onTranslate() }
+                }
+            )
+        }
+        items.append(contentsOf: [
+            MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
+            MailOverflowItem(id: "move", icon: .folderPlus, label: "Move") { @Sendable in
+                Task { @MainActor in onSaveToVault() }
+            },
+            MailOverflowItem(id: "share", icon: .share, label: "Share") {},
+            MailOverflowItem(id: "unread", icon: .mailOpen, label: "Mark unread") {}
+        ])
+        return items
     }
 
     private var aiElf: AIElfStripContent? {

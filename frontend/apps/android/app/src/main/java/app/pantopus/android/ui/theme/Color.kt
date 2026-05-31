@@ -202,6 +202,42 @@ object PantopusColors {
      * `Theme.Color.categoryStamps`.
      */
     val categoryStamps = Color(0xFF0E7490)
+
+    /**
+     * Category: translation — `#BE185D` pink-700. The language / translation
+     * accent for A17.13 Translation: the eyebrow / CategoryChip dot, the
+     * [app.pantopus.android.ui.screens.mailbox.translation.components.LanguageBadge]
+     * target pill, the side-by-side English column header, and the reading-view
+     * accent. Distinct from the Pulse [rose] (#BE123C) so the mailbox
+     * translation surface reads as its own category. Mirrored on iOS as
+     * `Theme.Color.categoryTranslation`.
+     */
+    val categoryTranslation = Color(0xFFBE185D)
+
+    /**
+     * Category: translation soft background — `#FCE7F3` pink-100. Pairs with
+     * [categoryTranslation] behind the glossary highlight and the
+     * translator-note "kind" pills.
+     */
+    val categoryTranslationBg = Color(0xFFFCE7F3)
+
+    /**
+     * Category: translation ink — `#9D174D` pink-800. Foreground for the
+     * glossary highlight term and the translator-note "kind" pill text.
+     */
+    val categoryTranslationInk = Color(0xFF9D174D)
+
+    /**
+     * Category: translation paper — `#FDF9F4`. The warm reading stock the
+     * confirmed-state reading view letter sits on.
+     */
+    val categoryTranslationPaper = Color(0xFFFDF9F4)
+
+    /**
+     * Category: translation paper ink — `#3A2F2A`. The warm sepia body ink
+     * for the letter rendered on [categoryTranslationPaper].
+     */
+    val categoryTranslationPaperInk = Color(0xFF3A2F2A)
     // Rating
     /**
      * Star / rating amber — `#F59E0B` (Tailwind amber-500). Fills the

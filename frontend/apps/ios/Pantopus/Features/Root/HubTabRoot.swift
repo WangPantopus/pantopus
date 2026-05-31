@@ -1251,6 +1251,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenSenderProfile: { userId in
                     Task { @MainActor in push(.publicProfile(userId: userId)) }
+                },
+                onTranslate: {
+                    Task { @MainActor in push(.mailTranslation(mailId: mailId)) }
                 }
             )
         case let .publicProfile(userId):
@@ -1960,8 +1963,12 @@ public struct HubTabRoot: View {
             StampsView(viewModel: StampsViewModel { pop() })
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
-        case .mailTranslation:
-            NotYetAvailableView(tabName: "Translation", icon: .globe)
+        case let .mailTranslation(mailId):
+            MailTranslationView(
+                mailId: mailId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onReply: { _ in Task { @MainActor in push(.placeholder(label: "Reply in English")) } }
+            )
         case .unboxing:
             NotYetAvailableView(tabName: "Unboxing", icon: .camera)
         case .earn:

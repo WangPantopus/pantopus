@@ -857,6 +857,9 @@ public struct YouTabRoot: View {
                 onBack: { Task { @MainActor in pop() } },
                 onOpenSenderProfile: { userId in
                     Task { @MainActor in path.append(.publicProfile(userId: userId)) }
+                },
+                onTranslate: {
+                    Task { @MainActor in path.append(.mailTranslation(mailId: mailId)) }
                 }
             )
         case .settings:
@@ -2008,8 +2011,12 @@ public struct YouTabRoot: View {
             StampsView(viewModel: StampsViewModel { Task { @MainActor in pop() } })
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
-        case .mailTranslation:
-            NotYetAvailableView(tabName: "Translation", icon: .globe)
+        case let .mailTranslation(mailId):
+            MailTranslationView(
+                mailId: mailId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onReply: { _ in Task { @MainActor in path.append(.placeholder(label: "Reply in English")) } }
+            )
         case .unboxing:
             NotYetAvailableView(tabName: "Unboxing", icon: .camera)
         case .earn:

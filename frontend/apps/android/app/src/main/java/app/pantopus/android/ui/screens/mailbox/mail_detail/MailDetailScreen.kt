@@ -59,6 +59,7 @@ import app.pantopus.android.ui.theme.Spacing
 fun MailDetailScreen(
     onBack: () -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
+    onTranslate: (() -> Unit)? = null,
     viewModel: MailDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -107,6 +108,7 @@ fun MailDetailScreen(
                     onFileRecord = viewModel::fileRecordToVault,
                     onOpenSenderProfile = onOpenSenderProfile,
                     onSaveToVault = viewModel::openSaveToVaultPicker,
+                    onTranslate = onTranslate,
                 )
             is MailDetailUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -192,6 +194,7 @@ private fun LoadedLayout(
     onFileRecord: () -> Unit,
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
+    onTranslate: (() -> Unit)? = null,
 ) {
     // Dispatch to ceremonial variant layouts when the projected content
     // carries decoded payloads. Every variant composes the shared
@@ -305,6 +308,7 @@ private fun LoadedLayout(
                 onAcknowledge = onAcknowledge,
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
+                onTranslate = onTranslate,
             )
     }
 }

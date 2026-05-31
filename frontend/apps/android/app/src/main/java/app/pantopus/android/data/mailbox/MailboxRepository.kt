@@ -14,6 +14,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateReques
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateResponse
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
+import app.pantopus.android.data.api.models.mailbox.v2.TranslateMailRequest
+import app.pantopus.android.data.api.models.mailbox.v2.TranslationResult
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.MailboxApi
@@ -87,4 +89,12 @@ class MailboxRepository
         /** `POST /api/mailbox/v2/community/rsvp` — T6.5d community RSVP. */
         suspend fun communityRsvp(communityItemId: String): NetworkResult<CommunityRsvpResponse> =
             safeApiCall { v2Api.communityRsvp(CommunityRsvpRequest(communityItemId = communityItemId)) }
+
+        /** `POST /api/mailbox/v2/p3/translate` — B2.3 (A17.13) translate /
+         *  confirm-translation write for the Translation screen. */
+        suspend fun translate(
+            mailId: String,
+            targetLang: String = "en",
+        ): NetworkResult<TranslationResult> =
+            safeApiCall { v2Api.translate(TranslateMailRequest(mailId = mailId, targetLang = targetLang)) }
     }

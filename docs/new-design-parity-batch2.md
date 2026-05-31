@@ -214,8 +214,20 @@ token target.
   "Confirmation #C-8841" / "Hearing Jun 3, 6 PM"; NextUp "Pay Riverside Linen
   — $642.50".
 
-### A17.13 — Translation (`mailbox/translation.tsx`) · BUILD (iOS + Android)
-- **iOS / Android:** **MISSING** (the 7 "Translation" hits are string keys).
+### A17.13 — Translation (`mailbox/translation.tsx`) · BUILT (B2.3, iOS + Android)
+- **Status:** **BUILT** (B2.3). iOS `Features/Mailbox/Translation/` and Android
+  `ui/screens/mailbox/translation/` ship the full screen (View/Screen + ViewModel
+  + Content/UiState + SampleData + `Components/`: LanguageBadge, ViewToggle,
+  SideBySide, TranslatorNotes). Machine ↔ confirmed transition is optimistic with
+  rollback; ViewToggle (Translated/Original/Side by side) swaps the body; "Listen"
+  stubs to a toast (real TTS deferred); "Confirm translation" posts to
+  `POST /api/mailbox/v2/p3/translate` (`MailboxV2Endpoints.translate` /
+  `MailboxV2Api.translate`). Reached from a mail item's **Translate** overflow
+  action on the generic detail variant + `pantopus://mailbox/translation?id=`
+  (routes were pre-staged in B1.6 and swapped off the placeholder here). New
+  `categoryTranslation` token family (pink-700 `#be185d` / bg `#fce7f3` / ink
+  `#9d174d` / paper `#fdf9f4` / paper-ink `#3a2f2a`) landed on both platforms.
+  Snapshot tripwires per state (machine / confirmed) on both platforms.
 - **Proposed target:** iOS `Mailbox/Translation/MailTranslationView.swift`;
   Android `mailbox/translation/MailTranslationScreen.kt`.
 - **Web reference:** `apps/web/.../mailbox/translation/page.tsx` takes `?id=`

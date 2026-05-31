@@ -71,6 +71,7 @@ fun GenericMailDetailLayout(
     onAcknowledge: () -> Unit,
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
+    onTranslate: (() -> Unit)? = null,
 ) {
     Box(modifier = Modifier.testTag("mailDetail_generic")) {
         MailItemDetailShell(
@@ -86,12 +87,15 @@ fun GenericMailDetailLayout(
                             onClick = onSaveToVault,
                         ),
                     overflowItems =
-                        listOf(
-                            MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
-                            MailOverflowItem("move", PantopusIcon.FolderPlus, "Move") { onSaveToVault() },
-                            MailOverflowItem("share", PantopusIcon.Share, "Share") {},
-                            MailOverflowItem("unread", PantopusIcon.MailOpen, "Mark unread") {},
-                        ),
+                        buildList {
+                            if (onTranslate != null) {
+                                add(MailOverflowItem("translate", PantopusIcon.Globe, "Translate") { onTranslate() })
+                            }
+                            add(MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {})
+                            add(MailOverflowItem("move", PantopusIcon.FolderPlus, "Move") { onSaveToVault() })
+                            add(MailOverflowItem("share", PantopusIcon.Share, "Share") {})
+                            add(MailOverflowItem("unread", PantopusIcon.MailOpen, "Mark unread") {})
+                        },
                 ),
             // V1 detail does not expose ai_summary today.
             aiElf =
