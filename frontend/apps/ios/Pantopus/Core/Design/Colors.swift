@@ -232,4 +232,24 @@ public extension Theme.Color {
     /// the `PerforatedStamp` Forever-series ink, and the book balance ring.
     /// Mirrored on Android as `PantopusColors.categoryStamps`.
     static let categoryStamps = SwiftUI.Color("Category/Stamps", bundle: Theme.bundle)
+    /// Category: translation — `#be185d` pink-700. The language / translation
+    /// accent for A17.13 Translation: the eyebrow / `CategoryChip` dot, the
+    /// `LanguageBadge` target pill, the side-by-side English column header,
+    /// and the `ReadingView` accent. Distinct from the Pulse `rose` (#be123c)
+    /// so the mailbox translation surface reads as its own category. Mirrored
+    /// on Android as `PantopusColors.categoryTranslation`.
+    static let categoryTranslation = SwiftUI.Color("Category/Translation", bundle: Theme.bundle)
+    /// Category: translation soft background — `#fce7f3` pink-100. Pairs with
+    /// `categoryTranslation` behind the glossary `<mark>` highlight and the
+    /// translator-note "kind" pills.
+    static let categoryTranslationBg = SwiftUI.Color("Category/TranslationBg", bundle: Theme.bundle)
+    /// Category: translation ink — `#9d174d` pink-800. The foreground for the
+    /// glossary highlight term and the translator-note "kind" pill text.
+    static let categoryTranslationInk = SwiftUI.Color("Category/TranslationInk", bundle: Theme.bundle)
+    /// Category: translation paper — `#fdf9f4`. The warm reading stock the
+    /// confirmed-state `ReadingView` letter sits on.
+    static let categoryTranslationPaper = SwiftUI.Color("Category/TranslationPaper", bundle: Theme.bundle)
+    /// Category: translation paper ink — `#3a2f2a`. The warm sepia body ink
+    /// for the letter rendered on `categoryTranslationPaper`.
+    static let categoryTranslationPaperInk = SwiftUI.Color("Category/TranslationPaperInk", bundle: Theme.bundle)
 }

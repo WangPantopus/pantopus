@@ -15,15 +15,20 @@ public struct MailDetailView: View {
     @State private var viewModel: MailDetailViewModel
     private let onBack: () -> Void
     private let onOpenSenderProfile: (@MainActor (String) -> Void)?
+    /// Opens the A17.13 Translation screen for this mail. When set, the
+    /// generic detail variant surfaces a "Translate" overflow action.
+    private let onTranslate: (@MainActor () -> Void)?
 
     public init(
         mailId: String,
         onBack: @escaping () -> Void,
-        onOpenSenderProfile: (@MainActor (String) -> Void)? = nil
+        onOpenSenderProfile: (@MainActor (String) -> Void)? = nil,
+        onTranslate: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: MailDetailViewModel(mailId: mailId))
         self.onBack = onBack
         self.onOpenSenderProfile = onOpenSenderProfile
+        self.onTranslate = onTranslate
     }
 
     public var body: some View {
@@ -265,7 +270,8 @@ public struct MailDetailView: View {
             onBack: { onBack() },
             onAcknowledge: { Task { await viewModel.acknowledge() } },
             onOpenSenderProfile: onOpenSenderProfile,
-            onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+            onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
+            onTranslate: onTranslate
         )
     }
 }

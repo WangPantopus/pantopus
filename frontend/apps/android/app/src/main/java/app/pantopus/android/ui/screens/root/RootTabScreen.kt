@@ -206,6 +206,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_M
 import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.translation.MailTranslationScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
@@ -2308,15 +2309,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.MAILBOX_ITEM_DETAIL,
                 arguments = listOf(navArgument(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
                 // T6.5b (P20) — generic A17.1 mail detail. P21-P23 will
                 // add package / coupon / booklet / certified variants on
                 // top of the same shared shell.
+                val mailId = entry.arguments?.getString(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY).orEmpty()
                 MailDetailScreen(
                     onBack = { navController.popBackStack() },
                     onOpenSenderProfile = { userId ->
                         navController.navigate(ChildRoutes.publicProfile(userId))
                     },
+                    onTranslate = { navController.navigate(ChildRoutes.translation(mailId)) },
                 )
             }
             composable(
@@ -3525,7 +3528,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.TRANSLATION,
                 arguments = listOf(navArgument(ChildRoutes.TRANSLATION_MAIL_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Translation", icon = PantopusIcon.Globe)
+                MailTranslationScreen(
+                    onBack = { navController.popBackStack() },
+                    onReply = { navController.navigate(ChildRoutes.placeholder("Reply in English")) },
+                )
             }
             composable(ChildRoutes.UNBOXING) {
                 NotYetAvailableView(tabName = "Unboxing", icon = PantopusIcon.Camera)

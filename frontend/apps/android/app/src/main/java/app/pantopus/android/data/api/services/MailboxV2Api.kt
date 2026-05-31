@@ -12,6 +12,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateReques
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateResponse
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
+import app.pantopus.android.data.api.models.mailbox.v2.TranslateMailRequest
+import app.pantopus.android.data.api.models.mailbox.v2.TranslationResult
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
@@ -77,4 +79,15 @@ interface MailboxV2Api {
     suspend fun communityRsvp(
         @Body body: CommunityRsvpRequest,
     ): CommunityRsvpResponse
+
+    /**
+     * `POST /api/mailbox/v2/p3/translate` — route
+     * `backend/routes/mailboxV2Phase3.js:1643`. Translates a mail item
+     * (A17.13) and caches both versions. Doubles as the "confirm/trust"
+     * write for the Translation screen until a dedicated confirm route ships.
+     */
+    @POST("api/mailbox/v2/p3/translate")
+    suspend fun translate(
+        @Body body: TranslateMailRequest,
+    ): TranslationResult
 }

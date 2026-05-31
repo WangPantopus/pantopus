@@ -82,6 +82,32 @@ public enum MailboxV2Endpoints {
             body: CommunityRsvpRequest(communityItemId: communityItemId)
         )
     }
+
+    /// `POST /api/mailbox/v2/p3/translate` — route
+    /// `backend/routes/mailboxV2Phase3.js:1643`. Translates a mail item
+    /// (A17.13) and caches both versions. `targetLang` defaults to `en`.
+    /// The Translation screen also uses this as the "confirm/trust" write
+    /// until a dedicated confirm route ships.
+    public static func translate(mailId: String, targetLang: String = "en") -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/mailbox/v2/p3/translate",
+            body: TranslateMailRequest(mailId: mailId, targetLang: targetLang)
+        )
+    }
+}
+
+/// Wire body for `POST /api/mailbox/v2/p3/translate`. The backend
+/// validator (`backend/routes/mailboxV2Phase3.js:1643`) requires
+/// `mailId` as a UUID string and an optional `targetLang`.
+public struct TranslateMailRequest: Encodable, Sendable {
+    public let mailId: String
+    public let targetLang: String
+
+    public init(mailId: String, targetLang: String = "en") {
+        self.mailId = mailId
+        self.targetLang = targetLang
+    }
 }
 
 /// Wire body for `POST /api/mailbox/v2/community/rsvp`. The backend
