@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.stamps.components
 
@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.PerforatedStamp
 import app.pantopus.android.ui.screens.mailbox.stamps.StampBook
-import app.pantopus.android.ui.screens.mailbox.stamps.StampInk
 import app.pantopus.android.ui.screens.mailbox.stamps.StampCard
+import app.pantopus.android.ui.screens.mailbox.stamps.StampInk
 import app.pantopus.android.ui.screens.mailbox.stamps.StampsSampleData
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon

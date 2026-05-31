@@ -30,7 +30,7 @@ public struct StampSheet: View {
                 AnyView(legend)
             }
             LazyVGrid(columns: Self.columns, spacing: Spacing.s2) {
-                ForEach(0 ..< book.total, id: \.self) { index in
+                ForEach(0..<book.total, id: \.self) { index in
                     cell(used: index < book.used)
                 }
             }

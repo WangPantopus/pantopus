@@ -30,7 +30,9 @@ public enum StampInk: String, Sendable, Hashable, CaseIterable, Identifiable {
     case spring
     case business
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Engraved paper ink for the `PerforatedStamp`.
     public var color: Color {
@@ -76,7 +78,9 @@ public struct StampBook: Sendable, Hashable {
     }
 
     /// Live postage left in the book.
-    public var remaining: Int { max(0, total - used) }
+    public var remaining: Int {
+        max(0, total - used)
+    }
 
     /// Fraction of the book still unused — drives the balance ring.
     public var remainingFraction: Double {

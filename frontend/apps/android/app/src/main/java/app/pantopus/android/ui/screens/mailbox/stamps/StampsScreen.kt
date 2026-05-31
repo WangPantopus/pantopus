@@ -4,6 +4,7 @@
     "LongMethod",
     "TooManyFunctions",
     "LongParameterList",
+    "UnusedPrivateMember",
 )
 
 package app.pantopus.android.ui.screens.mailbox.stamps

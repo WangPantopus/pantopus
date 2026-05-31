@@ -25,7 +25,7 @@ public struct StampsView: View {
 
     public var body: some View {
         VStack(spacing: Spacing.s0) {
-            StampsNav(onBack: { viewModel.tapBack() })
+            StampsNav { viewModel.tapBack() }
             stateBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -42,11 +42,11 @@ public struct StampsView: View {
         case .loading:
             StampsLoadingBody()
         case let .loaded(content):
-            StampsPopulatedBody(content: content, onBuyMore: { viewModel.buyMore() })
+            StampsPopulatedBody(content: content) { viewModel.buyMore() }
         case let .empty(content):
-            StampsEmptyBody(content: content, onBuy: { viewModel.purchaseStarterBook() })
+            StampsEmptyBody(content: content) { viewModel.purchaseStarterBook() }
         case let .error(message):
-            StampsErrorBody(message: message, onRetry: { Task { await viewModel.refresh() } })
+            StampsErrorBody(message: message) { Task { await viewModel.refresh() } }
         }
     }
 }
@@ -104,11 +104,11 @@ private struct StampsNav: View {
     }
 
     private func navIcon(_ icon: PantopusIcon, label: String, id: String) -> some View {
-        Button(action: {}) {
+        Button(action: {}, label: {
             Icon(icon, size: 18, color: Theme.Color.appTextStrong)
                 .frame(width: 34, height: 34)
                 .background(Circle().fill(Theme.Color.appSurfaceSunken))
-        }
+        })
         .buttonStyle(.plain)
         .accessibilityLabel(label)
         .accessibilityIdentifier(id)
@@ -341,7 +341,7 @@ private struct StampActionChip: View {
     let label: String
 
     var body: some View {
-        Button(action: {}) {
+        Button(action: {}, label: {
             VStack(spacing: Spacing.s1) {
                 Icon(icon, size: 17, color: Theme.Color.appTextSecondary)
                 Text(label)
@@ -356,7 +356,7 @@ private struct StampActionChip: View {
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-        }
+        })
         .buttonStyle(.plain)
         .accessibilityIdentifier("stampsAction.\(label)")
     }
@@ -611,8 +611,8 @@ struct StampsPopulatedFrame: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            StampsNav(onBack: {})
-            StampsPopulatedBody(content: content, onBuyMore: {})
+            StampsNav {}
+            StampsPopulatedBody(content: content) {}
         }
         .background(Theme.Color.appBg)
     }
@@ -624,8 +624,8 @@ struct StampsEmptyFrame: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            StampsNav(onBack: {})
-            StampsEmptyBody(content: content, onBuy: {})
+            StampsNav {}
+            StampsEmptyBody(content: content) {}
         }
         .background(Theme.Color.appBg)
     }

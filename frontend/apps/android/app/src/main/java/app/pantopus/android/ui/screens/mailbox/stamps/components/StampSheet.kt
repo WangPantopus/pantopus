@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.stamps.components
 
@@ -27,9 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.PerforatedStamp
 import app.pantopus.android.ui.screens.mailbox.stamps.StampBook
+import app.pantopus.android.ui.screens.mailbox.stamps.StampCard
 import app.pantopus.android.ui.screens.mailbox.stamps.StampInk
 import app.pantopus.android.ui.screens.mailbox.stamps.StampPalette
-import app.pantopus.android.ui.screens.mailbox.stamps.StampCard
 import app.pantopus.android.ui.screens.mailbox.stamps.StampSectionLabel
 import app.pantopus.android.ui.screens.mailbox.stamps.StampsSampleData
 import app.pantopus.android.ui.theme.PantopusColors
@@ -61,7 +61,7 @@ fun StampSheet(book: StampBook) {
             val gap = Spacing.s2
             val cellWidth = (maxWidth - gap * 3) / 4
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-                (0 until book.total).toList().chunked(4).forEach { rowIndices ->
+                for (rowIndices in (0 until book.total).toList().chunked(4)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                         rowIndices.forEach { index ->
                             val used = index < book.used

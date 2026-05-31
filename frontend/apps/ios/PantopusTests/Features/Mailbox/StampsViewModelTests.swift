@@ -99,7 +99,7 @@ final class StampsViewModelTests: XCTestCase {
 
     func test_tapBack_invokesCallback() {
         var backs = 0
-        let vm = StampsViewModel(seed: .populated, onBack: { backs += 1 })
+        let vm = StampsViewModel(seed: .populated) { backs += 1 }
         vm.tapBack()
         XCTAssertEqual(backs, 1)
     }

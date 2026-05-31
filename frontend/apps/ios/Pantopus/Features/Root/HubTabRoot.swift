@@ -277,10 +277,12 @@ public enum HubRoute: Hashable {
     /// Settings → "Payments & payouts" row and the
     /// `pantopus://wallet` deep link.
     case wallet
+
     // MARK: - B1.6 batch-2 routing seam
-    // Pre-registered routes for the batch-2 screens (B2–B5). Each resolves to
-    // `NotYetAvailableView` today; the screen prompts swap in their real
-    // destination view without touching this file.
+
+    /// Pre-registered routes for the batch-2 screens (B2–B5). Each resolves to
+    /// `NotYetAvailableView` today; the screen prompts swap in their real
+    /// destination view without touching this file.
     /// A17.11 — Stamps / postage wallet. `pantopus://mailbox/stamps`.
     case stamps
     /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
@@ -529,6 +531,7 @@ public struct HubTabRoot: View {
         case let .editBusinessPage(businessId):
             path.append(.editBusinessPage(businessId: businessId))
             _ = router.consume()
+
         // MARK: - B1.6 batch-2 routing seam
         // The mailbox sub-screens push through `.mailboxRoot` first so Back
         // walks back through the mailbox, matching `.vacationHold` / `.mailDay`.
@@ -1951,11 +1954,12 @@ public struct HubTabRoot: View {
                 onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } },
                 onSeeAllActivity: { Task { @MainActor in push(.placeholder(label: "All activity")) } }
             )
+
         // MARK: - B1.6 batch-2 routing seam
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.
         case .stamps:
-            StampsView(viewModel: StampsViewModel(onBack: { pop() }))
+            StampsView(viewModel: StampsViewModel { pop() })
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
         case .mailTranslation:
