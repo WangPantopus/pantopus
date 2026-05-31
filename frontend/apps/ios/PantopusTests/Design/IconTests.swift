@@ -91,7 +91,9 @@ final class IconTests: XCTestCase {
         // P5.2 / A14.6 Payments — inline-empty hero disc inside the Payment methods card.
         "credit-card",
         // B1.4 / A19 Legal — collapsible "Jump to section" TOC header.
-        "list"
+        "list",
+        // A17.11 Stamps — Elf rate gauge + Forever-postage validity badge.
+        "gauge", "infinity"
     ]
 
     func testInventoryMatches() {

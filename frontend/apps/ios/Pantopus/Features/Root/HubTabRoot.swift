@@ -1927,8 +1927,10 @@ public struct HubTabRoot: View {
                     onOpenSearch: { push(.mailboxSearch) },
                     onOpenMap: { push(.mailboxMap) },
                     onOpenMailDay: { push(.mailDay(variant: .populated)) },
+                    onOpenEarn: { push(.earn) },
                     onBrowseGigs: { push(.gigsFeed) },
-                    onOpenVacationHold: { push(.vacationHold) }
+                    onOpenVacationHold: { push(.vacationHold) },
+                    onOpenStamps: { push(.stamps) }
                 )
             )
         case .mailboxMap:
@@ -1958,7 +1960,7 @@ public struct HubTabRoot: View {
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.
         case .stamps:
-            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+            StampsView(viewModel: StampsViewModel { pop() })
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
         case let .mailTranslation(mailId):
@@ -1970,7 +1972,18 @@ public struct HubTabRoot: View {
         case .unboxing:
             NotYetAvailableView(tabName: "Unboxing", icon: .camera)
         case .earn:
-            NotYetAvailableView(tabName: "Earn", icon: .handCoins)
+            EarnView(
+                onBack: pop,
+                onHelp: { Task { @MainActor in push(.placeholder(label: "Earn help")) } },
+                onCashOut: { Task { @MainActor in push(.paymentsSettings) } },
+                onBrowseTasks: { Task { @MainActor in push(.gigsFeed) } },
+                onReferNeighbor: { Task { @MainActor in push(.placeholder(label: "Refer a neighbor")) } },
+                onOfferService: { Task { @MainActor in push(.placeholder(label: "Offer a service")) } },
+                onManagePayout: { Task { @MainActor in push(.paymentsSettings) } },
+                onAddBank: { Task { @MainActor in push(.paymentsSettings) } },
+                onSeeAllEarnings: { Task { @MainActor in push(.placeholder(label: "All earnings")) } },
+                onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } }
+            )
         case .businessOwner:
             NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
         case .viewAs:

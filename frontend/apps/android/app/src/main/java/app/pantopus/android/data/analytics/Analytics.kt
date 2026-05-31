@@ -264,6 +264,16 @@ sealed class AnalyticsEvent(
     ) : AnalyticsEvent("screen.vacation_hold.viewed") {
         override val properties = mapOf("mode" to mode)
     }
+
+    /**
+     * A17.11 Stamps (postage wallet) screen view. `state` is `populated`,
+     * `empty`, `loading`, or `error`.
+     */
+    data class ScreenStampsViewed(
+        val state: String,
+    ) : AnalyticsEvent("screen.stamps.viewed") {
+        override val properties = mapOf("state" to state)
+    }
 }
 
 /** Standard outcomes for form submissions and other yes/no telemetry. */

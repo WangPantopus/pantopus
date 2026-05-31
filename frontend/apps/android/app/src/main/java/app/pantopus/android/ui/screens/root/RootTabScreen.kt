@@ -202,6 +202,7 @@ import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
+import app.pantopus.android.ui.screens.mailbox.earn.EarnScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
@@ -210,6 +211,7 @@ import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.translation.MailTranslationScreen
+import app.pantopus.android.ui.screens.mailbox.stamps.StampsScreen
 import app.pantopus.android.ui.screens.mailbox.vacation.VacationHoldScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
@@ -3492,8 +3494,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
                     onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
                     onOpenMailDay = { navController.navigate(ChildRoutes.mailDay()) },
-                    onBrowseGigs = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                    onOpenEarn = { navController.navigate(ChildRoutes.EARN) },
                     onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
+                    onOpenStamps = { navController.navigate(ChildRoutes.STAMPS) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -3517,7 +3520,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             // ---- Batch 2 (B1.6) routing seam. Swap each body for the real
             // screen when the matching A.x screen ships. ----
             composable(ChildRoutes.STAMPS) {
-                NotYetAvailableView(tabName = "Stamps", icon = PantopusIcon.Stamp)
+                StampsScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MAIL_TASK,
@@ -3538,7 +3541,18 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 NotYetAvailableView(tabName = "Unboxing", icon = PantopusIcon.Camera)
             }
             composable(ChildRoutes.EARN) {
-                NotYetAvailableView(tabName = "Earn", icon = PantopusIcon.HandCoins)
+                EarnScreen(
+                    onBack = { navController.popBackStack() },
+                    onHelp = { navController.navigate(ChildRoutes.placeholder("Earn help")) },
+                    onCashOut = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
+                    onBrowseTasks = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                    onReferNeighbor = { navController.navigate(ChildRoutes.placeholder("Refer a neighbor")) },
+                    onOfferService = { navController.navigate(ChildRoutes.placeholder("Offer a service")) },
+                    onManagePayout = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
+                    onAddBank = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
+                    onSeeAllEarnings = { navController.navigate(ChildRoutes.placeholder("All earnings")) },
+                    onOpenTaxDocs = { navController.navigate(ChildRoutes.placeholder("Tax documents")) },
+                )
             }
             composable(
                 route = ChildRoutes.BUSINESS_OWNER,

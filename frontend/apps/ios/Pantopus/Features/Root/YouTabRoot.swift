@@ -817,8 +817,10 @@ public struct YouTabRoot: View {
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
                     onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
+                    onOpenEarn: { path.append(.earn) },
                     onBrowseGigs: { path.append(.gigsFeed) },
-                    onOpenVacationHold: { path.append(.vacationHold) }
+                    onOpenVacationHold: { path.append(.vacationHold) },
+                    onOpenStamps: { path.append(.stamps) }
                 )
             )
         case .mailboxMap:
@@ -2006,7 +2008,7 @@ public struct YouTabRoot: View {
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.
         case .stamps:
-            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+            StampsView(viewModel: StampsViewModel { Task { @MainActor in pop() } })
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
         case let .mailTranslation(mailId):
@@ -2018,7 +2020,18 @@ public struct YouTabRoot: View {
         case .unboxing:
             NotYetAvailableView(tabName: "Unboxing", icon: .camera)
         case .earn:
-            NotYetAvailableView(tabName: "Earn", icon: .handCoins)
+            EarnView(
+                onBack: { Task { @MainActor in pop() } },
+                onHelp: { path.append(.placeholder(label: "Earn help")) },
+                onCashOut: { path.append(.placeholder(label: "Payments")) },
+                onBrowseTasks: { path.append(.gigsFeed) },
+                onReferNeighbor: { path.append(.placeholder(label: "Refer a neighbor")) },
+                onOfferService: { path.append(.placeholder(label: "Offer a service")) },
+                onManagePayout: { path.append(.placeholder(label: "Payments")) },
+                onAddBank: { path.append(.placeholder(label: "Payments")) },
+                onSeeAllEarnings: { path.append(.placeholder(label: "All earnings")) },
+                onOpenTaxDocs: { path.append(.placeholder(label: "Tax documents")) }
+            )
         case .businessOwner:
             NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
         case .viewAs:

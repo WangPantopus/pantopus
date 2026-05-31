@@ -102,19 +102,23 @@ class MailboxRootViewModel
         private var onOpenMail: (String) -> Unit = {}
         private var onOpenSearch: () -> Unit = {}
         private var onOpenMap: () -> Unit = {}
-        private var onBrowseGigs: () -> Unit = {}
+
+        // A10.11 — opens the standalone Earn dashboard. Surfaced as the
+        // Earn-drawer empty-state CTA (the drawer is intentionally
+        // always-empty, so it acts as the launchpad into the Earn surface).
+        private var onOpenEarn: () -> Unit = {}
 
         /** Wire nav callbacks before first load. */
         fun configureNavigation(
             onOpenMail: (String) -> Unit,
             onOpenSearch: () -> Unit = {},
             onOpenMap: () -> Unit = {},
-            onBrowseGigs: () -> Unit = {},
+            onOpenEarn: () -> Unit = {},
         ) {
             this.onOpenMail = onOpenMail
             this.onOpenSearch = onOpenSearch
             this.onOpenMap = onOpenMap
-            this.onBrowseGigs = onBrowseGigs
+            this.onOpenEarn = onOpenEarn
         }
 
         fun load() = rebuild()
@@ -200,8 +204,8 @@ class MailboxRootViewModel
                         icon = PantopusIcon.Wallet,
                         headline = "No earn items yet",
                         subcopy = "Complete gigs to see payouts, 1099s, and tax docs land here automatically.",
-                        ctaTitle = "Browse gigs",
-                        onCta = { onBrowseGigs() },
+                        ctaTitle = "Open Earn dashboard",
+                        onCta = { onOpenEarn() },
                     )
                 drawer == MailboxDrawer.Earn && tab == MailboxTab.Counter ->
                     ListOfRowsUiState.Empty(
