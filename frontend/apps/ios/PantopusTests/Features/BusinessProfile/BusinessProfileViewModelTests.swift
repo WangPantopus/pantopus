@@ -12,6 +12,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable type_body_length
+
 @MainActor
 final class BusinessProfileViewModelTests: XCTestCase {
     override func setUp() {

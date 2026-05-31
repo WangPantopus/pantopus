@@ -102,10 +102,11 @@ public struct BusinessProfileView: View {
                 content: payload,
                 onBack: onBack,
                 onShare: onShare,
-                onMore: { viewModel.showOverflow = true },
+                onMore: presentOverflow,
                 onContact: onOpenMessages,
-                onBook: onBook
-            ) { callBusiness(payload) }
+                onBook: onBook,
+                onCall: callBusiness
+            )
         case .notFound:
             NotFoundLayout(onBack: onBack) { Task { await viewModel.refresh() } }
         case let .error(message):
@@ -113,8 +114,13 @@ public struct BusinessProfileView: View {
         }
     }
 
-    private func callBusiness(_ content: BusinessProfileContent) {
-        guard let phone = content.phoneNumber, !phone.isEmpty else { return }
+    private func presentOverflow() {
+        viewModel.showOverflow = true
+    }
+
+    private func callBusiness() {
+        guard case let .loaded(content) = viewModel.state,
+              let phone = content.phoneNumber, !phone.isEmpty else { return }
         let digits = phone.filter { $0.isNumber || $0 == "+" }
         if let url = URL(string: "tel:\(digits)") {
             onOpenWebsite(url)
@@ -192,7 +198,7 @@ private struct BusinessProfileSections: View {
                     .padding(.bottom, Spacing.s1)
             }
 
-            CategoryRow(categories: content.categories)
+            BizCategoryRow(categories: content.categories)
                 .padding(.top, content.isNewlyClaimed ? Spacing.s2 : Spacing.s0)
 
             aboutSection

@@ -152,10 +152,22 @@ fun BusinessProfileScreen(
             ModalBottomSheet(onDismissRequest = { viewModel.setShowOverflow(false) }, sheetState = sheetState) {
                 OverflowSheetContent(
                     showEdit = viewerIsOwner,
-                    onEdit = { viewModel.setShowOverflow(false); onEdit() },
-                    onSave = { viewModel.setShowOverflow(false); viewModel.save() },
-                    onShare = { viewModel.setShowOverflow(false); onShare() },
-                    onReport = { viewModel.setShowOverflow(false); onOpenReport() },
+                    onEdit = {
+                        viewModel.setShowOverflow(false)
+                        onEdit()
+                    },
+                    onSave = {
+                        viewModel.setShowOverflow(false)
+                        viewModel.save()
+                    },
+                    onShare = {
+                        viewModel.setShowOverflow(false)
+                        onShare()
+                    },
+                    onReport = {
+                        viewModel.setShowOverflow(false)
+                        onOpenReport()
+                    },
                     onCancel = { viewModel.setShowOverflow(false) },
                 )
             }

@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.business_profile.BusinessStatCell
+import app.pantopus.android.ui.screens.business_profile.BusinessStatTint
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.Spacing
 import kotlin.math.PI

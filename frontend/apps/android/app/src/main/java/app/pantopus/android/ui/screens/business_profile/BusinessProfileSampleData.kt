@@ -75,16 +75,28 @@ object BusinessProfileSampleData {
             services =
                 listOf(
                     BusinessServiceRow(
-                        "standard", "Standard clean", "2 hr · 2-person team",
-                        "from $90", "per visit", PantopusIcon.Droplets,
+                        id = "standard",
+                        name = "Standard clean",
+                        detail = "2 hr · 2-person team",
+                        priceLabel = "from $90",
+                        unit = "per visit",
+                        icon = PantopusIcon.Droplets,
                     ),
                     BusinessServiceRow(
-                        "deep", "Deep clean", "4 hr · baseboards, inside oven",
-                        "from $180", "per visit", PantopusIcon.Sparkles,
+                        id = "deep",
+                        name = "Deep clean",
+                        detail = "4 hr · baseboards, inside oven",
+                        priceLabel = "from $180",
+                        unit = "per visit",
+                        icon = PantopusIcon.Sparkles,
                     ),
                     BusinessServiceRow(
-                        "moveout", "Move-out clean", "Empty home · deposit-ready",
-                        "from $240", "flat", PantopusIcon.Package,
+                        id = "moveout",
+                        name = "Move-out clean",
+                        detail = "Empty home · deposit-ready",
+                        priceLabel = "from $240",
+                        unit = "flat",
+                        icon = PantopusIcon.Package,
                     ),
                 ),
             gallery =
@@ -157,12 +169,20 @@ object BusinessProfileSampleData {
             services =
                 listOf(
                     BusinessServiceRow(
-                        "walk", "30-min dog walk", "Solo walk · your route",
-                        "$22", "per walk", PantopusIcon.PawPrint,
+                        id = "walk",
+                        name = "30-min dog walk",
+                        detail = "Solo walk · your route",
+                        priceLabel = "$22",
+                        unit = "per walk",
+                        icon = PantopusIcon.PawPrint,
                     ),
                     BusinessServiceRow(
-                        "dropin", "Drop-in visit", "Feed, water, playtime",
-                        "$20", "per visit", PantopusIcon.Home,
+                        id = "dropin",
+                        name = "Drop-in visit",
+                        detail = "Feed, water, playtime",
+                        priceLabel = "$20",
+                        unit = "per visit",
+                        icon = PantopusIcon.Home,
                     ),
                 ),
             gallery = emptyList(),

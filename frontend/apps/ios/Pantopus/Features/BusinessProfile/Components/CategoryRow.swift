@@ -12,7 +12,7 @@
 import SwiftUI
 
 @MainActor
-struct CategoryRow: View {
+struct BizCategoryRow: View {
     let categories: [BusinessCategoryChip]
 
     var body: some View {
@@ -66,12 +66,12 @@ struct CategoryRow: View {
 
 #Preview("CategoryRow") {
     VStack(alignment: .leading, spacing: Spacing.s4) {
-        CategoryRow(categories: [
+        BizCategoryRow(categories: [
             BusinessCategoryChip(id: "clean", label: "Cleaning", icon: .sparkles, accent: .cleaning),
             BusinessCategoryChip(id: "home", label: "Home & apartment", icon: .home, accent: .neutral),
             BusinessCategoryChip(id: "move", label: "Move-out", icon: .package, accent: .neutral)
         ])
-        CategoryRow(categories: [
+        BizCategoryRow(categories: [
             BusinessCategoryChip(id: "pet", label: "Pet care", icon: .pawPrint, accent: .pet),
             BusinessCategoryChip(id: "dog", label: "Dog walking", icon: .dog, accent: .neutral)
         ])
