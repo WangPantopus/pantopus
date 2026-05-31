@@ -257,6 +257,7 @@ import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailS
 import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.support_trains.manage.ManageTrainScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
+import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomRoute
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.wallet.WalletScreen
@@ -3597,7 +3598,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.WAITING_ROOM,
                 arguments = listOf(navArgument(ChildRoutes.WAITING_ROOM_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Waiting room", icon = PantopusIcon.Hourglass)
+                WaitingRoomRoute(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MEMBERSHIP_DETAIL,

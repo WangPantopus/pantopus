@@ -132,6 +132,7 @@ import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -550,6 +551,12 @@ enum class PantopusIcon(
     Minus("minus"),
     UserMinus("user-minus"),
     CalendarPlus("calendar-plus"),
+
+    // A18.4 Waiting room — the persistent claim room's more-info halo glyph
+    // (`file-warning`) and the "Update evidence" inline-action glyph
+    // (`file-plus-2`).
+    FilePlus2("file-plus-2"),
+    FileWarning("file-warning"),
     ;
 
     companion object {
@@ -888,6 +895,11 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Minus -> IconSource.Material(Icons.Filled.Remove)
         PantopusIcon.UserMinus -> IconSource.Material(Icons.Filled.PersonRemove)
         PantopusIcon.CalendarPlus -> IconSource.Material(Icons.Filled.EventNote)
+        // A18.4 Waiting room. `NoteAdd` is the file-with-plus glyph for
+        // "Update evidence"; Material ships no doc-with-warning glyph, so
+        // `file-warning` falls back to the generic warning triangle.
+        PantopusIcon.FilePlus2 -> IconSource.Material(Icons.Filled.NoteAdd)
+        PantopusIcon.FileWarning -> IconSource.Material(Icons.Filled.Warning)
     }
 
 /**

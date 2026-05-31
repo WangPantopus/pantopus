@@ -2018,8 +2018,11 @@ public struct HubTabRoot: View {
             )
         case .viewAs:
             NotYetAvailableView(tabName: "View as", icon: .eye)
-        case .waitingRoom:
-            NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
+        case let .waitingRoom(homeId):
+            WaitingRoomView(
+                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active),
+                onBack: { pop() }
+            )
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

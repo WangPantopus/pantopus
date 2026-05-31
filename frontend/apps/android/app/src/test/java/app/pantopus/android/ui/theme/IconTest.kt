@@ -259,6 +259,9 @@ class IconTest {
             // A17.11 Stamps — Elf rate gauge + Forever-postage validity badge.
             "gauge",
             "infinity",
+            // A18.4 Waiting room — more-info halo glyph + Update-evidence action.
+            "file-plus-2",
+            "file-warning",
         )
 
     @Test

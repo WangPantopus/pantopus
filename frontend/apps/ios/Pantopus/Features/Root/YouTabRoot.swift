@@ -2068,8 +2068,11 @@ public struct YouTabRoot: View {
             )
         case .viewAs:
             NotYetAvailableView(tabName: "View as", icon: .eye)
-        case .waitingRoom:
-            NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
+        case let .waitingRoom(homeId):
+            WaitingRoomView(
+                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active),
+                onBack: { pop() }
+            )
         #if DEBUG
         case .statusWaiting:
             StatusWaitingView(
