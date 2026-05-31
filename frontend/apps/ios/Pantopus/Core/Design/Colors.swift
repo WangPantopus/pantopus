@@ -252,4 +252,10 @@ public extension Theme.Color {
     /// Category: translation paper ink — `#3a2f2a`. The warm sepia body ink
     /// for the letter rendered on `categoryTranslationPaper`.
     static let categoryTranslationPaperInk = SwiftUI.Color("Category/TranslationPaperInk", bundle: Theme.bundle)
+    /// Category: task — `#4f46e5` indigo-600. The action / productivity
+    /// accent for A17.12 Mail task: the eyebrow / `CategoryChip` dot, the
+    /// task-hero accent strip + checkbox border, the due-calendar block,
+    /// and the snooze-row glyphs. Mirrored on Android as
+    /// `PantopusColors.categoryTask`.
+    static let categoryTask = SwiftUI.Color("Category/Task", bundle: Theme.bundle)
 }

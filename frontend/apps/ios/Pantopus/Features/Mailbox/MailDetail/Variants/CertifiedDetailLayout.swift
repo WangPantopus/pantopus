@@ -32,6 +32,10 @@ struct CertifiedDetailLayout: View {
     /// just signals the trigger. Defaults to a no-op so existing call
     /// sites compile unchanged.
     var onSaveToVault: @MainActor () -> Void = {}
+    /// A17.12 — opens the Elf-extracted task Pantopus made from this
+    /// certified notice. `nil` hides the affordance (e.g. snapshot
+    /// fixtures), so existing call sites compile unchanged.
+    var onOpenExtractedTask: (@MainActor () -> Void)?
     @State private var showsConfirmGate = false
     @State private var didAutoPresentConfirmGate = false
     @State private var showsTermsSheet = false
@@ -265,6 +269,9 @@ struct CertifiedDetailLayout: View {
 
     private var senderAndNotice: some View {
         VStack(spacing: Spacing.s3) {
+            if let onOpenExtractedTask {
+                ExtractedTaskCard(onTap: onOpenExtractedTask)
+            }
             senderCard
             if shouldShowTermsSummary {
                 CertifiedTermsSummaryCard(
@@ -560,6 +567,54 @@ private struct HeroCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.top, Spacing.s2)
+    }
+}
+
+// MARK: - Elf-extracted task affordance (A17.12)
+
+/// "Pantopus made a task" row surfaced on certified notices that carry a
+/// deadline. Tapping it opens the A17.12 Mail-task detail. Indigo task
+/// accent so it reads as the automated-productivity chrome.
+private struct ExtractedTaskCard: View {
+    let onTap: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: { onTap() }) {
+            HStack(spacing: Spacing.s3) {
+                Icon(.listChecks, size: 18, color: Theme.Color.categoryTask)
+                    .frame(width: 38, height: 38)
+                    .background(Theme.Color.categoryTask.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(.sparkles, size: 10, color: Theme.Color.categoryTask)
+                        Text("Pantopus made a task")
+                            .font(.system(size: 12.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.appText)
+                    }
+                    Text("Submit written comment · due Fri 5:00 PM")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: Spacing.s0)
+                Text("View task")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.categoryTask)
+                Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s3 - 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.categoryTask.opacity(0.35), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("mailDetail_viewExtractedTask")
+        .accessibilityLabel("Pantopus made a task: Submit written comment, due Friday 5 PM. View task.")
     }
 }
 

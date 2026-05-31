@@ -1254,6 +1254,11 @@ public struct HubTabRoot: View {
                 },
                 onTranslate: {
                     Task { @MainActor in push(.mailTranslation(mailId: mailId)) }
+                },
+                onOpenExtractedTask: { sourceMailId in
+                    // A17.12 — the certified-notice "view task" affordance
+                    // opens the mail-derived task keyed by its source mail.
+                    Task { @MainActor in push(.mailTask(taskId: sourceMailId)) }
                 }
             )
         case let .publicProfile(userId):
@@ -1960,8 +1965,18 @@ public struct HubTabRoot: View {
         // line below for its real view without editing the route declarations.
         case .stamps:
             StampsView(viewModel: StampsViewModel { pop() })
-        case .mailTask:
-            NotYetAvailableView(tabName: "Task", icon: .listChecks)
+        case let .mailTask(taskId):
+            // A17.12 — Mail-derived task detail. Source-mail + next-up
+            // taps push the originating mail item onto this same stack.
+            MailTaskView(
+                viewModel: MailTaskViewModel(
+                    taskId: taskId,
+                    onOpenMail: { mailId in
+                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onBack: { if !path.isEmpty { path.removeLast() } }
+                )
+            )
         case let .mailTranslation(mailId):
             MailTranslationView(
                 mailId: mailId,

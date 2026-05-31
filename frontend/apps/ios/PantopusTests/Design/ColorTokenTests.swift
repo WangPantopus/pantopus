@@ -91,6 +91,8 @@ final class ColorTokenTests: XCTestCase {
         assertColor(Theme.Color.gigs, hex: "#f97316")
         assertColor(Theme.Color.rentals, hex: "#16a34a")
         assertColor(Theme.Color.vehicles, hex: "#dc2626")
+        // A17.12 — Mail-task indigo accent (mirrors Android categoryTask).
+        assertColor(Theme.Color.categoryTask, hex: "#4f46e5")
     }
 
     func testRating() {

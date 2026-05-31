@@ -207,6 +207,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_M
 import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mail_task.MailTaskScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
@@ -2322,6 +2323,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.publicProfile(userId))
                     },
                     onTranslate = { navController.navigate(ChildRoutes.translation(mailId)) },
+                    onOpenExtractedTask = { sourceMailId ->
+                        // A17.12 — the certified-notice "view task" affordance
+                        // opens the mail-derived task keyed by its source mail.
+                        navController.navigate(ChildRoutes.mailTask(sourceMailId))
+                    },
                 )
             }
             composable(
@@ -3526,7 +3532,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.MAIL_TASK,
                 arguments = listOf(navArgument(ChildRoutes.MAIL_TASK_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Task", icon = PantopusIcon.ListChecks)
+                // A17.12 — Mail-derived task detail. Source-mail + next-up
+                // taps push the originating mail item onto this same stack.
+                MailTaskScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMail = { mailId ->
+                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
+                )
             }
             composable(
                 route = ChildRoutes.TRANSLATION,
