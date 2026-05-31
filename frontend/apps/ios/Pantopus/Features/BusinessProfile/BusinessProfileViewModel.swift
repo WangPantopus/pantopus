@@ -224,9 +224,8 @@ extension BusinessProfileViewModel {
         let jobs = business.gigsCompleted ?? reviewsResponse?.gigsCompleted ?? 0
         let followers = business.followersCount ?? reviewsResponse?.followersCount ?? 0
 
-        let ratingCell: BusinessStatCell
-        if let rating, reviewCount > 0 {
-            ratingCell = BusinessStatCell(
+        let ratingCell = if let rating, reviewCount > 0 {
+            BusinessStatCell(
                 id: "rating",
                 value: String(format: "%.1f", rating),
                 label: "\(reviewCount) reviews",
@@ -234,7 +233,7 @@ extension BusinessProfileViewModel {
                 tint: .star
             )
         } else {
-            ratingCell = BusinessStatCell(
+            BusinessStatCell(
                 id: "rating",
                 value: "—",
                 label: "No reviews yet",
@@ -329,13 +328,12 @@ extension BusinessProfileViewModel {
         rows.sorted { $0.dayOfWeek < $1.dayOfWeek }.map { row in
             let dayIndex = max(0, min(6, row.dayOfWeek))
             let isClosed = row.isClosed == true
-            let time: String
-            if isClosed {
-                time = "Closed"
+            let time = if isClosed {
+                "Closed"
             } else if let open = row.openTime, let close = row.closeTime {
-                time = "\(formatTime(open)) – \(formatTime(close))"
+                "\(formatTime(open)) – \(formatTime(close))"
             } else {
-                time = "—"
+                "—"
             }
             return BusinessHoursRow(
                 id: row.id,

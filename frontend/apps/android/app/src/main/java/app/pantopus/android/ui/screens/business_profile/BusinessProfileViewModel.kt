@@ -398,16 +398,17 @@ class BusinessProfileViewModel
         ): BusinessOpenState? {
             for (offset in 1..7) {
                 val day = (weekday + offset) % 7
-                val row = byDay[day]?.firstOrNull() ?: continue
-                val open = row.openTime ?: continue
-                if (row.isClosed == true || minutes(open) == null) continue
-                val whenLabel = if (offset == 1) "tomorrow" else fullDayName(day)
-                return BusinessOpenState(
-                    isOpen = false,
-                    statusLabel = "Closed now",
-                    statusDetail = "Opens $whenLabel at ${formatTime(open)}",
-                    chipLabel = "Closed · opens ${formatTime(open)}",
-                )
+                val row = byDay[day]?.firstOrNull()
+                val open = row?.openTime
+                if (row != null && row.isClosed != true && open != null && minutes(open) != null) {
+                    val whenLabel = if (offset == 1) "tomorrow" else fullDayName(day)
+                    return BusinessOpenState(
+                        isOpen = false,
+                        statusLabel = "Closed now",
+                        statusDetail = "Opens $whenLabel at ${formatTime(open)}",
+                        chipLabel = "Closed · opens ${formatTime(open)}",
+                    )
+                }
             }
             return null
         }

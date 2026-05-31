@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongParameterList")
+@file:Suppress("MagicNumber", "PackageNaming", "LongParameterList", "LongMethod")
 
 package app.pantopus.android.ui.screens.business_profile.components
 
