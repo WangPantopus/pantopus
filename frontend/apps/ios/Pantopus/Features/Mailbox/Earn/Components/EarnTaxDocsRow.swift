@@ -1,12 +1,12 @@
 //
-//  TaxDocsRow.swift
+//  EarnTaxDocsRow.swift
 //  Pantopus
 //
 //  A10.11 — the Taxes row. File-text tile + "Tax documents" + the YTD /
 //  1099 meta line + chevron. The empty new-earner frame renders a gated
 //  `EarnLockedRow` here instead (taxes unlock after the first paid task).
-//  Named `EarnTaxDocsRow` to sit alongside the Wallet `TaxDocsRow` in the
-//  same module.
+//  Named `EarnTaxDocsRow` (file + type) to sit alongside the Wallet
+//  `TaxDocsRow` — Swift requires unique filenames per target.
 //
 
 import SwiftUI

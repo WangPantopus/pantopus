@@ -168,7 +168,7 @@ private fun AutoCashOutRow(autoCashOut: EarnAutoCashOut) {
                 .semantics {
                     contentDescription =
                         "${autoCashOut.title}. ${autoCashOut.detail}. " +
-                            if (autoCashOut.isOn) "On" else "Off"
+                        if (autoCashOut.isOn) "On" else "Off"
                 },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),

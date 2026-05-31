@@ -120,7 +120,7 @@ private fun EarnEarningRow(
                     .semantics {
                         contentDescription =
                             "${item.description}. $subtext. plus $${item.amount}. " +
-                                if (isPending) "On hold." else "Paid."
+                            if (isPending) "On hold." else "Paid."
                     }
                     .testTag("earnEarningRow-${item.id}"),
             verticalAlignment = Alignment.CenterVertically,

@@ -91,7 +91,10 @@ public enum EarnWayKind: String, Equatable, Sendable {
 /// A single `Ways to earn` row. `featured` lifts the first row onto the
 /// `primary50` tinted surface with a filled `primary600` icon tile.
 public struct EarnWayToEarn: Identifiable, Equatable, Sendable {
-    public var id: String { kind.rawValue }
+    public var id: String {
+        kind.rawValue
+    }
+
     public let kind: EarnWayKind
     public let title: String
     public let meta: String
