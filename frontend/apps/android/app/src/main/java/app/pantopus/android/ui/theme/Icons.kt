@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Air
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Approval
@@ -175,6 +176,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TableChart
@@ -311,6 +313,11 @@ enum class PantopusIcon(
     Timer("timer"),
     ArrowsRepeat("repeat"),
     Hourglass("hourglass"),
+
+    // A17.11 Stamps — `gauge` backs the Elf "~2 stamps / week" rate
+    // bullet; `infinity` backs the book's "Never expires" validity badge.
+    Gauge("gauge"),
+    Infinity("infinity"),
     HandCoins("hand-coins"),
     Package("package"),
     Flower("flower"),
@@ -665,6 +672,8 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Timer -> IconSource.Material(Icons.Filled.Timer)
         PantopusIcon.ArrowsRepeat -> IconSource.Material(Icons.Filled.Autorenew)
         PantopusIcon.Hourglass -> IconSource.Material(Icons.Filled.HourglassEmpty)
+        PantopusIcon.Gauge -> IconSource.Material(Icons.Filled.Speed)
+        PantopusIcon.Infinity -> IconSource.Material(Icons.Filled.AllInclusive)
         PantopusIcon.HandCoins -> IconSource.Material(Icons.Filled.Payments)
         PantopusIcon.Package -> IconSource.Material(Icons.Filled.Inventory2)
         PantopusIcon.Flower -> IconSource.Material(Icons.Filled.LocalFlorist)
