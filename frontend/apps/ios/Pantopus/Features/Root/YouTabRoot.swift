@@ -1974,6 +1974,9 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.placeholder(label: "Report business")) }
                 },
                 onOpenWebsite: { url in openURL(url) },
+                onBook: {
+                    Task { @MainActor in path.append(.placeholder(label: "Book")) }
+                },
                 onEdit: {
                     Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) }
                 }
@@ -1995,6 +1998,7 @@ public struct YouTabRoot: View {
                     personaHandle: personaHandle
                 ) { Task { @MainActor in pop() } }
             )
+
         // MARK: - B1.6 batch-2 routing seam
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.

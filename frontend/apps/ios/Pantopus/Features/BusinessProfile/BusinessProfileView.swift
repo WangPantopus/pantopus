@@ -2,11 +2,17 @@
 //  BusinessProfileView.swift
 //  Pantopus
 //
-//  P1.6 — Typed Business Profile screen. Forks PublicProfileView, then
-//  swaps the personal-pillar chrome for the violet business pillar:
-//  flat business-bg hero band, identity-ring avatar tinted to
-//  `.business`, the three-tab body (Overview / Services / Reviews),
-//  and a sticky Message + Save + Visit footer.
+//  A10.6 — public Business Profile, reshaped (B3.1) from the old tabbed
+//  layout to a single-scroll sectioned design: a `BizBannerHeader` cover
+//  + overlapping logo, a stat strip, category chips, then About / Hours /
+//  Service area / Services / Recent work / Reviews sections, over a sticky
+//  Contact + Book (or Call) dock. Floating circular controls overlay the
+//  banner. The newly-claimed + closed secondary frame swaps unfilled
+//  sections for `EmptyBlock`s and limits the dock.
+//
+//  Design reference: `docs/designs/A10/business-frames.jsx`
+//  (FrameBizPopulated + FrameBizNew) and `docs/new-design-parity-batch2.md`
+//  § A10.6. Identity pillar is business violet throughout.
 //
 // swiftlint:disable file_length
 
@@ -21,8 +27,9 @@ public struct BusinessProfileView: View {
     private let onShare: @MainActor () -> Void
     private let onOpenReport: @MainActor () -> Void
     private let onOpenWebsite: @MainActor (URL) -> Void
-    /// P4.2 — A13.10 Edit Business Page. Surfaced via the top-bar
-    /// overflow menu when the loaded payload's `viewerIsOwner` is true.
+    /// "Book" dock action — stubbed by the host (real booking ships later).
+    private let onBook: @MainActor () -> Void
+    /// A13.10 Edit Business Page, surfaced via overflow when viewer is owner.
     private let onEdit: @MainActor () -> Void
 
     public init(
@@ -32,6 +39,7 @@ public struct BusinessProfileView: View {
         onShare: @escaping @MainActor () -> Void = {},
         onOpenReport: @escaping @MainActor () -> Void = {},
         onOpenWebsite: @escaping @MainActor (URL) -> Void = { _ in },
+        onBook: @escaping @MainActor () -> Void = {},
         onEdit: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: BusinessProfileViewModel(businessId: businessId))
@@ -40,6 +48,7 @@ public struct BusinessProfileView: View {
         self.onShare = onShare
         self.onOpenReport = onOpenReport
         self.onOpenWebsite = onOpenWebsite
+        self.onBook = onBook
         self.onEdit = onEdit
     }
 
@@ -48,7 +57,7 @@ public struct BusinessProfileView: View {
             content
             if let toast = viewModel.toastMessage {
                 ToastView(message: ToastMessage(text: toast, kind: .neutral))
-                    .padding(.bottom, Spacing.s12)
+                    .padding(.bottom, Spacing.s16)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: toast) {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -68,6 +77,7 @@ public struct BusinessProfileView: View {
             if viewerOwnsLoadedBusiness {
                 Button("Edit business page") { onEdit() }
             }
+            Button("Save business") { Task { await viewModel.save() } }
             Button("Share business") { onShare() }
             Button("Report", role: .destructive) { onOpenReport() }
             Button("Cancel", role: .cancel) {}
@@ -88,661 +98,517 @@ public struct BusinessProfileView: View {
         case .loading:
             LoadingLayout(onBack: onBack)
         case let .loaded(payload):
-            loadedLayout(payload)
+            BusinessProfileLoadedView(
+                content: payload,
+                onBack: onBack,
+                onShare: onShare,
+                onMore: presentOverflow,
+                onContact: onOpenMessages,
+                onBook: onBook,
+                onCall: callBusiness
+            )
         case .notFound:
-            NotFoundLayout(onBack: onBack) {
-                Task { await viewModel.refresh() }
-            }
+            NotFoundLayout(onBack: onBack) { Task { await viewModel.refresh() } }
         case let .error(message):
-            ErrorLayout(message: message, onBack: onBack) {
-                Task { await viewModel.refresh() }
-            }
+            ErrorLayout(message: message, onBack: onBack) { Task { await viewModel.refresh() } }
         }
     }
 
-    private func loadedLayout(_ payload: BusinessProfileContent) -> some View {
-        ContentDetailShell(
-            title: nil,
-            onBack: onBack,
-            topBarAction: ContentDetailTopBarAction(
-                icon: .moreHorizontal,
-                accessibilityLabel: "More actions"
-            ) { Task { @MainActor in viewModel.showOverflow = true } },
-            header: {
-                BusinessProfileHero(header: payload.header) { onShare() }
-            },
-            body: {
-                BusinessProfileBody(
-                    content: payload,
-                    selectedTab: Binding(
-                        get: { viewModel.selectedTab },
-                        set: { viewModel.selectedTab = $0 }
-                    )
-                ) { onOpenWebsite($0) }
-            },
-            cta: {
-                BusinessProfileActionFooter(
-                    saveState: viewModel.saveState,
-                    websiteURL: payload.websiteURL,
-                    onMessage: { onOpenMessages() },
-                    onSave: { Task { await viewModel.save() } },
-                    onVisit: { url in onOpenWebsite(url) }
-                )
-                .padding(.bottom, Spacing.s2)
-            }
-        )
+    private func presentOverflow() {
+        viewModel.showOverflow = true
     }
-}
 
-// MARK: - Hero band
-
-@MainActor
-private struct BusinessProfileHero: View {
-    let header: BusinessProfileHeader
-    let onShare: @MainActor () -> Void
-
-    var body: some View {
-        VStack(spacing: Spacing.s0) {
-            // Flat violet wash — explicit "gradient OFF" per spec.
-            ZStack(alignment: .topTrailing) {
-                Theme.Color.businessBg
-                    .frame(height: 132)
-                    .accessibilityHidden(true)
-
-                Button {
-                    onShare()
-                } label: {
-                    Icon(.share, size: 18, color: Theme.Color.appText)
-                        .frame(width: 44, height: 44)
-                        .background(Theme.Color.appSurface.opacity(0.92))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, Spacing.s4)
-                .padding(.top, Spacing.s2)
-                .accessibilityLabel("Share")
-                .accessibilityIdentifier("businessProfile.share")
-            }
-
-            // Identity card overlaps the bottom of the band.
-            IdentityCard(header: header)
-                .padding(.horizontal, Spacing.s4)
-                .offset(y: -44)
-                .padding(.bottom, -44)
+    private func callBusiness() {
+        guard case let .loaded(content) = viewModel.state,
+              let phone = content.phoneNumber, !phone.isEmpty else { return }
+        let digits = phone.filter { $0.isNumber || $0 == "+" }
+        if let url = URL(string: "tel:\(digits)") {
+            onOpenWebsite(url)
         }
-        .frame(maxWidth: .infinity)
     }
 }
 
+// MARK: - Loaded layout
+
+/// The loaded frame, factored out so previews / snapshots can render it
+/// directly off `BusinessProfileContent`. Mirrors Android's
+/// `BusinessProfileLoadedFrame`.
 @MainActor
-private struct IdentityCard: View {
-    let header: BusinessProfileHeader
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            HStack(alignment: .top, spacing: Spacing.s3) {
-                ZStack(alignment: .bottomTrailing) {
-                    AvatarWithIdentityRing(
-                        name: header.displayName,
-                        imageURL: header.logoURL,
-                        identity: .business,
-                        ringProgress: 1,
-                        size: 72
-                    )
-                    if header.isVerified {
-                        VerifiedBadge(size: 24).offset(x: 2, y: 2)
-                    }
-                }
-                .frame(width: 80, height: 80)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(header.displayName)
-                        .font(.system(size: PantopusTextStyle.h2.size, weight: .bold))
-                        .tracking(-0.5)
-                        .foregroundStyle(Theme.Color.appText)
-                        .lineLimit(2)
-                        .accessibilityAddTraits(.isHeader)
-
-                    if let handle = header.handle {
-                        Text("@\(handle)")
-                            .font(.system(size: PantopusTextStyle.caption.size))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                            .lineLimit(1)
-                    }
-
-                    if let locality = header.locality, !locality.isEmpty {
-                        HStack(spacing: Spacing.s1) {
-                            Icon(.mapPin, size: 12, color: Theme.Color.appTextSecondary)
-                            Text(locality)
-                                .font(.system(size: PantopusTextStyle.caption.size))
-                                .foregroundStyle(Theme.Color.appTextSecondary)
-                                .lineLimit(1)
-                        }
-                        .padding(.top, 2)
-                    }
-                }
-
-                Spacer(minLength: Spacing.s0)
-            }
-
-            if !header.categoryChips.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Spacing.s2) {
-                        ForEach(header.categoryChips, id: \.self) { chip in
-                            StatusChip(chip, variant: .business)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(Spacing.s4)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.xl)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .pantopusShadow(.sm)
-        .accessibilityElement(children: .contain)
-    }
-}
-
-// MARK: - Body (stats + tabs + tab content)
-
-@MainActor
-private struct BusinessProfileBody: View {
+struct BusinessProfileLoadedView: View {
     let content: BusinessProfileContent
-    @Binding var selectedTab: BusinessProfileTab
-    let onOpenWebsite: @MainActor (URL) -> Void
+    let onBack: @MainActor () -> Void
+    let onShare: @MainActor () -> Void
+    let onMore: @MainActor () -> Void
+    let onContact: @MainActor () -> Void
+    let onBook: @MainActor () -> Void
+    let onCall: @MainActor () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            statsStrip
-                .padding(.horizontal, Spacing.s4)
-
-            tabStrip
-                .padding(.horizontal, Spacing.s4)
-
-            Group {
-                switch selectedTab {
-                case .overview: overviewTab
-                case .services: servicesTab
-                case .reviews: reviewsTab
-                }
-            }
-            .padding(.horizontal, Spacing.s4)
-
-            Spacer().frame(height: Spacing.s16)
-        }
-    }
-
-    private var statsStrip: some View {
-        HStack(alignment: .center, spacing: Spacing.s2) {
-            ForEach(content.stats) { stat in
-                VStack(spacing: 2) {
-                    Text(stat.value)
-                        .font(.system(size: PantopusTextStyle.h3.size, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text(stat.label.uppercased())
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(0.5)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(stat.value) \(stat.label)")
-            }
-        }
-        .padding(.vertical, Spacing.s3)
-        .padding(.horizontal, Spacing.s3)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .pantopusShadow(.sm)
-    }
-
-    private var tabStrip: some View {
-        HStack(spacing: Spacing.s0) {
-            ForEach(BusinessProfileTab.allCases) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    VStack(spacing: Spacing.s1) {
-                        Text(tab.label)
-                            .font(.system(
-                                size: PantopusTextStyle.small.size,
-                                weight: tab == selectedTab ? .semibold : .regular
-                            ))
-                            .foregroundStyle(
-                                tab == selectedTab
-                                    ? Theme.Color.business
-                                    : Theme.Color.appTextSecondary
-                            )
-                        Rectangle()
-                            .fill(tab == selectedTab ? Theme.Color.business : Color.clear)
-                            .frame(height: 2)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("businessProfile.tab.\(tab.rawValue)")
-                .accessibilityLabel(tab.label)
-                .accessibilityAddTraits(
-                    tab == selectedTab ? [.isButton, .isSelected] : .isButton
-                )
-            }
-        }
-    }
-
-    // MARK: Overview
-
-    private var overviewTab: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            if let about = content.about, !about.isEmpty {
-                BusinessSection(title: "About") {
-                    Text(about)
-                        .font(.system(size: PantopusTextStyle.body.size))
-                        .foregroundStyle(Theme.Color.appText)
-                        .lineSpacing(4)
-                }
-            }
-
-            if !content.hours.isEmpty {
-                BusinessSection(title: "Hours") {
-                    HoursTable(rows: content.hours)
-                }
-            }
-
-            if let address = content.address {
-                BusinessSection(title: "Address") {
-                    AddressBlock(address: address)
-                }
-            }
-
-            if !content.contact.isEmpty {
-                BusinessSection(title: "Contact") {
-                    VStack(spacing: Spacing.s0) {
-                        ForEach(Array(content.contact.enumerated()), id: \.element.id) { idx, row in
-                            ContactRowView(row: row) { url in onOpenWebsite(url) }
-                            if idx != content.contact.count - 1 {
-                                Divider().padding(.leading, Spacing.s10)
-                            }
-                        }
-                    }
-                    .background(Theme.Color.appSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radii.lg)
-                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+        ZStack(alignment: .top) {
+            ScrollView {
+                VStack(spacing: Spacing.s0) {
+                    BizBannerHeader(
+                        identity: .business,
+                        name: content.header.displayName,
+                        handle: content.header.handle.map { "@\($0)" } ?? "",
+                        locality: content.header.locality ?? "",
+                        logoIcon: content.header.logoIcon,
+                        verified: content.header.isVerified,
+                        status: bannerStatus
                     )
+                    StatStrip(stats: content.stats)
+                    BusinessProfileSections(content: content)
+                        .padding(.horizontal, Spacing.s4)
+                        .padding(.top, 14)
+                        .padding(.bottom, 132)
                 }
             }
+            .ignoresSafeArea(edges: .top)
 
-            if content.about == nil
-                && content.hours.isEmpty
-                && content.address == nil
-                && content.contact.isEmpty {
-                EmptyState(
-                    icon: .building2,
-                    headline: "Nothing here yet",
-                    subcopy: "This business hasn't filled in their public profile."
-                )
-                .frame(minHeight: 220)
-            }
+            FloatingControls(onBack: onBack, onShare: onShare, onMore: onMore)
         }
-        .accessibilityIdentifier("businessProfile.overview")
-    }
-
-    // MARK: Services
-
-    @ViewBuilder private var servicesTab: some View {
-        if content.services.isEmpty {
-            EmptyState(
-                icon: .tag,
-                headline: "No services listed yet",
-                subcopy: "When this business adds services or products, you'll see them here."
+        .background(Theme.Color.appBg)
+        .overlay(alignment: .bottom) {
+            ActionBar(
+                dock: content.dock,
+                onContact: onContact,
+                onBook: onBook,
+                onCall: onCall
             )
-            .frame(minHeight: 260)
-            .accessibilityIdentifier("businessProfile.services.empty")
-        } else {
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                ForEach(content.services) { service in
-                    ServiceRowView(service: service)
-                }
-            }
-            .accessibilityIdentifier("businessProfile.services")
         }
+        .accessibilityIdentifier("businessProfile.loaded")
     }
 
-    // MARK: Reviews
-
-    @ViewBuilder private var reviewsTab: some View {
-        if content.reviews.isEmpty {
-            EmptyState(
-                icon: .star,
-                headline: "No reviews yet",
-                subcopy: "Reviews show up here after a completed gig or purchase."
-            )
-            .frame(minHeight: 260)
-            .accessibilityIdentifier("businessProfile.reviews.empty")
-        } else {
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                ForEach(content.reviews) { card in
-                    ReviewRowView(card: card)
-                }
-            }
-            .accessibilityIdentifier("businessProfile.reviews")
-        }
+    private var bannerStatus: BizStatusBadge? {
+        guard let status = content.status else { return nil }
+        return status.isOpen ? .open(status.chipLabel) : .closed(status.chipLabel)
     }
 }
 
-// MARK: - Sub-views
+// MARK: - Sections
 
 @MainActor
-private struct BusinessSection<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text(title.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .accessibilityAddTraits(.isHeader)
-            content()
-        }
-    }
-}
-
-@MainActor
-private struct HoursTable: View {
-    let rows: [BusinessHoursRow]
-
-    var body: some View {
-        VStack(spacing: Spacing.s0) {
-            ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
-                HStack {
-                    Text(row.dayLabel)
-                        .font(.system(size: PantopusTextStyle.body.size, weight: .medium))
-                        .foregroundStyle(Theme.Color.appText)
-                    Spacer()
-                    Text(row.timeLabel)
-                        .font(.system(size: PantopusTextStyle.body.size))
-                        .foregroundStyle(
-                            row.isClosed ? Theme.Color.appTextSecondary : Theme.Color.appText
-                        )
-                }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, Spacing.s2)
-                if idx != rows.count - 1 {
-                    Divider()
-                }
-            }
-        }
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-    }
-}
-
-@MainActor
-private struct AddressBlock: View {
-    let address: BusinessAddress
+private struct BusinessProfileSections: View {
+    let content: BusinessProfileContent
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
-            mapPreview
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(address.lines, id: \.self) { line in
-                    Text(line)
-                        .font(.system(size: PantopusTextStyle.body.size))
-                        .foregroundStyle(Theme.Color.appText)
-                }
+            if content.isNewlyClaimed {
+                JustOpenedNote()
+                    .padding(.bottom, Spacing.s1)
             }
-            .padding(Spacing.s3)
+
+            BizCategoryRow(categories: content.categories)
+                .padding(.top, content.isNewlyClaimed ? Spacing.s2 : Spacing.s0)
+
+            aboutSection
+            hoursSection
+            serviceAreaSection
+            servicesSection
+            recentWorkSection
+            reviewsSection
+            footer
         }
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
+    }
+
+    // About
+
+    @ViewBuilder private var aboutSection: some View {
+        BizSectionHeader(title: "About")
+        if let about = content.about, !about.isEmpty {
+            Text(about)
+                .font(.system(size: 13.5))
+                .tracking(-0.05)
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .lineSpacing(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !content.aboutChips.isEmpty {
+                FlowChips(chips: content.aboutChips)
+                    .padding(.top, 10)
+            }
+        } else {
+            EmptyBlock(
+                icon: .fileText,
+                title: "No description yet",
+                message: "This business hasn't written an About blurb. It'll appear here once they do."
+            )
+        }
+    }
+
+    // Hours
+
+    @ViewBuilder private var hoursSection: some View {
+        BizSectionHeader(title: "Hours")
+        if let status = content.status, !content.hours.isEmpty {
+            HoursTable(status: status, rows: content.hours)
+        } else {
+            EmptyBlock(
+                icon: .clock,
+                title: "Hours not set",
+                message: "Opening hours haven't been published yet."
+            )
+        }
+    }
+
+    // Service area
+
+    @ViewBuilder private var serviceAreaSection: some View {
+        BizSectionHeader(title: "Service area")
+        if let area = content.serviceArea {
+            ServiceAreaCard(area: area)
+        } else {
+            EmptyBlock(
+                icon: .mapPin,
+                title: "Service area not set",
+                message: "This business hasn't shared where they work yet."
+            )
+        }
+    }
+
+    // Services
+
+    @ViewBuilder private var servicesSection: some View {
+        BizSectionHeader(title: "Services", seeAll: content.services.isEmpty ? nil : "See all")
+        if content.services.isEmpty {
+            EmptyBlock(
+                icon: .tag,
+                title: "No services yet",
+                message: "Services and prices show up here once they're listed."
+            )
+        } else {
+            ServicesList(services: content.services)
+        }
+    }
+
+    // Recent work
+
+    @ViewBuilder private var recentWorkSection: some View {
+        BizSectionHeader(title: "Recent work", seeAll: content.gallery.isEmpty ? nil : "See all")
+        if content.gallery.isEmpty {
+            EmptyBlock(
+                icon: .image,
+                title: "No photos yet",
+                message: "Work photos will appear here after the first few jobs."
+            )
+        } else {
+            GalleryStrip(tiles: content.gallery.map(galleryTile))
+        }
+    }
+
+    // Reviews
+
+    @ViewBuilder private var reviewsSection: some View {
+        let total = content.reviewSummary?.count ?? 0
+        BizSectionHeader(title: "Reviews", seeAll: total > 0 ? "See all \(total)" : nil)
+        if let summary = content.reviewSummary, total > 0 {
+            RatingDistribution(
+                average: summary.average,
+                count: summary.count,
+                distribution: summary.distribution
+            )
+            ForEach(content.reviews) { review in
+                BizReviewCard(card: review)
+                    .padding(.top, Spacing.s2)
+            }
+        } else {
+            EmptyBlock(
+                icon: .messageSquarePlus,
+                title: "No reviews yet",
+                message: "Be the first to hire \(content.header.displayName). Your review helps "
+                    + "the next neighbor decide.",
+                cta: EmptyBlock.CTA(label: "Hire to review", icon: .pencil) {}
+            )
+        }
+    }
+
+    // Footer
+
+    private var footer: some View {
+        HStack(spacing: 18) {
+            footerItem(icon: .flag, label: "Report")
+            footerItem(icon: .share, label: "Share")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, Spacing.s4)
+    }
+
+    private func footerItem(icon: PantopusIcon, label: String) -> some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(icon, size: 11, color: Theme.Color.appTextMuted)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextMuted)
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(address.lines.joined(separator: ", "))
+        .accessibilityLabel(label)
     }
 
-    @ViewBuilder private var mapPreview: some View {
-        if address.hasCoordinates {
-            // Static "map preview" tile — a flat sunken band with a
-            // pin to convey that the business has a mappable address.
-            // The real map view ships with the Nearby integration.
-            ZStack {
-                Theme.Color.appSurfaceSunken
-                Icon(.mapPin, size: 28, color: Theme.Color.business)
-            }
-            .frame(height: 96)
+    private func galleryTile(_ item: BusinessGalleryItem) -> GalleryTile {
+        GalleryTile(
+            id: item.id,
+            imageURL: item.imageURL,
+            label: item.label,
+            tint: galleryTint(item.tint),
+            icon: item.moreCount == nil ? .image : nil,
+            moreCount: item.moreCount
+        )
+    }
+
+    private func galleryTint(_ tint: BusinessGalleryTint) -> Color {
+        switch tint {
+        case .primary: Theme.Color.business
+        case .success: Theme.Color.success
+        case .slate: Theme.Color.slate
+        case .deep: Theme.Color.businessDark
         }
     }
 }
 
-@MainActor
-private struct ContactRowView: View {
-    let row: BusinessContactRow
-    let onTap: @MainActor (URL) -> Void
-
-    var body: some View {
-        Button {
-            if let url = row.actionURL {
-                onTap(url)
-            }
-        } label: {
-            HStack(spacing: Spacing.s3) {
-                Icon(icon, size: 18, color: Theme.Color.business)
-                    .frame(width: 28)
-                Text(row.value)
-                    .font(.system(size: PantopusTextStyle.body.size))
-                    .foregroundStyle(Theme.Color.appText)
-                    .lineLimit(1)
-                Spacer()
-                if row.actionURL != nil {
-                    Icon(.chevronRight, size: 14, color: Theme.Color.appTextSecondary)
-                }
-            }
-            .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, Spacing.s3)
-            .frame(minHeight: 44)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(row.kind.rawValue.capitalized): \(row.value)")
-    }
-
-    private var icon: PantopusIcon {
-        switch row.kind {
-        case .phone: .phone
-        case .email: .mail
-        case .website: .link
-        }
-    }
-}
+// MARK: - Section header
 
 @MainActor
-private struct ServiceRowView: View {
-    let service: BusinessServiceRow
+private struct BizSectionHeader: View {
+    let title: String
+    var seeAll: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s1) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(service.name)
-                    .font(.system(size: PantopusTextStyle.body.size, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Spacer()
-                Text(service.priceLabel)
-                    .font(.system(size: PantopusTextStyle.body.size, weight: .semibold))
+        HStack {
+            Text(title.uppercased())
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            if let seeAll {
+                Text(seeAll)
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.business)
             }
-            if let detail = service.detail, !detail.isEmpty {
-                Text(detail)
-                    .font(.system(size: PantopusTextStyle.small.size))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .lineSpacing(2)
-            }
         }
-        .padding(Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(service.name), \(service.priceLabel)")
+        .padding(.top, 18)
+        .padding(.bottom, 8)
     }
 }
 
+// MARK: - About chips (wrapping)
+
 @MainActor
-private struct ReviewRowView: View {
+private struct FlowChips: View {
+    let chips: [BusinessAboutChip]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(chips) { chip in
+                    HStack(spacing: Spacing.s1) {
+                        Icon(chip.icon, size: 11, strokeWidth: 2.2, color: Theme.Color.business)
+                        Text(chip.label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.business)
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Theme.Color.businessBg)
+                    .clipShape(Capsule())
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Just-opened trust note
+
+@MainActor
+private struct JustOpenedNote: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 11) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(Theme.Color.business)
+                    .frame(width: 32, height: 32)
+                Icon(.badgeCheck, size: 16, strokeWidth: 2.2, color: Theme.Color.appTextInverse)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Just opened on Pantopus")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .tracking(-0.1)
+                    .foregroundStyle(Theme.Color.businessDark)
+                Text("Address and business identity are verified. Reviews and photos build up "
+                    + "after the first few jobs — early neighbors set the tone.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.businessBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.business.opacity(0.25), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Service area card
+
+@MainActor
+private struct ServiceAreaCard: View {
+    let area: BusinessServiceArea
+
+    var body: some View {
+        VStack(spacing: Spacing.s0) {
+            MapPreview(
+                identity: .business,
+                serviceAreaRadius: area.hasCoordinates ? 56 : nil,
+                pinGlyph: .building2
+            )
+            HStack(alignment: .top, spacing: Spacing.s3) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(area.title)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .tracking(-0.1)
+                        .foregroundStyle(Theme.Color.appText)
+                    if let detail = area.detail, !detail.isEmpty {
+                        Text(detail)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                    }
+                    if let serviceArea = area.serviceArea, !serviceArea.isEmpty {
+                        HStack(spacing: Spacing.s1) {
+                            Icon(.navigation, size: 11, color: Theme.Color.success)
+                            Text(serviceArea)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Theme.Color.success)
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+                Spacer(minLength: Spacing.s0)
+                directionsButton
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+        }
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+    }
+
+    private var directionsButton: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.navigation, size: 13, color: Theme.Color.business)
+            Text("Directions")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.business)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(Theme.Color.businessBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityLabel("Directions")
+    }
+}
+
+// MARK: - Review card
+
+@MainActor
+private struct BizReviewCard: View {
     let card: BusinessReviewCard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: Spacing.s2) {
-                AvatarWithIdentityRing(
-                    name: card.reviewerName,
-                    imageURL: card.reviewerAvatarURL,
-                    identity: .personal,
-                    ringProgress: 1,
-                    size: 40
-                )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(card.reviewerName)
-                        .font(.system(size: PantopusTextStyle.small.size, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                    HStack(spacing: 2) {
-                        ForEach(0..<5) { idx in
-                            Icon(
-                                .star,
-                                size: 12,
-                                color: idx < card.rating
-                                    ? Theme.Color.warning
-                                    : Theme.Color.appTextMuted
-                            )
-                        }
+                ZStack(alignment: .bottomTrailing) {
+                    AvatarWithIdentityRing(
+                        name: card.reviewerName,
+                        imageURL: card.reviewerAvatarURL,
+                        identity: .personal,
+                        ringProgress: 1,
+                        size: 32
+                    )
+                    if card.verified {
+                        VerifiedBadge(size: 13).offset(x: 2, y: 2)
                     }
                 }
-                Spacer()
-                Text(card.timestamp)
-                    .font(.system(size: PantopusTextStyle.caption.size))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(width: 36, height: 36)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(card.reviewerName)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .tracking(-0.1)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(card.timestamp)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: Spacing.s2)
+                HStack(spacing: 1) {
+                    ForEach(0..<5) { index in
+                        StarShape()
+                            .fill(index < card.rating ? Theme.Color.star : Theme.Color.appBorder)
+                            .frame(width: 12, height: 12)
+                    }
+                }
             }
             if !card.body.isEmpty {
                 Text(card.body)
-                    .font(.system(size: PantopusTextStyle.small.size))
+                    .font(.system(size: 12.5))
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(Spacing.s3)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .pantopusShadow(.sm)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(card.reviewerName), \(card.rating) star review, \(card.timestamp)"
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(card.reviewerName), \(card.rating) star review, \(card.timestamp)")
     }
 }
 
-// MARK: - Sticky CTA
+// MARK: - Floating controls
 
 @MainActor
-private struct BusinessProfileActionFooter: View {
-    let saveState: BusinessProfileActionState
-    let websiteURL: URL?
-    let onMessage: @MainActor () -> Void
-    let onSave: @MainActor () -> Void
-    let onVisit: @MainActor (URL) -> Void
+private struct FloatingControls: View {
+    let onBack: @MainActor () -> Void
+    let onShare: @MainActor () -> Void
+    let onMore: @MainActor () -> Void
 
     var body: some View {
-        HStack(spacing: Spacing.s2) {
-            Button {
-                onMessage()
-            } label: {
-                HStack(spacing: Spacing.s1) {
-                    Icon(.messageCircle, size: 16, color: Theme.Color.appTextInverse)
-                    Text("Message")
-                        .font(.system(size: PantopusTextStyle.small.size, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appTextInverse)
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Theme.Color.business)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Message")
-            .accessibilityIdentifier("businessProfile.message")
-
-            Button {
-                onSave()
-            } label: {
-                HStack(spacing: Spacing.s1) {
-                    Icon(
-                        saveState == .saved ? .checkCircle : .bookmark,
-                        size: 16,
-                        color: saveState == .saved ? Theme.Color.business : Theme.Color.appText
-                    )
-                    Text(saveState == .saved ? "Saved" : "Save")
-                        .font(.system(size: PantopusTextStyle.small.size, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Theme.Color.appSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.lg)
-                        .stroke(Theme.Color.appBorder, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(saveState == .saved ? "Saved" : "Save")
-            .accessibilityIdentifier("businessProfile.save")
-
-            if let websiteURL {
-                Button {
-                    onVisit(websiteURL)
-                } label: {
-                    HStack(spacing: Spacing.s1) {
-                        Icon(.link, size: 16, color: Theme.Color.business)
-                        Text("Visit")
-                            .font(.system(size: PantopusTextStyle.small.size, weight: .semibold))
-                            .foregroundStyle(Theme.Color.business)
-                    }
-                    .frame(minWidth: 80, minHeight: 44)
-                    .padding(.horizontal, Spacing.s3)
-                    .background(Theme.Color.businessBg)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Visit website")
-                .accessibilityIdentifier("businessProfile.visit")
+        HStack {
+            control(.chevronLeft, label: "Back", action: onBack)
+            Spacer()
+            HStack(spacing: Spacing.s2) {
+                control(.share, label: "Share", action: onShare)
+                control(.moreHorizontal, label: "More actions", action: onMore)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, Spacing.s4)
-        .padding(.vertical, Spacing.s2)
-        .background(
-            Theme.Color.appSurface
-                .opacity(0.97)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.xl2))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.xl2)
-                        .stroke(Theme.Color.appBorder, lineWidth: 1)
-                )
-                .pantopusShadow(.md)
-        )
+        .padding(.horizontal, Spacing.s3)
+        .padding(.top, Spacing.s2)
+    }
+
+    private func control(_ icon: PantopusIcon, label: String, action: @escaping @MainActor () -> Void) -> some View {
+        Button { action() } label: {
+            Icon(icon, size: 19, color: Theme.Color.appTextInverse)
+                .frame(width: 34, height: 34)
+                .background(Theme.Color.appText.opacity(0.32))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 
@@ -757,24 +623,25 @@ private struct LoadingLayout: View {
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
-                    Theme.Color.businessBg
-                        .frame(height: 168)
-                        .accessibilityHidden(true)
+                    LinearGradient(
+                        colors: [Theme.Color.businessDark, Theme.Color.business],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: 116)
+                    .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: Spacing.s2) {
-                        Shimmer(width: 72, height: 72, cornerRadius: 36)
-                        Shimmer(width: 180, height: 24, cornerRadius: Radii.sm)
-                        Shimmer(width: 120, height: 14, cornerRadius: Radii.sm)
+                        Shimmer(width: 68, height: 68, cornerRadius: 18)
+                        Shimmer(width: 200, height: 22, cornerRadius: Radii.sm)
+                        Shimmer(width: 130, height: 14, cornerRadius: Radii.sm)
                     }
                     .padding(.horizontal, Spacing.s4)
-                    .offset(y: -48)
-                    Shimmer(height: 64, cornerRadius: Radii.lg)
-                        .padding(.horizontal, Spacing.s4)
-                    Shimmer(height: 44, cornerRadius: Radii.md)
-                        .padding(.horizontal, Spacing.s4)
-                    Shimmer(height: 120, cornerRadius: Radii.lg)
-                        .padding(.horizontal, Spacing.s4)
+                    .offset(y: -34)
+                    Shimmer(height: 64, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4)
+                    Shimmer(height: 100, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4)
+                    Shimmer(height: 120, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4)
                 }
-                .padding(.vertical, Spacing.s4)
+                .padding(.bottom, Spacing.s4)
             }
         }
         .background(Theme.Color.appBg)
@@ -829,6 +696,26 @@ private struct ErrorLayout: View {
     }
 }
 
-#Preview {
-    BusinessProfileView(businessId: "preview") {}
+#Preview("Populated") {
+    BusinessProfileLoadedView(
+        content: BusinessProfileSampleData.populated,
+        onBack: {},
+        onShare: {},
+        onMore: {},
+        onContact: {},
+        onBook: {},
+        onCall: {}
+    )
+}
+
+#Preview("Newly claimed + closed") {
+    BusinessProfileLoadedView(
+        content: BusinessProfileSampleData.newlyClaimed,
+        onBack: {},
+        onShare: {},
+        onMore: {},
+        onContact: {},
+        onBook: {},
+        onCall: {}
+    )
 }

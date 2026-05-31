@@ -15,9 +15,14 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * P1.6 — Paparazzi snapshots for the typed Business Profile screen.
- * Four frames mirror iOS: loading shimmer, empty-services state,
- * fully populated overview, and the not-found terminal state.
+ * A10.6 — Paparazzi snapshots for the reshaped single-scroll Business
+ * Profile. Four frames mirror iOS: the populated open profile, the
+ * newly-claimed + closed secondary frame (EmptyBlocks + Call dock), the
+ * loading shimmer, and the not-found terminal state.
+ *
+ * Baselines must be regenerated after the B3.1 single-scroll reshape (it
+ * changed the layout + frame names): `./gradlew :app:paparazziRecord`,
+ * then commit the four PNGs under `src/test/snapshots/images/`.
  */
 class BusinessProfileSnapshotTest {
     @get:Rule
@@ -25,10 +30,24 @@ class BusinessProfileSnapshotTest {
         Paparazzi(
             deviceConfig =
                 DeviceConfig.PIXEL_5.copy(
-                    screenHeight = 2400,
+                    screenHeight = 2600,
                     softButtons = false,
                 ),
         )
+
+    @Test
+    fun business_profile_populated() {
+        paparazzi.snapshot {
+            Frame { LoadedFrame(BusinessProfileSampleData.populated) }
+        }
+    }
+
+    @Test
+    fun business_profile_newly_claimed() {
+        paparazzi.snapshot {
+            Frame { LoadedFrame(BusinessProfileSampleData.newlyClaimed) }
+        }
+    }
 
     @Test
     fun business_profile_loading() {
@@ -44,132 +63,18 @@ class BusinessProfileSnapshotTest {
         }
     }
 
-    @Test
-    fun business_profile_populated() {
-        paparazzi.snapshot {
-            Frame {
-                BusinessProfileLoadedFrame(
-                    content = samplePopulated(),
-                    selectedTab = BusinessProfileTab.Overview,
-                    saveState = BusinessProfileSaveState.Idle,
-                    onBack = {},
-                    onShare = {},
-                    onOverflow = {},
-                    onSelectTab = {},
-                    onMessage = {},
-                    onSave = {},
-                    onOpenWebsite = {},
-                )
-            }
-        }
-    }
-
-    @Test
-    fun business_profile_empty_services() {
-        paparazzi.snapshot {
-            Frame {
-                BusinessProfileLoadedFrame(
-                    content =
-                        samplePopulated().copy(
-                            services = emptyList(),
-                        ),
-                    selectedTab = BusinessProfileTab.Services,
-                    saveState = BusinessProfileSaveState.Idle,
-                    onBack = {},
-                    onShare = {},
-                    onOverflow = {},
-                    onSelectTab = {},
-                    onMessage = {},
-                    onSave = {},
-                    onOpenWebsite = {},
-                )
-            }
-        }
-    }
-
-    private fun samplePopulated(): BusinessProfileContent =
-        BusinessProfileContent(
-            businessId = "biz-1",
-            header =
-                BusinessProfileHeader(
-                    displayName = "Elm Park Coffee",
-                    handle = "elmpark-coffee",
-                    locality = "Cambridge, MA",
-                    logoUrl = null,
-                    isVerified = true,
-                    categoryChips = listOf("Coffee", "Bakery"),
-                ),
-            stats =
-                listOf(
-                    BusinessStatCell(id = "followers", value = "240", label = "Followers"),
-                    BusinessStatCell(id = "reviews", value = "12", label = "Reviews"),
-                    BusinessStatCell(id = "years", value = "3", label = "Years"),
-                ),
-            about =
-                "Pour-over coffee and laminated pastry from the neighborhood. " +
-                    "Open early, slow on purpose.",
-            hours =
-                listOf(
-                    BusinessHoursRow(id = "h-0", dayLabel = "Sun", timeLabel = "Closed", isClosed = true),
-                    BusinessHoursRow(id = "h-1", dayLabel = "Mon", timeLabel = "7 AM – 4 PM", isClosed = false),
-                    BusinessHoursRow(id = "h-2", dayLabel = "Tue", timeLabel = "7 AM – 4 PM", isClosed = false),
-                ),
-            address =
-                BusinessAddress(
-                    lines = listOf("41 Elm Street", "Cambridge, MA, 02139"),
-                    latitude = 42.37,
-                    longitude = -71.11,
-                ),
-            contact =
-                listOf(
-                    BusinessContactRow(
-                        id = "phone",
-                        kind = BusinessContactRow.Kind.Phone,
-                        value = "+1-555-0101",
-                        actionUri = "tel:+15550101",
-                    ),
-                    BusinessContactRow(
-                        id = "email",
-                        kind = BusinessContactRow.Kind.Email,
-                        value = "hi@elmpark.test",
-                        actionUri = "mailto:hi@elmpark.test",
-                    ),
-                    BusinessContactRow(
-                        id = "website",
-                        kind = BusinessContactRow.Kind.Website,
-                        value = "elmparkcoffee.test",
-                        actionUri = "https://elmparkcoffee.test",
-                    ),
-                ),
-            services =
-                listOf(
-                    BusinessServiceRow(
-                        id = "svc-1",
-                        name = "Pour over",
-                        detail = "Single-origin, sliding scale.",
-                        priceLabel = "$5",
-                    ),
-                    BusinessServiceRow(
-                        id = "svc-2",
-                        name = "Cortado",
-                        detail = null,
-                        priceLabel = "$4",
-                    ),
-                ),
-            reviews =
-                listOf(
-                    BusinessReviewCard(
-                        id = "r1",
-                        reviewerName = "Sam",
-                        reviewerAvatarUrl = null,
-                        rating = 5,
-                        body = "Best coffee on Elm.",
-                        timestamp = "2d ago",
-                    ),
-                ),
-            websiteUrl = "https://elmparkcoffee.test",
-            viewerIsOwner = false,
+    @Composable
+    private fun LoadedFrame(content: BusinessProfileContent) {
+        BusinessProfileLoadedFrame(
+            content = content,
+            onBack = {},
+            onShare = {},
+            onMore = {},
+            onContact = {},
+            onBook = {},
+            onCall = {},
         )
+    }
 
     @Composable
     private fun Frame(content: @Composable () -> Unit) {
