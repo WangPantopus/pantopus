@@ -63,9 +63,10 @@ struct LegalLongFormView: View {
             accessibilityID: "legalContent.\(document.rawValue)",
             tocOpen: tocOpen,
             showBackToTop: showBackToTop,
-            onBack: onBack,
-            onToggleTOC: { withAnimation(Motion.screenTransition) { tocOpen.toggle() } }
-        )
+            onBack: onBack
+        ) {
+            withAnimation(Motion.screenTransition) { tocOpen.toggle() }
+        }
         .onPreferenceChange(LegalScrollOffsetKey.self) { offset in
             // Mirror the design threshold: the fab appears past `scrollTop > 220`.
             showBackToTop = offset > 220
@@ -96,7 +97,7 @@ struct LegalScaffold: View {
             ContentDetailTopBar(
                 title: title,
                 onBack: onBack,
-                action: ContentDetailTopBarAction(icon: .share, accessibilityLabel: "Share", handler: {})
+                action: ContentDetailTopBarAction(icon: .share, accessibilityLabel: "Share") {}
             )
             DocMetaStrip(lastUpdated: model.lastUpdated, version: model.version)
             ScrollViewReader { proxy in
@@ -106,13 +107,12 @@ struct LegalScaffold: View {
                             LegalTOCCard(
                                 items: model.sectionTitles,
                                 isOpen: tocOpen,
-                                onToggle: onToggleTOC,
-                                onJump: { index in
-                                    withAnimation(Motion.screenTransition) {
-                                        proxy.scrollTo("sec-\(index + 1)", anchor: .top)
-                                    }
+                                onToggle: onToggleTOC
+                            ) { index in
+                                withAnimation(Motion.screenTransition) {
+                                    proxy.scrollTo("sec-\(index + 1)", anchor: .top)
                                 }
-                            )
+                            }
                             .id(Self.topAnchorID)
 
                             ForEach(Array(model.sections.enumerated()), id: \.offset) { index, section in
