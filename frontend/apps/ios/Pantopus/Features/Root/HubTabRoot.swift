@@ -235,6 +235,10 @@ public enum HubRoute: Hashable {
     case menu
     /// A14.6 — Settings → Payments deep-link target.
     case paymentsSettings
+    /// A14.7 — Privacy preferences. Pushed from the A18.5 "View as"
+    /// preview's "Manage privacy" link when it lands in the Hub stack
+    /// (via the `pantopus://identity/preview` deep link).
+    case privacySettings
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
     case editProfile
     /// Mailbox search target (P4.2). Client-side filter over the user's
@@ -2017,7 +2021,13 @@ public struct HubTabRoot: View {
                 onOpenSettings: { Task { @MainActor in push(.placeholder(label: "Business settings")) } }
             )
         case .viewAs:
-            NotYetAvailableView(tabName: "View as", icon: .eye)
+            ViewAsView(
+                onBack: { Task { @MainActor in pop() } },
+                onManagePrivacy: { Task { @MainActor in push(.privacySettings) } },
+                onEdit: { Task { @MainActor in push(.editProfile) } }
+            )
+        case .privacySettings:
+            PrivacyView { Task { @MainActor in pop() } }
         case .waitingRoom:
             NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
         case .addHome:

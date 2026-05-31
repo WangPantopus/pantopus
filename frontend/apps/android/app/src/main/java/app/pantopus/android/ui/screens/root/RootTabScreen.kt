@@ -184,6 +184,7 @@ import app.pantopus.android.ui.screens.hub.PillarTile
 import app.pantopus.android.ui.screens.hub.today.TodayDetailScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityKind
+import app.pantopus.android.ui.screens.identity_center.view_as.ViewAsScreen
 import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
@@ -3218,6 +3219,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
                     },
+                    onOpenViewAs = { navController.navigate(ChildRoutes.VIEW_AS) },
                 )
             }
             composable(ChildRoutes.MAILBOX_SEARCH) {
@@ -3591,7 +3593,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.VIEW_AS) {
-                NotYetAvailableView(tabName = "View as", icon = PantopusIcon.Eye)
+                ViewAsScreen(
+                    onBack = { navController.popBackStack() },
+                    onManagePrivacy = { navController.navigate(ChildRoutes.SETTINGS_PRIVACY) },
+                    onEdit = { navController.navigate(ChildRoutes.EDIT_PROFILE) },
+                )
             }
             composable(
                 route = ChildRoutes.WAITING_ROOM,

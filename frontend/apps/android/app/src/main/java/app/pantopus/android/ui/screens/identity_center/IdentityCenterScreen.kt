@@ -66,6 +66,7 @@ fun IdentityCenterScreen(
     onBack: () -> Unit = {},
     onOpenIdentity: (IdentityCardContent) -> Unit = {},
     onOpenPlaceholder: (String) -> Unit = {},
+    onOpenViewAs: () -> Unit = {},
     viewModel: IdentityCenterViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -93,7 +94,11 @@ fun IdentityCenterScreen(
                     loaded = current.content,
                     onOpenIdentity = onOpenIdentity,
                     onBridgeToggle = viewModel::setBridge,
-                    onRowTap = onOpenPlaceholder,
+                    onRowTap = { row ->
+                        // A18.5 — the "Privacy Preview" row opens the "View
+                        // as" identity preview; other rows stay placeholders.
+                        if (row.id == "privacyPreview") onOpenViewAs() else onOpenPlaceholder(row.label)
+                    },
                 )
             is IdentityCenterUiState.Error ->
                 ErrorFrame(
@@ -218,7 +223,7 @@ internal fun LoadedFrame(
     loaded: IdentityCenterLoaded,
     onOpenIdentity: (IdentityCardContent) -> Unit,
     onBridgeToggle: (String, Boolean) -> Unit,
-    onRowTap: (String) -> Unit,
+    onRowTap: (IdentityRowContent) -> Unit,
 ) {
     Column(
         modifier =
@@ -481,7 +486,7 @@ private fun BridgesCard(
 private fun RowsCard(
     rows: List<IdentityRowContent>,
     idPrefix: String,
-    onRowTap: (String) -> Unit,
+    onRowTap: (IdentityRowContent) -> Unit,
 ) {
     Column(
         modifier =
@@ -497,7 +502,7 @@ private fun RowsCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clickable { onRowTap(row.label) }
+                        .clickable { onRowTap(row) }
                         .padding(horizontal = Spacing.s4, vertical = 14.dp)
                         .testTag("${idPrefix}Row_${row.id}"),
                 verticalAlignment = Alignment.CenterVertically,

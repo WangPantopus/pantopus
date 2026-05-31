@@ -1333,6 +1333,18 @@ public struct YouTabRoot: View {
                             path.append(.placeholder(label: "Identity"))
                         }
                     }
+                },
+                onOpenRow: { row in
+                    Task { @MainActor in
+                        // A18.5 — the "Privacy Preview" row opens the
+                        // "View as" identity preview; other rows are
+                        // pre-staged placeholders.
+                        if row.id == "privacyPreview" {
+                            path.append(.viewAs)
+                        } else {
+                            path.append(.placeholder(label: row.label))
+                        }
+                    }
                 }
             )
         case .audienceProfile:
@@ -2067,7 +2079,11 @@ public struct YouTabRoot: View {
                 onOpenSettings: { Task { @MainActor in path.append(.placeholder(label: "Business settings")) } }
             )
         case .viewAs:
-            NotYetAvailableView(tabName: "View as", icon: .eye)
+            ViewAsView(
+                onBack: { Task { @MainActor in pop() } },
+                onManagePrivacy: { Task { @MainActor in path.append(.privacySettings) } },
+                onEdit: { showsEditProfile = true }
+            )
         case .waitingRoom:
             NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
         #if DEBUG
