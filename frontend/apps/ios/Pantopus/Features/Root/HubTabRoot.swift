@@ -528,6 +528,7 @@ public struct HubTabRoot: View {
         case let .editBusinessPage(businessId):
             path.append(.editBusinessPage(businessId: businessId))
             _ = router.consume()
+
         // MARK: - B1.6 batch-2 routing seam
         // The mailbox sub-screens push through `.mailboxRoot` first so Back
         // walks back through the mailbox, matching `.vacationHold` / `.mailDay`.
@@ -1924,7 +1925,9 @@ public struct HubTabRoot: View {
                     onOpenMap: { push(.mailboxMap) },
                     onOpenMailDay: { push(.mailDay(variant: .populated)) },
                     onOpenEarn: { push(.earn) },
-                    onOpenVacationHold: { push(.vacationHold) }
+                    onBrowseGigs: { push(.gigsFeed) },
+                    onOpenVacationHold: { push(.vacationHold) },
+                    onOpenStamps: { push(.stamps) }
                 )
             )
         case .mailboxMap:
@@ -1949,11 +1952,12 @@ public struct HubTabRoot: View {
                 onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } },
                 onSeeAllActivity: { Task { @MainActor in push(.placeholder(label: "All activity")) } }
             )
+
         // MARK: - B1.6 batch-2 routing seam
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.
         case .stamps:
-            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+            StampsView(viewModel: StampsViewModel { pop() })
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
         case .mailTranslation:

@@ -90,6 +90,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     /// a hold) or `active` (a hold is in flight).
     case screenVacationHoldViewed(mode: String)
 
+    /// A17.11 Stamps (postage wallet) screen view. `state` is `populated`,
+    /// `empty`, `loading`, or `error`.
+    case screenStampsViewed(state: String)
+
     /// Wire-format event name. Stable across versions — vendor / dashboard
     /// owners depend on these strings.
     public var name: String {
@@ -149,6 +153,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenCreateBusinessStepViewed: "screen.create_business_wizard.step_viewed"
         case .ctaCreateBusinessCustomCategorySubmit: "cta.create_business.custom_category_submit"
         case .screenVacationHoldViewed: "screen.vacation_hold.viewed"
+        case .screenStampsViewed: "screen.stamps.viewed"
         }
     }
 
@@ -168,6 +173,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["label": label]
         case let .screenVacationHoldViewed(mode):
             ["mode": mode]
+        case let .screenStampsViewed(state):
+            ["state": state]
         case let .screenListingComposeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenPetsWizardStepViewed(stepNumber, stepName):

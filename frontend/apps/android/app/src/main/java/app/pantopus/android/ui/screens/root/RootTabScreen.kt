@@ -210,6 +210,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
+import app.pantopus.android.ui.screens.mailbox.stamps.StampsScreen
 import app.pantopus.android.ui.screens.mailbox.vacation.VacationHoldScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
@@ -2356,6 +2357,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
                     onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
+                    onBook = { navController.navigate(ChildRoutes.placeholder("Book")) },
                     onEdit = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
                 )
             }
@@ -3491,6 +3493,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMailDay = { navController.navigate(ChildRoutes.mailDay()) },
                     onOpenEarn = { navController.navigate(ChildRoutes.EARN) },
                     onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
+                    onOpenStamps = { navController.navigate(ChildRoutes.STAMPS) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -3514,7 +3517,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             // ---- Batch 2 (B1.6) routing seam. Swap each body for the real
             // screen when the matching A.x screen ships. ----
             composable(ChildRoutes.STAMPS) {
-                NotYetAvailableView(tabName = "Stamps", icon = PantopusIcon.Stamp)
+                StampsScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MAIL_TASK,

@@ -21,16 +21,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -40,38 +39,49 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.AvatarWithIdentityRing
+import app.pantopus.android.ui.components.BizBannerHeader
+import app.pantopus.android.ui.components.BizStatusBadge
 import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.GalleryStrip
+import app.pantopus.android.ui.components.GalleryTile
 import app.pantopus.android.ui.components.IdentityPillar
+import app.pantopus.android.ui.components.MapPreview
+import app.pantopus.android.ui.components.RatingDistribution
 import app.pantopus.android.ui.components.Shimmer
-import app.pantopus.android.ui.components.StatusChip
-import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.components.VerifiedBadge
+import app.pantopus.android.ui.screens.business_profile.components.ActionBar
+import app.pantopus.android.ui.screens.business_profile.components.BizStarGlyph
+import app.pantopus.android.ui.screens.business_profile.components.CategoryRow
+import app.pantopus.android.ui.screens.business_profile.components.EmptyBlock
+import app.pantopus.android.ui.screens.business_profile.components.HoursTable
+import app.pantopus.android.ui.screens.business_profile.components.ServicesList
+import app.pantopus.android.ui.screens.business_profile.components.StatStrip
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
-import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
 import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-import app.pantopus.android.ui.theme.pantopusShadow
 import kotlinx.coroutines.delay
 
 /**
- * P1.6 — Typed Business Profile screen. Mirrors the iOS layout: violet
- * hero band, business-pillar identity card, sticky Message/Save/Visit
- * footer, three tabs (Overview / Services / Reviews).
+ * A10.6 — public Business Profile, reshaped (B3.1) from the old tabbed
+ * layout to a single-scroll sectioned design. Mirrors iOS: a
+ * `BizBannerHeader` + stat strip, category chips, then About / Hours /
+ * Service area / Services / Recent work / Reviews sections over a sticky
+ * Contact + Book (or Call) dock, with floating controls over the banner.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,22 +91,17 @@ fun BusinessProfileScreen(
     onShare: () -> Unit = {},
     onOpenReport: () -> Unit = {},
     onOpenWebsite: (String) -> Unit = {},
-    /**
-     * P4.2 — A13.10 Edit Business Page. Surfaced via the overflow sheet
-     * when the loaded payload's `viewerIsOwner` is true.
-     */
+    onBook: () -> Unit = {},
     onEdit: () -> Unit = {},
     viewModel: BusinessProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val saveState by viewModel.saveState.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
 
     LaunchedEffect(Unit) { viewModel.load() }
-
     LaunchedEffect(toast) {
         if (toast != null) {
             delay(2_000)
@@ -115,23 +120,16 @@ fun BusinessProfileScreen(
             BusinessProfileUiState.Loading -> LoadingLayout(onBack = onBack)
             BusinessProfileUiState.NotFound -> NotFoundLayout(onBack = onBack, onRetry = viewModel::refresh)
             is BusinessProfileUiState.Error ->
-                ErrorLayout(
-                    onBack = onBack,
-                    message = current.message,
-                    onRetry = viewModel::refresh,
-                )
+                ErrorLayout(onBack = onBack, message = current.message, onRetry = viewModel::refresh)
             is BusinessProfileUiState.Loaded ->
                 BusinessProfileLoadedFrame(
                     content = current.content,
-                    selectedTab = selectedTab,
-                    saveState = saveState,
                     onBack = onBack,
                     onShare = onShare,
-                    onOverflow = { viewModel.setShowOverflow(true) },
-                    onSelectTab = viewModel::selectTab,
-                    onMessage = onOpenMessages,
-                    onSave = viewModel::save,
-                    onOpenWebsite = onOpenWebsite,
+                    onMore = { viewModel.setShowOverflow(true) },
+                    onContact = onOpenMessages,
+                    onBook = onBook,
+                    onCall = { telUri(current.content.phoneNumber)?.let(onOpenWebsite) },
                 )
         }
 
@@ -145,26 +143,22 @@ fun BusinessProfileScreen(
                         .background(PantopusColors.appText.copy(alpha = 0.9f))
                         .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
             ) {
-                Text(
-                    text = message,
-                    style = PantopusTextStyle.small,
-                    color = PantopusColors.appTextInverse,
-                )
+                Text(text = message, style = PantopusTextStyle.small, color = PantopusColors.appTextInverse)
             }
         }
 
         if (showOverflow) {
-            val viewerIsOwner =
-                (state as? BusinessProfileUiState.Loaded)?.content?.viewerIsOwner == true
-            ModalBottomSheet(
-                onDismissRequest = { viewModel.setShowOverflow(false) },
-                sheetState = sheetState,
-            ) {
+            val viewerIsOwner = (state as? BusinessProfileUiState.Loaded)?.content?.viewerIsOwner == true
+            ModalBottomSheet(onDismissRequest = { viewModel.setShowOverflow(false) }, sheetState = sheetState) {
                 OverflowSheetContent(
                     showEdit = viewerIsOwner,
                     onEdit = {
                         viewModel.setShowOverflow(false)
                         onEdit()
+                    },
+                    onSave = {
+                        viewModel.setShowOverflow(false)
+                        viewModel.save()
                     },
                     onShare = {
                         viewModel.setShowOverflow(false)
@@ -181,815 +175,518 @@ fun BusinessProfileScreen(
     }
 }
 
-// MARK: - Loaded layout
+private fun telUri(phone: String?): String? {
+    if (phone.isNullOrEmpty()) return null
+    val digits = phone.filter { it.isDigit() || it == '+' }
+    return "tel:$digits"
+}
+
+// MARK: - Loaded frame
 
 /**
- * The loaded-state body extracted as an `internal` composable so the
- * Paparazzi snapshot test can render it without standing up a Hilt VM.
- * Production code reaches it only via [BusinessProfileScreen].
+ * The loaded body extracted as an `internal` composable so the Paparazzi
+ * snapshot test can render it off [BusinessProfileContent]. Mirrors iOS
+ * `BusinessProfileLoadedView`.
  */
 @Composable
 internal fun BusinessProfileLoadedFrame(
     content: BusinessProfileContent,
-    selectedTab: BusinessProfileTab,
-    saveState: BusinessProfileSaveState,
     onBack: () -> Unit,
     onShare: () -> Unit,
-    onOverflow: () -> Unit,
-    onSelectTab: (BusinessProfileTab) -> Unit,
-    onMessage: () -> Unit,
-    onSave: () -> Unit,
-    onOpenWebsite: (String) -> Unit,
+    onMore: () -> Unit,
+    onContact: () -> Unit,
+    onBook: () -> Unit,
+    onCall: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            ContentDetailTopBar(
-                title = null,
-                onBack = onBack,
-                action =
-                    ContentDetailTopBarAction(
-                        icon = PantopusIcon.MoreHorizontal,
-                        contentDescription = "More actions",
-                        onClick = onOverflow,
-                    ),
+    Box(modifier = Modifier.fillMaxSize().testTag("businessProfile.loaded")) {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        ) {
+            BizBannerHeader(
+                name = content.header.displayName,
+                handle = content.header.handle?.let { "@$it" } ?: "",
+                locality = content.header.locality ?: "",
+                identity = IdentityPillar.Business,
+                logoIcon = content.header.logoIcon,
+                verified = content.header.isVerified,
+                status = bannerStatus(content.status),
             )
+            StatStrip(stats = content.stats)
             Column(
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.s4)
+                        .padding(top = 14.dp, bottom = 132.dp),
             ) {
-                Hero(header = content.header, onShare = onShare)
-                Spacer(modifier = Modifier.height(Spacing.s2))
-                StatsStrip(stats = content.stats)
-                Spacer(modifier = Modifier.height(Spacing.s4))
-                TabStrip(selected = selectedTab, onSelect = onSelectTab)
-                Spacer(modifier = Modifier.height(Spacing.s3))
-                when (selectedTab) {
-                    BusinessProfileTab.Overview ->
-                        OverviewTab(content = content, onOpenWebsite = onOpenWebsite)
-                    BusinessProfileTab.Services -> ServicesTab(services = content.services)
-                    BusinessProfileTab.Reviews -> ReviewsTab(reviews = content.reviews)
-                }
-                Spacer(modifier = Modifier.height(96.dp))
+                Sections(content)
             }
         }
 
-        ActionFooter(
-            saveState = saveState,
-            websiteUrl = content.websiteUrl,
-            onMessage = onMessage,
-            onSave = onSave,
-            onOpenWebsite = onOpenWebsite,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        FloatingControls(
+            onBack = onBack,
+            onShare = onShare,
+            onMore = onMore,
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+        )
+
+        ActionBar(
+            dock = content.dock,
+            onContact = onContact,
+            onBook = onBook,
+            onCall = onCall,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
         )
     }
 }
 
-// MARK: - Hero
-
-@Composable
-private fun Hero(
-    header: BusinessProfileHeader,
-    onShare: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(96.dp)
-                    .background(PantopusColors.businessBg),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(PantopusColors.appSurface.copy(alpha = 0.92f))
-                        .clickable(onClick = onShare)
-                        .semantics { contentDescription = "Share" }
-                        .testTag("businessProfile.share"),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.Share,
-                    contentDescription = null,
-                    size = 18.dp,
-                    tint = PantopusColors.appText,
-                )
-            }
-        }
-        IdentityCard(
-            header = header,
-            modifier =
-                Modifier
-                    .padding(horizontal = Spacing.s4)
-                    .padding(top = Spacing.s3),
-        )
+private fun bannerStatus(status: BusinessOpenState?): BizStatusBadge? =
+    status?.let {
+        if (it.isOpen) BizStatusBadge.open(it.chipLabel) else BizStatusBadge.closed(it.chipLabel)
     }
-}
+
+// MARK: - Sections
 
 @Composable
-private fun IdentityCard(
-    header: BusinessProfileHeader,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.xl))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                .pantopusShadow(PantopusElevations.sm, RoundedCornerShape(Radii.xl))
-                .background(PantopusColors.appSurface)
-                .padding(Spacing.s4),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Box(
-                modifier = Modifier.size(80.dp),
-                contentAlignment = Alignment.BottomEnd,
+private fun Sections(content: BusinessProfileContent) {
+    if (content.isNewlyClaimed) {
+        JustOpenedNote(modifier = Modifier.padding(bottom = Spacing.s1))
+    }
+    CategoryRow(
+        categories = content.categories,
+        modifier = Modifier.padding(top = if (content.isNewlyClaimed) Spacing.s2 else Spacing.s0),
+    )
+
+    // About
+    SectionHeader(title = "About")
+    if (!content.about.isNullOrEmpty()) {
+        Text(
+            text = content.about,
+            color = PantopusColors.appTextStrong,
+            fontSize = 13.5.sp,
+            letterSpacing = (-0.05).sp,
+        )
+        if (content.aboutChips.isNotEmpty()) {
+            Row(
+                modifier = Modifier.padding(top = 10.dp).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                AvatarWithIdentityRing(
-                    name = header.displayName,
-                    identity = IdentityPillar.Business,
-                    ringProgress = 1f,
-                    imageUrl = header.logoUrl,
-                    size = 72.dp,
-                    modifier = Modifier.align(Alignment.TopStart),
-                )
-                if (header.isVerified) {
-                    VerifiedBadge(size = Radii.xl3)
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = header.displayName,
-                    style = PantopusTextStyle.h2,
-                    color = PantopusColors.appText,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    modifier = Modifier.semantics { heading() },
-                )
-                if (header.handle != null) {
-                    Text(
-                        text = "@${header.handle}",
-                        style = PantopusTextStyle.caption,
-                        color = PantopusColors.appTextSecondary,
-                        maxLines = 1,
-                    )
-                }
-                if (!header.locality.isNullOrEmpty()) {
+                content.aboutChips.forEach { chip ->
                     Row(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(PantopusColors.businessBg)
+                                .padding(horizontal = 9.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                     ) {
                         PantopusIconImage(
-                            icon = PantopusIcon.MapPin,
+                            icon = chip.icon,
                             contentDescription = null,
-                            size = Radii.lg,
-                            tint = PantopusColors.appTextSecondary,
+                            size = 11.dp,
+                            strokeWidth = 2.2f,
+                            tint = PantopusColors.business,
                         )
                         Text(
-                            text = header.locality,
-                            style = PantopusTextStyle.caption,
-                            color = PantopusColors.appTextSecondary,
-                            maxLines = 1,
+                            text = chip.label,
+                            color = PantopusColors.business,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
             }
         }
-        if (header.categoryChips.isNotEmpty()) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
-                header.categoryChips.forEach { chip ->
-                    StatusChip(text = chip, variant = StatusChipVariant.Business)
-                }
-            }
+    } else {
+        EmptyBlock(
+            icon = PantopusIcon.FileText,
+            title = "No description yet",
+            body = "This business hasn't written an About blurb. It'll appear here once they do.",
+        )
+    }
+
+    // Hours
+    SectionHeader(title = "Hours")
+    val status = content.status
+    if (status != null && content.hours.isNotEmpty()) {
+        HoursTable(status = status, rows = content.hours)
+    } else {
+        EmptyBlock(
+            icon = PantopusIcon.Clock,
+            title = "Hours not set",
+            body = "Opening hours haven't been published yet.",
+        )
+    }
+
+    // Service area
+    SectionHeader(title = "Service area")
+    val area = content.serviceArea
+    if (area != null) {
+        ServiceAreaCard(area = area)
+    } else {
+        EmptyBlock(
+            icon = PantopusIcon.MapPin,
+            title = "Service area not set",
+            body = "This business hasn't shared where they work yet.",
+        )
+    }
+
+    // Services
+    SectionHeader(title = "Services", seeAll = if (content.services.isEmpty()) null else "See all")
+    if (content.services.isEmpty()) {
+        EmptyBlock(
+            icon = PantopusIcon.Tag,
+            title = "No services yet",
+            body = "Services and prices show up here once they're listed.",
+        )
+    } else {
+        ServicesList(services = content.services)
+    }
+
+    // Recent work
+    SectionHeader(title = "Recent work", seeAll = if (content.gallery.isEmpty()) null else "See all")
+    if (content.gallery.isEmpty()) {
+        EmptyBlock(
+            icon = PantopusIcon.Image,
+            title = "No photos yet",
+            body = "Work photos will appear here after the first few jobs.",
+        )
+    } else {
+        GalleryStrip(tiles = content.gallery.map { galleryTile(it) })
+    }
+
+    // Reviews
+    val summary = content.reviewSummary
+    SectionHeader(title = "Reviews", seeAll = if (summary != null && summary.count > 0) "See all ${summary.count}" else null)
+    if (summary != null && summary.count > 0) {
+        RatingDistribution(
+            average = summary.average,
+            count = summary.count,
+            distribution = summary.distribution.map { it.toFloat() },
+        )
+        content.reviews.forEach { review ->
+            ReviewCard(card = review, modifier = Modifier.padding(top = Spacing.s2))
         }
+    } else {
+        EmptyBlock(
+            icon = PantopusIcon.MessageSquarePlus,
+            title = "No reviews yet",
+            body =
+                "Be the first to hire ${content.header.displayName}. Your review helps the next " +
+                    "neighbor decide.",
+            ctaLabel = "Hire to review",
+            ctaIcon = PantopusIcon.Pencil,
+            onCta = {},
+        )
+    }
+
+    // Footer
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = Spacing.s4),
+        horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+    ) {
+        FooterItem(icon = PantopusIcon.Flag, label = "Report")
+        FooterItem(icon = PantopusIcon.Share, label = "Share")
     }
 }
 
-// MARK: - Stats strip
-
 @Composable
-private fun StatsStrip(stats: List<BusinessStatCell>) {
+private fun SectionHeader(
+    title: String,
+    seeAll: String? = null,
+) {
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.s4)
-                .clip(RoundedCornerShape(Radii.lg))
-                .pantopusShadow(PantopusElevations.sm, RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .padding(vertical = Spacing.s3, horizontal = Spacing.s3),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        stats.forEach { stat ->
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = stat.value,
-                    style = PantopusTextStyle.h3,
-                    color = PantopusColors.appText,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = stat.label.uppercase(),
-                    style = PantopusTextStyle.overline,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
+        Text(
+            text = title.uppercase(),
+            color = PantopusColors.appTextSecondary,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+            modifier = Modifier.semantics { heading() },
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        if (seeAll != null) {
+            Text(
+                text = seeAll,
+                color = PantopusColors.business,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
 
-// MARK: - Tab strip
-
 @Composable
-private fun TabStrip(
-    selected: BusinessProfileTab,
-    onSelect: (BusinessProfileTab) -> Unit,
+private fun FooterItem(
+    icon: PantopusIcon,
+    label: String,
 ) {
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.s4),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        modifier = Modifier.semantics { contentDescription = label },
     ) {
-        BusinessProfileTab.entries.forEach { tab ->
-            val isSelected = tab == selected
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .clickable { onSelect(tab) }
-                        .testTag("businessProfile.tab.${tab.key}")
-                        .semantics { contentDescription = tab.label },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.s1),
-            ) {
-                Spacer(modifier = Modifier.height(Spacing.s3))
-                Text(
-                    text = tab.label,
-                    style = PantopusTextStyle.small,
-                    color = if (isSelected) PantopusColors.business else PantopusColors.appTextSecondary,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                )
-                Spacer(modifier = Modifier.height(Spacing.s1))
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .background(
-                                if (isSelected) PantopusColors.business else PantopusColors.appBg,
-                            ),
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Overview tab
-
-@Composable
-private fun OverviewTab(
-    content: BusinessProfileContent,
-    onOpenWebsite: (String) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.s4)
-                .testTag("businessProfile.overview"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
-    ) {
-        if (!content.about.isNullOrEmpty()) {
-            SectionLabel(title = "About")
-            Text(
-                text = content.about,
-                style = PantopusTextStyle.body,
-                color = PantopusColors.appText,
-            )
-        }
-
-        if (content.hours.isNotEmpty()) {
-            SectionLabel(title = "Hours")
-            HoursTable(rows = content.hours)
-        }
-
-        content.address?.let { address ->
-            SectionLabel(title = "Address")
-            AddressBlock(address = address)
-        }
-
-        if (content.contact.isNotEmpty()) {
-            SectionLabel(title = "Contact")
-            ContactList(rows = content.contact, onOpenWebsite = onOpenWebsite)
-        }
-
-        val hasNoOverviewContent =
-            content.about.isNullOrEmpty() &&
-                content.hours.isEmpty() &&
-                content.address == null &&
-                content.contact.isEmpty()
-        if (hasNoOverviewContent) {
-            EmptyStateInline(
-                icon = PantopusIcon.Building2,
-                headline = "Nothing here yet",
-                subcopy = "This business hasn't filled in their public profile.",
-            )
-        }
+        PantopusIconImage(icon = icon, contentDescription = null, size = 11.dp, tint = PantopusColors.appTextMuted)
+        Text(text = label, color = PantopusColors.appTextMuted, fontSize = 11.sp)
     }
 }
 
 @Composable
-private fun SectionLabel(title: String) {
-    Text(
-        text = title.uppercase(),
-        style = PantopusTextStyle.overline,
-        color = PantopusColors.appTextSecondary,
-        modifier = Modifier.semantics { heading() },
-    )
-}
-
-@Composable
-private fun HoursTable(rows: List<BusinessHoursRow>) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface),
-    ) {
-        rows.forEachIndexed { idx, row ->
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = row.dayLabel,
-                    style = PantopusTextStyle.body,
-                    fontWeight = FontWeight.Medium,
-                    color = PantopusColors.appText,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = row.timeLabel,
-                    style = PantopusTextStyle.body,
-                    color = if (row.isClosed) PantopusColors.appTextSecondary else PantopusColors.appText,
-                )
-            }
-            if (idx != rows.lastIndex) {
-                HorizontalDivider(color = PantopusColors.appBorderSubtle)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddressBlock(address: BusinessAddress) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface),
-    ) {
-        if (address.hasCoordinates) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(96.dp)
-                        .background(PantopusColors.appSurfaceSunken),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.MapPin,
-                    contentDescription = null,
-                    size = 28.dp,
-                    tint = PantopusColors.business,
-                )
-            }
-        }
-        Column(modifier = Modifier.padding(Spacing.s3)) {
-            address.lines.forEach { line ->
-                Text(
-                    text = line,
-                    style = PantopusTextStyle.body,
-                    color = PantopusColors.appText,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ContactList(
-    rows: List<BusinessContactRow>,
-    onOpenWebsite: (String) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface),
-    ) {
-        rows.forEachIndexed { idx, row ->
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 44.dp)
-                        .clickable(enabled = row.actionUri != null) {
-                            row.actionUri?.let(onOpenWebsite)
-                        }
-                        .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
-                        .semantics {
-                            contentDescription = "${row.kind.name}: ${row.value}"
-                        },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-            ) {
-                PantopusIconImage(
-                    icon = iconFor(row.kind),
-                    contentDescription = null,
-                    size = 18.dp,
-                    tint = PantopusColors.business,
-                )
-                Text(
-                    text = row.value,
-                    style = PantopusTextStyle.body,
-                    color = PantopusColors.appText,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
-                )
-                if (row.actionUri != null) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.ChevronRight,
-                        contentDescription = null,
-                        size = 14.dp,
-                        tint = PantopusColors.appTextSecondary,
-                    )
-                }
-            }
-            if (idx != rows.lastIndex) {
-                HorizontalDivider(color = PantopusColors.appBorderSubtle)
-            }
-        }
-    }
-}
-
-private fun iconFor(kind: BusinessContactRow.Kind): PantopusIcon =
-    when (kind) {
-        BusinessContactRow.Kind.Phone -> PantopusIcon.Phone
-        BusinessContactRow.Kind.Email -> PantopusIcon.Mail
-        BusinessContactRow.Kind.Website -> PantopusIcon.Link
-    }
-
-// MARK: - Services tab
-
-@Composable
-private fun ServicesTab(services: List<BusinessServiceRow>) {
-    if (services.isEmpty()) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 260.dp)
-                    .testTag("businessProfile.services.empty"),
-        ) {
-            EmptyStateInline(
-                icon = PantopusIcon.Tag,
-                headline = "No services listed yet",
-                subcopy = "When this business adds services or products, you'll see them here.",
-            )
-        }
-    } else {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.s4)
-                    .testTag("businessProfile.services"),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-        ) {
-            services.forEach { ServiceCard(service = it) }
-        }
-    }
-}
-
-@Composable
-private fun ServiceCard(service: BusinessServiceRow) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .padding(Spacing.s3)
-                .semantics { contentDescription = "${service.name}, ${service.priceLabel}" },
-        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Text(
-                text = service.name,
-                style = PantopusTextStyle.body,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = service.priceLabel,
-                style = PantopusTextStyle.body,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.business,
-            )
-        }
-        if (!service.detail.isNullOrEmpty()) {
-            Text(
-                text = service.detail,
-                style = PantopusTextStyle.small,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-    }
-}
-
-// MARK: - Reviews tab
-
-@Composable
-private fun ReviewsTab(reviews: List<BusinessReviewCard>) {
-    if (reviews.isEmpty()) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 260.dp)
-                    .testTag("businessProfile.reviews.empty"),
-        ) {
-            EmptyStateInline(
-                icon = PantopusIcon.Star,
-                headline = "No reviews yet",
-                subcopy = "Reviews show up here after a completed gig or purchase.",
-            )
-        }
-    } else {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.s4)
-                    .testTag("businessProfile.reviews"),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-        ) {
-            reviews.forEach { ReviewCard(card = it) }
-        }
-    }
-}
-
-@Composable
-private fun ReviewCard(card: BusinessReviewCard) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .pantopusShadow(PantopusElevations.sm, RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .padding(Spacing.s3)
-                .semantics {
-                    contentDescription =
-                        "${card.reviewerName}, ${card.rating} star review, ${card.timestamp}"
-                },
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            AvatarWithIdentityRing(
-                name = card.reviewerName,
-                identity = IdentityPillar.Personal,
-                ringProgress = 1f,
-                imageUrl = card.reviewerAvatarUrl,
-                size = 40.dp,
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = card.reviewerName,
-                    style = PantopusTextStyle.small,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.appText,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    repeat(5) { idx ->
-                        PantopusIconImage(
-                            icon = PantopusIcon.Star,
-                            contentDescription = null,
-                            size = Radii.lg,
-                            tint =
-                                if (idx < card.rating) {
-                                    PantopusColors.warning
-                                } else {
-                                    PantopusColors.appTextMuted
-                                },
-                        )
-                    }
-                }
-            }
-            Text(
-                text = card.timestamp,
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-        if (card.body.isNotEmpty()) {
-            Text(
-                text = card.body,
-                style = PantopusTextStyle.small,
-                color = PantopusColors.appTextStrong,
-            )
-        }
-    }
-}
-
-// MARK: - Sticky CTA
-
-@Composable
-private fun ActionFooter(
-    saveState: BusinessProfileSaveState,
-    websiteUrl: String?,
-    onMessage: () -> Unit,
-    onSave: () -> Unit,
-    onOpenWebsite: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun JustOpenedNote(modifier: Modifier = Modifier) {
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.xl2))
-                .pantopusShadow(PantopusElevations.md, RoundedCornerShape(Radii.xl2))
-                .background(PantopusColors.appSurface.copy(alpha = 0.97f))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl2))
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        verticalAlignment = Alignment.CenterVertically,
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.businessBg)
+                .border(1.dp, PantopusColors.business.copy(alpha = 0.25f), RoundedCornerShape(Radii.lg))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.business)
-                    .clickable(onClick = onMessage)
-                    .testTag("businessProfile.message")
-                    .semantics { contentDescription = "Message" }
-                    .padding(horizontal = Spacing.s3),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+        Box(
+            modifier = Modifier.size(32.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.business),
+            contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = PantopusIcon.MessageCircle,
+                icon = PantopusIcon.BadgeCheck,
                 contentDescription = null,
-                size = Radii.xl,
+                size = 16.dp,
+                strokeWidth = 2.2f,
                 tint = PantopusColors.appTextInverse,
             )
-            Spacer(modifier = Modifier.width(Spacing.s1))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = "Message",
-                style = PantopusTextStyle.small,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appTextInverse,
+                text = "Just opened on Pantopus",
+                color = PantopusColors.businessDark,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.1).sp,
+            )
+            Text(
+                text =
+                    "Address and business identity are verified. Reviews and photos build up after " +
+                        "the first few jobs — early neighbors set the tone.",
+                color = PantopusColors.appTextStrong,
+                fontSize = 11.5.sp,
             )
         }
+    }
+}
 
-        val saved = saveState is BusinessProfileSaveState.Saved
+@Composable
+private fun ServiceAreaCard(area: BusinessServiceArea) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface),
+    ) {
+        MapPreview(
+            identity = IdentityPillar.Business,
+            serviceAreaRadius = if (area.hasCoordinates) 56.dp else null,
+            pinGlyph = PantopusIcon.Building2,
+        )
         Row(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                    .clickable(onClick = onSave)
-                    .testTag("businessProfile.save")
-                    .semantics { contentDescription = if (saved) "Saved" else "Save" }
-                    .padding(horizontal = Spacing.s3),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            verticalAlignment = Alignment.Top,
         ) {
-            PantopusIconImage(
-                icon = if (saved) PantopusIcon.CheckCircle else PantopusIcon.Bookmark,
-                contentDescription = null,
-                size = Radii.xl,
-                tint = if (saved) PantopusColors.business else PantopusColors.appText,
-            )
-            Spacer(modifier = Modifier.width(Spacing.s1))
-            Text(
-                text = if (saved) "Saved" else "Save",
-                style = PantopusTextStyle.small,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-            )
-        }
-
-        if (!websiteUrl.isNullOrEmpty()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = area.title,
+                    color = PantopusColors.appText,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.1).sp,
+                )
+                if (!area.detail.isNullOrEmpty()) {
+                    Text(text = area.detail, color = PantopusColors.appTextSecondary, fontSize = 11.sp)
+                }
+                if (!area.serviceArea.isNullOrEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Navigation,
+                            contentDescription = null,
+                            size = 11.dp,
+                            tint = PantopusColors.success,
+                        )
+                        Text(
+                            text = area.serviceArea,
+                            color = PantopusColors.success,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
             Row(
                 modifier =
                     Modifier
-                        .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(Radii.lg))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(PantopusColors.businessBg)
-                        .clickable { onOpenWebsite(websiteUrl) }
-                        .testTag("businessProfile.visit")
-                        .semantics { contentDescription = "Visit website" }
-                        .padding(horizontal = Spacing.s3),
+                        .padding(horizontal = 11.dp, vertical = 7.dp)
+                        .semantics { contentDescription = "Directions" },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.Link,
+                    icon = PantopusIcon.Navigation,
                     contentDescription = null,
-                    size = Radii.xl,
+                    size = 13.dp,
                     tint = PantopusColors.business,
                 )
-                Spacer(modifier = Modifier.width(Spacing.s1))
                 Text(
-                    text = "Visit",
-                    style = PantopusTextStyle.small,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "Directions",
                     color = PantopusColors.business,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
     }
 }
 
-// MARK: - Loading / NotFound / Error / inline empty
+@Composable
+private fun ReviewCard(
+    card: BusinessReviewCard,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = 14.dp, vertical = 13.dp)
+                .semantics {
+                    contentDescription = "${card.reviewerName}, ${card.rating} star review, ${card.timestamp}"
+                },
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.BottomEnd) {
+                AvatarWithIdentityRing(
+                    name = card.reviewerName,
+                    identity = IdentityPillar.Personal,
+                    ringProgress = 1f,
+                    imageUrl = card.reviewerAvatarUrl,
+                    size = 32.dp,
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+                if (card.verified) {
+                    VerifiedBadge(size = 13.dp)
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = card.reviewerName,
+                    color = PantopusColors.appText,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.1).sp,
+                )
+                Text(text = card.timestamp, color = PantopusColors.appTextSecondary, fontSize = 10.5.sp)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                repeat(5) { index ->
+                    BizStarGlyph(
+                        color = if (index < card.rating) PantopusColors.star else PantopusColors.appBorder,
+                        size = 12.dp,
+                    )
+                }
+            }
+        }
+        if (card.body.isNotEmpty()) {
+            Text(text = card.body, color = PantopusColors.appTextStrong, fontSize = 12.5.sp)
+        }
+    }
+}
+
+@Composable
+private fun FloatingControls(
+    onBack: () -> Unit,
+    onShare: () -> Unit,
+    onMore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ControlButton(icon = PantopusIcon.ChevronLeft, label = "Back", onClick = onBack)
+        Spacer(modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            ControlButton(icon = PantopusIcon.Share, label = "Share", onClick = onShare)
+            ControlButton(icon = PantopusIcon.MoreHorizontal, label = "More actions", onClick = onMore)
+        }
+    }
+}
+
+@Composable
+private fun ControlButton(
+    icon: PantopusIcon,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(PantopusColors.appText.copy(alpha = 0.32f))
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        PantopusIconImage(icon = icon, contentDescription = null, size = 19.dp, tint = PantopusColors.appTextInverse)
+    }
+}
+
+private fun galleryTile(item: BusinessGalleryItem): GalleryTile =
+    GalleryTile(
+        id = item.id,
+        imageUrl = item.imageUrl,
+        label = item.label,
+        tint = galleryTint(item.tint),
+        icon = if (item.moreCount == null) PantopusIcon.Image else null,
+        moreCount = item.moreCount,
+    )
+
+private fun galleryTint(tint: BusinessGalleryTint): Color =
+    when (tint) {
+        BusinessGalleryTint.Primary -> PantopusColors.business
+        BusinessGalleryTint.Success -> PantopusColors.success
+        BusinessGalleryTint.Slate -> PantopusColors.slate
+        BusinessGalleryTint.Deep -> PantopusColors.businessDark
+    }
+
+// MARK: - Loading / NotFound / Error / overflow
 
 @Composable
 internal fun LoadingLayout(onBack: () -> Unit) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .testTag("businessProfile.loading"),
-    ) {
+    Column(modifier = Modifier.fillMaxSize().testTag("businessProfile.loading")) {
         ContentDetailTopBar(title = null, onBack = onBack)
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(132.dp)
-                    .background(PantopusColors.businessBg),
-        )
+        Box(modifier = Modifier.fillMaxWidth().height(116.dp).background(PantopusColors.businessBg))
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(Spacing.s4),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            Shimmer(width = 72.dp, height = 72.dp, cornerRadius = 36.dp)
-            Shimmer(width = 200.dp, height = 24.dp, cornerRadius = Radii.sm)
-            Shimmer(width = 140.dp, height = 14.dp, cornerRadius = Radii.sm)
-            Shimmer(width = 320.dp, height = 56.dp, cornerRadius = Radii.lg)
+            Shimmer(width = 68.dp, height = 68.dp, cornerRadius = 18.dp)
+            Shimmer(width = 200.dp, height = 22.dp, cornerRadius = Radii.sm)
+            Shimmer(width = 130.dp, height = 14.dp, cornerRadius = Radii.sm)
+            Shimmer(width = 320.dp, height = 64.dp, cornerRadius = Radii.lg)
             Shimmer(width = 320.dp, height = 120.dp, cornerRadius = Radii.lg)
         }
     }
@@ -1000,12 +697,7 @@ internal fun NotFoundLayout(
     onBack: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .testTag("businessProfile.notFound"),
-    ) {
+    Column(modifier = Modifier.fillMaxSize().testTag("businessProfile.notFound")) {
         ContentDetailTopBar(title = null, onBack = onBack)
         EmptyState(
             icon = PantopusIcon.Building2,
@@ -1023,12 +715,7 @@ private fun ErrorLayout(
     message: String,
     onRetry: () -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .testTag("businessProfile.error"),
-    ) {
+    Column(modifier = Modifier.fillMaxSize().testTag("businessProfile.error")) {
         ContentDetailTopBar(title = null, onBack = onBack)
         EmptyState(
             icon = PantopusIcon.AlertCircle,
@@ -1041,51 +728,8 @@ private fun ErrorLayout(
 }
 
 @Composable
-private fun EmptyStateInline(
-    icon: PantopusIcon,
-    headline: String,
-    subcopy: String,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = Spacing.s10),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.businessBg),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = icon,
-                contentDescription = null,
-                size = 32.dp,
-                tint = PantopusColors.business,
-            )
-        }
-        Text(
-            text = headline,
-            style = PantopusTextStyle.h3,
-            color = PantopusColors.appText,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = subcopy,
-            style = PantopusTextStyle.small,
-            color = PantopusColors.appTextSecondary,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
 private fun OverflowSheetContent(
+    onSave: () -> Unit,
     onShare: () -> Unit,
     onReport: () -> Unit,
     onCancel: () -> Unit,
@@ -1093,15 +737,13 @@ private fun OverflowSheetContent(
     onEdit: () -> Unit = {},
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = Spacing.s5),
+        modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s5),
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         if (showEdit) {
             OverflowRow(label = "Edit business page", onClick = onEdit)
         }
+        OverflowRow(label = "Save business", onClick = onSave)
         OverflowRow(label = "Share business", onClick = onShare)
         OverflowRow(label = "Report", destructive = true, onClick = onReport)
         OverflowRow(label = "Cancel", onClick = onCancel)
@@ -1118,7 +760,6 @@ private fun OverflowRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
                 .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
         contentAlignment = Alignment.CenterStart,

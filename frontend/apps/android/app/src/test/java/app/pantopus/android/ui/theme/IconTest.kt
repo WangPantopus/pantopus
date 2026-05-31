@@ -256,6 +256,9 @@ class IconTest {
             "credit-card",
             // B1.4 / A19 Legal — collapsible "Jump to section" TOC header.
             "list",
+            // A17.11 Stamps — Elf rate gauge + Forever-postage validity badge.
+            "gauge",
+            "infinity",
         )
 
     @Test

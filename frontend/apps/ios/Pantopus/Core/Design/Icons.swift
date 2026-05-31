@@ -103,6 +103,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     /// keyword while preserving the upstream token in `rawValue`.
     case arrowsRepeat = "repeat"
     case hourglass
+    // A17.11 Stamps — `gauge` backs the Elf "~2 stamps / week" rate
+    // bullet; `infinity` backs the book's "Never expires" validity badge.
+    case gauge
+    case infinity
     case handCoins = "hand-coins"
     case package
     case flower
@@ -420,6 +424,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .timer: "timer"
         case .arrowsRepeat: "arrow.triangle.2.circlepath"
         case .hourglass: "hourglass"
+        case .gauge: "gauge.medium"
+        case .infinity: "infinity"
         case .handCoins: "hand.raised"
         case .package: "shippingbox"
         case .flower: "camera.macro"

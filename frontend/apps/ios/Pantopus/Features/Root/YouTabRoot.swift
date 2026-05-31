@@ -818,7 +818,9 @@ public struct YouTabRoot: View {
                     onOpenMap: { path.append(.mailboxMap) },
                     onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
                     onOpenEarn: { path.append(.earn) },
-                    onOpenVacationHold: { path.append(.vacationHold) }
+                    onBrowseGigs: { path.append(.gigsFeed) },
+                    onOpenVacationHold: { path.append(.vacationHold) },
+                    onOpenStamps: { path.append(.stamps) }
                 )
             )
         case .mailboxMap:
@@ -1974,6 +1976,9 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.placeholder(label: "Report business")) }
                 },
                 onOpenWebsite: { url in openURL(url) },
+                onBook: {
+                    Task { @MainActor in path.append(.placeholder(label: "Book")) }
+                },
                 onEdit: {
                     Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) }
                 }
@@ -1995,11 +2000,12 @@ public struct YouTabRoot: View {
                     personaHandle: personaHandle
                 ) { Task { @MainActor in pop() } }
             )
+
         // MARK: - B1.6 batch-2 routing seam
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.
         case .stamps:
-            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+            StampsView(viewModel: StampsViewModel { Task { @MainActor in pop() } })
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
         case .mailTranslation:
