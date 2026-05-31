@@ -819,7 +819,8 @@ public struct YouTabRoot: View {
                     onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
                     onOpenEarn: { path.append(.earn) },
                     onOpenVacationHold: { path.append(.vacationHold) },
-                    onOpenStamps: { path.append(.stamps) }
+                    onOpenStamps: { path.append(.stamps) },
+                    onOpenUnboxing: { path.append(.unboxing(mailId: nil)) }
                 )
             )
         case .mailboxMap:
@@ -2032,7 +2033,16 @@ public struct YouTabRoot: View {
                 onReply: { _ in Task { @MainActor in path.append(.placeholder(label: "Reply in English")) } }
             )
         case .unboxing:
-            NotYetAvailableView(tabName: "Unboxing", icon: .camera)
+            // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
+            // (OCR / classification / vault upload are out of scope), so the
+            // `mailId` payload is unused today; it rides the route for when a
+            // real originating-mail fetch lands.
+            UnboxingView(
+                viewModel: UnboxingViewModel(
+                    onScanNext: {},
+                    onOpenDrawer: { Task { @MainActor in path.append(.placeholder(label: "Home drawer")) } }
+                )
+            ) { Task { @MainActor in pop() } }
         case .earn:
             EarnView(
                 onBack: { Task { @MainActor in pop() } },

@@ -258,4 +258,21 @@ public extension Theme.Color {
     /// and the snooze-row glyphs. Mirrored on Android as
     /// `PantopusColors.categoryTask`.
     static let categoryTask = SwiftUI.Color("Category/Task", bundle: Theme.bundle)
+    /// Category: unboxing — `#0d9488` teal-600 ("scan teal"). The scan /
+    /// capture accent for A17.14 Unboxing: the nav eyebrow + `CategoryChip`
+    /// dot, the `CameraScanner` scan-line + "Item detected" pill, the
+    /// suggested-drawer selection ring, and the "Confirm — file to Home" CTA.
+    /// Mirrored on Android as `PantopusColors.categoryUnboxing`.
+    static let categoryUnboxing = SwiftUI.Color("Category/Unboxing", bundle: Theme.bundle)
+    /// Category: unboxing deep — `#0f766e` teal-700. The darker stop for
+    /// scan-accent text on a light surface (confidence line, re-route label,
+    /// "View" / "Scan the next item" link text).
+    static let categoryUnboxingDark = SwiftUI.Color("Category/UnboxingDark", bundle: Theme.bundle)
+    /// Category: unboxing soft background — `#f0fdfa` teal-50. Fills the
+    /// "New capture" state chip, the selected suggested-drawer card, the
+    /// "Add" filmstrip tile, and the "Scan the next item" launcher.
+    static let categoryUnboxingBg = SwiftUI.Color("Category/UnboxingBg", bundle: Theme.bundle)
+    /// Category: unboxing soft border — `#99f6e4` teal-200. Hairline border
+    /// on chips and dashed tiles tinted with `categoryUnboxingBg`.
+    static let categoryUnboxingBorder = SwiftUI.Color("Category/UnboxingBorder", bundle: Theme.bundle)
 }
