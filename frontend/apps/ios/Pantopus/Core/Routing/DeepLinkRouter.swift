@@ -89,9 +89,6 @@ final class DeepLinkRouter {
 
         // MARK: - B1.6 batch-2 routing seam
 
-        /// Pre-registered for the batch-2 screens (B2–B5). Each resolves to
-        /// the NotYetAvailableView placeholder today; the screen prompts swap
-        /// in their real destinations without editing the route files.
         /// `pantopus://mailbox/stamps` — A17.11 Stamps / postage wallet.
         case stamps
         /// `pantopus://mailbox/tasks/:id` — A17.12 mail-derived task detail.

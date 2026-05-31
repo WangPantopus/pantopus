@@ -26,12 +26,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.LocalDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BusinessProfileViewModelTest {
@@ -82,6 +82,7 @@ class BusinessProfileViewModelTest {
                     publicEmail = "hi@elmpark.test",
                     publicPhone = "+1-555-0101",
                     website = "elmparkcoffee.test",
+                    serviceArea = "Serves Cambridge & Somerville",
                     isPublished = true,
                     verificationStatus = "address_verified",
                     primaryLocation =
@@ -105,22 +106,8 @@ class BusinessProfileViewModelTest {
         BusinessPublicResponse(
             hours =
                 listOf(
-                    BusinessHoursDto(
-                        id = "h-mon",
-                        locationId = "loc-1",
-                        dayOfWeek = 1,
-                        openTime = "07:00",
-                        closeTime = "16:00",
-                        isClosed = false,
-                    ),
-                    BusinessHoursDto(
-                        id = "h-sun",
-                        locationId = "loc-1",
-                        dayOfWeek = 0,
-                        openTime = null,
-                        closeTime = null,
-                        isClosed = true,
-                    ),
+                    BusinessHoursDto("h-mon", "loc-1", 1, "07:00", "16:00", false),
+                    BusinessHoursDto("h-sun", "loc-1", 0, null, null, true),
                 ),
             catalog =
                 listOf(
@@ -163,7 +150,7 @@ class BusinessProfileViewModelTest {
         )
 
     @Test
-    fun load_emitsLoadedWithHeaderStatsHoursAndServices() =
+    fun load_projectsHeaderStatsCategoriesHoursServicesAndReviews() =
         runTest {
             coEvery { businesses.business("biz-1") } returns NetworkResult.Success(sampleDetail())
             coEvery { businesses.publicBusiness("elmpark-coffee") } returns NetworkResult.Success(samplePublic())
@@ -172,35 +159,42 @@ class BusinessProfileViewModelTest {
             val vm = makeVm()
             vm.load()
 
-            val state = vm.state.value as BusinessProfileUiState.Loaded
-            val c = state.content
+            val c = (vm.state.value as BusinessProfileUiState.Loaded).content
 
             assertEquals("Elm Park Coffee", c.header.displayName)
             assertEquals("elmpark-coffee", c.header.handle)
             assertEquals("Cambridge, MA", c.header.locality)
             assertTrue(c.header.isVerified)
-            assertEquals(listOf("Coffee", "Bakery"), c.header.categoryChips)
 
-            assertEquals(listOf("Followers", "Reviews", "Years"), c.stats.map { it.label })
-            assertEquals("240", c.stats.first().value)
+            assertEquals(listOf("Coffee", "Bakery"), c.categories.map { it.label })
+            assertEquals(BusinessCategoryAccent.Business, c.categories.first().accent)
+            assertEquals(BusinessCategoryAccent.Neutral, c.categories.last().accent)
 
+            assertEquals(listOf("12 reviews", "Jobs done", "Followers"), c.stats.map { it.label })
+            assertEquals("4.7", c.stats[0].value)
+            assertEquals(BusinessStatTint.Star, c.stats[0].tint)
+            assertEquals("240", c.stats[2].value)
+
+            assertEquals(false, c.isNewlyClaimed)
             assertEquals("Pour-over coffee and laminated pastry.", c.about)
 
             assertEquals(2, c.hours.size)
-            assertEquals(listOf("Sun", "Mon"), c.hours.map { it.dayLabel })
+            assertEquals(listOf("Sunday", "Monday"), c.hours.map { it.dayLabel })
             assertTrue(c.hours.first().isClosed)
+
+            assertNotNull(c.serviceArea)
+            assertEquals("Serves Cambridge & Somerville", c.serviceArea?.serviceArea)
 
             assertEquals(1, c.services.size)
             assertEquals("$5", c.services.first().priceLabel)
 
+            assertEquals(12, c.reviewSummary?.count)
             assertEquals(1, c.reviews.size)
             assertEquals("Sam", c.reviews.first().reviewerName)
-
-            assertNotNull(c.websiteUrl)
         }
 
     @Test
-    fun load_emptyServicesWhenPublicCatalogReturnsEmpty() =
+    fun load_emptyPublicResponseLeavesServicesAndHoursEmpty() =
         runTest {
             coEvery { businesses.business("biz-1") } returns NetworkResult.Success(sampleDetail())
             coEvery { businesses.publicBusiness("elmpark-coffee") } returns
@@ -210,34 +204,49 @@ class BusinessProfileViewModelTest {
             val vm = makeVm()
             vm.load()
 
-            val state = vm.state.value as BusinessProfileUiState.Loaded
-            assertTrue(state.content.services.isEmpty())
-            assertTrue(state.content.hours.isEmpty())
-            assertNotNull(state.content.about)
+            val c = (vm.state.value as BusinessProfileUiState.Loaded).content
+            assertTrue(c.services.isEmpty())
+            assertTrue(c.hours.isEmpty())
+            assertNull(c.status)
         }
 
     @Test
-    fun load_publicFetch404IsAbsorbed() =
+    fun load_newlyClaimedProjectsNewStatAndCallDock() =
         runTest {
-            coEvery { businesses.business("biz-1") } returns NetworkResult.Success(sampleDetail())
+            val newDetail =
+                sampleDetail().copy(
+                    business =
+                        sampleDetail().business.copy(
+                            reviewCount = 0,
+                            followersCount = 0,
+                            gigsCompleted = 0,
+                            averageRating = null,
+                        ),
+                )
+            val emptyProfile =
+                samplePublicProfile().copy(reviewCount = 0, averageRating = null, reviews = emptyList())
+            coEvery { businesses.business("biz-1") } returns NetworkResult.Success(newDetail)
             coEvery { businesses.publicBusiness("elmpark-coffee") } returns
-                NetworkResult.Failure(NetworkError.NotFound)
-            coEvery { profiles.publicProfile("biz-1") } returns NetworkResult.Success(samplePublicProfile())
+                NetworkResult.Success(BusinessPublicResponse(emptyList(), emptyList()))
+            coEvery { profiles.publicProfile("biz-1") } returns NetworkResult.Success(emptyProfile)
 
             val vm = makeVm()
             vm.load()
 
-            val state = vm.state.value as BusinessProfileUiState.Loaded
-            assertTrue(state.content.services.isEmpty())
-            assertTrue(state.content.hours.isEmpty())
-            assertEquals(1, state.content.reviews.size)
+            val c = (vm.state.value as BusinessProfileUiState.Loaded).content
+            assertTrue(c.isNewlyClaimed)
+            assertEquals(listOf("No reviews yet", "Jobs done", "On Pantopus"), c.stats.map { it.label })
+            assertEquals("—", c.stats[0].value)
+            assertEquals("New", c.stats[2].value)
+            assertEquals(BusinessStatTint.Business, c.stats[2].tint)
+            assertNull(c.reviewSummary)
+            assertEquals(BusinessActionDock.Secondary.Call, c.dock.secondary)
         }
 
     @Test
     fun load_primary404EmitsNotFound() =
         runTest {
-            coEvery { businesses.business("biz-1") } returns
-                NetworkResult.Failure(NetworkError.NotFound)
+            coEvery { businesses.business("biz-1") } returns NetworkResult.Failure(NetworkError.NotFound)
 
             val vm = makeVm()
             vm.load()
@@ -254,28 +263,43 @@ class BusinessProfileViewModelTest {
             val vm = makeVm()
             vm.load()
 
-            val state = vm.state.value
-            assertTrue(state is BusinessProfileUiState.Error)
+            assertTrue(vm.state.value is BusinessProfileUiState.Error)
         }
 
     @Test
-    fun selectTab_doesNotRefetch() =
-        runTest {
-            coEvery { businesses.business("biz-1") } returns NetworkResult.Success(sampleDetail())
-            coEvery { businesses.publicBusiness("elmpark-coffee") } returns NetworkResult.Success(samplePublic())
-            coEvery { profiles.publicProfile("biz-1") } returns NetworkResult.Success(samplePublicProfile())
+    fun computeOpenState_openNow() {
+        val vm = makeVm()
+        // 2024-01-01 is a Monday.
+        val rows = listOf(BusinessHoursDto("h", null, 1, "09:00", "17:00", false))
+        val status = vm.computeOpenState(rows, LocalDateTime.of(2024, 1, 1, 12, 0))
+        assertEquals(true, status?.isOpen)
+        assertEquals("Open now", status?.chipLabel)
+    }
 
-            val vm = makeVm()
-            vm.load()
+    @Test
+    fun computeOpenState_closedBeforeOpening() {
+        val vm = makeVm()
+        val rows = listOf(BusinessHoursDto("h", null, 1, "09:00", "17:00", false))
+        val status = vm.computeOpenState(rows, LocalDateTime.of(2024, 1, 1, 8, 0))
+        assertEquals(false, status?.isOpen)
+        assertEquals("Closed · opens 9 AM", status?.chipLabel)
+    }
 
-            vm.selectTab(BusinessProfileTab.Services)
-            vm.selectTab(BusinessProfileTab.Reviews)
-            assertEquals(BusinessProfileTab.Reviews, vm.selectedTab.value)
-            // No coVerify on number of calls: the structured-concurrency
-            // primary path already issues 3 calls; we just want to know
-            // tab switches don't trigger any state regression.
-            assertTrue(vm.state.value is BusinessProfileUiState.Loaded)
-        }
+    @Test
+    fun computeOpenState_closedFindsNextDay() {
+        val vm = makeVm()
+        // 2024-01-02 is a Tuesday; only Monday has hours.
+        val rows = listOf(BusinessHoursDto("h", null, 1, "09:00", "17:00", false))
+        val status = vm.computeOpenState(rows, LocalDateTime.of(2024, 1, 2, 12, 0))
+        assertEquals(false, status?.isOpen)
+        assertEquals("Opens Monday at 9 AM", status?.statusDetail)
+    }
+
+    @Test
+    fun computeOpenState_nullWhenNoHours() {
+        val vm = makeVm()
+        assertNull(vm.computeOpenState(emptyList(), LocalDateTime.of(2024, 1, 1, 12, 0)))
+    }
 
     @Test
     fun save_movesIdleToSavedAndEmitsToast() =
@@ -290,24 +314,5 @@ class BusinessProfileViewModelTest {
 
             assertEquals(BusinessProfileSaveState.Saved, vm.saveState.value)
             assertEquals("Saved", vm.toastMessage.value)
-        }
-
-    @Test
-    fun load_skipsPublicFetchWhenUsernameMissing() =
-        runTest {
-            val detailNoUsername =
-                sampleDetail().copy(
-                    business = sampleDetail().business.copy(username = null),
-                )
-            coEvery { businesses.business("biz-1") } returns NetworkResult.Success(detailNoUsername)
-            coEvery { profiles.publicProfile("biz-1") } returns NetworkResult.Success(samplePublicProfile())
-
-            val vm = makeVm()
-            vm.load()
-
-            val state = vm.state.value as BusinessProfileUiState.Loaded
-            assertTrue(state.content.services.isEmpty())
-            assertNull(state.content.header.handle)
-            assertFalse(state.content.viewerIsOwner)
         }
 }

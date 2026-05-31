@@ -280,9 +280,6 @@ public enum HubRoute: Hashable {
 
     // MARK: - B1.6 batch-2 routing seam
 
-    /// Pre-registered routes for the batch-2 screens (B2–B5). Each resolves to
-    /// `NotYetAvailableView` today; the screen prompts swap in their real
-    /// destination view without touching this file.
     /// A17.11 — Stamps / postage wallet. `pantopus://mailbox/stamps`.
     case stamps
     /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.

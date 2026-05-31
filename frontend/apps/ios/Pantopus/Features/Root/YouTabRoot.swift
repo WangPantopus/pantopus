@@ -264,9 +264,6 @@ public enum YouRoute: Hashable {
 
     // MARK: - B1.6 batch-2 routing seam
 
-    /// Pre-registered routes for the batch-2 screens (B2–B5) reached from the
-    /// You tab (mailbox, My businesses, Identity Center, the home card). Each
-    /// resolves to `NotYetAvailableView` until its screen prompt fills it in.
     /// A17.11 — Stamps / postage wallet. `pantopus://mailbox/stamps`.
     case stamps
     /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
@@ -1978,6 +1975,9 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.placeholder(label: "Report business")) }
                 },
                 onOpenWebsite: { url in openURL(url) },
+                onBook: {
+                    Task { @MainActor in path.append(.placeholder(label: "Book")) }
+                },
                 onEdit: {
                     Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) }
                 }

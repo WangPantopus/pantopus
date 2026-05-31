@@ -2,14 +2,14 @@
 //  BusinessProfileSnapshotTests.swift
 //  PantopusTests
 //
-//  P1.6 — design-reference baseline tripwire for the four
-//  Business Profile frames (loading / empty-services / populated /
+//  A10.6 — design-reference baseline tripwire for the reshaped Business
+//  Profile frames (populated / newly-claimed-closed / loading /
 //  not-found). Mirrors the pattern set by HubScreensSnapshotTests:
 //  asserts that the baseline PNG exists under
 //  `PantopusTests/__Snapshots__/p1/business-profile-<state>-ios.png`
-//  and is a non-trivial PNG. The first PR ships the test file with
-//  `XCTSkip` so the gate exists without failing CI on a missing
-//  baseline; a follow-up commits the baselines and removes the skip.
+//  and is a non-trivial PNG. The `BusinessProfileLoadedView` renders the
+//  two frames off `BusinessProfileSampleData`; the macOS snapshot job
+//  records the baselines (the cloud env has no Xcode — see drift D6).
 //
 
 import XCTest
@@ -25,16 +25,16 @@ final class BusinessProfileSnapshotTests: XCTestCase {
             .appendingPathComponent("p1")
     }
 
-    func test_businessProfile_loading_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("business-profile-loading")
-    }
-
-    func test_businessProfile_empty_services_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("business-profile-empty-services")
-    }
-
     func test_businessProfile_populated_ios_baseline_is_present() throws {
         try assertBaselineOrSkip("business-profile-populated")
+    }
+
+    func test_businessProfile_newly_claimed_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("business-profile-newly-claimed")
+    }
+
+    func test_businessProfile_loading_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("business-profile-loading")
     }
 
     func test_businessProfile_not_found_ios_baseline_is_present() throws {
