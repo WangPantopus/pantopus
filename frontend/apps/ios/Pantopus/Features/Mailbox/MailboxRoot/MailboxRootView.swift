@@ -27,7 +27,23 @@ public struct MailboxRootView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    viewModel.openStamps()
+                } label: {
+                    Icon(.gift, size: 22, color: Theme.Color.appText)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Stamps")
+                .accessibilityIdentifier("mailboxRootStamps")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button {
+                        viewModel.openStamps()
+                    } label: {
+                        Label("Stamps", systemImage: "giftcard")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.stamps")
                     Button {
                         viewModel.openVacationHold()
                     } label: {

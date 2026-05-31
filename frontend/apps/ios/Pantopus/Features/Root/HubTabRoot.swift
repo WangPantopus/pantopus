@@ -1925,7 +1925,8 @@ public struct HubTabRoot: View {
                     onOpenMap: { push(.mailboxMap) },
                     onOpenMailDay: { push(.mailDay(variant: .populated)) },
                     onBrowseGigs: { push(.gigsFeed) },
-                    onOpenVacationHold: { push(.vacationHold) }
+                    onOpenVacationHold: { push(.vacationHold) },
+                    onOpenStamps: { push(.stamps) }
                 )
             )
         case .mailboxMap:
@@ -1954,7 +1955,7 @@ public struct HubTabRoot: View {
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.
         case .stamps:
-            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+            StampsView(viewModel: StampsViewModel(onBack: { pop() }))
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
         case .mailTranslation:

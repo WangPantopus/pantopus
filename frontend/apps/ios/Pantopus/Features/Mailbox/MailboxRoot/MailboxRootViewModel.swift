@@ -173,6 +173,8 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// Mailbox root top bar surfaces a `…` overflow that opens a menu
     /// containing this single entry today (more settings can land later).
     private let onOpenVacationHoldHandler: @MainActor () -> Void
+    /// A17.11 — top-bar gift affordance opening the Stamps wallet.
+    private let onOpenStampsHandler: @MainActor () -> Void
     private let dataProvider: (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
     /// When set, `load()` surfaces this state verbatim — lets previews and
     /// tests pin the loading / error frames.
@@ -187,6 +189,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenMailDay: @escaping @MainActor () -> Void = {},
         onBrowseGigs: @escaping @MainActor () -> Void = {},
         onOpenVacationHold: @escaping @MainActor () -> Void = {},
+        onOpenStamps: @escaping @MainActor () -> Void = {},
         dataProvider: @escaping (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
             = MailboxRootSampleData.sections,
         seededState: ListOfRowsState? = nil
@@ -199,6 +202,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         self.onOpenMailDay = onOpenMailDay
         self.onBrowseGigs = onBrowseGigs
         onOpenVacationHoldHandler = onOpenVacationHold
+        onOpenStampsHandler = onOpenStamps
         self.dataProvider = dataProvider
         self.seededState = seededState
     }
@@ -208,6 +212,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// in the view layer can call it directly.
     public func openVacationHold() {
         onOpenVacationHoldHandler()
+    }
+
+    /// A17.11 — invoked from the Mailbox root top-bar gift button to open
+    /// the Stamps (postage wallet) screen.
+    public func openStamps() {
+        onOpenStampsHandler()
     }
 
     // MARK: - Lifecycle

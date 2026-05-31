@@ -819,7 +819,8 @@ public struct YouTabRoot: View {
                     onOpenMap: { path.append(.mailboxMap) },
                     onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
                     onBrowseGigs: { path.append(.gigsFeed) },
-                    onOpenVacationHold: { path.append(.vacationHold) }
+                    onOpenVacationHold: { path.append(.vacationHold) },
+                    onOpenStamps: { path.append(.stamps) }
                 )
             )
         case .mailboxMap:
@@ -2000,7 +2001,7 @@ public struct YouTabRoot: View {
         // Placeholder destinations. Each screen prompt (B2–B5) swaps the one
         // line below for its real view without editing the route declarations.
         case .stamps:
-            NotYetAvailableView(tabName: "Stamps", icon: .stamp)
+            StampsView(viewModel: StampsViewModel(onBack: { Task { @MainActor in pop() } }))
         case .mailTask:
             NotYetAvailableView(tabName: "Task", icon: .listChecks)
         case .mailTranslation:

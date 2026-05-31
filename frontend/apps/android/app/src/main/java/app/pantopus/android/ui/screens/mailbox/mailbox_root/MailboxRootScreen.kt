@@ -45,6 +45,7 @@ fun MailboxRootScreen(
     onOpenMailDay: () -> Unit = {},
     onBrowseGigs: () -> Unit = {},
     onOpenVacationHold: () -> Unit = {},
+    onOpenStamps: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MailboxRootViewModel = hiltViewModel(),
 ) {
@@ -103,7 +104,15 @@ fun MailboxRootScreen(
             )
         },
         extraTopBarAction = {
-            MailboxRootSettingsMenu(onOpenVacationHold = onOpenVacationHold)
+            IconButton(onClick = onOpenStamps, modifier = Modifier.testTag("mailboxRootStamps")) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Gift,
+                    contentDescription = "Stamps",
+                    size = 22.dp,
+                    tint = PantopusColors.appText,
+                )
+            }
+            MailboxRootSettingsMenu(onOpenVacationHold = onOpenVacationHold, onOpenStamps = onOpenStamps)
         },
     )
 }
@@ -114,7 +123,10 @@ fun MailboxRootScreen(
  * settings can land in the same menu without changing the chrome.
  */
 @Composable
-private fun MailboxRootSettingsMenu(onOpenVacationHold: () -> Unit) {
+private fun MailboxRootSettingsMenu(
+    onOpenVacationHold: () -> Unit,
+    onOpenStamps: () -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(
         onClick = { expanded = true },
@@ -131,6 +143,14 @@ private fun MailboxRootSettingsMenu(onOpenVacationHold: () -> Unit) {
         expanded = expanded,
         onDismissRequest = { expanded = false },
     ) {
+        DropdownMenuItem(
+            text = { Text("Stamps", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenStamps()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.stamps"),
+        )
         DropdownMenuItem(
             text = { Text("Vacation hold", color = PantopusColors.appText) },
             onClick = {
