@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod")
+@file:Suppress("LongMethod", "ktlint:standard:import-ordering")
 
 package app.pantopus.android.ui.screens.root
 

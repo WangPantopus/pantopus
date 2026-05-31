@@ -23,7 +23,9 @@ struct LegalDocModel {
     let contactEmail: String
     let contactLabel: String
 
-    var sectionTitles: [String] { sections.map(\.title) }
+    var sectionTitles: [String] {
+        sections.map(\.title)
+    }
 }
 
 struct LegalDocSection {
@@ -48,9 +50,14 @@ struct LegalRun {
     let bold: Bool
 
     /// Plain run.
-    static func t(_ text: String) -> LegalRun { LegalRun(text: text, bold: false) }
+    static func t(_ text: String) -> LegalRun {
+        LegalRun(text: text, bold: false)
+    }
+
     /// Bold defined-term run.
-    static func b(_ text: String) -> LegalRun { LegalRun(text: text, bold: true) }
+    static func b(_ text: String) -> LegalRun {
+        LegalRun(text: text, bold: true)
+    }
 }
 
 // MARK: - Verbatim copy (mirrors docs/designs/A19/legal-frames.jsx)
