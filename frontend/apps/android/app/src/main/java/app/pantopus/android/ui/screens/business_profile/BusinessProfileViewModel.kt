@@ -398,9 +398,8 @@ class BusinessProfileViewModel
         ): BusinessOpenState? {
             for (offset in 1..7) {
                 val day = (weekday + offset) % 7
-                val row = byDay[day]?.firstOrNull()
-                val open = row?.openTime
-                if (row != null && row.isClosed != true && open != null && minutes(open) != null) {
+                val open = openTimeFor(byDay[day]?.firstOrNull())
+                if (open != null) {
                     val whenLabel = if (offset == 1) "tomorrow" else fullDayName(day)
                     return BusinessOpenState(
                         isOpen = false,
@@ -411,6 +410,11 @@ class BusinessProfileViewModel
                 }
             }
             return null
+        }
+
+        private fun openTimeFor(row: BusinessHoursDto?): String? {
+            val open = row?.openTime ?: return null
+            return open.takeUnless { row.isClosed == true || minutes(it) == null }
         }
 
         private fun minutes(raw: String?): Int? {
