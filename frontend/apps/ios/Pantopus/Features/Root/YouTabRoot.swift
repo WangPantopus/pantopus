@@ -1792,7 +1792,9 @@ public struct YouTabRoot: View {
             MyBusinessesView(
                 viewModel: MyBusinessesViewModel(
                     onOpenBusiness: { businessId in
-                        Task { @MainActor in path.append(.businessProfile(businessId: businessId)) }
+                        // B3.2 — an owned business opens its owner dashboard
+                        // (A10.7), not the public profile.
+                        Task { @MainActor in path.append(.businessOwner(businessId: businessId)) }
                     },
                     onRegister: {
                         Task { @MainActor in path.append(.createBusiness) }
@@ -2056,8 +2058,14 @@ public struct YouTabRoot: View {
                 onSeeAllEarnings: { path.append(.placeholder(label: "All earnings")) },
                 onOpenTaxDocs: { path.append(.placeholder(label: "Tax documents")) }
             )
-        case .businessOwner:
-            NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
+        case let .businessOwner(businessId):
+            BusinessOwnerView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onEditPage: { Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) } },
+                onOpenInsights: { Task { @MainActor in path.append(.placeholder(label: "Insights")) } },
+                onOpenSettings: { Task { @MainActor in path.append(.placeholder(label: "Business settings")) } }
+            )
         case .viewAs:
             NotYetAvailableView(tabName: "View as", icon: .eye)
         case .waitingRoom:
