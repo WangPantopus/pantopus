@@ -817,7 +817,7 @@ public struct YouTabRoot: View {
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
                     onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
-                    onBrowseGigs: { path.append(.gigsFeed) },
+                    onOpenEarn: { path.append(.earn) },
                     onOpenVacationHold: { path.append(.vacationHold) }
                 )
             )
@@ -2007,7 +2007,18 @@ public struct YouTabRoot: View {
         case .unboxing:
             NotYetAvailableView(tabName: "Unboxing", icon: .camera)
         case .earn:
-            NotYetAvailableView(tabName: "Earn", icon: .handCoins)
+            EarnView(
+                onBack: { Task { @MainActor in pop() } },
+                onHelp: { path.append(.placeholder(label: "Earn help")) },
+                onCashOut: { path.append(.placeholder(label: "Payments")) },
+                onBrowseTasks: { path.append(.gigsFeed) },
+                onReferNeighbor: { path.append(.placeholder(label: "Refer a neighbor")) },
+                onOfferService: { path.append(.placeholder(label: "Offer a service")) },
+                onManagePayout: { path.append(.placeholder(label: "Payments")) },
+                onAddBank: { path.append(.placeholder(label: "Payments")) },
+                onSeeAllEarnings: { path.append(.placeholder(label: "All earnings")) },
+                onOpenTaxDocs: { path.append(.placeholder(label: "Tax documents")) }
+            )
         case .businessOwner:
             NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
         case .viewAs:

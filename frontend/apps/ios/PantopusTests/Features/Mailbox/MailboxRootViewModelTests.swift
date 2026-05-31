@@ -63,7 +63,7 @@ final class MailboxRootViewModelTests: XCTestCase {
             return XCTFail("Expected empty, got \(vm.state)")
         }
         XCTAssertEqual(content.headline, "No earn items yet")
-        XCTAssertEqual(content.ctaTitle, "Browse gigs")
+        XCTAssertEqual(content.ctaTitle, "Open Earn dashboard")
     }
 
     func test_everyEarnTabIsEmpty() async {
