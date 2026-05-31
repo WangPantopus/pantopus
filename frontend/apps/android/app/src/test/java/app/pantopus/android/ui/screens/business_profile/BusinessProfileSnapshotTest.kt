@@ -11,7 +11,6 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTheme
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 
@@ -21,12 +20,10 @@ import org.junit.Test
  * newly-claimed + closed secondary frame (EmptyBlocks + Call dock), the
  * loading shimmer, and the not-found terminal state.
  *
- * TODO(B3.1): baselines pending — the single-scroll reshape changed the
- * layout and frame names, so the old goldens were removed. Run
- * `./gradlew :app:paparazziRecord` to regenerate the four baselines, then
- * delete this `@Ignore` to re-enable snapshot verification.
+ * Baselines must be regenerated after the B3.1 single-scroll reshape (it
+ * changed the layout + frame names): `./gradlew :app:paparazziRecord`,
+ * then commit the four PNGs under `src/test/snapshots/images/`.
  */
-@Ignore("Paparazzi baselines pending: run ./gradlew :app:paparazziRecord after the B3.1 reshape, then remove this.")
 class BusinessProfileSnapshotTest {
     @get:Rule
     val paparazzi =
