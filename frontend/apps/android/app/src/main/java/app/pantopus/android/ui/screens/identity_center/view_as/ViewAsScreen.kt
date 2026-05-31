@@ -692,17 +692,12 @@ private fun HairLine(color: Color) {
 
 // MARK: - Tone palette
 
-private fun ViewAsTone.accent(): Color =
-    if (this == ViewAsTone.Info) PantopusColors.primary600 else PantopusColors.warning
+private fun ViewAsTone.accent(): Color = if (this == ViewAsTone.Info) PantopusColors.primary600 else PantopusColors.warning
 
-private fun ViewAsTone.foreground(): Color =
-    if (this == ViewAsTone.Info) PantopusColors.primary700 else PantopusColors.warning
+private fun ViewAsTone.foreground(): Color = if (this == ViewAsTone.Info) PantopusColors.primary700 else PantopusColors.warning
 
-private fun ViewAsTone.bannerBg(): Color =
-    if (this == ViewAsTone.Info) PantopusColors.primary50 else PantopusColors.warningBg
+private fun ViewAsTone.bannerBg(): Color = if (this == ViewAsTone.Info) PantopusColors.primary50 else PantopusColors.warningBg
 
-private fun ViewAsTone.bannerBorder(): Color =
-    if (this == ViewAsTone.Info) PantopusColors.primary100 else PantopusColors.warningLight
+private fun ViewAsTone.bannerBorder(): Color = if (this == ViewAsTone.Info) PantopusColors.primary100 else PantopusColors.warningLight
 
-private fun ViewAsTone.cardBorder(): Color =
-    if (this == ViewAsTone.Info) PantopusColors.primary200 else PantopusColors.warningLight
+private fun ViewAsTone.cardBorder(): Color = if (this == ViewAsTone.Info) PantopusColors.primary200 else PantopusColors.warningLight

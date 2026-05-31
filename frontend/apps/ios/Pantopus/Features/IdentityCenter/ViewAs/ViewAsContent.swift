@@ -84,7 +84,9 @@ public enum ViewAsFieldDisclosure: Sendable, Hashable {
     case hidden
 
     public var isHidden: Bool {
-        if case .hidden = self { return true }
+        if case .hidden = self {
+            return true
+        }
         return false
     }
 
@@ -204,7 +206,9 @@ public struct ViewAsRender: Sendable, Hashable, Identifiable {
     /// Privacy-footer copy preceding the bold "Manage privacy" link.
     public let footerText: String
 
-    public var id: String { viewer.id }
+    public var id: String {
+        viewer.id
+    }
 
     public init(
         viewer: ViewerAudience,
