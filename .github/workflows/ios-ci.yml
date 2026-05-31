@@ -56,7 +56,10 @@ jobs:
   test:
     name: Tests on ${{ matrix.simulator }}
     runs-on: macos-15
-    timeout-minutes: 30
+    # The full unit + UI-skip suite runs ~28-32 min on the slowest simulator
+    # (iPhone SE 3rd gen) — 30 was too tight and cancelled it mid-run, while
+    # iPhone 16 / 16 Pro finish in ~24-25 min. 45 gives reliable headroom.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
