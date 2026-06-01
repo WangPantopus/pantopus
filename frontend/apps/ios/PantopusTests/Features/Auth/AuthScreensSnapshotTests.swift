@@ -41,8 +41,8 @@ final class AuthScreensSnapshotTests: XCTestCase {
         try assertBaseline("forgot")
     }
 
-    func test_reset_ios_baseline_is_present() throws {
-        try assertBaseline("reset")
+    func test_setpassword_ios_baseline_is_present() throws {
+        try assertBaseline("setpassword")
     }
 
     func test_verify_ios_baseline_is_present() throws {

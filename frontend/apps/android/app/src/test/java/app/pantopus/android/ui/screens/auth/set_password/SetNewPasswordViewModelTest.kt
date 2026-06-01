@@ -1,6 +1,6 @@
 @file:Suppress("PackageNaming", "MagicNumber")
 
-package app.pantopus.android.ui.screens.auth.reset_password
+package app.pantopus.android.ui.screens.auth.set_password
 
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.auth.AuthError
@@ -25,7 +25,7 @@ import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ResetPasswordViewModelTest {
+class SetNewPasswordViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
@@ -35,7 +35,8 @@ class ResetPasswordViewModelTest {
     private fun buildVm(
         token: String,
         repo: AuthRepository = mockk(relaxed = true),
-    ): ResetPasswordViewModel = ResetPasswordViewModel(repo, SavedStateHandle(mapOf(ResetPasswordViewModel.TOKEN_KEY to token)))
+    ): SetNewPasswordViewModel =
+        SetNewPasswordViewModel(repo, SavedStateHandle(mapOf(SetNewPasswordViewModel.TOKEN_KEY to token)))
 
     @Test
     fun `token is captured from SavedStateHandle`() {
@@ -66,6 +67,29 @@ class ResetPasswordViewModelTest {
     }
 
     @Test
+    fun `strength hint switches from rule to praise when strong`() {
+        val vm = buildVm(token = "tok")
+        assertEquals("Use 8+ characters with a number and a symbol.", vm.uiState.value.strengthHint)
+        vm.onPasswordChange("strongpass1") // 11 chars, no symbol → fair, still the rule
+        assertEquals("Use 8+ characters with a number and a symbol.", vm.uiState.value.strengthHint)
+        vm.onPasswordChange("river-otter-92!") // 15 chars + number + symbol → strong
+        assertEquals(3, vm.uiState.value.passwordStrength)
+        assertEquals("Strong", vm.uiState.value.passwordStrengthLabel)
+        assertEquals("Great — long, with a number and a symbol.", vm.uiState.value.strengthHint)
+    }
+
+    @Test
+    fun `confirm match state tracks input`() {
+        val vm = buildVm(token = "tok")
+        vm.onPasswordChange("strongpass1")
+        assertEquals(SetNewPasswordViewModel.ConfirmMatch.None, vm.uiState.value.confirmMatch)
+        vm.onConfirmPasswordChange("strongpas")
+        assertEquals(SetNewPasswordViewModel.ConfirmMatch.Mismatch, vm.uiState.value.confirmMatch)
+        vm.onConfirmPasswordChange("strongpass1")
+        assertEquals(SetNewPasswordViewModel.ConfirmMatch.Match, vm.uiState.value.confirmMatch)
+    }
+
+    @Test
     fun `submit calls AuthRepository resetPassword with the token + new password`() =
         runTest {
             val repo = mockk<AuthRepository>(relaxed = true)
@@ -80,14 +104,14 @@ class ResetPasswordViewModelTest {
             advanceUntilIdle()
 
             val state = vm.uiState.value
-            assertTrue(state.phase is ResetPasswordViewModel.Phase.Reset)
+            assertTrue(state.phase is SetNewPasswordViewModel.Phase.Success)
             assertEquals("deep-tok", tokenSlot.captured)
             assertEquals("strongpass1", passwordSlot.captured)
             assertNull(state.errorMessage)
         }
 
     @Test
-    fun `submit rolls back loading state on error`() =
+    fun `submit rolls back to form on error`() =
         runTest {
             val repo = mockk<AuthRepository>(relaxed = true)
             coEvery { repo.resetPassword(any(), any()) } throws AuthError.ServerError("Invalid or expired reset token")
@@ -99,7 +123,7 @@ class ResetPasswordViewModelTest {
             advanceUntilIdle()
 
             val state = vm.uiState.value
-            assertTrue(state.phase is ResetPasswordViewModel.Phase.Form)
+            assertTrue(state.phase is SetNewPasswordViewModel.Phase.Form)
             assertEquals(
                 "Invalid or expired reset token",
                 (state.errorMessage as AuthError.ServerError).detail,

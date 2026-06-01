@@ -147,10 +147,10 @@ struct LoginView: View {
                         if !path.isEmpty { path.removeLast() }
                     }
                 case let .resetPassword(token):
-                    ResetPasswordView(
+                    SetNewPasswordView(
                         token: token,
-                        onClose: { if !path.isEmpty { path.removeLast() } },
-                        onDone: { path = [] }
+                        onBack: { if !path.isEmpty { path.removeLast() } },
+                        onContinue: { path = [] }
                     )
                 case let .verifyEmail(email, token):
                     VerifyEmailView(

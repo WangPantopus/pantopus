@@ -282,15 +282,6 @@ data class StatusWaitingContent(
             )
         }
 
-        /** Password reset success. */
-        fun passwordReset(): StatusWaitingContent =
-            StatusWaitingContent(
-                halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.Check),
-                headline = "Password reset",
-                subcopy = "You can now log in with your new password.",
-                primaryCta = StatusCta(label = "Back to login", actionKey = "back_to_login"),
-            )
-
         // ── A18.1 Check your email (verify-email-sent) ───────────────────
 
         /**
