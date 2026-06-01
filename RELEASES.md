@@ -7,6 +7,98 @@ T1–T4 predecessors.
 
 ---
 
+## New-design batch 2 (B-series) — 11 native catch-up screens + 13 primitives · 2026-06-01
+
+**Theme: native catch-up to web + design.** Eleven screens that
+post-date the original 44-screen new-design audit shipped on iOS +
+Android (web is the reference implementation and already shipped
+these). All eleven are now **DONE** — built/reshaped, snapshot-locked,
+and parity-verified across both platforms. Per-screen detail lives in
+[`docs/new-design-parity-batch2.md`](docs/new-design-parity-batch2.md);
+the companion prompt set is
+[`docs/claude-code-prompts-batch2.md`](docs/claude-code-prompts-batch2.md)
+(the `B`-prefixed set, distinct from the P0–P9.1 series).
+
+### Screens (11)
+
+| Design | Screen | Start → Now | PR |
+|---|---|---|---|
+| A17.11 | Stamps — postage / stamp-book wallet | BUILD → DONE | #187 (B2.1) |
+| A17.12 | Mail task — mail-derived task detail | BUILD → DONE | #186 (B2.2) |
+| A17.13 | Translation — auto-translated mail view | BUILD → DONE | #188 (B2.3) |
+| A17.14 | Unboxing — scan-first capture flow | BUILD → DONE | #189 (B2.4) |
+| A10.6 | Business profile (public) — single-scroll reshape | RESHAPE → DONE | #185 (B3.1) |
+| A10.7 | Business owner view + preview-as-neighbor | BUILD → DONE | #191 (B3.2) |
+| A10.11 | Earn dashboard (Wallet sibling) | BUILD → DONE | #190 (B4.1) |
+| A18.4 | Waiting room (persistent) — reshape | RESHAPE → DONE | #194 (B5.1) |
+| A18.5 | View As — identity preview | BUILD → DONE | #192 (B5.2) |
+| A19.1 / A19.2 | Privacy + Terms — long-form legal reshape | RESHAPE → DONE | #193 (B6.1) |
+
+### New shared primitives (13, Phase B1)
+
+Token-pure, preview + isolated-snapshot covered, all **consumed** (no
+orphans):
+
+- **Postage / capture (B1.1, #178/#179):** `PerforatedStamp` (+ `Postmark`),
+  `CameraScanner` (seeded-static viewfinder), `OcrFactsList`.
+- **Identity preview (B1.2, #181):** `ViewerPicker`, `RedactionScrim`.
+- **Legal (B1.3, #180):** `LegalTOCCard`, `DocMetaStrip`, `BackToTopFab`,
+  `LegalSection`.
+- **Business (B1.4) + Earn (B1.5, #182):** `BizBannerHeader`, `GalleryStrip`,
+  `RatingDistribution`, `MapPreview`, `ProgressRing`.
+
+New accent tokens (named, not hex): `categoryStamps` `#0e7490`,
+`categoryTask` `#4f46e5`, `categoryTranslation` family `#be185d`,
+`categoryUnboxing` family `#0d9488`, and the business-violet `#6d28d9`
+family + category accents — mirroring the `category-party` /
+`category-records` precedent.
+
+### Routing
+
+New deep links + routes wired on both platforms (iOS `DeepLinkRouter` +
+`HubRoute`/`YouRoute`; Android `ChildRoutes` in `RootTabScreen.kt`):
+`pantopus://mailbox/{stamps,tasks/:id,translation,unboxing,earn}`,
+`pantopus://businesses/:id`, `pantopus://homes/:id/waiting-room`,
+`pantopus://identity/preview`, `pantopus://legal/{privacy,terms}`. B1.6
+(#183) pre-staged the routes against a placeholder; each screen prompt
+swapped its destination in on landing.
+
+### Quality gates
+
+- **iOS:** `make lint && make test` — CI green on `ios-ci.yml`.
+  `verify-icons.sh` green; `verify-tokens.sh` (delta-gated, not a CI gate)
+  adds **zero** new flagged sites — all 11 batch-2 folders carry zero hex
+  literals and the CI `#RRGGBB` grep is clean.
+- **Android:** `./gradlew ktlintCheck detekt test paparazziVerify :app:assembleDebug`
+  — CI green on `android-ci.yml`.
+- **Snapshot lockfile (B7.1):** 22 design-reference PNGs (11 screens × 2
+  states) under
+  `frontend/apps/ios/PantopusTests/Features/__snapshots__/new-designs-batch2/`
+  + `frontend/apps/android/app/src/test/snapshots/images/new-designs-batch2/`,
+  rendered by `render-new-designs-batch2.mjs` and locked by
+  `T8ScreensSnapshotTests.swift` / `NewDesignBatch2ScreensSnapshotTest.kt`
+  (presence tripwires — file present, > 4 KB, PNG magic). Per-screen render
+  suites (Paparazzi / iOS snapshot) lock the implementations separately.
+  Regeneration policy: `NEW_DESIGNS_BATCH2.md`.
+
+### Open follow-ups
+
+- Mail-task **list/index** (A17.12 shipped detail only — B-1).
+- Live `AVCaptureSession` / CameraX capture for Unboxing (seeded
+  viewfinder shipped; live capture deferred — B-5).
+- Earn weekly-goal **fidelity**: shipped `ProgressRing` donut vs the
+  design's in-hero gradient bar (B-3) — for design review.
+- Real machine-translation + TTS for Translation ("Listen" is a stub).
+- Stripe-backed Stamps purchase / auto-refill (scoped stubs this batch).
+
+### Reference docs
+
+- [Batch-2 audit](docs/new-design-parity-batch2.md)
+- [Batch-2 prompt set](docs/claude-code-prompts-batch2.md)
+- [Lockfile regeneration policy](frontend/apps/ios/PantopusTests/Features/Shared/NEW_DESIGNS_BATCH2.md)
+
+---
+
 ## Tier 6 — 46 net-new screens + 2 new shared shells · 2026-05-18
 
 **Theme: design-pack closeout.** Forty-six newly designed screens
