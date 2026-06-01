@@ -39,6 +39,12 @@ public struct MailboxRootView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
+                        viewModel.openUnboxing()
+                    } label: {
+                        Label("Scan an item", systemImage: "camera.viewfinder")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.scanUnboxing")
+                    Button {
                         viewModel.openStamps()
                     } label: {
                         Label("Stamps", systemImage: "giftcard")

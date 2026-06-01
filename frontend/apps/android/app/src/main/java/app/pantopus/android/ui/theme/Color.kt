@@ -247,6 +247,37 @@ object PantopusColors {
      * `Theme.Color.categoryTask`.
      */
     val categoryTask = Color(0xFF4F46E5)
+
+    /**
+     * Category: unboxing — `#0D9488` teal-600 ("scan teal"). The scan /
+     * capture accent for A17.14 Unboxing: the nav eyebrow / CategoryChip dot,
+     * the [app.pantopus.android.ui.components.CameraScanner] scan-line +
+     * "Item detected" pill, the suggested-drawer selection ring, and the
+     * "Confirm — file to Home" CTA. Mirrored on iOS as
+     * `Theme.Color.categoryUnboxing`.
+     */
+    val categoryUnboxing = Color(0xFF0D9488)
+
+    /**
+     * Category: unboxing deep — `#0F766E` teal-700. The darker stop for
+     * scan-accent text on a light surface (confidence line, re-route label,
+     * "View" / "Scan the next item" link text).
+     */
+    val categoryUnboxingDark = Color(0xFF0F766E)
+
+    /**
+     * Category: unboxing soft background — `#F0FDFA` teal-50. Fills the
+     * "New capture" state chip, the selected suggested-drawer card, the
+     * "Add" filmstrip tile, and the "Scan the next item" launcher.
+     */
+    val categoryUnboxingBg = Color(0xFFF0FDFA)
+
+    /**
+     * Category: unboxing soft border — `#99F6E4` teal-200. Hairline border
+     * on chips and dashed tiles tinted with [categoryUnboxingBg].
+     */
+    val categoryUnboxingBorder = Color(0xFF99F6E4)
+
     // Rating
     /**
      * Star / rating amber — `#F59E0B` (Tailwind amber-500). Fills the

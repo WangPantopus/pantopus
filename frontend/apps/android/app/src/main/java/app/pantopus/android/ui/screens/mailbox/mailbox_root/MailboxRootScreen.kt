@@ -46,6 +46,7 @@ fun MailboxRootScreen(
     onOpenEarn: () -> Unit = {},
     onOpenVacationHold: () -> Unit = {},
     onOpenStamps: () -> Unit = {},
+    onOpenUnboxing: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MailboxRootViewModel = hiltViewModel(),
 ) {
@@ -112,18 +113,24 @@ fun MailboxRootScreen(
                     tint = PantopusColors.appText,
                 )
             }
-            MailboxRootSettingsMenu(onOpenVacationHold = onOpenVacationHold, onOpenStamps = onOpenStamps)
+            MailboxRootSettingsMenu(
+                onOpenUnboxing = onOpenUnboxing,
+                onOpenVacationHold = onOpenVacationHold,
+                onOpenStamps = onOpenStamps,
+            )
         },
     )
 }
 
 /**
- * Overflow / settings menu on the Mailbox root top bar. Today it
- * carries one entry — Vacation hold (A14.8). Future mailbox-scoped
- * settings can land in the same menu without changing the chrome.
+ * Overflow / settings menu on the Mailbox root top bar. Carries the
+ * A17.14 "Scan an item" entry (the scan/add affordance → Unboxing) and
+ * Vacation hold (A14.8). Future mailbox-scoped settings can land in the
+ * same menu without changing the chrome.
  */
 @Composable
 private fun MailboxRootSettingsMenu(
+    onOpenUnboxing: () -> Unit,
     onOpenVacationHold: () -> Unit,
     onOpenStamps: () -> Unit,
 ) {
@@ -143,6 +150,14 @@ private fun MailboxRootSettingsMenu(
         expanded = expanded,
         onDismissRequest = { expanded = false },
     ) {
+        DropdownMenuItem(
+            text = { Text("Scan an item", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenUnboxing()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.scanUnboxing"),
+        )
         DropdownMenuItem(
             text = { Text("Stamps", color = PantopusColors.appText) },
             onClick = {

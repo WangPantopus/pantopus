@@ -213,6 +213,7 @@ import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.stamps.StampsScreen
 import app.pantopus.android.ui.screens.mailbox.translation.MailTranslationScreen
+import app.pantopus.android.ui.screens.mailbox.unboxing.UnboxingScreen
 import app.pantopus.android.ui.screens.mailbox.vacation.VacationHoldScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
@@ -3503,6 +3504,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenEarn = { navController.navigate(ChildRoutes.EARN) },
                     onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
                     onOpenStamps = { navController.navigate(ChildRoutes.STAMPS) },
+                    onOpenUnboxing = { navController.navigate(ChildRoutes.UNBOXING) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -3551,7 +3553,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.UNBOXING) {
-                NotYetAvailableView(tabName = "Unboxing", icon = PantopusIcon.Camera)
+                // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
+                // (OCR / classification / vault upload are out of scope), so the
+                // route carries no mail id today.
+                UnboxingScreen(
+                    onBack = { navController.popBackStack() },
+                    onScanNext = { /* re-arms capture in-place — stays on this screen */ },
+                    onOpenDrawer = { navController.navigate(ChildRoutes.placeholder("Home drawer")) },
+                )
             }
             composable(ChildRoutes.EARN) {
                 EarnScreen(

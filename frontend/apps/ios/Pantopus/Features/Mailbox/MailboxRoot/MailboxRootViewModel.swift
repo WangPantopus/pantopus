@@ -174,10 +174,13 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     private let onOpenEarn: @MainActor () -> Void
     /// A14.8 — settings-menu entry for the Vacation hold screen. The
     /// Mailbox root top bar surfaces a `…` overflow that opens a menu
-    /// containing this single entry today (more settings can land later).
+    /// containing this entry (more settings can land later).
     private let onOpenVacationHoldHandler: @MainActor () -> Void
     /// A17.11 — top-bar gift affordance opening the Stamps wallet.
     private let onOpenStampsHandler: @MainActor () -> Void
+    /// A17.14 — overflow-menu "Scan an item" entry. The scan/add affordance
+    /// that opens the Unboxing scan-capture flow.
+    private let onOpenUnboxingHandler: @MainActor () -> Void
     private let dataProvider: (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
     /// When set, `load()` surfaces this state verbatim — lets previews and
     /// tests pin the loading / error frames.
@@ -193,6 +196,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenEarn: @escaping @MainActor () -> Void = {},
         onOpenVacationHold: @escaping @MainActor () -> Void = {},
         onOpenStamps: @escaping @MainActor () -> Void = {},
+        onOpenUnboxing: @escaping @MainActor () -> Void = {},
         dataProvider: @escaping (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
             = MailboxRootSampleData.sections,
         seededState: ListOfRowsState? = nil
@@ -206,6 +210,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         self.onOpenEarn = onOpenEarn
         onOpenVacationHoldHandler = onOpenVacationHold
         onOpenStampsHandler = onOpenStamps
+        onOpenUnboxingHandler = onOpenUnboxing
         self.dataProvider = dataProvider
         self.seededState = seededState
     }
@@ -221,6 +226,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// the Stamps (postage wallet) screen.
     public func openStamps() {
         onOpenStampsHandler()
+    }
+
+    /// A17.14 — invoked from `MailboxRootView`'s overflow menu when the user
+    /// taps "Scan an item". Opens the Unboxing scan-capture flow.
+    public func openUnboxing() {
+        onOpenUnboxingHandler()
     }
 
     // MARK: - Lifecycle
