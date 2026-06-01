@@ -728,28 +728,8 @@ private fun TimelineDot(
     val reduceMotion = rememberReduceMotion()
     // Paused current dots no longer pulse — the alert glyph is static.
     val pulse = state == StatusStepState.Current && !paused && !reduceMotion
-    val phase =
-        if (pulse) {
-            val transition = rememberInfiniteTransition(label = "dotPulse")
-            transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec =
-                    infiniteRepeatable(
-                        animation = tween(durationMillis = 1600, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                label = "dotPulsePhase",
-            ).value
-        } else {
-            0f
-        }
-    val halo =
-        when (state) {
-            StatusStepState.Done -> PantopusColors.successBg
-            StatusStepState.Current -> if (paused) PantopusColors.warningBg else PantopusColors.primary50
-            StatusStepState.Pending -> PantopusColors.appSurface
-        }
+    val phase = rememberTimelineDotPhase(pulse)
+    val palette = timelineDotPalette(state, paused)
     Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
         if (state != StatusStepState.Pending) {
             Box(
@@ -757,59 +737,106 @@ private fun TimelineDot(
                     Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(halo),
+                        .background(palette.halo),
             )
         }
-        val fill =
-            when (state) {
-                StatusStepState.Done -> PantopusColors.success
-                StatusStepState.Current -> if (paused) PantopusColors.warning else PantopusColors.primary600
-                StatusStepState.Pending -> PantopusColors.appSurface
-            }
         Box(
             modifier =
                 Modifier
                     .size(30.dp)
                     .clip(CircleShape)
-                    .background(fill)
-                    .then(
-                        if (state == StatusStepState.Pending) {
-                            Modifier.border(1.5.dp, PantopusColors.appBorderStrong, CircleShape)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .background(palette.fill)
+                    .then(timelineDotBorder(state)),
             contentAlignment = Alignment.Center,
         ) {
-            when {
-                state == StatusStepState.Done ->
-                    PantopusIconImage(
-                        icon = PantopusIcon.Check,
-                        contentDescription = null,
-                        size = 14.dp,
-                        strokeWidth = 3f,
-                        tint = PantopusColors.appTextInverse,
-                    )
-                state == StatusStepState.Current && paused ->
-                    PantopusIconImage(
-                        icon = PantopusIcon.AlertCircle,
-                        contentDescription = null,
-                        size = 16.dp,
-                        strokeWidth = 2.6f,
-                        tint = PantopusColors.appTextInverse,
-                    )
-                state == StatusStepState.Current ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(8.dp)
-                                .scale(1f - 0.3f * phase)
-                                .alpha(1f - 0.5f * phase)
-                                .clip(CircleShape)
-                                .background(PantopusColors.appTextInverse),
-                    )
-                else -> Unit
-            }
+            TimelineDotGlyph(state = state, paused = paused, phase = phase)
         }
+    }
+}
+
+@Composable
+private fun rememberTimelineDotPhase(pulse: Boolean): Float {
+    if (!pulse) return 0f
+
+    val transition = rememberInfiniteTransition(label = "dotPulse")
+    return transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1600, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "dotPulsePhase",
+    ).value
+}
+
+private data class TimelineDotPalette(
+    val halo: Color,
+    val fill: Color,
+)
+
+private fun timelineDotPalette(
+    state: StatusStepState,
+    paused: Boolean,
+): TimelineDotPalette =
+    when (state) {
+        StatusStepState.Done ->
+            TimelineDotPalette(
+                halo = PantopusColors.successBg,
+                fill = PantopusColors.success,
+            )
+        StatusStepState.Current ->
+            TimelineDotPalette(
+                halo = if (paused) PantopusColors.warningBg else PantopusColors.primary50,
+                fill = if (paused) PantopusColors.warning else PantopusColors.primary600,
+            )
+        StatusStepState.Pending ->
+            TimelineDotPalette(
+                halo = PantopusColors.appSurface,
+                fill = PantopusColors.appSurface,
+            )
+    }
+
+private fun timelineDotBorder(state: StatusStepState): Modifier =
+    if (state == StatusStepState.Pending) {
+        Modifier.border(1.5.dp, PantopusColors.appBorderStrong, CircleShape)
+    } else {
+        Modifier
+    }
+
+@Composable
+private fun TimelineDotGlyph(
+    state: StatusStepState,
+    paused: Boolean,
+    phase: Float,
+) {
+    when {
+        state == StatusStepState.Done ->
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 14.dp,
+                strokeWidth = 3f,
+                tint = PantopusColors.appTextInverse,
+            )
+        state == StatusStepState.Current && paused ->
+            PantopusIconImage(
+                icon = PantopusIcon.AlertCircle,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2.6f,
+                tint = PantopusColors.appTextInverse,
+            )
+        state == StatusStepState.Current ->
+            Box(
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .scale(1f - 0.3f * phase)
+                        .alpha(1f - 0.5f * phase)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appTextInverse),
+            )
     }
 }

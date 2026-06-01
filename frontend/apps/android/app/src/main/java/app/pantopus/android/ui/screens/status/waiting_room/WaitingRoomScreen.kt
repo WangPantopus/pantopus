@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import app.pantopus.android.ui.components.HaloCircle
 import app.pantopus.android.ui.screens.status.StatusCta
 import app.pantopus.android.ui.screens.status.StatusPillView
@@ -125,7 +125,14 @@ fun WaitingRoomScreen(
             ManageSection(content, onInlineAction)
             Spacer(modifier = Modifier.height(Spacing.s4))
         }
-        StickyDock(content, onPrimary = onPrimary, onSecondary = { cta -> onSecondary(cta); onBack() })
+        StickyDock(
+            content = content,
+            onPrimary = onPrimary,
+            onSecondary = { cta ->
+                onSecondary(cta)
+                onBack()
+            },
+        )
     }
 }
 

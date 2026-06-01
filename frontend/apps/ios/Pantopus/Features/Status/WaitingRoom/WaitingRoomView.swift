@@ -31,9 +31,10 @@ public struct WaitingRoomView: View {
         VStack(spacing: Spacing.s0) {
             WaitingRoomTopBar(
                 title: viewModel.content.title,
-                onBack: onBack,
-                onBell: { viewModel.openNotifications() }
-            )
+                onBack: onBack
+            ) {
+                viewModel.openNotifications()
+            }
             ScrollView {
                 VStack(spacing: Spacing.s5) {
                     HaloCircle(
@@ -117,9 +118,10 @@ public struct WaitingRoomView: View {
                 .kerning(0.6)
                 .frame(maxWidth: .infinity, alignment: .leading)
             WaitingRoomInlineActionGrid(
-                actions: viewModel.content.inlineActions,
-                onTap: { viewModel.handleInlineAction($0) }
-            )
+                actions: viewModel.content.inlineActions
+            ) {
+                viewModel.handleInlineAction($0)
+            }
         }
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("waitingRoomManage")

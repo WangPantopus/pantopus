@@ -251,13 +251,13 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.payments.PaymentsScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
+import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomRoute
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailActions
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailScreen
 import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.support_trains.manage.ManageTrainScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
-import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomRoute
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.wallet.WalletScreen
