@@ -17,15 +17,18 @@ public struct IdentityCenterView: View {
     @State private var switcherVisible = false
     private let onBack: @MainActor () -> Void
     private let onOpenIdentity: @MainActor (IdentityCardContent) -> Void
+    private let onOpenRow: @MainActor (IdentityRowContent) -> Void
 
     init(
         viewModel: IdentityCenterViewModel = IdentityCenterViewModel(),
         onBack: @escaping @MainActor () -> Void = {},
-        onOpenIdentity: @escaping @MainActor (IdentityCardContent) -> Void = { _ in }
+        onOpenIdentity: @escaping @MainActor (IdentityCardContent) -> Void = { _ in },
+        onOpenRow: @escaping @MainActor (IdentityRowContent) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
         self.onOpenIdentity = onOpenIdentity
+        self.onOpenRow = onOpenRow
     }
 
     public var body: some View {
@@ -256,29 +259,35 @@ public struct IdentityCenterView: View {
     private func rowsCard(_ rows: [IdentityRowContent], idPrefix: String) -> some View {
         VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                HStack(spacing: Spacing.s3) {
-                    Icon(row.icon, size: 18, color: Theme.Color.primary600)
-                        .frame(width: 24, height: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.label)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Theme.Color.appText)
-                        if let subtext = row.subtext {
-                            Text(subtext)
-                                .pantopusTextStyle(.caption)
+                Button {
+                    onOpenRow(row)
+                } label: {
+                    HStack(spacing: Spacing.s3) {
+                        Icon(row.icon, size: 18, color: Theme.Color.primary600)
+                            .frame(width: 24, height: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.label)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.Color.appText)
+                            if let subtext = row.subtext {
+                                Text(subtext)
+                                    .pantopusTextStyle(.caption)
+                                    .foregroundStyle(Theme.Color.appTextSecondary)
+                            }
+                        }
+                        Spacer(minLength: Spacing.s0)
+                        if let trailing = row.trailing {
+                            Text(trailing)
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
+                        Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
                     }
-                    Spacer(minLength: Spacing.s0)
-                    if let trailing = row.trailing {
-                        Text(trailing)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                    }
-                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
                 }
-                .padding(.horizontal, Spacing.s4)
-                .padding(.vertical, 14)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("\(idPrefix)Row_\(row.id)")
                 if index < rows.count - 1 {
                     Rectangle()
