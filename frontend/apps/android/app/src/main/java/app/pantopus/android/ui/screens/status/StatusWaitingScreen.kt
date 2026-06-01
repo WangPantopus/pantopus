@@ -230,7 +230,7 @@ private fun AddressChip(text: String) {
 private data class PillPalette(val bg: Color, val fg: Color, val border: Color)
 
 @Composable
-private fun StatusPillView(pill: StatusWaitingPill) {
+internal fun StatusPillView(pill: StatusWaitingPill) {
     val palette =
         when (pill.tone) {
             StatusPillTone.Neutral ->
@@ -610,32 +610,39 @@ private fun DockSecondaryButton(
 
 // ── Timeline (dots + dates + connecting line) ─────────────────────────────
 
+/**
+ * Status timeline. [paused] (A18.4) recolors the active node/segment to
+ * warning and swaps the pulsing current dot for an `alert-circle` (review
+ * paused / action needed). Internal so the A18.4 waiting room can reuse it.
+ */
 @Composable
-private fun StatusTimeline(
+internal fun StatusTimeline(
     stages: List<StatusTimelineStage>,
     currentStageId: String?,
+    paused: Boolean = false,
+    modifier: Modifier = Modifier.testTag("statusTimeline"),
 ) {
     val states = resolveStates(stages, currentStageId)
     val allDone = states.isNotEmpty() && states.all { it == StatusStepState.Done }
     val lastActive =
         states.indexOfLast { it == StatusStepState.Done || it == StatusStepState.Current }.coerceAtLeast(0)
     val filledSegments = if (allDone) (stages.size - 1).coerceAtLeast(0) else lastActive
-    val lineColor = if (allDone) PantopusColors.success else PantopusColors.primary600
+    val activeColor = if (paused) PantopusColors.warning else PantopusColors.primary600
+    val lineColor = if (allDone) PantopusColors.success else activeColor
 
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s4)
-                .testTag("statusTimeline"),
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             stages.forEachIndexed { index, _ ->
-                TimelineDot(state = states[index])
+                TimelineDot(state = states[index], paused = paused)
                 if (index != stages.lastIndex) {
                     Box(
                         modifier =
@@ -652,6 +659,7 @@ private fun StatusTimeline(
                 TimelineLabel(
                     stage = stage,
                     pending = states[index] == StatusStepState.Pending,
+                    subWarning = paused && states[index] == StatusStepState.Current,
                     horizontalAlignment =
                         when (index) {
                             0 -> Alignment.Start
@@ -671,6 +679,7 @@ private fun TimelineLabel(
     pending: Boolean,
     horizontalAlignment: Alignment.Horizontal,
     modifier: Modifier = Modifier,
+    subWarning: Boolean = false,
 ) {
     Column(
         modifier = modifier,
@@ -684,7 +693,11 @@ private fun TimelineLabel(
             color = if (pending) PantopusColors.appTextSecondary else PantopusColors.appText,
         )
         stage.sub?.let {
-            Text(text = it, fontSize = 10.sp, color = PantopusColors.appTextSecondary)
+            Text(
+                text = it,
+                fontSize = 10.sp,
+                color = if (subWarning) PantopusColors.warning else PantopusColors.appTextSecondary,
+            )
         }
     }
 }
@@ -708,25 +721,15 @@ private fun resolveStates(
 }
 
 @Composable
-private fun TimelineDot(state: StatusStepState) {
+private fun TimelineDot(
+    state: StatusStepState,
+    paused: Boolean = false,
+) {
     val reduceMotion = rememberReduceMotion()
-    val pulse = state == StatusStepState.Current && !reduceMotion
-    val phase =
-        if (pulse) {
-            val transition = rememberInfiniteTransition(label = "dotPulse")
-            transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec =
-                    infiniteRepeatable(
-                        animation = tween(durationMillis = 1600, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                label = "dotPulsePhase",
-            ).value
-        } else {
-            0f
-        }
+    // Paused current dots no longer pulse — the alert glyph is static.
+    val pulse = state == StatusStepState.Current && !paused && !reduceMotion
+    val phase = rememberTimelineDotPhase(pulse)
+    val palette = timelineDotPalette(state, paused)
     Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
         if (state != StatusStepState.Pending) {
             Box(
@@ -734,53 +737,106 @@ private fun TimelineDot(state: StatusStepState) {
                     Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (state == StatusStepState.Done) PantopusColors.successBg else PantopusColors.primary50,
-                        ),
+                        .background(palette.halo),
             )
         }
-        val fill =
-            when (state) {
-                StatusStepState.Done -> PantopusColors.success
-                StatusStepState.Current -> PantopusColors.primary600
-                StatusStepState.Pending -> PantopusColors.appSurface
-            }
         Box(
             modifier =
                 Modifier
                     .size(30.dp)
                     .clip(CircleShape)
-                    .background(fill)
-                    .then(
-                        if (state == StatusStepState.Pending) {
-                            Modifier.border(1.5.dp, PantopusColors.appBorderStrong, CircleShape)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .background(palette.fill)
+                    .then(timelineDotBorder(state)),
             contentAlignment = Alignment.Center,
         ) {
-            when (state) {
-                StatusStepState.Done ->
-                    PantopusIconImage(
-                        icon = PantopusIcon.Check,
-                        contentDescription = null,
-                        size = 14.dp,
-                        strokeWidth = 3f,
-                        tint = PantopusColors.appTextInverse,
-                    )
-                StatusStepState.Current ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(8.dp)
-                                .scale(1f - 0.3f * phase)
-                                .alpha(1f - 0.5f * phase)
-                                .clip(CircleShape)
-                                .background(PantopusColors.appTextInverse),
-                    )
-                StatusStepState.Pending -> Unit
-            }
+            TimelineDotGlyph(state = state, paused = paused, phase = phase)
         }
+    }
+}
+
+@Composable
+private fun rememberTimelineDotPhase(pulse: Boolean): Float {
+    if (!pulse) return 0f
+
+    val transition = rememberInfiniteTransition(label = "dotPulse")
+    return transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1600, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "dotPulsePhase",
+    ).value
+}
+
+private data class TimelineDotPalette(
+    val halo: Color,
+    val fill: Color,
+)
+
+private fun timelineDotPalette(
+    state: StatusStepState,
+    paused: Boolean,
+): TimelineDotPalette =
+    when (state) {
+        StatusStepState.Done ->
+            TimelineDotPalette(
+                halo = PantopusColors.successBg,
+                fill = PantopusColors.success,
+            )
+        StatusStepState.Current ->
+            TimelineDotPalette(
+                halo = if (paused) PantopusColors.warningBg else PantopusColors.primary50,
+                fill = if (paused) PantopusColors.warning else PantopusColors.primary600,
+            )
+        StatusStepState.Pending ->
+            TimelineDotPalette(
+                halo = PantopusColors.appSurface,
+                fill = PantopusColors.appSurface,
+            )
+    }
+
+private fun timelineDotBorder(state: StatusStepState): Modifier =
+    if (state == StatusStepState.Pending) {
+        Modifier.border(1.5.dp, PantopusColors.appBorderStrong, CircleShape)
+    } else {
+        Modifier
+    }
+
+@Composable
+private fun TimelineDotGlyph(
+    state: StatusStepState,
+    paused: Boolean,
+    phase: Float,
+) {
+    when {
+        state == StatusStepState.Done ->
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 14.dp,
+                strokeWidth = 3f,
+                tint = PantopusColors.appTextInverse,
+            )
+        state == StatusStepState.Current && paused ->
+            PantopusIconImage(
+                icon = PantopusIcon.AlertCircle,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2.6f,
+                tint = PantopusColors.appTextInverse,
+            )
+        state == StatusStepState.Current ->
+            Box(
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .scale(1f - 0.3f * phase)
+                        .alpha(1f - 0.5f * phase)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appTextInverse),
+            )
     }
 }

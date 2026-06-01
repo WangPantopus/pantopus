@@ -93,7 +93,9 @@ final class IconTests: XCTestCase {
         // B1.4 / A19 Legal — collapsible "Jump to section" TOC header.
         "list",
         // A17.11 Stamps — Elf rate gauge + Forever-postage validity badge.
-        "gauge", "infinity"
+        "gauge", "infinity",
+        // A18.4 Waiting room — more-info halo glyph + Update-evidence action.
+        "file-plus-2", "file-warning"
     ]
 
     func testInventoryMatches() {

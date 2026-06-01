@@ -143,18 +143,23 @@ struct StatusStackButton: View {
 struct StatusTimelineView: View {
     let stages: [StatusTimelineStage]
     let currentStageId: String?
+    /// A18.4 — recolor the active node/segment to warning and swap the
+    /// pulsing current dot for an `alert-circle` (review paused / action
+    /// needed). Defaults to `false` so A18.2/A18.3 call sites are unchanged.
+    var paused: Bool = false
 
     var body: some View {
         let states = resolvedStates
         let allDone = !states.isEmpty && states.allSatisfy { $0 == .done }
         let lastActive = states.lastIndex { $0 == .done || $0 == .current } ?? 0
         let filledSegments = allDone ? max(stages.count - 1, 0) : lastActive
-        let lineColor = allDone ? Theme.Color.success : Theme.Color.primary600
+        let activeColor = paused ? Theme.Color.warning : Theme.Color.primary600
+        let lineColor = allDone ? Theme.Color.success : activeColor
 
         VStack(spacing: Spacing.s2) {
             HStack(spacing: Spacing.s0) {
                 ForEach(Array(stages.enumerated()), id: \.element.id) { index, _ in
-                    TimelineDot(state: states[index])
+                    TimelineDot(state: states[index], paused: paused)
                     if index != stages.count - 1 {
                         Rectangle()
                             .fill(index < filledSegments ? lineColor : Theme.Color.appBorder)
@@ -174,7 +179,11 @@ struct StatusTimelineView: View {
                         if let sub = stage.sub {
                             Text(sub)
                                 .font(.system(size: 10))
-                                .foregroundStyle(Theme.Color.appTextSecondary)
+                                .foregroundStyle(
+                                    paused && states[index] == .current
+                                        ? Theme.Color.warning
+                                        : Theme.Color.appTextSecondary
+                                )
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: alignment(for: index))
@@ -220,6 +229,9 @@ struct StatusTimelineView: View {
 
 private struct TimelineDot: View {
     let state: StatusStepState
+    /// A18.4 — when paused, the current dot recolors to warning and shows a
+    /// static `alert-circle` instead of the pulsing inner dot.
+    var paused: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
@@ -229,7 +241,7 @@ private struct TimelineDot: View {
             // Soft halo ring behind done / current dots.
             if state != .pending {
                 Circle()
-                    .fill(state == .done ? Theme.Color.successBg : Theme.Color.primary50)
+                    .fill(haloFill)
                     .frame(width: 38, height: 38)
             }
             Circle()
@@ -244,6 +256,8 @@ private struct TimelineDot: View {
             switch state {
             case .done:
                 Icon(.check, size: 14, strokeWidth: 3, color: Theme.Color.appTextInverse)
+            case .current where paused:
+                Icon(.alertCircle, size: 16, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
             case .current:
                 Circle()
                     .fill(Theme.Color.appTextInverse)
@@ -263,14 +277,23 @@ private struct TimelineDot: View {
         .onAppear { if pulseEnabled { pulse = true } }
     }
 
+    /// Paused current dots pulse no longer (the alert glyph is static).
     private var pulseEnabled: Bool {
-        state == .current && !reduceMotion
+        state == .current && !paused && !reduceMotion
+    }
+
+    private var haloFill: Color {
+        switch state {
+        case .done: Theme.Color.successBg
+        case .current: paused ? Theme.Color.warningBg : Theme.Color.primary50
+        case .pending: Theme.Color.appSurface
+        }
     }
 
     private var fill: Color {
         switch state {
         case .done: Theme.Color.success
-        case .current: Theme.Color.primary600
+        case .current: paused ? Theme.Color.warning : Theme.Color.primary600
         case .pending: Theme.Color.appSurface
         }
     }

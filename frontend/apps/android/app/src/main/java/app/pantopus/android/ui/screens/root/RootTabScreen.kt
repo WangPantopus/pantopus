@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod")
+@file:Suppress("LongMethod", "ktlint:standard:import-ordering")
 
 package app.pantopus.android.ui.screens.root
 
@@ -252,6 +252,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.payments.PaymentsScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
+import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomRoute
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailActions
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailScreen
@@ -3603,7 +3604,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.WAITING_ROOM,
                 arguments = listOf(navArgument(ChildRoutes.WAITING_ROOM_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Waiting room", icon = PantopusIcon.Hourglass)
+                WaitingRoomRoute(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MEMBERSHIP_DETAIL,
