@@ -30,12 +30,6 @@
 
 import XCTest
 
-// 88 one-line presence assertions push this type past the default
-// SwiftLint length caps; the established convention for exhaustive test
-// rigs in this suite is a file-level disable (see e.g.
-// `MyBidsViewModelTests.swift`).
-// swiftlint:disable type_body_length file_length
-
 final class NewDesignScreensSnapshotTests: XCTestCase {
     /// PantopusTests/Features/Shared/__snapshots__/new-designs/ — resolved
     /// relative to this source file so the rig is location-independent.
@@ -427,7 +421,8 @@ final class NewDesignScreensSnapshotTests: XCTestCase {
         )
         let data = try Data(contentsOf: url)
         XCTAssertGreaterThan(
-            data.count, 4 * 1024,
+            data.count,
+            4 * 1024,
             "New-design baseline too small (\(data.count) bytes): \(url.path)"
         )
         // PNG magic bytes.
@@ -437,5 +432,3 @@ final class NewDesignScreensSnapshotTests: XCTestCase {
         )
     }
 }
-
-// swiftlint:enable type_body_length file_length

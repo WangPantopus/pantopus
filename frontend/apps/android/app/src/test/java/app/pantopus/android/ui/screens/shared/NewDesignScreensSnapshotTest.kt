@@ -30,14 +30,16 @@ import java.io.File
  * regeneration policy.
  */
 class NewDesignScreensSnapshotTest {
-    private val baselineDir: File = run {
-        val candidates = listOf(
-            "src/test/snapshots/images/new-designs",
-            "app/src/test/snapshots/images/new-designs",
-            "frontend/apps/android/app/src/test/snapshots/images/new-designs",
-        )
-        candidates.map(::File).firstOrNull { it.isDirectory } ?: File(candidates.first())
-    }
+    private val baselineDir: File =
+        run {
+            val candidates =
+                listOf(
+                    "src/test/snapshots/images/new-designs",
+                    "app/src/test/snapshots/images/new-designs",
+                    "frontend/apps/android/app/src/test/snapshots/images/new-designs",
+                )
+            candidates.map(::File).firstOrNull { it.isDirectory } ?: File(candidates.first())
+        }
 
     // ---- A03 — Pulse feed (tab archetype)
     @Test
