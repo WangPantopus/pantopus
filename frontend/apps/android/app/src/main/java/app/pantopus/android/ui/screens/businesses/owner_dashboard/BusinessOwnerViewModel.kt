@@ -16,6 +16,8 @@ import javax.inject.Inject
 /** Nav-arg key for the owned business UUID (matches `ChildRoutes.BUSINESS_OWNER`). */
 const val BUSINESS_OWNER_BUSINESS_ID_KEY = "businessId"
 
+private const val OWNER_DASHBOARD_LOAD_DELAY_MILLIS = 50L
+
 /**
  * A10.7 — view-model for the single-business owner dashboard. B3.2 is
  * sample-driven (no analytics or review-reply backend); the load path returns
@@ -45,7 +47,7 @@ class BusinessOwnerViewModel
             viewModelScope.launch {
                 // A short delay exercises the shimmer skeleton in the running
                 // app; tests seed content directly and skip this path.
-                delay(50)
+                delay(OWNER_DASHBOARD_LOAD_DELAY_MILLIS)
                 _state.value = BusinessOwnerUiState.Loaded(BusinessOwnerSampleData.marlow)
             }
         }
