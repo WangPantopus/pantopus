@@ -23,7 +23,9 @@ struct ProfileStrengthCard: View {
     /// Opens Edit Business Page focused on the pending step.
     let onAddStep: @MainActor (OwnerStrengthStep) -> Void
 
-    private var fraction: Double { Double(strength.percent) / 100 }
+    private var fraction: Double {
+        Double(strength.percent) / 100
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
@@ -146,6 +148,6 @@ struct ProfileStrengthCard: View {
             ]
         )
     ) { _ in }
-    .padding(Spacing.s4)
-    .background(Theme.Color.appBg)
+        .padding(Spacing.s4)
+        .background(Theme.Color.appBg)
 }

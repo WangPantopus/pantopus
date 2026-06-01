@@ -35,7 +35,7 @@ public final class BusinessOwnerViewModel {
     ///     `nil` the view-model derives the B3.2 sample.
     public init(businessId: String, content: BusinessOwnerContent? = nil) {
         self.businessId = businessId
-        self.injectedContent = content
+        injectedContent = content
     }
 
     public func load() async {
@@ -63,7 +63,7 @@ public final class BusinessOwnerViewModel {
         guard case let .loaded(content) = state else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        logger.debug("Stubbed review reply for \(reviewId) on business \(self.businessId)")
+        logger.debug("Stubbed review reply for \(reviewId) on business \(businessId)")
         state = .loaded(content.applyingReply(trimmed, to: reviewId))
     }
 

@@ -122,7 +122,9 @@ struct OwnerEditFrame: View {
     let onPreview: @MainActor () -> Void
     let onSubmitReply: @MainActor (String, String) -> Void
 
-    private var profile: BusinessProfileContent { content.publicProfile }
+    private var profile: BusinessProfileContent {
+        content.publicProfile
+    }
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
@@ -164,7 +166,7 @@ struct OwnerEditFrame: View {
         return status.isOpen ? .open(status.chipLabel) : .closed(status.chipLabel)
     }
 
-    @ViewBuilder private func scrollBody(in profile: BusinessProfileContent) -> some View {
+    private func scrollBody(in profile: BusinessProfileContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
             InsightTiles(insights: content.insights, onOpenInsights: onOpenInsights)
                 .padding(.top, 14)

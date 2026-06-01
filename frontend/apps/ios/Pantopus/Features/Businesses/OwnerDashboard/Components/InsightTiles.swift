@@ -122,6 +122,6 @@ struct InsightTiles: View {
             OwnerInsightTile(id: "contacts", icon: .messageCircle, value: "23", label: "Contacts")
         ]
     ) {}
-    .padding(Spacing.s4)
-    .background(Theme.Color.appBg)
+        .padding(Spacing.s4)
+        .background(Theme.Color.appBg)
 }
