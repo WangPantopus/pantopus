@@ -53,7 +53,7 @@ class MailTaskSnapshotTest {
         paparazzi.snapshot {
             MailTaskScreen(
                 onBack = {},
-                viewModel = MailTaskViewModel("t_412elm", MailTaskSeed.Active),
+                viewModel = loadedViewModel(MailTaskSeed.Active),
                 seed = MailTaskSeed.Active,
             )
         }
@@ -64,7 +64,7 @@ class MailTaskSnapshotTest {
         paparazzi.snapshot {
             MailTaskScreen(
                 onBack = {},
-                viewModel = MailTaskViewModel("t_412elm", MailTaskSeed.Done),
+                viewModel = loadedViewModel(MailTaskSeed.Done),
                 seed = MailTaskSeed.Done,
             )
         }
@@ -136,4 +136,10 @@ class MailTaskSnapshotTest {
             content()
         }
     }
+
+    private fun loadedViewModel(seed: MailTaskSeed): MailTaskViewModel =
+        MailTaskViewModel("t_412elm", seed).apply {
+            configureSeed(seed)
+            load()
+        }
 }
