@@ -166,6 +166,15 @@ struct LoginView: View {
                             path = [.signUp]
                         }
                     )
+                case let .verifyEmailLanding(token, email):
+                    VerifyEmailLandingView(
+                        email: email,
+                        token: token,
+                        // No session after verification (backend revokes it),
+                        // so Continue drops back to login to sign in.
+                        onContinue: { path = [] },
+                        onUseDifferentEmail: { path = [.signUp] }
+                    )
                 case let .error(authError):
                     AuthErrorView(
                         error: authError,
@@ -189,8 +198,11 @@ struct LoginView: View {
             _ = deepLink.consume()
             path = [.resetPassword(token: token)]
         case let .verifyEmail(token, email):
+            // The email's deep link always carries a token → land on the
+            // §1B-2 post-tap landing, not the pre-tap "we sent you a link"
+            // surface (which sign-up reaches with token == nil).
             _ = deepLink.consume()
-            path = [.verifyEmail(email: email, token: token)]
+            path = [.verifyEmailLanding(token: token, email: email)]
         default:
             break
         }

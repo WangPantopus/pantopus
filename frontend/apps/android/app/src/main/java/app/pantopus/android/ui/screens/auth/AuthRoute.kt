@@ -50,6 +50,13 @@ object AuthRoutes {
      */
     const val VERIFY_EMAIL_PATTERN = "auth/verify_email?email={email}&token={token}"
 
+    /**
+     * §1B-2 — Verify-email DEEP-LINK LANDING (the post-tap result screen,
+     * distinct from [VERIFY_EMAIL_PATTERN] above). Reached only via the
+     * verification email's deep link, so `{token}` is always present.
+     */
+    const val VERIFY_EMAIL_LANDING_PATTERN = "auth/verify_email_landing?email={email}&token={token}"
+
     fun resetPassword(token: String): String = "auth/reset_password/$token"
 
     fun verifyEmail(
@@ -59,5 +66,14 @@ object AuthRoutes {
         val emailArg = email?.takeIf { it.isNotEmpty() }.orEmpty()
         val tokenArg = token?.takeIf { it.isNotEmpty() }.orEmpty()
         return "auth/verify_email?email=$emailArg&token=$tokenArg"
+    }
+
+    fun verifyEmailLanding(
+        email: String? = null,
+        token: String? = null,
+    ): String {
+        val emailArg = email?.takeIf { it.isNotEmpty() }.orEmpty()
+        val tokenArg = token?.takeIf { it.isNotEmpty() }.orEmpty()
+        return "auth/verify_email_landing?email=$emailArg&token=$tokenArg"
     }
 }

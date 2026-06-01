@@ -26,6 +26,11 @@ public enum AuthRoute: Hashable, Sendable {
     /// reached via the verification email's deep link, in which case the
     /// screen auto-verifies on appear.
     case verifyEmail(email: String? = nil, token: String? = nil)
+    /// §1B-2 — Verify-email DEEP-LINK LANDING (the post-tap result screen,
+    /// distinct from A18.1 "Verify Email Sent" above). Reached only via the
+    /// verification email's deep link, so `token` is always present; the
+    /// landing confirms it on appear and shows verifying → success / expired.
+    case verifyEmailLanding(token: String, email: String? = nil)
     /// Generic auth error / banner detail screen (P4).
     case error(AuthError)
 }
