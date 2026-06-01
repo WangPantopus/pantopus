@@ -60,6 +60,10 @@ fun MailDetailScreen(
     onBack: () -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
     onTranslate: (() -> Unit)? = null,
+    // A17.12 — opens the Elf-extracted task for this mail (certified
+    // notices only). Receives the mail id so the host can resolve the
+    // task. Null hides the affordance.
+    onOpenExtractedTask: ((String) -> Unit)? = null,
     viewModel: MailDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,6 +113,10 @@ fun MailDetailScreen(
                     onOpenSenderProfile = onOpenSenderProfile,
                     onSaveToVault = viewModel::openSaveToVaultPicker,
                     onTranslate = onTranslate,
+                    onOpenExtractedTask =
+                        onOpenExtractedTask?.let { open ->
+                            { open(current.content.mailId) }
+                        },
                 )
             is MailDetailUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -195,6 +203,7 @@ private fun LoadedLayout(
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
     onTranslate: (() -> Unit)? = null,
+    onOpenExtractedTask: (() -> Unit)? = null,
 ) {
     // Dispatch to ceremonial variant layouts when the projected content
     // carries decoded payloads. Every variant composes the shared
@@ -227,6 +236,7 @@ private fun LoadedLayout(
                 onAcknowledge = onAcknowledge,
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
+                onOpenExtractedTask = onOpenExtractedTask,
             )
         content.category == MailItemCategory.Community && community != null ->
             CommunityDetailLayout(

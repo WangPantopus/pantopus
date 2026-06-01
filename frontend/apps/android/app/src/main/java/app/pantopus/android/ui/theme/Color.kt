@@ -238,6 +238,15 @@ object PantopusColors {
      * for the letter rendered on [categoryTranslationPaper].
      */
     val categoryTranslationPaperInk = Color(0xFF3A2F2A)
+
+    /**
+     * Category: task — `#4F46E5` indigo-600. The action / productivity
+     * accent for A17.12 Mail task: the eyebrow / CategoryChip dot, the
+     * task-hero accent strip + checkbox border, the due-calendar block,
+     * and the snooze-row glyphs. Mirrored on iOS as
+     * `Theme.Color.categoryTask`.
+     */
+    val categoryTask = Color(0xFF4F46E5)
     // Rating
     /**
      * Star / rating amber — `#F59E0B` (Tailwind amber-500). Fills the

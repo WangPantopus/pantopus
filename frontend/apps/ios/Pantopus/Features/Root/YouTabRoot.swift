@@ -859,6 +859,11 @@ public struct YouTabRoot: View {
                 },
                 onTranslate: {
                     Task { @MainActor in path.append(.mailTranslation(mailId: mailId)) }
+                },
+                onOpenExtractedTask: { sourceMailId in
+                    // A17.12 — the certified-notice "view task" affordance
+                    // opens the mail-derived task keyed by its source mail.
+                    Task { @MainActor in path.append(.mailTask(taskId: sourceMailId)) }
                 }
             )
         case .settings:
@@ -2008,8 +2013,18 @@ public struct YouTabRoot: View {
         // line below for its real view without editing the route declarations.
         case .stamps:
             StampsView(viewModel: StampsViewModel { Task { @MainActor in pop() } })
-        case .mailTask:
-            NotYetAvailableView(tabName: "Task", icon: .listChecks)
+        case let .mailTask(taskId):
+            // A17.12 — Mail-derived task detail. Source-mail + next-up
+            // taps push the originating mail item onto this same stack.
+            MailTaskView(
+                viewModel: MailTaskViewModel(
+                    taskId: taskId,
+                    onOpenMail: { mailId in
+                        Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onBack: { Task { @MainActor in pop() } }
+                )
+            )
         case let .mailTranslation(mailId):
             MailTranslationView(
                 mailId: mailId,

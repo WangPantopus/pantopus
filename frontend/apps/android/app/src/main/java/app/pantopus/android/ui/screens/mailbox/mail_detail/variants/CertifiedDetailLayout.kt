@@ -92,6 +92,10 @@ fun CertifiedDetailLayout(
     // T6.5e (P19.5) — Defaults to a no-op so existing call sites
     // compile unchanged.
     onSaveToVault: () -> Unit = {},
+    // A17.12 — opens the Elf-extracted task Pantopus made from this
+    // certified notice. Null hides the affordance (e.g. snapshot
+    // fixtures), so existing call sites compile unchanged.
+    onOpenExtractedTask: (() -> Unit)? = null,
 ) {
     val shouldShowConfirmGate =
         content.readStatusLabel.lowercase() == "unread" &&
@@ -126,6 +130,7 @@ fun CertifiedDetailLayout(
                     certified = certified,
                     onOpenSenderProfile = onOpenSenderProfile,
                     onViewTerms = { showsTermsSheet = true },
+                    onOpenExtractedTask = onOpenExtractedTask,
                 )
             },
             actions = {
@@ -651,8 +656,12 @@ private fun SenderAndNotice(
     certified: CertifiedDetailDto,
     onOpenSenderProfile: (String) -> Unit,
     onViewTerms: () -> Unit,
+    onOpenExtractedTask: (() -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        if (onOpenExtractedTask != null) {
+            ExtractedTaskCard(onTap = onOpenExtractedTask)
+        }
         CombinedSenderCarrierCard(
             senderName = content.senderDisplayName,
             senderMeta = content.senderMeta,
@@ -893,6 +902,78 @@ private fun SecondaryTile(
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appText,
+        )
+    }
+}
+
+/**
+ * A17.12 — "Pantopus made a task" row surfaced on certified notices that
+ * carry a deadline. Tapping it opens the A17.12 Mail-task detail. Indigo
+ * task accent so it reads as the automated-productivity chrome. Mirrors
+ * iOS `ExtractedTaskCard` in `CertifiedDetailLayout.swift`.
+ */
+@Composable
+private fun ExtractedTaskCard(onTap: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.categoryTask.copy(alpha = 0.35f), RoundedCornerShape(Radii.lg))
+                .clickable { onTap() }
+                .padding(horizontal = Spacing.s3, vertical = 10.dp)
+                .testTag("mailDetail_viewExtractedTask"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.categoryTask.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.ListChecks,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.categoryTask,
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Sparkles,
+                    contentDescription = null,
+                    size = 10.dp,
+                    tint = PantopusColors.categoryTask,
+                )
+                Text(
+                    text = "Pantopus made a task",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
+            }
+            Text(
+                text = "Submit written comment · due Fri 5:00 PM",
+                fontSize = 11.5.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = "View task",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.categoryTask,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.appTextMuted,
         )
     }
 }

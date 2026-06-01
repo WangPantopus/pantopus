@@ -13,22 +13,30 @@ import SwiftUI
 
 public struct MailDetailView: View {
     @State private var viewModel: MailDetailViewModel
+    private let mailId: String
     private let onBack: () -> Void
     private let onOpenSenderProfile: (@MainActor (String) -> Void)?
     /// Opens the A17.13 Translation screen for this mail. When set, the
     /// generic detail variant surfaces a "Translate" overflow action.
     private let onTranslate: (@MainActor () -> Void)?
+    /// A17.12 — opens the Elf-extracted task detail for this mail. When
+    /// non-nil the certified variant surfaces a "view task" card. The
+    /// closure receives the mail id so the host can resolve the task.
+    private let onOpenExtractedTask: (@MainActor (String) -> Void)?
 
     public init(
         mailId: String,
         onBack: @escaping () -> Void,
         onOpenSenderProfile: (@MainActor (String) -> Void)? = nil,
-        onTranslate: (@MainActor () -> Void)? = nil
+        onTranslate: (@MainActor () -> Void)? = nil,
+        onOpenExtractedTask: (@MainActor (String) -> Void)? = nil
     ) {
+        self.mailId = mailId
         _viewModel = State(initialValue: MailDetailViewModel(mailId: mailId))
         self.onBack = onBack
         self.onOpenSenderProfile = onOpenSenderProfile
         self.onTranslate = onTranslate
+        self.onOpenExtractedTask = onOpenExtractedTask
     }
 
     public var body: some View {
@@ -134,7 +142,10 @@ public struct MailDetailView: View {
                 onBack: { onBack() },
                 onAcknowledge: { Task { await viewModel.acknowledge() } },
                 onOpenSenderProfile: onOpenSenderProfile,
-                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
+                onOpenExtractedTask: onOpenExtractedTask.map { open in
+                    { @MainActor in open(mailId) }
+                }
             )
         } else {
             generic(content)
