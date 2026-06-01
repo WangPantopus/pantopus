@@ -295,7 +295,9 @@ public struct MailTaskContent: Sendable, Hashable {
     }
 
     /// Total subtasks.
-    public var totalSteps: Int { subtasks.count }
+    public var totalSteps: Int {
+        subtasks.count
+    }
 
     /// Steps counted as finished. When the task is marked done every step
     /// reads as complete regardless of its own flag.
@@ -310,7 +312,9 @@ public struct MailTaskContent: Sendable, Hashable {
     }
 
     /// The elf payload for the current frame.
-    public var elf: MailTaskElf { isDone ? elfDone : elfOpen }
+    public var elf: MailTaskElf {
+        isDone ? elfDone : elfOpen
+    }
 }
 
 // MARK: - State

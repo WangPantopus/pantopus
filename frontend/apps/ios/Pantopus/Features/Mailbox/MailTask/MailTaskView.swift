@@ -189,7 +189,6 @@ public struct MailTaskView: View {
 
     // MARK: - Action dock
 
-    @ViewBuilder
     private func actionDock(_ task: MailTaskContent) -> some View {
         VStack(spacing: Spacing.s2 + 2) {
             if task.isDone {

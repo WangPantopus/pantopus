@@ -13,8 +13,13 @@ import SwiftUI
 struct TaskCard: View {
     let content: MailTaskContent
 
-    private var done: Bool { content.isDone }
-    private var accent: Color { done ? Theme.Color.success : Theme.Color.categoryTask }
+    private var done: Bool {
+        content.isDone
+    }
+
+    private var accent: Color {
+        done ? Theme.Color.success : Theme.Color.categoryTask
+    }
 
     var body: some View {
         MailTaskAccentCard(accent: accent) {
