@@ -45,6 +45,7 @@ import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessWizardScreen
+import app.pantopus.android.ui.screens.businesses.owner_dashboard.BusinessOwnerScreen
 import app.pantopus.android.ui.screens.businesses.page_editor.EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.businesses.page_editor.EditBusinessPageScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
@@ -1629,7 +1630,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.MY_BUSINESSES) {
                 MyBusinessesScreen(
-                    onOpenBusiness = { _ -> navController.navigate(ChildRoutes.placeholder("Business dashboard")) },
+                    // B3.2 — an owned business opens its owner dashboard (A10.7).
+                    onOpenBusiness = { businessId -> navController.navigate(ChildRoutes.businessOwner(businessId)) },
                     onRegister = { navController.navigate(ChildRoutes.CREATE_BUSINESS) },
                     onBack = { navController.popBackStack() },
                 )
@@ -3579,8 +3581,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.BUSINESS_OWNER,
                 arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
-            ) {
-                NotYetAvailableView(tabName = "Business owner", icon = PantopusIcon.Briefcase)
+            ) { backStackEntry ->
+                val businessId = backStackEntry.arguments?.getString(ChildRoutes.BUSINESS_OWNER_ID_KEY) ?: ""
+                BusinessOwnerScreen(
+                    onBack = { navController.popBackStack() },
+                    onEditPage = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
+                    onOpenInsights = { navController.navigate(ChildRoutes.placeholder("Insights")) },
+                    onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Business settings")) },
+                )
             }
             composable(ChildRoutes.VIEW_AS) {
                 NotYetAvailableView(tabName = "View as", icon = PantopusIcon.Eye)

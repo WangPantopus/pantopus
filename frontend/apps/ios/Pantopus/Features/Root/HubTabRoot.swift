@@ -2008,8 +2008,14 @@ public struct HubTabRoot: View {
                 onSeeAllEarnings: { Task { @MainActor in push(.placeholder(label: "All earnings")) } },
                 onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } }
             )
-        case .businessOwner:
-            NotYetAvailableView(tabName: "Business owner", icon: .briefcase)
+        case let .businessOwner(businessId):
+            BusinessOwnerView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onEditPage: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } },
+                onOpenInsights: { Task { @MainActor in push(.placeholder(label: "Insights")) } },
+                onOpenSettings: { Task { @MainActor in push(.placeholder(label: "Business settings")) } }
+            )
         case .viewAs:
             NotYetAvailableView(tabName: "View as", icon: .eye)
         case .waitingRoom:
