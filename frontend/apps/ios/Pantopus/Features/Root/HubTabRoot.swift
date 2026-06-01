@@ -1989,11 +1989,11 @@ public struct HubTabRoot: View {
             // (OCR / classification / vault upload are out of scope), so the
             // `mailId` payload is unused today; it rides the route for when a
             // real originating-mail fetch lands.
+            let openDrawer: @MainActor () -> Void = {
+                Task { @MainActor in push(.placeholder(label: "Home drawer")) }
+            }
             UnboxingView(
-                viewModel: UnboxingViewModel(
-                    onScanNext: {},
-                    onOpenDrawer: { Task { @MainActor in push(.placeholder(label: "Home drawer")) } }
-                )
+                viewModel: UnboxingViewModel(onOpenDrawer: openDrawer)
             ) { if !path.isEmpty { path.removeLast() } }
         case .earn:
             EarnView(
@@ -2018,8 +2018,12 @@ public struct HubTabRoot: View {
             )
         case .viewAs:
             NotYetAvailableView(tabName: "View as", icon: .eye)
-        case .waitingRoom:
-            NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
+        case let .waitingRoom(homeId):
+            WaitingRoomView(
+                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active)
+            ) {
+                pop()
+            }
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

@@ -2039,11 +2039,11 @@ public struct YouTabRoot: View {
             // (OCR / classification / vault upload are out of scope), so the
             // `mailId` payload is unused today; it rides the route for when a
             // real originating-mail fetch lands.
+            let openDrawer: @MainActor () -> Void = {
+                Task { @MainActor in path.append(.placeholder(label: "Home drawer")) }
+            }
             UnboxingView(
-                viewModel: UnboxingViewModel(
-                    onScanNext: {},
-                    onOpenDrawer: { Task { @MainActor in path.append(.placeholder(label: "Home drawer")) } }
-                )
+                viewModel: UnboxingViewModel(onOpenDrawer: openDrawer)
             ) { Task { @MainActor in pop() } }
         case .earn:
             EarnView(
@@ -2068,8 +2068,12 @@ public struct YouTabRoot: View {
             )
         case .viewAs:
             NotYetAvailableView(tabName: "View as", icon: .eye)
-        case .waitingRoom:
-            NotYetAvailableView(tabName: "Waiting room", icon: .hourglass)
+        case let .waitingRoom(homeId):
+            WaitingRoomView(
+                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active)
+            ) {
+                pop()
+            }
         #if DEBUG
         case .statusWaiting:
             StatusWaitingView(

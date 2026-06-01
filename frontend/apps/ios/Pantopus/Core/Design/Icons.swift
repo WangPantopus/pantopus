@@ -341,6 +341,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case userMinus = "user-minus"
     case calendarPlus = "calendar-plus"
 
+    // A18.4 Waiting room — the persistent claim room's more-info halo glyph
+    // (`file-warning`) and the "Update evidence" inline-action glyph
+    // (`file-plus-2`).
+    case filePlus2 = "file-plus-2"
+    case fileWarning = "file-warning"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -606,6 +612,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .minus: "minus"
         case .userMinus: "person.badge.minus"
         case .calendarPlus: "calendar.badge.plus"
+        // A18.4 Waiting room. `doc.badge.plus` is the file-with-plus glyph;
+        // SF Symbols ships no doc-with-warning glyph, so `file-warning`
+        // falls back to the generic warning triangle.
+        case .filePlus2: "doc.badge.plus"
+        case .fileWarning: "exclamationmark.triangle"
         }
     }
 }
