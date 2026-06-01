@@ -12,6 +12,7 @@
 import XCTest
 @testable import Pantopus
 
+@MainActor
 final class WaitingRoomContentTests: XCTestCase {
     // MARK: - Active wait
 
