@@ -1928,7 +1928,6 @@ public struct HubTabRoot: View {
                     onOpenMap: { push(.mailboxMap) },
                     onOpenMailDay: { push(.mailDay(variant: .populated)) },
                     onOpenEarn: { push(.earn) },
-                    onBrowseGigs: { push(.gigsFeed) },
                     onOpenVacationHold: { push(.vacationHold) },
                     onOpenStamps: { push(.stamps) }
                 )

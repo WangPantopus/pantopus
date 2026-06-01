@@ -818,7 +818,6 @@ public struct YouTabRoot: View {
                     onOpenMap: { path.append(.mailboxMap) },
                     onOpenMailDay: { path.append(.mailDay(variant: .populated)) },
                     onOpenEarn: { path.append(.earn) },
-                    onBrowseGigs: { path.append(.gigsFeed) },
                     onOpenVacationHold: { path.append(.vacationHold) },
                     onOpenStamps: { path.append(.stamps) }
                 )
