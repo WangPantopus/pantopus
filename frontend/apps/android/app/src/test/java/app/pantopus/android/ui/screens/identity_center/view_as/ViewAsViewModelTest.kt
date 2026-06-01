@@ -15,8 +15,7 @@ import org.junit.Test
  * re-resolve when the picker changes. Pure JVM — the VM has no coroutines.
  */
 class ViewAsViewModelTest {
-    private fun render(vm: ViewAsViewModel): ViewAsRender? =
-        (vm.state.value as? ViewAsUiState.Loaded)?.render
+    private fun render(vm: ViewAsViewModel): ViewAsRender? = (vm.state.value as? ViewAsUiState.Loaded)?.render
 
     private fun disclosure(
         render: ViewAsRender,
