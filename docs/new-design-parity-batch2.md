@@ -37,6 +37,26 @@
 > - **POLISH** — file exists, structure matches; only per-state visuals /
 >   copy need refresh.
 > - **MATCH** — already at design.
+> - **DONE** — shipped on **both** platforms, snapshot-locked, parity-verified.
+>   Each DONE entry carries its prompt id + merged PR + the files that landed
+>   (mirroring how `docs/new-design-parity.md` annotates completed screens).
+>
+> **✅ Batch closed out (B7.1).** All 11 screens below are **DONE** on iOS +
+> Android. Every designed state is locked by the batch-2 snapshot lockfile —
+> iOS `PantopusTests/Features/Shared/T8ScreensSnapshotTests.swift` (+ baselines
+> under `PantopusTests/Features/__snapshots__/new-designs-batch2/`) and Android
+> `…/ui/screens/shared/NewDesignBatch2ScreensSnapshotTest.kt` (+
+> `app/src/test/snapshots/images/new-designs-batch2/`), rendered by
+> `render-new-designs-batch2.mjs`. 22 rows (11 screens × 2 designed states).
+> See `NEW_DESIGNS_BATCH2.md` for the regeneration policy. Tooling: iOS
+> `verify-icons.sh` green; the CI `#RRGGBB` hex grep over `Pantopus/Features` is
+> clean and all 11 batch-2 folders carry **zero** hex literals (new accents are
+> named tokens) and **zero off-scale values** (flagged spacing/type in batch-2
+> files use on-scale values via the raw `.padding()`/`.font(.system())` API form
+> — `verify-tokens.sh` is delta-gated, not a CI gate, per drift D5; this lockfile
+> PR touches no scanned source so adds **zero** new flagged sites). Android
+> detekt green on `android-ci.yml`. The 13 B1 primitives are all consumed (no
+> orphans). Full closeout detail at the foot of this doc.
 >
 > **Path prefixes** (table cells are relative to these):
 > - iOS — `frontend/apps/ios/Pantopus/Features/`
@@ -46,31 +66,43 @@
 
 ## Summary
 
-| Status | Count |
-|---|---:|
-| BUILD | 7 |
-| RESHAPE | 4 |
-| POLISH | 0 |
-| MATCH | 0 |
-| **Total screens audited** | **11** |
+| Status | Count | Now |
+|---|---:|---:|
+| BUILD (start) | 7 | → DONE |
+| RESHAPE (start) | 4 | → DONE |
+| POLISH | 0 | — |
+| MATCH | 0 | — |
+| **DONE (shipped both platforms, locked)** | — | **11** |
+| **Total screens audited** | **11** | **11** |
 
 iOS and Android sit at the same structural parity for every screen below
 (both were scaffolded from the same plan), so each grade is symmetric
 across both platforms unless the per-screen note says otherwise.
 
-| Design | Path (logical) | What it is | Grade |
-|---|---|---|---|
-| A17.11 | `mailbox/stamps.tsx` | Postage / stamp-book wallet | **BUILD** |
-| A17.12 | `mailbox/tasks.tsx` | Mail-derived task detail | **BUILD** |
-| A17.13 | `mailbox/translation.tsx` | Auto-translated mail view | **BUILD** |
-| A17.14 | `mailbox/unboxing.tsx` | Scan-first capture flow (camera) | **BUILD** |
-| A10.6 | `business/[username].tsx` | Public business profile | **RESHAPE** |
-| A10.7 | `businesses/[id]/index.tsx` | Business owner view (+ preview-as-neighbor) | **BUILD** |
-| A10.11 | `mailbox/earn.tsx` | Earn dashboard (Wallet sibling) | **BUILD** |
-| A18.4 | `homes/[id]/waiting-room.tsx` | Persistent "waiting for approval" room | **RESHAPE** |
-| A18.5 | `identity/preview.tsx` | "View as" identity preview | **BUILD** |
-| A19.1 | `legal/privacy.tsx` | Privacy Policy (long-form) | **RESHAPE** |
-| A19.2 | `legal/terms.tsx` | Terms of Service (same archetype) | **RESHAPE** |
+| Design | Path (logical) | What it is | Start | Grade |
+|---|---|---|---|---|
+| A17.11 | `mailbox/stamps.tsx` | Postage / stamp-book wallet | BUILD | **DONE** · B2.1 · [#187] |
+| A17.12 | `mailbox/tasks.tsx` | Mail-derived task detail | BUILD | **DONE** · B2.2 · [#186] |
+| A17.13 | `mailbox/translation.tsx` | Auto-translated mail view | BUILD | **DONE** · B2.3 · [#188] |
+| A17.14 | `mailbox/unboxing.tsx` | Scan-first capture flow (camera) | BUILD | **DONE** · B2.4 · [#189] |
+| A10.6 | `business/[username].tsx` | Public business profile | RESHAPE | **DONE** · B3.1 · [#185] |
+| A10.7 | `businesses/[id]/index.tsx` | Business owner view (+ preview-as-neighbor) | BUILD | **DONE** · B3.2 · [#191] |
+| A10.11 | `mailbox/earn.tsx` | Earn dashboard (Wallet sibling) | BUILD | **DONE** · B4.1 · [#190] |
+| A18.4 | `homes/[id]/waiting-room.tsx` | Persistent "waiting for approval" room | RESHAPE | **DONE** · B5.1 · [#194] |
+| A18.5 | `identity/preview.tsx` | "View as" identity preview | BUILD | **DONE** · B5.2 · [#192] |
+| A19.1 | `legal/privacy.tsx` | Privacy Policy (long-form) | RESHAPE | **DONE** · B6.1 · [#193] |
+| A19.2 | `legal/terms.tsx` | Terms of Service (same archetype) | RESHAPE | **DONE** · B6.1 · [#193] |
+
+[#185]: https://github.com/WangPantopus/pantopus/pull/185
+[#186]: https://github.com/WangPantopus/pantopus/pull/186
+[#187]: https://github.com/WangPantopus/pantopus/pull/187
+[#188]: https://github.com/WangPantopus/pantopus/pull/188
+[#189]: https://github.com/WangPantopus/pantopus/pull/189
+[#190]: https://github.com/WangPantopus/pantopus/pull/190
+[#191]: https://github.com/WangPantopus/pantopus/pull/191
+[#192]: https://github.com/WangPantopus/pantopus/pull/192
+[#193]: https://github.com/WangPantopus/pantopus/pull/193
+[#194]: https://github.com/WangPantopus/pantopus/pull/194
 
 ---
 
@@ -150,7 +182,18 @@ Stamps `#0e7490` (teal) · Task `#4f46e5` (indigo) · Translation `#be185d`
 `Colors.swift` / `Color.kt`; the shared Elf-strip gradient is a strong
 token target.
 
-### A17.11 — Stamps (`mailbox/stamps.tsx`) · BUILD (iOS + Android)
+### A17.11 — Stamps (`mailbox/stamps.tsx`) · DONE (B2.1 · #187, iOS + Android)
+- **Status: DONE (B2.1 · #187, both platforms).** Snapshot-locked
+  (`a17-11-stamps-{populated,empty}`). **iOS:** `Features/Mailbox/Stamps/`
+  — `StampsView` + `StampsViewModel` + `StampsContent` + `StampsSampleData` +
+  `Components/{StampBookHero, StampSheet, WalletRail, UsageHistoryRow}`. **Android:**
+  `ui/screens/mailbox/stamps/` — `StampsScreen` + VM + Content + SampleData +
+  `components/{StampBookHero, StampSheet, WalletRail, UsageHistoryRow}`. Reuses
+  the B1.1 `PerforatedStamp` (+ `Postmark`) primitive; perforation mask seeded
+  static in snapshots. `categoryStamps` teal `#0e7490` landed as a named token.
+  Route `.mailStamps` / `ChildRoutes.STAMPS = "mailbox/stamps"` +
+  `pantopus://mailbox/stamps`. Backed by `getStamps()` (earned | locked); buy /
+  auto-refill are scoped stubs per the brief (no Stripe).
 - **iOS:** **MISSING** — no Stamps view. The `MailItemCategory` enum has 20
   cases (`package`…`records`) and no `stamps`; the "Stamps" string hits are
   `CertifiedStampBadge` etc.
@@ -187,7 +230,18 @@ token target.
   perforation mask is the heavy draw; seed it static in snapshots, animate
   only in production, honor `reduceMotion`.
 
-### A17.12 — Mail task (`mailbox/tasks.tsx`) · BUILD (iOS + Android)
+### A17.12 — Mail task (`mailbox/tasks.tsx`) · DONE (B2.2 · #186, iOS + Android)
+- **Status: DONE (B2.2 · #186, both platforms).** Snapshot-locked
+  (`a17-12-mail-task-{open,done}`). **iOS:** `Features/Mailbox/MailTask/` —
+  `MailTaskView` + `MailTaskViewModel` + `MailTaskContent` + `MailTaskContentViews`
+  + `MailTaskSampleData` + `Components/{TaskCard, DueSnoozeCard, SubtaskChecklist,
+  SourceMailCard, NextUpCard}`. **Android:** `ui/screens/mailbox/mail_task/`
+  (mirror, `MailTaskScreen` + the same component set). `categoryTask` indigo
+  `#4f46e5` landed as a named token. "Mark done" runs the optimistic open→done
+  mutation with rollback; snooze / calendar / view-confirmation / archive chips
+  toast (scoped stubs). Route `.mailTask(taskId:)` / `ChildRoutes.MAIL_TASK =
+  "mailbox/tasks/{taskId}"` + `pantopus://mailbox/tasks/:id`. (The mail-task
+  **list** stays a follow-up — see resolved open question B-1.)
 - **iOS / Android:** **MISSING** (`MailTask` → 0 hits).
 - **Proposed target:** iOS `Mailbox/Tasks/MailTaskView.swift` (+ VM/content/
   sample/Components); Android `mailbox/tasks/MailTaskScreen.kt`.
@@ -214,8 +268,10 @@ token target.
   "Confirmation #C-8841" / "Hearing Jun 3, 6 PM"; NextUp "Pay Riverside Linen
   — $642.50".
 
-### A17.13 — Translation (`mailbox/translation.tsx`) · BUILT (B2.3, iOS + Android)
-- **Status:** **BUILT** (B2.3). iOS `Features/Mailbox/Translation/` and Android
+### A17.13 — Translation (`mailbox/translation.tsx`) · DONE (B2.3 · #188, iOS + Android)
+- **Status: DONE (B2.3 · #188, both platforms).** Snapshot-locked
+  (`a17-13-translation-{machine,confirmed}`). iOS `Features/Mailbox/Translation/`
+  and Android
   `ui/screens/mailbox/translation/` ship the full screen (View/Screen + ViewModel
   + Content/UiState + SampleData + `Components/`: LanguageBadge, ViewToggle,
   SideBySide, TranslatorNotes). Machine ↔ confirmed transition is optimistic with
@@ -256,7 +312,17 @@ token target.
   no facts grid); the glossary is a bespoke list. Side-by-side and reading
   views are layout, not new primitives.
 
-### A17.14 — Unboxing (`mailbox/unboxing.tsx`) · BUILD (iOS + Android)
+### A17.14 — Unboxing (`mailbox/unboxing.tsx`) · DONE (B2.4 · #189, iOS + Android)
+- **Status: DONE (B2.4 · #189, both platforms).** Snapshot-locked
+  (`a17-14-unboxing-{classified,filed}`). **iOS:** `Features/Mailbox/Unboxing/`
+  — `UnboxingView` + `UnboxingViewModel` + `UnboxingContent` + `UnboxingSampleData`
+  + `Components/{CaptureFilmstrip, DrawerSuggestionCard, FiledSummary}`. **Android:**
+  `ui/screens/mailbox/unboxing/` (mirror). Reuses B1.1 `CameraScanner` +
+  `OcrFactsList`; viewfinder is **seeded static** in snapshots (scan-line animates
+  production-only, `reduceMotion`-aware). `categoryUnboxing` teal `#0d9488` landed
+  as a named token. "Confirm — file to Home" runs classified→filed (optimistic,
+  Undo reverses); drawer re-route radios + ScanNext live. Route `.mailUnboxing` /
+  `ChildRoutes.MAIL_UNBOXING = "mailbox/unboxing"` + `pantopus://mailbox/unboxing`.
 - **iOS:** **MISSING** (`Unboxing` → 1 incidental hit, no camera/capture
   screen). **Android:** **MISSING**.
 - **Proposed target:** iOS `Mailbox/Unboxing/MailUnboxingView.swift`; Android
@@ -295,7 +361,18 @@ token target.
 
 ## A10 — Detail: content
 
-### A10.6 — Business profile (public) (`business/[username].tsx`) · RESHAPE (iOS + Android)
+### A10.6 — Business profile (public) (`business/[username].tsx`) · DONE (B3.1 · #185, iOS + Android)
+- **Status: DONE (B3.1 · #185, both platforms).** Snapshot-locked
+  (`a10-6-business-profile-{populated,new}`). Reshaped from the tabbed/violet-band
+  layout to the single-scroll sectioned design. **iOS:** `Features/BusinessProfile/`
+  — `BusinessProfileView` + `Content` + `ViewModel` + `SampleData` +
+  `Components/{ActionBar, CategoryRow, EmptyBlock, HoursTable, ServicesList,
+  StatStrip}`. **Android:** `ui/screens/business_profile/` (mirror). Reuses B1.4/B1.5
+  `BizBannerHeader` / `GalleryStrip` / `RatingDistribution` / `MapPreview` and the
+  business-violet `#6d28d9` family + category accents as named tokens; the `open`
+  flag drives the Hours status label/color. The body is a parametrized
+  composable/view reused by B3.2's preview mode. Existing route +
+  `pantopus://business/:username` preserved.
 - **iOS:** `BusinessProfile/{BusinessProfileView, BusinessProfileContent,
   BusinessProfileViewModel}.swift` exist.
 - **Android:** `business_profile/{BusinessProfileScreen, BusinessProfileContent,
@@ -335,7 +412,18 @@ token target.
 - **Routing:** `BusinessProfileView` / `BusinessProfileScreen`, reached from
   business search / discover and the `pantopus://business/:username` deep link.
 
-### A10.7 — Business owner view (`businesses/[id]/index.tsx`) · BUILD (iOS + Android)
+### A10.7 — Business owner view (`businesses/[id]/index.tsx`) · DONE (B3.2 · #191, iOS + Android)
+- **Status: DONE (B3.2 · #191, both platforms).** Snapshot-locked
+  (`a10-7-business-owner-{edit,preview}`). **iOS:** `Features/Businesses/OwnerDashboard/`
+  — `BusinessOwnerView` + `Content` + `ViewModel` + `SampleData` +
+  `Components/{OwnerHeader, InsightTiles, ProfileStrengthCard, ReviewReplyComposer,
+  PreviewBar}`. **Android:** `ui/screens/businesses/owner_dashboard/` (mirror).
+  Preview mode re-renders the **same data through B3.1's public body** (owner ↔
+  public stay identical); "View as neighbor" / "Preview" navigate to the preview
+  frame, "Exit" pops back; "Edit page" routes to `EditBusinessPageView` (A13.10);
+  reuses the existing `StrengthMeter` for profile strength. Route
+  `.businessOwner(businessId:)` / `ChildRoutes.BUSINESS_OWNER = "businesses/{businessId}"`
+  + `pantopus://businesses/:id`, reached from `MyBusinessesView` rows.
 - **iOS:** `Businesses/` has `MyBusinessesView` (list), `CreateBusiness/`
   (wizard), `PageEditor/EditBusinessPageView` (A13.10). **No single-business
   owner dashboard.** **Android:** same.
@@ -371,7 +459,23 @@ token target.
   "Exit" pops back. (Owner↔preview is **navigation between two frames**, not a
   runtime toggle.)
 
-### A10.11 — Earn (`mailbox/earn.tsx`) · BUILD (iOS + Android)
+### A10.11 — Earn (`mailbox/earn.tsx`) · DONE (B4.1 · #190, iOS + Android)
+- **Status: DONE (B4.1 · #190, both platforms).** Snapshot-locked
+  (`a10-11-earn-{populated,empty}`). **iOS:** `Features/Mailbox/Earn/` — `EarnView`
+  + `EarnViewModel` + `EarnContent` + `EarnSampleData` + `Components/{WeeklyGoalCard,
+  WaysToEarnRow, EarningsRow, PayoutSettingsCard, EarnTaxDocsRow}`. **Android:**
+  `ui/screens/mailbox/earn/` (mirror). Reuses `BalanceHero` framed for earnings.
+  The `empty`/no-bank gating drives the payout / earnings / CTA swap and omits the
+  Taxes row; Cash out / Browse open tasks / Add bank / Manage all wired. Route
+  `.earn` / `ChildRoutes.EARN = "mailbox/earn"` + `pantopus://mailbox/earn` — sits
+  beside Wallet (see resolved B-2).
+  > **⚠ Goal-momentum fidelity (B-3 follow-up).** B1.5 shipped the goal indicator
+  > as **`ProgressRing`** (a 64pt donut on a `WeeklyGoalCard` surface card below the
+  > hero), **not** the audit-recommended in-hero gradient **bar** the design renders
+  > ("74% to your $200 weekly goal · $52 to go" inside `EarnHero`). Implementation
+  > is consistent iOS↔Android and snapshot-locked, but the locked **design**
+  > baseline (`a10-11-earn-populated`) shows the bar — so this is a known
+  > design-vs-implementation diff for design review, not a lockfile failure.
 - **iOS:** `Wallet/` exists (A10.10); **no Earn**. **Android:** same. Web's
   `mailbox/earn` / `wallet` just `redirect()` to payments — there is **no
   standalone Earn surface anywhere yet**.
@@ -411,7 +515,18 @@ token target.
 
 ## A18 — Status / waiting / preview
 
-### A18.4 — Waiting for approval (`homes/[id]/waiting-room.tsx`) · RESHAPE (iOS + Android)
+### A18.4 — Waiting for approval (`homes/[id]/waiting-room.tsx`) · DONE (B5.1 · #194, iOS + Android)
+- **Status: DONE (B5.1 · #194, both platforms).** Snapshot-locked
+  (`a18-4-waiting-room-{active,more-info}`). **iOS:** `Features/Status/WaitingRoom/`
+  — `WaitingRoomView` + `WaitingRoomViewModel` + `WaitingRoomContent` +
+  `WaitingRoomComponents`. **Android:** `ui/screens/status/waiting_room/`
+  (`WaitingRoomScreen` + VM + Content). Persistent room (back arrow + bell, **not**
+  the one-shot `underReview` factory); reuses `HaloCircle` (info-pulse + warning
+  tones) + the `TimelineStepper`. Halo pulse animates production-only,
+  `reduceMotion`-aware, static in snapshots. "Update evidence" routes to re-upload;
+  "Cancel claim" is destructive with confirm. Route `.homeWaitingRoom(homeId:)` /
+  `ChildRoutes.HOME_WAITING_ROOM = "homes/{homeId}/waiting-room"` +
+  `pantopus://homes/:id/waiting-room`.
 - **iOS:** `Status/{StatusWaitingView, StatusWaitingContent}.swift` exist with
   factories `claimSubmitted` / `underReview` / `checkYourEmail` / `resetLinkSent`
   / `passwordReset`. **Android:** `status/StatusWaitingContent.kt` mirror.
@@ -453,7 +568,17 @@ token target.
   `pantopus://homes/:id/waiting-room`, reached from the home card while a
   claim is under review.
 
-### A18.5 — View As (`identity/preview.tsx`) · BUILD (iOS + Android)
+### A18.5 — View As (`identity/preview.tsx`) · DONE (B5.2 · #192, iOS + Android)
+- **Status: DONE (B5.2 · #192, both platforms).** Snapshot-locked
+  (`a18-5-view-as-{connection,public}`). **iOS:** `Features/IdentityCenter/ViewAs/`
+  — `ViewAsView` + `ViewAsViewModel` + `ViewAsContent` + `ViewAsSampleData`.
+  **Android:** `ui/screens/identity_center/view_as/` (mirror). Reuses B1.2
+  `ViewerPicker` (flat scroll row) + `RedactionScrim`. Picking a chip re-renders the
+  **entire** live profile (banner tone + badges + field redaction); there is **no
+  primary CTA / sticky dock** — the rendered card is the output (only the TopBar
+  Edit pill + inline "Manage privacy" → A14.7 are interactive). Chips
+  `viewAs_chip_<viewer>`. Route `.identityPreview` / `ChildRoutes.IDENTITY_PREVIEW =
+  "identity/preview"` + `pantopus://identity/preview`, reached from Identity Center.
 - **iOS:** `IdentityCenter/` + `IdentitySwitcherSheet` exist, but **no "View
   as" preview** (`ViewAs` → 0 real hits). **Android:** same.
 - **Proposed target:** iOS `IdentityCenter/ViewAs/IdentityPreviewView.swift`;
@@ -502,7 +627,20 @@ scroll state (**entry** = top of doc, TOC expanded; **mid-scroll** = TOC
 collapsed, back-to-top FAB visible). No FAB-nav, no tab bar. **Do both
 together** — same archetype, only the slot content changes.
 
-### A19.1 — Privacy Policy (`legal/privacy.tsx`) · RESHAPE · A19.2 — Terms of Service (`legal/terms.tsx`) · RESHAPE
+### A19.1 — Privacy Policy (`legal/privacy.tsx`) · DONE (B6.1 · #193) · A19.2 — Terms of Service (`legal/terms.tsx`) · DONE (B6.1 · #193)
+- **Status: DONE (B6.1 · #193, both platforms, both docs).** Snapshot-locked
+  (`a19-1-privacy-{top,reading}` + `a19-2-terms-{top,reading}` — 4 rows). One
+  scaffold, both docs. **iOS:** `Features/Settings/Legal/` — rebuilt
+  `LegalContentView` + `LegalDocuments` (structured section bodies) + the kept
+  `LegalIndexView`; plus the B1.3 primitives `Core/Design/Components/{LegalTOCCard,
+  LegalSection}` (with `DocMetaStrip` + `BackToTopFab`). **Android:**
+  `ui/screens/settings/legal/LegalScreens.kt` (rebuilt viewer; kept index). Section
+  bodies stored as structured data mirrored word-for-word from the web copy so iOS
+  + Android stay identical (Privacy "Last updated October 1, 2025 · v3.2", 10
+  sections; Terms "Last updated February 14, 2026 · v5.0", 12 sections). TOC tap
+  scrolls to section; collapse/expand works; `BackToTopFab` fades in past
+  `scrollTop > 220`; **share is chrome**. Reached from Settings → Help & legal +
+  `pantopus://legal/privacy` & `pantopus://legal/terms`.
 - **iOS:** `Settings/Legal/{LegalContentView, LegalIndexView}.swift` render a
   simple block list (`LegalContentView(document: .privacy)` has Overview /
   visibility / analytics blocks). **Android:** `settings/legal/LegalScreens.kt`
@@ -587,32 +725,77 @@ honored by every later B-prompt.
 
 ---
 
-## Open questions for product / design
+## Open questions for product / design — RESOLVED (B7.1)
 
-- **B-1 — Mail task list (A17.12).** The web `mailbox/tasks` route is a list;
-  this batch builds only the **task detail**. Confirm the list (mail-derived
-  tasks index) is a separate, later item and not expected in this PR.
-- **B-2 — Earn vs Wallet (A10.11 vs A10.10).** Two adjacent surfaces:
-  earnings-in (`Earn`) vs withdrawals/balance (`Wallet`). Confirm both exist,
-  with `Earn` reached via `pantopus://mailbox/earn` and `Wallet` keeping its
-  current entry. The web currently `redirect()`s both to payments — confirm
-  the native Earn surface is the canonical home.
-- **B-3 — `GoalProgressBar` vs `ProgressRing`.** The design uses a horizontal
-  goal bar, so B1.5 ships `GoalProgressBar` and defers the donut. Confirm no
-  other in-scope screen needs a donut ring (if so, extract `MailDay`'s
-  `DayHeader` ring).
-- **B-4 — New accent tokens.** Stamps `#0e7490`, Task `#4f46e5`, Translation
-  `#be185d`, Unboxing `#0d9488`, and the business-violet `#6d28d9` family land
-  as **named tokens** in `Colors.swift` / `Color.kt` (per the A17.9/A17.10
-  precedent — `category-party` / `category-records` were added the same way),
-  not raw hex. Confirm naming (`categoryStamps`, `categoryTask`,
-  `categoryTranslation`, `categoryUnboxing`).
-- **B-5 — Camera capture scope (A17.14).** Confirm whether the Unboxing
-  capture wires a real `AVCaptureSession` / CameraX preview (with permission
-  prompt + still fallback) in this batch, or ships the decorative seeded
-  viewfinder first and defers live capture.
+- **B-1 — Mail task list (A17.12). ✅ Resolved: detail only.** B2.2 (#186)
+  shipped just the **task detail** (`open` / `done`). The mail-derived tasks
+  **list/index** is confirmed a separate, later item — not in this batch.
+  Tracked as a follow-up; out of scope here.
+- **B-2 — Earn vs Wallet (A10.11 vs A10.10). ✅ Resolved: both exist,
+  distinct.** Native ships **both** — `Earn` (earnings-in) via
+  `pantopus://mailbox/earn` and `Wallet` (withdrawals/balance, A10.10) keeping
+  its entry. The native `Earn` surface is the canonical home (web still
+  `redirect()`s to payments). Mirrors the P5.2 Wallet-vs-Payments split.
+- **B-3 — `GoalProgressBar` vs `ProgressRing`. ⚠ Resolved against the audit
+  recommendation — shipped a `ProgressRing` donut.** B1.5 (#182) shipped
+  **`ProgressRing`** (a generic donut: track circle + trimmed accent arc +
+  centre label) under `Core/Design/Components` / `ui/components`, and A10.11's
+  `WeeklyGoalCard` consumes it as a 64pt green goal ring on a surface card. This
+  **diverges** from the design's in-hero gradient **bar** (the audit's "ship a
+  bar, not a donut" correction was not followed). The divergence is consistent
+  across iOS↔Android and snapshot-locked on the implementation side; the locked
+  **design** baseline (`a10-11-earn-populated`) still shows the bar. **Flagged
+  for design review** as a fidelity follow-up (either re-skin `WeeklyGoalCard` to
+  the in-hero bar, or bless the ring and re-cut the design pack with sign-off per
+  `NEW_DESIGNS_BATCH2.md`). `ProgressRing` being generic means a second consumer
+  (profile strength, task completion) can reuse it, so it is not orphaned.
+- **B-4 — New accent tokens. ✅ Resolved: named tokens, confirmed naming.**
+  Landed as named tokens on both platforms (iOS asset-catalog `Category/*` +
+  `Theme.Color`, Android `PantopusColors`): `categoryStamps` `#0e7490`,
+  `categoryTask` `#4f46e5`, the `categoryTranslation` family (`#be185d` + bg /
+  ink / paper / paper-ink), `categoryUnboxing` (+ Dark/Bg/Border), and the
+  business-violet `#6d28d9` family + category accents (B1.4/B1.5). No raw hex in
+  any batch-2 screen folder (verify-tokens confirms; the 14 remaining hex flags
+  are all pre-existing in batch-1 `MailThumb.swift`).
+- **B-5 — Camera capture scope (A17.14). ✅ Resolved: seeded viewfinder now,
+  live capture deferred.** B2.4 (#189) ships the **decorative seeded
+  viewfinder** (static framing + striping, scan-line animates production-only,
+  `reduceMotion`-aware, static in snapshots). The real `AVCaptureSession` /
+  CameraX preview + camera-permission prompt + still-frame fallback are deferred
+  to a production capture follow-up; the `CameraScanner` primitive (B1.1) is
+  shaped to back onto them without a screen rewrite.
 
 ---
 
-*End of batch-2 audit. Next: Phase B1 primitives (see
-`docs/claude-code-prompts-batch2.md`).*
+## Batch-2 closeout (B7.1) — what landed
+
+- **Snapshot lockfile (this PR).** `render-new-designs-batch2.mjs` renders the
+  11 in-scope design HTMLs into **22 platform-neutral baseline PNGs** (11 screens
+  × 2 designed states), written byte-identically to both
+  `frontend/apps/ios/PantopusTests/Features/__snapshots__/new-designs-batch2/`
+  and `frontend/apps/android/app/src/test/snapshots/images/new-designs-batch2/`.
+  Presence tripwires lock them: iOS `T8ScreensSnapshotTests.swift`, Android
+  `NewDesignBatch2ScreensSnapshotTest.kt` (both mirror the batch-1
+  `NewDesignScreens*` rigs — file present, > 4 KB, PNG magic bytes; no Android
+  SDK / Xcode needed). Regeneration policy in `NEW_DESIGNS_BATCH2.md`.
+- **B1 primitives — all consumed (no orphans).** `PerforatedStamp`/`Postmark`
+  (A17.11), `CameraScanner` + `OcrFactsList` (A17.14 + A17.13 facts),
+  `ViewerPicker` + `RedactionScrim` (A18.5), `LegalTOCCard` + `DocMetaStrip` +
+  `BackToTopFab` + `LegalSection` (A19), `BizBannerHeader` + `GalleryStrip` +
+  `RatingDistribution` + `MapPreview` (A10.6/7), `ProgressRing` (A10.11, see B-3).
+- **Tooling.** iOS `verify-icons.sh` green; `verify-tokens.sh` is delta-gated
+  (per drift D5, not a CI gate) and this PR touches no scanned source, so adds
+  **zero** new flagged sites; the CI `#RRGGBB` hex grep over `Pantopus/Features`
+  is clean and all 11 batch-2 folders carry **zero** hex literals; flagged
+  spacing/typography in batch-2 files use **on-scale** values via the raw
+  `.padding()`/`.font(.system())` API form (a style nit, not off-scale values).
+  Android `detekt` validates green on `android-ci.yml` (CI-only — no Android SDK
+  in the cloud env, per drift D6). Primary CTAs, back-nav, and state mutations
+  are wired; residual no-op affordances are design-blessed top-bar chrome
+  (bookmark / share / more) plus the Stamps/Unboxing quick-action chip rows
+  (scoped stubs, no Stripe/system hooks this batch).
+
+---
+
+*End of batch-2 audit — closed out by B7.1. Companion prompt set:
+`docs/claude-code-prompts-batch2.md`.*

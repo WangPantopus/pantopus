@@ -171,8 +171,10 @@ targets:
           # the flattened CopyPNGFile destination collides on those names —
           # exclude the whole tree.
           - "__Snapshots__/**"
-          # P9.1 new-design lockfile PNGs (Features/Shared/__snapshots__/
-          # new-designs/) are likewise resolved via `#filePath`, not bundled.
+          # New-design lockfile PNGs — batch 1 (Features/Shared/__snapshots__/
+          # new-designs/) and batch 2 (Features/__snapshots__/
+          # new-designs-batch2/) — are likewise resolved via `#filePath`, not
+          # bundled.
           - "**/__snapshots__/**"
     settings:
       base:
