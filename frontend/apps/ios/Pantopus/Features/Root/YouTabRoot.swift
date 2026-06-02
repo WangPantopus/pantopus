@@ -1383,11 +1383,11 @@ public struct YouTabRoot: View {
                 onOpenEditPersona: {
                     Task { @MainActor in path.append(.editPersona(personaId: EditPersonaSampleData.personaId)) }
                 },
-                onOpenBeacons: {
-                    Task { @MainActor in path.append(.beaconsFeed) }
-                },
                 onOpenFollowing: {
                     Task { @MainActor in path.append(.following) }
+                },
+                onOpenBeacons: {
+                    Task { @MainActor in path.append(.beaconsFeed) }
                 }
             )
         case .beaconsFeed:

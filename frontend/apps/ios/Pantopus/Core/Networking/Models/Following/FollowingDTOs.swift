@@ -33,7 +33,9 @@ public struct FollowingPaginationDTO: Decodable, Sendable, Hashable {
 
 /// One followed-Beacon row.
 public struct FollowingRowDTO: Decodable, Sendable, Hashable, Identifiable {
-    public var id: String { membershipId }
+    public var id: String {
+        membershipId
+    }
 
     public let membershipId: String
     public let persona: FollowingPersonaDTO
@@ -106,7 +108,7 @@ public struct MuteFollowingBody: Encodable, Sendable {
         case days
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         if let days {
             try container.encode(days, forKey: .days)

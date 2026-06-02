@@ -28,19 +28,30 @@ final class FollowingProjectionTests: XCTestCase {
             FollowingPostDTO(
                 id: "post-\(id)",
                 snippet: "Snippet \(id)",
-                createdAt: iso(now.addingTimeInterval(-$0 * 3_600))
+                createdAt: iso(now.addingTimeInterval(-$0 * 3600))
             )
         }
         return FollowingRowDTO(
             membershipId: id,
             persona: FollowingPersonaDTO(
-                id: "p-\(id)", handle: id, displayName: id,
-                avatarUrl: nil, status: "active", verified: true, followerCount: nil
+                id: "p-\(id)",
+                handle: id,
+                displayName: id,
+                avatarUrl: nil,
+                status: "active",
+                verified: true,
+                followerCount: nil
             ),
             fanHandle: nil,
             notificationLevel: "all",
-            mutedUntil: muted ? iso(now.addingTimeInterval(86_400 * 3)) : nil,
-            paidTier: tier.map { FollowingTierDTO(rank: 2, name: $0, priceCents: 500) },
+            mutedUntil: muted ? iso(now.addingTimeInterval(86400 * 3)) : nil,
+            paidTier: tier.map {
+                FollowingTierDTO(
+                    rank: 2,
+                    name: $0,
+                    priceCents: 500
+                )
+            },
             latestPost: post,
             unreadCount: unread,
             followedAt: nil,

@@ -21,18 +21,14 @@ class FollowingRepository
     constructor(
         private val api: FollowingApi,
     ) {
-        suspend fun list(sort: String): NetworkResult<FollowingListResponse> =
-            safeApiCall { api.list(sort = sort) }
+        suspend fun list(sort: String): NetworkResult<FollowingListResponse> = safeApiCall { api.list(sort = sort) }
 
-        suspend fun markSeen(personaId: String): NetworkResult<FollowingSeenResponse?> =
-            safeApiCall { api.markSeen(personaId) }
+        suspend fun markSeen(personaId: String): NetworkResult<FollowingSeenResponse?> = safeApiCall { api.markSeen(personaId) }
 
         suspend fun mute(
             personaId: String,
             days: Int,
-        ): NetworkResult<FollowingMuteResponse> =
-            safeApiCall { api.mute(personaId, FollowingMuteBody(days = days)) }
+        ): NetworkResult<FollowingMuteResponse> = safeApiCall { api.mute(personaId, FollowingMuteBody(days = days)) }
 
-        suspend fun unfollow(personaId: String): NetworkResult<FollowingActionEcho> =
-            safeApiCall { api.unfollow(personaId) }
+        suspend fun unfollow(personaId: String): NetworkResult<FollowingActionEcho> = safeApiCall { api.unfollow(personaId) }
     }

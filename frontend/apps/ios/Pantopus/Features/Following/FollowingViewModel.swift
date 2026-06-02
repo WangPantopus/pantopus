@@ -40,7 +40,7 @@ public final class FollowingViewModel {
     private var counts = FollowingCountsDTO(totalFollowing: 0, unreadBeacons: 0)
     private var loadedAtLeastOnce = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         onBack: @escaping @MainActor () -> Void = {},
         onDiscover: @escaping @MainActor () -> Void = {},
@@ -106,9 +106,17 @@ public final class FollowingViewModel {
 
     // MARK: - Navigation passthroughs
 
-    public func back() { onBack() }
-    public func discover() { onDiscover() }
-    public func openPersona(handle: String) { onOpenPersona(handle) }
+    public func back() {
+        onBack()
+    }
+
+    public func discover() {
+        onDiscover()
+    }
+
+    public func openPersona(handle: String) {
+        onOpenPersona(handle)
+    }
 
     // MARK: - Row action sheet
 
@@ -198,7 +206,7 @@ public final class FollowingViewModel {
     // MARK: - Time helpers
 
     private func isoNow(offsetDays: Int = 0) -> String {
-        let date = now().addingTimeInterval(TimeInterval(offsetDays) * 86_400)
+        let date = now().addingTimeInterval(TimeInterval(offsetDays) * 86400)
         return Self.isoFormatter.string(from: date)
     }
 
@@ -289,54 +297,112 @@ enum FollowingSampleData {
     }
 
     static func post(_ snippet: String, hoursAgo: Double) -> FollowingPostDTO {
-        let date = Date().addingTimeInterval(-hoursAgo * 3_600)
+        let date = Date().addingTimeInterval(-hoursAgo * 3600)
         let iso = ISO8601DateFormatter().string(from: date)
         return FollowingPostDTO(id: UUID().uuidString, snippet: snippet, createdAt: iso)
     }
 
     static let rows: [FollowingRowDTO] = [
         FollowingRowDTO(
-            membershipId: "m1", persona: persona("p1", "maplebakery", "Maple Bakery"),
-            fanHandle: nil, notificationLevel: "all", mutedUntil: nil,
+            membershipId: "m1",
+            persona: persona("p1", "maplebakery", "Maple Bakery"),
+            fanHandle: nil,
+            notificationLevel: "all",
+            mutedUntil: nil,
             paidTier: FollowingTierDTO(rank: 2, name: "Insiders", priceCents: 500),
-            latestPost: post("Croissants are back tomorrow at 7am \u{2014} first 30 half-off for followers.", hoursAgo: 2),
-            unreadCount: 3, followedAt: nil, lastSeenAt: nil
+            latestPost: post(
+                "Croissants are back tomorrow at 7am \u{2014} first 30 half-off for followers.",
+                hoursAgo: 2
+            ),
+            unreadCount: 3,
+            followedAt: nil,
+            lastSeenAt: nil
         ),
         FollowingRowDTO(
-            membershipId: "m2", persona: persona("p2", "burnsidelib", "Burnside Library"),
-            fanHandle: nil, notificationLevel: "all", mutedUntil: nil, paidTier: nil,
-            latestPost: post("Toddler story time Saturday \u{2014} 10am sharp in the kids\u{2019} room.", hoursAgo: 5),
-            unreadCount: 12, followedAt: nil, lastSeenAt: nil
-        ),
-        FollowingRowDTO(
-            membershipId: "m3", persona: persona("p3", "elmparkcity", "Elm Park Council"),
-            fanHandle: nil, notificationLevel: "all", mutedUntil: nil, paidTier: nil,
-            latestPost: post("Street sweeping shifts to Thursdays starting next week.", hoursAgo: 24),
-            unreadCount: 40, followedAt: nil, lastSeenAt: nil
-        ),
-        FollowingRowDTO(
-            membershipId: "m4", persona: persona("p4", "raetheplumber", "Rae the Plumber"),
-            fanHandle: nil, notificationLevel: "none",
-            mutedUntil: ISO8601DateFormatter().string(from: Date().addingTimeInterval(86_400 * 3)),
+            membershipId: "m2",
+            persona: persona("p2", "burnsidelib", "Burnside Library"),
+            fanHandle: nil,
+            notificationLevel: "all",
+            mutedUntil: nil,
             paidTier: nil,
-            latestPost: post("Quick tip: a shower that drips after you shut it off is a $4 cartridge.", hoursAgo: 48),
-            unreadCount: 0, followedAt: nil, lastSeenAt: nil
+            latestPost: post(
+                "Toddler story time Saturday \u{2014} 10am sharp in the kids\u{2019} room.",
+                hoursAgo: 5
+            ),
+            unreadCount: 12,
+            followedAt: nil,
+            lastSeenAt: nil
         ),
         FollowingRowDTO(
-            membershipId: "m5", persona: persona("p5", "samikim", "Sami Kim"),
-            fanHandle: nil, notificationLevel: "all", mutedUntil: nil, paidTier: nil,
-            latestPost: post("The new ramen place on 8th is worth the hype. Tonkotsu is the move.", hoursAgo: 72),
-            unreadCount: 0, followedAt: nil, lastSeenAt: nil
+            membershipId: "m3",
+            persona: persona("p3", "elmparkcity", "Elm Park Council"),
+            fanHandle: nil,
+            notificationLevel: "all",
+            mutedUntil: nil,
+            paidTier: nil,
+            latestPost: post(
+                "Street sweeping shifts to Thursdays starting next week.",
+                hoursAgo: 24
+            ),
+            unreadCount: 40,
+            followedAt: nil,
+            lastSeenAt: nil
         ),
         FollowingRowDTO(
-            membershipId: "m6", persona: persona("p6", "otispark", "Otis Park", verified: false),
-            fanHandle: nil, notificationLevel: "all", mutedUntil: nil, paidTier: nil,
-            latestPost: nil, unreadCount: 0, followedAt: nil, lastSeenAt: nil
+            membershipId: "m4",
+            persona: persona("p4", "raetheplumber", "Rae the Plumber"),
+            fanHandle: nil,
+            notificationLevel: "none",
+            mutedUntil: ISO8601DateFormatter().string(
+                from: Date().addingTimeInterval(86400 * 3)
+            ),
+            paidTier: nil,
+            latestPost: post(
+                "Quick tip: a shower that drips after you shut it off is a $4 cartridge.",
+                hoursAgo: 48
+            ),
+            unreadCount: 0,
+            followedAt: nil,
+            lastSeenAt: nil
         ),
         FollowingRowDTO(
-            membershipId: "m7", persona: persona("p7", "bayridgesketch", "Bay Ridge Sketch Club"),
-            fanHandle: nil, notificationLevel: "all", mutedUntil: nil, paidTier: nil,
-            latestPost: nil, unreadCount: 0, followedAt: nil, lastSeenAt: nil
+            membershipId: "m5",
+            persona: persona("p5", "samikim", "Sami Kim"),
+            fanHandle: nil,
+            notificationLevel: "all",
+            mutedUntil: nil,
+            paidTier: nil,
+            latestPost: post(
+                "The new ramen place on 8th is worth the hype. Tonkotsu is the move.",
+                hoursAgo: 72
+            ),
+            unreadCount: 0,
+            followedAt: nil,
+            lastSeenAt: nil
+        ),
+        FollowingRowDTO(
+            membershipId: "m6",
+            persona: persona("p6", "otispark", "Otis Park", verified: false),
+            fanHandle: nil,
+            notificationLevel: "all",
+            mutedUntil: nil,
+            paidTier: nil,
+            latestPost: nil,
+            unreadCount: 0,
+            followedAt: nil,
+            lastSeenAt: nil
+        ),
+        FollowingRowDTO(
+            membershipId: "m7",
+            persona: persona("p7", "bayridgesketch", "Bay Ridge Sketch Club"),
+            fanHandle: nil,
+            notificationLevel: "all",
+            mutedUntil: nil,
+            paidTier: nil,
+            latestPost: nil,
+            unreadCount: 0,
+            followedAt: nil,
+            lastSeenAt: nil
         )
     ]
 }

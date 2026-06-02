@@ -44,10 +44,14 @@ class FollowingProjectionTest {
     fun groupsByActivity() {
         val dtos =
             listOf(
-                row("a", unread = 3, hoursAgo = 2), // unread → New updates
-                row("b", unread = 0, hoursAgo = 48), // recent post → Active
-                row("c", unread = 0, hoursAgo = null), // no post → Quiet
-                row("d", unread = 5, hoursAgo = 1, muted = true), // muted suppresses unread → Active
+                // unread → New updates
+                row("a", unread = 3, hoursAgo = 2),
+                // recent post → Active
+                row("b", unread = 0, hoursAgo = 48),
+                // no post → Quiet
+                row("c", unread = 0, hoursAgo = null),
+                // muted suppresses unread → Active
+                row("d", unread = 5, hoursAgo = 1, muted = true),
             )
         val sections = FollowingProjection.sections(dtos, now)
         assertEquals(

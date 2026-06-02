@@ -21,8 +21,13 @@ public enum FollowingSort: String, CaseIterable, Sendable, Identifiable {
     case alpha
     case unread
 
-    public var id: String { rawValue }
-    public var wire: String { rawValue }
+    public var id: String {
+        rawValue
+    }
+
+    public var wire: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -64,11 +69,22 @@ public struct FollowingSection: Identifiable, Sendable, Hashable {
     public let kind: FollowingSectionKind
     public let rows: [FollowingRow]
 
-    public var id: String { kind.rawValue }
-    public var header: String { kind.header }
-    public var count: Int { rows.count }
+    public var id: String {
+        kind.rawValue
+    }
+
+    public var header: String {
+        kind.header
+    }
+
+    public var count: Int {
+        rows.count
+    }
+
     /// New-updates header is tinted `primary600`; the others use `fg4`.
-    public var isTinted: Bool { kind == .newUpdates }
+    public var isTinted: Bool {
+        kind == .newUpdates
+    }
 
     public init(kind: FollowingSectionKind, rows: [FollowingRow]) {
         self.kind = kind
@@ -106,7 +122,9 @@ public enum FollowingAvatarTone: CaseIterable, Sendable, Hashable {
         let all = allCases
         guard !all.isEmpty else { return .sky }
         var sum = 0
-        for scalar in key.unicodeScalars { sum = sum &+ Int(scalar.value) }
+        for scalar in key.unicodeScalars {
+            sum = sum &+ Int(scalar.value)
+        }
         return all[abs(sum) % all.count]
     }
 }
@@ -144,7 +162,10 @@ public struct FollowingRow: Identifiable, Sendable, Hashable {
     public let trailing: FollowingRowTrailing
     public let isMuted: Bool
 
-    public var tone: FollowingAvatarTone { FollowingAvatarTone.forKey(toneKey) }
+    public var tone: FollowingAvatarTone {
+        FollowingAvatarTone.forKey(toneKey)
+    }
+
     public var subtitle: String {
         if let followerLabel { "@\(handle) \u{00B7} \(followerLabel) followers" } else { "@\(handle)" }
     }
@@ -175,7 +196,9 @@ public struct FollowingActionTarget: Identifiable, Sendable, Hashable {
     public let verified: Bool
     public let isMuted: Bool
 
-    public var tone: FollowingAvatarTone { FollowingAvatarTone.forKey(toneKey) }
+    public var tone: FollowingAvatarTone {
+        FollowingAvatarTone.forKey(toneKey)
+    }
 }
 
 // MARK: - Mute durations
@@ -203,7 +226,9 @@ public enum FollowingMutePreset: Sendable, Hashable, CaseIterable {
     }
 
     /// Contract identifier suffix (`followingMute.{1|7|30}`).
-    public var accessibilityID: String { "followingMute.\(days)" }
+    public var accessibilityID: String {
+        "followingMute.\(days)"
+    }
 }
 
 /// Largest custom mute the backend accepts (`muteFollowingSchema` max).
@@ -224,7 +249,7 @@ public enum FollowingViewState: Sendable {
 /// so it is trivially unit-testable and reused by previews.
 public enum FollowingProjection {
     /// `~30 days` recency window for the "Active" bucket.
-    static let activeWindow: TimeInterval = 30 * 86_400
+    static let activeWindow: TimeInterval = 30 * 86400
     /// Unread display cap — the backend ceilings the real count at 25.
     static let unreadCap = 25
 
@@ -235,7 +260,8 @@ public enum FollowingProjection {
             buckets[kind, default: []].append(row)
         }
         // Preserve the server's ordering inside each bucket.
-        return [.newUpdates, .active, .quiet].compactMap { kind in
+        let orderedKinds: [FollowingSectionKind] = [.newUpdates, .active, .quiet]
+        return orderedKinds.compactMap { kind in
             guard let rows = buckets[kind], !rows.isEmpty else { return nil }
             return FollowingSection(kind: kind, rows: rows)
         }
@@ -247,13 +273,12 @@ public enum FollowingProjection {
         let createdAt = dto.latestPost?.createdAt
         let recent = isRecent(createdAt, now: now)
 
-        let kind: FollowingSectionKind
-        if unread > 0 {
-            kind = .newUpdates
+        let kind: FollowingSectionKind = if unread > 0 {
+            .newUpdates
         } else if dto.latestPost != nil, recent {
-            kind = .active
+            .active
         } else {
-            kind = .quiet
+            .quiet
         }
 
         let bodyText: String
@@ -269,13 +294,12 @@ public enum FollowingProjection {
             timeLabel = relativeTime(from: createdAt, now: now)
         }
 
-        let trailing: FollowingRowTrailing
-        if kind == .newUpdates {
-            trailing = .unread(unreadBadge(unread))
+        let trailing: FollowingRowTrailing = if kind == .newUpdates {
+            .unread(unreadBadge(unread))
         } else if muted {
-            trailing = .muted
+            .muted
         } else {
-            trailing = .chevron
+            .chevron
         }
 
         let display = dto.persona.displayName?.isEmpty == false
@@ -311,7 +335,7 @@ public enum FollowingProjection {
     static func initials(for name: String, fallback: String) -> String {
         let source = name.isEmpty ? fallback : name
         let words = source.split(separator: " ").prefix(2)
-        let letters = words.compactMap { $0.first }.map(String.init).joined().uppercased()
+        let letters = words.compactMap(\.first).map(String.init).joined().uppercased()
         return letters.isEmpty ? "\u{2022}" : letters
     }
 
@@ -319,8 +343,8 @@ public enum FollowingProjection {
         if value >= 1_000_000 {
             return trimmed(Double(value) / 1_000_000) + "m"
         }
-        if value >= 1_000 {
-            return trimmed(Double(value) / 1_000) + "k"
+        if value >= 1000 {
+            return trimmed(Double(value) / 1000) + "k"
         }
         return "\(value)"
     }
@@ -340,7 +364,7 @@ public enum FollowingProjection {
     static func relativeTime(from iso: String?, now: Date) -> String? {
         guard let date = parseDate(iso) else { return nil }
         let seconds = max(0, now.timeIntervalSince(date))
-        let minute = 60.0, hour = 3_600.0, day = 86_400.0, week = 604_800.0, year = 31_536_000.0
+        let minute = 60.0, hour = 3600.0, day = 86400.0, week = 604_800.0, year = 31_536_000.0
         switch seconds {
         case ..<minute: return "now"
         case ..<hour: return "\(Int(seconds / minute))m"
