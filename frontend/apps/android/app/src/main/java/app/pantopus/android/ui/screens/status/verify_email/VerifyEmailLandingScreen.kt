@@ -43,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.HaloCircle
 import app.pantopus.android.ui.components.HaloCircleTone
+import app.pantopus.android.ui.screens.status.StatusHalo
 import app.pantopus.android.ui.screens.status.StatusPillTone
 import app.pantopus.android.ui.screens.status.StatusPillView
 import app.pantopus.android.ui.screens.status.StatusWaitingPill
@@ -146,9 +147,7 @@ private fun PhaseBody(
         VerifyEmailLandingViewModel.Phase.Verifying ->
             StatePanel(
                 stateTag = VerifyEmailLandingTags.VERIFYING,
-                haloTone = HaloCircleTone.Info,
-                haloIcon = PantopusIcon.Mail,
-                haloPulsing = true,
+                halo = StatusHalo(tone = HaloCircleTone.Info, icon = PantopusIcon.Mail, isPulsing = true),
                 headline = "Verifying your email…",
                 body = emphasized("Hold on while we confirm the link for ${state.recipient}.", state.email),
                 pill =
@@ -169,8 +168,7 @@ private fun PhaseBody(
         VerifyEmailLandingViewModel.Phase.Success ->
             StatePanel(
                 stateTag = VerifyEmailLandingTags.SUCCESS,
-                haloTone = HaloCircleTone.Success,
-                haloIcon = PantopusIcon.Check,
+                halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.Check),
                 headline = "Email verified",
                 body = emphasized("${state.recipient} is confirmed. Your account is ready to go.", state.email),
                 pill =
@@ -191,8 +189,7 @@ private fun PhaseBody(
         VerifyEmailLandingViewModel.Phase.Expired ->
             StatePanel(
                 stateTag = VerifyEmailLandingTags.EXPIRED,
-                haloTone = HaloCircleTone.Warning,
-                haloIcon = PantopusIcon.AlertTriangle,
+                halo = StatusHalo(tone = HaloCircleTone.Warning, icon = PantopusIcon.AlertTriangle),
                 headline = "This link has expired",
                 body =
                     emphasized(
@@ -233,12 +230,10 @@ private fun PhaseBody(
 @Composable
 private fun StatePanel(
     stateTag: String,
-    haloTone: HaloCircleTone,
-    haloIcon: PantopusIcon,
+    halo: StatusHalo,
     headline: String,
     body: AnnotatedString,
     pill: StatusWaitingPill,
-    haloPulsing: Boolean = false,
     actions: @Composable () -> Unit,
 ) {
     Column(
@@ -246,7 +241,7 @@ private fun StatePanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
-        HaloCircle(tone = haloTone, icon = haloIcon, isPulsing = haloPulsing)
+        HaloCircle(tone = halo.tone, icon = halo.icon, isPulsing = halo.isPulsing)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),

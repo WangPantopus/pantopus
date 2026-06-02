@@ -91,10 +91,12 @@ struct VerifyEmailLandingView: View {
     private var verifyingBody: some View {
         scaffold(
             stateID: "verifyEmail.verifyingView",
-            halo: HaloCircle(tone: .info, icon: .mail, isPulsing: true),
-            headline: "Verifying your email…",
-            body: emphasized("Hold on while we confirm the link for \(viewModel.recipient).", viewModel.email),
-            pill: StatusWaitingPill(text: "Checking your link…", icon: .refreshCw, tone: .neutral, isSpinning: true)
+            chrome: PhaseChrome(
+                halo: HaloCircle(tone: .info, icon: .mail, isPulsing: true),
+                headline: "Verifying your email…",
+                body: emphasized("Hold on while we confirm the link for \(viewModel.recipient).", viewModel.email),
+                pill: StatusWaitingPill(text: "Checking your link…", icon: .refreshCw, tone: .neutral, isSpinning: true)
+            )
         ) {
             Text("This only takes a moment.")
                 .font(.system(size: 12))
@@ -106,12 +108,14 @@ struct VerifyEmailLandingView: View {
     private var successBody: some View {
         scaffold(
             stateID: "verifyEmail.successView",
-            halo: HaloCircle(tone: .success, icon: .check),
-            headline: "Email verified",
-            body: emphasized("\(viewModel.recipient) is confirmed. Your account is ready to go.", viewModel.email),
-            pill: StatusWaitingPill(text: "Verified · just now", icon: .checkCircle, tone: .success)
+            chrome: PhaseChrome(
+                halo: HaloCircle(tone: .success, icon: .check),
+                headline: "Email verified",
+                body: emphasized("\(viewModel.recipient) is confirmed. Your account is ready to go.", viewModel.email),
+                pill: StatusWaitingPill(text: "Verified · just now", icon: .checkCircle, tone: .success)
+            )
         ) {
-            PrimaryButton(
+            LandingPrimaryButton(
                 label: "Continue",
                 icon: .arrowRight,
                 identifier: "verifyEmail.continueBtn",
@@ -123,16 +127,18 @@ struct VerifyEmailLandingView: View {
     private var expiredBody: some View {
         scaffold(
             stateID: "verifyEmail.expiredView",
-            halo: HaloCircle(tone: .warning, icon: .alertTriangle),
-            headline: "This link has expired",
-            body: emphasized(
-                "Verification links last 24 hours. We can send a fresh one to \(viewModel.recipient).",
-                viewModel.email
-            ),
-            pill: StatusWaitingPill(text: "Link expired", icon: .clock, tone: .warning)
+            chrome: PhaseChrome(
+                halo: HaloCircle(tone: .warning, icon: .alertTriangle),
+                headline: "This link has expired",
+                body: emphasized(
+                    "Verification links last 24 hours. We can send a fresh one to \(viewModel.recipient).",
+                    viewModel.email
+                ),
+                pill: StatusWaitingPill(text: "Link expired", icon: .clock, tone: .warning)
+            )
         ) {
             VStack(spacing: Spacing.s2) {
-                PrimaryButton(
+                LandingPrimaryButton(
                     label: "Resend verification",
                     icon: .refreshCw,
                     identifier: "verifyEmail.resendBtn",
@@ -140,7 +146,7 @@ struct VerifyEmailLandingView: View {
                     isEnabled: viewModel.canResend,
                     action: resend
                 )
-                GhostButton(
+                LandingGhostButton(
                     label: "Use a different email",
                     icon: .pencil,
                     identifier: "verifyEmail.differentEmailBtn",
@@ -152,32 +158,38 @@ struct VerifyEmailLandingView: View {
 
     // MARK: - Shared scaffold
 
+    /// Halo + copy + pill bundle for one phase. Bundled into a value so the
+    /// `scaffold` builder stays within the parameter-count budget.
+    private struct PhaseChrome {
+        let halo: HaloCircle
+        let headline: String
+        let body: Text
+        let pill: StatusWaitingPill
+    }
+
     /// Centred A18 collapsed-status block: halo → headline → body → pill →
     /// state-specific actions. `stateID` is the per-phase contract tag.
     private func scaffold<Actions: View>(
         stateID: String,
-        halo: HaloCircle,
-        headline: String,
-        body: Text,
-        pill: StatusWaitingPill,
+        chrome: PhaseChrome,
         @ViewBuilder actions: () -> Actions
     ) -> some View {
         VStack(spacing: Spacing.s5) {
             Spacer(minLength: Spacing.s10)
-            halo
+            chrome.halo
             VStack(spacing: Spacing.s2) {
-                Text(headline)
+                Text(chrome.headline)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
-                body
+                chrome.body
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)
             }
-            StatusPillView(pill: pill)
+            StatusPillView(pill: chrome.pill)
             actions()
                 .frame(maxWidth: .infinity)
                 .padding(.top, Spacing.s2)
@@ -209,8 +221,9 @@ struct VerifyEmailLandingView: View {
 // MARK: - Buttons
 
 /// 48pt filled sky primary CTA with an optional trailing glyph and an
-/// in-place spinner for the in-flight resend.
-private struct PrimaryButton: View {
+/// in-place spinner for the in-flight resend. Named `Landing*` so it
+/// doesn't collide with the shared `PrimaryButton` (Core/Design/Components).
+private struct LandingPrimaryButton: View {
     let label: String
     let icon: PantopusIcon?
     let identifier: String
@@ -246,8 +259,9 @@ private struct PrimaryButton: View {
     }
 }
 
-/// 46pt outlined ghost CTA with a leading glyph.
-private struct GhostButton: View {
+/// 46pt outlined ghost CTA with a leading glyph. Named `Landing*` so it
+/// doesn't collide with the shared `GhostButton` (Core/Design/Components).
+private struct LandingGhostButton: View {
     let label: String
     let icon: PantopusIcon?
     let identifier: String
