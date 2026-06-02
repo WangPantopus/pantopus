@@ -114,6 +114,16 @@ public struct FanTierBadgeDTO: Decodable, Sendable, Hashable {
     public let name: String?
 }
 
+// MARK: - PATCH /api/personas/me/audience/:membershipId
+
+/// Owner-side action response (A22.2 "Your audience"). The backend echoes
+/// the membership id and its new status after an approve / decline /
+/// remove / mute / unmute transition.
+public struct AudienceMemberActionResponse: Decodable, Sendable, Hashable {
+    public let membershipId: String?
+    public let status: String?
+}
+
 // MARK: - GET /api/personas/:handle/posts
 
 public struct PersonaPostsResponse: Decodable, Sendable {

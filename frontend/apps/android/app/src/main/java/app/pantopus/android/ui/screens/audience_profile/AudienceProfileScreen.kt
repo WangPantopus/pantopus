@@ -84,6 +84,7 @@ fun AudienceProfileScreen(
     onOpenEditPersona: () -> Unit = {},
     onOpenBeacons: () -> Unit = {},
     onOpenFollowing: () -> Unit = {},
+    onOpenMembers: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -152,6 +153,7 @@ fun AudienceProfileScreen(
                                         onOpenThread = onOpenThread,
                                         onOpenBroadcast = onOpenBroadcast,
                                         onOpenCreatorInbox = onOpenCreatorInbox,
+                                        onOpenMembers = onOpenMembers,
                                     ),
                             ),
                     )
@@ -640,6 +642,7 @@ internal fun LoadedFrame(
                             onFollowerSearch = actions.onFollowerSearch,
                             onFollowerSort = actions.onFollowerSort,
                             onOpenFollower = actions.navigation.onOpenFollower,
+                            onOpenMembers = actions.navigation.onOpenMembers,
                         ),
                 )
             AudienceProfileTab.Threads ->
@@ -691,6 +694,7 @@ internal data class AudienceProfileNavigationActions(
     val onOpenThread: (ThreadRowContent) -> Unit,
     val onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
     val onOpenCreatorInbox: () -> Unit = {},
+    val onOpenMembers: () -> Unit = {},
 )
 
 @Composable
@@ -1378,7 +1382,55 @@ private data class FollowersTabActions(
     val onFollowerSearch: (String) -> Unit,
     val onFollowerSort: (FollowerSort) -> Unit,
     val onOpenFollower: (FollowerRowContent) -> Unit,
+    val onOpenMembers: () -> Unit,
 )
+
+/** A22.2 entry point — pushes the "Your audience" member-management surface
+ *  (pending requests + tier-grouped members). */
+@Composable
+private fun ManageAudienceRow(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onClick)
+                .padding(Spacing.s3)
+                .testTag("audienceProfileOpenMembers"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.UsersRound,
+            contentDescription = null,
+            size = 20.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Your audience",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Approve requests · manage members",
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 16.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextMuted,
+        )
+    }
+}
 
 @Composable
 private fun FollowersTab(
@@ -1395,6 +1447,7 @@ private fun FollowersTab(
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         AnalyticsRow(state.cells)
+        ManageAudienceRow(onClick = actions.onOpenMembers)
         TierStackedBar(state.breakdown)
         TierChipRow(chips = state.chips, selectedTier = state.selectedTier, onSelect = actions.onSelectTier)
         FollowerSearchField(text = state.searchText, onChange = actions.onFollowerSearch)

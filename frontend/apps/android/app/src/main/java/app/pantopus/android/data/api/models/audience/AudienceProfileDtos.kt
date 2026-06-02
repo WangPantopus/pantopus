@@ -78,6 +78,22 @@ data class FanTierBadgeDto(
     val name: String? = null,
 )
 
+// PATCH /api/personas/me/audience/:membershipId
+
+/** Owner-side action body (A22.2 "Your audience"). `action` ∈
+ *  `approve / decline / remove / mute / unmute`. */
+@JsonClass(generateAdapter = true)
+data class AudienceMemberActionBody(
+    val action: String,
+)
+
+/** Echoes the membership id + new status after the transition. */
+@JsonClass(generateAdapter = true)
+data class AudienceMemberActionResponse(
+    val membershipId: String? = null,
+    val status: String? = null,
+)
+
 // GET /api/personas/:handle/posts
 
 @JsonClass(generateAdapter = true)
