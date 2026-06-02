@@ -41,18 +41,18 @@ enum YourAudienceSampleData {
 
     static let pending: [AudienceMember] = [
         member("Dana Reyes", rank: 3, local: true, status: "pending", month: "2025-05"),
-        member("Marcus Lee", rank: 4, local: false, status: "pending", month: "2025-05"),
+        member("Marcus Lee", rank: 4, local: false, status: "pending", month: "2025-05")
     ]
 
     static let vipMembers: [AudienceMember] = [
         member("Priya Nair", rank: 4, local: true, month: "2025-01"),
-        member("Tom Becker", rank: 4, local: false, status: "muted", month: "2024-11"),
+        member("Tom Becker", rank: 4, local: false, status: "muted", month: "2024-11")
     ]
 
     static let insiderMembers: [AudienceMember] = [
         member("Sana Ortiz", rank: 3, local: true, month: "2025-03"),
         member("Otis Park", rank: 3, local: false, month: "2025-04"),
-        member("Lena Cho", rank: 3, local: true, month: "2025-05"),
+        member("Lena Cho", rank: 3, local: true, month: "2025-05")
     ]
 
     static let counts = AudienceCounts(totalActive: 5, pending: 2, byTier: [4: 2, 3: 3])
@@ -64,7 +64,7 @@ enum YourAudienceSampleData {
         pending: pending,
         tierGroups: [
             AudienceTierGroup(rank: 4, name: "VIP", members: vipMembers),
-            AudienceTierGroup(rank: 3, name: "Insiders", members: insiderMembers),
+            AudienceTierGroup(rank: 3, name: "Insiders", members: insiderMembers)
         ]
     )
 
