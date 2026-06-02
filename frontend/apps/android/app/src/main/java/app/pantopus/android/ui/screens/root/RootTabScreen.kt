@@ -7,10 +7,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,7 +34,11 @@ import androidx.navigation.navArgument
 import app.pantopus.android.BuildConfig
 import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.ui.components.InviteLinks
+import app.pantopus.android.ui.components.NavigationDrawer
+import app.pantopus.android.ui.components.NavigationDrawerContext
+import app.pantopus.android.ui.components.NavigationDrawerDestination
 import app.pantopus.android.ui.components.composeEmail
+import kotlinx.coroutines.launch
 import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
@@ -1282,6 +1290,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
         }
     val sessionViewModel: RootSessionViewModel = hiltViewModel()
     val currentHandle by sessionViewModel.currentHandle.collectAsStateWithLifecycle()
+    // §1C-b — context-aware navigation drawer, opened from the Hub menu button
+    // (repurposed from "open Settings"; Settings now lives as a drawer row).
+    val navDrawerState = rememberDrawerState(DrawerValue.Closed)
+    val navDrawerScope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = PantopusRoute.fromPath(backStackEntry?.destination?.route) ?: PantopusRoute.Hub
     val badges: Map<PantopusRoute, Int> =
@@ -1478,2285 +1490,2306 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
         }
     }
 
-    Scaffold(
-        bottomBar = {
-            PantopusBottomBar(
-                selected = currentRoute,
-                badges = badges,
-                onSelect = { target ->
-                    if (target == currentRoute) return@PantopusBottomBar
-                    navController.navigate(target.path) {
-                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+    ModalNavigationDrawer(
+        drawerState = navDrawerState,
+        gesturesEnabled = navDrawerState.isOpen,
+        drawerContent = {
+            NavigationDrawer(
+                context = NavigationDrawerContext.Personal(name = currentHandle),
+                onSelect = { destination ->
+                    navDrawerScope.launch { navDrawerState.close() }
+                    navController.navigate(routeForDrawer(destination))
+                },
+                onOpenIdentityCenter = {
+                    navDrawerScope.launch { navDrawerState.close() }
+                    navController.navigate(ChildRoutes.IDENTITY_CENTER)
+                },
+                onBackToHub = {
+                    navDrawerScope.launch { navDrawerState.close() }
                 },
             )
         },
-    ) { padding: PaddingValues ->
-        NavHost(
-            navController = navController,
-            startDestination = PantopusRoute.Hub.path,
-            modifier = Modifier.padding(padding),
-        ) {
-            composable(PantopusRoute.Hub.path) {
-                HubWithDebugFiveTap(navController = navController) {
-                    HubScreen(onIntent = { intent ->
-                        when (intent) {
-                            HubNavigationIntent.OpenNotifications ->
-                                navController.navigate(ChildRoutes.NOTIFICATIONS)
-                            HubNavigationIntent.OpenMenu ->
-                                navController.navigate(ChildRoutes.MENU)
-                            HubNavigationIntent.StartVerification ->
-                                navController.navigate(ChildRoutes.ADD_HOME)
-                            is HubNavigationIntent.ActionTapped ->
-                                when (intent.kind) {
-                                    ActionChipContent.Kind.AddHome ->
-                                        navController.navigate(ChildRoutes.ADD_HOME)
-                                    ActionChipContent.Kind.ScanMail ->
-                                        navController.navigate(ChildRoutes.MAILBOX_ROOT)
-                                    ActionChipContent.Kind.PostTask ->
-                                        navController.navigate(ChildRoutes.quickPostGig(GigsCategory.All.key))
-                                    ActionChipContent.Kind.SnapAndSell ->
-                                        navController.navigate(ChildRoutes.COMPOSE_LISTING)
-                                }
-                            is HubNavigationIntent.PillarTapped ->
-                                when (intent.pillar) {
-                                    PillarTile.Pillar.Mail ->
-                                        navController.navigate(ChildRoutes.MAILBOX_ROOT)
-                                    PillarTile.Pillar.Pulse ->
-                                        navController.navigate(ChildRoutes.PULSE_FEED)
-                                    PillarTile.Pillar.Marketplace ->
-                                        navController.navigate(ChildRoutes.MARKETPLACE)
-                                    PillarTile.Pillar.Gigs ->
-                                        navController.navigate(ChildRoutes.GIGS_FEED)
-                                }
-                            is HubNavigationIntent.DiscoveryTapped ->
-                                routeForDiscovery(intent.item).also { navController.navigate(it) }
-                            HubNavigationIntent.OpenDiscoverHub ->
-                                navController.navigate(ChildRoutes.DISCOVER_HUB)
-                            is HubNavigationIntent.JumpBackTapped ->
-                                routeForJumpBackIn(intent.item).also { navController.navigate(it) }
-                            HubNavigationIntent.OpenToday ->
-                                navController.navigate(ChildRoutes.TODAY_DETAIL)
-                            HubNavigationIntent.OpenRecentActivity ->
-                                navController.navigate(ChildRoutes.RECENT_ACTIVITY)
+    ) {
+        Scaffold(
+            bottomBar = {
+                PantopusBottomBar(
+                    selected = currentRoute,
+                    badges = badges,
+                    onSelect = { target ->
+                        if (target == currentRoute) return@PantopusBottomBar
+                        navController.navigate(target.path) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                    })
+                    },
+                )
+            },
+        ) { padding: PaddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = PantopusRoute.Hub.path,
+                modifier = Modifier.padding(padding),
+            ) {
+                composable(PantopusRoute.Hub.path) {
+                    HubWithDebugFiveTap(navController = navController) {
+                        HubScreen(onIntent = { intent ->
+                            when (intent) {
+                                HubNavigationIntent.OpenNotifications ->
+                                    navController.navigate(ChildRoutes.NOTIFICATIONS)
+                                HubNavigationIntent.OpenMenu ->
+                                    navDrawerScope.launch { navDrawerState.open() }
+                                HubNavigationIntent.StartVerification ->
+                                    navController.navigate(ChildRoutes.ADD_HOME)
+                                is HubNavigationIntent.ActionTapped ->
+                                    when (intent.kind) {
+                                        ActionChipContent.Kind.AddHome ->
+                                            navController.navigate(ChildRoutes.ADD_HOME)
+                                        ActionChipContent.Kind.ScanMail ->
+                                            navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                                        ActionChipContent.Kind.PostTask ->
+                                            navController.navigate(ChildRoutes.quickPostGig(GigsCategory.All.key))
+                                        ActionChipContent.Kind.SnapAndSell ->
+                                            navController.navigate(ChildRoutes.COMPOSE_LISTING)
+                                    }
+                                is HubNavigationIntent.PillarTapped ->
+                                    when (intent.pillar) {
+                                        PillarTile.Pillar.Mail ->
+                                            navController.navigate(ChildRoutes.MAILBOX_ROOT)
+                                        PillarTile.Pillar.Pulse ->
+                                            navController.navigate(ChildRoutes.PULSE_FEED)
+                                        PillarTile.Pillar.Marketplace ->
+                                            navController.navigate(ChildRoutes.MARKETPLACE)
+                                        PillarTile.Pillar.Gigs ->
+                                            navController.navigate(ChildRoutes.GIGS_FEED)
+                                    }
+                                is HubNavigationIntent.DiscoveryTapped ->
+                                    routeForDiscovery(intent.item).also { navController.navigate(it) }
+                                HubNavigationIntent.OpenDiscoverHub ->
+                                    navController.navigate(ChildRoutes.DISCOVER_HUB)
+                                is HubNavigationIntent.JumpBackTapped ->
+                                    routeForJumpBackIn(intent.item).also { navController.navigate(it) }
+                                HubNavigationIntent.OpenToday ->
+                                    navController.navigate(ChildRoutes.TODAY_DETAIL)
+                                HubNavigationIntent.OpenRecentActivity ->
+                                    navController.navigate(ChildRoutes.RECENT_ACTIVITY)
+                            }
+                        })
+                    }
                 }
-            }
-            composable(PantopusRoute.Nearby.path) {
-                NearbyScreen(
-                    onOpenEntity = { entity: MapEntity ->
-                        when (entity.kind) {
-                            MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
-                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
-                        }
-                    },
-                )
-            }
-            composable(PantopusRoute.Inbox.path) {
-                InboxScreen(
-                    onOpenConversation = { row ->
-                        navController.navigate(ChildRoutes.chatConversation(row))
-                    },
-                    onCompose = { navController.navigate(ChildRoutes.NEW_MESSAGE) },
-                    onOpenSearch = { navController.navigate(ChildRoutes.CHAT_SEARCH) },
-                )
-            }
-            composable(PantopusRoute.You.path) {
-                YouScreen(
-                    onOpenPublicProfile = { userId ->
-                        navController.navigate(ChildRoutes.publicProfile(userId))
-                    },
-                    onOpenPulsePost = { postId ->
-                        navController.navigate(ChildRoutes.pulsePost(postId))
-                    },
-                    onInviteOwner = { homeId, email ->
-                        navController.navigate(ChildRoutes.inviteOwner(homeId, email))
-                    },
-                    onDisambiguateMail = { mailId ->
-                        navController.navigate(ChildRoutes.disambiguateMail(mailId))
-                    },
-                    onOpenPrivacyHandshake = { handle ->
-                        navController.navigate(ChildRoutes.privacyHandshake(handle))
-                    },
-                    onOpenInviteToken = { token ->
-                        navController.navigate(ChildRoutes.tokenAccept(token))
-                    },
-                    onOpenCeremonialMail = {
-                        navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
-                    },
-                    onOpenCeremonialMailOpen = { mailId ->
-                        navController.navigate(ChildRoutes.ceremonialMailOpen(mailId))
-                    },
-                    onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_ROOT) },
-                    onOpenEditProfile = {
-                        navController.navigate(ChildRoutes.EDIT_PROFILE)
-                    },
-                    onOpenPlaceholder = { label ->
-                        navController.navigate(ChildRoutes.placeholder(label))
-                    },
-                    onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
-                    onOpenOffers = { navController.navigate(ChildRoutes.OFFERS) },
-                    onOpenMyBids = { navController.navigate(ChildRoutes.MY_BIDS) },
-                    onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
-                    onOpenMyPosts = { navController.navigate(ChildRoutes.MY_POSTS) },
-                    onOpenConnections = { navController.navigate(ChildRoutes.CONNECTIONS) },
-                    onOpenSupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
-                    onOpenIdentityCenter = { navController.navigate(ChildRoutes.IDENTITY_CENTER) },
-                    onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
-                    onOpenCreatorInbox = { navController.navigate(ChildRoutes.CREATOR_INBOX) },
-                    onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
-                    onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
-                    onOpenHomeCalendar = { homeId ->
-                        navController.navigate(ChildRoutes.homeCalendar(homeId))
-                    },
-                    onOpenHomePackages = { homeId ->
-                        navController.navigate(ChildRoutes.homePackages(homeId))
-                    },
-                    onOpenHomePolls = { homeId -> navController.navigate(ChildRoutes.homePolls(homeId)) },
-                    onOpenAccessCodes = { homeId, homeName ->
-                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
-                    },
-                    onOpenHomeTasks = { homeId -> navController.navigate(ChildRoutes.homeTasks(homeId)) },
-                    onOpenHomeMaintenance = { homeId ->
-                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
-                    },
-                    onOpenHomeOwners = { homeId -> navController.navigate(ChildRoutes.homeOwners(homeId)) },
-                    onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
-                    onOpenMyHomes = { navController.navigate(ChildRoutes.MY_HOMES) },
-                    onOpenMyListings = { navController.navigate(ChildRoutes.MY_LISTINGS) },
-                    onOpenMyBusinesses = { navController.navigate(ChildRoutes.MY_BUSINESSES) },
-                )
-            }
+                composable(PantopusRoute.Nearby.path) {
+                    NearbyScreen(
+                        onOpenEntity = { entity: MapEntity ->
+                            when (entity.kind) {
+                                MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                                MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
+                            }
+                        },
+                    )
+                }
+                composable(PantopusRoute.Inbox.path) {
+                    InboxScreen(
+                        onOpenConversation = { row ->
+                            navController.navigate(ChildRoutes.chatConversation(row))
+                        },
+                        onCompose = { navController.navigate(ChildRoutes.NEW_MESSAGE) },
+                        onOpenSearch = { navController.navigate(ChildRoutes.CHAT_SEARCH) },
+                    )
+                }
+                composable(PantopusRoute.You.path) {
+                    YouScreen(
+                        onOpenPublicProfile = { userId ->
+                            navController.navigate(ChildRoutes.publicProfile(userId))
+                        },
+                        onOpenPulsePost = { postId ->
+                            navController.navigate(ChildRoutes.pulsePost(postId))
+                        },
+                        onInviteOwner = { homeId, email ->
+                            navController.navigate(ChildRoutes.inviteOwner(homeId, email))
+                        },
+                        onDisambiguateMail = { mailId ->
+                            navController.navigate(ChildRoutes.disambiguateMail(mailId))
+                        },
+                        onOpenPrivacyHandshake = { handle ->
+                            navController.navigate(ChildRoutes.privacyHandshake(handle))
+                        },
+                        onOpenInviteToken = { token ->
+                            navController.navigate(ChildRoutes.tokenAccept(token))
+                        },
+                        onOpenCeremonialMail = {
+                            navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
+                        },
+                        onOpenCeremonialMailOpen = { mailId ->
+                            navController.navigate(ChildRoutes.ceremonialMailOpen(mailId))
+                        },
+                        onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_ROOT) },
+                        onOpenEditProfile = {
+                            navController.navigate(ChildRoutes.EDIT_PROFILE)
+                        },
+                        onOpenPlaceholder = { label ->
+                            navController.navigate(ChildRoutes.placeholder(label))
+                        },
+                        onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
+                        onOpenOffers = { navController.navigate(ChildRoutes.OFFERS) },
+                        onOpenMyBids = { navController.navigate(ChildRoutes.MY_BIDS) },
+                        onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
+                        onOpenMyPosts = { navController.navigate(ChildRoutes.MY_POSTS) },
+                        onOpenConnections = { navController.navigate(ChildRoutes.CONNECTIONS) },
+                        onOpenSupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
+                        onOpenIdentityCenter = { navController.navigate(ChildRoutes.IDENTITY_CENTER) },
+                        onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                        onOpenCreatorInbox = { navController.navigate(ChildRoutes.CREATOR_INBOX) },
+                        onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
+                        onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                        onOpenHomeCalendar = { homeId ->
+                            navController.navigate(ChildRoutes.homeCalendar(homeId))
+                        },
+                        onOpenHomePackages = { homeId ->
+                            navController.navigate(ChildRoutes.homePackages(homeId))
+                        },
+                        onOpenHomePolls = { homeId -> navController.navigate(ChildRoutes.homePolls(homeId)) },
+                        onOpenAccessCodes = { homeId, homeName ->
+                            navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
+                        },
+                        onOpenHomeTasks = { homeId -> navController.navigate(ChildRoutes.homeTasks(homeId)) },
+                        onOpenHomeMaintenance = { homeId ->
+                            navController.navigate(ChildRoutes.homeMaintenance(homeId))
+                        },
+                        onOpenHomeOwners = { homeId -> navController.navigate(ChildRoutes.homeOwners(homeId)) },
+                        onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
+                        onOpenMyHomes = { navController.navigate(ChildRoutes.MY_HOMES) },
+                        onOpenMyListings = { navController.navigate(ChildRoutes.MY_LISTINGS) },
+                        onOpenMyBusinesses = { navController.navigate(ChildRoutes.MY_BUSINESSES) },
+                    )
+                }
 
-            composable(ChildRoutes.MY_HOMES) {
-                MyHomesListScreen(
-                    onOpenHome = { homeId -> navController.navigate(ChildRoutes.homeDashboard(homeId)) },
-                    onAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.MY_LISTINGS) {
-                MyListingsScreen(
-                    onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
-                    onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.MY_BUSINESSES) {
-                MyBusinessesScreen(
-                    // B3.2 — an owned business opens its owner dashboard (A10.7).
-                    onOpenBusiness = { businessId -> navController.navigate(ChildRoutes.businessOwner(businessId)) },
-                    onRegister = { navController.navigate(ChildRoutes.CREATE_BUSINESS) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.CREATE_BUSINESS) {
-                CreateBusinessWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenBusiness = { _ ->
-                        navController.popBackStack(ChildRoutes.CREATE_BUSINESS, inclusive = true)
-                        navController.navigate(ChildRoutes.placeholder("Business dashboard"))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_DASHBOARD,
-                arguments = listOf(navArgument(HOME_DASHBOARD_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                HomeDashboardScreen(
-                    onBack = { navController.popBackStack() },
-                    onInviteOwner = { homeId ->
-                        navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
-                    },
-                    onClaimOwnership = { homeId ->
-                        // The ownership-claim flow branches on whether the
-                        // resident is the owner or a renter. Until the
-                        // backend wires that decision into the claim
-                        // start endpoint, we key off the sample-data
-                        // homeId pattern so QA can hit either path. Both
-                        // branches start identically from the dashboard
-                        // banner.
-                        val target =
-                            if (
-                                homeId.contains("renter", ignoreCase = true) ||
-                                homeId.contains("verify-landlord", ignoreCase = true)
-                            ) {
-                                ChildRoutes.verifyLandlord(homeId)
-                            } else {
-                                ChildRoutes.claimOwnership(homeId)
-                            }
-                        navController.navigate(target)
-                    },
-                    onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
-                    onOpenBills = { homeId ->
-                        navController.navigate(ChildRoutes.homeBills(homeId))
-                    },
-                    onOpenPolls = { homeId ->
-                        navController.navigate(ChildRoutes.homePolls(homeId))
-                    },
-                    onOpenPlaceholder = { label ->
-                        navController.navigate(ChildRoutes.placeholder(label))
-                    },
-                    onOpenPets = { homeId ->
-                        navController.navigate(ChildRoutes.homePets(homeId))
-                    },
-                    onOpenCalendar = { homeId ->
-                        navController.navigate(ChildRoutes.homeCalendar(homeId))
-                    },
-                    onOpenDocs = { homeId ->
-                        navController.navigate(ChildRoutes.homeDocs(homeId))
-                    },
-                    onOpenEmergency = { homeId ->
-                        navController.navigate(ChildRoutes.homeEmergency(homeId))
-                    },
-                    onOpenPackages = { homeId ->
-                        navController.navigate(ChildRoutes.homePackages(homeId))
-                    },
-                    onOpenAccessCodes = { homeId, homeName ->
-                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
-                    },
-                    onOpenTasks = { homeId ->
-                        navController.navigate(ChildRoutes.homeTasks(homeId))
-                    },
-                    onOpenMaintenance = { homeId ->
-                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
-                    },
-                    onOpenMembers = { homeId ->
-                        navController.navigate(ChildRoutes.homeMembers(homeId))
-                    },
-                    onOpenPropertyDetails = { homeId ->
-                        navController.navigate(ChildRoutes.propertyDetails(homeId))
-                    },
-                    onOpenSettings = { homeId ->
-                        navController.navigate(ChildRoutes.homeSettings(homeId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_BILLS,
-                arguments = listOf(navArgument(BILLS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(BILLS_HOME_ID_KEY).orEmpty()
-                BillsListScreen(
-                    onOpenBill = { billId ->
-                        navController.navigate(ChildRoutes.billDetail(homeId, billId))
-                    },
-                    onAddBill = { navController.navigate(ChildRoutes.addBill(homeId)) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.BILL_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(BILL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(BILL_DETAIL_BILL_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(BILL_DETAIL_HOME_ID_KEY).orEmpty()
-                val billId = entry.arguments?.getString(BILL_DETAIL_BILL_ID_KEY).orEmpty()
-                BillDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onEdit = {
-                        navController.navigate(ChildRoutes.editBill(homeId, billId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.ADD_BILL,
-                arguments = listOf(navArgument(ADD_BILL_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(ADD_BILL_HOME_ID_KEY).orEmpty()
-                AddBillWizardScreen(
-                    onClose = { navController.popBackStack() },
-                    onCreated = { billId ->
-                        // Replace the wizard with the bill detail so Back
-                        // returns to the Bills list, not the success step.
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.billDetail(homeId, billId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_BILL,
-                arguments =
-                    listOf(
-                        navArgument(ADD_BILL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(ADD_BILL_BILL_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) {
-                AddBillWizardScreen(
-                    onClose = { navController.popBackStack() },
-                    onCreated = { _ ->
-                        // Unreachable in edit mode — wizard emits
-                        // `Updated` on save instead of `Created`.
-                        navController.popBackStack()
-                    },
-                    onUpdated = { _ ->
-                        // Pop the wizard so the bill detail (already on
-                        // the stack underneath) becomes visible again.
-                        navController.popBackStack()
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_PETS,
-                arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                PetsListScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.HOME_CALENDAR,
-                arguments =
-                    listOf(navArgument(HOME_CALENDAR_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(HOME_CALENDAR_HOME_ID_KEY).orEmpty()
-                HomeCalendarScreen(
-                    onAddEvent = {
-                        navController.navigate(ChildRoutes.addCalendarEvent(homeId = homeId))
-                    },
-                    onOpenEvent = { eventId ->
-                        navController.navigate(
-                            ChildRoutes.calendarEventDetail(homeId = homeId, eventId = eventId),
-                        )
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.ADD_CALENDAR_EVENT,
-                arguments =
-                    listOf(
-                        navArgument(ADD_EVENT_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(ADD_EVENT_EVENT_ID_KEY) {
-                            type = NavType.StringType
-                            nullable = true
-                            defaultValue = null
+                composable(ChildRoutes.MY_HOMES) {
+                    MyHomesListScreen(
+                        onOpenHome = { homeId -> navController.navigate(ChildRoutes.homeDashboard(homeId)) },
+                        onAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.MY_LISTINGS) {
+                    MyListingsScreen(
+                        onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
+                        onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.MY_BUSINESSES) {
+                    MyBusinessesScreen(
+                        // B3.2 — an owned business opens its owner dashboard (A10.7).
+                        onOpenBusiness = { businessId -> navController.navigate(ChildRoutes.businessOwner(businessId)) },
+                        onRegister = { navController.navigate(ChildRoutes.CREATE_BUSINESS) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.CREATE_BUSINESS) {
+                    CreateBusinessWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenBusiness = { _ ->
+                            navController.popBackStack(ChildRoutes.CREATE_BUSINESS, inclusive = true)
+                            navController.navigate(ChildRoutes.placeholder("Business dashboard"))
                         },
-                        navArgument(ADD_EVENT_PREFILLED_CATEGORY_KEY) {
-                            type = NavType.StringType
-                            nullable = true
-                            defaultValue = null
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_DASHBOARD,
+                    arguments = listOf(navArgument(HOME_DASHBOARD_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    HomeDashboardScreen(
+                        onBack = { navController.popBackStack() },
+                        onInviteOwner = { homeId ->
+                            navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                         },
-                    ),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(ADD_EVENT_HOME_ID_KEY).orEmpty()
-                AddEventFormScreen(
-                    onClose = { navController.popBackStack() },
-                    onCommit = { commit ->
-                        when (commit) {
-                            is AddEventCommit.Created -> {
-                                navController.popBackStack()
-                                navController.navigate(
-                                    ChildRoutes.calendarEventDetail(
-                                        homeId = homeId,
-                                        eventId = commit.eventId,
-                                    ),
-                                )
-                            }
-                            is AddEventCommit.Updated -> {
-                                // Replace the form AND the stale detail with
-                                // a fresh detail so the re-fetched event
-                                // shows the updated fields.
-                                navController.navigate(
-                                    ChildRoutes.calendarEventDetail(
-                                        homeId = homeId,
-                                        eventId = commit.eventId,
-                                    ),
+                        onClaimOwnership = { homeId ->
+                            // The ownership-claim flow branches on whether the
+                            // resident is the owner or a renter. Until the
+                            // backend wires that decision into the claim
+                            // start endpoint, we key off the sample-data
+                            // homeId pattern so QA can hit either path. Both
+                            // branches start identically from the dashboard
+                            // banner.
+                            val target =
+                                if (
+                                    homeId.contains("renter", ignoreCase = true) ||
+                                    homeId.contains("verify-landlord", ignoreCase = true)
                                 ) {
-                                    popUpTo(ChildRoutes.CALENDAR_EVENT_DETAIL) {
-                                        inclusive = true
+                                    ChildRoutes.verifyLandlord(homeId)
+                                } else {
+                                    ChildRoutes.claimOwnership(homeId)
+                                }
+                            navController.navigate(target)
+                        },
+                        onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
+                        onOpenBills = { homeId ->
+                            navController.navigate(ChildRoutes.homeBills(homeId))
+                        },
+                        onOpenPolls = { homeId ->
+                            navController.navigate(ChildRoutes.homePolls(homeId))
+                        },
+                        onOpenPlaceholder = { label ->
+                            navController.navigate(ChildRoutes.placeholder(label))
+                        },
+                        onOpenPets = { homeId ->
+                            navController.navigate(ChildRoutes.homePets(homeId))
+                        },
+                        onOpenCalendar = { homeId ->
+                            navController.navigate(ChildRoutes.homeCalendar(homeId))
+                        },
+                        onOpenDocs = { homeId ->
+                            navController.navigate(ChildRoutes.homeDocs(homeId))
+                        },
+                        onOpenEmergency = { homeId ->
+                            navController.navigate(ChildRoutes.homeEmergency(homeId))
+                        },
+                        onOpenPackages = { homeId ->
+                            navController.navigate(ChildRoutes.homePackages(homeId))
+                        },
+                        onOpenAccessCodes = { homeId, homeName ->
+                            navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
+                        },
+                        onOpenTasks = { homeId ->
+                            navController.navigate(ChildRoutes.homeTasks(homeId))
+                        },
+                        onOpenMaintenance = { homeId ->
+                            navController.navigate(ChildRoutes.homeMaintenance(homeId))
+                        },
+                        onOpenMembers = { homeId ->
+                            navController.navigate(ChildRoutes.homeMembers(homeId))
+                        },
+                        onOpenPropertyDetails = { homeId ->
+                            navController.navigate(ChildRoutes.propertyDetails(homeId))
+                        },
+                        onOpenSettings = { homeId ->
+                            navController.navigate(ChildRoutes.homeSettings(homeId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_BILLS,
+                    arguments = listOf(navArgument(BILLS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(BILLS_HOME_ID_KEY).orEmpty()
+                    BillsListScreen(
+                        onOpenBill = { billId ->
+                            navController.navigate(ChildRoutes.billDetail(homeId, billId))
+                        },
+                        onAddBill = { navController.navigate(ChildRoutes.addBill(homeId)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.BILL_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(BILL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(BILL_DETAIL_BILL_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(BILL_DETAIL_HOME_ID_KEY).orEmpty()
+                    val billId = entry.arguments?.getString(BILL_DETAIL_BILL_ID_KEY).orEmpty()
+                    BillDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onEdit = {
+                            navController.navigate(ChildRoutes.editBill(homeId, billId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.ADD_BILL,
+                    arguments = listOf(navArgument(ADD_BILL_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(ADD_BILL_HOME_ID_KEY).orEmpty()
+                    AddBillWizardScreen(
+                        onClose = { navController.popBackStack() },
+                        onCreated = { billId ->
+                            // Replace the wizard with the bill detail so Back
+                            // returns to the Bills list, not the success step.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.billDetail(homeId, billId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_BILL,
+                    arguments =
+                        listOf(
+                            navArgument(ADD_BILL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(ADD_BILL_BILL_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    AddBillWizardScreen(
+                        onClose = { navController.popBackStack() },
+                        onCreated = { _ ->
+                            // Unreachable in edit mode — wizard emits
+                            // `Updated` on save instead of `Created`.
+                            navController.popBackStack()
+                        },
+                        onUpdated = { _ ->
+                            // Pop the wizard so the bill detail (already on
+                            // the stack underneath) becomes visible again.
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_PETS,
+                    arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    PetsListScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.HOME_CALENDAR,
+                    arguments =
+                        listOf(navArgument(HOME_CALENDAR_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(HOME_CALENDAR_HOME_ID_KEY).orEmpty()
+                    HomeCalendarScreen(
+                        onAddEvent = {
+                            navController.navigate(ChildRoutes.addCalendarEvent(homeId = homeId))
+                        },
+                        onOpenEvent = { eventId ->
+                            navController.navigate(
+                                ChildRoutes.calendarEventDetail(homeId = homeId, eventId = eventId),
+                            )
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.ADD_CALENDAR_EVENT,
+                    arguments =
+                        listOf(
+                            navArgument(ADD_EVENT_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(ADD_EVENT_EVENT_ID_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                            navArgument(ADD_EVENT_PREFILLED_CATEGORY_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(ADD_EVENT_HOME_ID_KEY).orEmpty()
+                    AddEventFormScreen(
+                        onClose = { navController.popBackStack() },
+                        onCommit = { commit ->
+                            when (commit) {
+                                is AddEventCommit.Created -> {
+                                    navController.popBackStack()
+                                    navController.navigate(
+                                        ChildRoutes.calendarEventDetail(
+                                            homeId = homeId,
+                                            eventId = commit.eventId,
+                                        ),
+                                    )
+                                }
+                                is AddEventCommit.Updated -> {
+                                    // Replace the form AND the stale detail with
+                                    // a fresh detail so the re-fetched event
+                                    // shows the updated fields.
+                                    navController.navigate(
+                                        ChildRoutes.calendarEventDetail(
+                                            homeId = homeId,
+                                            eventId = commit.eventId,
+                                        ),
+                                    ) {
+                                        popUpTo(ChildRoutes.CALENDAR_EVENT_DETAIL) {
+                                            inclusive = true
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.CALENDAR_EVENT_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(EVENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(EVENT_DETAIL_EVENT_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(EVENT_DETAIL_HOME_ID_KEY).orEmpty()
-                EventDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onEdit = { event ->
-                        navController.navigate(
-                            ChildRoutes.addCalendarEvent(
-                                homeId = homeId,
-                                eventId = event.id,
-                                prefilledCategory = event.eventType,
-                            ),
-                        )
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_EMERGENCY,
-                arguments = listOf(navArgument(EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(EMERGENCY_HOME_ID_KEY).orEmpty()
-                EmergencyInfoScreen(
-                    onAction = { dto ->
-                        navController.navigate(ChildRoutes.emergencyItem(homeId, dto.id))
-                    },
-                    onAdd = { navController.navigate(ChildRoutes.addEmergencyInfo(homeId)) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.ADD_EMERGENCY_INFO,
-                arguments =
-                    listOf(navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                AddEmergencyInfoFormScreen(
-                    onClose = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_EMERGENCY_INFO,
-                arguments =
-                    listOf(
-                        navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(ADD_EMERGENCY_ITEM_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) {
-                AddEmergencyInfoFormScreen(
-                    onClose = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.EMERGENCY_ITEM,
-                arguments =
-                    listOf(
-                        navArgument(EMERGENCY_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(EMERGENCY_DETAIL_ITEM_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(EMERGENCY_DETAIL_HOME_ID_KEY).orEmpty()
-                val emergencyId = entry.arguments?.getString(EMERGENCY_DETAIL_ITEM_ID_KEY).orEmpty()
-                EmergencyInfoDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onEdit = {
-                        navController.navigate(ChildRoutes.editEmergencyInfo(homeId, emergencyId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_PACKAGES,
-                arguments = listOf(navArgument(PACKAGES_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(PACKAGES_HOME_ID_KEY).orEmpty()
-                PackagesListScreen(
-                    currentUserId = null,
-                    memberLookup = { null },
-                    onOpenPackage = { packageId ->
-                        navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
-                    },
-                    onLogPackage = { navController.navigate(ChildRoutes.logPackage(homeId)) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_POLLS,
-                arguments = listOf(navArgument(POLLS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(POLLS_HOME_ID_KEY).orEmpty()
-                PollsListScreen(
-                    onOpenPoll = { pollId ->
-                        navController.navigate(ChildRoutes.pollDetail(homeId, pollId))
-                    },
-                    onStartPoll = {
-                        navController.navigate(ChildRoutes.startPoll(homeId))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.START_POLL,
-                arguments = listOf(navArgument(START_POLL_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                StartPollFormScreen(
-                    onClose = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_DOCS,
-                arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                val docsHomeId = it.arguments?.getString(DOCUMENTS_HOME_ID_KEY).orEmpty()
-                DocumentsScreen(
-                    onOpenDocument = { dto ->
-                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
-                    },
-                    onUpload = {
-                        navController.navigate(ChildRoutes.uploadDocument(docsHomeId))
-                    },
-                    onSearch = { navController.navigate(ChildRoutes.documentSearch(docsHomeId)) },
-                    onExport = { navController.navigate(ChildRoutes.placeholder("Export documents")) },
-                    onDocumentAction = { dto, _ ->
-                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.DOCUMENT_SEARCH,
-                arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                DocumentSearchScreen(
-                    onOpenDocument = { dto ->
-                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
-                    },
-                    onCancel = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.UPLOAD_DOCUMENT,
-                arguments = listOf(navArgument(UPLOAD_DOCUMENT_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                UploadDocumentFormScreen(
-                    onClose = { navController.popBackStack() },
-                    onUploaded = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.DOCUMENT_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(DOCUMENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(DOCUMENT_DETAIL_DOC_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(DOCUMENT_DETAIL_HOME_ID_KEY).orEmpty()
-                DocumentDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onReplace = {
-                        navController.navigate(ChildRoutes.uploadDocument(homeId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.POLL_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(POLL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(POLL_DETAIL_POLL_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) {
-                PollDetailScreen(
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.ACCESS_CODES,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(ChildRoutes.ACCESS_CODES_HOME_NAME_KEY) {
-                            type = NavType.StringType
-                            nullable = true
-                            defaultValue = null
                         },
-                    ),
-            ) { backStackEntry ->
-                val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
-                AccessCodesScreen(
-                    onAddCode = { category ->
-                        navController.navigate(
-                            ChildRoutes.editAccessCode(
-                                homeId = homeIdArg,
-                                secretId = null,
-                                category = category?.wire,
-                            ),
-                        )
-                    },
-                    onEditCode = { secretId ->
-                        navController.navigate(
-                            ChildRoutes.editAccessCode(
-                                homeId = homeIdArg,
-                                secretId = secretId,
-                                category = null,
-                            ),
-                        )
-                    },
-                    onSearch = {
-                        navController.navigate(ChildRoutes.accessCodesSearch(homeIdArg))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.ACCESS_CODES_SEARCH,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) { backStackEntry ->
-                val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
-                AccessCodesSearchScreen(
-                    onOpenCode = { secretId ->
-                        navController.navigate(
-                            ChildRoutes.editAccessCode(
-                                homeId = homeIdArg,
-                                secretId = secretId,
-                                category = null,
-                            ),
-                        )
-                    },
-                    onCancel = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_ACCESS_CODE,
-                arguments =
-                    listOf(
-                        navArgument(EDIT_ACCESS_CODE_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(EDIT_ACCESS_CODE_SECRET_ID_KEY) {
-                            type = NavType.StringType
-                            nullable = true
-                            defaultValue = null
-                        },
-                        navArgument(EDIT_ACCESS_CODE_CATEGORY_KEY) {
-                            type = NavType.StringType
-                            nullable = true
-                            defaultValue = null
-                        },
-                    ),
-            ) {
-                EditAccessCodeFormScreen(
-                    onClose = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_TASKS,
-                arguments = listOf(navArgument(HOUSEHOLD_TASKS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(HOUSEHOLD_TASKS_HOME_ID_KEY).orEmpty()
-                HouseholdTasksListScreen(
-                    onOpenTask = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Task detail"))
-                    },
-                    onAddTask = {
-                        navController.navigate(ChildRoutes.addHouseholdTask(homeId))
-                    },
-                    onEditRecurring = { taskId ->
-                        navController.navigate(ChildRoutes.editHouseholdTask(homeId, taskId))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.ADD_HOUSEHOLD_TASK,
-                arguments = listOf(navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                AddHouseholdTaskFormScreen(
-                    onClose = { navController.popBackStack() },
-                    onCreated = {
-                        // Pop back to the tasks list; the list refreshes
-                        // on next visit.
-                        navController.popBackStack()
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_HOUSEHOLD_TASK,
-                arguments =
-                    listOf(
-                        navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(ADD_HOUSEHOLD_TASK_TASK_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) {
-                AddHouseholdTaskFormScreen(
-                    onClose = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_MAINTENANCE,
-                arguments = listOf(navArgument(MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId =
-                    entry.arguments?.getString(MAINTENANCE_HOME_ID_KEY) ?: ""
-                MaintenanceListScreen(
-                    onOpenTask = { taskId ->
-                        navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
-                    },
-                    onAddTask = {
-                        navController.navigate(ChildRoutes.logMaintenance(homeId))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.LOG_MAINTENANCE,
-                arguments = listOf(navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId =
-                    entry.arguments?.getString(LOG_MAINTENANCE_HOME_ID_KEY) ?: ""
-                LogMaintenanceFormScreen(
-                    onClose = { navController.popBackStack() },
-                    onSubmitted = { taskId ->
-                        navController.popBackStack(
-                            ChildRoutes.homeMaintenance(homeId),
-                            inclusive = false,
-                        )
-                        navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_MAINTENANCE,
-                arguments =
-                    listOf(
-                        navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(LOG_MAINTENANCE_TASK_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) {
-                LogMaintenanceFormScreen(
-                    onClose = { navController.popBackStack() },
-                    onSubmitted = { _ -> navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.MAINTENANCE_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(MAINTENANCE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(MAINTENANCE_DETAIL_TASK_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(MAINTENANCE_DETAIL_HOME_ID_KEY) ?: ""
-                val taskId = entry.arguments?.getString(MAINTENANCE_DETAIL_TASK_ID_KEY) ?: ""
-                MaintenanceDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onEdit = {
-                        navController.navigate(ChildRoutes.editMaintenance(homeId, taskId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_OWNERS,
-                arguments = listOf(navArgument(OWNERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                OwnersListScreen(
-                    onOpenInvite = { homeId ->
-                        navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.PACKAGE_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(PACKAGE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(PACKAGE_DETAIL_PACKAGE_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) {
-                PackageDetailScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.LOG_PACKAGE,
-                arguments = listOf(navArgument(LOG_PACKAGE_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(LOG_PACKAGE_HOME_ID_KEY).orEmpty()
-                LogPackageScreen(
-                    onClose = { navController.popBackStack() },
-                    onCreated = { packageId ->
-                        // Replace the log-package destination with the
-                        // new package's detail so Back returns to the
-                        // Packages list, not the form.
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_MEMBERS,
-                arguments = listOf(navArgument(MEMBERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(MEMBERS_LIST_HOME_ID_KEY).orEmpty()
-                MembersListScreen(
-                    onBack = { navController.popBackStack() },
-                    onAddGuest = { navController.navigate(ChildRoutes.addGuest(homeId)) },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_SETTINGS,
-                arguments = listOf(navArgument(HOME_SETTINGS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val homeId = entry.arguments?.getString(HOME_SETTINGS_HOME_ID_KEY).orEmpty()
-                HomeSettingsScreen(
-                    onBack = { navController.popBackStack() },
-                    onNavigate = { route ->
-                        when (route) {
-                            HomeSettingsRoute.Address, HomeSettingsRoute.PropertyDetails ->
-                                navController.navigate(ChildRoutes.propertyDetails(homeId))
-                            HomeSettingsRoute.Photos ->
-                                navController.navigate(ChildRoutes.placeholder("Photos"))
-                            HomeSettingsRoute.Documents ->
-                                navController.navigate(ChildRoutes.homeDocs(homeId))
-                            HomeSettingsRoute.AccessCodes ->
-                                navController.navigate(ChildRoutes.accessCodes(homeId, null))
-                            HomeSettingsRoute.TrustedNeighbors ->
-                                navController.navigate(ChildRoutes.placeholder("Trusted neighbors"))
-                            HomeSettingsRoute.Security ->
-                                navController.navigate(ChildRoutes.homeSecurity(homeId))
-                            HomeSettingsRoute.People ->
-                                navController.navigate(ChildRoutes.homeMembers(homeId))
-                            HomeSettingsRoute.InviteLink ->
-                                navController.navigate(ChildRoutes.placeholder("Invite link"))
-                            HomeSettingsRoute.HomeNotifications ->
-                                navController.navigate(ChildRoutes.placeholder("Home notifications"))
-                            HomeSettingsRoute.LeaveHome ->
-                                navController.navigate(ChildRoutes.placeholder("Leave home"))
-                            HomeSettingsRoute.CancelClaim ->
-                                navController.navigate(ChildRoutes.placeholder("Cancel claim"))
-                        }
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.HOME_SECURITY,
-                arguments = listOf(navArgument(HOME_SECURITY_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                HomeSecurityScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.MAILBOX_ITEM_DETAIL,
-                arguments = listOf(navArgument(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                // T6.5b (P20) — generic A17.1 mail detail. P21-P23 will
-                // add package / coupon / booklet / certified variants on
-                // top of the same shared shell.
-                val mailId = entry.arguments?.getString(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY).orEmpty()
-                MailDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenSenderProfile = { userId ->
-                        navController.navigate(ChildRoutes.publicProfile(userId))
-                    },
-                    onTranslate = { navController.navigate(ChildRoutes.translation(mailId)) },
-                    onOpenExtractedTask = { sourceMailId ->
-                        // A17.12 — the certified-notice "view task" affordance
-                        // opens the mail-derived task keyed by its source mail.
-                        navController.navigate(ChildRoutes.mailTask(sourceMailId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.PUBLIC_PROFILE,
-                arguments = listOf(navArgument(PUBLIC_PROFILE_USER_ID_KEY) { type = NavType.StringType }),
-            ) {
-                PublicProfileScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenMessages = { profile ->
-                        navController.navigate(
-                            ChildRoutes.chatConversationFromPicker(
-                                userId = profile.id,
-                                displayName = profile.displayName,
-                                initials = initialsFromName(profile.displayName),
-                                verified = profile.verified == true,
-                                locality = profile.locality,
-                            ),
-                        )
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.BUSINESS_PROFILE,
-                arguments = listOf(navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                val businessId = backStackEntry.arguments?.getString(BUSINESS_PROFILE_BUSINESS_ID_KEY) ?: ""
-                BusinessProfileScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
-                    onShare = {
-                        appContext.shareText(
-                            "Check out this business on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
-                            "Share business",
-                        )
-                    },
-                    onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
-                    onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
-                    onBook = { navController.navigate(ChildRoutes.placeholder("Book")) },
-                    onEdit = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_BUSINESS_PAGE,
-                arguments = listOf(navArgument(EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY) { type = NavType.StringType }),
-            ) {
-                EditBusinessPageScreen(
-                    onBack = { navController.popBackStack() },
-                    onPreview = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.PULSE_POST,
-                arguments = listOf(navArgument(PULSE_POST_DETAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
-                PulsePostDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenProfile = { userId ->
-                        navController.navigate(ChildRoutes.publicProfile(userId))
-                    },
-                    onEdit = { postId ->
-                        navController.navigate(ChildRoutes.editPost(postId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.INVITE_OWNER,
-                arguments =
-                    listOf(
-                        navArgument(INVITE_OWNER_HOME_ID_KEY) { type = NavType.StringType },
-                        navArgument(INVITE_OWNER_CURRENT_EMAIL_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                    ),
-            ) {
-                InviteOwnerFormScreen(onClose = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.DISAMBIGUATE_MAIL,
-                arguments = listOf(navArgument(DISAMBIGUATE_MAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
-                DisambiguateMailFormScreen(onClose = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.MAILBOX_VAULT) {
-                // T6.5e (P19.5) — Mailbox Vault list-of-rows surface.
-                VaultListScreen(
-                    onOpenItem = { mailId ->
-                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
-                    },
-                    onAddTapped = {
-                        // FAB shortcut — drop the user back to the inbox
-                        // where mail items expose the kebab
-                        // "Save to vault" action.
-                        navController.navigate(ChildRoutes.MAILBOX_ROOT) {
-                            popUpTo(ChildRoutes.MAILBOX_ROOT) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    },
-                    onOpenMailbox = {
-                        navController.navigate(ChildRoutes.MAILBOX_ROOT) {
-                            popUpTo(ChildRoutes.MAILBOX_ROOT) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.CHAT_CONVERSATION,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.CHAT_KIND_KEY) { type = NavType.StringType },
-                        navArgument(ChildRoutes.CHAT_ID_KEY) { type = NavType.StringType },
-                        navArgument(ChildRoutes.CHAT_NAME_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument(ChildRoutes.CHAT_INITIALS_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument(ChildRoutes.CHAT_VERIFIED_KEY) {
-                            type = NavType.StringType
-                            defaultValue = "false"
-                        },
-                        navArgument(ChildRoutes.CHAT_IDENTITY_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument(ChildRoutes.CHAT_LOCALITY_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument(ChildRoutes.CHAT_ONLINE_KEY) {
-                            type = NavType.StringType
-                            defaultValue = "false"
-                        },
-                        navArgument(ChildRoutes.CHAT_TIER_NAME_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument(ChildRoutes.CHAT_TIER_RANK_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument(ChildRoutes.CHAT_SCROLL_TO_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                    ),
-            ) { entry ->
-                val args = entry.arguments ?: return@composable
-                val kind = args.getString(ChildRoutes.CHAT_KIND_KEY).orEmpty()
-                val id = args.getString(ChildRoutes.CHAT_ID_KEY).orEmpty()
-                val name = args.getString(ChildRoutes.CHAT_NAME_KEY).orEmpty()
-                val initials = args.getString(ChildRoutes.CHAT_INITIALS_KEY).orEmpty()
-                val verified = args.getString(ChildRoutes.CHAT_VERIFIED_KEY) == "true"
-                val locality = args.getString(ChildRoutes.CHAT_LOCALITY_KEY).orEmpty().takeIf { it.isNotEmpty() }
-                val online = args.getString(ChildRoutes.CHAT_ONLINE_KEY) == "true"
-                val tierName = args.getString(ChildRoutes.CHAT_TIER_NAME_KEY).orEmpty().ifEmpty { "Free" }
-                val tierRank = args.getString(ChildRoutes.CHAT_TIER_RANK_KEY).orEmpty().toIntOrNull() ?: 1
-                val scrollTo = args.getString(ChildRoutes.CHAT_SCROLL_TO_KEY).orEmpty().takeIf { it.isNotEmpty() }
-                val mode: ChatThreadMode =
-                    when (kind) {
-                        "ai" -> ChatThreadMode.Ai
-                        "room" -> ChatThreadMode.Room(id)
-                        "creator" -> ChatThreadMode.Person(otherUserId = id)
-                        else -> ChatThreadMode.Person(otherUserId = id)
-                    }
-                val counterparty: ChatCounterparty =
-                    when (kind) {
-                        "ai" -> ChatCounterparty.Ai(displayName = name)
-                        "room" -> ChatCounterparty.Group(displayName = name, memberCount = null)
-                        "creator" ->
-                            ChatCounterparty.Person(
-                                displayName = name,
-                                initials = initials,
-                                locality = locality,
-                                verified = verified,
-                                online = online,
+                    )
+                }
+                composable(
+                    route = ChildRoutes.CALENDAR_EVENT_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(EVENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(EVENT_DETAIL_EVENT_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(EVENT_DETAIL_HOME_ID_KEY).orEmpty()
+                    EventDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onEdit = { event ->
+                            navController.navigate(
+                                ChildRoutes.addCalendarEvent(
+                                    homeId = homeId,
+                                    eventId = event.id,
+                                    prefilledCategory = event.eventType,
+                                ),
                             )
-                        else ->
-                            ChatCounterparty.Person(
-                                displayName = name,
-                                initials = initials,
-                                locality = locality,
-                                verified = verified,
-                                online = online,
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_EMERGENCY,
+                    arguments = listOf(navArgument(EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(EMERGENCY_HOME_ID_KEY).orEmpty()
+                    EmergencyInfoScreen(
+                        onAction = { dto ->
+                            navController.navigate(ChildRoutes.emergencyItem(homeId, dto.id))
+                        },
+                        onAdd = { navController.navigate(ChildRoutes.addEmergencyInfo(homeId)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.ADD_EMERGENCY_INFO,
+                    arguments =
+                        listOf(navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    AddEmergencyInfoFormScreen(
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_EMERGENCY_INFO,
+                    arguments =
+                        listOf(
+                            navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(ADD_EMERGENCY_ITEM_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    AddEmergencyInfoFormScreen(
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EMERGENCY_ITEM,
+                    arguments =
+                        listOf(
+                            navArgument(EMERGENCY_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(EMERGENCY_DETAIL_ITEM_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(EMERGENCY_DETAIL_HOME_ID_KEY).orEmpty()
+                    val emergencyId = entry.arguments?.getString(EMERGENCY_DETAIL_ITEM_ID_KEY).orEmpty()
+                    EmergencyInfoDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onEdit = {
+                            navController.navigate(ChildRoutes.editEmergencyInfo(homeId, emergencyId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_PACKAGES,
+                    arguments = listOf(navArgument(PACKAGES_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(PACKAGES_HOME_ID_KEY).orEmpty()
+                    PackagesListScreen(
+                        currentUserId = null,
+                        memberLookup = { null },
+                        onOpenPackage = { packageId ->
+                            navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
+                        },
+                        onLogPackage = { navController.navigate(ChildRoutes.logPackage(homeId)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_POLLS,
+                    arguments = listOf(navArgument(POLLS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(POLLS_HOME_ID_KEY).orEmpty()
+                    PollsListScreen(
+                        onOpenPoll = { pollId ->
+                            navController.navigate(ChildRoutes.pollDetail(homeId, pollId))
+                        },
+                        onStartPoll = {
+                            navController.navigate(ChildRoutes.startPoll(homeId))
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.START_POLL,
+                    arguments = listOf(navArgument(START_POLL_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    StartPollFormScreen(
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_DOCS,
+                    arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    val docsHomeId = it.arguments?.getString(DOCUMENTS_HOME_ID_KEY).orEmpty()
+                    DocumentsScreen(
+                        onOpenDocument = { dto ->
+                            navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
+                        },
+                        onUpload = {
+                            navController.navigate(ChildRoutes.uploadDocument(docsHomeId))
+                        },
+                        onSearch = { navController.navigate(ChildRoutes.documentSearch(docsHomeId)) },
+                        onExport = { navController.navigate(ChildRoutes.placeholder("Export documents")) },
+                        onDocumentAction = { dto, _ ->
+                            navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.DOCUMENT_SEARCH,
+                    arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    DocumentSearchScreen(
+                        onOpenDocument = { dto ->
+                            navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
+                        },
+                        onCancel = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.UPLOAD_DOCUMENT,
+                    arguments = listOf(navArgument(UPLOAD_DOCUMENT_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    UploadDocumentFormScreen(
+                        onClose = { navController.popBackStack() },
+                        onUploaded = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.DOCUMENT_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(DOCUMENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(DOCUMENT_DETAIL_DOC_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(DOCUMENT_DETAIL_HOME_ID_KEY).orEmpty()
+                    DocumentDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onReplace = {
+                            navController.navigate(ChildRoutes.uploadDocument(homeId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.POLL_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(POLL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(POLL_DETAIL_POLL_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    PollDetailScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.ACCESS_CODES,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(ChildRoutes.ACCESS_CODES_HOME_NAME_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) { backStackEntry ->
+                    val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
+                    AccessCodesScreen(
+                        onAddCode = { category ->
+                            navController.navigate(
+                                ChildRoutes.editAccessCode(
+                                    homeId = homeIdArg,
+                                    secretId = null,
+                                    category = category?.wire,
+                                ),
                             )
-                    }
-                val conversationMode: ChatConversationMode =
-                    when (kind) {
-                        "ai" -> ChatConversationMode.AiAssistant
-                        "creator" -> ChatConversationMode.CreatorThread
-                        else -> ChatConversationMode.Dm
-                    }
-                val creatorContext =
-                    if (conversationMode == ChatConversationMode.CreatorThread) {
-                        ChatCreatorThreadContext.defaults(fanTierName = tierName, fanTierRank = tierRank)
+                        },
+                        onEditCode = { secretId ->
+                            navController.navigate(
+                                ChildRoutes.editAccessCode(
+                                    homeId = homeIdArg,
+                                    secretId = secretId,
+                                    category = null,
+                                ),
+                            )
+                        },
+                        onSearch = {
+                            navController.navigate(ChildRoutes.accessCodesSearch(homeIdArg))
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.ACCESS_CODES_SEARCH,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) { backStackEntry ->
+                    val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
+                    AccessCodesSearchScreen(
+                        onOpenCode = { secretId ->
+                            navController.navigate(
+                                ChildRoutes.editAccessCode(
+                                    homeId = homeIdArg,
+                                    secretId = secretId,
+                                    category = null,
+                                ),
+                            )
+                        },
+                        onCancel = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_ACCESS_CODE,
+                    arguments =
+                        listOf(
+                            navArgument(EDIT_ACCESS_CODE_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(EDIT_ACCESS_CODE_SECRET_ID_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                            navArgument(EDIT_ACCESS_CODE_CATEGORY_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) {
+                    EditAccessCodeFormScreen(
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_TASKS,
+                    arguments = listOf(navArgument(HOUSEHOLD_TASKS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(HOUSEHOLD_TASKS_HOME_ID_KEY).orEmpty()
+                    HouseholdTasksListScreen(
+                        onOpenTask = { _ ->
+                            navController.navigate(ChildRoutes.placeholder("Task detail"))
+                        },
+                        onAddTask = {
+                            navController.navigate(ChildRoutes.addHouseholdTask(homeId))
+                        },
+                        onEditRecurring = { taskId ->
+                            navController.navigate(ChildRoutes.editHouseholdTask(homeId, taskId))
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.ADD_HOUSEHOLD_TASK,
+                    arguments = listOf(navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    AddHouseholdTaskFormScreen(
+                        onClose = { navController.popBackStack() },
+                        onCreated = {
+                            // Pop back to the tasks list; the list refreshes
+                            // on next visit.
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_HOUSEHOLD_TASK,
+                    arguments =
+                        listOf(
+                            navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(ADD_HOUSEHOLD_TASK_TASK_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    AddHouseholdTaskFormScreen(
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_MAINTENANCE,
+                    arguments = listOf(navArgument(MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId =
+                        entry.arguments?.getString(MAINTENANCE_HOME_ID_KEY) ?: ""
+                    MaintenanceListScreen(
+                        onOpenTask = { taskId ->
+                            navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
+                        },
+                        onAddTask = {
+                            navController.navigate(ChildRoutes.logMaintenance(homeId))
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.LOG_MAINTENANCE,
+                    arguments = listOf(navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId =
+                        entry.arguments?.getString(LOG_MAINTENANCE_HOME_ID_KEY) ?: ""
+                    LogMaintenanceFormScreen(
+                        onClose = { navController.popBackStack() },
+                        onSubmitted = { taskId ->
+                            navController.popBackStack(
+                                ChildRoutes.homeMaintenance(homeId),
+                                inclusive = false,
+                            )
+                            navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_MAINTENANCE,
+                    arguments =
+                        listOf(
+                            navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(LOG_MAINTENANCE_TASK_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    LogMaintenanceFormScreen(
+                        onClose = { navController.popBackStack() },
+                        onSubmitted = { _ -> navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.MAINTENANCE_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(MAINTENANCE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(MAINTENANCE_DETAIL_TASK_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(MAINTENANCE_DETAIL_HOME_ID_KEY) ?: ""
+                    val taskId = entry.arguments?.getString(MAINTENANCE_DETAIL_TASK_ID_KEY) ?: ""
+                    MaintenanceDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onEdit = {
+                            navController.navigate(ChildRoutes.editMaintenance(homeId, taskId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_OWNERS,
+                    arguments = listOf(navArgument(OWNERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    OwnersListScreen(
+                        onOpenInvite = { homeId ->
+                            navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PACKAGE_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(PACKAGE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(PACKAGE_DETAIL_PACKAGE_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    PackageDetailScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.LOG_PACKAGE,
+                    arguments = listOf(navArgument(LOG_PACKAGE_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(LOG_PACKAGE_HOME_ID_KEY).orEmpty()
+                    LogPackageScreen(
+                        onClose = { navController.popBackStack() },
+                        onCreated = { packageId ->
+                            // Replace the log-package destination with the
+                            // new package's detail so Back returns to the
+                            // Packages list, not the form.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_MEMBERS,
+                    arguments = listOf(navArgument(MEMBERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(MEMBERS_LIST_HOME_ID_KEY).orEmpty()
+                    MembersListScreen(
+                        onBack = { navController.popBackStack() },
+                        onAddGuest = { navController.navigate(ChildRoutes.addGuest(homeId)) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_SETTINGS,
+                    arguments = listOf(navArgument(HOME_SETTINGS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(HOME_SETTINGS_HOME_ID_KEY).orEmpty()
+                    HomeSettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route ->
+                            when (route) {
+                                HomeSettingsRoute.Address, HomeSettingsRoute.PropertyDetails ->
+                                    navController.navigate(ChildRoutes.propertyDetails(homeId))
+                                HomeSettingsRoute.Photos ->
+                                    navController.navigate(ChildRoutes.placeholder("Photos"))
+                                HomeSettingsRoute.Documents ->
+                                    navController.navigate(ChildRoutes.homeDocs(homeId))
+                                HomeSettingsRoute.AccessCodes ->
+                                    navController.navigate(ChildRoutes.accessCodes(homeId, null))
+                                HomeSettingsRoute.TrustedNeighbors ->
+                                    navController.navigate(ChildRoutes.placeholder("Trusted neighbors"))
+                                HomeSettingsRoute.Security ->
+                                    navController.navigate(ChildRoutes.homeSecurity(homeId))
+                                HomeSettingsRoute.People ->
+                                    navController.navigate(ChildRoutes.homeMembers(homeId))
+                                HomeSettingsRoute.InviteLink ->
+                                    navController.navigate(ChildRoutes.placeholder("Invite link"))
+                                HomeSettingsRoute.HomeNotifications ->
+                                    navController.navigate(ChildRoutes.placeholder("Home notifications"))
+                                HomeSettingsRoute.LeaveHome ->
+                                    navController.navigate(ChildRoutes.placeholder("Leave home"))
+                                HomeSettingsRoute.CancelClaim ->
+                                    navController.navigate(ChildRoutes.placeholder("Cancel claim"))
+                            }
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_SECURITY,
+                    arguments = listOf(navArgument(HOME_SECURITY_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    HomeSecurityScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.MAILBOX_ITEM_DETAIL,
+                    arguments = listOf(navArgument(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    // T6.5b (P20) — generic A17.1 mail detail. P21-P23 will
+                    // add package / coupon / booklet / certified variants on
+                    // top of the same shared shell.
+                    val mailId = entry.arguments?.getString(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY).orEmpty()
+                    MailDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenSenderProfile = { userId ->
+                            navController.navigate(ChildRoutes.publicProfile(userId))
+                        },
+                        onTranslate = { navController.navigate(ChildRoutes.translation(mailId)) },
+                        onOpenExtractedTask = { sourceMailId ->
+                            // A17.12 — the certified-notice "view task" affordance
+                            // opens the mail-derived task keyed by its source mail.
+                            navController.navigate(ChildRoutes.mailTask(sourceMailId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PUBLIC_PROFILE,
+                    arguments = listOf(navArgument(PUBLIC_PROFILE_USER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    PublicProfileScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMessages = { profile ->
+                            navController.navigate(
+                                ChildRoutes.chatConversationFromPicker(
+                                    userId = profile.id,
+                                    displayName = profile.displayName,
+                                    initials = initialsFromName(profile.displayName),
+                                    verified = profile.verified == true,
+                                    locality = profile.locality,
+                                ),
+                            )
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_PROFILE,
+                    arguments = listOf(navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType }),
+                ) { backStackEntry ->
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                    val businessId = backStackEntry.arguments?.getString(BUSINESS_PROFILE_BUSINESS_ID_KEY) ?: ""
+                    BusinessProfileScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                        onShare = {
+                            appContext.shareText(
+                                "Check out this business on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                "Share business",
+                            )
+                        },
+                        onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
+                        onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
+                        onBook = { navController.navigate(ChildRoutes.placeholder("Book")) },
+                        onEdit = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_BUSINESS_PAGE,
+                    arguments = listOf(navArgument(EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    EditBusinessPageScreen(
+                        onBack = { navController.popBackStack() },
+                        onPreview = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PULSE_POST,
+                    arguments = listOf(navArgument(PULSE_POST_DETAIL_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    PulsePostDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenProfile = { userId ->
+                            navController.navigate(ChildRoutes.publicProfile(userId))
+                        },
+                        onEdit = { postId ->
+                            navController.navigate(ChildRoutes.editPost(postId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.INVITE_OWNER,
+                    arguments =
+                        listOf(
+                            navArgument(INVITE_OWNER_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(INVITE_OWNER_CURRENT_EMAIL_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) {
+                    InviteOwnerFormScreen(onClose = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.DISAMBIGUATE_MAIL,
+                    arguments = listOf(navArgument(DISAMBIGUATE_MAIL_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    DisambiguateMailFormScreen(onClose = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.MAILBOX_VAULT) {
+                    // T6.5e (P19.5) — Mailbox Vault list-of-rows surface.
+                    VaultListScreen(
+                        onOpenItem = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
+                        onAddTapped = {
+                            // FAB shortcut — drop the user back to the inbox
+                            // where mail items expose the kebab
+                            // "Save to vault" action.
+                            navController.navigate(ChildRoutes.MAILBOX_ROOT) {
+                                popUpTo(ChildRoutes.MAILBOX_ROOT) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenMailbox = {
+                            navController.navigate(ChildRoutes.MAILBOX_ROOT) {
+                                popUpTo(ChildRoutes.MAILBOX_ROOT) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.CHAT_CONVERSATION,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.CHAT_KIND_KEY) { type = NavType.StringType },
+                            navArgument(ChildRoutes.CHAT_ID_KEY) { type = NavType.StringType },
+                            navArgument(ChildRoutes.CHAT_NAME_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_INITIALS_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_VERIFIED_KEY) {
+                                type = NavType.StringType
+                                defaultValue = "false"
+                            },
+                            navArgument(ChildRoutes.CHAT_IDENTITY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_LOCALITY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_ONLINE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = "false"
+                            },
+                            navArgument(ChildRoutes.CHAT_TIER_NAME_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_TIER_RANK_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_SCROLL_TO_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) { entry ->
+                    val args = entry.arguments ?: return@composable
+                    val kind = args.getString(ChildRoutes.CHAT_KIND_KEY).orEmpty()
+                    val id = args.getString(ChildRoutes.CHAT_ID_KEY).orEmpty()
+                    val name = args.getString(ChildRoutes.CHAT_NAME_KEY).orEmpty()
+                    val initials = args.getString(ChildRoutes.CHAT_INITIALS_KEY).orEmpty()
+                    val verified = args.getString(ChildRoutes.CHAT_VERIFIED_KEY) == "true"
+                    val locality = args.getString(ChildRoutes.CHAT_LOCALITY_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                    val online = args.getString(ChildRoutes.CHAT_ONLINE_KEY) == "true"
+                    val tierName = args.getString(ChildRoutes.CHAT_TIER_NAME_KEY).orEmpty().ifEmpty { "Free" }
+                    val tierRank = args.getString(ChildRoutes.CHAT_TIER_RANK_KEY).orEmpty().toIntOrNull() ?: 1
+                    val scrollTo = args.getString(ChildRoutes.CHAT_SCROLL_TO_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                    val mode: ChatThreadMode =
+                        when (kind) {
+                            "ai" -> ChatThreadMode.Ai
+                            "room" -> ChatThreadMode.Room(id)
+                            "creator" -> ChatThreadMode.Person(otherUserId = id)
+                            else -> ChatThreadMode.Person(otherUserId = id)
+                        }
+                    val counterparty: ChatCounterparty =
+                        when (kind) {
+                            "ai" -> ChatCounterparty.Ai(displayName = name)
+                            "room" -> ChatCounterparty.Group(displayName = name, memberCount = null)
+                            "creator" ->
+                                ChatCounterparty.Person(
+                                    displayName = name,
+                                    initials = initials,
+                                    locality = locality,
+                                    verified = verified,
+                                    online = online,
+                                )
+                            else ->
+                                ChatCounterparty.Person(
+                                    displayName = name,
+                                    initials = initials,
+                                    locality = locality,
+                                    verified = verified,
+                                    online = online,
+                                )
+                        }
+                    val conversationMode: ChatConversationMode =
+                        when (kind) {
+                            "ai" -> ChatConversationMode.AiAssistant
+                            "creator" -> ChatConversationMode.CreatorThread
+                            else -> ChatConversationMode.Dm
+                        }
+                    val creatorContext =
+                        if (conversationMode == ChatConversationMode.CreatorThread) {
+                            ChatCreatorThreadContext.defaults(fanTierName = tierName, fanTierRank = tierRank)
+                        } else {
+                            null
+                        }
+                    ChatConversationHost(
+                        mode = mode,
+                        counterparty = counterparty,
+                        chrome =
+                            ChatConversationChrome(
+                                mode = conversationMode,
+                                creatorThread =
+                                    creatorContext?.let {
+                                        ChatCreatorThreadChrome(
+                                            context = it,
+                                            onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                                        )
+                                    },
+                            ),
+                        onBack = { navController.popBackStack() },
+                        scrollToMessageId = scrollTo,
+                    )
+                }
+                composable(ChildRoutes.CHAT_SEARCH) {
+                    ChatSearchScreen(
+                        onOpenResult = { result ->
+                            navController.navigate(ChildRoutes.chatSearchConversation(result))
+                        },
+                        onCancel = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.NEW_MESSAGE) {
+                    NewMessageScreen(
+                        onCancel = { navController.popBackStack() },
+                        onSelect = { destination ->
+                            // Pop the picker first so back from the
+                            // conversation returns to the chat list, not
+                            // the picker (mirrors iOS InboxTabRoot).
+                            navController.popBackStack()
+                            navController.navigate(
+                                ChildRoutes.chatConversationFromPicker(
+                                    userId = destination.userId,
+                                    displayName = destination.displayName,
+                                    initials = destination.initials,
+                                    verified = destination.verified,
+                                    locality = destination.locality,
+                                ),
+                            )
+                        },
+                        onInvite = { appContext.shareText(InviteLinks.INVITE_MESSAGE, "Invite to Pantopus") },
+                    )
+                }
+                composable(ChildRoutes.PULSE_FEED) {
+                    FeedScreen(
+                        onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
+                        onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.BEACONS_FEED) {
+                    BeaconsFeedScreen(
+                        onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
+                        onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
+                        onDiscover = { navController.navigate(ChildRoutes.DISCOVER_HUB) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.FOLLOWING) {
+                    FollowingScreen(
+                        onBack = { navController.popBackStack() },
+                        onDiscover = { navController.navigate(ChildRoutes.DISCOVER_HUB) },
+                        onOpenPersona = { navController.navigate(ChildRoutes.placeholder("Beacon")) },
+                    )
+                }
+                composable(ChildRoutes.MARKETPLACE) {
+                    MarketplaceScreen(
+                        onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
+                        onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.LISTING_DETAIL,
+                    arguments = listOf(navArgument(ChildRoutes.LISTING_DETAIL_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    ListingDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMessages = { listing ->
+                            listing.userId?.let { sellerId ->
+                                val name = listing.title ?: "Seller"
+                                navController.navigate(
+                                    ChildRoutes.chatConversationFromPicker(
+                                        userId = sellerId,
+                                        displayName = name,
+                                        initials = initialsFromName(name),
+                                        verified = false,
+                                        locality = listing.locationName,
+                                    ),
+                                )
+                            }
+                        },
+                        onViewOffers = { dto ->
+                            navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
+                        },
+                        onEditListing = { dto ->
+                            navController.navigate(ChildRoutes.editListing(dto.id))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.LISTING_OFFERS,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.LISTING_OFFERS_ID_KEY) { type = NavType.StringType },
+                            navArgument(ChildRoutes.LISTING_OFFERS_TITLE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) { entry ->
+                    val listingId = entry.arguments?.getString(ChildRoutes.LISTING_OFFERS_ID_KEY).orEmpty()
+                    ListingOffersScreen(
+                        onBack = { navController.popBackStack() },
+                        onShareListing = {
+                            appContext.shareText(
+                                "Check out this listing on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                "Share listing",
+                            )
+                        },
+                        onOpenBuyer = { buyer -> navController.navigate(ChildRoutes.publicProfile(buyer.id)) },
+                        onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
+                        onEditPrice = {
+                            navController.navigate(
+                                ChildRoutes.editListing(
+                                    listingId = listingId,
+                                    jumpToStep = ListingComposeStep.Price.name,
+                                ),
+                            )
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.INVOICE_DETAIL,
+                    arguments = listOf(navArgument(ChildRoutes.INVOICE_DETAIL_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    InvoiceDetailScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.COMPOSE_LISTING) {
+                    ListingComposeWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenListingDetail = { listingId ->
+                            // Pop the wizard then push detail so Back returns to
+                            // Marketplace, not the success screen.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.listingDetail(listingId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_LISTING,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.EDIT_LISTING_ID_KEY) { type = NavType.StringType },
+                            navArgument(ChildRoutes.EDIT_LISTING_JUMP_TO_STEP_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) {
+                    ListingComposeWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenListingDetail = { _ -> navController.popBackStack() },
+                        onListingUpdated = { _ ->
+                            // Pop the edit wizard. The detail / offers screen
+                            // underneath refreshes from its own LaunchedEffect.
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable(ChildRoutes.GIGS_FEED) {
+                    GigsFeedScreen(
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                        onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
+                        onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
+                        onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.GIG_SEARCH) {
+                    GigSearchScreen(
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.GIG_DETAIL,
+                    arguments = listOf(navArgument(ChildRoutes.GIG_DETAIL_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    GigDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMessages = { gig ->
+                            gig.userId?.let { posterId ->
+                                val name = gig.creator?.name ?: gig.creator?.username ?: gig.title
+                                navController.navigate(
+                                    ChildRoutes.chatConversationFromPicker(
+                                        userId = posterId,
+                                        displayName = name,
+                                        initials = initialsFromName(name),
+                                        verified = gig.creator?.verified == true,
+                                        locality = null,
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.NEARBY_MAP_FOR_GIGS,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = GigsCategory.All.key
+                            },
+                        ),
+                ) { entry ->
+                    val raw =
+                        entry.arguments?.getString(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) ?: GigsCategory.All.key
+                    NearbyMapScreen(
+                        onOpenEntity = { entity ->
+                            when (entity.kind) {
+                                MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                                MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
+                            }
+                        },
+                        onBack = { navController.popBackStack() },
+                        initialCategory = GigsCategory.fromBackendKey(raw),
+                    )
+                }
+                composable(
+                    route = ChildRoutes.QUICK_POST_GIG,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = GigsCategory.All.key
+                            },
+                        ),
+                ) { entry ->
+                    val raw = entry.arguments?.getString(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
+                    PostGigV1Screen(
+                        onDismiss = { navController.popBackStack() },
+                        onPosted = { gigId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        },
+                        preselectedCategoryKey = raw,
+                    )
+                }
+                composable(
+                    route = ChildRoutes.COMPOSE_GIG,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = GigsCategory.All.key
+                            },
+                        ),
+                ) { entry ->
+                    val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
+                    GigComposeWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenGigDetail = { gigId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        },
+                        preselectedCategoryKey = raw,
+                    )
+                }
+                composable(
+                    route = ChildRoutes.COMPOSE_POST,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.COMPOSE_INTENT_KEY) {
+                                type = NavType.StringType
+                                defaultValue = PulseIntent.All.key
+                            },
+                        ),
+                ) {
+                    PulseComposeScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.EDIT_POST,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.EDIT_POST_POST_ID_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) {
+                    PulseComposeScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.NOTIFICATIONS) {
+                    NotificationsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.RECENT_ACTIVITY) {
+                    RecentActivityScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpen = { destination ->
+                            when (destination) {
+                                is RecentActivityDestination.GigDetail ->
+                                    navController.navigate(ChildRoutes.gigDetail(destination.id))
+                                is RecentActivityDestination.ListingDetail ->
+                                    navController.navigate(ChildRoutes.listingDetail(destination.id))
+                                is RecentActivityDestination.MailItemDetail ->
+                                    navController.navigate(ChildRoutes.mailboxItemDetail(destination.id))
+                                is RecentActivityDestination.PulsePost ->
+                                    navController.navigate(ChildRoutes.pulsePost(destination.id))
+                                is RecentActivityDestination.HomeDashboard ->
+                                    navController.navigate(ChildRoutes.homeDashboard(destination.id))
+                                is RecentActivityDestination.Placeholder ->
+                                    navController.navigate(ChildRoutes.placeholder(destination.label))
+                            }
+                        },
+                    )
+                }
+                composable(ChildRoutes.CONNECTIONS) {
+                    ConnectionsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenChat = { target: ConnectionsChatTarget ->
+                            val row =
+                                ConversationRowContent(
+                                    id = target.userId,
+                                    variant = ConversationRowVariant.Dm,
+                                    displayName = target.displayName,
+                                    initials = target.initials,
+                                    avatarUrl = null,
+                                    identityChip = null,
+                                    verified = target.verified,
+                                    preview = "",
+                                    timeLabel = "",
+                                    unread = 0,
+                                    pinned = false,
+                                    topicKinds = emptySet(),
+                                )
+                            navController.navigate(ChildRoutes.chatConversation(row))
+                        },
+                        onFindPeople = {
+                            findPeopleLauncher.launch(null)
+                        },
+                    )
+                }
+                composable(ChildRoutes.DISCOVER_HUB) {
+                    DiscoverHubScreen(
+                        onBack = { navController.popBackStack() },
+                        onSelect = { target ->
+                            when (target) {
+                                is DiscoverHubTarget.Person ->
+                                    navController.navigate(ChildRoutes.publicProfile(target.userId))
+                                is DiscoverHubTarget.Business ->
+                                    navController.navigate(ChildRoutes.businessProfile(target.businessId))
+                                is DiscoverHubTarget.Gig ->
+                                    navController.navigate(ChildRoutes.gigDetail(target.gigId))
+                                is DiscoverHubTarget.Listing ->
+                                    navController.navigate(ChildRoutes.listingDetail(target.listingId))
+                                is DiscoverHubTarget.Post ->
+                                    navController.navigate(ChildRoutes.pulsePost(target.postId))
+                                DiscoverHubTarget.SeeAllPeople ->
+                                    navController.navigate(ChildRoutes.CONNECTIONS)
+                                DiscoverHubTarget.SeeAllBusinesses ->
+                                    navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
+                                DiscoverHubTarget.SeeAllGigs ->
+                                    navController.navigate(ChildRoutes.GIGS_FEED)
+                                DiscoverHubTarget.SeeAllListings ->
+                                    navController.navigate(ChildRoutes.MARKETPLACE)
+                                DiscoverHubTarget.SeeAllPosts ->
+                                    navController.navigate(ChildRoutes.PULSE_FEED)
+                            }
+                        },
+                        onOpenMap = { navController.navigate(ChildRoutes.EXPLORE) },
+                    )
+                }
+                composable(ChildRoutes.DISCOVER_BUSINESSES) {
+                    DiscoverBusinessesScreen(
+                        onBack = { navController.popBackStack() },
+                        onSelect = { target ->
+                            when (target) {
+                                is DiscoverBusinessesTarget.Business ->
+                                    navController.navigate(ChildRoutes.businessProfile(target.businessId))
+                                DiscoverBusinessesTarget.SetHomeAddress ->
+                                    navController.navigate(ChildRoutes.ADD_HOME)
+                                DiscoverBusinessesTarget.InviteBusiness ->
+                                    appContext.composeEmail(
+                                        subject = "Join Pantopus",
+                                        body =
+                                            "I'd love to see your business on Pantopus — neighbors near " +
+                                                "me are looking for trusted local pros. ${InviteLinks.DOWNLOAD_URL}",
+                                    )
+                            }
+                        },
+                    )
+                }
+                composable(ChildRoutes.OFFERS) {
+                    OffersScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenOfferDetail = { dto ->
+                            val gigId = dto.gigId ?: dto.gig?.id
+                            if (!gigId.isNullOrBlank()) {
+                                navController.navigate(ChildRoutes.gigDetail(gigId))
+                            }
+                        },
+                        onBrowseListings = { navController.navigate(ChildRoutes.MARKETPLACE) },
+                        onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
+                    )
+                }
+                composable(ChildRoutes.MY_BIDS) {
+                    MyBidsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenBid = { dto ->
+                            val gigId = dto.gigId ?: dto.gig?.id
+                            if (!gigId.isNullOrBlank()) {
+                                navController.navigate(ChildRoutes.gigDetail(gigId))
+                            }
+                        },
+                        onBrowseTasks = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                        onMessageClient = { dto ->
+                            // Push to gig detail; "Message poster" is wired there.
+                            val gigId = dto.gigId ?: dto.gig?.id
+                            if (!gigId.isNullOrBlank()) {
+                                navController.navigate(ChildRoutes.gigDetail(gigId))
+                            }
+                        },
+                        // Edit-bid + Leave-review are presented as sheets from
+                        // inside the screen (P3.4) — no router wiring needed.
+                    )
+                }
+                composable(ChildRoutes.MY_TASKS) {
+                    MyTasksScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                        onOpenBids = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                        onEditTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                        onMessageWorker = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                        onLeaveReview = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                        onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
+                        onRepost = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
+                    )
+                }
+                composable(ChildRoutes.COMPOSE_TASK) {
+                    GigComposeWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenGigDetail = { gigId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        },
+                        preselectedCategoryKey = null,
+                    )
+                }
+                composable(ChildRoutes.MY_POSTS) {
+                    MyPostsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenPost = { dto -> navController.navigate(ChildRoutes.pulsePost(dto.id)) },
+                        onCompose = { navController.navigate(ChildRoutes.composePost("")) },
+                        onEditPost = { dto -> navController.navigate(ChildRoutes.editPost(dto.id)) },
+                    )
+                }
+                composable(ChildRoutes.MENU) {
+                    SettingsIndexScreen(
+                        onClose = { navController.popBackStack() },
+                        onNavigate = { route ->
+                            when (route) {
+                                SettingsRoute.Notifications -> navController.navigate(ChildRoutes.SETTINGS_NOTIFICATIONS)
+                                SettingsRoute.Privacy -> navController.navigate(ChildRoutes.SETTINGS_PRIVACY)
+                                SettingsRoute.IdentityCenter -> navController.navigate(ChildRoutes.IDENTITY_CENTER)
+                                SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.EDIT_PROFILE)
+                                SettingsRoute.Password -> navController.navigate(ChildRoutes.SETTINGS_PASSWORD)
+                                SettingsRoute.Verification -> navController.navigate(ChildRoutes.SETTINGS_VERIFICATION)
+                                SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
+                                // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
+                                SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
+                                // P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
+                                // setup · payout routing). Distinct from A10.10 Wallet
+                                // (earnings-in) which lives at `ChildRoutes.WALLET` and
+                                // is reachable via the Wallet tab + `pantopus://wallet`
+                                // deep link.
+                                SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.SETTINGS_PAYMENTS)
+                                SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
+                                SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
+                                SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
+                                SettingsRoute.ReviewClaims -> {
+                                    // Close settings, push the admin queue.
+                                    navController.popBackStack()
+                                    navController.navigate(ChildRoutes.REVIEW_CLAIMS)
+                                }
+                                SettingsRoute.DidSignOut -> navController.popBackStack()
+                            }
+                        },
+                    )
+                }
+                composable(ChildRoutes.EDIT_PROFILE) {
+                    EditProfileScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.SETTINGS_NOTIFICATIONS) {
+                    NotificationSettingsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.SETTINGS_PRIVACY) {
+                    PrivacySettingsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.SETTINGS_BLOCKED_USERS) {
+                    BlockedUsersScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.SETTINGS_PASSWORD) {
+                    PasswordChangeScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.SETTINGS_VERIFICATION) {
+                    VerificationCenterScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.SETTINGS_HELP) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    HelpCenterScreen(
+                        onBack = { navController.popBackStack() },
+                        onEmailSupport = {
+                            val intent =
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_SENDTO,
+                                    android.net.Uri.parse("mailto:support@pantopus.app?subject=Help"),
+                                )
+                            context.startActivity(intent)
+                        },
+                    )
+                }
+                composable(ChildRoutes.SETTINGS_LEGAL) {
+                    LegalIndexScreen(
+                        onBack = { navController.popBackStack() },
+                        onSelectDocument = { doc ->
+                            navController.navigate(ChildRoutes.settingsLegalContent(doc.rowId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.SETTINGS_LEGAL_CONTENT,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.SETTINGS_LEGAL_DOC_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) { entry ->
+                    val docId = entry.arguments?.getString(ChildRoutes.SETTINGS_LEGAL_DOC_KEY).orEmpty()
+                    val doc = LegalDocument.entries.firstOrNull { it.rowId == docId }
+                    if (doc != null) {
+                        LegalContentScreen(document = doc, onBack = { navController.popBackStack() })
                     } else {
-                        null
+                        LegalEmptyState(onBack = { navController.popBackStack() })
                     }
-                ChatConversationHost(
-                    mode = mode,
-                    counterparty = counterparty,
-                    chrome =
-                        ChatConversationChrome(
-                            mode = conversationMode,
-                            creatorThread =
-                                creatorContext?.let {
-                                    ChatCreatorThreadChrome(
-                                        context = it,
-                                        onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                }
+                composable(ChildRoutes.SETTINGS_ABOUT) {
+                    AboutScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.SETTINGS_PAYMENTS) {
+                    PaymentsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.PRIVACY_HANDSHAKE,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.PRIVACY_HANDSHAKE_HANDLE_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) {
+                    PrivacyHandshakeScreen(
+                        onDismiss = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.TOKEN_ACCEPT,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.TOKEN_ACCEPT_TOKEN_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) {
+                    TokenAcceptScreen(
+                        onDismiss = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.CEREMONIAL_MAIL) {
+                    CeremonialMailWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenMail = { mailId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.CEREMONIAL_MAIL_OPEN,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.CEREMONIAL_MAIL_OPEN_ID_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) {
+                    CeremonialMailOpenScreen(
+                        onBack = { navController.popBackStack() },
+                        onWriteBack = {
+                            navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
+                        },
+                    )
+                }
+                composable(ChildRoutes.AUDIENCE_PROFILE) {
+                    val audienceViewModel: AudienceProfileViewModel = hiltViewModel()
+                    AudienceProfileScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenFollower = { row ->
+                            navController.navigate(ChildRoutes.placeholder("Follower · ${row.displayName}"))
+                        },
+                        onOpenThread = {
+                            navController.navigate(ChildRoutes.CREATOR_INBOX)
+                        },
+                        onOpenBroadcast = { card, tiers ->
+                            audienceViewModel.cacheBroadcastSeed(card, tiers)
+                            navController.navigate(ChildRoutes.broadcastDetail(card.id))
+                        },
+                        onOpenSetup = {
+                            navController.navigate(ChildRoutes.privacyHandshake(currentHandle))
+                        },
+                        onOpenCreatorInbox = {
+                            navController.navigate(ChildRoutes.CREATOR_INBOX)
+                        },
+                        onOpenMembership = { personaId ->
+                            navController.navigate(ChildRoutes.membershipDetail(personaId))
+                        },
+                        onComposeBroadcast = { personaId ->
+                            navController.navigate(ChildRoutes.composeBroadcast(personaId))
+                        },
+                        onOpenEditPersona = {
+                            navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
+                        },
+                        onOpenBeacons = {
+                            navController.navigate(ChildRoutes.BEACONS_FEED)
+                        },
+                        onOpenFollowing = {
+                            navController.navigate(ChildRoutes.FOLLOWING)
+                        },
+                        onOpenMembers = {
+                            navController.navigate(ChildRoutes.CREATOR_AUDIENCE_MEMBERS)
+                        },
+                        viewModel = audienceViewModel,
+                    )
+                }
+                composable(ChildRoutes.CREATOR_AUDIENCE_MEMBERS) {
+                    YourAudienceScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    ChildRoutes.BROADCAST_DETAIL,
+                    arguments = listOf(navArgument(BROADCAST_DETAIL_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BroadcastDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onOverflow = {
+                            navController.navigate(ChildRoutes.placeholder("Broadcast actions"))
+                        },
+                        onReply = {
+                            navController.navigate(ChildRoutes.placeholder("Reply to broadcast"))
+                        },
+                        onBoost = {
+                            navController.navigate(ChildRoutes.placeholder("Boost broadcast"))
+                        },
+                        onPin = {
+                            navController.navigate(ChildRoutes.placeholder("Pin broadcast"))
+                        },
+                    )
+                }
+                composable(ChildRoutes.CREATOR_INBOX) {
+                    CreatorInboxScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenThread = { row ->
+                            navController.navigate(ChildRoutes.creatorThreadConversation(row))
+                        },
+                        onOpenBroadcast = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                        onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Inbox settings")) },
+                    )
+                }
+                composable(ChildRoutes.IDENTITY_CENTER) {
+                    IdentityCenterScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenIdentity = { card ->
+                            when (card.kind) {
+                                IdentityKind.PublicProfile ->
+                                    navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
+                                IdentityKind.Local ->
+                                    navController.navigate(ChildRoutes.placeholder("Local profile"))
+                                IdentityKind.Personal ->
+                                    navController.navigate(ChildRoutes.placeholder("Personal"))
+                                IdentityKind.Professional ->
+                                    navController.navigate(ChildRoutes.PROFESSIONAL_PROFILE)
+                            }
+                        },
+                        onOpenPlaceholder = { label ->
+                            navController.navigate(ChildRoutes.placeholder(label))
+                        },
+                        onOpenViewAs = { navController.navigate(ChildRoutes.VIEW_AS) },
+                    )
+                }
+                composable(ChildRoutes.MAILBOX_SEARCH) {
+                    MailboxSearchScreen(
+                        onOpenMail = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
+                        onCancel = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.SUPPORT_TRAINS) {
+                    SupportTrainsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTrain = { trainId ->
+                            navController.navigate(ChildRoutes.supportTrainDetail(trainId))
+                        },
+                        onStartTrain = {
+                            navController.navigate(ChildRoutes.START_SUPPORT_TRAIN)
+                        },
+                        onSearch = {
+                            navController.navigate(ChildRoutes.SUPPORT_TRAINS_SEARCH)
+                        },
+                    )
+                }
+                composable(ChildRoutes.SUPPORT_TRAINS_SEARCH) {
+                    SupportTrainsSearchScreen(
+                        onOpenTrain = { trainId ->
+                            navController.navigate(ChildRoutes.supportTrainDetail(trainId))
+                        },
+                        onCancel = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.START_SUPPORT_TRAIN) {
+                    StartSupportTrainWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenTrain = { trainId ->
+                            // A10.9 (P3.1) — After publish we land on the
+                            // participant detail; the organizer who just
+                            // launched it reaches the review queue via
+                            // the dock overflow on the detail screen.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.supportTrainDetail(trainId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.SUPPORT_TRAIN_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.SUPPORT_TRAIN_DETAIL_ID_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) { entry ->
+                    val trainId = entry.arguments?.getString(ChildRoutes.SUPPORT_TRAIN_DETAIL_ID_KEY).orEmpty()
+                    SupportTrainDetailScreen(
+                        actions =
+                            SupportTrainDetailActions(
+                                onBack = { navController.popBackStack() },
+                                onOpenManage = {
+                                    // P4.3 / A13.13 — A10.9 dock-overflow lands
+                                    // on the organizer Manage Train surface (was
+                                    // wired to review-signups as a stub before
+                                    // A13.13 shipped).
+                                    navController.navigate(ChildRoutes.manageTrain(trainId))
+                                },
+                                onShare = {
+                                    appContext.shareText(
+                                        "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                        "Share train",
                                     )
                                 },
-                        ),
-                    onBack = { navController.popBackStack() },
-                    scrollToMessageId = scrollTo,
-                )
-            }
-            composable(ChildRoutes.CHAT_SEARCH) {
-                ChatSearchScreen(
-                    onOpenResult = { result ->
-                        navController.navigate(ChildRoutes.chatSearchConversation(result))
-                    },
-                    onCancel = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.NEW_MESSAGE) {
-                NewMessageScreen(
-                    onCancel = { navController.popBackStack() },
-                    onSelect = { destination ->
-                        // Pop the picker first so back from the
-                        // conversation returns to the chat list, not
-                        // the picker (mirrors iOS InboxTabRoot).
-                        navController.popBackStack()
-                        navController.navigate(
-                            ChildRoutes.chatConversationFromPicker(
-                                userId = destination.userId,
-                                displayName = destination.displayName,
-                                initials = destination.initials,
-                                verified = destination.verified,
-                                locality = destination.locality,
+                                onSignUp = {
+                                    // Slot-claim sheet lands with the
+                                    // editor surface in a P3.7 follow-up — surface
+                                    // the affordance via a placeholder for now so
+                                    // the dock CTA remains testable.
+                                    navController.navigate(ChildRoutes.placeholder("Claim a slot"))
+                                },
+                                onEditSlot = {
+                                    navController.navigate(ChildRoutes.placeholder("Edit your slot"))
+                                },
+                                onSendCard = {
+                                    navController.navigate(ChildRoutes.placeholder("Send a card"))
+                                },
+                                onJoinAsBackup = {
+                                    navController.navigate(ChildRoutes.placeholder("Join as backup"))
+                                },
+                                onMessageHost = {
+                                    navController.navigate(ChildRoutes.placeholder("Message host"))
+                                },
                             ),
-                        )
-                    },
-                    onInvite = { appContext.shareText(InviteLinks.INVITE_MESSAGE, "Invite to Pantopus") },
-                )
-            }
-            composable(ChildRoutes.PULSE_FEED) {
-                FeedScreen(
-                    onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
-                    onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.BEACONS_FEED) {
-                BeaconsFeedScreen(
-                    onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
-                    onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
-                    onDiscover = { navController.navigate(ChildRoutes.DISCOVER_HUB) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.FOLLOWING) {
-                FollowingScreen(
-                    onBack = { navController.popBackStack() },
-                    onDiscover = { navController.navigate(ChildRoutes.DISCOVER_HUB) },
-                    onOpenPersona = { navController.navigate(ChildRoutes.placeholder("Beacon")) },
-                )
-            }
-            composable(ChildRoutes.MARKETPLACE) {
-                MarketplaceScreen(
-                    onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
-                    onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.LISTING_DETAIL,
-                arguments = listOf(navArgument(ChildRoutes.LISTING_DETAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
-                ListingDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenMessages = { listing ->
-                        listing.userId?.let { sellerId ->
-                            val name = listing.title ?: "Seller"
-                            navController.navigate(
-                                ChildRoutes.chatConversationFromPicker(
-                                    userId = sellerId,
-                                    displayName = name,
-                                    initials = initialsFromName(name),
-                                    verified = false,
-                                    locality = listing.locationName,
-                                ),
-                            )
-                        }
-                    },
-                    onViewOffers = { dto ->
-                        navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
-                    },
-                    onEditListing = { dto ->
-                        navController.navigate(ChildRoutes.editListing(dto.id))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.LISTING_OFFERS,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.LISTING_OFFERS_ID_KEY) { type = NavType.StringType },
-                        navArgument(ChildRoutes.LISTING_OFFERS_TITLE_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                    ),
-            ) { entry ->
-                val listingId = entry.arguments?.getString(ChildRoutes.LISTING_OFFERS_ID_KEY).orEmpty()
-                ListingOffersScreen(
-                    onBack = { navController.popBackStack() },
-                    onShareListing = {
-                        appContext.shareText(
-                            "Check out this listing on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
-                            "Share listing",
-                        )
-                    },
-                    onOpenBuyer = { buyer -> navController.navigate(ChildRoutes.publicProfile(buyer.id)) },
-                    onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
-                    onEditPrice = {
-                        navController.navigate(
-                            ChildRoutes.editListing(
-                                listingId = listingId,
-                                jumpToStep = ListingComposeStep.Price.name,
-                            ),
-                        )
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.INVOICE_DETAIL,
-                arguments = listOf(navArgument(ChildRoutes.INVOICE_DETAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
-                InvoiceDetailScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.COMPOSE_LISTING) {
-                ListingComposeWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenListingDetail = { listingId ->
-                        // Pop the wizard then push detail so Back returns to
-                        // Marketplace, not the success screen.
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.listingDetail(listingId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_LISTING,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.EDIT_LISTING_ID_KEY) { type = NavType.StringType },
-                        navArgument(ChildRoutes.EDIT_LISTING_JUMP_TO_STEP_KEY) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                    ),
-            ) {
-                ListingComposeWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenListingDetail = { _ -> navController.popBackStack() },
-                    onListingUpdated = { _ ->
-                        // Pop the edit wizard. The detail / offers screen
-                        // underneath refreshes from its own LaunchedEffect.
-                        navController.popBackStack()
-                    },
-                )
-            }
-            composable(ChildRoutes.GIGS_FEED) {
-                GigsFeedScreen(
-                    onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
-                    onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
-                    onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
-                    onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.GIG_SEARCH) {
-                GigSearchScreen(
-                    onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.GIG_DETAIL,
-                arguments = listOf(navArgument(ChildRoutes.GIG_DETAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
-                GigDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenMessages = { gig ->
-                        gig.userId?.let { posterId ->
-                            val name = gig.creator?.name ?: gig.creator?.username ?: gig.title
-                            navController.navigate(
-                                ChildRoutes.chatConversationFromPicker(
-                                    userId = posterId,
-                                    displayName = name,
-                                    initials = initialsFromName(name),
-                                    verified = gig.creator?.verified == true,
-                                    locality = null,
-                                ),
-                            )
-                        }
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.NEARBY_MAP_FOR_GIGS,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) {
-                            type = NavType.StringType
-                            defaultValue = GigsCategory.All.key
-                        },
-                    ),
-            ) { entry ->
-                val raw =
-                    entry.arguments?.getString(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) ?: GigsCategory.All.key
-                NearbyMapScreen(
-                    onOpenEntity = { entity ->
-                        when (entity.kind) {
-                            MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
-                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
-                        }
-                    },
-                    onBack = { navController.popBackStack() },
-                    initialCategory = GigsCategory.fromBackendKey(raw),
-                )
-            }
-            composable(
-                route = ChildRoutes.QUICK_POST_GIG,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) {
-                            type = NavType.StringType
-                            defaultValue = GigsCategory.All.key
-                        },
-                    ),
-            ) { entry ->
-                val raw = entry.arguments?.getString(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
-                PostGigV1Screen(
-                    onDismiss = { navController.popBackStack() },
-                    onPosted = { gigId ->
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.gigDetail(gigId))
-                    },
-                    preselectedCategoryKey = raw,
-                )
-            }
-            composable(
-                route = ChildRoutes.COMPOSE_GIG,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) {
-                            type = NavType.StringType
-                            defaultValue = GigsCategory.All.key
-                        },
-                    ),
-            ) { entry ->
-                val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
-                GigComposeWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenGigDetail = { gigId ->
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.gigDetail(gigId))
-                    },
-                    preselectedCategoryKey = raw,
-                )
-            }
-            composable(
-                route = ChildRoutes.COMPOSE_POST,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.COMPOSE_INTENT_KEY) {
-                            type = NavType.StringType
-                            defaultValue = PulseIntent.All.key
-                        },
-                    ),
-            ) {
-                PulseComposeScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.EDIT_POST,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.EDIT_POST_POST_ID_KEY) {
-                            type = NavType.StringType
-                        },
-                    ),
-            ) {
-                PulseComposeScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.NOTIFICATIONS) {
-                NotificationsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.RECENT_ACTIVITY) {
-                RecentActivityScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpen = { destination ->
-                        when (destination) {
-                            is RecentActivityDestination.GigDetail ->
-                                navController.navigate(ChildRoutes.gigDetail(destination.id))
-                            is RecentActivityDestination.ListingDetail ->
-                                navController.navigate(ChildRoutes.listingDetail(destination.id))
-                            is RecentActivityDestination.MailItemDetail ->
-                                navController.navigate(ChildRoutes.mailboxItemDetail(destination.id))
-                            is RecentActivityDestination.PulsePost ->
-                                navController.navigate(ChildRoutes.pulsePost(destination.id))
-                            is RecentActivityDestination.HomeDashboard ->
-                                navController.navigate(ChildRoutes.homeDashboard(destination.id))
-                            is RecentActivityDestination.Placeholder ->
-                                navController.navigate(ChildRoutes.placeholder(destination.label))
-                        }
-                    },
-                )
-            }
-            composable(ChildRoutes.CONNECTIONS) {
-                ConnectionsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenChat = { target: ConnectionsChatTarget ->
-                        val row =
-                            ConversationRowContent(
-                                id = target.userId,
-                                variant = ConversationRowVariant.Dm,
-                                displayName = target.displayName,
-                                initials = target.initials,
-                                avatarUrl = null,
-                                identityChip = null,
-                                verified = target.verified,
-                                preview = "",
-                                timeLabel = "",
-                                unread = 0,
-                                pinned = false,
-                                topicKinds = emptySet(),
-                            )
-                        navController.navigate(ChildRoutes.chatConversation(row))
-                    },
-                    onFindPeople = {
-                        findPeopleLauncher.launch(null)
-                    },
-                )
-            }
-            composable(ChildRoutes.DISCOVER_HUB) {
-                DiscoverHubScreen(
-                    onBack = { navController.popBackStack() },
-                    onSelect = { target ->
-                        when (target) {
-                            is DiscoverHubTarget.Person ->
-                                navController.navigate(ChildRoutes.publicProfile(target.userId))
-                            is DiscoverHubTarget.Business ->
-                                navController.navigate(ChildRoutes.businessProfile(target.businessId))
-                            is DiscoverHubTarget.Gig ->
-                                navController.navigate(ChildRoutes.gigDetail(target.gigId))
-                            is DiscoverHubTarget.Listing ->
-                                navController.navigate(ChildRoutes.listingDetail(target.listingId))
-                            is DiscoverHubTarget.Post ->
-                                navController.navigate(ChildRoutes.pulsePost(target.postId))
-                            DiscoverHubTarget.SeeAllPeople ->
-                                navController.navigate(ChildRoutes.CONNECTIONS)
-                            DiscoverHubTarget.SeeAllBusinesses ->
-                                navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
-                            DiscoverHubTarget.SeeAllGigs ->
-                                navController.navigate(ChildRoutes.GIGS_FEED)
-                            DiscoverHubTarget.SeeAllListings ->
-                                navController.navigate(ChildRoutes.MARKETPLACE)
-                            DiscoverHubTarget.SeeAllPosts ->
-                                navController.navigate(ChildRoutes.PULSE_FEED)
-                        }
-                    },
-                    onOpenMap = { navController.navigate(ChildRoutes.EXPLORE) },
-                )
-            }
-            composable(ChildRoutes.DISCOVER_BUSINESSES) {
-                DiscoverBusinessesScreen(
-                    onBack = { navController.popBackStack() },
-                    onSelect = { target ->
-                        when (target) {
-                            is DiscoverBusinessesTarget.Business ->
-                                navController.navigate(ChildRoutes.businessProfile(target.businessId))
-                            DiscoverBusinessesTarget.SetHomeAddress ->
-                                navController.navigate(ChildRoutes.ADD_HOME)
-                            DiscoverBusinessesTarget.InviteBusiness ->
-                                appContext.composeEmail(
-                                    subject = "Join Pantopus",
-                                    body =
-                                        "I'd love to see your business on Pantopus — neighbors near " +
-                                            "me are looking for trusted local pros. ${InviteLinks.DOWNLOAD_URL}",
-                                )
-                        }
-                    },
-                )
-            }
-            composable(ChildRoutes.OFFERS) {
-                OffersScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenOfferDetail = { dto ->
-                        val gigId = dto.gigId ?: dto.gig?.id
-                        if (!gigId.isNullOrBlank()) {
-                            navController.navigate(ChildRoutes.gigDetail(gigId))
-                        }
-                    },
-                    onBrowseListings = { navController.navigate(ChildRoutes.MARKETPLACE) },
-                    onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
-                )
-            }
-            composable(ChildRoutes.MY_BIDS) {
-                MyBidsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenBid = { dto ->
-                        val gigId = dto.gigId ?: dto.gig?.id
-                        if (!gigId.isNullOrBlank()) {
-                            navController.navigate(ChildRoutes.gigDetail(gigId))
-                        }
-                    },
-                    onBrowseTasks = { navController.navigate(ChildRoutes.GIGS_FEED) },
-                    onMessageClient = { dto ->
-                        // Push to gig detail; "Message poster" is wired there.
-                        val gigId = dto.gigId ?: dto.gig?.id
-                        if (!gigId.isNullOrBlank()) {
-                            navController.navigate(ChildRoutes.gigDetail(gigId))
-                        }
-                    },
-                    // Edit-bid + Leave-review are presented as sheets from
-                    // inside the screen (P3.4) — no router wiring needed.
-                )
-            }
-            composable(ChildRoutes.MY_TASKS) {
-                MyTasksScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
-                    onOpenBids = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
-                    onEditTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
-                    onMessageWorker = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
-                    onLeaveReview = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
-                    onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
-                    onRepost = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
-                )
-            }
-            composable(ChildRoutes.COMPOSE_TASK) {
-                GigComposeWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenGigDetail = { gigId ->
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.gigDetail(gigId))
-                    },
-                    preselectedCategoryKey = null,
-                )
-            }
-            composable(ChildRoutes.MY_POSTS) {
-                MyPostsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenPost = { dto -> navController.navigate(ChildRoutes.pulsePost(dto.id)) },
-                    onCompose = { navController.navigate(ChildRoutes.composePost("")) },
-                    onEditPost = { dto -> navController.navigate(ChildRoutes.editPost(dto.id)) },
-                )
-            }
-            composable(ChildRoutes.MENU) {
-                SettingsIndexScreen(
-                    onClose = { navController.popBackStack() },
-                    onNavigate = { route ->
-                        when (route) {
-                            SettingsRoute.Notifications -> navController.navigate(ChildRoutes.SETTINGS_NOTIFICATIONS)
-                            SettingsRoute.Privacy -> navController.navigate(ChildRoutes.SETTINGS_PRIVACY)
-                            SettingsRoute.IdentityCenter -> navController.navigate(ChildRoutes.IDENTITY_CENTER)
-                            SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.EDIT_PROFILE)
-                            SettingsRoute.Password -> navController.navigate(ChildRoutes.SETTINGS_PASSWORD)
-                            SettingsRoute.Verification -> navController.navigate(ChildRoutes.SETTINGS_VERIFICATION)
-                            SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
-                            // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
-                            SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
-                            // P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
-                            // setup · payout routing). Distinct from A10.10 Wallet
-                            // (earnings-in) which lives at `ChildRoutes.WALLET` and
-                            // is reachable via the Wallet tab + `pantopus://wallet`
-                            // deep link.
-                            SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.SETTINGS_PAYMENTS)
-                            SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
-                            SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
-                            SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
-                            SettingsRoute.ReviewClaims -> {
-                                // Close settings, push the admin queue.
-                                navController.popBackStack()
-                                navController.navigate(ChildRoutes.REVIEW_CLAIMS)
-                            }
-                            SettingsRoute.DidSignOut -> navController.popBackStack()
-                        }
-                    },
-                )
-            }
-            composable(ChildRoutes.EDIT_PROFILE) {
-                EditProfileScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.SETTINGS_NOTIFICATIONS) {
-                NotificationSettingsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.SETTINGS_PRIVACY) {
-                PrivacySettingsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.SETTINGS_BLOCKED_USERS) {
-                BlockedUsersScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.SETTINGS_PASSWORD) {
-                PasswordChangeScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.SETTINGS_VERIFICATION) {
-                VerificationCenterScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.SETTINGS_HELP) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                HelpCenterScreen(
-                    onBack = { navController.popBackStack() },
-                    onEmailSupport = {
-                        val intent =
-                            android.content.Intent(
-                                android.content.Intent.ACTION_SENDTO,
-                                android.net.Uri.parse("mailto:support@pantopus.app?subject=Help"),
-                            )
-                        context.startActivity(intent)
-                    },
-                )
-            }
-            composable(ChildRoutes.SETTINGS_LEGAL) {
-                LegalIndexScreen(
-                    onBack = { navController.popBackStack() },
-                    onSelectDocument = { doc ->
-                        navController.navigate(ChildRoutes.settingsLegalContent(doc.rowId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.SETTINGS_LEGAL_CONTENT,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.SETTINGS_LEGAL_DOC_KEY) {
-                            type = NavType.StringType
-                        },
-                    ),
-            ) { entry ->
-                val docId = entry.arguments?.getString(ChildRoutes.SETTINGS_LEGAL_DOC_KEY).orEmpty()
-                val doc = LegalDocument.entries.firstOrNull { it.rowId == docId }
-                if (doc != null) {
-                    LegalContentScreen(document = doc, onBack = { navController.popBackStack() })
-                } else {
-                    LegalEmptyState(onBack = { navController.popBackStack() })
+                    )
                 }
-            }
-            composable(ChildRoutes.SETTINGS_ABOUT) {
-                AboutScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.SETTINGS_PAYMENTS) {
-                PaymentsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.PRIVACY_HANDSHAKE,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.PRIVACY_HANDSHAKE_HANDLE_KEY) {
-                            type = NavType.StringType
-                        },
-                    ),
-            ) {
-                PrivacyHandshakeScreen(
-                    onDismiss = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.TOKEN_ACCEPT,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.TOKEN_ACCEPT_TOKEN_KEY) {
-                            type = NavType.StringType
-                        },
-                    ),
-            ) {
-                TokenAcceptScreen(
-                    onDismiss = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.CEREMONIAL_MAIL) {
-                CeremonialMailWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenMail = { mailId ->
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.CEREMONIAL_MAIL_OPEN,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.CEREMONIAL_MAIL_OPEN_ID_KEY) {
-                            type = NavType.StringType
-                        },
-                    ),
-            ) {
-                CeremonialMailOpenScreen(
-                    onBack = { navController.popBackStack() },
-                    onWriteBack = {
-                        navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
-                    },
-                )
-            }
-            composable(ChildRoutes.AUDIENCE_PROFILE) {
-                val audienceViewModel: AudienceProfileViewModel = hiltViewModel()
-                AudienceProfileScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenFollower = { row ->
-                        navController.navigate(ChildRoutes.placeholder("Follower · ${row.displayName}"))
-                    },
-                    onOpenThread = {
-                        navController.navigate(ChildRoutes.CREATOR_INBOX)
-                    },
-                    onOpenBroadcast = { card, tiers ->
-                        audienceViewModel.cacheBroadcastSeed(card, tiers)
-                        navController.navigate(ChildRoutes.broadcastDetail(card.id))
-                    },
-                    onOpenSetup = {
-                        navController.navigate(ChildRoutes.privacyHandshake(currentHandle))
-                    },
-                    onOpenCreatorInbox = {
-                        navController.navigate(ChildRoutes.CREATOR_INBOX)
-                    },
-                    onOpenMembership = { personaId ->
-                        navController.navigate(ChildRoutes.membershipDetail(personaId))
-                    },
-                    onComposeBroadcast = { personaId ->
-                        navController.navigate(ChildRoutes.composeBroadcast(personaId))
-                    },
-                    onOpenEditPersona = {
-                        navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
-                    },
-                    onOpenBeacons = {
-                        navController.navigate(ChildRoutes.BEACONS_FEED)
-                    },
-                    onOpenFollowing = {
-                        navController.navigate(ChildRoutes.FOLLOWING)
-                    },
-                    onOpenMembers = {
-                        navController.navigate(ChildRoutes.CREATOR_AUDIENCE_MEMBERS)
-                    },
-                    viewModel = audienceViewModel,
-                )
-            }
-            composable(ChildRoutes.CREATOR_AUDIENCE_MEMBERS) {
-                YourAudienceScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                ChildRoutes.BROADCAST_DETAIL,
-                arguments = listOf(navArgument(BROADCAST_DETAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
-                BroadcastDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onOverflow = {
-                        navController.navigate(ChildRoutes.placeholder("Broadcast actions"))
-                    },
-                    onReply = {
-                        navController.navigate(ChildRoutes.placeholder("Reply to broadcast"))
-                    },
-                    onBoost = {
-                        navController.navigate(ChildRoutes.placeholder("Boost broadcast"))
-                    },
-                    onPin = {
-                        navController.navigate(ChildRoutes.placeholder("Pin broadcast"))
-                    },
-                )
-            }
-            composable(ChildRoutes.CREATOR_INBOX) {
-                CreatorInboxScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenThread = { row ->
-                        navController.navigate(ChildRoutes.creatorThreadConversation(row))
-                    },
-                    onOpenBroadcast = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
-                    onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Inbox settings")) },
-                )
-            }
-            composable(ChildRoutes.IDENTITY_CENTER) {
-                IdentityCenterScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenIdentity = { card ->
-                        when (card.kind) {
-                            IdentityKind.PublicProfile ->
-                                navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
-                            IdentityKind.Local ->
-                                navController.navigate(ChildRoutes.placeholder("Local profile"))
-                            IdentityKind.Personal ->
-                                navController.navigate(ChildRoutes.placeholder("Personal"))
-                            IdentityKind.Professional ->
-                                navController.navigate(ChildRoutes.PROFESSIONAL_PROFILE)
-                        }
-                    },
-                    onOpenPlaceholder = { label ->
-                        navController.navigate(ChildRoutes.placeholder(label))
-                    },
-                    onOpenViewAs = { navController.navigate(ChildRoutes.VIEW_AS) },
-                )
-            }
-            composable(ChildRoutes.MAILBOX_SEARCH) {
-                MailboxSearchScreen(
-                    onOpenMail = { mailId ->
-                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
-                    },
-                    onCancel = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.SUPPORT_TRAINS) {
-                SupportTrainsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenTrain = { trainId ->
-                        navController.navigate(ChildRoutes.supportTrainDetail(trainId))
-                    },
-                    onStartTrain = {
-                        navController.navigate(ChildRoutes.START_SUPPORT_TRAIN)
-                    },
-                    onSearch = {
-                        navController.navigate(ChildRoutes.SUPPORT_TRAINS_SEARCH)
-                    },
-                )
-            }
-            composable(ChildRoutes.SUPPORT_TRAINS_SEARCH) {
-                SupportTrainsSearchScreen(
-                    onOpenTrain = { trainId ->
-                        navController.navigate(ChildRoutes.supportTrainDetail(trainId))
-                    },
-                    onCancel = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.START_SUPPORT_TRAIN) {
-                StartSupportTrainWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenTrain = { trainId ->
-                        // A10.9 (P3.1) — After publish we land on the
-                        // participant detail; the organizer who just
-                        // launched it reaches the review queue via
-                        // the dock overflow on the detail screen.
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.supportTrainDetail(trainId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.SUPPORT_TRAIN_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.SUPPORT_TRAIN_DETAIL_ID_KEY) {
-                            type = NavType.StringType
-                        },
-                    ),
-            ) { entry ->
-                val trainId = entry.arguments?.getString(ChildRoutes.SUPPORT_TRAIN_DETAIL_ID_KEY).orEmpty()
-                SupportTrainDetailScreen(
-                    actions =
-                        SupportTrainDetailActions(
-                            onBack = { navController.popBackStack() },
-                            onOpenManage = {
-                                // P4.3 / A13.13 — A10.9 dock-overflow lands
-                                // on the organizer Manage Train surface (was
-                                // wired to review-signups as a stub before
-                                // A13.13 shipped).
-                                navController.navigate(ChildRoutes.manageTrain(trainId))
-                            },
-                            onShare = {
-                                appContext.shareText(
-                                    "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
-                                    "Share train",
-                                )
-                            },
-                            onSignUp = {
-                                // Slot-claim sheet lands with the
-                                // editor surface in a P3.7 follow-up — surface
-                                // the affordance via a placeholder for now so
-                                // the dock CTA remains testable.
-                                navController.navigate(ChildRoutes.placeholder("Claim a slot"))
-                            },
-                            onEditSlot = {
-                                navController.navigate(ChildRoutes.placeholder("Edit your slot"))
-                            },
-                            onSendCard = {
-                                navController.navigate(ChildRoutes.placeholder("Send a card"))
-                            },
-                            onJoinAsBackup = {
-                                navController.navigate(ChildRoutes.placeholder("Join as backup"))
-                            },
-                            onMessageHost = {
-                                navController.navigate(ChildRoutes.placeholder("Message host"))
+                composable(
+                    route = ChildRoutes.REVIEW_SIGNUPS,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.REVIEW_SIGNUPS_ID_KEY) {
+                                type = NavType.StringType
                             },
                         ),
-                )
-            }
-            composable(
-                route = ChildRoutes.REVIEW_SIGNUPS,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.REVIEW_SIGNUPS_ID_KEY) {
-                            type = NavType.StringType
+                ) {
+                    ReviewSignupsScreen(
+                        onBack = { navController.popBackStack() },
+                        onShareTrain = {
+                            appContext.shareText(
+                                "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                "Share train",
+                            )
                         },
-                    ),
-            ) {
-                ReviewSignupsScreen(
-                    onBack = { navController.popBackStack() },
-                    onShareTrain = {
-                        appContext.shareText(
-                            "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
-                            "Share train",
-                        )
-                    },
-                    onEditSignup = { reservationId ->
-                        navController.navigate(ChildRoutes.editSignup(reservationId))
-                    },
-                    onMessageHelper = { reservationId ->
-                        navController.navigate(ChildRoutes.placeholder("Message helper · $reservationId"))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.EDIT_SIGNUP,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.EDIT_SIGNUP_ID_KEY) {
-                            type = NavType.StringType
+                        onEditSignup = { reservationId ->
+                            navController.navigate(ChildRoutes.editSignup(reservationId))
                         },
-                    ),
-            ) {
-                EditSignupFormScreen(
-                    onClose = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.MANAGE_TRAIN,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.MANAGE_TRAIN_ID_KEY) {
-                            type = NavType.StringType
+                        onMessageHelper = { reservationId ->
+                            navController.navigate(ChildRoutes.placeholder("Message helper · $reservationId"))
                         },
-                    ),
-            ) {
-                ManageTrainScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenAnalytics = { id ->
-                        navController.navigate(ChildRoutes.placeholder("Train analytics · $id"))
-                    },
-                    onEditDates = { id ->
-                        navController.navigate(ChildRoutes.placeholder("Edit dates · $id"))
-                    },
-                    onInviteHelpers = { id ->
-                        navController.navigate(ChildRoutes.placeholder("Invite helpers · $id"))
-                    },
-                )
-            }
-            composable(ChildRoutes.REVIEW_CLAIMS) {
-                ReviewClaimsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenClaim = { claimId ->
-                        navController.navigate(ChildRoutes.reviewClaimDetail(claimId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.REVIEW_CLAIM_DETAIL,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.REVIEW_CLAIM_DETAIL_ID_KEY) {
-                            type = NavType.StringType
+                    )
+                }
+                composable(
+                    route = ChildRoutes.EDIT_SIGNUP,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.EDIT_SIGNUP_ID_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) {
+                    EditSignupFormScreen(
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.MANAGE_TRAIN,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.MANAGE_TRAIN_ID_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) {
+                    ManageTrainScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenAnalytics = { id ->
+                            navController.navigate(ChildRoutes.placeholder("Train analytics · $id"))
                         },
-                    ),
-            ) {
-                // VM reads `claimId` from SavedStateHandle via the
-                // `CLAIM_ID_KEY` constant, which mirrors
-                // `REVIEW_CLAIM_DETAIL_ID_KEY` above.
-                ReviewClaimDetailScreen(
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.PLACEHOLDER,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.PLACEHOLDER_LABEL_KEY) {
-                            type = NavType.StringType
-                            defaultValue = "This"
+                        onEditDates = { id ->
+                            navController.navigate(ChildRoutes.placeholder("Edit dates · $id"))
                         },
-                    ),
-            ) { entry ->
-                val label = entry.arguments?.getString(ChildRoutes.PLACEHOLDER_LABEL_KEY) ?: "This"
-                NotYetAvailableView(tabName = label, icon = PantopusIcon.Info)
-            }
-            // ---- Wave A bootstrap placeholders. Swap each body for the real
-            // screen when the matching A.x screen ships. ----
-            composable(ChildRoutes.TODAY_DETAIL) {
-                TodayDetailScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.WALLET) {
-                WalletScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenHistory = {
-                        navController.navigate(ChildRoutes.placeholder("Wallet history"))
-                    },
-                    onWithdraw = {
-                        navController.navigate(ChildRoutes.placeholder("Withdraw"))
-                    },
-                    onManagePayout = {
-                        navController.navigate(ChildRoutes.placeholder("Manage payout method"))
-                    },
-                    onReverifyPayout = {
-                        navController.navigate(ChildRoutes.placeholder("Re-verify bank"))
-                    },
-                    onOpenTaxDocs = {
-                        navController.navigate(ChildRoutes.placeholder("Tax documents"))
-                    },
-                    onSeeAllActivity = {
-                        navController.navigate(ChildRoutes.placeholder("All activity"))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.PROPERTY_DETAILS,
-                arguments =
-                    listOf(navArgument(ChildRoutes.PROPERTY_DETAILS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                PropertyDetailsScreen(
-                    onBack = { navController.popBackStack() },
-                    onRequestCorrection = {
-                        navController.navigate(ChildRoutes.placeholder("Request correction"))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.ADD_GUEST,
-                arguments = listOf(navArgument(ADD_GUEST_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                AddGuestFormScreen(
-                    onClose = { navController.popBackStack() },
-                    onSent = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.TRANSFER_OWNERSHIP,
-                arguments = listOf(navArgument(TRANSFER_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                TransferOwnershipScreen(
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.TASKS_MAP,
-                arguments =
-                    listOf(
-                        navArgument(ChildRoutes.TASKS_MAP_CATEGORY_KEY) {
-                            type = NavType.StringType
-                            defaultValue = GigsCategory.All.key
+                        onInviteHelpers = { id ->
+                            navController.navigate(ChildRoutes.placeholder("Invite helpers · $id"))
                         },
-                    ),
-            ) {
-                TasksMapScreen(
-                    onOpenTask = { taskId -> navController.navigate(ChildRoutes.gigDetail(taskId)) },
-                    onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.EXPLORE) {
-                ExploreMapScreen(
-                    onOpenEntity = { entity: ExploreEntity ->
-                        when (entity.kind) {
-                            ExploreKind.Task -> navController.navigate(ChildRoutes.gigDetail(entity.id))
-                            ExploreKind.Item -> navController.navigate(ChildRoutes.listingDetail(entity.id))
-                            ExploreKind.Post -> navController.navigate(ChildRoutes.pulsePost(entity.id))
-                            ExploreKind.Spot -> navController.navigate(ChildRoutes.businessProfile(entity.id))
-                        }
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.MAILBOX_ROOT) {
-                MailboxRootScreen(
-                    onOpenMail = { mailId ->
-                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
-                    },
-                    onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
-                    onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
-                    onOpenMailDay = { navController.navigate(ChildRoutes.mailDay()) },
-                    onOpenEarn = { navController.navigate(ChildRoutes.EARN) },
-                    onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
-                    onOpenStamps = { navController.navigate(ChildRoutes.STAMPS) },
-                    onOpenUnboxing = { navController.navigate(ChildRoutes.UNBOXING) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.MAILBOX_MAP) {
-                MailboxMapScreen(onBack = { navController.popBackStack() })
-            }
-            composable(ChildRoutes.MAILBOX_VACATION) {
-                VacationHoldScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.MAIL_DAY,
-                arguments = listOf(navArgument(MAIL_DAY_VARIANT_KEY) { type = NavType.StringType }),
-            ) {
-                MailDayScreen(
-                    onClose = { navController.popBackStack() },
-                    onScan = { /* Out of scope per A13.16 — scanner integration */ },
-                    onSeeHistory = { /* Out of scope */ },
-                    onOpenNudge = { /* Out of scope */ },
-                )
-            }
-            // ---- Batch 2 (B1.6) routing seam. Swap each body for the real
-            // screen when the matching A.x screen ships. ----
-            composable(ChildRoutes.STAMPS) {
-                StampsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.MAIL_TASK,
-                arguments = listOf(navArgument(ChildRoutes.MAIL_TASK_ID_KEY) { type = NavType.StringType }),
-            ) {
-                // A17.12 — Mail-derived task detail. Source-mail + next-up
-                // taps push the originating mail item onto this same stack.
-                MailTaskScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenMail = { mailId ->
-                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.TRANSLATION,
-                arguments = listOf(navArgument(ChildRoutes.TRANSLATION_MAIL_ID_KEY) { type = NavType.StringType }),
-            ) {
-                MailTranslationScreen(
-                    onBack = { navController.popBackStack() },
-                    onReply = { navController.navigate(ChildRoutes.placeholder("Reply in English")) },
-                )
-            }
-            composable(ChildRoutes.UNBOXING) {
-                // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
-                // (OCR / classification / vault upload are out of scope), so the
-                // route carries no mail id today.
-                UnboxingScreen(
-                    onBack = { navController.popBackStack() },
-                    onScanNext = { /* re-arms capture in-place — stays on this screen */ },
-                    onOpenDrawer = { navController.navigate(ChildRoutes.placeholder("Home drawer")) },
-                )
-            }
-            composable(ChildRoutes.EARN) {
-                EarnScreen(
-                    onBack = { navController.popBackStack() },
-                    onHelp = { navController.navigate(ChildRoutes.placeholder("Earn help")) },
-                    onCashOut = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
-                    onBrowseTasks = { navController.navigate(ChildRoutes.GIGS_FEED) },
-                    onReferNeighbor = { navController.navigate(ChildRoutes.placeholder("Refer a neighbor")) },
-                    onOfferService = { navController.navigate(ChildRoutes.placeholder("Offer a service")) },
-                    onManagePayout = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
-                    onAddBank = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
-                    onSeeAllEarnings = { navController.navigate(ChildRoutes.placeholder("All earnings")) },
-                    onOpenTaxDocs = { navController.navigate(ChildRoutes.placeholder("Tax documents")) },
-                )
-            }
-            composable(
-                route = ChildRoutes.BUSINESS_OWNER,
-                arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val businessId = backStackEntry.arguments?.getString(ChildRoutes.BUSINESS_OWNER_ID_KEY) ?: ""
-                BusinessOwnerScreen(
-                    onBack = { navController.popBackStack() },
-                    onEditPage = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
-                    onOpenInsights = { navController.navigate(ChildRoutes.placeholder("Insights")) },
-                    onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Business settings")) },
-                )
-            }
-            composable(ChildRoutes.VIEW_AS) {
-                ViewAsScreen(
-                    onBack = { navController.popBackStack() },
-                    onManagePrivacy = { navController.navigate(ChildRoutes.SETTINGS_PRIVACY) },
-                    onEdit = { navController.navigate(ChildRoutes.EDIT_PROFILE) },
-                )
-            }
-            composable(
-                route = ChildRoutes.WAITING_ROOM,
-                arguments = listOf(navArgument(ChildRoutes.WAITING_ROOM_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                WaitingRoomRoute(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.MEMBERSHIP_DETAIL,
-                arguments =
-                    listOf(navArgument(ChildRoutes.MEMBERSHIP_DETAIL_PERSONA_ID_KEY) { type = NavType.StringType }),
-            ) {
-                MembershipDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onShare = {
-                        appContext.shareText(
-                            "Check out this membership on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
-                            "Share membership",
-                        )
-                    },
-                    onOpenPersona = {
-                        navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
-                    },
-                    onChangeTier = {
-                        navController.navigate(ChildRoutes.placeholder("Change tier"))
-                    },
-                    onUpdatePayment = {
-                        navController.navigate(ChildRoutes.placeholder("Update payment"))
-                    },
-                    onCancel = {
-                        navController.navigate(ChildRoutes.placeholder("Membership cancelled"))
-                    },
-                    onRequestRefund = {
-                        navController.navigate(ChildRoutes.placeholder("Request refund"))
-                    },
-                )
-            }
-            composable(ChildRoutes.PROFESSIONAL_PROFILE) {
-                ProfessionalProfileScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.EDIT_PERSONA,
-                arguments =
-                    listOf(navArgument(ChildRoutes.EDIT_PERSONA_PERSONA_ID_KEY) { type = NavType.StringType }),
-            ) {
-                EditPersonaScreen(
-                    onClose = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = ChildRoutes.COMPOSE_BROADCAST,
-                arguments =
-                    listOf(navArgument(ChildRoutes.COMPOSE_BROADCAST_PERSONA_ID_KEY) { type = NavType.StringType }),
-            ) {
-                ComposeBroadcastScreen(
-                    onClose = { navController.popBackStack() },
-                    onSent = { navController.popBackStack() },
-                )
-            }
-            composable(ChildRoutes.ADD_HOME) {
-                AddHomeWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenHomeDashboard = { homeId ->
-                        // Pop the wizard then push the dashboard so Back
-                        // returns to MyHomes, not the success screen.
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.homeDashboard(homeId))
-                    },
-                )
-            }
-            composable(ChildRoutes.BUSINESS_WAITLIST) {
-                BusinessWaitlistScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = ChildRoutes.CLAIM_OWNERSHIP,
-                arguments = listOf(navArgument(CLAIM_OWNERSHIP_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                ClaimOwnershipWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenClaimsList = {
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.MY_CLAIMS)
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.VERIFY_LANDLORD,
-                arguments = listOf(navArgument(VERIFY_LANDLORD_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                VerifyLandlordWizardScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onOpenPostcardVerification = { resolvedHomeId ->
-                        // Replace the wizard with the postcard tracker so
-                        // Back returns to the home dashboard, not the
-                        // wizard.
-                        navController.popBackStack()
-                        navController.navigate(ChildRoutes.postcardVerification(resolvedHomeId))
-                    },
-                )
-            }
-            composable(
-                route = ChildRoutes.POSTCARD_VERIFICATION,
-                arguments =
-                    listOf(
-                        navArgument(POSTCARD_VERIFICATION_HOME_ID_KEY) { type = NavType.StringType },
-                    ),
-            ) {
-                PostcardVerificationScreen(
-                    onDismiss = { navController.popBackStack() },
-                    onVerified = { _ ->
-                        // Pop the tracker — the underlying home dashboard
-                        // refreshes on next visit.
-                        navController.popBackStack()
-                    },
-                )
-            }
-            composable(ChildRoutes.MY_CLAIMS) {
-                MyClaimsListScreen(
-                    onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
-                    onOpenClaim = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Claim status"))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            if (BuildConfig.DEBUG) {
-                composable(ChildRoutes.TOKEN_GALLERY) { TokenGalleryScreen() }
+                    )
+                }
+                composable(ChildRoutes.REVIEW_CLAIMS) {
+                    ReviewClaimsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenClaim = { claimId ->
+                            navController.navigate(ChildRoutes.reviewClaimDetail(claimId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.REVIEW_CLAIM_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.REVIEW_CLAIM_DETAIL_ID_KEY) {
+                                type = NavType.StringType
+                            },
+                        ),
+                ) {
+                    // VM reads `claimId` from SavedStateHandle via the
+                    // `CLAIM_ID_KEY` constant, which mirrors
+                    // `REVIEW_CLAIM_DETAIL_ID_KEY` above.
+                    ReviewClaimDetailScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PLACEHOLDER,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.PLACEHOLDER_LABEL_KEY) {
+                                type = NavType.StringType
+                                defaultValue = "This"
+                            },
+                        ),
+                ) { entry ->
+                    val label = entry.arguments?.getString(ChildRoutes.PLACEHOLDER_LABEL_KEY) ?: "This"
+                    NotYetAvailableView(tabName = label, icon = PantopusIcon.Info)
+                }
+                // ---- Wave A bootstrap placeholders. Swap each body for the real
+                // screen when the matching A.x screen ships. ----
+                composable(ChildRoutes.TODAY_DETAIL) {
+                    TodayDetailScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.WALLET) {
+                    WalletScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenHistory = {
+                            navController.navigate(ChildRoutes.placeholder("Wallet history"))
+                        },
+                        onWithdraw = {
+                            navController.navigate(ChildRoutes.placeholder("Withdraw"))
+                        },
+                        onManagePayout = {
+                            navController.navigate(ChildRoutes.placeholder("Manage payout method"))
+                        },
+                        onReverifyPayout = {
+                            navController.navigate(ChildRoutes.placeholder("Re-verify bank"))
+                        },
+                        onOpenTaxDocs = {
+                            navController.navigate(ChildRoutes.placeholder("Tax documents"))
+                        },
+                        onSeeAllActivity = {
+                            navController.navigate(ChildRoutes.placeholder("All activity"))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PROPERTY_DETAILS,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.PROPERTY_DETAILS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    PropertyDetailsScreen(
+                        onBack = { navController.popBackStack() },
+                        onRequestCorrection = {
+                            navController.navigate(ChildRoutes.placeholder("Request correction"))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.ADD_GUEST,
+                    arguments = listOf(navArgument(ADD_GUEST_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    AddGuestFormScreen(
+                        onClose = { navController.popBackStack() },
+                        onSent = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.TRANSFER_OWNERSHIP,
+                    arguments = listOf(navArgument(TRANSFER_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    TransferOwnershipScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.TASKS_MAP,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.TASKS_MAP_CATEGORY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = GigsCategory.All.key
+                            },
+                        ),
+                ) {
+                    TasksMapScreen(
+                        onOpenTask = { taskId -> navController.navigate(ChildRoutes.gigDetail(taskId)) },
+                        onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.EXPLORE) {
+                    ExploreMapScreen(
+                        onOpenEntity = { entity: ExploreEntity ->
+                            when (entity.kind) {
+                                ExploreKind.Task -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                                ExploreKind.Item -> navController.navigate(ChildRoutes.listingDetail(entity.id))
+                                ExploreKind.Post -> navController.navigate(ChildRoutes.pulsePost(entity.id))
+                                ExploreKind.Spot -> navController.navigate(ChildRoutes.businessProfile(entity.id))
+                            }
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.MAILBOX_ROOT) {
+                    MailboxRootScreen(
+                        onOpenMail = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
+                        onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
+                        onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
+                        onOpenMailDay = { navController.navigate(ChildRoutes.mailDay()) },
+                        onOpenEarn = { navController.navigate(ChildRoutes.EARN) },
+                        onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
+                        onOpenStamps = { navController.navigate(ChildRoutes.STAMPS) },
+                        onOpenUnboxing = { navController.navigate(ChildRoutes.UNBOXING) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.MAILBOX_MAP) {
+                    MailboxMapScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.MAILBOX_VACATION) {
+                    VacationHoldScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.MAIL_DAY,
+                    arguments = listOf(navArgument(MAIL_DAY_VARIANT_KEY) { type = NavType.StringType }),
+                ) {
+                    MailDayScreen(
+                        onClose = { navController.popBackStack() },
+                        onScan = { /* Out of scope per A13.16 — scanner integration */ },
+                        onSeeHistory = { /* Out of scope */ },
+                        onOpenNudge = { /* Out of scope */ },
+                    )
+                }
+                // ---- Batch 2 (B1.6) routing seam. Swap each body for the real
+                // screen when the matching A.x screen ships. ----
+                composable(ChildRoutes.STAMPS) {
+                    StampsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.MAIL_TASK,
+                    arguments = listOf(navArgument(ChildRoutes.MAIL_TASK_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    // A17.12 — Mail-derived task detail. Source-mail + next-up
+                    // taps push the originating mail item onto this same stack.
+                    MailTaskScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMail = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.TRANSLATION,
+                    arguments = listOf(navArgument(ChildRoutes.TRANSLATION_MAIL_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    MailTranslationScreen(
+                        onBack = { navController.popBackStack() },
+                        onReply = { navController.navigate(ChildRoutes.placeholder("Reply in English")) },
+                    )
+                }
+                composable(ChildRoutes.UNBOXING) {
+                    // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
+                    // (OCR / classification / vault upload are out of scope), so the
+                    // route carries no mail id today.
+                    UnboxingScreen(
+                        onBack = { navController.popBackStack() },
+                        onScanNext = { /* re-arms capture in-place — stays on this screen */ },
+                        onOpenDrawer = { navController.navigate(ChildRoutes.placeholder("Home drawer")) },
+                    )
+                }
+                composable(ChildRoutes.EARN) {
+                    EarnScreen(
+                        onBack = { navController.popBackStack() },
+                        onHelp = { navController.navigate(ChildRoutes.placeholder("Earn help")) },
+                        onCashOut = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
+                        onBrowseTasks = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                        onReferNeighbor = { navController.navigate(ChildRoutes.placeholder("Refer a neighbor")) },
+                        onOfferService = { navController.navigate(ChildRoutes.placeholder("Offer a service")) },
+                        onManagePayout = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
+                        onAddBank = { navController.navigate(ChildRoutes.SETTINGS_PAYMENTS) },
+                        onSeeAllEarnings = { navController.navigate(ChildRoutes.placeholder("All earnings")) },
+                        onOpenTaxDocs = { navController.navigate(ChildRoutes.placeholder("Tax documents")) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_OWNER,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) { backStackEntry ->
+                    val businessId = backStackEntry.arguments?.getString(ChildRoutes.BUSINESS_OWNER_ID_KEY) ?: ""
+                    BusinessOwnerScreen(
+                        onBack = { navController.popBackStack() },
+                        onEditPage = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
+                        onOpenInsights = { navController.navigate(ChildRoutes.placeholder("Insights")) },
+                        onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Business settings")) },
+                    )
+                }
+                composable(ChildRoutes.VIEW_AS) {
+                    ViewAsScreen(
+                        onBack = { navController.popBackStack() },
+                        onManagePrivacy = { navController.navigate(ChildRoutes.SETTINGS_PRIVACY) },
+                        onEdit = { navController.navigate(ChildRoutes.EDIT_PROFILE) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.WAITING_ROOM,
+                    arguments = listOf(navArgument(ChildRoutes.WAITING_ROOM_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    WaitingRoomRoute(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.MEMBERSHIP_DETAIL,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.MEMBERSHIP_DETAIL_PERSONA_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    MembershipDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onShare = {
+                            appContext.shareText(
+                                "Check out this membership on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                "Share membership",
+                            )
+                        },
+                        onOpenPersona = {
+                            navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
+                        },
+                        onChangeTier = {
+                            navController.navigate(ChildRoutes.placeholder("Change tier"))
+                        },
+                        onUpdatePayment = {
+                            navController.navigate(ChildRoutes.placeholder("Update payment"))
+                        },
+                        onCancel = {
+                            navController.navigate(ChildRoutes.placeholder("Membership cancelled"))
+                        },
+                        onRequestRefund = {
+                            navController.navigate(ChildRoutes.placeholder("Request refund"))
+                        },
+                    )
+                }
+                composable(ChildRoutes.PROFESSIONAL_PROFILE) {
+                    ProfessionalProfileScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.EDIT_PERSONA,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.EDIT_PERSONA_PERSONA_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    EditPersonaScreen(
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.COMPOSE_BROADCAST,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.COMPOSE_BROADCAST_PERSONA_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    ComposeBroadcastScreen(
+                        onClose = { navController.popBackStack() },
+                        onSent = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.ADD_HOME) {
+                    AddHomeWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenHomeDashboard = { homeId ->
+                            // Pop the wizard then push the dashboard so Back
+                            // returns to MyHomes, not the success screen.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.homeDashboard(homeId))
+                        },
+                    )
+                }
+                composable(ChildRoutes.BUSINESS_WAITLIST) {
+                    BusinessWaitlistScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.CLAIM_OWNERSHIP,
+                    arguments = listOf(navArgument(CLAIM_OWNERSHIP_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    ClaimOwnershipWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenClaimsList = {
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.MY_CLAIMS)
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.VERIFY_LANDLORD,
+                    arguments = listOf(navArgument(VERIFY_LANDLORD_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    VerifyLandlordWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenPostcardVerification = { resolvedHomeId ->
+                            // Replace the wizard with the postcard tracker so
+                            // Back returns to the home dashboard, not the
+                            // wizard.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.postcardVerification(resolvedHomeId))
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.POSTCARD_VERIFICATION,
+                    arguments =
+                        listOf(
+                            navArgument(POSTCARD_VERIFICATION_HOME_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    PostcardVerificationScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onVerified = { _ ->
+                            // Pop the tracker — the underlying home dashboard
+                            // refreshes on next visit.
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable(ChildRoutes.MY_CLAIMS) {
+                    MyClaimsListScreen(
+                        onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
+                        onOpenClaim = { _ ->
+                            navController.navigate(ChildRoutes.placeholder("Claim status"))
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                if (BuildConfig.DEBUG) {
+                    composable(ChildRoutes.TOKEN_GALLERY) { TokenGalleryScreen() }
+                }
             }
         }
     }
@@ -3818,6 +3851,60 @@ private fun routeForDiscovery(item: DiscoveryCardContent): String =
         DiscoveryKind.Gig -> ChildRoutes.gigDetail(item.id)
         DiscoveryKind.Business -> ChildRoutes.businessProfile(item.id)
         DiscoveryKind.Unknown -> ChildRoutes.placeholder(item.title)
+    }
+
+/**
+ * §1C-b — maps a navigation-drawer destination onto an existing route.
+ * Destinations with no shipped native route fall back to the NotYetAvailable
+ * placeholder. The drawer is opened from the personal Hub, so the Home /
+ * Business rows (rendered for previews + tests) resolve to placeholders until
+ * a home / business dashboard adopts the drawer with its own id-aware mapper.
+ */
+@Suppress("CyclomaticComplexMethod")
+private fun routeForDrawer(destination: NavigationDrawerDestination): String =
+    when (destination) {
+        NavigationDrawerDestination.MyHomes -> ChildRoutes.MY_HOMES
+        NavigationDrawerDestination.MyBusinesses -> ChildRoutes.MY_BUSINESSES
+        NavigationDrawerDestination.Connections -> ChildRoutes.CONNECTIONS
+        NavigationDrawerDestination.Mailbox -> ChildRoutes.MAILBOX_ROOT
+        NavigationDrawerDestination.ProfileAndPrivacy -> ChildRoutes.IDENTITY_CENTER
+        NavigationDrawerDestination.BeaconUpdates -> ChildRoutes.BEACONS_FEED
+        NavigationDrawerDestination.Search -> ChildRoutes.GIG_SEARCH
+        NavigationDrawerDestination.DiscoverNeighbors -> ChildRoutes.placeholder("Discover Neighbors")
+        NavigationDrawerDestination.MyBeacon -> ChildRoutes.placeholder("My Beacon")
+        NavigationDrawerDestination.MyListings -> ChildRoutes.MY_LISTINGS
+        NavigationDrawerDestination.MyPulse -> ChildRoutes.MY_POSTS
+        NavigationDrawerDestination.MyTasks -> ChildRoutes.MY_TASKS
+        NavigationDrawerDestination.MyBids -> ChildRoutes.MY_BIDS
+        NavigationDrawerDestination.OffersAndBids -> ChildRoutes.OFFERS
+        NavigationDrawerDestination.PostTask -> ChildRoutes.quickPostGig(GigsCategory.All.key)
+        NavigationDrawerDestination.WalletAndPayments -> ChildRoutes.WALLET
+        NavigationDrawerDestination.Settings -> ChildRoutes.MENU
+        NavigationDrawerDestination.HelpSupport -> ChildRoutes.SETTINGS_HELP
+        NavigationDrawerDestination.BusinessPayments -> ChildRoutes.SETTINGS_PAYMENTS
+        NavigationDrawerDestination.HomeProperty,
+        NavigationDrawerDestination.HomeOverview,
+        NavigationDrawerDestination.HomeTasks,
+        NavigationDrawerDestination.HomeIssues,
+        NavigationDrawerDestination.HomeBills,
+        NavigationDrawerDestination.HomeMembers,
+        NavigationDrawerDestination.HomeMailbox,
+        NavigationDrawerDestination.HomePackages,
+        NavigationDrawerDestination.HomeDocuments,
+        NavigationDrawerDestination.HomeVendors,
+        NavigationDrawerDestination.HomeEmergency,
+        NavigationDrawerDestination.HomeSettings,
+        NavigationDrawerDestination.BusinessOverview,
+        NavigationDrawerDestination.BusinessProfileRow,
+        NavigationDrawerDestination.BusinessLocations,
+        NavigationDrawerDestination.BusinessCatalog,
+        NavigationDrawerDestination.BusinessPages,
+        NavigationDrawerDestination.BusinessPostTask,
+        NavigationDrawerDestination.BusinessChat,
+        NavigationDrawerDestination.BusinessTeam,
+        NavigationDrawerDestination.BusinessReviews,
+        NavigationDrawerDestination.BusinessSettings,
+        -> ChildRoutes.placeholder("Coming soon")
     }
 
 /**
