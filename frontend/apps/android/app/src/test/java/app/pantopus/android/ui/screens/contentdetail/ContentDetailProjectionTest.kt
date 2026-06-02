@@ -60,6 +60,52 @@ class ContentDetailProjectionTest {
         assertEquals("Be the first to bid", callout?.title)
     }
 
+    @Test fun task_v2_worker_in_progress_shows_deliver_dock() {
+        val gig =
+            baseGig.copy(
+                title = "Move a mattress",
+                price = 85.0,
+                category = "moving",
+                status = "in_progress",
+                isV2 = true,
+                acceptedBy = "me",
+                bidCount = 1,
+            )
+        val content = GigDetailViewModel.Projection.project(gig, emptyList(), canMarkDelivered = true)
+        assertEquals("In progress", content.statusPill?.label)
+        assertEquals(ContentDetailPill.Tone.Warning, content.statusPill?.tone)
+        assertEquals("Mark as delivered", content.dock.primary.label)
+        assertEquals(PantopusIcon.CheckCheck, content.dock.primary.icon)
+        assertTrue(content.dock.primary.enabled)
+        assertEquals("Message", content.dock.secondary?.label)
+    }
+
+    @Test fun task_v2_without_worker_keeps_bid_dock() {
+        val gig =
+            baseGig.copy(
+                title = "Move a mattress",
+                price = 85.0,
+                category = "moving",
+                status = "in_progress",
+                isV2 = true,
+                acceptedBy = "me",
+                bidCount = 1,
+            )
+        // canMarkDelivered defaults false — the bidder dock holds.
+        val content = GigDetailViewModel.Projection.project(gig, emptyList())
+        assertEquals("Place bid", content.dock.primary.label)
+    }
+
+    @Test fun viewer_can_mark_delivered_gate() {
+        val inProgress = baseGig.copy(status = "in_progress", isV2 = true, acceptedBy = "me")
+        assertTrue(GigDetailViewModel.viewerCanMarkDelivered(inProgress, "me"))
+        assertFalse(GigDetailViewModel.viewerCanMarkDelivered(inProgress, "someone-else"))
+        assertFalse(GigDetailViewModel.viewerCanMarkDelivered(inProgress, null))
+        // Assigned-but-not-started tasks are not yet completable.
+        val assigned = baseGig.copy(status = "assigned", isV2 = true, acceptedBy = "me")
+        assertFalse(GigDetailViewModel.viewerCanMarkDelivered(assigned, "me"))
+    }
+
     @Test fun gig_v1_projection_is_sparse() {
         val gig =
             baseGig.copy(

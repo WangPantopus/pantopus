@@ -339,9 +339,11 @@ public struct DeliveryProofSheetView: View {
         .padding(.bottom, Spacing.s5)
         .accessibilityIdentifier("deliveryProof.submit")
     }
+}
 
-    // MARK: - State 2: SUBMITTED
+// MARK: - State 2: SUBMITTED + helpers
 
+extension DeliveryProofSheetView {
     private var submittedState: some View {
         VStack(spacing: 0) {
             VStack(spacing: Spacing.s4) {

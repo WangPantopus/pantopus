@@ -138,9 +138,11 @@ public final class GigDetailViewModel {
             return false
         }
     }
+}
 
-    // MARK: - Projection
+// MARK: - Projection
 
+extension GigDetailViewModel {
     /// Top-level projection. Splits on the explicit `is_v2` discriminator
     /// (`GigDTO.isV2`): V2 ("Magic Task") gets the rich surface, legacy V1
     /// gets the sparse layout (which also carries the awarded terminal
