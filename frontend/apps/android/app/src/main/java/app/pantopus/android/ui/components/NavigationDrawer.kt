@@ -171,8 +171,7 @@ fun NavigationDrawerContext.headerSubtitle(): String =
         is NavigationDrawerContext.Business -> subtitle
     }
 
-fun NavigationDrawerContext.showsBackToHub(): Boolean =
-    this !is NavigationDrawerContext.Personal
+fun NavigationDrawerContext.showsBackToHub(): Boolean = this !is NavigationDrawerContext.Personal
 
 private fun item(
     icon: PantopusIcon,

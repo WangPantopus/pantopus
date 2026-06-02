@@ -340,7 +340,7 @@ public struct HubTabRoot: View {
     }
 
     private var currentUserName: String {
-        if case let .signedIn(user) = auth.state { return user.displayName }
+        if case let .signedIn(user) = auth.state { return user.displayName ?? "" }
         return ""
     }
 
@@ -433,6 +433,9 @@ public struct HubTabRoot: View {
         .findPeopleSheet(isPresented: $showFindPeople)
         .overlay { navigationDrawerOverlay }
         .sheet(isPresented: $navDrawerIdentityCenter) {
+            // `onBack` is not the trailing parameter of `IdentityCenterView`,
+            // so the argument label must stay explicit here.
+            // swiftlint:disable:next trailing_closure
             IdentityCenterView(onBack: { navDrawerIdentityCenter = false })
         }
     }
@@ -452,7 +455,7 @@ public struct HubTabRoot: View {
                 }
             },
             onOpenIdentityCenter: { navDrawerIdentityCenter = true },
-            onBackToHub: { Task { @MainActor in path.removeAll(where: { _ in true }) } }
+            onBackToHub: { Task { @MainActor in path.removeAll { _ in true } } }
         )
     }
 
