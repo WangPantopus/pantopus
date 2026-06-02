@@ -4,19 +4,14 @@
 //
 //  §1B-4 — Proof-of-delivery / completion sheet a hired worker uses to
 //  mark a V2 task delivered. Presented over the A09.1 Task-V2 detail
-//  (`GigDetailView`). A13-Form bottom-sheet vocabulary: overline
-//  sections, a photo-proof upload grid, an optional note, a payment
-//  trust line, and a primary "Mark as delivered".
-//
-//  One sheet · two states (design: docs/design/new/Delivery Proof Sheet.html
-//  + delivery-proof-frames.jsx):
-//    1. ENTRY     — compose the proof (≥1 photo required, optional note).
-//    2. SUBMITTED — "Delivery confirmed" recap with a "Back to task" CTA.
+//  (`GigDetailView`). Design: docs/design/new/Delivery Proof Sheet.html
+//  + delivery-proof-frames.jsx. One sheet · two states: ENTRY (compose
+//  the proof — ≥1 photo required, optional note) and SUBMITTED
+//  ("Delivery confirmed" recap with a "Back to task" CTA).
 //
 //  Submit roundtrip is owned by the host (`GigDetailViewModel`): each
 //  photo is uploaded via `POST /api/files/upload`, then the resulting
-//  URLs ride `POST /api/gigs/:gigId/mark-completed` alongside the note.
-//  No new endpoints.
+//  URLs ride `POST /api/gigs/:gigId/mark-completed` with the note.
 //
 
 import PhotosUI
