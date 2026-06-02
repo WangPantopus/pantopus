@@ -67,6 +67,52 @@ final class ContentDetailProjectionTests: XCTestCase {
         XCTAssertEqual(callout?.title, "Be the first to bid")
     }
 
+    // MARK: - Gig V2 worker delivery (Block F)
+
+    func testTaskV2WorkerInProgressShowsDeliverDock() {
+        let gig = makeGig(GigSpec(
+            title: "Move a mattress",
+            price: 85,
+            category: "moving",
+            status: "in_progress",
+            isV2: true,
+            acceptedBy: "me",
+            bidCount: 1
+        ))
+        let content = GigDetailViewModel.project(gig: gig, bids: [], canMarkDelivered: true)
+        XCTAssertEqual(content.statusPill?.label, "In progress")
+        XCTAssertEqual(content.statusPill?.tone, .warning)
+        XCTAssertEqual(content.dock.primary.label, "Mark as delivered")
+        XCTAssertEqual(content.dock.primary.icon, .checkCheck)
+        XCTAssertTrue(content.dock.primary.enabled)
+        XCTAssertEqual(content.dock.secondary?.label, "Message")
+    }
+
+    func testTaskV2WithoutWorkerKeepsBidDock() {
+        let gig = makeGig(GigSpec(
+            title: "Move a mattress",
+            price: 85,
+            category: "moving",
+            status: "in_progress",
+            isV2: true,
+            acceptedBy: "me",
+            bidCount: 1
+        ))
+        // canMarkDelivered defaults false — the bidder dock holds.
+        let content = GigDetailViewModel.project(gig: gig, bids: [])
+        XCTAssertEqual(content.dock.primary.label, "Place bid")
+    }
+
+    func testViewerCanMarkDeliveredGate() {
+        let inProgress = makeGig(GigSpec(status: "in_progress", isV2: true, acceptedBy: "me"))
+        XCTAssertTrue(GigDetailViewModel.viewerCanMarkDelivered(gig: inProgress, currentUserId: "me"))
+        XCTAssertFalse(GigDetailViewModel.viewerCanMarkDelivered(gig: inProgress, currentUserId: "someone-else"))
+        XCTAssertFalse(GigDetailViewModel.viewerCanMarkDelivered(gig: inProgress, currentUserId: nil))
+        // Assigned-but-not-started and open tasks are not yet completable.
+        let assigned = makeGig(GigSpec(status: "assigned", isV2: true, acceptedBy: "me"))
+        XCTAssertFalse(GigDetailViewModel.viewerCanMarkDelivered(gig: assigned, currentUserId: "me"))
+    }
+
     // MARK: - Gig V1 (legacy)
 
     func testGigV1ProjectionIsSparse() {
@@ -240,9 +286,11 @@ final class ContentDetailProjectionTests: XCTestCase {
         let paid = InvoiceDetailViewModel.paidFixture(invoiceId: "INV-00318")
         XCTAssertEqual(paid.hero.priceTone, .success)
     }
+}
 
-    // MARK: - Fixtures
+// MARK: - Fixtures
 
+extension ContentDetailProjectionTests {
     /// Test fixture spec — keeps `makeGig` to a single parameter (under
     /// SwiftLint's function_parameter_count threshold) while letting each
     /// test set only the fields it cares about.

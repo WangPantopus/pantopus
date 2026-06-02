@@ -132,13 +132,15 @@ data class PlaceBidResponse(
 )
 
 /**
- * Body for `POST /api/gigs/:gigId/mark-completed`. T5.3.1 only sends
- * the optional `note`; the full backend shape also accepts `photos`
- * and `checklist` for a future photo-strip PR.
+ * Body for `POST /api/gigs/:gigId/mark-completed`. The Delivery Proof
+ * sheet sends the optional `note` plus `photos` (proof-of-delivery URLs
+ * uploaded first via `POST /api/files/upload`); the backend stores them
+ * as `completion_photos`. `checklist` is omitted.
  */
 @JsonClass(generateAdapter = true)
 data class MarkCompletedBody(
     val note: String? = null,
+    val photos: List<String>? = null,
 )
 
 /** Response envelope from the mark-completed endpoint. */

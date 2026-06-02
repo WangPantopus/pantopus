@@ -40,8 +40,10 @@ fun GigDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var sheetTarget by remember { mutableStateOf<EditBidSheetTarget?>(null) }
+    var deliveryTarget by remember { mutableStateOf<DeliveryProofTarget?>(null) }
     var toastText by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val deliverySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -65,13 +67,23 @@ fun GigDetailScreen(
             // the gig id internally; we look it up here for the sheet
             // header copy. When the state isn't loaded yet, the dock CTA
             // is hidden so we never reach this branch in practice.
-            sheetTarget =
-                EditBidSheetTarget(
-                    id = "new-bid",
-                    gigId = viewModel.currentGigId(),
-                    gigTitle = gig?.title ?: "this task",
-                    bidId = null,
-                )
+            if (viewModel.canMarkDelivered()) {
+                // Assigned worker on an in-progress task → Delivery Proof sheet.
+                deliveryTarget =
+                    DeliveryProofTarget(
+                        id = "deliver",
+                        gigId = viewModel.currentGigId(),
+                        gigTitle = gig?.title ?: "this task",
+                    )
+            } else {
+                sheetTarget =
+                    EditBidSheetTarget(
+                        id = "new-bid",
+                        gigId = viewModel.currentGigId(),
+                        gigTitle = gig?.title ?: "this task",
+                        bidId = null,
+                    )
+            }
         },
         onSecondaryAction = openMessages,
         onRetry = { viewModel.load() },
@@ -102,6 +114,24 @@ fun GigDetailScreen(
                     ok
                 },
                 onCancel = { sheetTarget = null },
+            )
+        }
+    }
+
+    val delivery = deliveryTarget
+    if (delivery != null) {
+        ModalBottomSheet(
+            onDismissRequest = { deliveryTarget = null },
+            sheetState = deliverySheetState,
+        ) {
+            DeliveryProofSheet(
+                target = delivery,
+                onSubmit = { photos, note ->
+                    suspendCancellableCoroutine<Boolean> { cont ->
+                        viewModel.submitDeliveryProof(photos, note) { result -> cont.resume(result) }
+                    }
+                },
+                onDismiss = { deliveryTarget = null },
             )
         }
     }

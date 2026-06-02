@@ -9,6 +9,8 @@ import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -26,10 +28,27 @@ class GigDetailViewModel
     @Inject
     constructor(
         private val repo: GigsRepository,
+        private val authRepo: AuthRepository,
+        private val filesRepo: FilesRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
             const val GIG_ID_KEY = "gigId"
+
+            /**
+             * Worker self-completion gate: the signed-in viewer is the
+             * assigned worker (`accepted_by`) and the task is `in_progress`
+             * (mirrors the backend `mark-completed` precondition + MyBids'
+             * "Mark complete" gate).
+             */
+            fun viewerCanMarkDelivered(
+                gig: GigDto,
+                currentUserId: String?,
+            ): Boolean {
+                if (currentUserId.isNullOrEmpty()) return false
+                if (gig.acceptedBy != currentUserId) return false
+                return gig.status?.lowercase() == "in_progress"
+            }
         }
 
         private val gigId: String = savedStateHandle.get<String>(GIG_ID_KEY) ?: ""
@@ -38,9 +57,15 @@ class GigDetailViewModel
         val state: StateFlow<ContentDetailUiState> = _state.asStateFlow()
 
         private var rawGig: GigDto? = null
+        private var canMarkDelivered = false
 
         /** Current gig snapshot — null until the first fetch resolves. */
         fun gigSnapshot(): GigDto? = rawGig
+
+        /** True when the viewer is the assigned worker on an in-progress task. */
+        fun canMarkDelivered(): Boolean = canMarkDelivered
+
+        private fun currentUserId(): String? = (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
 
         fun load() {
             _state.value = ContentDetailUiState.Loading
@@ -48,12 +73,14 @@ class GigDetailViewModel
                 when (val result = repo.detail(gigId)) {
                     is NetworkResult.Success -> {
                         rawGig = result.data.gig
+                        canMarkDelivered = viewerCanMarkDelivered(result.data.gig, currentUserId())
                         var bids: List<GigBidDto> = emptyList()
                         when (val bidsResult = repo.bids(gigId)) {
                             is NetworkResult.Success -> bids = bidsResult.data.bids
                             else -> Unit
                         }
-                        _state.value = ContentDetailUiState.Loaded(Projection.project(result.data.gig, bids))
+                        _state.value =
+                            ContentDetailUiState.Loaded(Projection.project(result.data.gig, bids, canMarkDelivered))
                     }
                     is NetworkResult.Failure -> {
                         _state.value = ContentDetailUiState.Error(result.error.message)
@@ -88,6 +115,51 @@ class GigDetailViewModel
             }
         }
 
+        /**
+         * Upload each proof photo via `POST /api/files/upload`, then mark
+         * the task completed with the resulting URLs + the optional note.
+         * Calls [onResult] with `true` so the Delivery Proof sheet can flip
+         * to its SUBMITTED confirmation; refreshes the task on success.
+         */
+        fun submitDeliveryProof(
+            photos: List<DeliveryProofPhoto>,
+            note: String?,
+            onResult: (Boolean) -> Unit = {},
+        ) {
+            val gig = rawGig
+            if (gig == null || photos.isEmpty()) {
+                onResult(false)
+                return
+            }
+            viewModelScope.launch {
+                val urls = mutableListOf<String>()
+                for (photo in photos) {
+                    val upload =
+                        filesRepo.uploadFile(
+                            filename = photo.filename,
+                            mimeType = photo.mimeType,
+                            bytes = photo.bytes,
+                            fileType = "gig_completion",
+                            visibility = "private",
+                        )
+                    when (upload) {
+                        is NetworkResult.Success -> urls.add(upload.data.file.url)
+                        is NetworkResult.Failure -> {
+                            onResult(false)
+                            return@launch
+                        }
+                    }
+                }
+                when (repo.markCompleted(gigId, note, urls)) {
+                    is NetworkResult.Success -> {
+                        load()
+                        onResult(true)
+                    }
+                    is NetworkResult.Failure -> onResult(false)
+                }
+            }
+        }
+
         /** Returns the gig id wired from `SavedStateHandle`. */
         fun currentGigId(): String = gigId
 
@@ -102,11 +174,19 @@ class GigDetailViewModel
             fun project(
                 gig: GigDto,
                 bids: List<GigBidDto>,
-            ): ContentDetailContent = if (gig.isV2 == true) projectTaskV2(gig, bids) else projectGigV1(gig, bids)
+                canMarkDelivered: Boolean = false,
+            ): ContentDetailContent {
+                return if (gig.isV2 == true) {
+                    projectTaskV2(gig, bids, canMarkDelivered)
+                } else {
+                    projectGigV1(gig, bids)
+                }
+            }
 
             private fun projectTaskV2(
                 gig: GigDto,
                 bids: List<GigBidDto>,
+                canMarkDelivered: Boolean,
             ): ContentDetailContent {
                 val category = GigsCategory.fromBackendKey(gig.category)
                 val bidCount = gig.bidCount ?: bids.size
@@ -204,24 +284,36 @@ class GigDetailViewModel
                     } else {
                         "Open · No bids yet"
                     }
+                // The assigned worker viewing an in-progress task gets the
+                // completion affordance (→ Delivery Proof sheet) instead of
+                // the bidder dock; everyone else sees "Place bid".
+                val statusPill =
+                    ContentDetailPill(
+                        id = "status",
+                        label = if (canMarkDelivered) "In progress" else statusLabel,
+                        icon = PantopusIcon.Circle,
+                        tone = ContentDetailPill.Tone.Warning,
+                    )
+                val dock =
+                    if (canMarkDelivered) {
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                            primary = ContentDetailDockButton(label = "Mark as delivered", icon = PantopusIcon.CheckCheck),
+                        )
+                    } else {
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                            primary = ContentDetailDockButton(label = "Place bid"),
+                        )
+                    }
                 return ContentDetailContent(
                     kind = ContentDetailKind.Gig,
-                    statusPill =
-                        ContentDetailPill(
-                            id = "status",
-                            label = statusLabel,
-                            icon = PantopusIcon.Circle,
-                            tone = ContentDetailPill.Tone.Warning,
-                        ),
+                    statusPill = statusPill,
                     hero = hero,
                     statStrip = statStrip,
                     modules = modules,
                     trustCapsules = emptyList(),
-                    dock =
-                        ContentDetailDock(
-                            secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
-                            primary = ContentDetailDockButton(label = "Place bid"),
-                        ),
+                    dock = dock,
                 )
             }
 
