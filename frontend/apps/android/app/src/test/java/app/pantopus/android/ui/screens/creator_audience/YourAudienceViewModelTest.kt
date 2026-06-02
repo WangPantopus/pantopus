@@ -42,7 +42,6 @@ class YourAudienceViewModelTest {
         handle: String,
         name: String,
         rank: Int,
-        tierName: String,
         local: Boolean,
         status: String,
         month: String,
@@ -52,7 +51,7 @@ class YourAudienceViewModelTest {
         fanDisplayName = name,
         fanAvatarUrl = null,
         status = status,
-        tier = FanTierBadgeDto(rank = rank, name = tierName),
+        tier = FanTierBadgeDto(rank = rank, name = testTierName(rank)),
         verifiedLocal = local,
         tenureMonths = 4,
         joinedMonth = month,
@@ -63,10 +62,10 @@ class YourAudienceViewModelTest {
         AudienceListResponse(
             items =
                 listOf(
-                    fan("m1", "danareyes", "Dana Reyes", 3, "Insiders", true, "pending", "2025-05"),
-                    fan("m2", "priyanair", "Priya Nair", 4, "VIP", true, "active", "2025-01"),
-                    fan("m3", "tombecker", "Tom Becker", 4, "VIP", false, "muted", "2024-11"),
-                    fan("m4", "sanaortiz", "Sana Ortiz", 3, "Insiders", true, "active", "2025-03"),
+                    fan("m1", "danareyes", "Dana Reyes", 3, true, "pending", "2025-05"),
+                    fan("m2", "priyanair", "Priya Nair", 4, true, "active", "2025-01"),
+                    fan("m3", "tombecker", "Tom Becker", 4, false, "muted", "2024-11"),
+                    fan("m4", "sanaortiz", "Sana Ortiz", 3, true, "active", "2025-03"),
                 ),
             counts = AudienceCountsDto(totalActive = 3, pending = 1, byTier = mapOf("3" to 2, "4" to 2)),
         )
@@ -134,7 +133,7 @@ class YourAudienceViewModelTest {
             AudienceListResponse(
                 items =
                     listOf(
-                        fan("m1", "danareyes", "Dana Reyes", 3, "Insiders", true, "active", "2025-05"),
+                        fan("m1", "danareyes", "Dana Reyes", 3, true, "active", "2025-05"),
                     ),
                 counts = AudienceCountsDto(totalActive = 4, pending = 0, byTier = mapOf("3" to 3, "4" to 2)),
             )
@@ -156,4 +155,11 @@ class YourAudienceViewModelTest {
         assertEquals(0, vm.counts.value.pending)
         assertEquals("Approved Dana Reyes.", vm.toast.value)
     }
+
+    private fun testTierName(rank: Int): String =
+        when (rank) {
+            4 -> "VIP"
+            3 -> "Insiders"
+            else -> audienceTierDefaultName(rank)
+        }
 }

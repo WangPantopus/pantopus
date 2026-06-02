@@ -140,7 +140,7 @@ class YourAudienceViewModel
         /** Overflow → Change tier. Tier moves aren't wired on mobile yet. */
         fun changeTier(member: AudienceMember) {
             _overflowTarget.value = null
-            _toast.value = "Changing tiers is coming soon."
+            _toast.value = "Changing tiers for ${member.displayName} is coming soon."
         }
 
         /** Empty-state CTA — sharing the Beacon link isn't wired yet. */

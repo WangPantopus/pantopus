@@ -213,15 +213,19 @@ object AudienceFormat {
 
     /** "2025-05" → "May 2025". Month granularity is all the privacy
      *  serializer exposes. */
-    fun monthLabel(value: String?): String? {
-        if (value == null) return null
-        val parts = value.split("-")
-        if (parts.size != 2) return null
-        val year = parts[0].toIntOrNull() ?: return null
-        val month = parts[1].toIntOrNull() ?: return null
-        if (month !in 1..12) return null
-        return "${MONTHS[month - 1]} $year"
-    }
+    fun monthLabel(value: String?): String? =
+        value
+            ?.split("-")
+            ?.takeIf { it.size == 2 }
+            ?.let { parts ->
+                val year = parts[0].toIntOrNull()
+                val month = parts[1].toIntOrNull()
+                if (year != null && month != null && month in 1..12) {
+                    "${MONTHS[month - 1]} $year"
+                } else {
+                    null
+                }
+            }
 
     fun requestedLabel(month: String?): String =
         monthLabel(month)?.let { "requested $it" } ?: "requested recently"

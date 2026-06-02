@@ -12,7 +12,6 @@ object YourAudienceSampleData {
         name: String,
         handle: String,
         rank: Int,
-        tierName: String,
         local: Boolean,
         status: String = "active",
         joinedMonth: String? = "2025-01",
@@ -22,7 +21,7 @@ object YourAudienceSampleData {
         handle = handle,
         avatarUrl = null,
         tierRank = rank,
-        tierName = tierName,
+        tierName = sampleTierName(rank),
         verifiedLocal = local,
         status = status,
         joinedMonth = joinedMonth,
@@ -31,21 +30,21 @@ object YourAudienceSampleData {
 
     val pending =
         listOf(
-            member("m_dana", "Dana Reyes", "@danareyes", 3, "Insiders", local = true, status = "pending", joinedMonth = "2025-05"),
-            member("m_marcus", "Marcus Lee", "@marcuslee", 4, "VIP", local = false, status = "pending", joinedMonth = "2025-05"),
+            member("m_dana", "Dana Reyes", "@danareyes", 3, local = true, status = "pending", joinedMonth = "2025-05"),
+            member("m_marcus", "Marcus Lee", "@marcuslee", 4, local = false, status = "pending", joinedMonth = "2025-05"),
         )
 
     val vipMembers =
         listOf(
-            member("m_priya", "Priya Nair", "@priyanair", 4, "VIP", local = true, joinedMonth = "2025-01"),
-            member("m_tom", "Tom Becker", "@tombecker", 4, "VIP", local = false, status = "muted", joinedMonth = "2024-11"),
+            member("m_priya", "Priya Nair", "@priyanair", 4, local = true, joinedMonth = "2025-01"),
+            member("m_tom", "Tom Becker", "@tombecker", 4, local = false, status = "muted", joinedMonth = "2024-11"),
         )
 
     val insiderMembers =
         listOf(
-            member("m_sana", "Sana Ortiz", "@sanaortiz", 3, "Insiders", local = true, joinedMonth = "2025-03"),
-            member("m_otis", "Otis Park", "@otispark", 3, "Insiders", local = false, joinedMonth = "2025-04"),
-            member("m_lena", "Lena Cho", "@lenacho", 3, "Insiders", local = true, joinedMonth = "2025-05"),
+            member("m_sana", "Sana Ortiz", "@sanaortiz", 3, local = true, joinedMonth = "2025-03"),
+            member("m_otis", "Otis Park", "@otispark", 3, local = false, joinedMonth = "2025-04"),
+            member("m_lena", "Lena Cho", "@lenacho", 3, local = true, joinedMonth = "2025-05"),
         )
 
     val counts = AudienceCounts(totalActive = 5, pending = 2, byTier = mapOf(4 to 2, 3 to 3))
@@ -62,4 +61,11 @@ object YourAudienceSampleData {
                     AudienceTierGroup(rank = 3, name = "Insiders", members = insiderMembers),
                 ),
         )
+
+    private fun sampleTierName(rank: Int): String =
+        when (rank) {
+            4 -> "VIP"
+            3 -> "Insiders"
+            else -> audienceTierDefaultName(rank)
+        }
 }
