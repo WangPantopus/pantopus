@@ -3,7 +3,9 @@
 //  Pantopus
 //
 //  Body slots for the Content Detail shell. `GridTabsBody` is the concrete
-//  one used by HomeDashboard; the rest ship as `NotYetAvailable` stubs.
+//  one used by HomeDashboard. The article / key-value / media bodies now
+//  ship as concrete views under `Bodies/` (see the MARK at the foot of this
+//  file); only `GridTabsBody`'s secondary-tab fallback stays a placeholder.
 //
 
 import SwiftUI
@@ -213,31 +215,12 @@ public struct GridTabsBody<Overview: View>: View {
     }
 }
 
-// MARK: - Stubs
+// MARK: - Concrete bodies (moved out of this file)
 
-public struct LongFormBodyStub: View {
-    public init() {}
-    public var body: some View {
-        NotYetAvailableView(tabName: "Article body", icon: .file)
-            .frame(height: 320)
-            .padding(.horizontal, Spacing.s4)
-    }
-}
-
-public struct KeyValueBodyStub: View {
-    public init() {}
-    public var body: some View {
-        NotYetAvailableView(tabName: "Key/value body", icon: .info)
-            .frame(height: 320)
-            .padding(.horizontal, Spacing.s4)
-    }
-}
-
-public struct SegmentedMediaBodyStub: View {
-    public init() {}
-    public var body: some View {
-        NotYetAvailableView(tabName: "Media body", icon: .camera)
-            .frame(height: 320)
-            .padding(.horizontal, Spacing.s4)
-    }
-}
+//
+// The `article`, `key_value`, and `media` body slots now ship as concrete
+// views — `ArticleBody`, `KeyValueBody`, and `MediaBody` — under
+// `ContentDetail/Bodies/`, replacing the `LongFormBodyStub` /
+// `KeyValueBodyStub` / `SegmentedMediaBodyStub` NotYetAvailable placeholders.
+// `GridTabsBody` above keeps its NotYetAvailable fallback only for a
+// genuinely undesigned secondary tab.
