@@ -71,6 +71,7 @@ import app.pantopus.android.ui.screens.explore.ExploreMapScreen
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.beacons.BeaconsFeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.following.FollowingScreen
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
@@ -815,6 +816,12 @@ private object ChildRoutes {
      * AudienceProfile entry and the `pantopus://beacons` deep link.
      */
     const val BEACONS_FEED = "feed/beacons"
+
+    /**
+     * §1A① — "Following": the Beacons the signed-in user follows. Reached
+     * from the Audience Profile "Following" entry row.
+     */
+    const val FOLLOWING = "following"
 
     /** Gigs feed (T2.3). Reached from Hub → pillar(.Gigs). */
     const val GIGS_FEED = "gigs/feed"
@@ -2598,6 +2605,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable(ChildRoutes.FOLLOWING) {
+                FollowingScreen(
+                    onBack = { navController.popBackStack() },
+                    onDiscover = { navController.navigate(ChildRoutes.DISCOVER_HUB) },
+                    onOpenPersona = { navController.navigate(ChildRoutes.placeholder("Beacon")) },
+                )
+            }
             composable(ChildRoutes.MARKETPLACE) {
                 MarketplaceScreen(
                     onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
@@ -3168,6 +3182,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenBeacons = {
                         navController.navigate(ChildRoutes.BEACONS_FEED)
+                    },
+                    onOpenFollowing = {
+                        navController.navigate(ChildRoutes.FOLLOWING)
                     },
                     viewModel = audienceViewModel,
                 )
