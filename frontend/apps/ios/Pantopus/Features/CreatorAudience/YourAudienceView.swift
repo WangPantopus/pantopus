@@ -18,7 +18,7 @@ public struct YourAudienceView: View {
     @State private var viewModel: YourAudienceViewModel
     private let onBack: @MainActor () -> Void
 
-    public init(
+    init(
         viewModel: YourAudienceViewModel = YourAudienceViewModel(),
         onBack: @escaping @MainActor () -> Void = {}
     ) {
@@ -407,7 +407,7 @@ public struct YourAudienceView: View {
         .padding(.bottom, Spacing.s2)
     }
 
-    private func groupCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func groupCard(@ViewBuilder content: () -> some View) -> some View {
         VStack(spacing: Spacing.s0) { content() }
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Color.appSurface)
@@ -431,7 +431,7 @@ public struct YourAudienceView: View {
             Theme.Color.primary600,
             Theme.Color.business,
             Theme.Color.success,
-            Theme.Color.warning,
+            Theme.Color.warning
         ]
         let tint = palette[audienceStableIndex(member.handle, count: palette.count)]
         return ZStack {

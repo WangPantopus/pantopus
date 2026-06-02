@@ -33,14 +33,19 @@ public final class YourAudienceViewModel {
     private let api: APIClient
     private var loadedAtLeastOnce = false
 
-    public init(api: APIClient = .shared) {
+    init(api: APIClient = .shared) {
         self.api = api
     }
 
     // MARK: - Loading
 
-    public func load() async { await fetch() }
-    public func refresh() async { await fetch() }
+    public func load() async {
+        await fetch()
+    }
+
+    public func refresh() async {
+        await fetch()
+    }
 
     /// Switch scope chips. Re-fetches with the matching query params.
     public func select(filter newFilter: AudienceFilter) async {
@@ -120,7 +125,7 @@ public final class YourAudienceViewModel {
     }
 
     /// Overflow → Change tier. Tier moves aren't wired on mobile yet.
-    public func changeTier(_ member: AudienceMember) {
+    public func changeTier(_: AudienceMember) {
         overflowTarget = nil
         toast = "Changing tiers is coming soon."
     }

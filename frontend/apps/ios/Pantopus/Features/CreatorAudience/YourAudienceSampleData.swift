@@ -41,7 +41,7 @@ enum YourAudienceSampleData {
         member(
             id: "m_marcus", name: "Marcus Lee", handle: "@marcuslee", rank: 4,
             tierName: "VIP", local: false, status: "pending", joinedMonth: "2025-05"
-        ),
+        )
     ]
 
     static let vipMembers: [AudienceMember] = [
@@ -49,13 +49,13 @@ enum YourAudienceSampleData {
         member(
             id: "m_tom", name: "Tom Becker", handle: "@tombecker", rank: 4,
             tierName: "VIP", local: false, status: "muted", joinedMonth: "2024-11"
-        ),
+        )
     ]
 
     static let insiderMembers: [AudienceMember] = [
         member(id: "m_sana", name: "Sana Ortiz", handle: "@sanaortiz", rank: 3, tierName: "Insiders", local: true, joinedMonth: "2025-03"),
         member(id: "m_otis", name: "Otis Park", handle: "@otispark", rank: 3, tierName: "Insiders", local: false, joinedMonth: "2025-04"),
-        member(id: "m_lena", name: "Lena Cho", handle: "@lenacho", rank: 3, tierName: "Insiders", local: true, joinedMonth: "2025-05"),
+        member(id: "m_lena", name: "Lena Cho", handle: "@lenacho", rank: 3, tierName: "Insiders", local: true, joinedMonth: "2025-05")
     ]
 
     static var counts: AudienceCounts {
@@ -68,7 +68,7 @@ enum YourAudienceSampleData {
             pending: pending,
             tierGroups: [
                 AudienceTierGroup(rank: 4, name: "VIP", members: vipMembers),
-                AudienceTierGroup(rank: 3, name: "Insiders", members: insiderMembers),
+                AudienceTierGroup(rank: 3, name: "Insiders", members: insiderMembers)
             ]
         )
     }
@@ -76,10 +76,12 @@ enum YourAudienceSampleData {
     static let tierNames: [Int: String] = [4: "VIP", 3: "Insiders"]
 
     #if DEBUG
+    @MainActor
     static func populatedViewModel() -> YourAudienceViewModel {
         YourAudienceViewModel.preview(.loaded(populatedLoaded), counts: counts, tierNames: tierNames)
     }
 
+    @MainActor
     static func emptyViewModel() -> YourAudienceViewModel {
         YourAudienceViewModel.preview(.empty, counts: .zero)
     }

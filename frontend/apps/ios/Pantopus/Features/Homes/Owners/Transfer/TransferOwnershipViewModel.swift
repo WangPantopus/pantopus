@@ -51,7 +51,7 @@ public final class TransferOwnershipViewModel {
     /// Biometric evaluator. Default uses `LocalAuthentication`; tests can
     /// inject a deterministic stub that returns `.success` / `.failure`
     /// without prompting the user.
-    public typealias BiometricEvaluator = @MainActor (_ reason: String) async -> Result<Void, Error>
+    public typealias BiometricEvaluator = @MainActor (_ reason: String) async -> Result<Void, any Error>
     private let biometricEvaluator: BiometricEvaluator
 
     /// Stubbed backend round-trip. Replaced by a `try await api.request(…)`

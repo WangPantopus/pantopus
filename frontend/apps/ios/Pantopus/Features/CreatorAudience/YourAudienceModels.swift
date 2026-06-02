@@ -129,9 +129,17 @@ public struct AudienceMember: Identifiable, Hashable, Sendable {
     public let joinedMonth: String?
     public let tenureMonths: Int
 
-    public var id: String { membershipId }
-    public var isPending: Bool { status == "pending" }
-    public var isMuted: Bool { status == "muted" }
+    public var id: String {
+        membershipId
+    }
+
+    public var isPending: Bool {
+        status == "pending"
+    }
+
+    public var isMuted: Bool {
+        status == "muted"
+    }
 
     public init(
         membershipId: String,
@@ -202,7 +210,9 @@ public struct AudienceTierChip: Identifiable, Hashable, Sendable {
     public let rank: Int
     public let name: String
     public let count: Int
-    public var id: Int { rank }
+    public var id: Int {
+        rank
+    }
 }
 
 /// Active (non-pending) members grouped under one tier.
@@ -210,7 +220,9 @@ public struct AudienceTierGroup: Identifiable, Sendable {
     public let rank: Int
     public let name: String
     public var members: [AudienceMember]
-    public var id: Int { rank }
+    public var id: Int {
+        rank
+    }
 }
 
 /// Populated payload for the loaded state.
@@ -243,13 +255,13 @@ enum AudienceFormat {
               (1...12).contains(month) else { return nil }
         let names = [
             "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
         ]
         return "\(names[month - 1]) \(year)"
     }
 
     /// Relative "requested …" copy for a pending row.
-    static func requestedLabel(month: String?, tenureMonths: Int) -> String {
+    static func requestedLabel(month: String?, tenureMonths _: Int) -> String {
         if let label = monthLabel(month) {
             return "requested \(label)"
         }

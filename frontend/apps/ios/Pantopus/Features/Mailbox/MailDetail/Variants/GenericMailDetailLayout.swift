@@ -22,7 +22,7 @@ struct GenericMailDetailLayout: View {
     let onOpenSenderProfile: (@MainActor (String) -> Void)?
     let onSaveToVault: @MainActor () -> Void
     /// When set, the overflow menu gains a "Translate" action (A17.13).
-    var onTranslate: (@MainActor () -> Void)?
+    var onTranslate: (@MainActor @Sendable () -> Void)?
 
     var body: some View {
         MailItemDetailShell(

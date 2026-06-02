@@ -125,7 +125,7 @@ final class YourAudienceViewModelTests: XCTestCase {
         """
         SequencedURLProtocol.sequence = [
             .status(200, body: populatedBody),
-            .status(200, body: pendingOnly),
+            .status(200, body: pendingOnly)
         ]
         let vm = makeVM()
         await vm.load()
@@ -143,7 +143,7 @@ final class YourAudienceViewModelTests: XCTestCase {
 
     // MARK: - Actions
 
-    func testApproveReFetchesAndClearsPending() async {
+    func testApproveReFetchesAndClearsPending() async throws {
         let afterApprove = """
         {
           "items": [
@@ -157,7 +157,7 @@ final class YourAudienceViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: populatedBody),
             .status(200, body: "{\"membershipId\":\"m1\",\"status\":\"active\"}"),
-            .status(200, body: afterApprove),
+            .status(200, body: afterApprove)
         ]
         let vm = makeVM()
         await vm.load()
@@ -168,7 +168,7 @@ final class YourAudienceViewModelTests: XCTestCase {
         let pending = before.pending.first
         XCTAssertEqual(pending?.membershipId, "m1")
 
-        await vm.approve(pending!)
+        try await vm.approve(XCTUnwrap(pending))
 
         guard case let .loaded(after) = vm.state else {
             return XCTFail("Expected .loaded after approve, got \(vm.state)")

@@ -1946,9 +1946,9 @@ public struct HubTabRoot: View {
             MailboxMapView { pop() }
         case .vacationHold:
             VacationHoldView(
-                viewModel: VacationHoldViewModel {
+                viewModel: VacationHoldViewModel(onBack: {
                     pop()
-                }
+                })
             )
         case let .mailDay(variant):
             MailDayView(viewModel: MailDayViewModel(variant: variant)) {
