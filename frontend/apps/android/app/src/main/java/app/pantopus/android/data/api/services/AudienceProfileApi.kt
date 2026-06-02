@@ -1,6 +1,8 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.audience.AudienceListResponse
+import app.pantopus.android.data.api.models.audience.AudienceMemberActionBody
+import app.pantopus.android.data.api.models.audience.AudienceMemberActionResponse
 import app.pantopus.android.data.api.models.audience.MembershipStatsResponse
 import app.pantopus.android.data.api.models.audience.PersonaMeResponse
 import app.pantopus.android.data.api.models.audience.PersonaPostsResponse
@@ -10,6 +12,7 @@ import app.pantopus.android.data.api.models.audience.PublishUpdateBody
 import app.pantopus.android.data.api.models.audience.PublishUpdateResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -70,4 +73,13 @@ interface AudienceProfileApi {
         @Path("channelId") channelId: String,
         @Body body: PublishUpdateBody,
     ): PublishUpdateResponse
+
+    /** `PATCH /api/personas/me/audience/:membershipId` — owner-side action
+     *  on one audience member (approve / decline / remove / mute / unmute).
+     *  Route `backend/routes/personas.js:753`. */
+    @PATCH("api/personas/me/audience/{membershipId}")
+    suspend fun audienceMemberAction(
+        @Path("membershipId") membershipId: String,
+        @Body body: AudienceMemberActionBody,
+    ): AudienceMemberActionResponse
 }

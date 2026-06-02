@@ -441,7 +441,7 @@ private struct VacationToggleRow: View {
             } else {
                 Toggle("", isOn: Binding(
                     get: { isOn },
-                    set: onChange
+                    set: { onChange($0) }
                 ))
                 .labelsHidden()
                 .tint(Theme.Color.primary600)

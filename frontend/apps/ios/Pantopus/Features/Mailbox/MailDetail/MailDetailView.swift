@@ -18,7 +18,7 @@ public struct MailDetailView: View {
     private let onOpenSenderProfile: (@MainActor (String) -> Void)?
     /// Opens the A17.13 Translation screen for this mail. When set, the
     /// generic detail variant surfaces a "Translate" overflow action.
-    private let onTranslate: (@MainActor () -> Void)?
+    private let onTranslate: (@MainActor @Sendable () -> Void)?
     /// A17.12 — opens the Elf-extracted task detail for this mail. When
     /// non-nil the certified variant surfaces a "view task" card. The
     /// closure receives the mail id so the host can resolve the task.
@@ -28,7 +28,7 @@ public struct MailDetailView: View {
         mailId: String,
         onBack: @escaping () -> Void,
         onOpenSenderProfile: (@MainActor (String) -> Void)? = nil,
-        onTranslate: (@MainActor () -> Void)? = nil,
+        onTranslate: (@MainActor @Sendable () -> Void)? = nil,
         onOpenExtractedTask: (@MainActor (String) -> Void)? = nil
     ) {
         self.mailId = mailId

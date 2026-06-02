@@ -38,6 +38,9 @@ public struct AudienceProfileView: View {
     /// §1A① — entry into "Following" (the list of Beacons the user
     /// follows). Optional so only the host that wires it renders the row.
     private let onOpenFollowing: (@MainActor () -> Void)?
+    /// A22.2 — "Your audience" creator member management (pending requests
+    /// + tier-grouped members). Sibling surface to this broadcast hub.
+    private let onOpenMembers: @MainActor () -> Void
 
     init(
         viewModel: AudienceProfileViewModel = AudienceProfileViewModel(),
@@ -51,6 +54,7 @@ public struct AudienceProfileView: View {
         onComposeBroadcast: @escaping @MainActor (String) -> Void = { _ in },
         onOpenEditPersona: @escaping @MainActor () -> Void = {},
         onOpenFollowing: (@MainActor () -> Void)? = nil,
+        onOpenMembers: @escaping @MainActor () -> Void = {},
         onOpenBeacons: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
@@ -65,6 +69,7 @@ public struct AudienceProfileView: View {
         self.onOpenEditPersona = onOpenEditPersona
         self.onOpenBeacons = onOpenBeacons
         self.onOpenFollowing = onOpenFollowing
+        self.onOpenMembers = onOpenMembers
     }
 
     public var body: some View {
@@ -889,6 +894,7 @@ public struct AudienceProfileView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 analyticsRow(loaded.analyticsCells)
+                manageAudienceRow
                 tierStackedBar(loaded.tierBreakdown)
                 tierChipRow(loaded.tierChips)
                 followerSearchField
@@ -911,6 +917,35 @@ public struct AudienceProfileView: View {
             .padding(Spacing.s4)
         }
         .accessibilityIdentifier("audienceProfileFollowersList")
+    }
+
+    /// A22.2 entry point — pushes the "Your audience" member-management
+    /// surface (pending requests + tier-grouped members).
+    private var manageAudienceRow: some View {
+        Button(action: onOpenMembers) {
+            HStack(spacing: Spacing.s3) {
+                Icon(.usersRound, size: 20, color: Theme.Color.primary600)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Your audience")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Approve requests · manage members")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer()
+                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+            }
+            .padding(Spacing.s3)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("audienceProfileOpenMembers")
     }
 
     private var followerSearchField: some View {

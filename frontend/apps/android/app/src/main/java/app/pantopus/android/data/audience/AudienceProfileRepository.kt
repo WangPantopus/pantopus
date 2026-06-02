@@ -1,6 +1,8 @@
 package app.pantopus.android.data.audience
 
 import app.pantopus.android.data.api.models.audience.AudienceListResponse
+import app.pantopus.android.data.api.models.audience.AudienceMemberActionBody
+import app.pantopus.android.data.api.models.audience.AudienceMemberActionResponse
 import app.pantopus.android.data.api.models.audience.MembershipStatsResponse
 import app.pantopus.android.data.api.models.audience.PersonaMeResponse
 import app.pantopus.android.data.api.models.audience.PersonaPostsResponse
@@ -24,6 +26,19 @@ class AudienceProfileRepository
         suspend fun me(): NetworkResult<PersonaMeResponse> = safeApiCall { api.me() }
 
         suspend fun audience(): NetworkResult<AudienceListResponse> = safeApiCall { api.audience() }
+
+        /** A22.2 "Your audience" — filtered fan list + counts by tier. */
+        suspend fun audienceMembers(
+            status: String?,
+            tierRank: Int?,
+        ): NetworkResult<AudienceListResponse> = safeApiCall { api.audience(status = status, tierRank = tierRank) }
+
+        /** A22.2 — approve / decline / remove / mute / unmute one member. */
+        suspend fun audienceMemberAction(
+            membershipId: String,
+            action: String,
+        ): NetworkResult<AudienceMemberActionResponse> =
+            safeApiCall { api.audienceMemberAction(membershipId, AudienceMemberActionBody(action)) }
 
         suspend fun posts(handle: String): NetworkResult<PersonaPostsResponse> = safeApiCall { api.posts(handle) }
 

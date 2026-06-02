@@ -115,6 +115,10 @@ public enum YouRoute: Hashable {
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
     case audienceProfile
+    /// A22.2 — "Your audience" creator member management (pending requests +
+    /// tier-grouped active members). Pushed from the Audience Profile
+    /// Followers tab "Your audience" entry row.
+    case creatorAudienceMembers
     /// A03.2 — Beacon Updates feed (`surface=personas`), reached from the
     /// Audience Profile "Beacon Updates" entry row.
     case beaconsFeed
@@ -1386,10 +1390,15 @@ public struct YouTabRoot: View {
                 onOpenFollowing: {
                     Task { @MainActor in path.append(.following) }
                 },
+                onOpenMembers: {
+                    Task { @MainActor in path.append(.creatorAudienceMembers) }
+                },
                 onOpenBeacons: {
                     Task { @MainActor in path.append(.beaconsFeed) }
                 }
             )
+        case .creatorAudienceMembers:
+            YourAudienceView { Task { @MainActor in pop() } }
         case .beaconsFeed:
             BeaconsFeedView(
                 onOpenPost: { _ in

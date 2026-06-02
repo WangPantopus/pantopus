@@ -59,6 +59,7 @@ import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.creator_audience.YourAudienceScreen
 import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxRowContent
 import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
@@ -704,6 +705,11 @@ private object ChildRoutes {
 
     /** Public Profile management / Creator audience dashboard (T3.3). */
     const val AUDIENCE_PROFILE = "audience-profile"
+
+    /** A22.2 "Your audience" — creator member management (pending requests
+     *  + tier-grouped members). Pushed from the Audience Profile Followers
+     *  tab "Your audience" row. */
+    const val CREATOR_AUDIENCE_MEMBERS = "creator/audience/members"
 
     /** P1.3 — Broadcast detail full-screen takeover pushed from a tap
      *  on an update card on the Audience Profile. The tapped row's
@@ -3188,8 +3194,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenFollowing = {
                         navController.navigate(ChildRoutes.FOLLOWING)
                     },
+                    onOpenMembers = {
+                        navController.navigate(ChildRoutes.CREATOR_AUDIENCE_MEMBERS)
+                    },
                     viewModel = audienceViewModel,
                 )
+            }
+            composable(ChildRoutes.CREATOR_AUDIENCE_MEMBERS) {
+                YourAudienceScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 ChildRoutes.BROADCAST_DETAIL,

@@ -30,6 +30,19 @@ public enum AudienceProfileEndpoints {
         return Endpoint(method: .get, path: "/api/personas/me/audience", query: query)
     }
 
+    /// `PATCH /api/personas/me/audience/:membershipId` — owner-side action
+    /// on a single audience member. `action` ∈
+    /// `approve / decline / remove / mute / unmute`; the backend maps each
+    /// to a status transition and writes an audit-log entry. Route
+    /// `backend/routes/personas.js:753`.
+    public static func memberAction(membershipId: String, action: String) -> Endpoint {
+        Endpoint(
+            method: .patch,
+            path: "/api/personas/me/audience/\(membershipId)",
+            body: AudienceMemberActionBody(action: action)
+        )
+    }
+
     /// `GET /api/personas/:handle/posts` — recent Update posts.
     /// Route `backend/routes/personas.js:1046`.
     public static func posts(handle: String) -> Endpoint {
@@ -86,5 +99,16 @@ public struct PublishUpdateBody: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case body, visibility
         case targetTierRank = "target_tier_rank"
+    }
+}
+
+/// Body for the owner-side audience-member action route (A22.2 "Your
+/// audience"). `action` valid values: `approve / decline / remove / mute /
+/// unmute`.
+public struct AudienceMemberActionBody: Encodable, Sendable {
+    public let action: String
+
+    public init(action: String) {
+        self.action = action
     }
 }
