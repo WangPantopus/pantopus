@@ -444,7 +444,6 @@ public struct HubTabRoot: View {
     /// personal context (home / business dashboards adopt the drawer with their
     /// own context); the pill opens the Identity Center and rows push existing
     /// routes via `route(forDrawer:)`.
-    @ViewBuilder
     private var navigationDrawerOverlay: some View {
         NavigationDrawerView(
             viewModel: NavigationDrawerViewModel(context: .personal(name: currentUserName)),
@@ -466,8 +465,14 @@ public struct HubTabRoot: View {
         forDrawer destination: NavigationDrawerDestination,
         context: NavigationDrawerContext
     ) -> HubRoute? {
-        let homeId: String = { if case let .home(id, _, _) = context { return id }; return "" }()
-        let businessId: String = { if case let .business(id, _, _) = context { return id }; return "" }()
+        var homeId = ""
+        if case let .home(id, _, _) = context {
+            homeId = id
+        }
+        var businessId = ""
+        if case let .business(id, _, _) = context {
+            businessId = id
+        }
         switch destination {
         // Personal
         case .myHomes: return .myHomes

@@ -33,6 +33,10 @@ struct NavigationDrawerView: View {
             .animation(.easeOut(duration: 0.22), value: isPresented)
         }
         .allowsHitTesting(isPresented)
+        // When closed the overlay must be inert for both touch and
+        // accessibility — otherwise the full-bleed GeometryReader occludes the
+        // Hub's scroll view and breaks XCUITest's scroll-to-visible actions.
+        .accessibilityHidden(!isPresented)
         .accessibilityIdentifier("navDrawer")
     }
 

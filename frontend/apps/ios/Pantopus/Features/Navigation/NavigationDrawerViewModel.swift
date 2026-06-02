@@ -129,7 +129,9 @@ struct NavigationDrawerItem: Identifiable, Equatable {
     let isActive: Bool
     let destination: NavigationDrawerDestination
 
-    var id: String { slug }
+    var id: String {
+        slug
+    }
 }
 
 /// A labelled group of rows. `overline == nil` renders the leading, header-less
@@ -231,12 +233,12 @@ final class NavigationDrawerViewModel {
                 item(.building2, "My Businesses", .myBusinesses),
                 item(.users, "Connections", .connections),
                 item(.mail, "Mailbox", .mailbox),
-                item(.shield, "Profile & Privacy", .profileAndPrivacy),
+                item(.shield, "Profile & Privacy", .profileAndPrivacy)
             ]),
             NavigationDrawerSection(id: "discover", overline: "Discover", items: [
                 item(.rss, "Beacon Updates", .beaconUpdates),
                 item(.search, "Search", .search),
-                item(.compass, "Discover Neighbors", .discoverNeighbors),
+                item(.compass, "Discover Neighbors", .discoverNeighbors)
             ]),
             NavigationDrawerSection(id: "your-stuff", overline: "Your Stuff", items: [
                 item(.radio, "My Beacon", .myBeacon),
@@ -246,12 +248,12 @@ final class NavigationDrawerViewModel {
                 item(.hand, "My Bids", .myBids),
                 item(.gavel, "Offers & Bids", .offersAndBids),
                 item(.plusCircle, "Post Task", .postTask),
-                item(.creditCard, "Wallet & Payments", .walletAndPayments),
+                item(.creditCard, "Wallet & Payments", .walletAndPayments)
             ]),
             NavigationDrawerSection(id: "settings", overline: "Settings", items: [
                 item(.slidersHorizontal, "Settings", .settings),
-                item(.helpCircle, "Help & Support", .helpSupport),
-            ]),
+                item(.helpCircle, "Help & Support", .helpSupport)
+            ])
         ]
     }
 
@@ -266,17 +268,17 @@ final class NavigationDrawerViewModel {
                 item(.wrench, "Issues", .homeIssues),
                 item(.creditCard, "Bills", .homeBills),
                 item(.users, "Members", .homeMembers),
-                item(.mail, "Mailbox", .homeMailbox),
+                item(.mail, "Mailbox", .homeMailbox)
             ]),
             NavigationDrawerSection(id: "more", overline: "More", items: [
                 item(.package, "Packages", .homePackages),
                 item(.fileText, "Documents", .homeDocuments),
                 item(.hammer, "Vendors", .homeVendors),
-                item(.alertTriangle, "Emergency", .homeEmergency),
+                item(.alertTriangle, "Emergency", .homeEmergency)
             ]),
             NavigationDrawerSection(id: "settings", overline: "Settings", items: [
-                item(.slidersHorizontal, "Home Settings", .homeSettings),
-            ]),
+                item(.slidersHorizontal, "Home Settings", .homeSettings)
+            ])
         ]
     }
 
@@ -291,16 +293,16 @@ final class NavigationDrawerViewModel {
                 item(.tag, "Catalog", .businessCatalog),
                 item(.file, "Pages", .businessPages),
                 item(.plusCircle, "Post Task", .businessPostTask),
-                item(.messageSquare, "Business Chat", .businessChat),
+                item(.messageSquare, "Business Chat", .businessChat)
             ]),
             NavigationDrawerSection(id: "manage", overline: "Manage", items: [
                 item(.users, "Team", .businessTeam),
                 item(.star, "Reviews", .businessReviews),
-                item(.creditCard, "Payments", .businessPayments),
+                item(.creditCard, "Payments", .businessPayments)
             ]),
             NavigationDrawerSection(id: "settings", overline: "Settings", items: [
-                item(.slidersHorizontal, "Settings", .businessSettings),
-            ]),
+                item(.slidersHorizontal, "Settings", .businessSettings)
+            ])
         ]
     }
 }

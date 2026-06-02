@@ -40,7 +40,7 @@ final class NavigationDrawerViewModelTests: XCTestCase {
             "beacon-updates", "search", "discover-neighbors",
             "my-beacon", "my-listings", "my-pulse", "my-tasks", "my-bids",
             "offers-and-bids", "post-task", "wallet-and-payments",
-            "settings", "help-and-support",
+            "settings", "help-and-support"
         ])
     }
 
@@ -73,7 +73,7 @@ final class NavigationDrawerViewModelTests: XCTestCase {
             "overview", "profile", "locations-and-hours", "catalog", "pages",
             "post-task", "business-chat",
             "team", "reviews", "payments",
-            "settings",
+            "settings"
         ])
     }
 }
