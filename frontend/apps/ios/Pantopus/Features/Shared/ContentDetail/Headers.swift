@@ -3,9 +3,8 @@
 //  Pantopus
 //
 //  Header slots for the Content Detail shell. `HomeHeroHeader` is the
-//  only concrete implementation today; the others ship as
-//  `NotYetAvailable` placeholders so screens can already reference the
-//  types.
+//  concrete one in this file; the business and wallet headers now ship as
+//  concrete views under `Headers/` (see the MARK at the foot of this file).
 //
 
 import SwiftUI
@@ -89,30 +88,15 @@ public struct HomeHeroHeader: View {
     }
 }
 
-// MARK: - Stubs (implemented in later prompts)
+// MARK: - Concrete headers (moved out of this file)
 
 //
 // `PostAuthorHeaderStub` and `ProfileHeaderStub` were removed in P17 —
 // their concrete implementations now live in
 // `ContentDetail/Headers/PostAuthorHeader.swift` and
 // `ContentDetail/Headers/ProfileHeader.swift`.
-
-/// Placeholder for a future business header.
-public struct BusinessHeaderStub: View {
-    public init() {}
-    public var body: some View {
-        NotYetAvailableView(tabName: "Business header", icon: .shoppingBag)
-            .frame(height: 240)
-            .padding(.horizontal, Spacing.s4)
-    }
-}
-
-/// Placeholder for a future wallet hero.
-public struct WalletHeroStub: View {
-    public init() {}
-    public var body: some View {
-        NotYetAvailableView(tabName: "Wallet header", icon: .shield)
-            .frame(height: 240)
-            .padding(.horizontal, Spacing.s4)
-    }
-}
+//
+// `BusinessHeaderStub` and `WalletHeroStub` were likewise replaced by the
+// concrete `BusinessHeader` and `WalletHeader` views under
+// `ContentDetail/Headers/`, removing the last header NotYetAvailable
+// placeholders.
