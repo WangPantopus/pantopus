@@ -23,14 +23,37 @@ public final class GigDetailViewModel {
     /// Cached raw gig used by the place-bid + message flows.
     public private(set) var rawGig: GigDTO?
 
+    /// True when the signed-in viewer is the gig's assigned worker and the
+    /// task is `in_progress` — the only state in which the worker can mark
+    /// delivery (mirrors the backend `mark-completed` precondition and
+    /// MyBids' "Mark complete" gate). Drives the dock's "Mark as delivered"
+    /// affordance + which sheet the host presents.
+    public private(set) var canMarkDelivered: Bool = false
+
     private let gigId: String
     private let api: APIClient
+    private let uploader: MultipartUploader
     private let currentUserId: String?
 
-    init(gigId: String, api: APIClient = .shared, currentUserId: String? = nil) {
+    init(
+        gigId: String,
+        api: APIClient = .shared,
+        uploader: MultipartUploader = .shared,
+        currentUserId: String? = GigDetailViewModel.currentSignedInUserId()
+    ) {
         self.gigId = gigId
         self.api = api
+        self.uploader = uploader
         self.currentUserId = currentUserId
+    }
+
+    /// The signed-in user id, or `nil` when signed out. Mirrors
+    /// `ListingDetailViewModel.currentSignedInUserId`.
+    static func currentSignedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.id
+        }
+        return nil
     }
 
     public func load() async {
@@ -39,16 +62,57 @@ public final class GigDetailViewModel {
             let detail: GigDetailResponse = try await api.request(GigsEndpoints.detail(id: gigId))
             rawGig = detail.gig
             viewerIsOwner = currentUserId != nil && detail.gig.userId == currentUserId
+            canMarkDelivered = Self.viewerCanMarkDelivered(gig: detail.gig, currentUserId: currentUserId)
             var bids: [GigBidDTO] = []
             if viewerIsOwner {
                 if let bidsResponse: GigBidsResponse = try? await api.request(GigsEndpoints.bids(gigId: gigId)) {
                     bids = bidsResponse.bids
                 }
             }
-            state = .loaded(Self.project(gig: detail.gig, bids: bids))
+            state = .loaded(Self.project(gig: detail.gig, bids: bids, canMarkDelivered: canMarkDelivered))
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gig."
             state = .error(message: message)
+        }
+    }
+
+    /// The worker self-completion gate: signed-in viewer is the assigned
+    /// worker (`accepted_by`) and the task is `in_progress`.
+    static func viewerCanMarkDelivered(gig: GigDTO, currentUserId: String?) -> Bool {
+        guard let me = currentUserId, !me.isEmpty,
+              let worker = gig.acceptedBy, worker == me else { return false }
+        return (gig.status ?? "").lowercased() == "in_progress"
+    }
+
+    /// Upload each proof photo via `POST /api/files/upload`, then mark the
+    /// task completed with the resulting URLs + the optional note. Returns
+    /// `true` so the Delivery Proof sheet can flip to its SUBMITTED
+    /// confirmation; refreshes the task (status → completed) on success.
+    @discardableResult
+    public func submitDeliveryProof(photos: [DeliveryProofPhoto], note: String?) async -> Bool {
+        guard let gig = rawGig, !photos.isEmpty else { return false }
+        do {
+            var urls: [String] = []
+            for photo in photos {
+                let response = try await uploader.uploadFile(
+                    MultipartFile(
+                        fieldName: "file",
+                        filename: photo.filename,
+                        mimeType: photo.mimeType,
+                        data: photo.data
+                    ),
+                    formFields: ["file_type": "gig_completion", "visibility": "private"]
+                )
+                urls.append(response.file.url)
+            }
+            _ = try await api.request(
+                GigsEndpoints.markCompleted(gigId: gig.id, note: note, photos: urls),
+                as: EmptyResponse.self
+            )
+            await load()
+            return true
+        } catch {
+            return false
         }
     }
 
@@ -84,13 +148,19 @@ public final class GigDetailViewModel {
     /// capsules with ratings, per-bid tags — is rendered from
     /// `GigDetailSampleData` until the Magic Task JSONB is wired through
     /// the backend (out of scope per P8.2).
-    static func project(gig: GigDTO, bids: [GigBidDTO]) -> ContentDetailContent {
-        (gig.isV2 == true) ? projectTaskV2(gig: gig, bids: bids) : projectGigV1(gig: gig, bids: bids)
+    static func project(gig: GigDTO, bids: [GigBidDTO], canMarkDelivered: Bool = false) -> ContentDetailContent {
+        (gig.isV2 == true)
+            ? projectTaskV2(gig: gig, bids: bids, canMarkDelivered: canMarkDelivered)
+            : projectGigV1(gig: gig, bids: bids)
     }
 
     // MARK: V2 (Task) — Magic Task surface
 
-    private static func projectTaskV2(gig: GigDTO, bids: [GigBidDTO]) -> ContentDetailContent {
+    private static func projectTaskV2(
+        gig: GigDTO,
+        bids: [GigBidDTO],
+        canMarkDelivered: Bool
+    ) -> ContentDetailContent {
         let category = GigsCategory.from(backendKey: gig.category)
         let bidCount = gig.bidCount ?? bids.count
         let metaPieces: [String] = [
@@ -137,18 +207,30 @@ public final class GigDetailViewModel {
                 footerPill: "neighbors viewing"
             )))
         }
+        // The assigned worker viewing an in-progress task gets the
+        // completion affordance (→ Delivery Proof sheet) instead of the
+        // bidder dock; everyone else sees the standard "Place bid" path.
         let statusLabel = bidCount > 0 ? "Open · \(bidCount) \(bidCount == 1 ? "bid" : "bids")" : "Open · No bids yet"
+        let statusPill = canMarkDelivered
+            ? ContentDetailPill(label: "In progress", icon: .circle, tone: .warning)
+            : ContentDetailPill(label: statusLabel, icon: .circle, tone: .warning)
+        let dock = canMarkDelivered
+            ? ContentDetailDock(
+                secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                primary: ContentDetailDockButton(label: "Mark as delivered", icon: .checkCheck)
+            )
+            : ContentDetailDock(
+                secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                primary: ContentDetailDockButton(label: "Place bid")
+            )
         return ContentDetailContent(
             kind: .gig,
-            statusPill: ContentDetailPill(label: statusLabel, icon: .circle, tone: .warning),
+            statusPill: statusPill,
             hero: hero,
             statStrip: statRows(gig),
             modules: modules,
             trustCapsules: [],
-            dock: ContentDetailDock(
-                secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                primary: ContentDetailDockButton(label: "Place bid")
-            )
+            dock: dock
         )
     }
 

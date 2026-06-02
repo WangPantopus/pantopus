@@ -12,6 +12,7 @@ import SwiftUI
 public struct GigDetailView: View {
     @State private var viewModel: GigDetailViewModel
     @State private var bidSheetTarget: EditBidSheetTarget?
+    @State private var deliveryTarget: DeliveryProofTarget?
     @State private var toast: ToastMessage?
     private let onBack: @MainActor () -> Void
     private let onMessage: (@MainActor (GigDTO) -> Void)?
@@ -30,7 +31,7 @@ public struct GigDetailView: View {
         TransactionalDetailShell(
             state: viewModel.state,
             onBack: onBack,
-            onPrimaryAction: { presentBidSheet() },
+            onPrimaryAction: { presentPrimaryAction() },
             onSecondaryAction: { if let gig = viewModel.rawGig { onMessage?(gig) } },
             onRetry: { Task { await viewModel.load() } },
             onMessageCounterparty: { if let gig = viewModel.rawGig { onMessage?(gig) } }
@@ -54,6 +55,15 @@ public struct GigDetailView: View {
             )
             .presentationDetents([.large])
         }
+        .sheet(item: $deliveryTarget) { target in
+            DeliveryProofSheetView(
+                target: target,
+                onSubmit: { photos, note in
+                    await viewModel.submitDeliveryProof(photos: photos, note: note)
+                },
+                onDismiss: { deliveryTarget = nil }
+            )
+        }
         .overlay(alignment: .bottom) { toastOverlay }
     }
 
@@ -70,6 +80,16 @@ public struct GigDetailView: View {
         }
     }
 
+    /// Dock primary routes to the Delivery Proof sheet when the viewer is
+    /// the assigned worker on an in-progress task, otherwise the bid sheet.
+    private func presentPrimaryAction() {
+        if viewModel.canMarkDelivered {
+            presentDeliveryProof()
+        } else {
+            presentBidSheet()
+        }
+    }
+
     private func presentBidSheet() {
         guard let gig = viewModel.rawGig else { return }
         bidSheetTarget = EditBidSheetTarget(
@@ -77,6 +97,15 @@ public struct GigDetailView: View {
             gigId: gig.id,
             gigTitle: gig.title,
             bidId: nil
+        )
+    }
+
+    private func presentDeliveryProof() {
+        guard let gig = viewModel.rawGig else { return }
+        deliveryTarget = DeliveryProofTarget(
+            id: "deliver-\(gig.id)",
+            gigId: gig.id,
+            gigTitle: gig.title
         )
     }
 }

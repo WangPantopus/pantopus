@@ -123,14 +123,15 @@ public enum GigsEndpoints {
     }
 
     /// `POST /api/gigs/:gigId/mark-completed` — worker marks an
-    /// assigned gig as done. No body is required; we accept an optional
-    /// note for the photo/notes flow when a future PR brings it in.
-    /// Route `backend/routes/gigs.js:5926`.
-    public static func markCompleted(gigId: String, note: String? = nil) -> Endpoint {
+    /// assigned gig as done. Body accepts an optional `note` plus an
+    /// optional array of proof-photo `photos` URLs (uploaded first via
+    /// `POST /api/files/upload`); the backend stores them as
+    /// `completion_photos`. Route `backend/routes/gigs.js:6092`.
+    public static func markCompleted(gigId: String, note: String? = nil, photos: [String]? = nil) -> Endpoint {
         Endpoint(
             method: .post,
             path: "/api/gigs/\(gigId)/mark-completed",
-            body: MarkCompletedBody(note: note)
+            body: MarkCompletedBody(note: note, photos: photos)
         )
     }
 
@@ -217,14 +218,17 @@ public struct WithdrawBidBody: Encodable, Sendable {
     }
 }
 
-/// Body for `POST /api/gigs/:gigId/mark-completed`. The full backend
-/// shape also accepts `photos` and `checklist`; T5.3.1 only sends the
-/// optional `note`. Later flows (photo strip) can extend this.
+/// Body for `POST /api/gigs/:gigId/mark-completed`. The backend shape
+/// accepts `note`, `photos` (proof-of-delivery URLs), and `checklist`.
+/// The Delivery Proof sheet sends `note` + `photos`; `checklist` is
+/// omitted (encoded only when non-nil).
 public struct MarkCompletedBody: Encodable, Sendable {
     public let note: String?
+    public let photos: [String]?
 
-    public init(note: String? = nil) {
+    public init(note: String? = nil, photos: [String]? = nil) {
         self.note = note
+        self.photos = photos
     }
 }
 
