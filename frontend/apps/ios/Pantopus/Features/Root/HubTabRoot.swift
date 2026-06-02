@@ -321,6 +321,13 @@ public struct HubTabRoot: View {
     @State private var modalRoute: HubModalRoute?
     /// P6.6 — "Find people" → contacts picker → invite share.
     @State private var showFindPeople = false
+    /// §1C-b — context-aware navigation drawer, opened from the Hub menu
+    /// button (repurposed from "open Settings"). Settings now lives as a row
+    /// inside the drawer.
+    @State private var showNavDrawer = false
+    /// Identity Center presented when the drawer's context pill is tapped
+    /// (LAUNCHER / Option A switching path).
+    @State private var navDrawerIdentityCenter = false
     #if DEBUG
     @State private var debugSheet: HubRoute?
     #endif
@@ -329,6 +336,11 @@ public struct HubTabRoot: View {
 
     private var currentUserId: String {
         if case let .signedIn(user) = auth.state { return user.id }
+        return ""
+    }
+
+    private var currentUserName: String {
+        if case let .signedIn(user) = auth.state { return user.displayName ?? "" }
         return ""
     }
 
@@ -419,6 +431,94 @@ public struct HubTabRoot: View {
         }
         .sheet(item: $systemSheet) { request in request.makeView() }
         .findPeopleSheet(isPresented: $showFindPeople)
+        .overlay { navigationDrawerOverlay }
+        .sheet(isPresented: $navDrawerIdentityCenter) {
+            // `onBack` is not the trailing parameter of `IdentityCenterView`,
+            // so the argument label must stay explicit here.
+            // swiftlint:disable:next trailing_closure
+            IdentityCenterView(onBack: { navDrawerIdentityCenter = false })
+        }
+    }
+
+    /// §1C-b — the context-aware navigation drawer. The Hub menu is always the
+    /// personal context (home / business dashboards adopt the drawer with their
+    /// own context); the pill opens the Identity Center and rows push existing
+    /// routes via `route(forDrawer:)`.
+    private var navigationDrawerOverlay: some View {
+        NavigationDrawerView(
+            viewModel: NavigationDrawerViewModel(context: .personal(name: currentUserName)),
+            isPresented: $showNavDrawer,
+            onSelect: { destination in
+                if let route = Self.route(forDrawer: destination, context: .personal(name: "")) {
+                    path.append(route)
+                }
+            },
+            onOpenIdentityCenter: { navDrawerIdentityCenter = true },
+            onBackToHub: { Task { @MainActor in path.removeAll { _ in true } } }
+        )
+    }
+
+    /// Maps a drawer destination onto an existing `HubRoute`. Destinations with
+    /// no shipped native route fall back to the `NotYetAvailable` placeholder.
+    /// Home / Business destinations read the active id from `context`.
+    static func route(
+        forDrawer destination: NavigationDrawerDestination,
+        context: NavigationDrawerContext
+    ) -> HubRoute? {
+        var homeId = ""
+        if case let .home(id, _, _) = context {
+            homeId = id
+        }
+        var businessId = ""
+        if case let .business(id, _, _) = context {
+            businessId = id
+        }
+        switch destination {
+        // Personal
+        case .myHomes: return .myHomes
+        case .myBusinesses: return .placeholder(label: "My Businesses")
+        case .connections: return .connections
+        case .mailbox: return .mailboxRoot
+        case .profileAndPrivacy: return .privacySettings
+        case .beaconUpdates: return .beaconsFeed
+        case .search: return .gigSearch
+        case .discoverNeighbors: return .discoverHub
+        case .myBeacon: return .placeholder(label: "My Beacon")
+        case .myListings: return .marketplace
+        case .myPulse: return .pulseFeed
+        case .myTasks: return .placeholder(label: "My Tasks")
+        case .myBids: return .myBids
+        case .offersAndBids: return .placeholder(label: "Offers & Bids")
+        case .postTask: return .quickPostGig(category: GigsCategory.all.rawValue)
+        case .walletAndPayments: return .wallet
+        case .settings: return .menu
+        case .helpSupport: return .placeholder(label: "Help & Support")
+        // Home
+        case .homeProperty: return .propertyDetails(homeId: homeId)
+        case .homeOverview: return .homeDashboard(homeId: homeId)
+        case .homeTasks: return .homeTasks(homeId: homeId)
+        case .homeIssues: return .homeMaintenance(homeId: homeId)
+        case .homeBills: return .homeBills(homeId: homeId)
+        case .homeMembers: return .homeMembers(homeId: homeId)
+        case .homeMailbox: return .mailboxRoot
+        case .homePackages: return .homePackages(homeId: homeId)
+        case .homeDocuments: return .homeDocs(homeId: homeId)
+        case .homeVendors: return .placeholder(label: "Vendors")
+        case .homeEmergency: return .homeEmergency(homeId: homeId)
+        case .homeSettings: return .homeSettings(homeId: homeId)
+        // Business
+        case .businessOverview: return .businessOwner(businessId: businessId)
+        case .businessProfileRow: return .businessProfile(businessId: businessId)
+        case .businessLocations: return .placeholder(label: "Locations & Hours")
+        case .businessCatalog: return .placeholder(label: "Catalog")
+        case .businessPages: return .editBusinessPage(businessId: businessId)
+        case .businessPostTask: return .quickPostGig(category: GigsCategory.all.rawValue)
+        case .businessChat: return .placeholder(label: "Business Chat")
+        case .businessTeam: return .placeholder(label: "Team")
+        case .businessReviews: return .placeholder(label: "Reviews")
+        case .businessPayments: return .paymentsSettings
+        case .businessSettings: return .placeholder(label: "Business Settings")
+        }
     }
 
     private var navigationPathBinding: Binding<NavigationPath> {
@@ -577,7 +677,7 @@ public struct HubTabRoot: View {
         HubView { intent in
             switch intent {
             case .openNotifications: path.append(.notifications)
-            case .openMenu: path.append(.menu)
+            case .openMenu: showNavDrawer = true
             case .startVerification: path.append(.addHome)
             case .action(.addHome): path.append(.addHome)
             case .action(.scanMail): path.append(.mailboxRoot)
