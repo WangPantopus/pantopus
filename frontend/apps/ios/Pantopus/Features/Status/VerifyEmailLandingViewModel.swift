@@ -26,7 +26,7 @@ import Foundation
 final class VerifyEmailLandingViewModel {
     /// The three post-tap outcomes the design frames. `verifying` is the
     /// transient loading moment; `success` / `expired` are terminal.
-    enum Phase: Equatable, Sendable {
+    enum Phase: Equatable {
         case verifying
         case success
         case expired
@@ -34,7 +34,7 @@ final class VerifyEmailLandingViewModel {
 
     /// Transient confirmation surfaced after a Resend tap. `isError`
     /// drives the toast tint (success vs. failure copy).
-    struct ResendToast: Equatable, Sendable {
+    struct ResendToast: Equatable {
         let message: String
         let isError: Bool
     }

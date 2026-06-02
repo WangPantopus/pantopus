@@ -169,10 +169,10 @@ struct VerifyEmailLandingView: View {
 
     /// Centred A18 collapsed-status block: halo → headline → body → pill →
     /// state-specific actions. `stateID` is the per-phase contract tag.
-    private func scaffold<Actions: View>(
+    private func scaffold(
         stateID: String,
         chrome: PhaseChrome,
-        @ViewBuilder actions: () -> Actions
+        @ViewBuilder actions: () -> some View
     ) -> some View {
         VStack(spacing: Spacing.s5) {
             Spacer(minLength: Spacing.s10)
