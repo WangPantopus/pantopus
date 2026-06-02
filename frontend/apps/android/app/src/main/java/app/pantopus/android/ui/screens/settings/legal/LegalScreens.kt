@@ -56,6 +56,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.BackToTopFab
 import app.pantopus.android.ui.components.DocMetaStrip
+import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.LegalSection
 import app.pantopus.android.ui.components.LegalTOCCard
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
@@ -202,6 +203,25 @@ fun LegalIndexScreen(
                 onTapRow = viewModel::onRow,
                 onRetry = viewModel::load,
             ),
+    )
+}
+
+/**
+ * Fallback shown when a Legal route's `:doc` argument doesn't resolve to a
+ * known [LegalDocument] — e.g. a stale deep link. Replaces the old
+ * NotYetAvailable placeholder with a proper empty index state per the A14.3
+ * Settings/Legal design: a "Select a document" prompt that routes the member
+ * back to the Legal table of contents.
+ */
+@Composable
+fun LegalEmptyState(onBack: () -> Unit = {}) {
+    EmptyState(
+        modifier = Modifier.testTag("legalIndex.empty"),
+        icon = PantopusIcon.FileText,
+        headline = "Select a document",
+        subcopy = "Pick a policy from the Legal list to read it here.",
+        ctaTitle = "Browse legal documents",
+        onCta = onBack,
     )
 }
 
