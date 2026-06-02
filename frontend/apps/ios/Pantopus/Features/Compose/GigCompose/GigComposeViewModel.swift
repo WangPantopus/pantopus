@@ -339,7 +339,7 @@ extension GigComposeViewModel {
         let lowered = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let withoutHash = lowered.hasPrefix("#") ? String(lowered.dropFirst()) : lowered
         let hyphenated = withoutHash
-            .split(whereSeparator: { $0 == " " || $0 == "\t" })
+            .split { $0 == " " || $0 == "\t" }
             .joined(separator: "-")
         let capped = String(hyphenated.prefix(50))
         return capped.isEmpty ? nil : capped

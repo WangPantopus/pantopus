@@ -11,6 +11,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable type_body_length
+
 @MainActor
 final class GigComposeViewModelTests: XCTestCase {
     override func setUp() {

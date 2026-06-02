@@ -29,7 +29,9 @@ public enum GigPickerSheet: String, Identifiable, CaseIterable, Sendable {
     case urgency
     case tags
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Detents tuned to each sheet's natural content height.
     var detents: Set<PresentationDetent> {
@@ -226,11 +228,8 @@ private struct GigDeadlineSheet: View {
             PickerChip(label: "Today", isActive: isSameDay(offset: 0)) { pick(offset: 0) }
             PickerChip(label: "Tomorrow", isActive: isSameDay(offset: 1)) { pick(offset: 1) }
             PickerChip(label: "This weekend", isActive: isWeekendSelected) { pickWeekend() }
-            PickerChip(
-                label: "Flexible",
-                isActive: selectedDay == nil,
-                identifier: "gigPicker.deadline.flexible"
-            ) { selectedDay = nil }
+            PickerChip(label: "Flexible", isActive: selectedDay == nil) { selectedDay = nil }
+                .accessibilityIdentifier("gigPicker.deadline.flexible")
         }
     }
 
@@ -479,10 +478,7 @@ private struct GigPolicySheet: View {
             subtitle: "What happens if the booking is called off.",
             applyLabel: "Save policy",
             applyIdentifier: "gigPicker.policySave",
-            onApply: {
-                viewModel.setCancellationPolicy(selection)
-                viewModel.dismissPicker()
-            },
+            onApply: save,
             onClose: viewModel.dismissPicker
         ) {
             VStack(spacing: Spacing.s0) {
@@ -504,6 +500,11 @@ private struct GigPolicySheet: View {
         .onAppear {
             selection = viewModel.form.cancellationPolicy ?? .moderate
         }
+    }
+
+    private func save() {
+        viewModel.setCancellationPolicy(selection)
+        viewModel.dismissPicker()
     }
 }
 
@@ -570,10 +571,7 @@ private struct GigUrgencySheet: View {
             subtitle: "Boost a time-sensitive gig to the top.",
             applyLabel: "Apply",
             applyIdentifier: "gigPicker.urgencyApply",
-            onApply: {
-                viewModel.setUrgent(isUrgent)
-                viewModel.dismissPicker()
-            },
+            onApply: applyUrgency,
             onClose: viewModel.dismissPicker
         ) {
             VStack(alignment: .leading, spacing: Spacing.s0) {
@@ -597,6 +595,11 @@ private struct GigUrgencySheet: View {
             }
         }
         .onAppear { isUrgent = viewModel.form.isUrgent }
+    }
+
+    private func applyUrgency() {
+        viewModel.setUrgent(isUrgent)
+        viewModel.dismissPicker()
     }
 
     private var urgentToggleCard: some View {
@@ -1001,7 +1004,6 @@ private struct CategorySheetTile: View {
 private struct PickerChip: View {
     let label: String
     let isActive: Bool
-    var identifier: String? = nil
     let onTap: () -> Void
 
     var body: some View {
@@ -1018,21 +1020,8 @@ private struct PickerChip: View {
                 )
         }
         .buttonStyle(.plain)
-        .modifier(OptionalIdentifier(identifier: identifier))
         .accessibilityLabel("\(label)\(isActive ? ", selected" : "")")
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
-    }
-}
-
-private struct OptionalIdentifier: ViewModifier {
-    let identifier: String?
-
-    func body(content: Content) -> some View {
-        if let identifier {
-            content.accessibilityIdentifier(identifier)
-        } else {
-            content
-        }
     }
 }
 

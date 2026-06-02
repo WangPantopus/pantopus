@@ -70,7 +70,6 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.UUID
 
 // ════════════════════════════════════════════════════════════════
 //  E.1 — Post-a-Task composer picker sheets (Android)
@@ -166,7 +165,13 @@ private fun SheetCloseButton(onClose: () -> Unit) {
                 .semantics { contentDescription = "Close" },
         contentAlignment = Alignment.Center,
     ) {
-        PantopusIconImage(icon = PantopusIcon.X, contentDescription = null, size = 17.dp, strokeWidth = 2.4f, tint = PantopusColors.appTextSecondary)
+        PantopusIconImage(
+            icon = PantopusIcon.X,
+            contentDescription = null,
+            size = 17.dp,
+            strokeWidth = 2.4f,
+            tint = PantopusColors.appTextSecondary,
+        )
     }
 }
 
@@ -232,7 +237,13 @@ private fun DeadlineSheetContent(
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(icon = PantopusIcon.Clock, contentDescription = null, size = 17.dp, tint = PantopusColors.appTextSecondary)
-            Text("By a specific time", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+            Text(
+                "By a specific time",
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
             Text(
                 if (specificTime) "6:00 PM" else "Any time",
                 fontSize = 13.5.sp,
@@ -252,7 +263,13 @@ private fun DeadlineCalendar(
     var month by remember(selectedDay) { mutableStateOf(YearMonth.from(selectedDay ?: today)) }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(month.format(MONTH_YEAR), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+            Text(
+                month.format(MONTH_YEAR),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
             CalendarNavButton(PantopusIcon.ChevronLeft, "Previous month") { month = month.minusMonths(1) }
             Spacer(Modifier.size(Spacing.s1))
             CalendarNavButton(PantopusIcon.ChevronRight, "Next month") { month = month.plusMonths(1) }
@@ -462,7 +479,13 @@ private fun UrgencySheetContent(
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1 + 3.dp)) {
-                    PantopusIconImage(icon = PantopusIcon.Zap, contentDescription = null, size = 17.dp, strokeWidth = 2.4f, tint = PantopusColors.warning)
+                    PantopusIconImage(
+                        icon = PantopusIcon.Zap,
+                        contentDescription = null,
+                        size = 17.dp,
+                        strokeWidth = 2.4f,
+                        tint = PantopusColors.warning,
+                    )
                     Text("Mark as urgent", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
                 }
                 Text(
@@ -594,7 +617,12 @@ private fun TagChipView(
             Modifier
                 .clip(CircleShape)
                 .background(PantopusColors.primary600)
-                .padding(start = Spacing.s3 - 1.dp, end = if (removable) Spacing.s2 else Spacing.s3 - 1.dp, top = Spacing.s1 + 2.dp, bottom = Spacing.s1 + 2.dp)
+                .padding(
+                    start = Spacing.s3 - 1.dp,
+                    end = if (removable) Spacing.s2 else Spacing.s3 - 1.dp,
+                    top = Spacing.s1 + 2.dp,
+                    bottom = Spacing.s1 + 2.dp,
+                )
                 .testTag("gigPicker.tagChip"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1 + 1.dp),
@@ -602,9 +630,18 @@ private fun TagChipView(
         Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextInverse)
         if (removable) {
             Box(
-                modifier = Modifier.clip(CircleShape).clickable(role = Role.Button, onClick = onRemove).semantics { contentDescription = "Remove $label" },
+                modifier =
+                    Modifier.clip(
+                        CircleShape,
+                    ).clickable(role = Role.Button, onClick = onRemove).semantics { contentDescription = "Remove $label" },
             ) {
-                PantopusIconImage(icon = PantopusIcon.X, contentDescription = null, size = 13.dp, strokeWidth = 2.6f, tint = PantopusColors.appTextInverse)
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = null,
+                    size = 13.dp,
+                    strokeWidth = 2.6f,
+                    tint = PantopusColors.appTextInverse,
+                )
             }
         }
     }
@@ -653,8 +690,10 @@ private fun SuggestionChipView(
 
 @Composable
 private fun AttachmentSheetContent(vm: GigComposeViewModel) {
-    fun add(prefix: String) {
-        vm.addPhoto("placeholder://$prefix/${UUID.randomUUID()}")
+    // Real upload lands in P15.5 — each source mints a placeholder
+    // attachment so the cap + count behaviour stays exercisable.
+    fun add() {
+        vm.addPlaceholderPhoto()
         vm.dismissPicker()
     }
     Column(
@@ -693,7 +732,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.primary600,
                 container = PantopusColors.primary50,
                 testTag = "gigPicker.attach.photos",
-            ) { add("photo") }
+            ) { add() }
             HorizontalDivider(color = PantopusColors.appBorderSubtle, modifier = Modifier.padding(start = 70.dp))
             AttachmentActionRow(
                 icon = PantopusIcon.Image,
@@ -702,7 +741,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.success,
                 container = PantopusColors.successBg,
                 testTag = "gigPicker.attach.library",
-            ) { add("photo") }
+            ) { add() }
             HorizontalDivider(color = PantopusColors.appBorderSubtle, modifier = Modifier.padding(start = 70.dp))
             AttachmentActionRow(
                 icon = PantopusIcon.FileText,
@@ -711,7 +750,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.magic,
                 container = PantopusColors.magicBg,
                 testTag = "gigPicker.attach.file",
-            ) { add("file") }
+            ) { add() }
         }
         Box(
             modifier =
@@ -961,7 +1000,13 @@ private fun RadioGlyph(isOn: Boolean) {
         contentAlignment = Alignment.Center,
     ) {
         if (isOn) {
-            PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 13.dp, strokeWidth = 3f, tint = PantopusColors.appTextInverse)
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 13.dp,
+                strokeWidth = 3f,
+                tint = PantopusColors.appTextInverse,
+            )
         }
     }
 }
@@ -1022,5 +1067,4 @@ private fun deadlineLabel(iso: String?): String? =
         }.getOrNull()
     }
 
-private fun tagsLabel(tags: List<String>): String? =
-    if (tags.isEmpty()) null else tags.joinToString(" · ") { "#$it" }
+private fun tagsLabel(tags: List<String>): String? = if (tags.isEmpty()) null else tags.joinToString(" · ") { "#$it" }
