@@ -19,7 +19,6 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import app.pantopus.android.ui.screens.hub.HUB_SCREEN_TAG
-import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.root.NotYetAvailableView
 import app.pantopus.android.ui.screens.root.PantopusBottomBar
 import app.pantopus.android.ui.screens.root.PantopusRoute
@@ -73,7 +72,7 @@ class A11yLabelAudit {
                 Box(Modifier.padding(padding)) {
                     when (selected) {
                         PantopusRoute.Hub -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
-                        PantopusRoute.Nearby -> NearbyScreen()
+                        PantopusRoute.Nearby -> Box(Modifier.fillMaxSize().testTag("nearbyTab.mapList"))
                         PantopusRoute.Inbox ->
                             NotYetAvailableView(
                                 tabName = "Inbox",
