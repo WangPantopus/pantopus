@@ -13,6 +13,7 @@ import app.pantopus.android.data.api.services.BusinessDiscoveryApi
 import app.pantopus.android.data.api.services.BusinessesApi
 import app.pantopus.android.data.api.services.ChatApi
 import app.pantopus.android.data.api.services.FilesApi
+import app.pantopus.android.data.api.services.FollowingApi
 import app.pantopus.android.data.api.services.GigsApi
 import app.pantopus.android.data.api.services.HomeMembersApi
 import app.pantopus.android.data.api.services.HomePetsApi
@@ -186,6 +187,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideRelationshipsApi(retrofit: Retrofit): RelationshipsApi = retrofit.create(RelationshipsApi::class.java)
+
+    @Provides @Singleton
+    fun provideFollowingApi(retrofit: Retrofit): FollowingApi = retrofit.create(FollowingApi::class.java)
 
     @Provides @Singleton
     fun provideBlocksApi(retrofit: Retrofit): BlocksApi = retrofit.create(BlocksApi::class.java)

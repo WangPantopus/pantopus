@@ -118,6 +118,9 @@ public enum YouRoute: Hashable {
     /// A03.2 — Beacon Updates feed (`surface=personas`), reached from the
     /// Audience Profile "Beacon Updates" entry row.
     case beaconsFeed
+    /// §1A① — "Following": the Beacons the signed-in user follows, reached
+    /// from the Audience Profile "Following" entry row.
+    case following
     case privacyHandshake(personaHandle: String)
     /// P1.3 — Broadcast detail full-screen takeover, pushed when the
     /// creator taps an update card on the Audience Profile. The
@@ -1380,6 +1383,9 @@ public struct YouTabRoot: View {
                 onOpenEditPersona: {
                     Task { @MainActor in path.append(.editPersona(personaId: EditPersonaSampleData.personaId)) }
                 },
+                onOpenFollowing: {
+                    Task { @MainActor in path.append(.following) }
+                },
                 onOpenBeacons: {
                     Task { @MainActor in path.append(.beaconsFeed) }
                 }
@@ -1396,6 +1402,18 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.placeholder(label: "Discover beacons")) }
                 },
                 onBack: { Task { @MainActor in pop() } }
+            )
+        case .following:
+            FollowingView(
+                viewModel: FollowingViewModel(
+                    onBack: { Task { @MainActor in pop() } },
+                    onDiscover: {
+                        Task { @MainActor in path.append(.placeholder(label: "Discover beacons")) }
+                    },
+                    onOpenPersona: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Beacon")) }
+                    }
+                )
             )
         case let .broadcastDetail(broadcastId, card, tierSegments):
             BroadcastDetailView(

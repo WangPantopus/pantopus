@@ -83,6 +83,7 @@ fun AudienceProfileScreen(
     onComposeBroadcast: (String) -> Unit = {},
     onOpenEditPersona: () -> Unit = {},
     onOpenBeacons: () -> Unit = {},
+    onOpenFollowing: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -156,6 +157,7 @@ fun AudienceProfileScreen(
                     )
                 }
                 BeaconsFooter(onOpenBeacons = onOpenBeacons)
+                FollowingFooter(onOpenFollowing = onOpenFollowing)
                 MemberFooter(onOpenMembership = onOpenMembership)
             }
         }
@@ -199,6 +201,63 @@ private fun BeaconsFooter(onOpenBeacons: () -> Unit) {
             )
             Text(
                 text = "Broadcasts from beacons you follow",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = "Open",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary700,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
+    }
+}
+
+/**
+ * §1A① — entry into "Following" (the list of Beacons the user follows).
+ * Mirrors [BeaconsFooter]'s row recipe.
+ */
+@Composable
+private fun FollowingFooter(onOpenFollowing: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .clickable { onOpenFollowing() }
+                .padding(horizontal = Spacing.s4, vertical = 10.dp)
+                .heightIn(min = 48.dp)
+                .testTag("audienceProfileFollowingEntry")
+                .semantics {
+                    contentDescription = "Following. Beacons you follow. Open."
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Users,
+            contentDescription = null,
+            size = Radii.xl,
+            strokeWidth = 2.3f,
+            tint = PantopusColors.primary600,
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = "Following",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Beacons you follow",
                 fontSize = 11.sp,
                 color = PantopusColors.appTextSecondary,
             )
