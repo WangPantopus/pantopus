@@ -14,8 +14,8 @@ import androidx.navigation.navArgument
 import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.ui.screens.auth.auth_error.AuthErrorScreen
 import app.pantopus.android.ui.screens.auth.forgot_password.ForgotPasswordScreen
-import app.pantopus.android.ui.screens.auth.reset_password.ResetPasswordScreen
-import app.pantopus.android.ui.screens.auth.reset_password.ResetPasswordViewModel
+import app.pantopus.android.ui.screens.auth.set_password.SetNewPasswordScreen
+import app.pantopus.android.ui.screens.auth.set_password.SetNewPasswordViewModel
 import app.pantopus.android.ui.screens.auth.sign_up.SignUpScreen
 import app.pantopus.android.ui.screens.auth.verify_email.VerifyEmailScreen
 import app.pantopus.android.ui.screens.auth.verify_email.VerifyEmailViewModel
@@ -92,13 +92,13 @@ fun AuthNavHost() {
         }
         composable(
             route = AuthRoutes.RESET_PASSWORD_PATTERN,
-            arguments = listOf(navArgument(ResetPasswordViewModel.TOKEN_KEY) { type = NavType.StringType }),
+            arguments = listOf(navArgument(SetNewPasswordViewModel.TOKEN_KEY) { type = NavType.StringType }),
         ) { entry ->
-            val token = entry.arguments?.getString(ResetPasswordViewModel.TOKEN_KEY).orEmpty()
-            ResetPasswordScreen(
+            val token = entry.arguments?.getString(SetNewPasswordViewModel.TOKEN_KEY).orEmpty()
+            SetNewPasswordScreen(
                 token = token,
-                onClose = { navController.popBackStack() },
-                onDone = {
+                onBack = { navController.popBackStack() },
+                onContinue = {
                     navController.popBackStack(AuthRoutes.LOGIN, inclusive = false)
                 },
             )

@@ -1,18 +1,18 @@
 //
-//  ResetPasswordViewModelTests.swift
+//  SetNewPasswordViewModelTests.swift
 //  PantopusTests
 //
-//  T6.1c P5 — Covers token parsing (carried as an init arg from the
-//  deep-link route), submit gating (passwords match + strength), the
-//  AuthManager.resetPassword call with the right body, and error
-//  rollback.
+//  §1B-1 — Covers token capture (carried as an init arg from the deep-link
+//  route), submit gating (passwords match + strength + token), the
+//  AuthManager.resetPassword call with the right body, the success phase
+//  transition, error rollback, and the strength / match hint vocabulary.
 //
 
 import XCTest
 @testable import Pantopus
 
 @MainActor
-final class ResetPasswordViewModelTests: XCTestCase {
+final class SetNewPasswordViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -35,14 +35,14 @@ final class ResetPasswordViewModelTests: XCTestCase {
     // MARK: - Token parsing from deep-link
 
     func test_token_is_captured_from_init() {
-        let vm = ResetPasswordViewModel(token: "deep-link-hashed-token")
+        let vm = SetNewPasswordViewModel(token: "deep-link-hashed-token")
         XCTAssertEqual(vm.token, "deep-link-hashed-token")
     }
 
     // MARK: - Gating
 
     func test_canSubmit_requires_strength_and_match_and_token() {
-        let vm = ResetPasswordViewModel(token: "tok")
+        let vm = SetNewPasswordViewModel(token: "tok")
         XCTAssertFalse(vm.canSubmit)
         vm.password = "weak"
         vm.confirmPassword = "weak"
@@ -55,10 +55,33 @@ final class ResetPasswordViewModelTests: XCTestCase {
     }
 
     func test_canSubmit_false_with_empty_token() {
-        let vm = ResetPasswordViewModel(token: "")
+        let vm = SetNewPasswordViewModel(token: "")
         vm.password = "strongpass1"
         vm.confirmPassword = "strongpass1"
         XCTAssertFalse(vm.canSubmit, "missing token blocks submission")
+    }
+
+    // MARK: - Hint vocabulary
+
+    func test_strength_hint_switches_from_rule_to_praise_when_strong() {
+        let vm = SetNewPasswordViewModel(token: "tok")
+        XCTAssertEqual(vm.strengthHint, "Use 8+ characters with a number and a symbol.")
+        vm.password = "strongpass1" // 11 chars, no symbol → fair, still the rule
+        XCTAssertEqual(vm.strengthHint, "Use 8+ characters with a number and a symbol.")
+        vm.password = "river-otter-92!" // 15 chars + number + symbol → strong
+        XCTAssertEqual(vm.passwordStrength, 3)
+        XCTAssertEqual(vm.passwordStrengthLabel, "Strong")
+        XCTAssertEqual(vm.strengthHint, "Great — long, with a number and a symbol.")
+    }
+
+    func test_confirm_match_state_tracks_input() {
+        let vm = SetNewPasswordViewModel(token: "tok")
+        vm.password = "strongpass1"
+        XCTAssertEqual(vm.confirmMatch, .none, "no confirm typed yet")
+        vm.confirmPassword = "strongpas"
+        XCTAssertEqual(vm.confirmMatch, .mismatch)
+        vm.confirmPassword = "strongpass1"
+        XCTAssertEqual(vm.confirmMatch, .match)
     }
 
     // MARK: - Submit success
@@ -68,13 +91,13 @@ final class ResetPasswordViewModelTests: XCTestCase {
             .status(200, body: "{\"message\":\"Password reset successful.\"}")
         ]
         let auth = makeAuth()
-        let vm = ResetPasswordViewModel(token: "deep-tok")
+        let vm = SetNewPasswordViewModel(token: "deep-tok")
         vm.password = "strongpass1"
         vm.confirmPassword = "strongpass1"
 
         await vm.submit(using: auth)
 
-        XCTAssertEqual(vm.phase, .reset)
+        XCTAssertEqual(vm.phase, .success)
         XCTAssertNil(vm.errorMessage)
         XCTAssertFalse(vm.isLoading)
 
@@ -86,12 +109,12 @@ final class ResetPasswordViewModelTests: XCTestCase {
 
     // MARK: - Error rollback
 
-    func test_submit_invalid_token_rolls_back_loading_state() async {
+    func test_submit_invalid_token_rolls_back_to_form() async {
         SequencedURLProtocol.routeResponses["/api/users/reset-password"] = [
             .status(400, body: "{\"error\":\"Invalid or expired reset token\"}")
         ]
         let auth = makeAuth()
-        let vm = ResetPasswordViewModel(token: "stale-tok")
+        let vm = SetNewPasswordViewModel(token: "stale-tok")
         vm.password = "strongpass1"
         vm.confirmPassword = "strongpass1"
 
@@ -108,7 +131,7 @@ final class ResetPasswordViewModelTests: XCTestCase {
 
     func test_submit_blocked_when_invalid_does_not_hit_network() async {
         let auth = makeAuth()
-        let vm = ResetPasswordViewModel(token: "tok")
+        let vm = SetNewPasswordViewModel(token: "tok")
         // password missing — gate blocks submission
         await vm.submit(using: auth)
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 0)

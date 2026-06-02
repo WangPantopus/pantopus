@@ -1,6 +1,6 @@
 @file:Suppress("PackageNaming", "MagicNumber", "SwallowedException", "TooGenericExceptionCaught")
 
-package app.pantopus.android.ui.screens.auth.reset_password
+package app.pantopus.android.ui.screens.auth.set_password
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -17,15 +17,18 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * T6.1c P5 — Reset password view-model. Mirrors iOS
- * `ResetPasswordViewModel` (`Features/Auth/Screens/ResetPasswordView.swift`).
- * Reads the hashed recovery token from [SavedStateHandle] (populated by
- * the NavHost's `{token}` path argument). Submit is gated on the two
- * passwords matching AND the new password passing the same client-side
- * strength rules as signup.
+ * §1B-1 — "Set a new password" view-model. Mirrors iOS
+ * `SetNewPasswordViewModel`. Reads the hashed recovery token from
+ * [SavedStateHandle] (populated by the NavHost's `{token}` path argument).
+ * Submit is gated on the two passwords matching AND the new password
+ * passing the same client-side strength rules as signup. On success the
+ * screen flips to the bespoke "Password updated" confirmation.
+ *
+ * Reuses the existing `/api/users/reset-password` endpoint via
+ * [AuthRepository.resetPassword] — no new networking.
  */
 @HiltViewModel
-class ResetPasswordViewModel
+class SetNewPasswordViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
@@ -34,8 +37,11 @@ class ResetPasswordViewModel
         sealed interface Phase {
             data object Form : Phase
 
-            data object Reset : Phase
+            data object Success : Phase
         }
+
+        /** Confirm-field match state, surfaced as the inline match hint. */
+        enum class ConfirmMatch { None, Match, Mismatch }
 
         data class UiState(
             val token: String = "",
@@ -60,7 +66,28 @@ class ResetPasswordViewModel
                         1 -> "Weak"
                         2 -> "Fair"
                         3 -> "Strong"
-                        else -> "—"
+                        else -> ""
+                    }
+
+            /**
+             * Helper line under the new-password field. Praise once the meter
+             * reaches "Strong"; otherwise the guiding rule. Two-state per the
+             * design (`Use 8+ …` → `Great — …`).
+             */
+            val strengthHint: String
+                get() =
+                    if (passwordStrength >= 3) {
+                        "Great — long, with a number and a symbol."
+                    } else {
+                        "Use 8+ characters with a number and a symbol."
+                    }
+
+            val confirmMatch: ConfirmMatch
+                get() =
+                    when {
+                        confirmPassword.isEmpty() -> ConfirmMatch.None
+                        passwordsMatch -> ConfirmMatch.Match
+                        else -> ConfirmMatch.Mismatch
                     }
         }
 
@@ -76,8 +103,8 @@ class ResetPasswordViewModel
 
         /**
          * Submits the reset request to `POST /api/users/reset-password`. On
-         * success flips [Phase.Reset] so the screen can render the
-         * "Password reset" status frame + start its auto-redirect timer.
+         * success flips [Phase.Success] so the screen renders the
+         * "Password updated" confirmation.
          */
         fun submit() {
             val snapshot = _uiState.value
@@ -86,7 +113,7 @@ class ResetPasswordViewModel
             viewModelScope.launch {
                 try {
                     authRepository.resetPassword(snapshot.token, snapshot.password)
-                    _uiState.update { it.copy(isLoading = false, phase = Phase.Reset) }
+                    _uiState.update { it.copy(isLoading = false, phase = Phase.Success) }
                 } catch (e: AuthError) {
                     _uiState.update { it.copy(isLoading = false, errorMessage = e) }
                 } catch (e: Throwable) {

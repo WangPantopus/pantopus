@@ -391,18 +391,6 @@ public extension StatusWaitingContent {
         )
     }
 
-    /// Password reset success — reached after `ResetPasswordView` submits a
-    /// valid token + new password. Auto-redirects to login (caller wires the
-    /// timer).
-    static func passwordReset() -> StatusWaitingContent {
-        StatusWaitingContent(
-            halo: StatusHalo(tone: .success, icon: .check),
-            headline: "Password reset",
-            subcopy: "You can now log in with your new password.",
-            primaryCta: StatusCTA(label: "Back to login", actionKey: "back_to_login")
-        )
-    }
-
     // MARK: A18.1 — Check your email (verify-email-sent)
 
     /// A18.1 — fire-and-wait state after sign-up. `resent == false` shows the

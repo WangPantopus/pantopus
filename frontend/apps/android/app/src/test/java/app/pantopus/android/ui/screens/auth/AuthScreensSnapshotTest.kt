@@ -36,7 +36,7 @@ class AuthScreensSnapshotTest {
     fun forgot_android_baseline_is_present() = assertBaseline("forgot")
 
     @Test
-    fun reset_android_baseline_is_present() = assertBaseline("reset")
+    fun setpassword_android_baseline_is_present() = assertBaseline("setpassword")
 
     @Test
     fun verify_android_baseline_is_present() = assertBaseline("verify")
