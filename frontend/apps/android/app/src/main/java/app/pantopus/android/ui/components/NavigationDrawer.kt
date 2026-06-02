@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod")
+@file:Suppress("MagicNumber", "LongMethod", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.components
 
