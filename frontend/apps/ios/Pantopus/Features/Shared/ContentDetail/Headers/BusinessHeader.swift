@@ -213,7 +213,7 @@ public struct BusinessHeader: View {
 
     private var initials: String {
         let words = name.split(separator: " ").prefix(2)
-        let letters = words.compactMap { $0.first }
+        let letters = words.compactMap(\.first)
         return String(letters).uppercased()
     }
 
