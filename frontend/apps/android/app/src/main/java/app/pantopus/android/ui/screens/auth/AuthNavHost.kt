@@ -19,6 +19,8 @@ import app.pantopus.android.ui.screens.auth.set_password.SetNewPasswordViewModel
 import app.pantopus.android.ui.screens.auth.sign_up.SignUpScreen
 import app.pantopus.android.ui.screens.auth.verify_email.VerifyEmailScreen
 import app.pantopus.android.ui.screens.auth.verify_email.VerifyEmailViewModel
+import app.pantopus.android.ui.screens.status.verify_email.VerifyEmailLandingScreen
+import app.pantopus.android.ui.screens.status.verify_email.VerifyEmailLandingViewModel
 
 /**
  * Nav graph rooted at [AuthRoutes.LOGIN] for the signed-out experience.
@@ -46,9 +48,12 @@ fun AuthNavHost() {
                 }
             }
             is DeepLinkRouter.Destination.VerifyEmail -> {
+                // The email's deep link always carries a token → land on the
+                // §1B-2 post-tap landing, not the pre-tap "we sent you a link"
+                // surface (which sign-up reaches with no token).
                 DeepLinkRouter.consume()
                 navController.navigate(
-                    AuthRoutes.verifyEmail(email = pending.email, token = pending.token),
+                    AuthRoutes.verifyEmailLanding(email = pending.email, token = pending.token),
                 ) {
                     popUpTo(AuthRoutes.LOGIN)
                 }
@@ -124,6 +129,35 @@ fun AuthNavHost() {
                     navController.popBackStack(AuthRoutes.LOGIN, inclusive = false)
                 },
                 onChangeEmail = { _ ->
+                    navController.navigate(AuthRoutes.SIGN_UP) {
+                        popUpTo(AuthRoutes.LOGIN)
+                    }
+                },
+            )
+        }
+        composable(
+            route = AuthRoutes.VERIFY_EMAIL_LANDING_PATTERN,
+            arguments =
+                listOf(
+                    navArgument(VerifyEmailLandingViewModel.EMAIL_KEY) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument(VerifyEmailLandingViewModel.TOKEN_KEY) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+        ) {
+            VerifyEmailLandingScreen(
+                // No session after verification (backend revokes it), so
+                // Continue drops back to login to sign in.
+                onContinue = {
+                    navController.popBackStack(AuthRoutes.LOGIN, inclusive = false)
+                },
+                onUseDifferentEmail = {
                     navController.navigate(AuthRoutes.SIGN_UP) {
                         popUpTo(AuthRoutes.LOGIN)
                     }
