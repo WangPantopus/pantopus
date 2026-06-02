@@ -35,7 +35,7 @@ enum NavigationDrawerPillar: Equatable {
     case home
     case business
 
-    /// Solid pillar colour (`Personal #0284C7 / Home #16A34A / Business #7C3AED`).
+    /// Solid pillar colour (Personal sky / Home green / Business violet).
     var tint: Color {
         switch self {
         case .personal: Theme.Color.primary600
