@@ -165,6 +165,24 @@ enum class GigComposeLocationMode(
         }
 }
 
+/**
+ * E.1 — cancellation-policy tier surfaced by the composer's policy picker
+ * sheet. The mid tier reads **Moderate** in the design but maps to the
+ * backend's `standard` value (`backend/routes/gigs.js:438`).
+ */
+enum class GigCancellationPolicy(
+    val label: String,
+    val detail: String,
+    val wireValue: String,
+) {
+    Flexible("Flexible", "Full refund up to 24 hours before the start time.", "flexible"),
+    Moderate("Moderate", "50% refund up to 48 hours before. No refund after.", "standard"),
+    Strict("Strict", "No refund within 7 days of the start time.", "strict"),
+}
+
+/** E.1 — the composer picker sheets, presented one-at-a-time over the wizard. */
+enum class GigPickerSheet { Attachment, Category, Deadline, Policy, Urgency, Tags }
+
 /** Plain-old-data address fields collected in step 5 for `APlace`. */
 data class GigComposePlaceAddress(
     val line1: String = "",
@@ -191,6 +209,9 @@ object GigComposeLimits {
     const val DESCRIPTION_MIN: Int = 20
     const val DESCRIPTION_MAX: Int = 2000
     const val MAX_PHOTOS: Int = 6
+
+    /** E.1 — gig tag cap. Mirrors `tags` `.max(5)` in `createGigSchema`. */
+    const val MAX_TAGS: Int = 5
 
     /** B.3 — Magic Task describe textarea cap (matches A12.8 "184 / 500"). */
     const val DESCRIBE_MAX: Int = 500
@@ -219,6 +240,14 @@ data class GigComposeFormState(
     val scheduledStartISO: String? = null,
     val locationMode: GigComposeLocationMode? = null,
     val placeAddress: GigComposePlaceAddress = GigComposePlaceAddress(),
+    /** E.1 — optional hard deadline (`deadline`), ISO-8601. null ⇒ flexible. */
+    val deadlineISO: String? = null,
+    /** E.1 — cancellation policy (`cancellation_policy`). null ⇒ backend default. */
+    val cancellationPolicy: GigCancellationPolicy? = null,
+    /** E.1 — boost flag (`is_urgent`). */
+    val isUrgent: Boolean = false,
+    /** E.1 — freeform tags (`tags`), stored without the leading `#`. */
+    val tags: List<String> = emptyList(),
 ) {
     val currentStep: GigComposeStep
         get() = GigComposeStep.fromOrdinal(step)
@@ -248,7 +277,11 @@ data class GigComposeFormState(
                 scheduledStartISO != null ||
                 locationMode != null ||
                 placeAddress.isComplete ||
-                placeAddress.line1.isNotEmpty()
+                placeAddress.line1.isNotEmpty() ||
+                deadlineISO != null ||
+                cancellationPolicy != null ||
+                isUrgent ||
+                tags.isNotEmpty()
 
     companion object {
         val EMPTY = GigComposeFormState()

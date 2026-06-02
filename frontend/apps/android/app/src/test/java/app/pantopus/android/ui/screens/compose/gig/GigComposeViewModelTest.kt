@@ -385,4 +385,88 @@ class GigComposeViewModelTest {
         assertEquals("Deep clean", vm.state.value.form.title)
         assertEquals(GigComposeBudgetType.Fixed, vm.state.value.form.budgetType)
     }
+
+    // MARK: - E.1 Composer picker sheets
+
+    @Test
+    fun build_body_carries_picker_sheet_fields() {
+        val vm = makeVm()
+        seedReviewReady(vm)
+        val deadline = Instant.now().plusSeconds(172_800).toString()
+        vm.setDeadline(deadline)
+        vm.setCancellationPolicy(GigCancellationPolicy.Moderate)
+        vm.setUrgent(true)
+        vm.addTag("#Heavy Lifting")
+        vm.addTag("weekend")
+        val body = vm.buildCreateBody()
+        assertNotNull(body)
+        assertEquals(deadline, body?.deadline)
+        assertEquals("standard", body?.cancellationPolicy)
+        assertEquals(true, body?.isUrgent)
+        assertEquals(listOf("heavy-lifting", "weekend"), body?.tags)
+    }
+
+    @Test
+    fun build_body_omits_picker_fields_when_unset() {
+        val vm = makeVm()
+        seedReviewReady(vm)
+        val body = vm.buildCreateBody()
+        assertNotNull(body)
+        assertNull(body?.deadline)
+        assertNull(body?.cancellationPolicy)
+        assertNull("is_urgent is omitted when the boost is off.", body?.isUrgent)
+        assertNull(body?.tags)
+    }
+
+    @Test
+    fun cancellation_policy_wire_values() {
+        assertEquals("flexible", GigCancellationPolicy.Flexible.wireValue)
+        assertEquals("standard", GigCancellationPolicy.Moderate.wireValue)
+        assertEquals("strict", GigCancellationPolicy.Strict.wireValue)
+    }
+
+    @Test
+    fun normalize_tag_strips_hash_lowercases_and_hyphenates() {
+        assertEquals("heavy-lifting", GigComposeViewModel.normalizeTag("#Heavy Lifting"))
+        assertEquals("truck-needed", GigComposeViewModel.normalizeTag("  Truck  Needed "))
+        assertNull(GigComposeViewModel.normalizeTag("   "))
+        assertNull(GigComposeViewModel.normalizeTag("#"))
+    }
+
+    @Test
+    fun add_tag_caps_at_max_and_dedupes() {
+        val vm = makeVm()
+        repeat(GigComposeLimits.MAX_TAGS + 3) { vm.addTag("tag$it") }
+        assertEquals(GigComposeLimits.MAX_TAGS, vm.state.value.form.tags.size)
+        val before = vm.state.value.form.tags
+        vm.addTag("#TAG0")
+        assertEquals("Duplicate (normalised) tags are ignored.", before, vm.state.value.form.tags)
+    }
+
+    @Test
+    fun toggle_tag_adds_then_removes() {
+        val vm = makeVm()
+        vm.toggleTag("#furniture")
+        assertEquals(listOf("furniture"), vm.state.value.form.tags)
+        vm.toggleTag("#furniture")
+        assertTrue(vm.state.value.form.tags.isEmpty())
+    }
+
+    @Test
+    fun present_and_dismiss_picker() {
+        val vm = makeVm()
+        assertNull(vm.state.value.activeSheet)
+        vm.presentPicker(GigPickerSheet.Tags)
+        assertEquals(GigPickerSheet.Tags, vm.state.value.activeSheet)
+        vm.dismissPicker()
+        assertNull(vm.state.value.activeSheet)
+    }
+
+    @Test
+    fun urgency_counts_toward_dirty() {
+        val vm = makeVm()
+        assertFalse(vm.chrome.dirty)
+        vm.setUrgent(true)
+        assertTrue("Setting urgent must trigger the discard confirm.", vm.chrome.dirty)
+    }
 }

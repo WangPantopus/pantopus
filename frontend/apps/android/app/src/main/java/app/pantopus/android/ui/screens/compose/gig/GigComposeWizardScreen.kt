@@ -127,11 +127,14 @@ fun GigComposeWizardScreen(
             GigComposeStep.Budget -> BudgetStep(state, viewModel)
             GigComposeStep.Schedule -> ScheduleStep(state, viewModel)
             GigComposeStep.Location -> LocationStep(state, viewModel)
-            GigComposeStep.Review -> ReviewStep(state)
+            GigComposeStep.Review -> ReviewStep(state, viewModel)
             GigComposeStep.Success -> SuccessStep()
         }
         state.errorMessage?.let { ErrorBanner(it) }
     }
+
+    // E.1 — composer picker sheets presented over the wizard.
+    GigComposePickerSheetHost(state = state, viewModel = viewModel)
 }
 
 // MARK: - Step 2: Basics
@@ -161,7 +164,9 @@ private fun BasicsStep(
     PhotoSlotsRow(
         count = state.form.photoIds.size,
         max = GigComposeLimits.MAX_PHOTOS,
-        onAdd = vm::addPlaceholderPhoto,
+        // E.1 — the add tile opens the attachment-source sheet
+        // (camera / library / file).
+        onAdd = { vm.presentPicker(GigPickerSheet.Attachment) },
         onRemove = vm::removePhoto,
     )
 }
@@ -233,7 +238,7 @@ private fun PhotoSlotsRow(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(
-            text = "Photos (optional, up to $max)",
+            text = "Photos & files (optional, up to $max)",
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
         )
@@ -478,7 +483,10 @@ private fun LocationStep(
 // MARK: - Step 6: Review
 
 @Composable
-private fun ReviewStep(state: GigComposeUiState) {
+private fun ReviewStep(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
     HeadlineBlock("Review and post")
     SubcopyBlock("Check the details. Helpers see what's below as your gig card.")
     val form = state.form
@@ -495,6 +503,8 @@ private fun ReviewStep(state: GigComposeUiState) {
                 ReviewSummaryRow("Location", locationSummary(form)),
             ),
     )
+    // E.1 — optional composer fields backed by the picker sheets.
+    GigComposeOptionsBlock(form = form, vm = vm)
 }
 
 private fun photosSummary(count: Int): String =

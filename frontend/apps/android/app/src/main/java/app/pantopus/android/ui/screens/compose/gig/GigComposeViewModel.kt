@@ -40,6 +40,12 @@ data class GigComposeUiState(
     val isSubmitting: Boolean = false,
     val createdGigId: String? = null,
     val errorMessage: String? = null,
+    /**
+     * E.1 — the composer picker sheet currently presented over the wizard,
+     * or null. Transient UI state — never persisted to [SavedStateHandle]
+     * (a half-open sheet shouldn't survive process death).
+     */
+    val activeSheet: GigPickerSheet? = null,
 )
 
 /**
@@ -296,6 +302,59 @@ open class GigComposeViewModel
             persist()
         }
 
+        // MARK: - E.1 Composer picker sheets
+
+        /** Present one of the composer's bottom-sheet pickers. */
+        fun presentPicker(sheet: GigPickerSheet) {
+            _state.update { it.copy(activeSheet = sheet) }
+        }
+
+        /** Dismiss whichever picker sheet is open. */
+        fun dismissPicker() {
+            _state.update { it.copy(activeSheet = null) }
+        }
+
+        /** E.1 — set (or clear) the optional deadline. null ⇒ flexible. */
+        fun setDeadline(iso: String?) {
+            _state.update { it.copy(form = it.form.copy(deadlineISO = iso)) }
+            persist()
+        }
+
+        /** E.1 — choose the cancellation-policy tier. */
+        fun setCancellationPolicy(policy: GigCancellationPolicy) {
+            _state.update { it.copy(form = it.form.copy(cancellationPolicy = policy)) }
+            persist()
+        }
+
+        /** E.1 — toggle the urgent boost flag. */
+        fun setUrgent(isUrgent: Boolean) {
+            _state.update { it.copy(form = it.form.copy(isUrgent = isUrgent)) }
+            persist()
+        }
+
+        /** E.1 — add a tag if there's room ([GigComposeLimits.MAX_TAGS]). */
+        fun addTag(raw: String) {
+            val tag = normalizeTag(raw) ?: return
+            val current = _state.value.form.tags
+            if (current.size >= GigComposeLimits.MAX_TAGS || current.contains(tag)) return
+            _state.update { it.copy(form = it.form.copy(tags = current + tag)) }
+            persist()
+        }
+
+        /** E.1 — remove a tag by its normalised value. */
+        fun removeTag(tag: String) {
+            _state.update {
+                it.copy(form = it.form.copy(tags = it.form.tags.filterNot { existing -> existing == tag }))
+            }
+            persist()
+        }
+
+        /** E.1 — add a suggested tag if absent, remove it if already chosen. */
+        fun toggleTag(raw: String) {
+            val tag = normalizeTag(raw) ?: return
+            if (_state.value.form.tags.contains(tag)) removeTag(tag) else addTag(tag)
+        }
+
         // MARK: - State machine
 
         private suspend fun advance() {
@@ -393,6 +452,12 @@ open class GigComposeViewModel
                 scheduledStart = fields.scheduledStart,
                 taskFormat = fields.taskFormat,
                 attachments = form.photoIds.ifEmpty { null },
+                // E.1 — composer picker-sheet fields. `is_urgent` only rides
+                // along when the boost is on; the rest are omitted when unset.
+                deadline = form.deadlineISO,
+                cancellationPolicy = form.cancellationPolicy?.wireValue,
+                isUrgent = if (form.isUrgent) true else null,
+                tags = form.tags.ifEmpty { null },
                 location = fields.location,
             )
         }
@@ -641,6 +706,10 @@ open class GigComposeViewModel
             savedStateHandle[KEY_PLACE_CITY] = form.placeAddress.city
             savedStateHandle[KEY_PLACE_STATE] = form.placeAddress.state
             savedStateHandle[KEY_PLACE_ZIP] = form.placeAddress.zip
+            savedStateHandle[KEY_DEADLINE] = form.deadlineISO
+            savedStateHandle[KEY_CANCELLATION] = form.cancellationPolicy?.name
+            savedStateHandle[KEY_IS_URGENT] = form.isUrgent
+            savedStateHandle[KEY_TAGS] = ArrayList(form.tags)
         }
 
         @Suppress("CyclomaticComplexMethod")
@@ -652,7 +721,9 @@ open class GigComposeViewModel
             val budgetTypeName: String? = savedStateHandle[KEY_BUDGET_TYPE]
             val scheduleTypeName: String? = savedStateHandle[KEY_SCHEDULE_TYPE]
             val locationModeName: String? = savedStateHandle[KEY_LOCATION_MODE]
+            val cancellationName: String? = savedStateHandle[KEY_CANCELLATION]
             val photos: ArrayList<String> = savedStateHandle[KEY_PHOTOS] ?: arrayListOf()
+            val tags: ArrayList<String> = savedStateHandle[KEY_TAGS] ?: arrayListOf()
             return GigComposeFormState(
                 step = step,
                 composeMode = composeModeName?.let { name -> ComposeMode.entries.firstOrNull { it.name == name } } ?: ComposeMode.Magic,
@@ -675,6 +746,13 @@ open class GigComposeViewModel
                         state = savedStateHandle[KEY_PLACE_STATE] ?: "",
                         zip = savedStateHandle[KEY_PLACE_ZIP] ?: "",
                     ),
+                deadlineISO = savedStateHandle[KEY_DEADLINE],
+                cancellationPolicy =
+                    cancellationName?.let { name ->
+                        GigCancellationPolicy.entries.firstOrNull { it.name == name }
+                    },
+                isUrgent = savedStateHandle[KEY_IS_URGENT] ?: false,
+                tags = tags.toList(),
             )
         }
 
@@ -697,8 +775,13 @@ open class GigComposeViewModel
             private const val KEY_PLACE_CITY = "composeGig.placeCity"
             private const val KEY_PLACE_STATE = "composeGig.placeState"
             private const val KEY_PLACE_ZIP = "composeGig.placeZip"
+            private const val KEY_DEADLINE = "composeGig.deadline"
+            private const val KEY_CANCELLATION = "composeGig.cancellationPolicy"
+            private const val KEY_IS_URGENT = "composeGig.isUrgent"
+            private const val KEY_TAGS = "composeGig.tags"
             private const val DETECTION_DEBOUNCE_MS = 350L
             private const val MIN_DETECT_TEXT_LENGTH = 3
+            private const val MAX_TAG_LENGTH = 50
 
             /** B.3 — deterministic keyword → archetype map (stand-in for backend NLP). */
             fun detectArchetype(text: String): GigComposeCategory? {
@@ -725,6 +808,22 @@ open class GigComposeViewModel
                     ) -> GigComposeCategory.Tech
                     else -> null
                 }
+            }
+
+            /**
+             * E.1 — normalise a freeform tag for storage: trimmed,
+             * lowercased, without a leading `#`, whitespace collapsed to
+             * single hyphens, capped at 50 chars. Returns null for empty
+             * input.
+             */
+            internal fun normalizeTag(raw: String): String? {
+                val withoutHash = raw.trim().lowercase().removePrefix("#")
+                val hyphenated =
+                    withoutHash
+                        .split(Regex("\\s+"))
+                        .filter { it.isNotEmpty() }
+                        .joinToString("-")
+                return hyphenated.take(MAX_TAG_LENGTH).ifEmpty { null }
             }
 
             /** Strip everything except digits + a single decimal point. */

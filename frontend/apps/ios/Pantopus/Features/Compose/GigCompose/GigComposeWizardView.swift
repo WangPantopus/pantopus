@@ -44,7 +44,11 @@ public struct GigComposeWizardView: View {
     }
 
     public var body: some View {
-        WizardShell(model: viewModel) {
+        // `@Bindable` projects a binding to the `@Observable` model's
+        // `activePickerSheet` so the E.1 picker sheets present via
+        // `.sheet(item:)`.
+        @Bindable var bindable = viewModel
+        return WizardShell(model: viewModel) {
             stepContent
             if let error = viewModel.errorMessage {
                 GigComposeErrorBanner(message: error)
@@ -64,6 +68,9 @@ public struct GigComposeWizardView: View {
         .onChange(of: viewModel.form) { _, _ in persist() }
         .onChange(of: viewModel.pendingEvent) { _, event in handle(event) }
         .accessibilityIdentifier("composeGigWizard")
+        .sheet(item: $bindable.activePickerSheet) { sheet in
+            GigPickerSheetHost(sheet: sheet, viewModel: viewModel)
+        }
     }
 
     @ViewBuilder
@@ -150,13 +157,10 @@ private struct BasicsStep: View {
         PhotoSlotsRow(
             count: viewModel.form.photoIds.count,
             max: GigComposeLimits.maxPhotos,
-            onAddPlaceholder: {
-                // Real upload pipeline lands in P15.5. Until then this
-                // mints a placeholder URL so the cap + count behaviour
-                // are exercisable. The wire field is omitted from the
-                // POST body when empty (see `buildCreateBody`).
-                viewModel.addPhoto("placeholder://photo/\(UUID().uuidString)")
-            },
+            // E.1 — the add tile opens the attachment-source sheet
+            // (camera / library / file). Each source mints a placeholder
+            // attachment until the real upload pipeline lands in P15.5.
+            onAddPlaceholder: { viewModel.presentPicker(.attachment) },
             onRemove: viewModel.removePhoto(at:)
         )
     }
@@ -224,7 +228,7 @@ private struct PhotoSlotsRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text("Photos (optional, up to \(max))")
+            Text("Photos & files (optional, up to \(max))")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             HStack(spacing: Spacing.s2) {
@@ -508,6 +512,8 @@ private struct ReviewStep: View {
             ReviewSummaryRow(label: "Schedule", value: scheduleSummary),
             ReviewSummaryRow(label: "Location", value: locationSummary)
         ])
+        // E.1 — optional composer fields backed by the picker sheets.
+        GigComposeOptionsBlock(viewModel: viewModel)
     }
 
     private var condensedDescription: String {
@@ -562,6 +568,107 @@ private struct ReviewStep: View {
             }
             return "A place"
         }
+    }
+}
+
+// MARK: - E.1 Optional details (picker-sheet fields)
+
+/// Tappable field rows on the Review step that open the composer picker
+/// sheets and reflect their bound values. Mirrors the design's composer
+/// field list (Category · Deadline · Cancellation policy · Urgency · Tags).
+private struct GigComposeOptionsBlock: View {
+    @Bindable var viewModel: GigComposeViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            Text("ADD DETAILS (OPTIONAL)")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            OptionFieldRow(
+                label: "Category",
+                value: viewModel.form.category?.label,
+                placeholder: "Tap to choose",
+                identifier: "gigPicker.row.category"
+            ) { viewModel.presentPicker(.category) }
+            OptionFieldRow(
+                label: "Deadline",
+                value: deadlineText,
+                placeholder: "Flexible",
+                identifier: "gigPicker.row.deadline"
+            ) { viewModel.presentPicker(.deadline) }
+            OptionFieldRow(
+                label: "Cancellation policy",
+                value: viewModel.form.cancellationPolicy?.label,
+                placeholder: "Standard",
+                identifier: "gigPicker.row.policy"
+            ) { viewModel.presentPicker(.policy) }
+            OptionFieldRow(
+                label: "Urgency",
+                value: viewModel.form.isUrgent ? "Urgent" : nil,
+                placeholder: "Not urgent",
+                identifier: "gigPicker.row.urgency"
+            ) { viewModel.presentPicker(.urgency) }
+            OptionFieldRow(
+                label: "Tags",
+                value: tagsText,
+                placeholder: "Add tags",
+                identifier: "gigPicker.row.tags"
+            ) { viewModel.presentPicker(.tags) }
+        }
+    }
+
+    private var deadlineText: String? {
+        guard let iso = viewModel.form.deadlineISO,
+              let date = ISO8601DateFormatter().date(from: iso)
+        else { return nil }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEE, MMM d"
+        return fmt.string(from: date)
+    }
+
+    private var tagsText: String? {
+        let tags = viewModel.form.tags
+        guard !tags.isEmpty else { return nil }
+        return tags.map { "#\($0)" }.joined(separator: " · ")
+    }
+}
+
+private struct OptionFieldRow: View {
+    let label: String
+    let value: String?
+    let placeholder: String
+    let identifier: String
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: Spacing.s1 + 1) {
+                Text(label)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                HStack(spacing: Spacing.s2) {
+                    Text(value ?? placeholder)
+                        .font(.system(size: 13.5))
+                        .foregroundStyle(value == nil ? Theme.Color.appTextMuted : Theme.Color.appText)
+                        .lineLimit(1)
+                    Spacer(minLength: Spacing.s0)
+                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+                }
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 44)
+                .frame(maxWidth: .infinity)
+                .background(value == nil ? Theme.Color.appSurface : Theme.Color.primary50)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .stroke(value == nil ? Theme.Color.appBorder : Theme.Color.primary600, lineWidth: 1)
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel("\(label): \(value ?? placeholder)")
     }
 }
 
