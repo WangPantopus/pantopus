@@ -15,7 +15,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import app.pantopus.android.ui.screens.hub.HUB_SCREEN_TAG
-import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Rule
 import org.junit.Test
@@ -24,12 +23,13 @@ import org.junit.Test
  * Drives the root tab scaffold without Hilt by hosting the bottom bar
  * directly. Verifies that:
  * - Hub is the default selection.
- * - Each stubbed tab renders the NotYetAvailable empty state.
+ * - Switching tabs swaps in each tab's body.
  * - Re-selecting Hub returns to the Hub container.
  *
- * The Hub destination is stubbed with a tagged Box so the test stays free
- * of Hilt — the real HubScreen pulls a HiltViewModel which would require
- * a Hilt-aware test runner.
+ * The Hub and Nearby destinations are stubbed with tagged boxes so the test
+ * stays free of Hilt — their real screens (HubScreen / NearbyMapScreen) pull
+ * HiltViewModels which would require a Hilt-aware test runner. Inbox and You
+ * render the Hilt-free NotYetAvailable placeholder.
  */
 class RootTabTest {
     @get:Rule
@@ -51,7 +51,7 @@ class RootTabTest {
                 Box(Modifier.padding(padding)) {
                     when (selected) {
                         PantopusRoute.Hub -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
-                        PantopusRoute.Nearby -> NearbyScreen()
+                        PantopusRoute.Nearby -> Box(Modifier.fillMaxSize().testTag("nearbyTab.mapList"))
                         PantopusRoute.Inbox ->
                             NotYetAvailableView(
                                 tabName = "Inbox",
@@ -70,9 +70,9 @@ class RootTabTest {
         // Default is Hub.
         composeRule.onNodeWithTag(HUB_SCREEN_TAG).assertIsDisplayed()
 
-        // Nearby tab renders the empty-state heading.
+        // Nearby tab renders the Map+List hybrid container.
         composeRule.onNodeWithTag("tab.nearby").performClick()
-        composeRule.onNodeWithTag(NOT_YET_AVAILABLE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag("nearbyTab.mapList").assertIsDisplayed()
 
         // Inbox tab renders its empty-state heading.
         composeRule.onNodeWithTag("tab.inbox").performClick()

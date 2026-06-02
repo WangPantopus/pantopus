@@ -98,6 +98,7 @@ fun NearbyMapScreen(
     onOpenEntity: (MapEntity) -> Unit = {},
     onBack: (() -> Unit)? = null,
     initialCategory: app.pantopus.android.ui.screens.gigs.GigsCategory? = null,
+    listTestTag: String? = null,
     viewModel: NearbyMapViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -184,20 +185,26 @@ fun NearbyMapScreen(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(),
         )
-        BottomSheet(
-            state = state,
-            activeSort = activeSort,
-            sheetStop = sheetStop,
-            screenHeightPx = screenHeightPx,
-            onSelectSort = viewModel::selectSort,
-            onSelectStop = viewModel::setSheetStop,
-            onTapEntity = { entity ->
-                viewModel.selectEntity(entity.id)
-                onOpenEntity(entity)
-            },
-            onRefresh = viewModel::refresh,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .then(if (listTestTag != null) Modifier.testTag(listTestTag) else Modifier),
+        ) {
+            BottomSheet(
+                state = state,
+                activeSort = activeSort,
+                sheetStop = sheetStop,
+                screenHeightPx = screenHeightPx,
+                onSelectSort = viewModel::selectSort,
+                onSelectStop = viewModel::setSheetStop,
+                onTapEntity = { entity ->
+                    viewModel.selectEntity(entity.id)
+                    onOpenEntity(entity)
+                },
+                onRefresh = viewModel::refresh,
+            )
+        }
         MapControls(
             sheetStop = sheetStop,
             screenHeightPx = screenHeightPx,

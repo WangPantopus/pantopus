@@ -19,7 +19,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.screens.hub.HUB_SCREEN_TAG
-import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.root.NotYetAvailableView
 import app.pantopus.android.ui.screens.root.PantopusBottomBar
 import app.pantopus.android.ui.screens.root.PantopusRoute
@@ -75,7 +74,7 @@ class TapTargetAudit {
                 Box(Modifier.padding(padding)) {
                     when (selected) {
                         PantopusRoute.Hub -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
-                        PantopusRoute.Nearby -> NearbyScreen()
+                        PantopusRoute.Nearby -> Box(Modifier.fillMaxSize().testTag("nearbyTab.mapList"))
                         PantopusRoute.Inbox ->
                             NotYetAvailableView(
                                 tabName = "Inbox",

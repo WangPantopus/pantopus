@@ -224,6 +224,7 @@ import app.pantopus.android.ui.screens.membership.MembershipDetailScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
 import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
+import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
@@ -249,6 +250,7 @@ import app.pantopus.android.ui.screens.settings.blocks.BlockedUsersScreen
 import app.pantopus.android.ui.screens.settings.help.HelpCenterScreen
 import app.pantopus.android.ui.screens.settings.legal.LegalContentScreen
 import app.pantopus.android.ui.screens.settings.legal.LegalDocument
+import app.pantopus.android.ui.screens.settings.legal.LegalEmptyState
 import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.payments.PaymentsScreen
@@ -1538,7 +1540,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
             }
             composable(PantopusRoute.Nearby.path) {
-                NearbyMapScreen(
+                NearbyScreen(
                     onOpenEntity = { entity: MapEntity ->
                         when (entity.kind) {
                             MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
@@ -3091,7 +3093,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 if (doc != null) {
                     LegalContentScreen(document = doc, onBack = { navController.popBackStack() })
                 } else {
-                    NotYetAvailableView(tabName = "Legal", icon = PantopusIcon.FileText)
+                    LegalEmptyState(onBack = { navController.popBackStack() })
                 }
             }
             composable(ChildRoutes.SETTINGS_ABOUT) {
