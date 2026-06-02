@@ -134,10 +134,23 @@ final class NavigationSmokeTest: XCTestCase {
         XCTAssertTrue(menu.waitForExistence(timeout: 3))
         menu.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).tap()
         // The Hub menu now opens the context-aware navigation drawer; Settings
-        // lives as a row inside it.
+        // lives as a row near the bottom of its scroll view.
         let settingsRow = app.buttons["navDrawer.item.settings"].firstMatch
         XCTAssertTrue(settingsRow.waitForExistence(timeout: 5))
-        settingsRow.tap()
+        // The drawer is a custom scroll view whose AX scroll-to-visible is
+        // unreliable for the bottom row, so swipe it into view first, then tap
+        // by coordinate (a coordinate tap does not trigger scroll-to-visible).
+        let scroll = app.scrollViews["navDrawer.scroll"].firstMatch
+        var swipes = 0
+        while !settingsRow.isHittable, swipes < 6 {
+            if scroll.exists {
+                scroll.swipeUp()
+            } else {
+                app.swipeUp()
+            }
+            swipes += 1
+        }
+        settingsRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         assertReaches("settings", in: app, timeout: 8)
     }
 

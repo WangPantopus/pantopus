@@ -64,9 +64,13 @@ struct NavigationDrawerView: View {
                     if viewModel.showsBackToHub {
                         backToHub
                     }
-                    Spacer(minLength: Spacing.s4)
+                    // Bottom inset so the last row clears the home indicator —
+                    // otherwise it renders flush against the screen edge where
+                    // XCUITest's scroll-to-visible can't settle.
+                    Spacer(minLength: Spacing.s10)
                 }
             }
+            .accessibilityIdentifier("navDrawer.scroll")
         }
         .background(Theme.Color.appSurface)
         .clipShape(
