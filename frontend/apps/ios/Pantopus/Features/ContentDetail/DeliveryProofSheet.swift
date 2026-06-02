@@ -442,7 +442,9 @@ extension DeliveryProofSheetView {
             .foregroundStyle(Theme.Color.appTextMuted)
     }
 
-    private var canSubmit: Bool { !photos.isEmpty }
+    private var canSubmit: Bool {
+        !photos.isEmpty
+    }
 
     private var recapTitle: String {
         let count = photos.count
