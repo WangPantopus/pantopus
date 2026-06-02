@@ -190,6 +190,10 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
     public let scheduledStart: String?
     public let taskFormat: String?
     public let attachments: [String]?
+    public let deadline: String?
+    public let cancellationPolicy: String?
+    public let isUrgent: Bool?
+    public let tags: [String]?
     public let location: CreateGigLocation
 
     public init(
@@ -202,6 +206,10 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
         scheduledStart: String?,
         taskFormat: String?,
         attachments: [String]?,
+        deadline: String? = nil,
+        cancellationPolicy: String? = nil,
+        isUrgent: Bool? = nil,
+        tags: [String]? = nil,
         location: CreateGigLocation
     ) {
         self.title = title
@@ -213,6 +221,10 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
         self.scheduledStart = scheduledStart
         self.taskFormat = taskFormat
         self.attachments = attachments
+        self.deadline = deadline
+        self.cancellationPolicy = cancellationPolicy
+        self.isUrgent = isUrgent
+        self.tags = tags
         self.location = location
     }
 
@@ -223,6 +235,10 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
         case scheduledStart = "scheduled_start"
         case taskFormat = "task_format"
         case attachments
+        case deadline
+        case cancellationPolicy = "cancellation_policy"
+        case isUrgent = "is_urgent"
+        case tags
         case location
     }
 }

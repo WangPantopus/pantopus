@@ -43,6 +43,11 @@ final class GigComposeViewModel: WizardModel {
     /// One-shot navigation events the host view consumes.
     var pendingEvent: GigComposeOutboundEvent?
 
+    /// E.1 — the composer picker sheet currently presented over the wizard,
+    /// or nil. Transient UI state — deliberately not mirrored into
+    /// `@SceneStorage` (a half-open sheet shouldn't survive process death).
+    var activePickerSheet: GigPickerSheet?
+
     // MARK: - Private dependencies
 
     private let api: APIClient
@@ -275,6 +280,71 @@ extension GigComposeViewModel {
         if let zip { form.placeAddress.zip = zip }
     }
 
+    // MARK: - E.1 Composer picker sheets
+
+    /// Present one of the composer's bottom-sheet pickers.
+    func presentPicker(_ sheet: GigPickerSheet) {
+        activePickerSheet = sheet
+    }
+
+    /// Dismiss whichever picker sheet is open.
+    func dismissPicker() {
+        activePickerSheet = nil
+    }
+
+    /// E.1 — set (or clear) the optional deadline. `iso == nil` ⇒ flexible.
+    func setDeadline(_ iso: String?) {
+        form.deadlineISO = iso
+    }
+
+    /// E.1 — choose the cancellation-policy tier.
+    func setCancellationPolicy(_ policy: GigCancellationPolicy) {
+        form.cancellationPolicy = policy
+    }
+
+    /// E.1 — toggle the urgent boost flag.
+    func setUrgent(_ isUrgent: Bool) {
+        form.isUrgent = isUrgent
+    }
+
+    /// E.1 — add a tag if there's room (`maxTags`). No-op on duplicates or
+    /// empty input.
+    func addTag(_ raw: String) {
+        guard let tag = Self.normalizeTag(raw),
+              form.tags.count < GigComposeLimits.maxTags,
+              !form.tags.contains(tag)
+        else { return }
+        form.tags.append(tag)
+    }
+
+    /// E.1 — remove a tag by its normalised value.
+    func removeTag(_ tag: String) {
+        form.tags.removeAll { $0 == tag }
+    }
+
+    /// E.1 — add a suggested tag if absent, remove it if already chosen.
+    func toggleTag(_ raw: String) {
+        guard let tag = Self.normalizeTag(raw) else { return }
+        if form.tags.contains(tag) {
+            removeTag(tag)
+        } else {
+            addTag(tag)
+        }
+    }
+
+    /// Normalise a freeform tag into the stored form: trimmed, lowercased,
+    /// without a leading `#`, whitespace collapsed to single hyphens, capped
+    /// at 50 chars. Returns nil for empty input.
+    static func normalizeTag(_ raw: String) -> String? {
+        let lowered = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let withoutHash = lowered.hasPrefix("#") ? String(lowered.dropFirst()) : lowered
+        let hyphenated = withoutHash
+            .split(whereSeparator: { $0 == " " || $0 == "\t" })
+            .joined(separator: "-")
+        let capped = String(hyphenated.prefix(50))
+        return capped.isEmpty ? nil : capped
+    }
+
     // MARK: - State transitions
 
     var currentStep: GigComposeStep {
@@ -379,6 +449,13 @@ extension GigComposeViewModel {
             scheduledStart: scheduledStart,
             taskFormat: taskFormat,
             attachments: form.photoIds.isEmpty ? nil : form.photoIds,
+            // E.1 — composer picker-sheet fields. Each is omitted from the
+            // JSON when unset (optional + `encodeIfPresent`); `is_urgent`
+            // only rides along when the boost is on.
+            deadline: form.deadlineISO,
+            cancellationPolicy: form.cancellationPolicy?.wireValue,
+            isUrgent: form.isUrgent ? true : nil,
+            tags: form.tags.isEmpty ? nil : form.tags,
             location: location
         )
     }

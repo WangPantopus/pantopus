@@ -164,6 +164,12 @@ data class CreateGigBody(
     @Json(name = "scheduled_start") val scheduledStart: String? = null,
     @Json(name = "task_format") val taskFormat: String? = null,
     val attachments: List<String>? = null,
+    // E.1 — composer picker-sheet fields. Optional, so Moshi omits them
+    // from the JSON when unset.
+    val deadline: String? = null,
+    @Json(name = "cancellation_policy") val cancellationPolicy: String? = null,
+    @Json(name = "is_urgent") val isUrgent: Boolean? = null,
+    val tags: List<String>? = null,
     val location: CreateGigLocation,
 )
 

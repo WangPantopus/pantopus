@@ -147,6 +147,43 @@ public enum GigComposeLocationMode: String, CaseIterable, Sendable, Codable, Has
     }
 }
 
+/// E.1 — cancellation-policy tier surfaced by the composer's policy picker
+/// sheet. The mid tier is labelled **Moderate** in the design but maps to
+/// the backend's `standard` value (`backend/routes/gigs.js:438`).
+public enum GigCancellationPolicy: String, CaseIterable, Sendable, Codable, Hashable {
+    case flexible
+    case moderate
+    case strict
+
+    /// User-facing card title.
+    public var label: String {
+        switch self {
+        case .flexible: "Flexible"
+        case .moderate: "Moderate"
+        case .strict: "Strict"
+        }
+    }
+
+    /// Refund-rule subcopy rendered under the title.
+    public var detail: String {
+        switch self {
+        case .flexible: "Full refund up to 24 hours before the start time."
+        case .moderate: "50% refund up to 48 hours before. No refund after."
+        case .strict: "No refund within 7 days of the start time."
+        }
+    }
+
+    /// Wire value forwarded as `cancellation_policy`. The design's
+    /// "Moderate" tier maps onto the backend's `standard` enum member.
+    public var wireValue: String {
+        switch self {
+        case .flexible: "flexible"
+        case .moderate: "standard"
+        case .strict: "strict"
+        }
+    }
+}
+
 /// Plain-old-data address fields collected in step 5 when the user
 /// picks `aPlace`. Mirrors `AddHomeAddressFields`.
 public struct GigComposePlaceAddress: Codable, Sendable, Equatable {
@@ -213,6 +250,8 @@ public enum GigComposeLimits {
     public static let descriptionMin: Int = 20
     public static let descriptionMax: Int = 2000
     public static let maxPhotos: Int = 6
+    /// E.1 — gig tag cap. Mirrors `tags` `.max(5)` in `createGigSchema`.
+    public static let maxTags: Int = 5
     /// B.3 — Magic Task describe textarea cap (matches A12.8 "184 / 500").
     public static let describeMax: Int = 500
 }
@@ -241,6 +280,16 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
     public var scheduledStartISO: String?
     public var locationMode: GigComposeLocationMode?
     public var placeAddress: GigComposePlaceAddress
+    /// E.1 — optional hard deadline (`deadline`), ISO-8601. nil ⇒ flexible
+    /// (no deadline sent).
+    public var deadlineISO: String?
+    /// E.1 — cancellation policy (`cancellation_policy`). nil ⇒ backend
+    /// default (`standard`).
+    public var cancellationPolicy: GigCancellationPolicy?
+    /// E.1 — boost flag (`is_urgent`).
+    public var isUrgent: Bool
+    /// E.1 — freeform tags (`tags`), stored without the leading `#`.
+    public var tags: [String]
 
     public init(
         step: Int = GigComposeStep.category.rawValue,
@@ -257,7 +306,11 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         scheduleType: GigComposeScheduleType? = nil,
         scheduledStartISO: String? = nil,
         locationMode: GigComposeLocationMode? = nil,
-        placeAddress: GigComposePlaceAddress = .init()
+        placeAddress: GigComposePlaceAddress = .init(),
+        deadlineISO: String? = nil,
+        cancellationPolicy: GigCancellationPolicy? = nil,
+        isUrgent: Bool = false,
+        tags: [String] = []
     ) {
         self.step = step
         self.composeMode = composeMode
@@ -274,6 +327,10 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         self.scheduledStartISO = scheduledStartISO
         self.locationMode = locationMode
         self.placeAddress = placeAddress
+        self.deadlineISO = deadlineISO
+        self.cancellationPolicy = cancellationPolicy
+        self.isUrgent = isUrgent
+        self.tags = tags
     }
 
     public static let empty = GigComposeFormState()
@@ -299,5 +356,9 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
             || locationMode != nil
             || placeAddress.isComplete
             || !placeAddress.line1.isEmpty
+            || deadlineISO != nil
+            || cancellationPolicy != nil
+            || isUrgent
+            || !tags.isEmpty
     }
 }

@@ -350,4 +350,77 @@ final class GigComposeViewModelTests: XCTestCase {
         vm.restore(from: other)
         XCTAssertEqual(vm.form.title, "Hang 3 shelves in the living room", "Restore must not stomp existing data.")
     }
+
+    // MARK: - E.1 Composer picker sheets
+
+    func testBuildBodyCarriesPickerSheetFields() throws {
+        let deadline = ISO8601DateFormatter().string(from: Date().addingTimeInterval(172_800))
+        let vm = makeVM(initialState: filledAtReview())
+        vm.setDeadline(deadline)
+        vm.setCancellationPolicy(.moderate)
+        vm.setUrgent(true)
+        vm.addTag("#Heavy Lifting")
+        vm.addTag("weekend")
+        let body = try XCTUnwrap(vm.buildCreateBody())
+        XCTAssertEqual(body.deadline, deadline)
+        XCTAssertEqual(body.cancellationPolicy, "standard", "Moderate maps onto the backend's standard tier.")
+        XCTAssertEqual(body.isUrgent, true)
+        XCTAssertEqual(body.tags, ["heavy-lifting", "weekend"])
+    }
+
+    func testBuildBodyOmitsPickerFieldsWhenUnset() throws {
+        let body = try XCTUnwrap(makeVM(initialState: filledAtReview()).buildCreateBody())
+        XCTAssertNil(body.deadline)
+        XCTAssertNil(body.cancellationPolicy)
+        XCTAssertNil(body.isUrgent, "is_urgent is omitted when the boost is off.")
+        XCTAssertNil(body.tags)
+    }
+
+    func testCancellationPolicyWireValues() {
+        XCTAssertEqual(GigCancellationPolicy.flexible.wireValue, "flexible")
+        XCTAssertEqual(GigCancellationPolicy.moderate.wireValue, "standard")
+        XCTAssertEqual(GigCancellationPolicy.strict.wireValue, "strict")
+    }
+
+    func testNormalizeTagStripsHashLowercasesAndHyphenates() {
+        XCTAssertEqual(GigComposeViewModel.normalizeTag("#Heavy Lifting"), "heavy-lifting")
+        XCTAssertEqual(GigComposeViewModel.normalizeTag("  Truck  Needed "), "truck-needed")
+        XCTAssertNil(GigComposeViewModel.normalizeTag("   "))
+        XCTAssertNil(GigComposeViewModel.normalizeTag("#"))
+    }
+
+    func testAddTagCapsAtMaxAndDedupes() {
+        let vm = makeVM()
+        for index in 0..<(GigComposeLimits.maxTags + 3) {
+            vm.addTag("tag\(index)")
+        }
+        XCTAssertEqual(vm.form.tags.count, GigComposeLimits.maxTags, "Tag list is capped at maxTags.")
+        let before = vm.form.tags
+        vm.addTag("#TAG0")
+        XCTAssertEqual(vm.form.tags, before, "Duplicate (normalised) tags are ignored.")
+    }
+
+    func testToggleTagAddsThenRemoves() {
+        let vm = makeVM()
+        vm.toggleTag("#furniture")
+        XCTAssertEqual(vm.form.tags, ["furniture"])
+        vm.toggleTag("#furniture")
+        XCTAssertTrue(vm.form.tags.isEmpty, "Toggling an existing tag removes it.")
+    }
+
+    func testPresentAndDismissPicker() {
+        let vm = makeVM()
+        XCTAssertNil(vm.activePickerSheet)
+        vm.presentPicker(.tags)
+        XCTAssertEqual(vm.activePickerSheet, .tags)
+        vm.dismissPicker()
+        XCTAssertNil(vm.activePickerSheet)
+    }
+
+    func testUrgencyAndDeadlineCountTowardDirty() {
+        let vm = makeVM()
+        XCTAssertFalse(vm.chrome.dirty)
+        vm.setUrgent(true)
+        XCTAssertTrue(vm.chrome.dirty, "Setting urgent must trigger the discard confirm.")
+    }
 }
