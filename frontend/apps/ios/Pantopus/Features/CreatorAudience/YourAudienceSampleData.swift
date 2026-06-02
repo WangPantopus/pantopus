@@ -9,71 +9,64 @@
 import Foundation
 
 enum YourAudienceSampleData {
-    static func member(
-        id: String,
-        name: String,
-        handle: String,
+    private static func member(
+        _ name: String,
         rank: Int,
-        tierName: String,
         local: Bool,
         status: String = "active",
-        joinedMonth: String? = "2025-01"
+        month: String = "2025-01"
     ) -> AudienceMember {
-        AudienceMember(
-            membershipId: id,
+        let key = name.lowercased().filter { !$0.isWhitespace }
+        return AudienceMember(
+            membershipId: "m_\(key)",
             displayName: name,
-            handle: handle,
+            handle: "@\(key)",
             avatarURL: nil,
             tierRank: rank,
-            tierName: tierName,
+            tierName: tierName(rank: rank),
             verifiedLocal: local,
             status: status,
-            joinedMonth: joinedMonth,
+            joinedMonth: month,
             tenureMonths: 4
         )
     }
 
+    private static func tierName(rank: Int) -> String {
+        switch rank {
+        case 4: "VIP"
+        case 3: "Insiders"
+        default: "Members"
+        }
+    }
+
     static let pending: [AudienceMember] = [
-        member(
-            id: "m_dana", name: "Dana Reyes", handle: "@danareyes", rank: 3,
-            tierName: "Insiders", local: true, status: "pending", joinedMonth: "2025-05"
-        ),
-        member(
-            id: "m_marcus", name: "Marcus Lee", handle: "@marcuslee", rank: 4,
-            tierName: "VIP", local: false, status: "pending", joinedMonth: "2025-05"
-        )
+        member("Dana Reyes", rank: 3, local: true, status: "pending", month: "2025-05"),
+        member("Marcus Lee", rank: 4, local: false, status: "pending", month: "2025-05"),
     ]
 
     static let vipMembers: [AudienceMember] = [
-        member(id: "m_priya", name: "Priya Nair", handle: "@priyanair", rank: 4, tierName: "VIP", local: true, joinedMonth: "2025-01"),
-        member(
-            id: "m_tom", name: "Tom Becker", handle: "@tombecker", rank: 4,
-            tierName: "VIP", local: false, status: "muted", joinedMonth: "2024-11"
-        )
+        member("Priya Nair", rank: 4, local: true, month: "2025-01"),
+        member("Tom Becker", rank: 4, local: false, status: "muted", month: "2024-11"),
     ]
 
     static let insiderMembers: [AudienceMember] = [
-        member(id: "m_sana", name: "Sana Ortiz", handle: "@sanaortiz", rank: 3, tierName: "Insiders", local: true, joinedMonth: "2025-03"),
-        member(id: "m_otis", name: "Otis Park", handle: "@otispark", rank: 3, tierName: "Insiders", local: false, joinedMonth: "2025-04"),
-        member(id: "m_lena", name: "Lena Cho", handle: "@lenacho", rank: 3, tierName: "Insiders", local: true, joinedMonth: "2025-05")
+        member("Sana Ortiz", rank: 3, local: true, month: "2025-03"),
+        member("Otis Park", rank: 3, local: false, month: "2025-04"),
+        member("Lena Cho", rank: 3, local: true, month: "2025-05"),
     ]
 
-    static var counts: AudienceCounts {
-        AudienceCounts(totalActive: 5, pending: 2, byTier: [4: 2, 3: 3])
-    }
-
-    static var populatedLoaded: AudienceLoaded {
-        AudienceLoaded(
-            counts: counts,
-            pending: pending,
-            tierGroups: [
-                AudienceTierGroup(rank: 4, name: "VIP", members: vipMembers),
-                AudienceTierGroup(rank: 3, name: "Insiders", members: insiderMembers)
-            ]
-        )
-    }
+    static let counts = AudienceCounts(totalActive: 5, pending: 2, byTier: [4: 2, 3: 3])
 
     static let tierNames: [Int: String] = [4: "VIP", 3: "Insiders"]
+
+    static let populatedLoaded = AudienceLoaded(
+        counts: counts,
+        pending: pending,
+        tierGroups: [
+            AudienceTierGroup(rank: 4, name: "VIP", members: vipMembers),
+            AudienceTierGroup(rank: 3, name: "Insiders", members: insiderMembers),
+        ]
+    )
 
     #if DEBUG
     @MainActor

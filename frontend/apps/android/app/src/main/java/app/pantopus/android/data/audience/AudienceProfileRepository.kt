@@ -31,8 +31,7 @@ class AudienceProfileRepository
         suspend fun audienceMembers(
             status: String?,
             tierRank: Int?,
-        ): NetworkResult<AudienceListResponse> =
-            safeApiCall { api.audience(status = status, tierRank = tierRank) }
+        ): NetworkResult<AudienceListResponse> = safeApiCall { api.audience(status = status, tierRank = tierRank) }
 
         /** A22.2 — approve / decline / remove / mute / unmute one member. */
         suspend fun audienceMemberAction(

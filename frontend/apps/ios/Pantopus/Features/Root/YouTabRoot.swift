@@ -1398,9 +1398,7 @@ public struct YouTabRoot: View {
                 }
             )
         case .creatorAudienceMembers:
-            YourAudienceView(
-                onBack: { Task { @MainActor in pop() } }
-            )
+            YourAudienceView { Task { @MainActor in pop() } }
         case .beaconsFeed:
             BeaconsFeedView(
                 onOpenPost: { _ in

@@ -20,7 +20,9 @@ import app.pantopus.android.ui.theme.PantopusIcon
  *  show full totals. */
 sealed interface AudienceFilter {
     data object All : AudienceFilter
+
     data object Pending : AudienceFilter
+
     data class Tier(val rank: Int) : AudienceFilter
 
     val statusParam: String?
@@ -78,8 +80,7 @@ internal fun audienceTierIcon(rank: Int): PantopusIcon =
         else -> PantopusIcon.Users
     }
 
-internal fun audienceTierDefaultName(rank: Int): String =
-    if (rank in 1..4) "Tier $rank" else "Members"
+internal fun audienceTierDefaultName(rank: Int): String = if (rank in 1..4) "Tier $rank" else "Members"
 
 // ── UI models ──
 
@@ -132,9 +133,10 @@ data class AudienceCounts(
             AudienceCounts(
                 totalActive = dto.totalActive ?: 0,
                 pending = dto.pending ?: 0,
-                byTier = dto.byTier.orEmpty()
-                    .mapNotNull { (key, value) -> key.toIntOrNull()?.let { it to value } }
-                    .toMap(),
+                byTier =
+                    dto.byTier.orEmpty()
+                        .mapNotNull { (key, value) -> key.toIntOrNull()?.let { it to value } }
+                        .toMap(),
             )
     }
 }
@@ -156,10 +158,12 @@ data class AudienceLoaded(
 /** Single source of truth for the screen body. */
 sealed interface YourAudienceUiState {
     data object Loading : YourAudienceUiState
+
     data class Loaded(val loaded: AudienceLoaded) : YourAudienceUiState
 
     /** Full empty — no members and no pending requests at all. */
     data object Empty : YourAudienceUiState
+
     data class Error(val message: String) : YourAudienceUiState
 }
 
@@ -206,10 +210,11 @@ fun groupMembersByTier(
 // ── Formatting ──
 
 object AudienceFormat {
-    private val MONTHS = listOf(
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    )
+    private val MONTHS =
+        listOf(
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        )
 
     /** "2025-05" → "May 2025". Month granularity is all the privacy
      *  serializer exposes. */
@@ -227,9 +232,7 @@ object AudienceFormat {
                 }
             }
 
-    fun requestedLabel(month: String?): String =
-        monthLabel(month)?.let { "requested $it" } ?: "requested recently"
+    fun requestedLabel(month: String?): String = monthLabel(month)?.let { "requested $it" } ?: "requested recently"
 
-    fun memberSinceLabel(month: String?): String? =
-        monthLabel(month)?.let { "Member since $it" }
+    fun memberSinceLabel(month: String?): String? = monthLabel(month)?.let { "Member since $it" }
 }
