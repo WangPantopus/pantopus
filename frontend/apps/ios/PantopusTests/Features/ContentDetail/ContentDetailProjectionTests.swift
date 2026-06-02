@@ -286,9 +286,11 @@ final class ContentDetailProjectionTests: XCTestCase {
         let paid = InvoiceDetailViewModel.paidFixture(invoiceId: "INV-00318")
         XCTAssertEqual(paid.hero.priceTone, .success)
     }
+}
 
-    // MARK: - Fixtures
+// MARK: - Fixtures
 
+extension ContentDetailProjectionTests {
     /// Test fixture spec — keeps `makeGig` to a single parameter (under
     /// SwiftLint's function_parameter_count threshold) while letting each
     /// test set only the fields it cares about.

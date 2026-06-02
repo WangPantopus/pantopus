@@ -65,8 +65,7 @@ class GigDetailViewModel
         /** True when the viewer is the assigned worker on an in-progress task. */
         fun canMarkDelivered(): Boolean = canMarkDelivered
 
-        private fun currentUserId(): String? =
-            (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
+        private fun currentUserId(): String? = (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
 
         fun load() {
             _state.value = ContentDetailUiState.Loading
@@ -176,8 +175,13 @@ class GigDetailViewModel
                 gig: GigDto,
                 bids: List<GigBidDto>,
                 canMarkDelivered: Boolean = false,
-            ): ContentDetailContent =
-                if (gig.isV2 == true) projectTaskV2(gig, bids, canMarkDelivered) else projectGigV1(gig, bids)
+            ): ContentDetailContent {
+                return if (gig.isV2 == true) {
+                    projectTaskV2(gig, bids, canMarkDelivered)
+                } else {
+                    projectGigV1(gig, bids)
+                }
+            }
 
             private fun projectTaskV2(
                 gig: GigDto,
