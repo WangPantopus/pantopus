@@ -3,11 +3,17 @@
 //  Pantopus
 //
 //  P5.1 / A14.1 — `GroupedListDataSource` for the per-home Settings
-//  index. Two frames (established / newly claimed) ship from
-//  `HomeSettingsSampleData`; navigation is delegated to the host via
-//  `HomeSettingsRoute`. Per the spec, per-row persistence is out of
-//  scope for this slice — chevron rows route, destructive routes,
-//  and that's it.
+//  index. This is a NAVIGATION index (chevron rows that route to the
+//  Address / Photos / People / … sub-screens), not a settings form —
+//  there is no settings `PATCH` here.
+//
+//  Block 2A wiring: the live path (no explicit `frame`) fetches the
+//  real home so the identity card shows `home.name` + address, and the
+//  People row's subtext reflects the real member / pending counts from
+//  the same `GET /:id/occupants` the Members screen uses. Rows whose
+//  subtext has no backend source are left bare rather than faked. An
+//  explicit `frame` keeps the view-model local (the preview / snapshot
+//  seam) and reproduces the original sample frames verbatim.
 //
 
 import Foundation
@@ -38,17 +44,41 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
         "Home settings"
     }
 
-    public var footerCaption: String? {
-        HomeSettingsSampleData.footer(for: frame)
-    }
+    public private(set) var footerCaption: String?
 
     public private(set) var state: GroupedListState = .loading
 
     public let homeId: String
-    public let frame: HomeSettingsSampleData.Frame
-    public var identity: HomeSettingsSampleData.Identity {
-        HomeSettingsSampleData.identity(for: frame)
+    /// Identity strip above the first group. Seeded from sample for
+    /// previews; replaced with real `home.name` + verification chip once
+    /// the live fetch resolves.
+    public private(set) var identity: HomeSettingsSampleData.Identity
+
+    /// Established vs newly-claimed shape. Seeded for previews; derived
+    /// from `isPendingOwner` / `pendingClaimId` on the live path.
+    private var frame: HomeSettingsSampleData.Frame
+
+    /// Non-nil → preview / test seam (project the sample frame, no fetch).
+    private let sampleFrame: HomeSettingsSampleData.Frame?
+    private let client: APIClient
+
+    /// Row subtexts resolved for the active frame. The seeded path fills
+    /// every slot from the sample fixture; the live path fills only the
+    /// slots a real endpoint backs and leaves the rest `nil`.
+    private struct RowSubtexts {
+        var address: String?
+        var propertyDetails: String?
+        var photos: String?
+        var documents: String?
+        var accessCodes: String?
+        var trustedNeighbors: String?
+        var privacy: String?
+        var people: String?
+        var inviteLink: String?
+        var notifications: String?
     }
+
+    private var subtexts: RowSubtexts
 
     private static let routeByRowId: [String: HomeSettingsRoute] = [
         "address": .address,
@@ -70,15 +100,51 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
     public init(
         homeId: String,
         frame: HomeSettingsSampleData.Frame? = nil,
+        client: APIClient = .shared,
         onNavigate: @escaping @MainActor (HomeSettingsRoute) -> Void = { _ in }
     ) {
         self.homeId = homeId
-        self.frame = frame ?? HomeSettingsSampleData.frame(forHomeId: homeId)
+        sampleFrame = frame
+        self.client = client
         self.onNavigate = onNavigate
+        let resolved = frame ?? HomeSettingsSampleData.frame(forHomeId: homeId)
+        self.frame = resolved
+        identity = HomeSettingsSampleData.identity(for: resolved)
+        footerCaption = HomeSettingsSampleData.footer(for: resolved)
+        subtexts = Self.sampleSubtexts(for: resolved)
     }
 
     public func load() async {
-        state = .loaded(groups())
+        // Preview / test seam: an explicit sample frame keeps the
+        // view-model purely local so snapshots reproduce verbatim.
+        if let sampleFrame {
+            frame = sampleFrame
+            identity = HomeSettingsSampleData.identity(for: sampleFrame)
+            footerCaption = HomeSettingsSampleData.footer(for: sampleFrame)
+            subtexts = Self.sampleSubtexts(for: sampleFrame)
+            state = .loaded(groups())
+            return
+        }
+
+        state = .loading
+        do {
+            // Member counts are best-effort — a roster failure still lets
+            // the identity card + navigation render.
+            async let detailRequest = client.request(
+                HomesEndpoints.detail(homeId: homeId),
+                as: HomeDetailResponse.self
+            )
+            async let occupantsResult = client.perform(
+                HomesEndpoints.occupants(homeId: homeId),
+                as: OccupantsResponse.self
+            )
+            let detail = try await detailRequest
+            let occupants = try? (await occupantsResult).get()
+            apply(detail: detail.home, occupants: occupants)
+            state = .loaded(groups())
+        } catch {
+            state = .error(message: "We couldn't load this home's settings. Check your connection and try again.")
+        }
     }
 
     public func tapRow(_ rowId: String) async {
@@ -89,6 +155,88 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
     public func toggleRow(_: String, isOn _: Bool) async {}
     public func selectRadio(_: String) async {}
     public func setSlider(_: String, index _: Int) async {}
+
+    // MARK: - Live mapping
+
+    private func apply(detail: HomeDetail, occupants: OccupantsResponse?) {
+        let isPending = detail.isPendingOwner || detail.pendingClaimId != nil
+        frame = isPending ? .pending : .populated
+
+        let homeName = detail.base.name?.nonEmpty
+            ?? detail.base.address?.nonEmpty
+            ?? "This home"
+        identity = HomeSettingsSampleData.Identity(
+            homeName: homeName,
+            addressChipLabel: isPending ? "Verifying" : "Verified",
+            addressChipTone: isPending ? .warning : .success
+        )
+        footerCaption = "\(homeName) · \(isPending ? "Claim pending" : "Owner")"
+
+        var resolved = RowSubtexts()
+        resolved.address = Self.addressLine(for: detail.base)
+        resolved.propertyDetails = Self.humanizedHomeType(detail.base.homeType)
+        resolved.people = Self.peopleSubtext(occupants: occupants)
+        subtexts = resolved
+    }
+
+    private static func addressLine(for home: HomeDTO) -> String? {
+        guard let street = home.address?.nonEmpty else { return nil }
+        if let city = home.city?.nonEmpty {
+            return "\(street), \(city)"
+        }
+        return street
+    }
+
+    private static func humanizedHomeType(_ raw: String?) -> String? {
+        guard let raw = raw?.nonEmpty else { return nil }
+        return raw
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .capitalized
+    }
+
+    private static func peopleSubtext(occupants: OccupantsResponse?) -> String? {
+        guard let occupants else { return nil }
+        let members = occupants.occupants.count
+        let pending = occupants.pendingInvites.count
+        let memberLabel = members == 1 ? "1 member" : "\(members) members"
+        guard pending > 0 else { return memberLabel }
+        let pendingLabel = pending == 1 ? "1 pending" : "\(pending) pending"
+        return "\(memberLabel) · \(pendingLabel)"
+    }
+
+    // MARK: - Sample seam
+
+    private static func sampleSubtexts(for frame: HomeSettingsSampleData.Frame) -> RowSubtexts {
+        switch frame {
+        case .populated:
+            RowSubtexts(
+                address: "14 Elm Park Lane",
+                propertyDetails: "3 bed · 2 bath · Built 1998",
+                photos: "Front porch · added Mar 2024",
+                documents: "Lease, HOA, Tax",
+                accessCodes: "2 active codes",
+                trustedNeighbors: "3 approved",
+                privacy: "Verified neighbors only",
+                people: "4 members · 1 pending",
+                inviteLink: "Active · expires in 12 days",
+                notifications: "Push, email digest"
+            )
+        case .pending:
+            RowSubtexts(
+                address: "42 Magnolia Court",
+                propertyDetails: "Not set",
+                photos: "Add a photo",
+                documents: "Available after verification",
+                accessCodes: "Not set",
+                trustedNeighbors: "Available after verification",
+                privacy: "Available after verification",
+                people: "Just you",
+                inviteLink: "Available after verification",
+                notifications: "Default"
+            )
+        }
+    }
 
     // MARK: - Group projection
 
@@ -103,85 +251,43 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
     }
 
     private func homeIdentityGroup() -> GroupedListGroup {
-        let addressChip = HomeSettingsSampleData.identity(for: frame)
         let addressControl: RowControl = .chipStatus(
-            label: addressChip.addressChipLabel,
-            tone: addressChip.addressChipTone,
+            label: identity.addressChipLabel,
+            tone: identity.addressChipTone,
             includesChevron: true
         )
-        let rows: [GroupedListRow] = switch frame {
-        case .populated:
-            [
-                GroupedListRow(id: "address", label: "Address", subtext: "14 Elm Park Lane", control: addressControl),
-                GroupedListRow(
-                    id: "propertyDetails",
-                    label: "Property details",
-                    subtext: "3 bed · 2 bath · Built 1998",
-                    control: .chevron
-                ),
-                GroupedListRow(id: "photos", label: "Photos", subtext: "Front porch · added Mar 2024", control: .chevron),
-                GroupedListRow(id: "documents", label: "Documents", subtext: "Lease, HOA, Tax", control: .chevron)
-            ]
-        case .pending:
-            [
-                GroupedListRow(id: "address", label: "Address", subtext: "42 Magnolia Court", control: addressControl),
-                GroupedListRow(id: "propertyDetails", label: "Property details", subtext: "Not set", control: .chevron),
-                GroupedListRow(id: "photos", label: "Photos", subtext: "Add a photo", control: .chevron),
-                GroupedListRow(id: "documents", label: "Documents", subtext: "Available after verification", control: .chevron)
-            ]
-        }
+        let rows: [GroupedListRow] = [
+            GroupedListRow(id: "address", label: "Address", subtext: subtexts.address, control: addressControl),
+            GroupedListRow(id: "propertyDetails", label: "Property details", subtext: subtexts.propertyDetails, control: .chevron),
+            GroupedListRow(id: "photos", label: "Photos", subtext: subtexts.photos, control: .chevron),
+            GroupedListRow(id: "documents", label: "Documents", subtext: subtexts.documents, control: .chevron)
+        ]
         return GroupedListGroup(id: "homeIdentity", overline: "Home identity", rows: rows)
     }
 
     private func accessGroup() -> GroupedListGroup {
-        let rows: [GroupedListRow] = switch frame {
-        case .populated:
-            [
-                GroupedListRow(id: "accessCodes", label: "Access codes", subtext: "2 active codes", control: .chevron),
-                GroupedListRow(id: "trustedNeighbors", label: "Trusted neighbors", subtext: "3 approved", control: .chevron),
-                GroupedListRow(id: "privacy", label: "Privacy", subtext: "Verified neighbors only", control: .chevron)
-            ]
-        case .pending:
-            [
-                GroupedListRow(id: "accessCodes", label: "Access codes", subtext: "Not set", control: .chevron),
-                GroupedListRow(
-                    id: "trustedNeighbors",
-                    label: "Trusted neighbors",
-                    subtext: "Available after verification",
-                    control: .chevron
-                ),
-                GroupedListRow(id: "privacy", label: "Privacy", subtext: "Available after verification", control: .chevron)
-            ]
-        }
+        let rows: [GroupedListRow] = [
+            GroupedListRow(id: "accessCodes", label: "Access codes", subtext: subtexts.accessCodes, control: .chevron),
+            GroupedListRow(id: "trustedNeighbors", label: "Trusted neighbors", subtext: subtexts.trustedNeighbors, control: .chevron),
+            GroupedListRow(id: "privacy", label: "Privacy", subtext: subtexts.privacy, control: .chevron)
+        ]
         return GroupedListGroup(id: "access", overline: "Access", rows: rows)
     }
 
     private func membersGroup() -> GroupedListGroup {
-        let rows: [GroupedListRow] = switch frame {
-        case .populated:
-            [
-                GroupedListRow(id: "people", label: "People", subtext: "4 members · 1 pending", control: .chevron),
-                GroupedListRow(id: "inviteLink", label: "Invite link", subtext: "Active · expires in 12 days", control: .chevron)
-            ]
-        case .pending:
-            [
-                GroupedListRow(id: "people", label: "People", subtext: "Just you", control: .chevron),
-                GroupedListRow(id: "inviteLink", label: "Invite link", subtext: "Available after verification", control: .chevron)
-            ]
-        }
+        let rows: [GroupedListRow] = [
+            GroupedListRow(id: "people", label: "People", subtext: subtexts.people, control: .chevron),
+            GroupedListRow(id: "inviteLink", label: "Invite link", subtext: subtexts.inviteLink, control: .chevron)
+        ]
         return GroupedListGroup(id: "members", overline: "Members", rows: rows)
     }
 
     private func notificationsGroup() -> GroupedListGroup {
-        let sub = switch frame {
-        case .populated: "Push, email digest"
-        case .pending: "Default"
-        }
-        return GroupedListGroup(
+        GroupedListGroup(
             id: "notifications",
             overline: "Notifications",
             rows: [
-                GroupedListRow(id: "homeNotifications", label: "Home notifications", subtext: sub, control: .chevron)
+                GroupedListRow(id: "homeNotifications", label: "Home notifications", subtext: subtexts.notifications, control: .chevron)
             ]
         )
     }
@@ -194,5 +300,14 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
             GroupedListRow(id: "cancelClaim", label: "Cancel claim", control: .chevron, destructive: true)
         }
         return GroupedListGroup(id: "windDown", overline: "Wind down", rows: [row])
+    }
+}
+
+private extension String {
+    /// Trimmed value, or `nil` when empty — so blank server strings fall
+    /// back to the next source instead of rendering an empty line.
+    var nonEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
