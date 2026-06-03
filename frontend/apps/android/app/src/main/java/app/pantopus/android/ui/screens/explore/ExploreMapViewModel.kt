@@ -114,8 +114,8 @@ class ExploreMapViewModel
             }
             val gigsResult = gigsDeferred.await()
             val listingsResult = listingsDeferred.await()
-            val gigs = (gigsResult as? NetworkResult.Success)?.data?.gigs
-            val listings = (listingsResult as? NetworkResult.Success)?.data?.listings
+            val gigs = if (gigsResult is NetworkResult.Success) gigsResult.data.gigs else null
+            val listings = if (listingsResult is NetworkResult.Success) listingsResult.data.listings else null
             if (gigs == null && listings == null) {
                 _state.value = ExploreMapUiState.Error("Couldn't load the map.")
                 return
