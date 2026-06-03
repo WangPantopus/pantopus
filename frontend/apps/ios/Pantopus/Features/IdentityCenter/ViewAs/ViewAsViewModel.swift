@@ -130,7 +130,7 @@ public final class ViewAsViewModel {
             mutualsField(context, hidden: hidden),
             contactField(visible?.viewer, hidden: hidden)
         ]
-        let hiddenCount = fields.filter { $0.disclosure.isHidden }.count
+        let hiddenCount = fields.filter(\.disclosure.isHidden).count
         let tone: ViewAsTone = hiddenCount >= 3 ? .restricted : .info
         let label = response.viewerLabel ?? audience.label
         let name = visible?.displayName ?? "You"
@@ -182,11 +182,10 @@ public final class ViewAsViewModel {
     }
 
     private static func ratingField(_ stats: ViewAsResponse.ViewAsVisibleProfile.Stats?) -> ViewAsField {
-        let disclosure: ViewAsFieldDisclosure
-        if let reviews = stats?.reviews, reviews > 0 {
-            disclosure = .visible("\(reviews) review\(reviews == 1 ? "" : "s")")
+        let disclosure: ViewAsFieldDisclosure = if let reviews = stats?.reviews, reviews > 0 {
+            .visible("\(reviews) review\(reviews == 1 ? "" : "s")")
         } else {
-            disclosure = .hidden
+            .hidden
         }
         return ViewAsField(id: "rating", icon: .star, label: "Rating", disclosure: disclosure)
     }

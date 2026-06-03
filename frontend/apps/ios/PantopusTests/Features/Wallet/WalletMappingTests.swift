@@ -71,7 +71,7 @@ final class WalletMappingTests: XCTestCase {
 
     func testCentsFormatting() {
         XCTAssertEqual(WalletViewModel.centsToPlain(84750), "847.50")
-        XCTAssertEqual(WalletViewModel.centsToPlain(128450), "1,284.50")
+        XCTAssertEqual(WalletViewModel.centsToPlain(128_450), "1,284.50")
         XCTAssertEqual(WalletViewModel.centsToCurrency(18600), "$186.00")
         XCTAssertEqual(WalletViewModel.centsToPlain(0), "0.00")
     }

@@ -13,9 +13,17 @@ import XCTest
 
 private final class StubLocationProvider: LocationProviding, @unchecked Sendable {
     let coord: UserCoordinate?
-    init(_ coord: UserCoordinate?) { self.coord = coord }
-    func cachedCoordinate() -> UserCoordinate? { coord }
-    func requestCurrent(timeoutSeconds _: TimeInterval) async -> UserCoordinate? { coord }
+    init(_ coord: UserCoordinate?) {
+        self.coord = coord
+    }
+
+    func cachedCoordinate() -> UserCoordinate? {
+        coord
+    }
+
+    func requestCurrent(timeoutSeconds _: TimeInterval) async -> UserCoordinate? {
+        coord
+    }
 }
 
 @MainActor

@@ -211,9 +211,9 @@ public final class WalletViewModel {
     static func status(for tx: WalletTransactionDTO, direction: ActivityDirection) -> ActivityStatus {
         switch tx.status {
         case "pending":
-            return .pending(clearsLabel: "soon")
+            .pending(clearsLabel: "soon")
         default:
-            return direction == .out ? .complete : .available
+            direction == .out ? .complete : .available
         }
     }
 
