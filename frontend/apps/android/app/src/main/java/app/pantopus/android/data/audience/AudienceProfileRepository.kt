@@ -3,6 +3,7 @@ package app.pantopus.android.data.audience
 import app.pantopus.android.data.api.models.audience.AudienceListResponse
 import app.pantopus.android.data.api.models.audience.AudienceMemberActionBody
 import app.pantopus.android.data.api.models.audience.AudienceMemberActionResponse
+import app.pantopus.android.data.api.models.audience.BroadcastHistoryResponse
 import app.pantopus.android.data.api.models.audience.MembershipStatsResponse
 import app.pantopus.android.data.api.models.audience.PersonaMeResponse
 import app.pantopus.android.data.api.models.audience.PersonaPostsResponse
@@ -53,4 +54,10 @@ class AudienceProfileRepository
             channelId: String,
             body: PublishUpdateBody,
         ): NetworkResult<PublishUpdateResponse> = safeApiCall { api.publishUpdate(channelId, body) }
+
+        /** A.7 — broadcast history (recent updates) for the compose surface. */
+        suspend fun broadcastHistory(
+            channelId: String,
+            limit: Int = 50,
+        ): NetworkResult<BroadcastHistoryResponse> = safeApiCall { api.broadcastHistory(channelId, limit) }
     }

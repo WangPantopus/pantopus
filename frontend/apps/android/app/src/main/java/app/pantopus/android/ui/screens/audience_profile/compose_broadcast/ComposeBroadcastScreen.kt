@@ -38,6 +38,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.audience_profile.tierColor
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -73,7 +75,10 @@ fun ComposeBroadcastScreen(
     viewModel: ComposeBroadcastViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
+    val recentsLoading by viewModel.recentsLoading.collectAsStateWithLifecycle()
+    val recentsError by viewModel.recentsError.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    LaunchedEffect(Unit) { viewModel.load() }
 
     // Picker launcher lives on the screen (not the scaffold) so the
     // scaffold renders under Paparazzi without an ActivityResultRegistryOwner.
@@ -108,6 +113,9 @@ fun ComposeBroadcastScreen(
         onSaveDraft = viewModel::saveDraft,
         onSend = { viewModel.send(onSent = onSent) },
         onRetry = viewModel::retry,
+        recentsLoading = recentsLoading,
+        recentsError = recentsError,
+        onRetryRecents = viewModel::load,
     )
 }
 
@@ -125,6 +133,9 @@ internal fun ComposeBroadcastScaffold(
     onSaveDraft: () -> Unit = {},
     onSend: () -> Unit = {},
     onRetry: () -> Unit = {},
+    recentsLoading: Boolean = false,
+    recentsError: String? = null,
+    onRetryRecents: () -> Unit = {},
 ) {
     var showAudienceSheet by remember { mutableStateOf(false) }
     var showScheduleSheet by remember { mutableStateOf(false) }
@@ -162,7 +173,12 @@ internal fun ComposeBroadcastScaffold(
                         onAudienceClick = { showAudienceSheet = true },
                     )
                     ScheduleRow(scheduledLabel = uiState.scheduledLabel, onClick = { showScheduleSheet = true })
-                    RecentSection(uiState.recentBroadcasts)
+                    RecentSection(
+                        recents = uiState.recentBroadcasts,
+                        loading = recentsLoading,
+                        error = recentsError,
+                        onRetry = onRetryRecents,
+                    )
                 }
             }
             if (uiState.isSending) SendingOverlay()
@@ -618,37 +634,92 @@ private fun ScheduleRow(
 // MARK: - Recent broadcasts
 
 @Composable
-private fun RecentSection(recents: List<RecentBroadcastContent>) {
-    if (recents.isNotEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().testTag("composeBroadcastRecentSection"),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            SectionHeader("LAST ${recents.size} BROADCASTS")
+private fun RecentSection(
+    recents: List<RecentBroadcastContent>,
+    loading: Boolean = false,
+    error: String? = null,
+    onRetry: () -> Unit = {},
+) {
+    when {
+        loading && recents.isEmpty() -> RecentsLoading()
+        error != null && recents.isEmpty() -> RecentsError(message = error, onRetry = onRetry)
+        recents.isNotEmpty() ->
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radii.lg))
-                        .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+                modifier = Modifier.fillMaxWidth().testTag("composeBroadcastRecentSection"),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
-                recents.forEachIndexed { index, broadcast ->
-                    RecentRow(broadcast)
-                    if (index < recents.lastIndex) {
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+                SectionHeader("LAST ${recents.size} BROADCASTS")
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radii.lg))
+                            .background(PantopusColors.appSurface)
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+                ) {
+                    recents.forEachIndexed { index, broadcast ->
+                        RecentRow(broadcast)
+                        if (index < recents.lastIndex) {
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+                        }
                     }
                 }
             }
-        }
-    } else {
+        else ->
+            Column(
+                modifier = Modifier.fillMaxWidth().testTag("composeBroadcastEmptySection"),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                SectionHeader("PAST BROADCASTS")
+                FirstBroadcastCard()
+                EmptyAnalyticsStrip()
+            }
+    }
+}
+
+@Composable
+private fun RecentsLoading() {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("composeBroadcastRecentLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        SectionHeader("RECENT BROADCASTS")
+        Shimmer(width = 360.dp, height = 84.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 84.dp, cornerRadius = Radii.lg)
+    }
+}
+
+@Composable
+private fun RecentsError(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("composeBroadcastRecentError"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        SectionHeader("RECENT BROADCASTS")
         Column(
-            modifier = Modifier.fillMaxWidth().testTag("composeBroadcastEmptySection"),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            SectionHeader("PAST BROADCASTS")
-            FirstBroadcastCard()
-            EmptyAnalyticsStrip()
+            Text(text = message, fontSize = 12.5.sp, color = PantopusColors.appTextSecondary)
+            Text(
+                text = "Try again",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary600,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onRetry)
+                        .testTag("composeBroadcastRecentRetry"),
+            )
         }
     }
 }

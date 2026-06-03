@@ -229,3 +229,41 @@ public struct BroadcastMessageDTO: Decodable, Sendable, Hashable {
         case createdAt = "created_at"
     }
 }
+
+// MARK: - GET /api/broadcast/channels/:id/messages  (history)
+
+/// History envelope. The compose surface only reads `messages`; `channel` /
+/// `persona` / `analytics` / `viewer` are present on the wire but unused.
+public struct BroadcastHistoryResponse: Decodable, Sendable {
+    public let messages: [BroadcastHistoryMessageDTO]
+}
+
+/// One row in the broadcast history. The owner sees full rows; a `locked`
+/// teaser row only appears for tier-gated content above the viewer's rank
+/// (never for the owner). All fields optional so both shapes decode.
+public struct BroadcastHistoryMessageDTO: Decodable, Sendable, Hashable {
+    public let id: String?
+    public let body: String?
+    public let visibility: String?
+    public let targetTierRank: Int?
+    public let createdAt: String?
+    public let publishedAt: String?
+    public let deliveredCount: Int?
+    public let readCount: Int?
+    public let media: [BroadcastMediaDTO]?
+    public let locked: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id, body, visibility, media, locked
+        case targetTierRank = "target_tier_rank"
+        case createdAt = "created_at"
+        case publishedAt = "published_at"
+        case deliveredCount = "delivered_count"
+        case readCount = "read_count"
+    }
+}
+
+public struct BroadcastMediaDTO: Decodable, Sendable, Hashable {
+    public let url: String?
+    public let type: String?
+}

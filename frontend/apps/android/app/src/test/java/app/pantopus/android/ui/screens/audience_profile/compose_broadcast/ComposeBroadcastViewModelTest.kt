@@ -3,6 +3,8 @@
 package app.pantopus.android.ui.screens.audience_profile.compose_broadcast
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.audience.AudienceProfileRepository
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -29,12 +31,20 @@ import org.junit.Test
 class ComposeBroadcastViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
+    // The behavioral tests never call load() or the real publish path
+    // (send-success uses the default no-op performSend, send-failure overrides
+    // it), so an unstubbed mock repository is never invoked.
+    private val repository: AudienceProfileRepository = mockk()
+
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
     @After fun tearDown() = Dispatchers.resetMain()
 
     private fun buildVm(personaId: String = "p1"): ComposeBroadcastViewModel =
-        ComposeBroadcastViewModel(SavedStateHandle(mapOf(COMPOSE_BROADCAST_PERSONA_ID_KEY to personaId)))
+        ComposeBroadcastViewModel(
+            SavedStateHandle(mapOf(COMPOSE_BROADCAST_PERSONA_ID_KEY to personaId)),
+            repository,
+        )
 
     @Test
     fun `initial state is empty`() {

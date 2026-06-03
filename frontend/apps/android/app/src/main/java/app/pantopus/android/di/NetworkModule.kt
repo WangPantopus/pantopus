@@ -30,6 +30,7 @@ import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
 import app.pantopus.android.data.api.services.MailboxVaultApi
+import app.pantopus.android.data.api.services.MembershipApi
 import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.OffersApi
 import app.pantopus.android.data.api.services.PostsApi
@@ -235,6 +236,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAudienceProfileApi(retrofit: Retrofit): AudienceProfileApi = retrofit.create(AudienceProfileApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideMembershipApi(retrofit: Retrofit): MembershipApi = retrofit.create(MembershipApi::class.java)
 
     @Provides
     @Singleton

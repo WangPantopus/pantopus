@@ -3,6 +3,7 @@ package app.pantopus.android.data.api.services
 import app.pantopus.android.data.api.models.audience.AudienceListResponse
 import app.pantopus.android.data.api.models.audience.AudienceMemberActionBody
 import app.pantopus.android.data.api.models.audience.AudienceMemberActionResponse
+import app.pantopus.android.data.api.models.audience.BroadcastHistoryResponse
 import app.pantopus.android.data.api.models.audience.MembershipStatsResponse
 import app.pantopus.android.data.api.models.audience.PersonaMeResponse
 import app.pantopus.android.data.api.models.audience.PersonaPostsResponse
@@ -73,6 +74,15 @@ interface AudienceProfileApi {
         @Path("channelId") channelId: String,
         @Body body: PublishUpdateBody,
     ): PublishUpdateResponse
+
+    /** `GET /api/broadcast/channels/:channelId/messages` — broadcast history,
+     *  most-recent first (`limit`-only). Route
+     *  `backend/routes/broadcastChannels.js:315`. */
+    @GET("api/broadcast/channels/{channelId}/messages")
+    suspend fun broadcastHistory(
+        @Path("channelId") channelId: String,
+        @Query("limit") limit: Int = 50,
+    ): BroadcastHistoryResponse
 
     /** `PATCH /api/personas/me/audience/:membershipId` — owner-side action
      *  on one audience member (approve / decline / remove / mute / unmute).

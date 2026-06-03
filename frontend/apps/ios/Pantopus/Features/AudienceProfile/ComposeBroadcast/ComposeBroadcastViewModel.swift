@@ -8,10 +8,14 @@
 //  so it always matches the prompt's
 //  `.empty / .composing / .scheduled / .sending / .error` contract.
 //
-//  No backend: `performSend` defaults to a no-op success and can be
-//  injected (latency / failure) by the host or tests. Recent broadcasts
-//  + persona + per-audience reach are seeded from
-//  `ComposeBroadcastSampleData`.
+//  Wiring: `load()` resolves the owner's persona + broadcast channel from
+//  `GET /api/personas/me`, the per-tier reach from
+//  `GET /api/personas/:id/membership-stats`, and the recent broadcasts from
+//  `GET /api/broadcast/channels/:id/messages` (history). `send()` publishes
+//  via `POST /api/broadcast/channels/:id/messages` — injected through
+//  `performSend` by the `.live` factory. The default `performSend` stays a
+//  no-op success so unit tests drive the state machine without a network;
+//  `ComposeBroadcastSampleData` remains the preview/snapshot seam.
 //
 
 import Foundation
@@ -29,7 +33,7 @@ public final class ComposeBroadcastViewModel {
     }
 
     public let personaId: String
-    public let persona: BroadcastPersona
+    public private(set) var persona: BroadcastPersona
     public private(set) var recentBroadcasts: [RecentBroadcastContent]
     public let maxCharacterCount: Int
 
@@ -38,12 +42,21 @@ public final class ComposeBroadcastViewModel {
     private var phase: Phase = .idle
     private var lastSavedDraft: ComposeBroadcastDraft
 
-    private let audienceReach: [BroadcastAudience: Int]
+    /// Recents-section fetch state (the composer itself is always live).
+    public private(set) var recentsLoading = false
+    public private(set) var recentsError: String?
+
+    private var audienceReach: [BroadcastAudience: Int]
     private let onSent: @MainActor () -> Void
+    private let api: APIClient
+
+    /// The persona's broadcast channel id, resolved by `load()`; the send
+    /// path needs it. Nil until `load()` resolves it.
+    private var channelId: String?
 
     /// Stubbed network call. Default is an immediate no-op success; the
-    /// host injects latency and the test suite injects a thrower /
-    /// state-capture closure. `var` so it can be swapped after init.
+    /// `.live` factory swaps in the real publish, and the test suite injects
+    /// a thrower / state-capture closure. `var` so it can be swapped post-init.
     var performSend: @MainActor (ComposeBroadcastDraft, Date?) async throws -> Void
 
     public init(
@@ -54,6 +67,7 @@ public final class ComposeBroadcastViewModel {
         draft: ComposeBroadcastDraft = ComposeBroadcastDraft(),
         scheduledAt: Date? = nil,
         maxCharacterCount: Int = 1000,
+        api: APIClient = .shared,
         onSent: @escaping @MainActor () -> Void = {},
         performSend: @escaping @MainActor (ComposeBroadcastDraft, Date?) async throws -> Void = { _, _ in }
     ) {
@@ -64,9 +78,70 @@ public final class ComposeBroadcastViewModel {
         self.draft = draft
         self.scheduledAt = scheduledAt
         self.maxCharacterCount = maxCharacterCount
+        self.api = api
         self.onSent = onSent
         self.performSend = performSend
         lastSavedDraft = draft
+    }
+
+    // MARK: - Loading
+
+    /// Resolve the owner's persona + channel, per-tier reach, and recent
+    /// broadcasts. Best-effort: a failure on any leg leaves the composer
+    /// usable; only the recents surface shows an inline error.
+    public func load() async {
+        recentsLoading = true
+        recentsError = nil
+
+        var resolvedPersonaId = personaId
+        do {
+            let me: PersonaMeResponse = try await api.request(AudienceProfileEndpoints.me)
+            if let summary = me.persona {
+                resolvedPersonaId = summary.id
+                persona = Self.persona(from: summary, fallback: persona)
+            }
+            channelId = me.channel?.id
+        } catch {
+            // Composer still works; send resolves the channel lazily.
+        }
+
+        if let stats = try? await api.request(
+            AudienceProfileEndpoints.membershipStats(personaId: resolvedPersonaId),
+            as: MembershipStatsResponse.self
+        ) {
+            audienceReach = Self.reach(from: stats.counts)
+        }
+
+        if let channelId {
+            do {
+                let history: BroadcastHistoryResponse = try await api.request(
+                    AudienceProfileEndpoints.broadcastHistory(channelId: channelId)
+                )
+                recentBroadcasts = history.messages.compactMap(Self.recentBroadcast)
+                recentsError = nil
+            } catch {
+                recentsError = (error as? APIError)?.errorDescription
+                    ?? "Couldn't load recent broadcasts."
+            }
+        }
+        recentsLoading = false
+    }
+
+    /// The real publish call, invoked through `performSend` by `.live`.
+    func publish(_ draft: ComposeBroadcastDraft) async throws {
+        guard let channelId else {
+            throw ComposeBroadcastError(message: "Your broadcast channel isn't ready yet. Try again in a moment.")
+        }
+        let wire = Self.wire(for: draft.audience)
+        let body = PublishUpdateBody(
+            body: draft.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            visibility: wire.visibility,
+            targetTierRank: wire.rank
+        )
+        _ = try await api.request(
+            AudienceProfileEndpoints.publishUpdate(channelId: channelId, body: body),
+            as: PublishUpdateResponse.self
+        )
     }
 
     // MARK: - Derived state
@@ -199,4 +274,111 @@ public final class ComposeBroadcastViewModel {
         }
         return "Couldn't send broadcast. Try again."
     }
+
+    /// Map the targeting chip onto the broadcast `visibility` +
+    /// `target_tier_rank` wire contract (`broadcastChannels.js`).
+    static func wire(for audience: BroadcastAudience) -> (visibility: String, rank: Int?) {
+        switch audience {
+        case .allBeacons: ("public", nil)
+        case .followersOnly: ("followers", nil)
+        case .bronzePlus: ("tier_or_above", 2)
+        case .silverPlus: ("tier_or_above", 3)
+        case .goldOnly: ("tier_or_above", 4)
+        }
+    }
+
+    /// Map a broadcast message back onto a targeting chip for the recents
+    /// list. The inverse of `wire(for:)`.
+    static func audience(visibility: String?, targetTierRank: Int?) -> BroadcastAudience {
+        switch visibility {
+        case "public": .allBeacons
+        case "followers": .followersOnly
+        case "tier_or_above", "subscribers":
+            switch targetTierRank ?? 2 {
+            case ...2: .bronzePlus
+            case 3: .silverPlus
+            default: .goldOnly
+            }
+        default: .allBeacons
+        }
+    }
+
+    /// Cumulative per-tier counts → per-chip reach. `allBeacons` /
+    /// `followersOnly` both reach the full follower base.
+    static func reach(from counts: MembershipStatsCounts) -> [BroadcastAudience: Int] {
+        [
+            .allBeacons: counts.followers ?? 0,
+            .followersOnly: counts.followers ?? 0,
+            .bronzePlus: counts.members ?? 0,
+            .silverPlus: counts.insiders ?? 0,
+            .goldOnly: counts.direct ?? 0
+        ]
+    }
+
+    static func persona(from summary: PersonaSummaryDTO, fallback: BroadcastPersona) -> BroadcastPersona {
+        let name = summary.displayName ?? summary.handle ?? fallback.displayName
+        let handle = summary.handle.map { "@\($0)" } ?? fallback.handle
+        return BroadcastPersona(
+            id: summary.id,
+            handle: handle,
+            displayName: name,
+            kind: fallback.kind,
+            avatarInitial: name.first.map { String($0).uppercased() } ?? fallback.avatarInitial
+        )
+    }
+
+    static func recentBroadcast(_ dto: BroadcastHistoryMessageDTO) -> RecentBroadcastContent? {
+        guard dto.locked != true, let id = dto.id else { return nil }
+        let delivered = dto.deliveredCount ?? 0
+        let read = dto.readCount ?? 0
+        let readPct = delivered > 0 ? "\(Int((Double(read) / Double(delivered) * 100).rounded()))%" : "—"
+        return RecentBroadcastContent(
+            id: id,
+            timeLabel: relativeTime(from: dto.publishedAt ?? dto.createdAt),
+            audience: audience(visibility: dto.visibility, targetTierRank: dto.targetTierRank),
+            body: dto.body ?? "",
+            reach: shortCount(delivered),
+            read: shortCount(read),
+            readPct: readPct,
+            // The broadcast serializer carries no reaction / reply counts.
+            reactions: "—",
+            replies: "—",
+            hasMedia: !(dto.media?.isEmpty ?? true)
+        )
+    }
+
+    static func shortCount(_ count: Int) -> String {
+        if count < 1000 { return "\(count)" }
+        let thousands = Double(count) / 1000.0
+        if count < 10000 { return String(format: "%.1fK", thousands) }
+        return "\(Int(thousands.rounded()))K"
+    }
+
+    static func relativeTime(from iso: String?) -> String {
+        guard let iso, let date = parseDate(iso) else { return "" }
+        let minutes = Int(Date().timeIntervalSince(date) / 60)
+        if minutes < 1 { return "Just now" }
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        if hours < 24 { return hours == 1 ? "1h ago" : "\(hours)h ago" }
+        let days = hours / 24
+        if days == 1 { return "Yesterday" }
+        if days < 7 { return "\(days)d ago" }
+        return "\(days / 7)w ago"
+    }
+
+    private static func parseDate(_ iso: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: iso) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: iso)
+    }
+}
+
+/// Client-side compose failure (e.g. the channel hasn't resolved yet).
+/// `LocalizedError` so the composer's error banner shows the message.
+struct ComposeBroadcastError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
 }

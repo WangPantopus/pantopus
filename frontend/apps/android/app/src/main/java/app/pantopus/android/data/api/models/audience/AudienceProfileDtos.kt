@@ -199,3 +199,37 @@ data class BroadcastMessageDto(
     @Json(name = "target_tier_rank") val targetTierRank: Int? = null,
     @Json(name = "created_at") val createdAt: String? = null,
 )
+
+// GET /api/broadcast/channels/:id/messages  (history)
+
+/**
+ * History envelope. The compose surface only reads `messages`; `channel` /
+ * `persona` / `analytics` / `viewer` are present on the wire but unused. The
+ * owner sees full rows; a `locked` teaser row only appears for tier-gated
+ * content above the viewer's rank (never for the owner), so all fields are
+ * optional.
+ */
+@JsonClass(generateAdapter = true)
+data class BroadcastHistoryResponse(
+    val messages: List<BroadcastHistoryMessageDto> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class BroadcastHistoryMessageDto(
+    val id: String? = null,
+    val body: String? = null,
+    val visibility: String? = null,
+    @Json(name = "target_tier_rank") val targetTierRank: Int? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "published_at") val publishedAt: String? = null,
+    @Json(name = "delivered_count") val deliveredCount: Int? = null,
+    @Json(name = "read_count") val readCount: Int? = null,
+    val media: List<BroadcastMediaDto>? = null,
+    val locked: Boolean? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class BroadcastMediaDto(
+    val url: String? = null,
+    val type: String? = null,
+)

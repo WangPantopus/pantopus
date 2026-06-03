@@ -40,6 +40,7 @@ public struct ComposeBroadcastView: View {
         }
         .background(Theme.Color.appBg)
         .toolbar(.hidden, for: .tabBar)
+        .task { await viewModel.load() }
         .photosPicker(
             isPresented: $showsPhotosPicker,
             selection: $photoSelection,
@@ -204,7 +205,11 @@ public struct ComposeBroadcastView: View {
     // MARK: - Recent broadcasts
 
     @ViewBuilder private var recentBroadcastsSection: some View {
-        if viewModel.hasRecentBroadcasts {
+        if viewModel.recentsLoading && !viewModel.hasRecentBroadcasts {
+            recentsLoadingCard
+        } else if let message = viewModel.recentsError, !viewModel.hasRecentBroadcasts {
+            recentsErrorCard(message)
+        } else if viewModel.hasRecentBroadcasts {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 sectionHeader(title: "Last \(viewModel.recentBroadcasts.count) broadcasts")
                 VStack(spacing: Spacing.s0) {
@@ -231,6 +236,45 @@ public struct ComposeBroadcastView: View {
             }
             .accessibilityIdentifier("composeBroadcastEmptySection")
         }
+    }
+
+    private var recentsLoadingCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            sectionHeader(title: "Recent broadcasts")
+            VStack(spacing: Spacing.s2) {
+                Shimmer(height: 84, cornerRadius: Radii.lg)
+                Shimmer(height: 84, cornerRadius: Radii.lg)
+            }
+        }
+        .accessibilityIdentifier("composeBroadcastRecentLoading")
+    }
+
+    private func recentsErrorCard(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            sectionHeader(title: "Recent broadcasts")
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text(message)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { Task { await viewModel.load() } } label: {
+                    Text("Try again")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.primary600)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("composeBroadcastRecentRetry")
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+        .accessibilityIdentifier("composeBroadcastRecentError")
     }
 
     private func sectionHeader(title: String) -> some View {
