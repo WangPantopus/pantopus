@@ -69,8 +69,16 @@ lane is itemised below with a status marker:
         Android 13+.
   - [ ] **Release blocker:** `app/google-services.json` is still the
         committed placeholder. Pull the real file from the Firebase
-        Console before release — FCM will not deliver until then. (This is
-        the only Android gap; all client code is wired and tested.)
+        Console before release — FCM will not deliver until then. See the
+        go-live runbook in §8 for the exact steps. (All client code is
+        wired and tested; this is the only *functional* Android gap.)
+  - [ ] **Pre-launch polish:** the notification small-icon is still
+        `R.mipmap.ic_launcher` (`NotificationDispatcher.postNotification`).
+        Android masks the small-icon to a white-on-transparent silhouette,
+        so the full-colour launcher icon renders as a flat block in the
+        status bar. Add a dedicated monochrome
+        `res/drawable/ic_notification.xml` (plus a `setColor(...)` brand
+        accent) before public launch — a design-asset task, tracked in §8.4.
 
 ## 4. Backend message-send swap — shipped
 
@@ -161,3 +169,95 @@ that file.
     round-trip per platform — no live credentials or network).
   - A test push round-trips end-to-end only with real credentials wired;
     the unit suite mocks the transport, as the plan allows.
+
+### Verification log
+
+  - **2026-06-03** — Backend push suite green:
+    `cd backend && jest tests/unit/push` → **36 passed across 5 suites**
+    (`tokenRouting`, `dispatch`, `fcmClient` [10], `apnsClient`,
+    `expoClient`). This exercises the mocked FCM round-trip (OAuth2
+    exchange → data-only `messages:send` body → invalid-token pruning) and
+    confirms an `android` registration routes to `fcmClient` at both
+    registration time (`resolveRegistration`: `android → fcm`) and send
+    time (`classifyProvider`). `pushService` wires the senders
+    (`{ apns, fcm, expo }`) into `dispatchToTokens`.
+  - **2026-06-03** — Android client verified present + wired by inspection:
+    `PantopusMessagingService` (`onNewToken` → `registerPushToken(_,
+    "android")`, `onMessageReceived` → `NotificationDispatcher`),
+    `PushTokenSyncer` (app-open safety net), `MainActivity`
+    (`POST_NOTIFICATIONS` runtime prompt + deep-link forward), the manifest
+    `<service>` on `com.google.firebase.MESSAGING_EVENT`, and the Gradle
+    FCM deps + `google-services` plugin. `./gradlew :app:assembleDebug` and
+    the JVM push tests (`NotificationDispatcherTest`, `PushTokenSyncerTest`)
+    require the Android SDK + Gradle toolchain, which this ephemeral
+    environment does not provision — run them on a dev box / CI with the
+    SDK: `cd frontend/apps/android && ./gradlew :app:assembleDebug
+    :app:testDebugUnitTest`. The instrumented `NotificationPermissionTest`
+    needs an emulator/device: `:app:connectedDebugAndroidTest`.
+
+## 8. Android FCM go-live runbook
+
+Everything below is operational setup the *release* needs; the client and
+backend code already speak the contract.
+
+### 8.1 Real `google-services.json`
+
+The committed `frontend/apps/android/app/google-services.json` is a
+placeholder (see the `_TODO` at the top of that file). To wire the real one:
+
+  1. Firebase Console → create/select the project → **Project settings →
+     General → Your apps → Add app → Android**.
+  2. Register **both** application IDs the build emits:
+     - `app.pantopus.android` (release)
+     - `app.pantopus.android.debug` (debug — `applicationIdSuffix=".debug"`)
+  3. Download the generated `google-services.json` and drop it at
+     `frontend/apps/android/app/google-services.json`, replacing the
+     placeholder. The `com.google.gms.google-services` plugin processes it
+     at build time; no code change is needed.
+  4. The real file carries a live API key — keep it out of public forks. It
+     is needed at *build* time, so CI that produces release artifacts must
+     inject it (e.g. a base64 secret written to disk before
+     `assembleRelease`).
+
+### 8.2 FCM **server** credentials (independent of the client file)
+
+The send path (`backend/services/push/fcmClient.js`) authenticates to FCM
+HTTP v1 with a Google service account — separate from the client
+`google-services.json`. In the Firebase/GCP console:
+
+  1. **Project settings → Service accounts → Generate new private key** →
+     downloads a service-account JSON.
+  2. Set **one** credential slot in the backend env
+     (`backend/.env.example` documents all three):
+     - `FCM_PROJECT_ID` + `FCM_CLIENT_EMAIL` + `FCM_PRIVATE_KEY` (preferred;
+       a literal `\n` in the key is accepted), **or**
+     - `FCM_SERVICE_ACCOUNT_JSON` (the whole JSON inline), **or**
+     - `GOOGLE_APPLICATION_CREDENTIALS` (path to the JSON file).
+  3. The service account needs the **Firebase Cloud Messaging API** enabled
+     on the project. With no slot set, `fcmClient.isConfigured()` returns
+     `false` and the dispatcher skips FCM cleanly (the backend still boots
+     and the unit suite passes without secrets).
+
+### 8.3 Test-push smoke (real credentials)
+
+  1. Build + install the debug app on an Android 13+ device and accept the
+     `POST_NOTIFICATIONS` prompt; the app registers its FCM token via
+     `POST /api/notifications/register` (`platform=android` → backend tags
+     `provider=fcm`).
+  2. Trigger any backend notification for that user (e.g. a chat message or
+     gig bid). Expect a foreground + background system notification on the
+     matching channel and a tap that deep-links into the right screen.
+  3. Quick raw check without a triggering action: Firebase Console →
+     **Cloud Messaging → send a test message** to the device token. Note
+     the production backend sends **data-only** messages, so a console
+     "notification" send exercises display but not the
+     `NotificationDispatcher` data-routing/channel path.
+
+### 8.4 Pre-launch polish
+
+  - Replace the notification small-icon (`NotificationDispatcher` uses
+    `R.mipmap.ic_launcher`) with a white-on-transparent
+    `res/drawable/ic_notification.xml` plus a brand `setColor(...)` accent —
+    the launcher icon renders as a flat silhouette in the status bar. This
+    is a design-asset task (no source vector exists yet; the launcher
+    foreground is a raster PNG), tracked as a §3 open item.
