@@ -2,7 +2,7 @@ package app.pantopus.android.data.hub
 
 import app.pantopus.android.data.api.models.hub.HubDiscoveryResponse
 import app.pantopus.android.data.api.models.hub.HubResponse
-import app.pantopus.android.data.api.models.hub.HubTodayDetailResponse
+import app.pantopus.android.data.api.models.hub.HubTodayPayload
 import app.pantopus.android.data.api.models.hub.HubTodayResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
@@ -24,7 +24,7 @@ class HubRepository
         suspend fun today(): NetworkResult<HubTodayResponse> = safeApiCall { api.today() }
 
         /** `GET /api/hub/today` (typed) — backs the full-screen Today briefing. */
-        suspend fun todayDetail(): NetworkResult<HubTodayDetailResponse> = safeApiCall { api.todayDetail() }
+        suspend fun todayDetail(): NetworkResult<HubTodayPayload> = safeApiCall { api.todayDetail() }
 
         /**
          * `GET /api/hub/discovery?filter=...&limit=...`.

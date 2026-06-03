@@ -84,8 +84,10 @@ final class TodayDetailViewModel {
     private func fetchLive() async {
         state = .loading
         do {
-            let response: HubTodayDetailResponse = try await api.request(HubEndpoints.today())
-            guard let payload = response.today else {
+            // The success body is the payload at the top level (no `today`
+            // wrapper); the failure path decodes with `error` set / no data.
+            let payload: HubTodayPayload = try await api.request(HubEndpoints.today())
+            guard payload.isRenderable else {
                 state = .error(message: "Today's briefing isn't available right now.")
                 return
             }

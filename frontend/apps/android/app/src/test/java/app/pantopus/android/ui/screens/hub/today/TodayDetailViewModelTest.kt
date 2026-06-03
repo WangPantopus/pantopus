@@ -2,7 +2,6 @@
 
 package app.pantopus.android.ui.screens.hub.today
 
-import app.pantopus.android.data.api.models.hub.HubTodayDetailResponse
 import app.pantopus.android.data.api.models.hub.HubTodayPayload
 import app.pantopus.android.data.api.models.hub.TodayAlertDto
 import app.pantopus.android.data.api.models.hub.TodayAqiDto
@@ -80,22 +79,20 @@ class TodayDetailViewModelTest {
         runTest {
             coEvery { repository.todayDetail() } returns
                 NetworkResult.Success(
-                    HubTodayDetailResponse(
-                        today =
-                            HubTodayPayload(
-                                location = TodayLocationDto(label = "Elm Park", timezone = "America/New_York"),
-                                summary = "Mild.",
-                                weather =
-                                    TodayWeatherDto(
-                                        currentTempF = 67.0,
-                                        conditionLabel = "Mostly sunny",
-                                        highF = 74.0,
-                                        lowF = 58.0,
-                                    ),
-                                aqi = TodayAqiDto(index = 42, category = "Good", isNoteworthy = false),
-                                alerts = emptyList(),
-                                signals = listOf(TodaySignalDto(kind = "rain", label = "Shower", urgency = "low")),
+                    HubTodayPayload(
+                        location = TodayLocationDto(label = "Elm Park", timezone = "America/New_York"),
+                        summary = "Mild.",
+                        displayMode = "standard",
+                        weather =
+                            TodayWeatherDto(
+                                currentTempF = 67.0,
+                                conditionLabel = "Mostly sunny",
+                                highF = 74.0,
+                                lowF = 58.0,
                             ),
+                        aqi = TodayAqiDto(index = 42, category = "Good", isNoteworthy = false),
+                        alerts = emptyList(),
+                        signals = listOf(TodaySignalDto(kind = "rain", label = "Shower", urgency = "low")),
                     ),
                 )
 
@@ -114,13 +111,11 @@ class TodayDetailViewModelTest {
         runTest {
             coEvery { repository.todayDetail() } returns
                 NetworkResult.Success(
-                    HubTodayDetailResponse(
-                        today =
-                            HubTodayPayload(
-                                location = TodayLocationDto(label = "Elm Park"),
-                                weather = TodayWeatherDto(currentTempF = 19.0, conditionLabel = "Hard freeze"),
-                                alerts = listOf(TodayAlertDto(id = "a1", severity = "severe", title = "Freeze")),
-                            ),
+                    HubTodayPayload(
+                        location = TodayLocationDto(label = "Elm Park"),
+                        displayMode = "standard",
+                        weather = TodayWeatherDto(currentTempF = 19.0, conditionLabel = "Hard freeze"),
+                        alerts = listOf(TodayAlertDto(id = "a1", severity = "severe", title = "Freeze")),
                     ),
                 )
 
@@ -134,7 +129,22 @@ class TodayDetailViewModelTest {
     fun liveLoadContextUnavailableSurfacesError() =
         runTest {
             coEvery { repository.todayDetail() } returns
-                NetworkResult.Success(HubTodayDetailResponse(today = null, error = "CONTEXT_UNAVAILABLE"))
+                NetworkResult.Success(HubTodayPayload(error = "CONTEXT_UNAVAILABLE"))
+
+            val viewModel = TodayDetailViewModel(repository)
+            viewModel.load()
+
+            assertTrue(viewModel.state.value is TodayDetailUiState.Error)
+        }
+
+    @Test
+    fun liveLoadHiddenDisplayModeSurfacesError() =
+        runTest {
+            // No usable location → the orchestrator returns display_mode=hidden.
+            coEvery { repository.todayDetail() } returns
+                NetworkResult.Success(
+                    HubTodayPayload(displayMode = "hidden", summary = "Location not available."),
+                )
 
             val viewModel = TodayDetailViewModel(repository)
             viewModel.load()

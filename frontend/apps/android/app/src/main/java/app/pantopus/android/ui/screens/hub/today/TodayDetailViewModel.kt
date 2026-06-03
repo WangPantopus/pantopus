@@ -45,9 +45,9 @@ class TodayDetailViewModel
             viewModelScope.launch {
                 when (val result = repository.todayDetail()) {
                     is NetworkResult.Success -> {
-                        val payload = result.data.today
+                        val payload = result.data
                         _state.value =
-                            if (payload == null) {
+                            if (!payload.isRenderable) {
                                 TodayDetailUiState.Error("Today's briefing isn't available right now.")
                             } else {
                                 val content = TodayDetailMapper.fromPayload(payload)

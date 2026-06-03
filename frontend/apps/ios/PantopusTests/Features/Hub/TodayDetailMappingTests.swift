@@ -42,11 +42,13 @@ final class TodayDetailMappingTests: XCTestCase {
         .init(
             location: .init(label: label, timezone: "America/New_York", latitude: nil, longitude: nil),
             summary: "Mild and mostly sunny.",
+            displayMode: "standard",
             weather: weather,
             aqi: aqi,
             alerts: alerts,
             signals: signals,
-            seasonal: nil
+            seasonal: nil,
+            error: nil
         )
     }
 
@@ -136,13 +138,15 @@ final class TodayDetailMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
+            // Success body is the payload at the TOP LEVEL — no `today` wrapper.
             "/api/hub/today": [.status(200, body: """
-            {"today":{"location":{"label":"Elm Park","timezone":"America/New_York"},\
-            "summary":"Mild.","weather":{"current_temp_f":67,"condition_code":"clear",\
+            {"location":{"label":"Elm Park","timezone":"America/New_York"},\
+            "summary":"Mild.","display_mode":"standard",\
+            "weather":{"current_temp_f":67,"condition_code":"clear",\
             "condition_label":"Mostly sunny","high_f":74,"low_f":58,"precipitation_next_6h":false},\
             "aqi":{"index":42,"category":"Good","is_noteworthy":false},"alerts":[],\
             "signals":[{"kind":"rain","label":"Light shower","detail":"After 4pm","urgency":"low"}],\
-            "seasonal":null}}
+            "seasonal":null}
             """)]
         ])
         let vm = TodayDetailViewModel(api: APIClient(session: session, retryPolicy: .none))
@@ -164,6 +168,22 @@ final class TodayDetailMappingTests: XCTestCase {
         await vm.load()
         guard case .error = vm.state else {
             return XCTFail("Expected error for CONTEXT_UNAVAILABLE, got \(vm.state)")
+        }
+    }
+
+    func testLiveLoadHiddenDisplayModeSurfacesError() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        // No usable location → the orchestrator returns display_mode=hidden.
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/hub/today": [.status(200, body: """
+            {"summary":"Location not available.","display_mode":"hidden","weather":null,"signals":[]}
+            """)]
+        ])
+        let vm = TodayDetailViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        guard case .error = vm.state else {
+            return XCTFail("Expected error for display_mode=hidden, got \(vm.state)")
         }
     }
 }

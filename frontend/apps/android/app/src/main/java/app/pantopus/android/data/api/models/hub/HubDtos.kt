@@ -236,23 +236,28 @@ data class DiscoveryItem(
 // Hub Today (typed payload — P1-F).
 // The legacy [HubTodayResponse] keeps the untyped JsonValue shape used by the
 // Hub overview rail; this typed variant backs the full-screen Today briefing.
-// Field names mirror the orchestrator response (`providerOrchestrator.js`).
-
-@JsonClass(generateAdapter = true)
-data class HubTodayDetailResponse(
-    val today: HubTodayPayload? = null,
-    val error: String? = null,
-)
+//
+// IMPORTANT: the route serializes this object at the TOP LEVEL on success
+// (`res.json(result)` in routes/hub.js, where `result` is the orchestrator
+// payload). There is no `today` wrapper key. The only wrapped shape is the
+// failure path `{ today: null, error: "CONTEXT_UNAVAILABLE" }`, and the
+// no-location path sets `display_mode: "hidden"` — both are surfaced here.
 
 @JsonClass(generateAdapter = true)
 data class HubTodayPayload(
     val location: TodayLocationDto? = null,
     val summary: String? = null,
+    @Json(name = "display_mode") val displayMode: String? = null,
     val weather: TodayWeatherDto? = null,
     val aqi: TodayAqiDto? = null,
     val alerts: List<TodayAlertDto>? = null,
     val signals: List<TodaySignalDto>? = null,
-)
+    val error: String? = null,
+) {
+    /** True when the payload carries a renderable briefing (not the error or
+     *  hidden-location path). */
+    val isRenderable: Boolean get() = error == null && displayMode != "hidden"
+}
 
 @JsonClass(generateAdapter = true)
 data class TodayLocationDto(

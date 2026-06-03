@@ -189,25 +189,42 @@ public struct HubTodayResponse: Decodable, Sendable, Hashable {
 
 // MARK: - Hub Today (typed payload — P1-F)
 
-/// Typed envelope for `GET /api/hub/today`. The legacy `HubTodayResponse`
+/// Typed payload for `GET /api/hub/today`. The legacy `HubTodayResponse`
 /// keeps the untyped `JSONValue` shape used by the Hub overview rail; this
-/// typed variant backs the full-screen Today briefing. Field names mirror
-/// the orchestrator response (`providerOrchestrator.js`).
-public struct HubTodayDetailResponse: Decodable, Sendable, Hashable {
-    public let today: HubTodayPayload?
-    public let error: String?
-}
-
-/// The assembled Today context. Optional throughout — providers fail
-/// independently (`Promise.allSettled`), so any block can be absent.
+/// typed variant backs the full-screen Today briefing.
+///
+/// IMPORTANT: the route serializes this object at the TOP LEVEL on success
+/// (`res.json(result)` in `routes/hub.js`, where `result` is the
+/// orchestrator payload — see `getHubToday` in `providerOrchestrator.js`).
+/// There is no `today` wrapper key. The only wrapped shape is the failure
+/// path `{ today: null, error: "CONTEXT_UNAVAILABLE" }`, and the no-location
+/// path sets `display_mode: "hidden"` — both are surfaced here so the
+/// view-model can show the error chrome.
 public struct HubTodayPayload: Decodable, Sendable, Hashable {
     public let location: TodayLocation?
     public let summary: String?
+    /// `hidden` when no usable location is configured; `standard` /
+    /// `prominent` otherwise.
+    public let displayMode: String?
     public let weather: TodayWeather?
     public let aqi: TodayAQI?
     public let alerts: [TodayAlert]?
     public let signals: [TodaySignalDTO]?
     public let seasonal: TodaySeasonal?
+    /// Present only on the failure path (`CONTEXT_UNAVAILABLE`).
+    public let error: String?
+
+    /// True when the payload carries a renderable briefing (not the error
+    /// or hidden-location path).
+    public var isRenderable: Bool {
+        error == nil && displayMode != "hidden"
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case location, summary
+        case displayMode = "display_mode"
+        case weather, aqi, alerts, signals, seasonal, error
+    }
 
     public struct TodayLocation: Decodable, Sendable, Hashable {
         public let label: String?

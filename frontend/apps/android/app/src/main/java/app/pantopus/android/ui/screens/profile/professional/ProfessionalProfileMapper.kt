@@ -81,15 +81,15 @@ object ProfessionalProfileMapper {
     private fun visibilityRows(
         isPublic: Boolean,
         isActive: Boolean,
-    ): List<ProVisibilityRow> =
+    ): List<VisibilityRow> =
         listOf(
-            ProVisibilityRow(
+            VisibilityRow(
                 id = "publicProfile",
                 label = "Public profile",
                 sub = "Neighbors can open your professional profile from search and gigs.",
                 isOn = isPublic,
             ),
-            ProVisibilityRow(
+            VisibilityRow(
                 id = "activeForHire",
                 label = "Active for hire",
                 sub = "Show as available to take on new work.",
