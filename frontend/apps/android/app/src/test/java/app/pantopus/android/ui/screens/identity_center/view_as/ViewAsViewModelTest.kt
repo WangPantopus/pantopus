@@ -128,7 +128,12 @@ class ViewAsViewModelTest {
                                 badges = listOf("verified_resident"),
                                 locality = ViewAsLocality(city = "Maple Heights", state = "NY", neighborhood = "Maple Heights"),
                                 stats = ViewAsStats(reviews = 38),
-                                viewer = ViewAsViewerRelationship(canMessage = true, isFollowingLocal = true, relationshipStatus = "accepted"),
+                                viewer =
+                                    ViewAsViewerRelationship(
+                                        canMessage = true,
+                                        isFollowingLocal = true,
+                                        relationshipStatus = "accepted",
+                                    ),
                             ),
                         hidden = emptyList(),
                         context = ViewAsContextDto(isNeighbor = true, isConnection = true),

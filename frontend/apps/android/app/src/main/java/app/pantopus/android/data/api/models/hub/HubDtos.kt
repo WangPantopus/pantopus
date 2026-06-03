@@ -233,7 +233,7 @@ data class DiscoveryItem(
     val createdAt: String? = null,
 )
 
-// ── Hub Today (typed payload — P1-F) ────────────────────────────────────────
+// Hub Today (typed payload — P1-F).
 // The legacy [HubTodayResponse] keeps the untyped JsonValue shape used by the
 // Hub overview rail; this typed variant backs the full-screen Today briefing.
 // Field names mirror the orchestrator response (`providerOrchestrator.js`).
