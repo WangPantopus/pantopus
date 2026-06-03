@@ -1,0 +1,100 @@
+//
+//  WalletDTOs.swift
+//  Pantopus
+//
+//  DTOs for the read-path wallet endpoints in `backend/routes/wallet.js`.
+//  Monetary values are integer cents (the `WalletTransaction.amount` /
+//  `Wallet.balance` columns are `bigint`); the view-model formats them into
+//  display strings. Field names are preserved verbatim from the route
+//  responses via explicit `CodingKeys` (the client does not apply
+//  `convertFromSnakeCase`).
+//
+
+import Foundation
+
+// MARK: - Balance (GET /api/wallet — backend/routes/wallet.js:55)
+
+/// `GET /api/wallet` envelope.
+public struct WalletBalanceResponse: Decodable, Sendable, Hashable {
+    public let wallet: Wallet
+
+    public struct Wallet: Decodable, Sendable, Hashable, Identifiable {
+        public let id: String
+        /// Available balance in integer cents.
+        public let balance: Int
+        public let currency: String
+        public let frozen: Bool
+        public let lifetimeWithdrawals: Int?
+        public let lifetimeReceived: Int?
+
+        private enum CodingKeys: String, CodingKey {
+            case id
+            case balance
+            case currency
+            case frozen
+            case lifetimeWithdrawals = "lifetime_withdrawals"
+            case lifetimeReceived = "lifetime_received"
+        }
+    }
+}
+
+// MARK: - Transactions (GET /api/wallet/transactions — backend/routes/wallet.js:124)
+
+/// `GET /api/wallet/transactions` envelope.
+public struct WalletTransactionsResponse: Decodable, Sendable, Hashable {
+    public let transactions: [WalletTransactionDTO]
+    public let total: Int?
+    public let limit: Int?
+    public let offset: Int?
+}
+
+/// A single `WalletTransaction` row. Only the fields the Recent-activity feed
+/// renders are modelled; the decoder ignores the rest (`wallet_id`,
+/// `payment_id`, `gig_id`, `metadata`, …).
+public struct WalletTransactionDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    /// One of `deposit | withdrawal | gig_income | gig_payment | tip_income |
+    /// tip_sent | refund | adjustment | transfer_in | transfer_out |
+    /// cancellation_fee`.
+    public let type: String
+    /// Positive integer cents (the DB enforces `amount > 0`); direction is
+    /// derived from `type`.
+    public let amount: Int
+    public let description: String?
+    public let currency: String?
+    /// One of `completed | pending | failed | reversed`.
+    public let status: String
+    public let counterpartyId: String?
+    public let createdAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case type
+        case amount
+        case description
+        case currency
+        case status
+        case counterpartyId = "counterparty_id"
+        case createdAt = "created_at"
+    }
+}
+
+// MARK: - Pending release (GET /api/wallet/pending-release — backend/routes/wallet.js:160)
+
+/// `GET /api/wallet/pending-release` — escrow breakdown. All values are
+/// integer cents / counts.
+public struct WalletPendingReleaseResponse: Decodable, Sendable, Hashable {
+    public let inReviewCents: Int
+    public let releasingSoonCents: Int
+    public let totalPendingCents: Int
+    public let inReviewCount: Int
+    public let releasingSoonCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case inReviewCents = "in_review_cents"
+        case releasingSoonCents = "releasing_soon_cents"
+        case totalPendingCents = "total_pending_cents"
+        case inReviewCount = "in_review_count"
+        case releasingSoonCount = "releasing_soon_count"
+    }
+}
