@@ -71,8 +71,8 @@ final class TasksMapViewModelTests: XCTestCase {
         XCTAssertEqual(vm.selectedId, "g1")
         XCTAssertEqual(visible?.first?.category, .handyman)
         XCTAssertEqual(visible?.first?.price, "$60")
-        XCTAssertEqual(visible?.first(where: { $0.id == "g2" })?.price, "$22/walk")
-        XCTAssertEqual(visible?.first(where: { $0.id == "g2" })?.category, .petcare)
+        XCTAssertEqual(visible?.first { $0.id == "g2" }?.price, "$22/walk")
+        XCTAssertEqual(visible?.first { $0.id == "g2" }?.category, .petcare)
         // Distance was computed client-side, not "—".
         XCTAssertNotEqual(visible?.first?.distanceLabel, "—")
     }

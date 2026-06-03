@@ -213,7 +213,8 @@ final class SupportTrainDetailViewModelTests: XCTestCase {
         {"id":"s2","slot_date":"2025-12-03","slot_label":"Dinner","support_mode":"meal","status":"full","filled_count":1,"capacity":1}
       ],
       "my_reservations":[
-        {"id":"r1","slot_id":"s2","status":"reserved","contribution_mode":"cook","dish_title":"Lentil soup","created_at":"2025-11-20T00:00:00Z"}
+        {"id":"r1","slot_id":"s2","status":"reserved","contribution_mode":"cook","dish_title":"Lentil soup",
+         "created_at":"2025-11-20T00:00:00Z"}
       ],
       "updates":[],
       "organizers":[{"id":"o1","role":"primary","User":{"id":"u1","username":"diane","name":"Diane K."}}],

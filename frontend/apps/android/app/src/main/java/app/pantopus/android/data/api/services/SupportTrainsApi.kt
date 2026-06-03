@@ -100,7 +100,7 @@ interface SupportTrainsApi {
      * scoped to the viewer's role. Route
      * `backend/routes/supportTrains.js:3444`.
      *
-     * PREFIX NOTE: this client family targets `/api/support-trains/*`
+     * PREFIX NOTE: this client family targets `/api/support-trains/{...}`
      * (matching the shipped list/create siblings), while the Express router
      * is mounted at `/api/activities/support-trains` (`backend/app.js:398`).
      * Kept consistent with the siblings; see the P1-E delivery notes.

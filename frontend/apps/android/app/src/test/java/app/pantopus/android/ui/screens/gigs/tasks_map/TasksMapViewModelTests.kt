@@ -45,6 +45,7 @@ class TasksMapViewModelTests {
 
     // Anchor is TasksMapSampleData.anchor (40.7484, -73.9857); coords are
     // placed so handyman-1 is the closest task.
+    @Suppress("LongParameterList")
     private fun gig(
         id: String,
         category: String,

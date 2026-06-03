@@ -92,8 +92,7 @@ class SupportTrainsRepository
          * Detail / A13.13 Manage). Route
          * `backend/routes/supportTrains.js:3444`.
          */
-        suspend fun detail(supportTrainId: String): NetworkResult<SupportTrainDetailDto> =
-            safeApiCall { api.detail(supportTrainId) }
+        suspend fun detail(supportTrainId: String): NetworkResult<SupportTrainDetailDto> = safeApiCall { api.detail(supportTrainId) }
 
         /**
          * `POST /api/support-trains/:id/updates` — broadcast an update.

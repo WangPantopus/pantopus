@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.support_trains.detail
 
@@ -200,7 +200,8 @@ object SupportTrainDetailProjection {
             dayLabel = date?.let { format(it, "EEE") } ?: "",
             dateLabel = date?.let { format(it, "d") } ?: "",
             state = if (covered) SlotRowState.Covered else SlotRowState.Open,
-            author = null, // detail endpoint omits the per-slot helper
+            // Detail endpoint omits the per-slot helper.
+            author = null,
             title = if (covered) label else "Open · $label",
             subtitle = dropWindow(slot.endTime),
             mine = false,

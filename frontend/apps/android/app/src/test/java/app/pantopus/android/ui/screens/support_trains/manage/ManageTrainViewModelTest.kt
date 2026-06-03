@@ -52,8 +52,7 @@ class ManageTrainViewModelTest {
         SavedStateHandle(mapOf(ManageTrainViewModel.TRAIN_ID_KEY to trainId))
 
     /** Offline VM seeded with the design fixture (no `load()` network). */
-    private fun makeVm(): ManageTrainViewModel =
-        ManageTrainViewModel(repo, savedState()).also { it.load(ManageTrainSampleData.active) }
+    private fun makeVm(): ManageTrainViewModel = ManageTrainViewModel(repo, savedState()).also { it.load(ManageTrainSampleData.active) }
 
     private fun slot(
         id: String,
