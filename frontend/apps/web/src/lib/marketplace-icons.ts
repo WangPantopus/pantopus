@@ -29,6 +29,11 @@ export const CATEGORY_ICONS: Record<CategoryKey, string> = {
   collectibles: 'Gem',
   appliances: 'Refrigerator',
   free_stuff: 'Gift',
+  food_baked_goods: 'Utensils',
+  plants_garden: 'Sprout',
+  pet_supplies: 'PawPrint',
+  arts_crafts: 'Palette',
+  tickets_events: 'Ticket',
   other: 'Package',
 };
 
@@ -41,6 +46,10 @@ export const LISTING_TYPE_ICONS: Record<ListingTypeKey, string> = {
   vehicle_sale: 'Car',
   vehicle_rent: 'Car',
   service_gig: 'Hammer',
+  pre_order: 'CalendarClock',
+  recurring: 'Repeat',
+  trade_swap: 'RefreshCw',
+  flash_sale: 'Zap',
 };
 
 /** Lucide icon name per filter pill */
@@ -52,4 +61,7 @@ export const FILTER_PILL_ICONS: Record<FilterPillKey, string> = {
   trusted: 'ShieldCheck',
   new_today: 'Sparkles',
   remote: 'Globe',
+  price_0_25: 'DollarSign',
+  price_25_100: 'BadgeDollarSign',
+  price_100_up: 'CircleDollarSign',
 };

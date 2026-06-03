@@ -125,11 +125,11 @@ export default function UserIdentityLink({
   const resolveConnectionId = async (targetUserId: string, mode: 'pending' | 'connected') => {
     if (mode === 'pending') {
       const pending = await api.relationships.getPendingRequests();
-      const rel = (pending.requests || []).find((r: Record<string, unknown>) => (r.requester as Record<string, unknown>)?.id === targetUserId);
+      const rel = (pending.requests || []).find((r) => r.requester?.id === targetUserId);
       return rel?.id || null;
     }
     const connected = await api.relationships.getConnections();
-    const rel = (connected.relationships || []).find((r: Record<string, unknown>) => (r.other_user as Record<string, unknown>)?.id === targetUserId);
+    const rel = (connected.relationships || []).find((r) => r.other_user?.id === targetUserId);
     return rel?.id || null;
   };
 

@@ -147,15 +147,20 @@ export default function InviteFlow({
     setStep('role');
   };
 
-  const handleSubmit = async () => {
-    setError('');
-    setSending(true);
-    try {
-      const preset = presets.find((p) => p.key === selectedPreset);
-      await onInvite({
-        email: method === 'email' ? email.trim() : undefined,
-        user_id: method === 'username' ? selectedUser.id : undefined,
-        username: method === 'username' ? selectedUser.username : undefined,
+	  const handleSubmit = async () => {
+	    setError('');
+	    if (method === 'username' && !selectedUser) {
+	      setError('Please search and select a user');
+	      return;
+	    }
+	    setSending(true);
+	    try {
+	      const preset = presets.find((p) => p.key === selectedPreset);
+	      const inviteUser = method === 'username' ? selectedUser : null;
+	      await onInvite({
+	        email: method === 'email' ? email.trim() : undefined,
+	        user_id: inviteUser?.id,
+	        username: inviteUser?.username,
         relationship: preset?.role_base || 'member',
         preset_key: selectedPreset,
         message: message.trim() || undefined,
@@ -164,10 +169,10 @@ export default function InviteFlow({
       });
       setSuccess(
         method === 'email'
-          ? `Invitation sent to ${email}`
-          : method === 'username'
-          ? `Invitation sent to @${selectedUser.username}`
-          : 'Invite link generated'
+	          ? `Invitation sent to ${email}`
+	          : method === 'username'
+	          ? `Invitation sent to @${inviteUser?.username || usernameQuery}`
+	          : 'Invite link generated'
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send invitation');

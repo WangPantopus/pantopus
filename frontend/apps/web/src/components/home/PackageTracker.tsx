@@ -19,7 +19,7 @@ export default function PackageTracker({
   homeId,
   highlightPackageId,
 }: {
-  packages: Record<string, unknown>[];
+  packages: Record<string, any>[];
   onAdd?: () => void;
   onMarkPickedUp?: (pkgId: string) => void;
   homeId?: string;

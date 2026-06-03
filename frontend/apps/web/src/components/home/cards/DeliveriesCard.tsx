@@ -25,7 +25,7 @@ export function DeliveriesCardPreview({
   pendingPkgs,
   onExpand,
 }: {
-  packages: Record<string, unknown>[];
+  packages: Record<string, any>[];
   pendingPkgs: number;
   onExpand: () => void;
 }) {
@@ -77,11 +77,11 @@ export default function DeliveriesCard({
   onBack,
   highlightPackageId,
 }: {
-  packages: Record<string, unknown>[];
+  packages: Record<string, any>[];
   homeId: string;
   onAddPackage: () => void;
   onMarkPickedUp: (pkgId: string) => void;
-  onPackageClick?: (pkg: Record<string, unknown>) => void;
+  onPackageClick?: (pkg: Record<string, any>) => void;
   onBack: () => void;
   highlightPackageId?: string;
 }) {

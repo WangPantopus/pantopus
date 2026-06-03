@@ -59,7 +59,7 @@ export function clusterMarkers<T extends { latitude: number; longitude: number }
 
   for (const feature of clusters) {
     const [lng, lat] = feature.geometry.coordinates;
-    const props = feature.properties;
+    const props = feature.properties as Record<string, any>;
 
     if (props.cluster) {
       const clusterId = props.cluster_id;

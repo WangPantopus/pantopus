@@ -51,13 +51,22 @@ interface ReviewData {
   id: string;
   rating: number;
   comment?: string;
+  reviewer?: {
+    id?: string;
+    username?: string;
+    profile_picture_url?: string;
+  };
+  reviewer_username?: string;
   reviewer_name?: string;
+  reviewer_avatar?: string;
   [key: string]: unknown;
 }
 
 interface GigData {
   id: string;
   title?: string;
+  category?: string;
+  created_at?: string;
   status?: string;
   [key: string]: unknown;
 }
@@ -180,7 +189,7 @@ export default function OverviewTab({
               <div key={gig.id} className="rounded-lg border border-app p-3 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-app">{gig.title}</p>
-                  <p className="text-xs text-app-secondary">{gig.category || 'General'} • {new Date(gig.created_at).toLocaleDateString()}</p>
+                  <p className="text-xs text-app-secondary">{gig.category || 'General'} • {gig.created_at ? new Date(gig.created_at).toLocaleDateString() : 'Unknown date'}</p>
                 </div>
                 <span className="text-xs px-2 py-1 rounded-full bg-surface-muted text-app-secondary">{(gig.status || 'open').toUpperCase()}</span>
               </div>

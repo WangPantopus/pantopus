@@ -47,7 +47,7 @@ export default function NearbyTodayCard({
   selectedCategory = '',
   onSelectCategory,
 }: {
-  gigs: Record<string, unknown>[];
+  gigs: Record<string, any>[];
   loading: boolean;
   selectedCategory?: string;
   onSelectCategory?: (key: string) => void;

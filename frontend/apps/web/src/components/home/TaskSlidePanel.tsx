@@ -36,9 +36,9 @@ export default function TaskSlidePanel({
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Record<string, unknown>) => Promise<void>;
-  task?: Record<string, unknown> | null; // null = create, object = edit
-  members: Record<string, unknown>[];
+  onSave: (data: Record<string, any>) => Promise<void>;
+  task?: Record<string, any> | null; // null = create, object = edit
+  members: Record<string, any>[];
   homeId?: string;
 }) {
   const isEdit = !!task;
@@ -94,7 +94,7 @@ export default function TaskSlidePanel({
     setSaving(true);
     setError('');
     try {
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, any> = {
         task_type: taskType,
         title: title.trim(),
         description: description.trim() || undefined,

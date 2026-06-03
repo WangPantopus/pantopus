@@ -6,10 +6,6 @@
 export const colors = {
   // ─── Primary (Sky-blue, slightly warm) ───────────────────
   primary: {
-    // Off-white tinted background — sits between pure surface and primary-50.
-    // Used for the unread-row tint in notifications and any "barely there"
-    // primary surface that needs to read as inert against a clean white tab.
-    25: '#f8fbff',
     50: '#f0f9ff',
     100: '#e0f2fe',
     200: '#bae6fd',
@@ -71,17 +67,6 @@ export const colors = {
     home: { color: '#16A34A', bg: '#DCFCE7', light: '#F0FDF4' },
     business: { color: '#7C3AED', bg: '#F3E8FF', light: '#FAF5FF' },
     professional: { color: '#D97706', bg: '#FEF3C7', light: '#FFFBEB' },
-    // T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
-    // on My tasks V2 rows (gradient archetype tile + sparkles disc +
-    // archetype overline) and the Magic ingest FAB on Mailbox-A17 root.
-    // Mirrors `Theme.Color.magic*` on iOS and `PantopusColors.magic*`
-    // on Android.
-    magic: {
-      color: '#6D28D9',
-      bg: '#EDE9FE',
-      light: '#F5F3FF',
-      border: '#DDD6FE',
-    },
   },
 
   // ─── Accent palette ──────────────────────────────────────

@@ -18,8 +18,8 @@ interface PaymentMethod {
 }
 
 /** Backend / DB uses card_* and payment_method_type; align with mobile PaymentMethodsTab. */
-function normalizePaymentMethod(raw: Record<string, unknown>): PaymentMethod {
-  const nested = (raw.card && typeof raw.card === 'object' ? raw.card : raw) as Record<string, unknown>;
+function normalizePaymentMethod(raw: Record<string, any>): PaymentMethod {
+  const nested = (raw.card && typeof raw.card === 'object' ? raw.card : raw) as Record<string, any>;
   const brandRaw =
     (nested.brand as string | undefined) ||
     (nested.card_brand as string | undefined) ||
@@ -97,7 +97,7 @@ export default function PaymentMethodList({
       setError(null);
       const result = await getPaymentMethods();
       const rows = result.paymentMethods || [];
-      setMethods(rows.map((m) => normalizePaymentMethod(m as Record<string, unknown>)));
+      setMethods(rows.map((m) => normalizePaymentMethod(m as Record<string, any>)));
     } catch (err: any) {
       setError(err?.message || 'Failed to load payment methods');
     } finally {

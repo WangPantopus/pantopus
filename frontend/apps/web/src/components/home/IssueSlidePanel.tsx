@@ -27,8 +27,8 @@ export default function IssueSlidePanel({
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Record<string, unknown>) => Promise<void>;
-  issue?: Record<string, unknown>; // null = create, object = edit
+  onSave: (data: Record<string, any>) => Promise<void>;
+  issue?: Record<string, any>; // null = create, object = edit
 }) {
   const isEdit = !!issue;
 
@@ -70,7 +70,7 @@ export default function IssueSlidePanel({
     setSaving(true);
     setError('');
     try {
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, any> = {
         title: title.trim(),
         description: description.trim() || undefined,
         severity,

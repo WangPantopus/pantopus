@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Home, MessageCircle, Star, Calendar, Search, AlertTriangle, Tag, Newspaper, Trophy, User, Megaphone } from 'lucide-react';
 import type { PostType } from '@pantopus/api';
 
-type FeedSurface = 'place' | 'following' | 'connections';
+type FeedSurface = 'place' | 'personas' | 'connections';
 
 const PLACE_FILTERS: { key: PostType | 'all'; label: string; icon: ReactNode; color: string }[] = [
   { key: 'all', label: 'All', icon: <Home className="w-4 h-4" />, color: '#6B7280' },

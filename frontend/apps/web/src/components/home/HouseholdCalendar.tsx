@@ -36,10 +36,10 @@ export default function HouseholdCalendar({
   events,
   packages,
 }: {
-  tasks: Record<string, unknown>[];
-  bills: Record<string, unknown>[];
-  events: Record<string, unknown>[];
-  packages: Record<string, unknown>[];
+  tasks: Record<string, any>[];
+  bills: Record<string, any>[];
+  events: Record<string, any>[];
+  packages: Record<string, any>[];
 }) {
   const now = new Date();
   const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);

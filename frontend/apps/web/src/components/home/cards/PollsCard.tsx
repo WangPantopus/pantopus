@@ -14,7 +14,7 @@ export function PollsCardPreview({
   polls,
   onExpand,
 }: {
-  polls: Record<string, unknown>[];
+  polls: Record<string, any>[];
   onExpand: () => void;
 }) {
   const openPolls = polls.filter((p) => p.status === 'open');
@@ -177,7 +177,7 @@ function PollItem({
   voting,
   showResults,
 }: {
-  poll: Record<string, unknown>;
+  poll: Record<string, any>;
   onVote?: (idx: number) => void;
   onClose?: () => void;
   voting?: boolean;
@@ -191,7 +191,7 @@ function PollItem({
 
   // Count votes per option
   const voteCounts = options.map((_: unknown, i: number) =>
-    votes.filter((v: Record<string, unknown>) => v.option_index === i).length
+    votes.filter((v: Record<string, any>) => v.option_index === i).length
   );
 
   return (

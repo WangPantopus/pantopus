@@ -5,13 +5,13 @@ import { confirmStore } from '@/components/ui/confirm-store';
 import Field from '../shared/Field';
 
 interface CatalogTabProps {
-  catalog: Record<string, unknown>[];
+  catalog: Record<string, any>[];
   businessId: string;
   onUpdate: () => void;
 }
 
 export default function CatalogTab({ catalog: initialCatalog, businessId, onUpdate }: CatalogTabProps) {
-  const [items, setItems] = useState<Record<string, unknown>[]>(initialCatalog);
+  const [items, setItems] = useState<Record<string, any>[]>(initialCatalog);
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', kind: 'service', price_cents: '', description: '' });
   const [saving, setSaving] = useState(false);

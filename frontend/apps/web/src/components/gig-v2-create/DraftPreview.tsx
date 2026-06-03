@@ -74,13 +74,16 @@ export default function DraftPreview({
     setPosting(true);
     setError('');
     try {
-      const lat = Number(location?.latitude);
-      const lng = Number(location?.longitude);
-      const addr = typeof location?.address === 'string' ? location.address.trim() : '';
-      const requestLocation =
-        Number.isFinite(lat) && Number.isFinite(lng) && addr
-          ? {
-              mode: location?.mode || 'address',
+	      const lat = Number(location?.latitude);
+	      const lng = Number(location?.longitude);
+	      const addr = typeof location?.address === 'string' ? location.address.trim() : '';
+	      const locationMode = (['home', 'address', 'current', 'custom'] as const).includes(location?.mode as any)
+	        ? location?.mode as 'home' | 'address' | 'current' | 'custom'
+	        : 'address';
+	      const requestLocation =
+	        Number.isFinite(lat) && Number.isFinite(lng) && addr
+	          ? {
+	              mode: locationMode,
               latitude: lat,
               longitude: lng,
               address: addr,

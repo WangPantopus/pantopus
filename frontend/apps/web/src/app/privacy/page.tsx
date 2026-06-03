@@ -61,7 +61,7 @@ export default function PrivacyPage() {
 
         <PolicySection title="1. Who we are">
           <p>
-            Pantopus is a neighborhood platform that connects verified residents, local gig workers, households, and local businesses. We are the data controller for information collected through Pantopus.
+            Pantopus is a real-world network that connects verified people, homes, local work, businesses, and Beacons. We are the data controller for information collected through Pantopus.
           </p>
           <p>
             For privacy questions, contact us at{' '}
@@ -95,7 +95,7 @@ export default function PrivacyPage() {
 
         <PolicySection title="4. How sharing works">
           <p>
-            This is the most important section for a neighborhood platform, so we want to be clear.
+            This is the most important section for a real-world trust platform, so we want to be clear.
           </p>
           <div className="space-y-4 mt-4">
             <div className="bg-app-surface-raised/60 border border-app-border-subtle rounded-xl p-5">
@@ -212,7 +212,7 @@ function SiteNav() {
             <LayoutDashboard className="w-7 h-7 text-primary-600" />
             <div className="flex flex-col leading-none">
               <span className="text-xl font-bold tracking-tight text-primary-700 dark:text-primary-400">Pantopus</span>
-              <span className="hidden sm:block text-[10px] font-medium text-app-text-muted dark:text-app-text-secondary tracking-wide uppercase">Digital Neighborhood OS</span>
+              <span className="hidden sm:block text-[10px] font-medium text-app-text-muted dark:text-app-text-secondary tracking-wide uppercase">Your real-world network</span>
             </div>
           </Link>
           <div className="flex items-center gap-3">
@@ -236,7 +236,7 @@ function SiteFooter() {
               <span className="text-lg font-bold text-white">Pantopus</span>
             </div>
             <p className="text-sm text-app-text-secondary leading-relaxed max-w-xs">
-              Your Digital Neighborhood Operating System. Verified people, real homes, local work — all in one place.
+              Your real-world network. Verified people, real homes, local work, and Beacons in one place.
             </p>
           </div>
           <div>

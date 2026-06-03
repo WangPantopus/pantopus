@@ -41,7 +41,7 @@ function HorizontalScrollSection({
         {items.map((item) => (
           <div key={item.id} className="flex-shrink-0 w-[200px] sm:w-[220px] snap-start">
             <ListingCard
-              item={item as any}
+              item={item}
               onSave={() => onSave(item.id)}
               onClick={() => router.push(`/app/marketplace/${item.id}`)}
             />
@@ -62,7 +62,7 @@ function WantedRow({
   onClick: () => void;
 }) {
   const budget = item.budget_max ? `$${Number(item.budget_max).toFixed(0)}` : null;
-  const creator = (item as any).creator || {};
+  const creator = (item.creator || {}) as NonNullable<Listing['creator']>;
   const name = creator?.first_name || creator?.name || creator?.username || 'Someone';
   const profileHref = creator?.username ? `/${creator.username}` : null;
 
@@ -167,7 +167,7 @@ function SparseGrid({
         style={{ animationFillMode: 'forwards' }}
       >
         <p className="text-sm text-app-text-muted leading-relaxed">
-          Your neighborhood marketplace is just getting started! Here {allItems.length === 1 ? 'is' : 'are'} the{' '}
+          Your marketplace is just getting started! Here {allItems.length === 1 ? 'is' : 'are'} the{' '}
           <strong className="text-app-text-strong">{data.total_active}</strong> listing{data.total_active !== 1 ? 's' : ''}{' '}
           nearby.
         </p>
@@ -178,7 +178,7 @@ function SparseGrid({
         {allItems.map((item) => (
           <ListingCard
             key={item.id}
-            item={item as any}
+            item={item}
             onSave={() => onSave(item.id)}
             onClick={() => router.push(`/app/marketplace/${item.id}`)}
           />
@@ -342,7 +342,7 @@ export default function MarketplaceDiscoveryFeed({
             {sections.nearby_deals.map((item) => (
               <ListingCard
                 key={item.id}
-                item={item as any}
+                item={item}
                 onSave={() => onSave(item.id)}
                 onClick={() => router.push(`/app/marketplace/${item.id}`)}
               />

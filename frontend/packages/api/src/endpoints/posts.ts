@@ -9,7 +9,7 @@ import { get, post, put, del, patch } from '../client';
 
 export type {
   PostType, PostVisibility, PostFormat, LocationPrecision, VisibilityScope,
-  SafetyAlertKind, FeedSurface, DistributionTarget, PostAs, Audience,
+  SafetyAlertKind, FeedSurface, DistributionTarget, PostAs, PersonalPostAs, PersonaPostAudience, Audience,
   FeedScope, TrustLevel, MapLayerType, PostCreator, PostComment,
   PostingIdentity, Post, MatchedBusiness,
 } from '@pantopus/types/post';
@@ -22,6 +22,7 @@ import type {
   LocationPrecision,
   MapLayerType,
   MatchedBusiness,
+  PersonaPostAudience,
   Post,
   PostAs,
   PostComment,
@@ -43,7 +44,7 @@ export async function getMatchedBusinesses(
 // ============ v1.1 CURSOR-PAGINATED FEEDS ============
 
 export interface CursorPagination {
-  nextCursor: { createdAt: string; id: string } | null;
+  nextCursor: { createdAt: string; id: string; rankBucket?: number } | null;
   hasMore: boolean;
 }
 
@@ -53,20 +54,52 @@ export interface FeedResponseV2 {
   emptyGraph?: boolean;
   requiresViewingLocation?: boolean;
   message?: string;
+  activeEventKey?: string | null;
+  noActiveEvent?: boolean;
 }
+
+export type FeedTopic = 'sports';
+export type SportsMode = 'for_you' | 'local' | 'event' | 'watch';
 
 export async function getFeedV2(params: {
   surface: FeedSurface;
   limit?: number;
   cursorCreatedAt?: string;
   cursorId?: string;
+  cursorRankBucket?: number;
   postType?: PostType;
   latitude?: number;
   longitude?: number;
   radiusMiles?: number;
   tags?: string;
+  topic?: FeedTopic;
+  sportsMode?: SportsMode;
+  eventKey?: string;
 }): Promise<FeedResponseV2> {
   return get('/api/posts/feed', params);
+}
+
+// ============ SPORTS TOPIC LANE ============
+
+export interface ActiveSportsEvent {
+  event_key: string;
+  display_name: string;
+  short_label: string;
+  league: string;
+  country: string;
+  starts_at: string;
+  ends_at: string;
+  priority: number;
+  cadence?: Record<string, unknown>;
+}
+
+export interface ActiveSportsEventsResponse {
+  primaryEvent: ActiveSportsEvent | null;
+  events: ActiveSportsEvent[];
+}
+
+export async function getActiveSportsEvents(): Promise<ActiveSportsEventsResponse> {
+  return get('/api/sports/active-events');
 }
 
 // ============ PLACE ELIGIBILITY ============
@@ -104,7 +137,7 @@ export interface MapMarker {
   // Post fields
   post_type?: PostType;
   post_as?: PostAs;
-  audience?: Audience;
+  audience?: Audience | PersonaPostAudience;
   content?: string;
   location_name?: string;
   home_address?: string;
@@ -181,6 +214,7 @@ export async function createPost(data: {
   title?: string;
   mediaUrls?: string[];
   mediaTypes?: string[];
+  mediaThumbnails?: string[];
   mediaLiveUrls?: string[];
   postType?: PostType;
   postFormat?: PostFormat;
@@ -196,6 +230,7 @@ export async function createPost(data: {
   tags?: string[];
   // Feed redesign fields
   postAs?: PostAs;
+  identityContextId?: string;
   audience?: Audience;
   targetPlaceId?: string;
   businessId?: string;
@@ -222,14 +257,13 @@ export async function createPost(data: {
   refTaskId?: string;
   // v1.1: Distribution targets & cross-post
   distributionTargets?: DistributionTarget[];
-  crossPostToFollowers?: boolean;
   crossPostToConnections?: boolean;
   gpsTimestamp?: string;
   gpsLatitude?: number;
   gpsLongitude?: number;
   // v1.2: Social layer fields
   purpose?: string;
-  profileVisibilityScope?: 'public' | 'followers' | 'connections' | 'local_context' | 'hidden';
+  profileVisibilityScope?: 'public' | 'connections' | 'local_context' | 'hidden';
   showOnProfile?: boolean;
 }): Promise<{ message: string; post: Post }> {
   return post('/api/posts', data);
@@ -243,6 +277,7 @@ export async function updatePost(postId: string, data: {
   content?: string;
   mediaUrls?: string[];
   mediaTypes?: string[];
+  mediaThumbnails?: string[];
   postType?: PostType;
   visibility?: PostVisibility;
 }): Promise<{ message: string; post: Post }> {
@@ -354,25 +389,6 @@ export async function toggleCommentLike(postId: string, commentId: string): Prom
   return post(`/api/posts/${postId}/comments/${commentId}/like`);
 }
 
-// ============ FOLLOWS ============
-// Canonical follow endpoints live under /api/users/:id/follow
-// These delegate to the canonical endpoints for backward compatibility.
-
-/** @deprecated Use users.followUser instead */
-export async function followUser(userId: string): Promise<{ message: string; following: boolean }> {
-  return post(`/api/users/${userId}/follow`);
-}
-
-/** @deprecated Use users.unfollowUser instead */
-export async function unfollowUser(userId: string): Promise<{ message: string; following: boolean }> {
-  return del(`/api/users/${userId}/follow`);
-}
-
-/** @deprecated Use users.getFollowing instead */
-export async function getFollowing(): Promise<{ following: any[] }> {
-  return get('/api/posts/following');
-}
-
 // ============ USER POSTS ============
 
 export async function getUserPosts(userId: string, params?: {
@@ -407,7 +423,6 @@ export interface FeedPreferences {
   user_id: string;
   hide_deals_place: boolean;
   hide_alerts_place: boolean;
-  show_politics_following?: boolean;
   show_politics_connections?: boolean;
   show_politics_place?: boolean;
 }
@@ -419,7 +434,6 @@ export async function getFeedPreferences(): Promise<{ preferences: FeedPreferenc
 export async function updateFeedPreferences(data: {
   hideDealsPlace?: boolean;
   hideAlertsPlace?: boolean;
-  showPoliticsFollowing?: boolean;
   showPoliticsConnections?: boolean;
   showPoliticsPlace?: boolean;
 }): Promise<{ message: string; preferences: FeedPreferences }> {

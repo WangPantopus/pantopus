@@ -36,7 +36,7 @@ export default function GigReviewPage() {
         setMe(profile);
         setGig(g);
 
-        const mine = (gigReviews?.reviews || []).find((r: Record<string, unknown>) => String(r.reviewer_id) === String(profile?.id));
+        const mine = (gigReviews?.reviews || []).find((r: Record<string, any>) => String(r.reviewer_id) === String(profile?.id));
         setExistingReview(mine || null);
       } catch (err: unknown) {
         if (!mounted) return;

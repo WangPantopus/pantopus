@@ -7,7 +7,7 @@ import type { SeatListItem } from '@pantopus/types';
 import { SeatCard, InviteSeatModal, EditSeatModal } from '../seats';
 
 interface TeamTabProps {
-  team: Record<string, unknown>[];
+  team: Record<string, any>[];
   businessId: string;
   access: { hasAccess: boolean; isOwner: boolean; role_base: string | null };
   onUpdate: () => void;
@@ -93,7 +93,7 @@ export default function TeamTab({ businessId, access, onUpdate }: TeamTabProps) 
       <div className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-5 py-4">
         <ShieldCheck className="w-5 h-5 text-violet-600 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium text-violet-800">Identity Firewall active</p>
+          <p className="text-sm font-medium text-violet-800">Profiles & Privacy active</p>
           <p className="text-xs text-violet-600 mt-0.5">
             Team members interact through their seat identity. Personal profiles, connections, and activity remain completely separated.
           </p>

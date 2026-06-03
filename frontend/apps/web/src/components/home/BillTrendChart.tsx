@@ -19,7 +19,7 @@ interface BillTrendChartProps {
 // ── Helpers ────────────────────────────────────────────────────
 
 function isInsufficient(b: unknown): b is BillBenchmarkInsufficient {
-  return !!b && typeof b === 'object' && (b as Record<string, unknown>).insufficient_data === true;
+  return !!b && typeof b === 'object' && (b as Record<string, any>).insufficient_data === true;
 }
 
 const MONTH_SHORT = [

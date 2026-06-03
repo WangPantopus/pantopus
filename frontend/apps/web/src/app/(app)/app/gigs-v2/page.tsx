@@ -117,7 +117,7 @@ function filtersReducer(state: FiltersState, action: FiltersAction): FiltersStat
 
 // Build the API filter payload from the reducer state + pagination cursor.
 function buildApiFilters(f: FiltersState, pageNum: number) {
-  const filters: Record<string, unknown> = {
+  const filters: Record<string, any> = {
     page: pageNum,
     limit: PAGE_SIZE,
     status: ['open'],
@@ -202,7 +202,7 @@ export default function GigsBrowseV2Page() {
     queryFn: async ({ pageParam = 1 }) => {
       const apiFilters = buildApiFilters(filters, pageParam as number);
       const result = await api.gigs.getGigs(apiFilters);
-      const resultData = result as Record<string, unknown>;
+      const resultData = result as Record<string, any>;
       const raw = (resultData?.gigs ?? resultData?.data ?? []) as GigListItem[];
       const items = Array.isArray(raw) ? raw : [];
       return { items, page: pageParam as number };

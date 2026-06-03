@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect } from 'react';
 
 interface ImageLightboxProps {
@@ -41,14 +40,18 @@ export default function ImageLightbox({ imageUrl, title, onClose }: ImageLightbo
         </div>
       )}
 
-      {/* Image */}
-      <Image
+      {/* Native img: arbitrary chat URLs; avoids next/image dev sizing warnings in lightbox. */}
+      <img
         src={imageUrl}
         alt={title || 'Image preview'}
-        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
-        width={900}
-        height={600}
-        unoptimized
+        className="rounded-lg shadow-2xl"
+        style={{
+          width: 'auto',
+          height: 'auto',
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+          objectFit: 'contain',
+        }}
         onClick={e => e.stopPropagation()}
       />
     </div>

@@ -28,12 +28,25 @@ import type {
   ListingType,
 } from '@pantopus/types';
 
+// Listing creator shape. After P0.4 the backend returns the new identity
+// shape (handle / displayName / avatarUrl) for marketplace listings; the
+// legacy fields below remain typed-optional so consumers migrating away
+// from the old keys can do so incrementally.
 export interface ListingCreator {
   id: string;
-  username: string;
+  /** P0.4: new canonical handle. Reads should prefer this over username. */
+  handle?: string | null;
+  /** P0.4: new canonical display name. Reads should prefer this over name/first_name. */
+  displayName?: string;
+  /** P0.4: new canonical avatar URL. Reads should prefer this over profile_picture_url. */
+  avatarUrl?: string | null;
+  /** Legacy, may still be populated on some surfaces; prefer `handle`. */
+  username?: string;
+  /** Legacy, may still be populated on some surfaces; prefer `displayName`. */
   name?: string;
   first_name?: string;
   last_name?: string;
+  /** Legacy, may still be populated on some surfaces; prefer `avatarUrl`. */
   profile_picture_url?: string;
 }
 
@@ -347,7 +360,10 @@ export async function getMyListings(params?: {
   limit?: number;
   offset?: number;
   status?: ListingStatus;
-}): Promise<{ listings: Listing[] }> {
+}): Promise<{
+  listings: Listing[];
+  pagination?: { limit: number; offset: number; total?: number | null; hasMore?: boolean };
+}> {
   return get('/api/listings/me', params);
 }
 

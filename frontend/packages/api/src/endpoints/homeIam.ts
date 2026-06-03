@@ -238,6 +238,7 @@ export async function createScopedGrant(homeId: string, data: {
   duration_hours?: number;
   passcode?: string;
   can_edit?: boolean;
+  permission_scope?: string;
 }): Promise<{ grant: ScopedGrant; token: string }> {
   return post(`/api/homes/${homeId}/scoped-grants`, data);
 }

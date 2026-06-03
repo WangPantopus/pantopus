@@ -14,3 +14,5 @@ export { default as SparseFeedSummary } from './SparseFeedSummary';
 export { default as PostSkeleton } from './PostSkeleton';
 export { default as PostMediaGrid } from './PostMediaGrid';
 export { default as PostTargetPicker } from './PostTargetPicker';
+export { default as TopicChipRow } from './TopicChipRow';
+export { default as SportsEventModule } from './SportsEventModule';

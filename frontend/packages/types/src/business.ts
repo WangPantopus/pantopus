@@ -19,7 +19,7 @@ export interface BusinessUser {
   tagline?: string | null;
   average_rating?: number | null;
   review_count?: number;
-  followers_count?: number;
+  profile?: BusinessProfile | null;
 }
 
 // ─── BusinessProfile ────────────────────────────────────────

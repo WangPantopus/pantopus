@@ -9,7 +9,7 @@ interface TodayCardProps {
   totalDue: number;
   pendingPkgs: number;
   memberCount: number;
-  events: Record<string, unknown>[];
+  events: Record<string, any>[];
   onNavigateTab: (tab: string) => void;
 }
 
@@ -52,7 +52,7 @@ export default function TodayCard({
   const allClear = summaryItems.length === 0;
 
   return (
-    <div className="rounded-xl border border-app-border bg-gradient-to-br from-white to-gray-50 shadow-sm p-5">
+    <div className="rounded-xl border border-app-border bg-app-surface shadow-sm p-5">
       {/* Date heading */}
       <div className="flex items-center justify-between mb-4">
         <div>

@@ -62,12 +62,19 @@ async function fetchHubData(): Promise<HubPayload> {
     }
   }
 
+  const profileCompleteness =
+    (hubPayload.setup as Partial<HubPayload['setup']>).profileCompleteness ?? { score: 0, checks: {}, missingFields: [] };
+
   return {
     ...hubPayload,
     homes,
     availability,
     cards,
-    setup: { ...hubPayload.setup, steps: setupSteps },
+    setup: {
+      ...hubPayload.setup,
+      steps: setupSteps,
+      profileCompleteness,
+    },
   };
 }
 

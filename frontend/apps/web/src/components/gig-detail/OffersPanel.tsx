@@ -11,7 +11,7 @@ import GigPaymentSetup from '@/components/payments/GigPaymentSetup';
 import { toast } from '@/components/ui/toast-store';
 import { confirmStore } from '@/components/ui/confirm-store';
 
-type AnyObj = Record<string, unknown>;
+type AnyObj = Record<string, any>;
 
 const formatUsd = (amount: number): string => `$${amount.toFixed(2)}`;
 const getOfferAmount = (offer: AnyObj | undefined): number | null => {
@@ -24,7 +24,7 @@ const getOfferAmount = (offer: AnyObj | undefined): number | null => {
 interface GigsOffersApiExt {
   getGigBids?: (gigId: string) => Promise<{ bids?: AnyObj[] } | AnyObj[]>;
   rejectBid?: (gigId: string, bidId: string) => Promise<unknown>;
-  counterBid?: (gigId: string, bidId: string, data: Record<string, unknown>) => Promise<unknown>;
+  counterBid?: (gigId: string, bidId: string, data: Record<string, any>) => Promise<unknown>;
   withdrawCounter?: (gigId: string, bidId: string) => Promise<unknown>;
 }
 
@@ -75,7 +75,7 @@ export default function OffersPanel({
     try {
       const gigsExt = api.gigs as unknown as GigsOffersApiExt;
       const list = await gigsExt.getGigBids?.(gigId);
-      const bids = ((list as Record<string, unknown>)?.bids ?? list ?? []) as AnyObj[];
+      const bids = ((list as Record<string, any>)?.bids ?? list ?? []) as AnyObj[];
       setOffers(bids);
     } catch (e: unknown) {
       console.error('Failed to load offers:', e);
@@ -103,8 +103,8 @@ export default function OffersPanel({
 
     try {
       setOffersError(null);
-      const resp = await api.gigs.acceptBid(gigId, bidId) as Record<string, unknown>;
-      const payment = (resp?.payment || null) as Record<string, unknown> | null;
+      const resp = await api.gigs.acceptBid(gigId, bidId) as Record<string, any>;
+      const payment = (resp?.payment || null) as Record<string, any> | null;
       const clientSecret = (resp?.clientSecret || payment?.clientSecret || null) as string | null;
       const setupIntentId = (resp?.setupIntentId || payment?.setupIntentId || null) as string | null;
       const roomId = resp?.roomId || null;
@@ -126,8 +126,8 @@ export default function OffersPanel({
       }
     } catch (err: unknown) {
       console.error('Accept failed:', err);
-      const errData = err && typeof err === 'object' ? (err as Record<string, unknown>) : null;
-      const errCode = errData?.data ? String((errData.data as Record<string, unknown>)?.code || '') : null;
+      const errData = err && typeof err === 'object' ? (err as Record<string, any>) : null;
+      const errCode = errData?.data ? String((errData.data as Record<string, any>)?.code || '') : null;
       if (errCode === 'payer_payment_required') {
         setOffersError('Add a payment method to accept this bid');
       } else if (errCode === 'pending_payment_conflict') {
@@ -159,7 +159,7 @@ export default function OffersPanel({
       }
     } catch (e: unknown) {
       console.error('Reject failed:', e);
-      const eData = e && typeof e === 'object' ? (e as Record<string, unknown>) : null;
+      const eData = e && typeof e === 'object' ? (e as Record<string, any>) : null;
       setOffersError(e instanceof Error ? e.message : 'Failed to reject bid');
     }
   };
@@ -172,7 +172,7 @@ export default function OffersPanel({
       await (api.gigs as unknown as GigsOffersApiExt).counterBid?.(gigId, String(offer.id), { amount: Number(amt), message: msg });
       await loadOffers();
     } catch (e: unknown) {
-      const eData = e && typeof e === 'object' ? (e as Record<string, unknown>) : null;
+      const eData = e && typeof e === 'object' ? (e as Record<string, any>) : null;
       setOffersError(e instanceof Error ? e.message : 'Failed to counter');
     }
   };
@@ -427,7 +427,7 @@ export default function OffersPanel({
               setPaymentClientSecret(null);
               if (pendingAcceptBidId) {
                 try {
-                  const result = await api.gigs.finalizeAccept(gigId, pendingAcceptBidId) as Record<string, unknown>;
+                  const result = await api.gigs.finalizeAccept(gigId, pendingAcceptBidId) as Record<string, any>;
                   const roomId = result?.roomId || null;
                   toast.success(
                     paymentIsSetupIntent

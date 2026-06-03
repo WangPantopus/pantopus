@@ -58,11 +58,6 @@ module.exports = {
         'app-home-bg':         'var(--color-identity-home-bg)',
         'app-business':        'var(--color-identity-business)',
         'app-business-bg':     'var(--color-identity-business-bg)',
-        // T6.0b — Magic Task lavender quartet.
-        'app-magic':           'var(--color-identity-magic)',
-        'app-magic-bg':        'var(--color-identity-magic-bg)',
-        'app-magic-light':     'var(--color-identity-magic-light)',
-        'app-magic-border':    'var(--color-identity-magic-border)',
       },
       borderRadius: theme.radii,
       keyframes: {

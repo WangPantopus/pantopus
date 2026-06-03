@@ -24,7 +24,7 @@ function EngagementChip({ mode }: { mode: string | null | undefined }) {
 
 // ─── Props ──────────────────────────────────────────────────
 interface GigCardV2Props {
-  gig: GigListItem & Record<string, unknown>;
+  gig: GigListItem & Record<string, any>;
   onClick: () => void;
   viewerUserId: string | null;
   acceptingGigId: string | null;

@@ -25,6 +25,19 @@ const SocketContext = createContext<SocketContextValue>({
   connected: false,
 });
 
+/** Where Socket.IO should connect from the browser. */
+function getSocketBaseUrl(): string {
+  if (typeof window === 'undefined') return API_BASE_URL;
+  const host = window.location.hostname;
+  const isLocalDevHost =
+    host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  // Local Next dev: rewrites do not reliably proxy WebSocket upgrades to an external
+  // backend — connect straight to NEXT_PUBLIC_API_URL (same as before).
+  // Production: same origin as the page so httpOnly `pantopus_access` is sent on the handshake.
+  if (isLocalDevHost) return API_BASE_URL;
+  return window.location.origin;
+}
+
 // ── Provider ─────────────────────────────────────────────────
 
 export function SocketProvider({ children }: { children: ReactNode }) {
@@ -81,7 +94,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socketRef.current = null;
     }
 
-    const nextSocket = io(API_BASE_URL, {
+    const nextSocket = io(getSocketBaseUrl(), {
       auth: { token: authToken },
       transports: ['websocket', 'polling'],
       tryAllTransports: true,

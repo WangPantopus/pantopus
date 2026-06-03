@@ -63,11 +63,15 @@ export default function ProfessionalPage() {
     setLoading(true);
     try {
       const res = await api.professional.getMyProfile();
-      setProfile(res.profile);
-      populateForm(res.profile);
-      setMode('view');
+      if (!res.profile) {
+        setProfile(null);
+        setMode('create');
+      } else {
+        setProfile(res.profile);
+        populateForm(res.profile);
+        setMode('view');
+      }
     } catch {
-      // No profile yet — show create mode
       setProfile(null);
       setMode('create');
     } finally {
@@ -79,14 +83,14 @@ export default function ProfessionalPage() {
     loadProfile();
   }, [loadProfile]);
 
-  const populateForm = (p: Record<string, unknown>) => {
+  const populateForm = (p: Record<string, any>) => {
     setHeadline((p.headline as string) || '');
     setBio((p.bio as string) || '');
     setCategories((p.categories as string[]) || []);
     setIsPublic((p.is_public as boolean) ?? true);
-    const pricingMeta = p.pricing_meta as Record<string, unknown> | undefined;
+    const pricingMeta = p.pricing_meta as Record<string, any> | undefined;
     setHourlyRate(pricingMeta?.hourly_rate?.toString() || '');
-    const serviceArea = p.service_area as Record<string, unknown> | undefined;
+    const serviceArea = p.service_area as Record<string, any> | undefined;
     setServiceCity((serviceArea?.city as string) || '');
     setServiceState((serviceArea?.state as string) || '');
     setRadiusKm(serviceArea?.radius_km?.toString() || '50');

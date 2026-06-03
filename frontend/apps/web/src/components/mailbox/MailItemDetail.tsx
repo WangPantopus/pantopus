@@ -9,7 +9,7 @@ import type {
 } from '@/types/mailbox';
 // Security: DOMPurify is required to sanitize HTML rendered via dangerouslySetInnerHTML.
 // Do not remove — mail content is untrusted user/external input (AUTH-3.2).
-import DOMPurify from 'dompurify';
+import DOMPurify, { type Config as DOMPurifyConfig } from 'dompurify';
 import TrustBadge from './TrustBadge';
 import UrgencyIndicator from './UrgencyIndicator';
 import DrawerBadge from './DrawerBadge';
@@ -39,7 +39,7 @@ function formatBytes(bytes: number): string {
 
 // ── HTML sanitization config (AUTH-3.2) ──────────────────────
 
-const SANITIZE_CONFIG: DOMPurify.Config = {
+const SANITIZE_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [
     'p', 'div', 'span', 'a', 'br', 'ul', 'ol', 'li',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -70,7 +70,7 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 });
 
 function sanitizeHtml(dirty: string): string {
-  return DOMPurify.sanitize(dirty, SANITIZE_CONFIG) as string;
+  return DOMPurify.sanitize(dirty, SANITIZE_CONFIG) as unknown as string;
 }
 
 // ── Block renderers ──────────────────────────────────────────

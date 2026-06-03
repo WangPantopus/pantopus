@@ -6,25 +6,29 @@
 import { get, post, put, patch, del } from '../client';
 import type { User, UserProfile, ProfileUpdateForm, ApiResponse, MonthlyReceipt, InviteProgress } from '@pantopus/types';
 
+function cleanPathParam(value: string): string {
+  return encodeURIComponent(String(value || '').trim().replace(/^@+/, ''));
+}
+
 /**
  * Get user profile by username (legacy — prefer getProfileById for UUID lookups)
  */
 export async function getProfile(userId: string): Promise<UserProfile> {
-  return get<UserProfile>(`/api/users/${userId}`);
+  return get<UserProfile>(`/api/users/${cleanPathParam(userId)}`);
 }
 
 /**
  * Get full public profile by user UUID
  */
 export async function getProfileById(userId: string): Promise<UserProfile> {
-  return get<UserProfile>(`/api/users/id/${userId}`);
+  return get<UserProfile>(`/api/users/id/${cleanPathParam(userId)}`);
 }
 
 /**
  * Get user profile by username
  */
 export async function getProfileByUsername(username: string): Promise<UserProfile> {
-  return get<UserProfile>(`/api/users/username/${username}`);
+  return get<UserProfile>(`/api/users/username/${cleanPathParam(username)}`);
 }
 
 /**

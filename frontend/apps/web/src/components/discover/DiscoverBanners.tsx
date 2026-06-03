@@ -9,7 +9,7 @@ import type { SearchScope } from './discoverTypes';
 export function EmptyState({ category, scope }: { category?: string; scope: SearchScope }) {
   const router = useRouter();
   const href = category ? `/app/gigs/new?category=${category}` : '/app/gigs-v2/new';
-  const isBusinessScope = scope === 'businesses' || (scope === 'all');
+  const isBusinessScope = scope === 'businesses';
   return (
     <div className="text-center py-16 px-6">
       <div className="mb-4 flex justify-center"><Search className="w-10 h-10 text-app-muted" /></div>

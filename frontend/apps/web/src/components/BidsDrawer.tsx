@@ -46,7 +46,7 @@ export default function BidsDrawer({
 
   const accept = async (bidId: string) => {
     const selectedBid = bids.find((b) => String(b?.id) === String(bidId));
-    const rawAmount = Number((selectedBid as Record<string, unknown> | undefined)?.amount ?? gig.price ?? NaN);
+    const rawAmount = Number((selectedBid as Record<string, any> | undefined)?.amount ?? gig.price ?? NaN);
     const amount = Number.isFinite(rawAmount) ? rawAmount : null;
     const confirmed = await confirmStore.open({
       title: amount != null && amount > 0 ? 'Authorize payment method?' : 'Accept this bid?',
@@ -63,11 +63,11 @@ export default function BidsDrawer({
     setBusyId(bidId);
     setError('');
     try {
-      const resp = await api.gigs.acceptBid(gig.id, bidId) as Record<string, unknown>;
+      const resp = await api.gigs.acceptBid(gig.id, bidId) as Record<string, any>;
       await load();
       onChanged();
 
-      const payment = (resp?.payment as Record<string, unknown>) || null;
+      const payment = (resp?.payment as Record<string, any>) || null;
       const clientSecret = (resp?.clientSecret as string) || (payment?.clientSecret as string) || null;
       const setupIntentId = (resp?.setupIntentId as string) || (payment?.setupIntentId as string) || null;
       const roomId = (resp?.roomId as string) || null;

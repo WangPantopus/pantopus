@@ -12,40 +12,18 @@ import {
   XCircle, Ban, Hourglass, Handshake, Bell, PartyPopper, Rocket,
   CheckSquare, Mailbox,
 } from 'lucide-react';
-import PageHeader from '@/components/PageHeader';
 import SearchInput from '@/components/SearchInput';
 import { BID_STATUS, statusClasses } from '@/components/statusColors';
 import { formatTimeAgo as timeAgo } from '@pantopus/ui-utils';
-import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import { toast } from '@/components/ui/toast-store';
 import { confirmStore } from '@/components/ui/confirm-store';
+import { ListArchetype } from '@/components/archetypes';
+import { ProBadge } from '@/components/ProBadge';
 import type { GigBidWithUser } from '@pantopus/types';
 
-// T5.3.1 — the mobile design groups the 7 backend statuses into 4 tabs.
-// Web mirrors the same tab vocabulary so iOS / Android / web parity holds.
-// See docs/t5-buildout-plan.md "My bids implementation notes" for the
-// canonical bucket → status mapping.
-type FilterStatus = 'active' | 'accepted' | 'rejected' | 'done';
-
-function bidTabBucket(bid: GigBidWithUser): FilterStatus {
-  const bidStatus = (bid.status ?? '').toLowerCase();
-  const gigStatus = (bid.gig?.status ?? '').toLowerCase();
-  if (gigStatus === 'cancelled' && bidStatus !== 'accepted') return 'rejected';
-  if (gigStatus === 'completed' && bidStatus === 'accepted') return 'done';
-  if (bidStatus === 'pending' || bidStatus === 'countered') return 'active';
-  if (bidStatus === 'accepted' || bidStatus === 'assigned') return 'accepted';
-  if (
-    bidStatus === 'rejected' ||
-    bidStatus === 'declined' ||
-    bidStatus === 'withdrawn' ||
-    bidStatus === 'expired'
-  ) {
-    return 'rejected';
-  }
-  return 'active';
-}
+type FilterStatus = 'all' | 'pending' | 'accepted' | 'rejected' | 'countered' | 'withdrawn' | 'expired';
 
 const WITHDRAW_REASONS = [
   { value: 'schedule_conflict', label: 'Schedule conflict', icon: CalendarDays },
@@ -56,7 +34,7 @@ const WITHDRAW_REASONS = [
 
 export default function MyBidsPage() {
   const router = useRouter();
-  const [filter, setFilter] = useState<FilterStatus>('active');
+  const [filter, setFilter] = useState<FilterStatus>('all');
   const [search, setSearch] = useState('');
   const [withdrawModal, setWithdrawModal] = useState<{ gigId: string; bidId: string } | null>(null);
   const [withdrawReason, setWithdrawReason] = useState('');
@@ -71,7 +49,7 @@ export default function MyBidsPage() {
     queryKey: queryKeys.myBids(),
     queryFn: async () => {
       const response = await api.gigs.getMyBids({ limit: 200 });
-      const resObj = response as Record<string, unknown>;
+      const resObj = response as Record<string, any>;
       return (resObj?.bids || resObj?.data || []) as GigBidWithUser[];
     },
     staleTime: 30_000,
@@ -150,7 +128,7 @@ export default function MyBidsPage() {
   };
 
   const filteredBids = bids.filter(bid => {
-    if (bidTabBucket(bid) !== filter) return false;
+    if (filter !== 'all' && bid.status !== filter) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       const gig = bid.gig || {};
@@ -169,11 +147,6 @@ export default function MyBidsPage() {
     countered: bids.filter(b => b.status === 'countered').length,
     withdrawn: bids.filter(b => b.status === 'withdrawn').length,
     expired: bids.filter(b => b.status === 'expired').length,
-    // T5.3.1 — 4-tab grouping matching iOS / Android.
-    active: bids.filter(b => bidTabBucket(b) === 'active').length,
-    activeAccepted: bids.filter(b => bidTabBucket(b) === 'accepted').length,
-    activeRejected: bids.filter(b => bidTabBucket(b) === 'rejected').length,
-    done: bids.filter(b => bidTabBucket(b) === 'done').length,
   };
 
   const totalEarnings = bids
@@ -186,98 +159,67 @@ export default function MyBidsPage() {
   return (
     <div className="min-h-[calc(100vh-64px)]">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <PageHeader
-          title="My Bids"
+        <ListArchetype<GigBidWithUser>
+          title={<span className="inline-flex items-center gap-2">My bids<ProBadge /></span>}
           subtitle={`${stats.pending} pending${stats.countered ? ` · ${stats.countered} countered` : ''} · $${totalEarnings} potential earnings`}
-          ctaLabel="Browse Tasks"
-          ctaOnClick={() => router.push('/app/gigs')}
-        >
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Search your bids…"
-            className="max-w-sm"
-          />
-        </PageHeader>
+          primaryAction={{ label: 'Browse tasks', onClick: () => router.push('/app/gigs') }}
+          headerFilters={
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search your bids…"
+              className="max-w-sm"
+            />
+          }
+          renderHeader={() => (
+            <>
+              {fetchError && <ErrorState message={fetchError} onRetry={() => loadBids()} />}
 
-        {/* Error Banner */}
-        {fetchError && (
-          <ErrorState message={fetchError} onRetry={() => loadBids()} />
-        )}
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <SummaryCard label="Total bids" value={stats.all} tone="neutral" />
+                <SummaryCard label="Pending" value={stats.pending} tone="warning" />
+                <SummaryCard label="Accepted" value={stats.accepted} tone="info" />
+                <SummaryCard label="Potential earnings" value={`$${totalEarnings}`} tone="success" />
+              </div>
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-app-surface rounded-xl border border-app-border p-4">
-            <p className="text-sm text-app-text-secondary">Total Bids</p>
-            <p className="text-2xl font-bold text-app-text">{stats.all}</p>
-          </div>
-          <div className="bg-app-surface rounded-xl border border-amber-200 p-4">
-            <p className="text-sm text-amber-600">Pending</p>
-            <p className="text-2xl font-bold text-amber-700">{stats.pending}</p>
-          </div>
-          <div className="bg-app-surface rounded-xl border border-teal-200 p-4">
-            <p className="text-sm text-teal-600">Accepted</p>
-            <p className="text-2xl font-bold text-teal-700">{stats.accepted}</p>
-          </div>
-          <div className="bg-app-surface rounded-xl border border-green-200 p-4">
-            <p className="text-sm text-green-600">Potential Earnings</p>
-            <p className="text-2xl font-bold text-green-700">${totalEarnings}</p>
-          </div>
-        </div>
-
-        {/* Filter pills — 4-tab design grouping (Active / Accepted / Rejected / Done).
-            The 7 backend statuses are bucketed via `bidTabBucket()` so iOS,
-            Android, and web share the same vocabulary. */}
-        <div className="flex flex-wrap gap-3 mb-8">
-          <StatPill label="Active" count={stats.active} active={filter === 'active'} onClick={() => setFilter('active')} color="amber" />
-          <StatPill label="Accepted" count={stats.activeAccepted} active={filter === 'accepted'} onClick={() => setFilter('accepted')} color="teal" />
-          <StatPill label="Rejected" count={stats.activeRejected} active={filter === 'rejected'} onClick={() => setFilter('rejected')} color="gray" />
-          <StatPill label="Done" count={stats.done} active={filter === 'done'} onClick={() => setFilter('done')} color="green" />
-        </div>
-
-        {/* Bids list */}
-        {loading ? (
-          <LoadingSkeleton variant="gig-card" count={3} />
-        ) : filteredBids.length === 0 ? (
-          <EmptyState
-            icon={Mailbox}
-            title={
-              filter === 'active'
-                ? "You haven't bid on any tasks yet"
-                : filter === 'accepted'
-                  ? 'No accepted bids yet'
-                  : filter === 'rejected'
-                    ? 'Nothing here'
-                    : 'No completed gigs yet'
-            }
-            description={
-              filter === 'active'
-                ? 'Browse tasks and place your first bid!'
-                : filter === 'accepted'
-                  ? 'Bids the poster accepts will show up here.'
-                  : filter === 'rejected'
-                    ? 'Rejected, withdrawn, or expired bids will land here.'
-                    : 'Finished gigs and their reviews will show up here.'
-            }
-            actionLabel="Browse Tasks"
-            onAction={() => router.push('/app/gigs')}
-          />
-        ) : (
-          <div className="space-y-4">
-            {filteredBids.map((bid) => (
-              <BidCard
-                key={bid.id}
-                bid={bid}
-                onViewGig={() => handleViewGig(bid.gig_id || bid.gig?.id)}
-                onWithdraw={() => openWithdrawModal(bid.gig_id || bid.gig?.id, bid.id)}
-                onAcceptCounter={() => handleAcceptCounter(bid.gig_id || bid.gig?.id, bid.id)}
-                onDeclineCounter={() => handleDeclineCounter(bid.gig_id || bid.gig?.id, bid.id)}
-                onStartWork={() => handleStartWork(bid.gig_id || bid.gig?.id)}
-                onMarkCompleted={() => handleMarkCompleted(bid.gig_id || bid.gig?.id)}
-              />
-            ))}
-          </div>
-        )}
+              {/* Filter pills */}
+              <div className="flex flex-wrap gap-3">
+                <StatPill label="All" count={stats.all} active={filter === 'all'} onClick={() => setFilter('all')} />
+                <StatPill label="Pending" count={stats.pending} active={filter === 'pending'} onClick={() => setFilter('pending')} color="amber" />
+                <StatPill label="Countered" count={stats.countered} active={filter === 'countered'} onClick={() => setFilter('countered')} color="purple" />
+                <StatPill label="Accepted" count={stats.accepted} active={filter === 'accepted'} onClick={() => setFilter('accepted')} color="teal" />
+                <StatPill label="Rejected" count={stats.rejected} active={filter === 'rejected'} onClick={() => setFilter('rejected')} color="red" />
+                <StatPill label="Withdrawn" count={stats.withdrawn} active={filter === 'withdrawn'} onClick={() => setFilter('withdrawn')} color="gray" />
+                <StatPill label="Expired" count={stats.expired} active={filter === 'expired'} onClick={() => setFilter('expired')} color="gray" />
+              </div>
+            </>
+          )}
+          loading={loading}
+          loadingSlot={<LoadingSkeleton variant="gig-card" count={3} />}
+          rows={filteredBids}
+          rowSpacing={4}
+          keyExtractor={(bid) => bid.id}
+          renderRow={(bid) => (
+            <BidCard
+              bid={bid}
+              onViewGig={() => handleViewGig(bid.gig_id || bid.gig?.id)}
+              onWithdraw={() => openWithdrawModal(bid.gig_id || bid.gig?.id, bid.id)}
+              onAcceptCounter={() => handleAcceptCounter(bid.gig_id || bid.gig?.id, bid.id)}
+              onDeclineCounter={() => handleDeclineCounter(bid.gig_id || bid.gig?.id, bid.id)}
+              onStartWork={() => handleStartWork(bid.gig_id || bid.gig?.id)}
+              onMarkCompleted={() => handleMarkCompleted(bid.gig_id || bid.gig?.id)}
+            />
+          )}
+          emptyState={{
+            icon: Mailbox,
+            headline: filter === 'all' ? 'No bids placed yet' : `No ${filter} bids`,
+            subcopy: 'Browse tasks and place your first bid.',
+            tone: 'personal',
+            ctaLabel: 'Browse tasks',
+            onCtaClick: () => router.push('/app/gigs'),
+          }}
+        />
       </main>
 
       {/* Withdraw modal */}
@@ -337,25 +279,45 @@ export default function MyBidsPage() {
   );
 }
 
+/* ─── Summary Card ─── */
+function SummaryCard({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string | number;
+  tone?: 'neutral' | 'warning' | 'info' | 'success';
+}) {
+  const toneCls: Record<string, string> = {
+    neutral: 'border-app-border text-app-text',
+    warning: 'border-app-warning-light text-app-warning',
+    info: 'border-app-info-light text-app-info',
+    success: 'border-app-success-light text-app-success',
+  };
+  return (
+    <div className={`bg-app-surface rounded-xl border ${toneCls[tone]} p-4`}>
+      <p className="text-sm text-app-text-secondary">{label}</p>
+      <p className={`text-2xl font-bold ${tone === 'neutral' ? 'text-app-text' : ''}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 /* ─── Stat Pill ─── */
 function StatPill({
   label, count, active, onClick, color = 'gray',
 }: {
   label: string; count: number; active: boolean; onClick: () => void; color?: string;
 }) {
-  // T5.3.1 — the design shows all 4 tabs even when a count is 0 so the
-  // user always sees the tab vocabulary. Hide other-context pills (the
-  // legacy "All / Pending / Countered" set, kept off the page now) only
-  // when they're 0 + unactive.
-  const isCoreTab = label === 'Active' || label === 'Accepted' || label === 'Rejected' || label === 'Done';
-  if (count === 0 && !active && label !== 'All' && !isCoreTab) return null;
+  if (count === 0 && !active && label !== 'All') return null;
 
   const colorMap: Record<string, string> = {
     amber: 'bg-amber-100 text-amber-700',
     teal: 'bg-teal-100 text-teal-700',
     red: 'bg-red-100 text-red-700',
     purple: 'bg-purple-100 text-purple-700',
-    green: 'bg-green-100 text-green-700',
     gray: 'bg-app-surface-sunken text-app-text-secondary',
   };
 

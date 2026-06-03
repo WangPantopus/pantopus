@@ -49,7 +49,7 @@ export type MailItem = {
   payout_status?: string | null;
   total_read_time_ms?: number | null;
   view_count?: number | null;
-  mail_extracted?: Record<string, unknown> | null;
+  mail_extracted?: Record<string, any> | null;
   links?: MailLink[];
 };
 

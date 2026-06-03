@@ -19,7 +19,7 @@ export function EmergencyCardPreview({
   emergencies,
   onExpand,
 }: {
-  emergencies: Record<string, unknown>[];
+  emergencies: Record<string, any>[];
   onExpand: () => void;
 }) {
   return (
@@ -60,8 +60,8 @@ export default function EmergencyCard({
   homeId: _homeId,
   onBack,
 }: {
-  emergencies: Record<string, unknown>[];
-  home: Record<string, unknown>;
+  emergencies: Record<string, any>[];
+  home: Record<string, any>;
   homeId: string;
   onBack: () => void;
 }) {

@@ -57,6 +57,8 @@ import {
   ShoppingBag,
   ListTodo,
   HandCoins,
+  ShieldCheck,
+  Radio,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -68,8 +70,14 @@ export const NavIcons = {
   marketplace: ShoppingBag,
   tasks: Briefcase,
   messages: MessageCircle,
+  // Audience destination — unified-IA §3.2: distinct visual cue from
+  // every Personal-zone item. Radio matches the megaphone metaphor used
+  // in the audience-zone notification stream (P2.3).
+  audience: Radio,
+  beacon: Radio,
   map: Map,
   connections: Users,
+  identity: ShieldCheck,
   myTasks: ListTodo,
   myBids: HandCoins,
   // Legacy aliases (still used in some pages)

@@ -40,11 +40,11 @@ interface CompletionGigData {
 
 /** Extended gig API methods not in base type definitions */
 interface GigsCompletionApiExt {
-  reopenBidding: (gigId: string) => Promise<Record<string, unknown>>;
+  reopenBidding: (gigId: string) => Promise<Record<string, any>>;
   startGig: (gigId: string) => Promise<unknown>;
-  markGigCompleted: (gigId: string, data: Record<string, unknown>) => Promise<unknown>;
-  confirmGigCompletion?: (gigId: string, data: Record<string, unknown>) => Promise<unknown>;
-  completeGig?: (gigId: string, data: Record<string, unknown>) => Promise<unknown>;
+  markGigCompleted: (gigId: string, data: Record<string, any>) => Promise<unknown>;
+  confirmGigCompletion?: (gigId: string, data: Record<string, any>) => Promise<unknown>;
+  completeGig?: (gigId: string, data: Record<string, any>) => Promise<unknown>;
 }
 
 export interface CompletionFlowHandle {
@@ -66,6 +66,16 @@ interface CompletionFlowProps {
   onOpenChat: () => void;
 }
 
+interface CancellationPreview {
+  policy_label?: string;
+  fee: number;
+  fee_pct?: number;
+  zone_label: string;
+  zone?: number;
+  in_grace?: boolean;
+  policy_description?: string;
+}
+
 export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function CompletionFlow({
   gigId,
   gig,
@@ -84,6 +94,8 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
   const isCompleted = gigStatus === 'completed';
   const isPaidGig = Number(gig?.price || 0) > 0;
   const acceptedBy = gig?.accepted_by ?? gig?.acceptedBy ?? null;
+  const completionPhotos = gig.completion_photos ?? [];
+  const completionChecklist = gig.completion_checklist ?? [];
   const iAmWorkerAssigned = isWorker && isAssigned;
   const iAmWorkerInProgress = isWorker && isInProgress;
   const iAmWorkerCompleted = isWorker && isCompleted;
@@ -91,12 +103,12 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
 
   // Cancellation
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelPreview, setCancelPreview] = useState<Record<string, unknown> | null>(null);
+  const [cancelPreview, setCancelPreview] = useState<CancellationPreview | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
   // No-show
-  const [noShowCheck, setNoShowCheck] = useState<Record<string, unknown> | null>(null);
+  const [noShowCheck, setNoShowCheck] = useState<Record<string, any> | null>(null);
   const [showNoShowModal, setShowNoShowModal] = useState(false);
   const [noShowDescription, setNoShowDescription] = useState('');
   const [reportingNoShow, setReportingNoShow] = useState(false);
@@ -166,7 +178,7 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
     setCancelPreview(null);
     try {
       const preview = await api.gigs.getCancellationPreview(gigId);
-      setCancelPreview(preview);
+      setCancelPreview(preview as CancellationPreview);
     } catch {
       setCancelPreview({ zone: -1, zone_label: 'Unknown', fee: 0, in_grace: true, policy_label: 'Standard' });
     }
@@ -207,8 +219,8 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
       toast.success('Work started!');
     } catch (err: unknown) {
       console.error('Start work failed:', err);
-      const errData = err && typeof err === 'object' ? (err as Record<string, unknown>) : null;
-      if ((errData?.data as Record<string, unknown>)?.code === 'payer_authorization_required') {
+      const errData = err && typeof err === 'object' ? (err as Record<string, any>) : null;
+      if ((errData?.data as Record<string, any>)?.code === 'payer_authorization_required') {
         toast.warning('Waiting for requester payment authorization. Ask the gig owner to complete payment on the gig page.');
       } else {
         toast.error(err instanceof Error ? err.message : 'Failed to start work');
@@ -228,7 +240,7 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
       let photoUrls: string[] = [];
       if (completionFiles.length > 0) {
         const uploadRes = await api.upload.uploadGigCompletionMedia(gigId, completionFiles);
-        photoUrls = (uploadRes?.media || []).map((m: Record<string, unknown>) => m.file_url).filter(Boolean) as string[];
+        photoUrls = (uploadRes?.media || []).map((m: Record<string, any>) => m.file_url).filter(Boolean) as string[];
       }
       const gigsExt = api.gigs as unknown as GigsCompletionApiExt;
       await gigsExt.markGigCompleted(gigId, {
@@ -399,9 +411,9 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
           <h3 className="text-lg font-semibold text-blue-900 mb-2">Review & Confirm</h3>
           <p className="text-sm text-blue-800 mb-3">The worker marked this gig completed. Review their work and confirm.</p>
 
-          {(gig?.completion_photos?.length > 0) && (
+          {completionPhotos.length > 0 && (
             <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-              {gig.completion_photos.slice(0, 4).map((url: string, i: number) => (
+              {completionPhotos.slice(0, 4).map((url: string, i: number) => (
                 <Image
                   key={i}
                   src={url}
@@ -414,8 +426,8 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
                   quality={80}
                 />
               ))}
-              {gig.completion_photos.length > 4 && (
-                <span className="text-xs text-blue-600 self-center">+{gig.completion_photos.length - 4} more</span>
+              {completionPhotos.length > 4 && (
+                <span className="text-xs text-blue-600 self-center">+{completionPhotos.length - 4} more</span>
               )}
             </div>
           )}
@@ -598,7 +610,7 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
             </div>
 
             <div className="px-6 py-4 space-y-4">
-              {(gig?.completion_note || (gig?.completion_photos?.length > 0)) ? (
+              {(gig?.completion_note || completionPhotos.length > 0) ? (
                 <div className="bg-app-surface-raised rounded-lg p-4 space-y-3">
                   <p className="text-xs font-semibold text-app-text-secondary uppercase tracking-wide">Worker&apos;s Submission</p>
 
@@ -609,11 +621,11 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
                     </div>
                   )}
 
-                  {gig?.completion_photos?.length > 0 && (
+                  {completionPhotos.length > 0 && (
                     <div>
-                      <p className="text-xs text-app-text-secondary mb-1">Photos ({gig.completion_photos.length}):</p>
+                      <p className="text-xs text-app-text-secondary mb-1">Photos ({completionPhotos.length}):</p>
                       <div className="grid grid-cols-3 gap-2">
-                        {gig.completion_photos.map((url: string, i: number) => (
+                        {completionPhotos.map((url: string, i: number) => (
                           <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                             <Image
                               src={url}
@@ -631,11 +643,11 @@ export default forwardRef<CompletionFlowHandle, CompletionFlowProps>(function Co
                     </div>
                   )}
 
-                  {gig?.completion_checklist?.length > 0 && (
+                  {completionChecklist.length > 0 && (
                     <div>
                       <p className="text-xs text-app-text-secondary mb-1">Checklist:</p>
                       <div className="space-y-1">
-                        {gig.completion_checklist.map((c: { item: string; done: boolean }, i: number) => (
+                        {completionChecklist.map((c: { item: string; done: boolean }, i: number) => (
                           <div key={i} className="flex items-center gap-2 text-sm">
                             <span>{c.done ? <CheckCircle className="w-4 h-4 inline-block text-green-600" /> : <Square className="w-4 h-4 inline-block text-app-text-muted" />}</span>
                             <span className={c.done ? 'text-app-text' : 'text-app-text-secondary'}>{c.item}</span>

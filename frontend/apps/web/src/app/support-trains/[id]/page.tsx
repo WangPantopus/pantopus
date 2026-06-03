@@ -8,7 +8,9 @@ import {
   buildSupportTrainShareUrl,
 } from '@pantopus/utils';
 import {
+  absoluteMediaUrl,
   buildShareMetadata,
+  displayNameForUser,
   fetchPublicSupportTrain,
   formatLocationLine,
   getStoreDownloadCta,
@@ -16,6 +18,35 @@ import {
 } from '@/lib/publicShare';
 import OpenInAppButton from '@/components/public-share/OpenInAppButton';
 import SlotSignupButton from '@/components/public-share/SlotSignupButton';
+
+type OrganizerUser = {
+  id?: string | null;
+  username?: string | null;
+  name?: string | null;
+  first_name?: string | null;
+  firstName?: string | null;
+  profile_picture_url?: string | null;
+};
+
+type SupportTrainSlot = {
+  id: string;
+  status?: string | null;
+  filled_count?: number | null;
+  capacity?: number | null;
+  slot_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  slot_label?: string | null;
+  support_mode?: string | null;
+};
+
+type SupportTrainWithOrganizers = {
+  organizers?: Array<{
+    role?: string | null;
+    user?: OrganizerUser | null;
+  }> | null;
+  slots?: SupportTrainSlot[] | null;
+};
 
 function supportModeLabel(key: string): string {
   if (key === 'home_cooked_meals') return 'Home-cooked meals';
@@ -30,6 +61,84 @@ function formatWindow(start?: string | null, end?: string | null): string | null
   if (start) return `${start}+`;
   if (end) return `Until ${end}`;
   return null;
+}
+
+function getOrganizerUser(
+  train: SupportTrainWithOrganizers | null | undefined
+): OrganizerUser | null {
+  const organizers = Array.isArray(train?.organizers) ? train.organizers : [];
+  const primary = organizers.find((organizer) => organizer?.role === 'primary');
+  return primary?.user || organizers[0]?.user || null;
+}
+
+function getProfileHref(user: OrganizerUser | null | undefined): string | null {
+  if (typeof user?.username !== 'string' || !user.username.trim()) return null;
+  return `/${encodeURIComponent(user.username.trim())}`;
+}
+
+function initialsForName(value: string): string {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
+
+function OrganizerAvatar({ user, name }: { user: OrganizerUser; name: string }) {
+  const avatarUrl = absoluteMediaUrl(user?.profile_picture_url);
+
+  if (avatarUrl) {
+    return (
+      // Native img keeps public avatars working across storage hosts without Next image config churn.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatarUrl}
+        alt=""
+        className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+      />
+    );
+  }
+
+  return (
+    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
+      {initialsForName(name)}
+    </span>
+  );
+}
+
+function OrganizerChip({ user }: { user: OrganizerUser }) {
+  const name = displayNameForUser(user, 'Organizer');
+  const href = getProfileHref(user);
+  const content = (
+    <>
+      <OrganizerAvatar user={user} name={name} />
+      <span className="min-w-0">
+        <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-app-text-secondary">
+          Organized by
+        </span>
+        <span className="block truncate text-sm font-semibold text-app">{name}</span>
+      </span>
+    </>
+  );
+
+  if (!href) {
+    return (
+      <div className="inline-flex max-w-full items-center gap-3 rounded-full bg-surface-muted px-3 py-2">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="inline-flex max-w-full items-center gap-3 rounded-full bg-surface-muted px-3 py-2 text-left transition hover:bg-primary-50"
+      aria-label={`View ${name}'s public profile`}
+    >
+      {content}
+    </Link>
+  );
 }
 
 export async function generateMetadata({
@@ -126,9 +235,12 @@ export default async function PublicSupportTrainPage({
   const supportModes = Object.entries(train.support_modes || {})
     .filter(([, enabled]) => !!enabled)
     .map(([key]) => supportModeLabel(key));
-  const openSlots = (train.slots || []).filter(
-    (slot: any) => slot?.status === 'open' && (slot?.filled_count ?? 0) < (slot?.capacity ?? 1)
+  const trainSlots = Array.isArray(train.slots) ? (train.slots as SupportTrainSlot[]) : [];
+  const visibleSlots = trainSlots.filter((slot) => slot?.status !== 'canceled');
+  const openSlots = visibleSlots.filter(
+    (slot) => slot?.status === 'open' && (slot?.filled_count ?? 0) < (slot?.capacity ?? 1)
   );
+  const organizerUser = getOrganizerUser(train);
 
   // Map enabled support modes to contribution_mode values for the signup form
   const modeKeyToContribution: Record<string, 'cook' | 'takeout' | 'groceries'> = {
@@ -186,6 +298,7 @@ export default async function PublicSupportTrainPage({
                 <h1 className="text-3xl font-semibold tracking-tight text-app sm:text-4xl">
                   {train.title || 'Support Train'}
                 </h1>
+                {organizerUser ? <OrganizerChip user={organizerUser} /> : null}
                 <p className="text-base leading-7 text-app-text-secondary">
                   {train.story || 'Help coordinate support for this household.'}
                 </p>
@@ -279,10 +392,10 @@ export default async function PublicSupportTrainPage({
           </div>
 
           <div className="mt-6 space-y-3">
-            {(train.slots || []).length === 0 ? (
+            {visibleSlots.length === 0 ? (
               <p className="text-sm text-app-text-secondary">No dates have been posted yet.</p>
             ) : (
-              (train.slots || []).map((slot: any) => {
+              visibleSlots.map((slot) => {
                 const dateLabel = slot?.slot_date
                   ? new Date(`${slot.slot_date}T00:00:00Z`).toLocaleDateString('en-US', {
                       weekday: 'long',

@@ -61,7 +61,7 @@ export const mailboxKeys = {
 
   // Drawers
   drawers: () => [...mailboxKeys.all, 'drawers'] as const,
-  drawerItems: (drawer: string, params?: Record<string, unknown>) =>
+  drawerItems: (drawer: string, params?: Record<string, any>) =>
     [...mailboxKeys.all, 'drawer', drawer, params] as const,
   itemDetail: (itemId: string) =>
     [...mailboxKeys.all, 'item', itemId] as const,
@@ -75,14 +75,14 @@ export const mailboxKeys = {
 
   // Vault
   vaultFolders: () => [...mailboxKeys.all, 'vault', 'folders'] as const,
-  vaultFolderItems: (folderId: string, params?: Record<string, unknown>) =>
+  vaultFolderItems: (folderId: string, params?: Record<string, any>) =>
     [...mailboxKeys.all, 'vault', 'folder', folderId, params] as const,
   vaultSearch: (query: string) =>
     [...mailboxKeys.all, 'vault', 'search', query] as const,
 
   // Earn
   earnWallet: () => [...mailboxKeys.all, 'earn', 'wallet'] as const,
-  walletTransactions: (params?: Record<string, unknown>) =>
+  walletTransactions: (params?: Record<string, any>) =>
     [...mailboxKeys.all, 'earn', 'transactions', params] as const,
 
   // Translation
@@ -98,11 +98,11 @@ export const mailboxKeys = {
     [...mailboxKeys.all, 'records', 'asset', assetId] as const,
 
   // Map
-  mapPins: (homeId: string, params?: Record<string, unknown>) =>
+  mapPins: (homeId: string, params?: Record<string, any>) =>
     [...mailboxKeys.all, 'map', 'pins', homeId, params] as const,
 
   // Community
-  communityItems: (params?: Record<string, unknown>) =>
+  communityItems: (params?: Record<string, any>) =>
     [...mailboxKeys.all, 'community', params] as const,
 
   // Tasks
@@ -156,7 +156,7 @@ export function useDrawerItems(
   >,
 ) {
   return useQuery<MailboxPaginatedResponse<MailItemV2>, MailboxApiError>({
-    queryKey: mailboxKeys.drawerItems(drawer, params as Record<string, unknown>),
+    queryKey: mailboxKeys.drawerItems(drawer, params as Record<string, any>),
     queryFn: () => api.getDrawerItems(drawer, params),
     staleTime: STALE_30S,
     ...options,
@@ -326,7 +326,7 @@ export function useVaultFolderItems(
   >,
 ) {
   return useQuery<MailboxPaginatedResponse<MailItemV2>, MailboxApiError>({
-    queryKey: mailboxKeys.vaultFolderItems(folderId, params as Record<string, unknown>),
+    queryKey: mailboxKeys.vaultFolderItems(folderId, params as Record<string, any>),
     queryFn: () => api.getFolderItems(folderId, params),
     staleTime: STALE_1M,
     enabled: !!folderId,
@@ -391,7 +391,7 @@ export function useWalletTransactions(
   >,
 ) {
   return useQuery<MailboxPaginatedResponse<WalletTransaction>, MailboxApiError>({
-    queryKey: mailboxKeys.walletTransactions(params as Record<string, unknown>),
+    queryKey: mailboxKeys.walletTransactions(params as Record<string, any>),
     queryFn: () => api.getWalletTransactions(params),
     staleTime: STALE_1M,
     ...options,
@@ -608,7 +608,7 @@ export function useMapPins(
   options?: Omit<UseQueryOptions<HomeMapPin[], MailboxApiError>, 'queryKey' | 'queryFn'>,
 ) {
   return useQuery<HomeMapPin[], MailboxApiError>({
-    queryKey: mailboxKeys.mapPins(homeId, params as Record<string, unknown>),
+    queryKey: mailboxKeys.mapPins(homeId, params as Record<string, any>),
     queryFn: () => api.getMapPins(homeId, params),
     staleTime: STALE_1M,
     enabled: !!homeId,
@@ -634,7 +634,7 @@ export function useCommunityItems(
   options?: Omit<UseQueryOptions<CommunityMailItem[], MailboxApiError>, 'queryKey' | 'queryFn'>,
 ) {
   return useQuery<CommunityMailItem[], MailboxApiError>({
-    queryKey: mailboxKeys.communityItems(params as Record<string, unknown>),
+    queryKey: mailboxKeys.communityItems(params as Record<string, any>),
     queryFn: () => api.getCommunityItems(params),
     staleTime: STALE_30S,
     ...options,

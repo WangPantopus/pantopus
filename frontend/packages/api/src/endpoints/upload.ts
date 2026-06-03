@@ -5,37 +5,117 @@
 
 import apiClient, { get, del } from '../client';
 
-function appendMultipartFiles(formData: FormData, files: any[], prefix: string) {
-  files.forEach((file: any, idx: number) => {
-    // React Native FormData requires uri-based file objects.
-    if (file && typeof file === 'object' && file.uri) {
-      const rawType = file.type || file.mimeType;
-      const normalizedType =
-        typeof rawType === 'string' && rawType.includes('/')
-          ? rawType
-          : (file.mimeType || 'application/octet-stream');
-      formData.append('files', {
-        uri: file.uri,
-        name: file.name || file.fileName || `${prefix}-${Date.now()}-${idx}`,
-        type: normalizedType,
-      } as any);
-      return;
+/**
+ * P2.12 / audience-profile §6.4 — randomize the multipart filename
+ * so the picker-supplied name (often IMG_3271_at_my_house.jpg with
+ * camera-derived prefixes / GPS bread-crumb path components on
+ * Android) never reaches Pantopus's S3 keys, access logs, or DB
+ * file_name columns. The original extension is preserved so the
+ * server's extension-based routing (image vs video vs HEIC) still
+ * works.
+ *
+ * Not crypto-grade randomness — Math.random + Date.now is enough
+ * to defeat correlation against the picker's name. The server's
+ * sharp pipeline strips EXIF independently (see
+ * backend/routes/upload.js:stripImageMetadata), so randomizing the
+ * filename here closes the matching half of the §6.4 invariant.
+ */
+function randomUploadName(prefix: string, hint: string | null | undefined): string {
+  let ext = 'bin';
+  if (hint) {
+    const fromExt = String(hint).match(/\.([a-zA-Z0-9]{1,5})(?:\?|$)/);
+    if (fromExt) {
+      ext = fromExt[1].toLowerCase();
+    } else if (hint.includes('/')) {
+      // hint looks like a MIME type (image/jpeg, video/mp4, …).
+      const mime = hint.toLowerCase();
+      if (mime === 'image/png') ext = 'png';
+      else if (mime === 'image/heic' || mime === 'image/heif') ext = 'heic';
+      else if (mime === 'image/webp') ext = 'webp';
+      else if (mime === 'image/gif') ext = 'gif';
+      else if (mime === 'video/mp4') ext = 'mp4';
+      else if (mime === 'video/quicktime') ext = 'mov';
+      else if (mime.startsWith('image/')) ext = 'jpg';
+      else if (mime.startsWith('video/')) ext = 'mp4';
     }
-    formData.append('files', file as any);
-  });
+  }
+  if (!/^[a-z0-9]{1,5}$/.test(ext)) ext = 'bin';
+  const r1 = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+  const r2 = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+  const t = Date.now().toString(16).slice(-6);
+  return `${prefix}-${t}${r1}${r2}.${ext}`;
+}
+
+function isUriFile(file: any): boolean {
+  return Boolean(file && typeof file === 'object' && typeof file.uri === 'string');
+}
+
+function normalizeMime(file: any, fallback = 'application/octet-stream'): string {
+  const rawType = file?.type || file?.mimeType;
+  return typeof rawType === 'string' && rawType.includes('/')
+    ? rawType
+    : (file?.mimeType || fallback);
+}
+
+function isMediaMime(mime: string): boolean {
+  return mime.startsWith('image/') || mime.startsWith('video/');
+}
+
+function nameForUpload(prefix: string, file: any, mime: string): string {
+  const original = file?.fileName || file?.name;
+  if (isMediaMime(mime)) return randomUploadName(prefix, mime || original);
+  return original || randomUploadName(prefix, mime);
+}
+
+async function appendMultipartFile(
+  formData: FormData,
+  field: string,
+  file: any,
+  prefix: string,
+  fallbackMime = 'application/octet-stream',
+) {
+  if (isUriFile(file)) {
+    const mime = normalizeMime(file, fallbackMime);
+    formData.append(field, {
+      uri: file.uri,
+      name: nameForUpload(prefix, file, mime),
+      type: mime,
+    } as any);
+    return;
+  }
+
+  if (typeof File !== 'undefined' && file instanceof File && isMediaMime(file.type || fallbackMime)) {
+    const renamed = new File([file], randomUploadName(prefix, file.name || file.type), {
+      type: file.type,
+      lastModified: file.lastModified,
+    });
+    formData.append(field, renamed as any);
+    return;
+  }
+
+  formData.append(field, file as any);
+}
+
+async function appendMultipartFiles(formData: FormData, files: any[], prefix: string) {
+  for (const file of files) {
+    await appendMultipartFile(formData, 'files', file, prefix);
+  }
 }
 
 /**
  * Upload profile picture
+ *
+ * P2.12 — multipart filename is randomized; original `file.name`
+ * never reaches the server.
  */
-export async function uploadProfilePicture(file: File): Promise<{
+export async function uploadProfilePicture(file: File | any): Promise<{
   message: string;
   url: string;
   key: string;
   user: { id: string; profile_picture_url: string };
 }> {
   const formData = new FormData();
-  formData.append('file', file);
+  await appendMultipartFile(formData, 'file', file, 'profile', 'image/jpeg');
 
   const response = await apiClient.post('/api/upload/profile-picture', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -63,7 +143,7 @@ export async function uploadGigMedia(
   }>;
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files as any[], 'gig-media');
+  await appendMultipartFiles(formData, files as any[], 'gig-media');
 
   const response = await apiClient.post(`/api/upload/gig-media/${gigId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -90,7 +170,7 @@ export async function uploadGigQuestionMedia(
   }>;
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files as any[], 'gig-question-media');
+  await appendMultipartFiles(formData, files as any[], 'gig-question-media');
 
   const response = await apiClient.post(`/api/upload/gig-question-media/${gigId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -117,7 +197,7 @@ export async function uploadGigCompletionMedia(
   }>;
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files as any[], 'gig-completion-media');
+  await appendMultipartFiles(formData, files as any[], 'gig-completion-media');
 
   const response = await apiClient.post(`/api/upload/gig-completion-media/${gigId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -169,7 +249,7 @@ export async function uploadHomeTaskMedia(
   }>;
 }> {
   const formData = new FormData();
-  files.forEach((file) => formData.append('files', file));
+  await appendMultipartFiles(formData, files as any[], 'home-task-media');
 
   const response = await apiClient.post(
     `/api/upload/home-task-media/${homeId}/${taskId}`,
@@ -197,18 +277,7 @@ export async function uploadChatMedia(
   }>;
 }> {
   const formData = new FormData();
-  files.forEach((file: any, idx: number) => {
-    // React Native files are uri-based objects, not browser File objects.
-    if (file && typeof file === 'object' && file.uri) {
-      formData.append('files', {
-        uri: file.uri,
-        name: file.name || `chat-file-${Date.now()}-${idx}`,
-        type: file.type || file.mimeType || 'application/octet-stream',
-      } as any);
-      return;
-    }
-    formData.append('files', file as any);
-  });
+  await appendMultipartFiles(formData, files as any[], 'chat-media');
 
   // Must explicitly set multipart/form-data so axios doesn't use the default
   // application/json content-type which causes multer to skip file parsing.
@@ -240,15 +309,7 @@ export async function uploadOwnershipEvidence(
   const formData = new FormData();
 
   // React Native FormData requires uri-based file objects with explicit shape.
-  if (file && typeof file === 'object' && file.uri) {
-    formData.append('file', {
-      uri: file.uri,
-      name: file.name || `evidence-${Date.now()}`,
-      type: file.type || file.mimeType || 'application/octet-stream',
-    } as any);
-  } else {
-    formData.append('file', file);
-  }
+  await appendMultipartFile(formData, 'file', file, 'evidence');
 
   formData.append('evidence_type', evidenceType);
 
@@ -292,16 +353,8 @@ export async function uploadLivePhoto(
   thumbnailUrl: string | null;
 }> {
   const formData = new FormData();
-  formData.append('image', {
-    uri: imageFile.uri,
-    name: imageFile.name || `live-still-${Date.now()}.jpg`,
-    type: imageFile.type || 'image/jpeg',
-  } as any);
-  formData.append('video', {
-    uri: videoFile.uri,
-    name: videoFile.name || `live-video-${Date.now()}.mov`,
-    type: videoFile.type || 'video/quicktime',
-  } as any);
+  await appendMultipartFile(formData, 'image', imageFile, 'live-still', 'image/jpeg');
+  await appendMultipartFile(formData, 'video', videoFile, 'live-video', 'video/quicktime');
 
   const response = await apiClient.post('/api/upload/live-photo', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -319,9 +372,11 @@ export async function uploadPostMedia(
   message: string;
   media_urls: string[];
   media_types: string[];
+  media_thumbnails: string[];
+  media_live_urls: string[];
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files, 'post-media');
+  await appendMultipartFiles(formData, files, 'post-media');
 
   const response = await apiClient.post(`/api/upload/post-media/${postId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -349,7 +404,7 @@ export async function uploadCommentMedia(
   }>;
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files, 'comment-media');
+  await appendMultipartFiles(formData, files, 'comment-media');
 
   const response = await apiClient.post(`/api/upload/comment-media/${commentId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -369,7 +424,7 @@ export async function uploadListingMedia(
   media_types: string[];
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files, 'listing');
+  await appendMultipartFiles(formData, files, 'listing');
 
   const response = await apiClient.post(`/api/upload/listing-media/${listingId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -404,7 +459,7 @@ export async function uploadMailAttachments(
   }>;
 }> {
   const formData = new FormData();
-  files.forEach((file) => formData.append('files', file));
+  await appendMultipartFiles(formData, files, 'mail');
 
   const response = await apiClient.post('/api/upload/mail-attachments', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -429,7 +484,7 @@ export async function uploadAIMedia(
   }>;
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files, 'ai-chat');
+  await appendMultipartFiles(formData, files, 'ai-chat');
 
   const response = await apiClient.post('/api/upload/ai-media', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -450,18 +505,43 @@ export async function uploadBusinessMedia(
   key: string;
 }> {
   const formData = new FormData();
-  if (file && typeof file === 'object' && file.uri) {
-    formData.append('file', {
-      uri: file.uri,
-      name: file.name || `business-${type}-${Date.now()}`,
-      type: file.type || file.mimeType || 'image/jpeg',
-    } as any);
-  } else {
-    formData.append('file', file);
-  }
+  await appendMultipartFile(formData, 'file', file, `business-${type}`, 'image/jpeg');
 
   const response = await apiClient.post(
     `/api/upload/business-media/${businessId}?type=${type}`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data;
+}
+
+/**
+ * Upload Audience Profile avatar or banner image.
+ */
+export async function uploadPersonaMedia(
+  personaId: string,
+  file: any,
+  type: 'avatar' | 'banner'
+): Promise<{
+  message: string;
+  url: string;
+  key: string;
+  persona: {
+    id: string;
+    handle: string;
+    avatar_url: string | null;
+    banner_url: string | null;
+  };
+}> {
+  const formData = new FormData();
+  // P2.12 — randomize filename so the picker's IMG_xxxx never reaches
+  // S3 / DB file_name / access logs. Persona avatar + banner are the
+  // most-leveraged identity surface; the firewall starts here.
+  const namePrefix = `persona-${type}`;
+  await appendMultipartFile(formData, 'file', file, namePrefix, 'image/jpeg');
+
+  const response = await apiClient.post(
+    `/api/upload/persona-media/${personaId}?type=${type}`,
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } }
   );
@@ -480,7 +560,7 @@ export async function uploadReviewMedia(
   media_urls: string[];
 }> {
   const formData = new FormData();
-  appendMultipartFiles(formData, files, 'review');
+  await appendMultipartFiles(formData, files, 'review');
 
   const response = await apiClient.post(`/api/upload/review-media/${reviewId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

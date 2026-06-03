@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
-import type { ChatMessage } from '@pantopus/types';
+import type { ChatMessage, User } from '@pantopus/types';
 import { getDateKey, formatDateLabel } from '@pantopus/ui-utils';
 import { useSocket, useSocketConnected } from './useSocket';
 import { useSocketEvent, useSocketEmit } from './useSocket';
@@ -94,19 +94,25 @@ function insertMessageSorted(messages: ChatMessage[], newMsg: ChatMessage): Chat
   return result;
 }
 
-export function extractAttachments(msg: ChatMessage): Record<string, unknown>[] {
+type ChatMessageLike = Partial<ChatMessage> & {
+  attachments?: unknown;
+  type?: string;
+  message?: string;
+};
+
+export function extractAttachments(msg: ChatMessageLike): Record<string, any>[] {
   const raw = msg?.attachments;
   if (!Array.isArray(raw)) return [];
   return raw
     .map((a: unknown) => {
       if (typeof a === 'string') return { id: a, original_filename: 'Attachment', file_url: null, mime_type: '' };
-      if (a && typeof a === 'object') return a as Record<string, unknown>;
+      if (a && typeof a === 'object') return a as Record<string, any>;
       return null;
     })
-    .filter((x): x is Record<string, unknown> => x != null);
+    .filter((x): x is Record<string, any> => x != null);
 }
 
-export function resolveMessageType(msg: ChatMessage): string {
+export function resolveMessageType(msg: ChatMessageLike): string {
   const rawType = msg?.message_type || msg?.type || 'text';
   const metadata = msg?.metadata || {};
   if (rawType === 'text' && (metadata.listingId || metadata.listing_id)) return 'listing_offer';
@@ -141,6 +147,8 @@ export interface UseChatMessagesReturn {
   hasMore: boolean;
   loadingOlder: boolean;
   resolvedRoomId: string | null;
+  /** Populated in person-based mode after createDirectChat resolves (header / avatar). */
+  directChatPeer: User | null;
   sendMessage: (text: string, files?: File[]) => Promise<void>;
   retryMessage: (messageId: string) => Promise<void>;
   loadOlder: () => Promise<void>;
@@ -161,6 +169,7 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [resolvedRoomId, setResolvedRoomId] = useState<string | null>(roomId || null);
+  const [directChatPeer, setDirectChatPeer] = useState<User | null>(null);
   const [conversationRoomIds, setConversationRoomIds] = useState<string[]>([]);
   const nextCursorRef = useRef<string | null>(null);
 
@@ -186,20 +195,20 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
       const before = cursor?.before;
       const after = cursor?.after;
       if (isRoomMode && roomId) {
-        const resp = await (api.chat as Record<string, unknown> & typeof api.chat).getMessages?.(roomId, {
+        const resp = await (api.chat as Record<string, any> & typeof api.chat).getMessages?.(roomId, {
           limit: 100,
           ...(before ? { before } : {}),
           ...(after ? { after } : {}),
           ...(asBusinessUserId ? { asBusinessUserId } : {}),
-        }) as Record<string, unknown> | undefined;
+        }) as Record<string, any> | undefined;
         if (resp?.nextCursor !== undefined) nextCursorRef.current = (resp.nextCursor as string | null);
         return (resp?.messages as ChatMessage[]) || [];
       } else if (otherUserId) {
-        const params: Record<string, unknown> = { limit: 100 };
+        const params: Record<string, any> = { limit: 100 };
         if (before) params.before = before;
         if (after) params.after = after;
         if (topicId) params.topicId = topicId;
-        const result = await api.chat.getConversationMessages(otherUserId, params as Parameters<typeof api.chat.getConversationMessages>[1]) as Record<string, unknown>;
+        const result = await api.chat.getConversationMessages(otherUserId, params as Parameters<typeof api.chat.getConversationMessages>[1]) as Record<string, any>;
         if (result?.nextCursor !== undefined) nextCursorRef.current = (result.nextCursor as string | null);
         const rawRoomIds = Array.isArray(result?.roomIds) ? (result.roomIds as unknown[]) : [];
         const nextRoomIds = Array.from(new Set(rawRoomIds.map((id) => String(id)).filter(Boolean))).sort();
@@ -225,10 +234,10 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
   const markRead = useCallback(async () => {
     try {
       if (isRoomMode && roomId) {
-        if (asBusinessUserId && (api.chat as Record<string, unknown>).markMessagesAsReadForIdentity) {
-          await ((api.chat as Record<string, unknown>).markMessagesAsReadForIdentity as (roomId: string, opts: Record<string, unknown>) => Promise<void>)(roomId, { asBusinessUserId });
+        if (asBusinessUserId && (api.chat as Record<string, any>).markMessagesAsReadForIdentity) {
+          await ((api.chat as Record<string, any>).markMessagesAsReadForIdentity as (roomId: string, opts: Record<string, any>) => Promise<void>)(roomId, { asBusinessUserId });
         } else {
-          await ((api.chat as Record<string, unknown>).markMessagesAsRead as ((roomId: string) => Promise<void>) | undefined)?.(roomId);
+          await ((api.chat as Record<string, any>).markMessagesAsRead as ((roomId: string) => Promise<void>) | undefined)?.(roomId);
         }
       } else if (otherUserId) {
         await api.chat.markConversationAsRead(otherUserId);
@@ -282,14 +291,21 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
   // ── Resolve room for person-based mode ──────────────────
 
   useEffect(() => {
-    if (!otherUserId || isRoomMode) return;
+    if (!otherUserId || isRoomMode) {
+      setDirectChatPeer(null);
+      return;
+    }
+    setDirectChatPeer(null);
     let cancelled = false;
     (async () => {
       try {
-        const result = await api.chat.createDirectChat(otherUserId) as Record<string, unknown>;
-        const rid = result?.roomId || result?.room?.id;
-        if (!cancelled && rid) setResolvedRoomId(rid);
-      } catch {}
+        const result = await api.chat.createDirectChat(otherUserId);
+        const rid = result?.roomId;
+        if (!cancelled && rid) setResolvedRoomId(String(rid));
+        if (!cancelled && result?.otherUser) setDirectChatPeer(result.otherUser as User);
+      } catch {
+        if (!cancelled) setDirectChatPeer(null);
+      }
     })();
     return () => { cancelled = true; };
   }, [otherUserId, isRoomMode]);
@@ -396,11 +412,11 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
     if (!activeRoomIds.includes(String(msgRoomId))) return;
     setMessages(prev => {
       // Skip if already have this message (dedup)
-      if (prev.some(m => String(m.id) === String(msg.id) && !(m as Record<string, unknown>)._optimistic)) return prev;
+      if (prev.some(m => String(m.id) === String(msg.id) && !(m as Record<string, any>)._optimistic)) return prev;
       // Replace any optimistic message matching by client_message_id
-      const msgClientId = (msg as Record<string, unknown>).client_message_id;
+      const msgClientId = (msg as Record<string, any>).client_message_id;
       const filtered = msgClientId
-        ? prev.filter(m => (m as Record<string, unknown>)._clientMessageId !== msgClientId && m.id !== msgClientId)
+        ? prev.filter(m => (m as Record<string, any>)._clientMessageId !== msgClientId && m.id !== msgClientId)
         : prev;
       // Binary insert: O(log n) insertion (vs O(n log n) via full sort).
       return insertMessageSorted(filtered, msg);
@@ -411,12 +427,12 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
 
   // Listen for incoming messages via socket (new + legacy event names)
   // ── Socket event handlers (extracted for stable identity + profiling) ──
-  const handleMessageDeleted = useCallback((data: Record<string, unknown>) => {
+  const handleMessageDeleted = useCallback((data: Record<string, any>) => {
     if (!data?.messageId) return;
     setMessages(prev => prev.filter(m => String(m.id) !== String(data.messageId)));
   }, []);
 
-  const handleMessageEdited = useCallback((data: Record<string, unknown>) => {
+  const handleMessageEdited = useCallback((data: Record<string, any>) => {
     if (!data?.messageId || !data?.message) return;
     const updated = data.message as ChatMessage;
     setMessages(prev => prev.map(m =>
@@ -507,13 +523,13 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
       const trimmed = text.trim();
       const hasFiles = (files?.length || 0) > 0;
 
-      let uploadedFiles: Record<string, unknown>[] = [];
+      let uploadedFiles: Record<string, any>[] = [];
       if (hasFiles && files) {
-        const uploadRes = await ((api.upload as Record<string, unknown>).uploadChatMedia as (roomId: string, files: File[]) => Promise<Record<string, unknown>>)(targetRoomId, files);
-        uploadedFiles = (uploadRes?.media as Record<string, unknown>[]) || [];
+        const uploadRes = await ((api.upload as Record<string, any>).uploadChatMedia as (roomId: string, files: File[]) => Promise<Record<string, any>>)(targetRoomId, files);
+        uploadedFiles = (uploadRes?.media as Record<string, any>[]) || [];
       }
 
-      const fileIds = uploadedFiles.map((f: Record<string, unknown>) => f.id).filter(Boolean);
+      const fileIds = uploadedFiles.map((f: Record<string, any>) => f.id).filter(Boolean);
       const messageType = fileIds.length > 0
         ? (uploadedFiles.length === 1 && String(uploadedFiles[0]?.mime_type || '').startsWith('image/') ? 'image' : 'file')
         : 'text';
@@ -538,6 +554,8 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
           ...prev,
           {
             id: clientMessageId,
+            room_id: vars.targetRoomId,
+            sender_id: currentUserId || 'self',
             user_id: currentUserId || 'self',
             sender: { id: currentUserId || 'self', username: '', name: '', profile_picture_url: '' },
             message_text: trimmed,
@@ -545,6 +563,8 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
             created_at: new Date().toISOString(),
             attachments: [],
             metadata: {},
+            is_edited: false,
+            is_deleted: false,
             _optimistic: true,
             _clientMessageId: clientMessageId,
           },
@@ -557,7 +577,7 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
       if (deliveredMessage?.id) {
         setMessages((prev) => {
           // Remove optimistic message matching this clientMessageId
-          const withoutOptimistic = prev.filter((m) => m.id !== clientMessageId && (m as Record<string, unknown>)._clientMessageId !== clientMessageId);
+          const withoutOptimistic = prev.filter((m) => m.id !== clientMessageId && (m as Record<string, any>)._clientMessageId !== clientMessageId);
           if (withoutOptimistic.some((m) => String(m.id) === String(deliveredMessage.id))) {
             return withoutOptimistic;
           }
@@ -595,13 +615,13 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
   // ── Retry failed message ────────────────────────────
 
   const retryMessage = useCallback(async (messageId: string) => {
-    const failedMsg = messagesRef.current.find(m => m.id === messageId && (m as Record<string, unknown>)._failed);
+    const failedMsg = messagesRef.current.find(m => m.id === messageId && (m as Record<string, any>)._failed);
     if (!failedMsg) return;
 
     const targetRoomId = isRoomMode ? roomId : resolvedRoomId;
     if (!targetRoomId) return;
 
-    const clientMessageId = ((failedMsg as Record<string, unknown>)._clientMessageId as string) || messageId;
+    const clientMessageId = ((failedMsg as Record<string, any>)._clientMessageId as string) || messageId;
     const msgText = failedMsg.message_text || failedMsg.message || '';
 
     // Mark as sending again
@@ -621,7 +641,7 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
       const delivered = sendResult?.message as ChatMessage | undefined;
       if (delivered?.id) {
         setMessages(prev => {
-          const withoutOptimistic = prev.filter(m => m.id !== messageId && (m as Record<string, unknown>)._clientMessageId !== clientMessageId);
+          const withoutOptimistic = prev.filter(m => m.id !== messageId && (m as Record<string, any>)._clientMessageId !== clientMessageId);
           if (withoutOptimistic.some(m => String(m.id) === String(delivered.id))) return withoutOptimistic;
           return mergeMessages(withoutOptimistic, [delivered]);
         });
@@ -688,6 +708,7 @@ export function useChatMessages(opts: UseChatMessagesOptions): UseChatMessagesRe
     hasMore,
     loadingOlder,
     resolvedRoomId,
+    directChatPeer,
     sendMessage,
     retryMessage,
     loadOlder,

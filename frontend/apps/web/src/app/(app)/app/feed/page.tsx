@@ -5,27 +5,34 @@ import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
-  MapPin, Users, Link as LinkIcon,
+  MapPin, Link as LinkIcon, Radio, Trophy,
   ClipboardList, Map as MapIcon, Settings,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { FeedSurface } from '@pantopus/api';
+import type { FeedSurface, PostType } from '@pantopus/api';
 import {
   PostComposer, PostCard, PostDetailPanel, FeedFilters, NearbyProvidersCard,
   NeighborhoodPulse, EmptyFeed, SparseFeedSummary, PostSkeleton,
+  TopicChipRow, SportsEventModule,
 } from '@/components/feed';
+import type { SportsStarter } from '@/components/feed/EmptyFeed';
 import ReportModal from '@/components/ui/ReportModal';
 import InquiryChatDrawer from '@/components/discover/InquiryChatDrawer';
 import { useAreaPicker } from '@/hooks/useAreaPicker';
 import { useFeedPreferences } from '@/hooks/useFeedPreferences';
 import { useFeedData, type FilterType } from '@/hooks/useFeedData';
+import { useActiveSportsEvents } from '@/hooks/useActiveSportsEvents';
+import {
+  PLACE_TOPICS, SPORTS_MODES,
+  type SportsComposerMetadata, type SportsMode,
+} from '@/constants/feedTopics';
 import { FEED_POST_CREATED_EVENT } from '@/lib/feedComposerEvents';
 
 const FeedMap = dynamic(() => import('./FeedMap'), { ssr: false });
 
 const SURFACE_TABS: { key: FeedSurface; label: string; icon: ReactNode }[] = [
   { key: 'place', label: 'Place', icon: <MapPin className="w-4 h-4 inline-block" /> },
-  { key: 'following', label: 'Following', icon: <Users className="w-4 h-4 inline-block" /> },
+  { key: 'personas', label: 'Beacons', icon: <Radio className="w-4 h-4 inline-block" /> },
   { key: 'connections', label: 'Connections', icon: <LinkIcon className="w-4 h-4 inline-block" /> },
 ];
 
@@ -59,11 +66,78 @@ export default function FeedPage() {
     showToast,
   });
 
+  const inSportsLane = feed.surface === 'place' && feed.topic === 'sports';
+  const activeEvents = useActiveSportsEvents(inSportsLane);
+
+  // Composer sports pre-prime: when the composer opens from the Sports lane,
+  // these map `sportsMode`/primaryEvent into the composer's initial topic
+  // state so the post carries topic/sports_scope/event_key automatically.
+  const [composeSportsSeed, setComposeSportsSeed] = useState<{
+    scope: string | null;
+    metadata: SportsComposerMetadata;
+    contentSeed?: string;
+    postTypePreset?: PostType | null;
+    modalOnly?: boolean;
+  }>({ scope: null, metadata: {} });
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const prefs = useFeedPreferences(showToast, useCallback(() => feed.loadFeed(true), [feed.loadFeed]));
 
-  const showComposer = !(feed.surface === 'place' && !feed.placeEligible);
+  const showComposer = feed.surface !== 'personas' && !(feed.surface === 'place' && !feed.placeEligible);
+
+  // Derive the Sports mode chip row with a dynamic label for the "event" chip
+  // pulled from active_sports_events.short_label. Hide the chip entirely when
+  // no event is active so we never ship dead labels.
+  const primaryEvent = activeEvents.primaryEvent;
+  const sportsModeChips = inSportsLane
+    ? SPORTS_MODES
+        .filter((m) => m.key !== 'event' || !!primaryEvent)
+        .map((m) => (m.key === 'event' && primaryEvent
+          ? { ...m, label: primaryEvent.short_label || primaryEvent.display_name }
+          : m))
+    : [];
+
+  // When the user opens compose from the Sports lane, stamp the seed so the
+  // composer initial props prime topic/scope/event metadata.
+  const seedSportsComposer = useCallback(
+    (opts?: { starter?: SportsStarter; fromEventModule?: boolean }) => {
+      const meta: SportsComposerMetadata = {};
+      let scope: string | null = null;
+      let contentSeed: string | undefined;
+      let postTypePreset: PostType | null = null;
+      const modalOnly = Boolean(opts?.starter);
+      const validStarterKeys = new Set(['anyone_watching', 'best_place_watch', 'youth_signups', 'pickup_weekend']);
+      if (opts?.starter) {
+        if (opts.starter.scope) scope = opts.starter.scope;
+        if (opts.starter.isGameThread) meta.is_game_thread = true;
+        if (opts.starter.isWatchPrompt) meta.is_watch_prompt = true;
+        if (validStarterKeys.has(opts.starter.key)) {
+          meta.starter_key = opts.starter.key as SportsComposerMetadata['starter_key'];
+        }
+        if (opts.starter.placeholder) contentSeed = opts.starter.placeholder;
+        postTypePreset = 'ask_local';
+      }
+      if (feed.sportsMode === 'watch' && !scope) {
+        scope = 'watch';
+        meta.is_watch_prompt = true;
+      }
+      if ((feed.sportsMode === 'event' || opts?.fromEventModule) && primaryEvent?.event_key) {
+        meta.event_key = feed.eventKey || primaryEvent.event_key;
+      }
+      setComposeSportsSeed({ scope, metadata: meta, contentSeed, postTypePreset, modalOnly });
+    },
+    [feed.sportsMode, feed.eventKey, primaryEvent?.event_key],
+  );
   const reloadFeed = feed.loadFeed;
+
+  useEffect(() => {
+    if (showCompose) return;
+    setComposeSportsSeed((prev) => (
+      prev.modalOnly
+        ? { scope: null, metadata: {}, contentSeed: undefined, postTypePreset: null, modalOnly: false }
+        : { ...prev, contentSeed: undefined, postTypePreset: null }
+    ));
+  }, [showCompose]);
 
   useEffect(() => {
     if (!showComposer && showCompose) {
@@ -216,7 +290,7 @@ export default function FeedPage() {
                         ) : area.areaSuggestions.length === 0 ? (
                           <div className="px-3 py-2 text-xs text-app-muted">No matches yet</div>
                         ) : (
-                          area.areaSuggestions.map((s: Record<string, unknown>, idx: number) => {
+                          area.areaSuggestions.map((s: Record<string, any>, idx: number) => {
                             const label = typeof s.label === 'string' ? s.label : '';
                             const text = typeof s.text === 'string' ? s.text : label || 'Unknown place';
 
@@ -268,10 +342,74 @@ export default function FeedPage() {
             )}
 
             {showComposer && (
-              <PostComposer onPost={feed.handleCreatePost} isPosting={feed.isPosting} user={feed.user} activeSurface={feed.surface} />
+              <PostComposer
+                onPost={feed.handleCreatePost}
+                isPosting={feed.isPosting}
+                user={feed.user}
+                activeSurface={feed.surface}
+                initialTopic={inSportsLane ? 'sports' : null}
+                initialSportsScope={inSportsLane && !composeSportsSeed.modalOnly ? composeSportsSeed.scope : null}
+                initialSportsMetadata={inSportsLane && !composeSportsSeed.modalOnly ? composeSportsSeed.metadata : undefined}
+                onLeaveSportsTopic={() => feed.setTopic(null)}
+              />
             )}
 
-            <FeedFilters selected={feed.filter} onChange={feed.setFilter} surface={feed.surface} onMuteTopic={feed.handleMuteTopic} />
+            {feed.surface === 'place' && (
+              <TopicChipRow
+                topics={PLACE_TOPICS.map((t) => ({ key: t.key, label: t.label, icon: <Trophy className="w-4 h-4" /> }))}
+                activeTopic={feed.topic}
+                onTopicChange={feed.setTopic}
+              />
+            )}
+
+            {inSportsLane && sportsModeChips.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
+                {sportsModeChips.map((m) => {
+                  const isActive = (feed.sportsMode || 'for_you') === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      onClick={() => {
+                        feed.setSportsMode(m.key as SportsMode);
+                        if (m.key === 'event' && primaryEvent?.event_key) {
+                          feed.setEventKey(primaryEvent.event_key);
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                        isActive
+                          ? 'bg-primary-600 text-white shadow-md'
+                          : 'bg-surface text-app-muted border border-app hover-bg-app hover:shadow-sm'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {inSportsLane && primaryEvent && (
+              <SportsEventModule
+                primaryEvent={primaryEvent}
+                onStartThread={() => {
+                  seedSportsComposer({ fromEventModule: true });
+                  setShowCompose(true);
+                }}
+                onSelectEventMode={(ek) => {
+                  feed.setEventKey(ek);
+                  feed.setSportsMode('event');
+                }}
+              />
+            )}
+
+            {!inSportsLane && (
+              <FeedFilters
+                selected={feed.filter}
+                onChange={feed.setFilter}
+                surface={feed.surface}
+                onMuteTopic={feed.handleMuteTopic}
+              />
+            )}
 
             {feed.loading ? (
               <div className="space-y-4">
@@ -294,6 +432,13 @@ export default function FeedPage() {
                   locationLat={area.viewingLat}
                   locationLng={area.viewingLng}
                   radiusMiles={area.radiusMiles}
+                  topic={feed.topic}
+                  sportsMode={feed.sportsMode}
+                  noActiveEvent={inSportsLane && feed.sportsMode === 'event' && !primaryEvent}
+                  onStarterPress={(starter) => {
+                    seedSportsComposer({ starter });
+                    setShowCompose(true);
+                  }}
                 />
               </>
             ) : (
@@ -407,6 +552,12 @@ export default function FeedPage() {
                 isPosting={feed.isPosting}
                 user={feed.user}
                 activeSurface={feed.surface}
+                initialTopic={inSportsLane ? 'sports' : null}
+                initialSportsScope={inSportsLane ? composeSportsSeed.scope : null}
+                initialSportsMetadata={inSportsLane ? composeSportsSeed.metadata : undefined}
+                initialSportsContentSeed={inSportsLane ? composeSportsSeed.contentSeed : null}
+                initialSportsPostType={inSportsLane ? composeSportsSeed.postTypePreset : null}
+                onLeaveSportsTopic={() => feed.setTopic(null)}
               />
             </div>
           </div>
@@ -450,21 +601,20 @@ export default function FeedPage() {
                   <p className="text-xs font-semibold text-app-muted uppercase tracking-wider mb-2">Political Content</p>
                   <div className="flex items-center justify-between py-1.5">
                     <div>
-                      <p className="text-sm text-app">Show in Following & Connections</p>
+                      <p className="text-sm text-app">Show in Connections</p>
                       <p className="text-[11px] text-app-muted">Political posts are hidden by default</p>
                     </div>
                     <button
                       onClick={() => {
-                        const next = !prefs.prefs!.show_politics_following;
-                        prefs.updatePref('showPoliticsFollowing', next);
+                        const next = !prefs.prefs!.show_politics_connections;
                         prefs.updatePref('showPoliticsConnections', next);
                       }}
                       className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${
-                        prefs.prefs.show_politics_following ? 'bg-blue-600' : 'bg-surface-muted border border-app'
+                        prefs.prefs.show_politics_connections ? 'bg-blue-600' : 'bg-surface-muted border border-app'
                       }`}
                     >
                       <span className={`inline-block h-4 w-4 mt-0.5 rounded-full bg-surface shadow transform transition-transform ${
-                        prefs.prefs.show_politics_following ? 'translate-x-4' : 'translate-x-0.5'
+                        prefs.prefs.show_politics_connections ? 'translate-x-4' : 'translate-x-0.5'
                       }`} />
                     </button>
                   </div>

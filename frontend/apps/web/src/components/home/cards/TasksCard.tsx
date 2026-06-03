@@ -31,6 +31,8 @@ interface TaskItem {
   assigned_to?: string;
   recurring?: boolean;
   task_type?: string;
+  converted_to_gig_id?: string;
+  visibility?: 'public' | 'members' | 'managers' | 'sensitive';
   [key: string]: unknown;
 }
 
@@ -73,9 +75,9 @@ export function TasksCardPreview({
     >
       {topTasks.length > 0 ? (
         <div className="space-y-2">
-          {topTasks.map((t) => (
-            <div key={t.id} className="flex items-center gap-2 text-sm">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[t.priority] || PRIORITY_DOT.low}`} />
+	          {topTasks.map((t) => (
+	            <div key={t.id} className="flex items-center gap-2 text-sm">
+	              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[t.priority || 'low'] || PRIORITY_DOT.low}`} />
               <span className="text-app-text-strong truncate flex-1">{t.title}</span>
               {t.assigned_to && (
                 <span className="text-[10px] text-app-text-muted flex-shrink-0">
@@ -123,7 +125,8 @@ export default function TasksCard({
   onTaskDelete: (taskId: string) => void;
   onBack: () => void;
 }) {
-  const [subTab, setSubTab] = useState<SubTab>('today');
+	  const [subTab, setSubTab] = useState<SubTab>('today');
+	  const now = new Date();
 
   const todayEnd = useMemo(() => {
     const now = new Date();
@@ -242,7 +245,7 @@ export default function TasksCard({
               </button>
 
               {/* Type icon */}
-              <span className="text-sm flex-shrink-0">{TYPE_ICON[task.task_type] || <Pin className="w-4 h-4" />}</span>
+	              <span className="text-sm flex-shrink-0">{TYPE_ICON[task.task_type || ''] || <Pin className="w-4 h-4" />}</span>
 
               {/* Content */}
               <div className="min-w-0 flex-1">
@@ -273,7 +276,7 @@ export default function TasksCard({
                     {new Date(task.due_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                 )}
-                <span className={`w-2 h-2 rounded-full ${PRIORITY_DOT[task.priority] || PRIORITY_DOT.low}`} />
+	                <span className={`w-2 h-2 rounded-full ${PRIORITY_DOT[task.priority || 'low'] || PRIORITY_DOT.low}`} />
               </div>
 
               {/* Delete on hover */}
@@ -302,8 +305,11 @@ export default function TasksCard({
             <p className="text-sm font-medium text-emerald-800">Need outside help?</p>
             <p className="text-xs text-emerald-600">Unassigned tasks can be posted to find local help.</p>
           </div>
-          <button
-            onClick={() => onTaskClick(tasks.find((t) => t.status === 'open' && !t.assigned_to))}
+	          <button
+	            onClick={() => {
+	              const firstOpenTask = tasks.find((t) => t.status === 'open' && !t.assigned_to);
+	              if (firstOpenTask) onTaskClick(firstOpenTask);
+	            }}
             className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition flex-shrink-0"
           >
             View Task

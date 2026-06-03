@@ -24,7 +24,7 @@ export default function AboutPage() {
             About Pantopus
           </h1>
           <p className="text-xl md:text-2xl text-app-text-secondary dark:text-app-text-muted leading-relaxed max-w-2xl mx-auto">
-            The Digital Neighborhood OS — built for real people, real homes, and the lives we actually live in them.
+            Your real-world network, built for real people, real homes, and the lives we actually live in them.
           </p>
         </div>
       </section>
@@ -33,13 +33,13 @@ export default function AboutPage() {
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="prose-custom">
           <p className="text-xl text-app-text-strong leading-relaxed mb-6">
-            Pantopus started with a simple frustration: neighborhood tools were either overrun with complaints, missing the features that actually mattered, or so generic they could be anywhere on earth.
+            Pantopus started with a simple frustration: real-world tools were fragmented. Neighborhood apps, home tools, task marketplaces, and public profiles all lived in separate places.
           </p>
           <p className="text-lg text-app-text-secondary dark:text-app-text-muted leading-relaxed mb-6">
             We wanted something grounded. Something that felt like your actual street — where the people you interact with are real, where your home is more than a pin on a map, where asking for help or offering a skill doesn&apos;t require navigating a corporate platform designed for the whole internet.
           </p>
           <p className="text-lg text-app-text-secondary dark:text-app-text-muted leading-relaxed">
-            So we built Pantopus: a platform where your address anchors your identity, your neighborhood has a living feed with actual intent behind every post, and your home has its own command center — tasks, mailbox, household members, and all.
+            So we built Pantopus: a platform where your real-world identities can stay distinct, your home has its own command center, and Beacons, tasks, marketplace, mail, and local updates can live together.
           </p>
         </div>
       </section>
@@ -115,7 +115,7 @@ export default function AboutPage() {
               icon: '🏘️',
               color: 'bg-primary-50 dark:bg-primary-900/20 border-primary-100 dark:border-primary-800/30',
               label: 'Residents',
-              body: 'A calmer, more useful neighborhood layer. Real people, real updates, real help.',
+              body: 'A calmer, more useful local layer. Real people, real updates, real help.',
             },
             {
               icon: '💼',
@@ -184,7 +184,7 @@ function SiteNav() {
             <LayoutDashboard className="w-7 h-7 text-primary-600" />
             <div className="flex flex-col leading-none">
               <span className="text-xl font-bold tracking-tight text-primary-700 dark:text-primary-400">Pantopus</span>
-              <span className="hidden sm:block text-[10px] font-medium text-app-text-muted dark:text-app-text-secondary tracking-wide uppercase">Digital Neighborhood OS</span>
+              <span className="hidden sm:block text-[10px] font-medium text-app-text-muted dark:text-app-text-secondary tracking-wide uppercase">Your real-world network</span>
             </div>
           </Link>
           <div className="flex items-center gap-3">
@@ -213,7 +213,7 @@ function SiteFooter() {
               <span className="text-lg font-bold text-white">Pantopus</span>
             </div>
             <p className="text-sm text-app-text-secondary leading-relaxed max-w-xs">
-              Your Digital Neighborhood Operating System. Verified people, real homes, local work — all in one place.
+              Your real-world network. Verified people, real homes, local work, and Beacons in one place.
             </p>
           </div>
           <div>

@@ -12,6 +12,9 @@ export {
   POST_TYPE_ICONS_IONICON,
   PURPOSE_TO_POST_TYPE,
   resolvePostType,
+  isSportsComposerPurpose,
+  mapComposerPurposeToApiPurpose,
+  sportsComposerPurposeToStarterKey,
 } from './post-types';
 export type { PostTypeConfig } from './post-types';
 export { formatPrice, toPriceLabel, getGigPrice } from './price';
@@ -87,3 +90,11 @@ export type { WalletTxTypeStyle } from './wallet-constants';
 export { buildBackendPayload, validateComposeState } from './compose-payload-builder';
 export { getCurrentSeason, getStationeryConfig, INK_CONFIGS } from './stationery';
 export type { InkConfig, StationeryConfig } from './stationery';
+export {
+  readAuthRedirectQuery,
+  safeRedirectPath,
+  extractApiError,
+  extractFieldErrors,
+  normalizeEmail,
+  oauthRedirectParamForWeb,
+} from './auth-form';

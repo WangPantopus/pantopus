@@ -40,7 +40,7 @@ function BoundsWatcher({ onBounds }: { onBounds: (b: Bounds) => void }) {
   return null;
 }
 
-function makePinIcon(g: Record<string, unknown>) {
+function makePinIcon(g: Record<string, any>) {
   const title = (g?.title ?? '').toString().trim();
   const initial = title ? title[0].toUpperCase() : '•';
 
@@ -80,7 +80,7 @@ export default function DashboardMap({
   onSelectGig
 }: {
   center: [number, number];
-  gigs: Record<string, unknown>[];
+  gigs: Record<string, any>[];
   onCenter: (c: [number, number]) => void;
   onBounds: (b: Bounds) => void;
   onSelectGig: (id: string) => void;
@@ -94,12 +94,12 @@ export default function DashboardMap({
 
       {gigs
         .filter((g) => {
-          const loc = g.location as Record<string, unknown> | undefined;
+          const loc = g.location as Record<string, any> | undefined;
           return (g.latitude != null && g.longitude != null) || (loc?.lat != null && loc?.lng != null);
         })
         .slice(0, 200)
         .map((g) => {
-          const loc = g.location as Record<string, unknown> | undefined;
+          const loc = g.location as Record<string, any> | undefined;
           const lat = (g.latitude ?? loc?.lat) as number | undefined;
           const lng = (g.longitude ?? loc?.lng) as number | undefined;
           if (lat == null || lng == null) return null;

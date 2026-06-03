@@ -118,7 +118,7 @@ function RequestCard({
   onRefresh: () => void;
 }) {
   const resident = request.primary_resident;
-  const message = (request.metadata as Record<string, unknown>)?.message;
+  const message = (request.metadata as Record<string, any>)?.message;
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

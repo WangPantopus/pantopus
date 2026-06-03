@@ -29,6 +29,15 @@ function typeIcon(t: string): LucideIcon { return ACCESS_TYPES.find(a => a.value
 function typeLabel(t: string) { return ACCESS_TYPES.find(a => a.value === t)?.label ?? t; }
 function visBadge(v: string) { return VISIBILITY_OPTIONS.find(o => o.value === v) ?? VISIBILITY_OPTIONS[1]; }
 
+type AccessSecretFormData = {
+  id?: string;
+  access_type: string;
+  label: string;
+  secret_value: string;
+  notes?: string;
+  visibility?: string;
+};
+
 /* ── component ─────────────────────────────────────────────────── */
 export default function QuickAccess({
   home,
@@ -38,9 +47,9 @@ export default function QuickAccess({
   canManageAccess = false,
   onSecretsChange,
 }: {
-  home: Record<string, unknown>;
+  home: Record<string, any>;
   secrets?: HomeAccessSecret[];
-  emergencies?: Record<string, unknown>[];
+  emergencies?: Record<string, any>[];
   homeId?: string;
   canManageAccess?: boolean;
   onSecretsChange?: (secrets: HomeAccessSecret[]) => void;
@@ -81,7 +90,7 @@ export default function QuickAccess({
   }, []);
 
   /* ── save (create or update) ── */
-  const handleSave = async (formData: Record<string, unknown>) => {
+  const handleSave = async (formData: AccessSecretFormData) => {
     if (!hid) return;
     setSaving(true);
     try {
@@ -188,7 +197,7 @@ export default function QuickAccess({
               )}
 
               {visibleSecrets.map((s) => (
-                <div key={s.id} className="border border-app-border-subtle rounded-lg p-2.5 bg-app-surface-raised/70 group">
+                <div key={s.id || `${s.access_type}-${s.label}`} className="border border-app-border-subtle rounded-lg p-2.5 bg-app-surface-raised/70 group">
                   <div className="flex items-start gap-2">
                     {(() => { const TypeIcon = typeIcon(s.access_type); return <TypeIcon className="w-4 h-4 mt-0.5 flex-shrink-0 text-app-text-secondary" />; })()}
                     <div className="min-w-0 flex-1">
@@ -206,12 +215,12 @@ export default function QuickAccess({
                         <code className="text-xs font-mono text-app-text bg-app-surface border border-app-border px-2 py-0.5 rounded break-all flex-1">
                           {s.secret_value}
                         </code>
-                        <button
-                          onClick={() => copyValue(s.id, s.secret_value)}
-                          className="text-app-text-muted hover:text-app-text-secondary flex-shrink-0"
-                          title="Copy to clipboard"
-                        >
-                          {copiedId === s.id ? (
+	                        <button
+	                          onClick={() => copyValue(String(s.id || s.label), s.secret_value || '')}
+	                          className="text-app-text-muted hover:text-app-text-secondary flex-shrink-0"
+	                          title="Copy to clipboard"
+	                        >
+	                          {copiedId === String(s.id || s.label) ? (
                             <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
@@ -230,8 +239,8 @@ export default function QuickAccess({
 
                       {/* Visibility badge + actions */}
                       <div className="flex items-center justify-between mt-1.5">
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${visBadge(s.visibility).color}`}>
-                          {visBadge(s.visibility).label}
+	                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${visBadge(s.visibility || 'members').color}`}>
+	                          {visBadge(s.visibility || 'members').label}
                         </span>
                         {canManageAccess && viewMode === 'family' && (
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -241,10 +250,10 @@ export default function QuickAccess({
                             >
                               Edit
                             </button>
-                            {confirmDelete === s.id ? (
-                              <span className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleDelete(s.id)}
+	                            {confirmDelete === String(s.id || '') ? (
+	                              <span className="flex items-center gap-1">
+	                                <button
+	                                  onClick={() => { if (s.id) handleDelete(s.id); }}
                                   disabled={saving}
                                   className="text-[10px] text-red-600 hover:text-red-700 font-medium"
                                 >
@@ -257,9 +266,9 @@ export default function QuickAccess({
                                   Cancel
                                 </button>
                               </span>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmDelete(s.id)}
+	                            ) : (
+	                              <button
+	                                onClick={() => setConfirmDelete(String(s.id || ''))}
                                 className="text-[10px] text-red-500 hover:text-red-600 font-medium"
                               >
                                 Delete
@@ -386,9 +395,9 @@ function AccessCodeForm({
   onSave,
   onCancel,
 }: {
-  initial: Partial<HomeAccessSecret>;
-  saving: boolean;
-  onSave: (data: Record<string, unknown>) => void;
+	  initial: Partial<HomeAccessSecret>;
+	  saving: boolean;
+	  onSave: (data: AccessSecretFormData) => void;
   onCancel: () => void;
 }) {
   const isEdit = !!initial.id;

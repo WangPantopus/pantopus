@@ -59,7 +59,6 @@ export interface MailItemV2 {
   mail_type?: string;
   primary_action?: string;
   ack_required?: boolean;
-  display_title?: string;
   object_payload?: Record<string, any> | null;
   // Package join
   package?: MailPackage | null;

@@ -22,7 +22,7 @@ export default function PostConfirmation({ result, onClose, onUndo }: PostConfir
   const [countdown, setCountdown] = useState(Math.ceil(UNDO_WINDOW_MS / 1000));
   const [progress, setProgress] = useState(100);
   const startRef = useRef(Date.now());
-  const autoCloseRef = useRef<ReturnType<typeof setTimeout>>();
+  const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Countdown timer
   useEffect(() => {

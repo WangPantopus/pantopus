@@ -77,7 +77,7 @@ export default function ItemDetailPage() {
     id: detail.wrapper.id,
     certified: true as const,
     requires_acknowledgment: detail.policy.requires_acknowledgment,
-    acknowledged_at: acknowledge.data?.acknowledged_at ?? (detail.wrapper as unknown as Record<string, unknown>).acknowledged_at as string | undefined,
+    acknowledged_at: acknowledge.data?.acknowledged_at ?? (detail.wrapper as unknown as Record<string, any>).acknowledged_at as string | undefined,
     acknowledged_by: undefined,
     audit_trail: acknowledge.data?.audit_trail ?? [],
   } : null;
@@ -187,7 +187,7 @@ export default function ItemDetailPage() {
       const session = res.sessions.find(s => s.mail_id === mailId);
       if (!session) return [];
       // Return participant list from session
-      return ((session as unknown as Record<string, unknown>).participants ?? []) as PartyParticipant[];
+      return ((session as unknown as Record<string, any>).participants ?? []) as PartyParticipant[];
     } catch {
       return [];
     }
@@ -559,7 +559,7 @@ export default function ItemDetailPage() {
         <GigCreationModal
           source={gigSource}
           packageTitle={detail.wrapper.outside_title}
-          packageDescription={detail.inside.blocks?.[0]?.type === 'text' ? (detail.inside.blocks[0] as unknown as Record<string, unknown>).content as string : undefined}
+          packageDescription={detail.inside.blocks?.[0]?.type === 'text' ? (detail.inside.blocks[0] as unknown as Record<string, any>).content as string : undefined}
           deliveryEta={wrapperAny?.eta_latest}
           homeAddress={wrapperAny?.delivery_address}
           photoUrl={wrapperAny?.delivery_photo_url}

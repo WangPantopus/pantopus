@@ -16,8 +16,8 @@ export function HomeHelpCardPreview({
   nearbyGigs,
   onExpand,
 }: {
-  homeGigs: Record<string, unknown>[];
-  nearbyGigs: Record<string, unknown>[];
+  homeGigs: Record<string, any>[];
+  nearbyGigs: Record<string, any>[];
   onExpand: () => void;
 }) {
   const activeGigs = homeGigs.filter((g) => g.status === 'open' || g.status === 'assigned' || g.status === 'in_progress');
@@ -63,10 +63,10 @@ export default function HomeHelpCard({
   tasks,
   onBack,
 }: {
-  homeGigs: Record<string, unknown>[];
-  nearbyGigs: Record<string, unknown>[];
+  homeGigs: Record<string, any>[];
+  nearbyGigs: Record<string, any>[];
   homeId: string;
-  tasks: Record<string, unknown>[];
+  tasks: Record<string, any>[];
   onBack: () => void;
 }) {
   const router = useRouter();
@@ -172,8 +172,8 @@ export default function HomeHelpCard({
                   </div>
                 </div>
 
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${GIG_STATUS_COLORS[gig.status] || GIG_STATUS_COLORS.open}`}>
-                  {gig.status?.replace('_', ' ') || 'open'}
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${statusClasses(GIG_STATUS_STYLES, gig.status || 'open')}`}>
+                  {statusLabel(GIG_STATUS_STYLES, gig.status || 'open')}
                 </span>
               </div>
             );

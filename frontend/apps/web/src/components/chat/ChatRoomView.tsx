@@ -32,7 +32,7 @@ export default function ChatRoomView({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [roomInfo, setRoomInfo] = useState<ChatRoomWithDetails | null>(null);
   const [representedUserIds, setRepresentedUserIds] = useState<string[]>([]);
-  const [preBidStatus, setPreBidStatus] = useState<Record<string, unknown> | null>(null);
+  const [preBidStatus, setPreBidStatus] = useState<Record<string, any> | null>(null);
   const [historicalMessages, setHistoricalMessages] = useState<ChatMessage[]>([]);
   const [historicalRoomId, setHistoricalRoomId] = useState<string | null>(null);
 
@@ -58,7 +58,7 @@ export default function ChatRoomView({
   useEffect(() => {
     (async () => {
       try {
-        const resp = await (api.chat as Record<string, unknown> & { getChatRoom?: (id: string, opts?: Record<string, unknown>) => Promise<{ room?: ChatRoomWithDetails }> }).getChatRoom?.(roomId, {
+        const resp = await (api.chat as Record<string, any> & { getChatRoom?: (id: string, opts?: Record<string, any>) => Promise<{ room?: ChatRoomWithDetails }> }).getChatRoom?.(roomId, {
           ...(asBusinessUserId ? { asBusinessUserId } : {}),
         });
         setRoomInfo(resp?.room || null);
@@ -80,13 +80,13 @@ export default function ChatRoomView({
     const represented = new Set<string>([String(currentUserId)]);
     const participants = Array.isArray(roomInfo?.participants) ? roomInfo.participants : [];
     const participantIds: string[] = Array.from(
-      new Set(participants.map((p: Record<string, unknown>) => String((p?.user_id as string) || ((p?.user as Record<string, unknown>)?.id as string) || '')).filter(Boolean)),
+      new Set(participants.map((p: Record<string, any>) => String((p?.user_id as string) || ((p?.user as Record<string, any>)?.id as string) || '')).filter(Boolean)),
     );
     Promise.all(
       participantIds.map(async (candidateId) => {
         if (!candidateId || candidateId === String(currentUserId)) return;
         try {
-          const access = await ((api.businessIam as Record<string, unknown>).getMyBusinessAccess as ((id: string) => Promise<{ hasAccess?: boolean; isOwner?: boolean; permissions?: string[] }>) | undefined)?.(candidateId);
+          const access = await ((api.businessIam as Record<string, any>).getMyBusinessAccess as ((id: string) => Promise<{ hasAccess?: boolean; isOwner?: boolean; permissions?: string[] }>) | undefined)?.(candidateId);
           if (access?.hasAccess && (access?.isOwner || (Array.isArray(access?.permissions) && (access.permissions.includes('gigs.manage') || access.permissions.includes('gigs.post'))))) {
             represented.add(candidateId);
           }
@@ -111,20 +111,20 @@ export default function ChatRoomView({
   useEffect(() => {
     if (!roomInfo || !currentUserId) { setHistoricalMessages([]); setHistoricalRoomId(null); return; }
     const participants = roomInfo?.participants || [];
-    const nonCurrent = participants.filter((p: Record<string, unknown>) => !isRepresented((p.user_id as string) || ((p.user as Record<string, unknown>)?.id as string)));
-    const ownerParticipant = participants.find((p: Record<string, unknown>) => p.role === 'owner');
-    const iRepresentOwner = Boolean(ownerParticipant && isRepresented((ownerParticipant.user_id as string) || ((ownerParticipant.user as Record<string, unknown>)?.id as string)));
+    const nonCurrent = participants.filter((p: Record<string, any>) => !isRepresented((p.user_id as string) || ((p.user as Record<string, any>)?.id as string)));
+    const ownerParticipant = participants.find((p: Record<string, any>) => p.role === 'owner');
+    const iRepresentOwner = Boolean(ownerParticipant && isRepresented((ownerParticipant.user_id as string) || ((ownerParticipant.user as Record<string, any>)?.id as string)));
     const other = (iRepresentOwner
-      ? (nonCurrent.find((p: Record<string, unknown>) => p.role !== 'owner') || nonCurrent[0])
-      : (ownerParticipant || nonCurrent[0])) as Record<string, unknown> | undefined;
-    const otherUser = other?.user as Record<string, unknown> | undefined;
+      ? (nonCurrent.find((p: Record<string, any>) => p.role !== 'owner') || nonCurrent[0])
+      : (ownerParticipant || nonCurrent[0])) as Record<string, any> | undefined;
+    const otherUser = other?.user as Record<string, any> | undefined;
     const otherUserId = otherUser?.id as string | undefined;
     if (!otherUserId) { setHistoricalMessages([]); setHistoricalRoomId(null); return; }
 
     (async () => {
       try {
-        try { await ((api.chat as Record<string, unknown>).markConversationAsRead as ((id: string, opts?: Record<string, unknown>) => Promise<void>) | undefined)?.(String(otherUserId), { ...(asBusinessUserId ? { asBusinessUserId } : {}) }); } catch {}
-        const convResp = await ((api.chat as Record<string, unknown>).getConversationMessages as ((id: string, opts?: Record<string, unknown>) => Promise<{ messages?: ChatMessage[]; roomIds?: string[] }>) | undefined)?.(String(otherUserId), {
+        try { await ((api.chat as Record<string, any>).markConversationAsRead as ((id: string, opts?: Record<string, any>) => Promise<void>) | undefined)?.(String(otherUserId), { ...(asBusinessUserId ? { asBusinessUserId } : {}) }); } catch {}
+        const convResp = await ((api.chat as Record<string, any>).getConversationMessages as ((id: string, opts?: Record<string, any>) => Promise<{ messages?: ChatMessage[]; roomIds?: string[] }>) | undefined)?.(String(otherUserId), {
           limit: 1000,
           ...(asBusinessUserId ? { asBusinessUserId } : {}),
         });
@@ -139,7 +139,7 @@ export default function ChatRoomView({
 
   // ── Ownership check ───────────────────────────────────
   const isOwnMessage = useCallback(
-    (msg: ChatMessage) => isRepresented(msg.user_id || msg.sender_id || (msg.sender as Record<string, unknown>)?.id as string),
+    (msg: ChatMessage) => isRepresented(msg.user_id || msg.sender_id || (msg.sender as Record<string, any>)?.id as string),
     [isRepresented],
   );
 
@@ -236,16 +236,16 @@ export default function ChatRoomView({
 
   // ── Derive chat title ─────────────────────────────────
   const participants = roomInfo?.participants || [];
-  const nonCurrentParticipants = participants.filter((p: Record<string, unknown>) => !isRepresented((p.user_id as string) || ((p.user as Record<string, unknown>)?.id as string)));
-  const ownerParticipant = participants.find((p: Record<string, unknown>) => p.role === 'owner');
-  const iRepresentOwner = Boolean(ownerParticipant && isRepresented((ownerParticipant.user_id as string) || ((ownerParticipant.user as Record<string, unknown>)?.id as string)));
+  const nonCurrentParticipants = participants.filter((p: Record<string, any>) => !isRepresented((p.user_id as string) || ((p.user as Record<string, any>)?.id as string)));
+  const ownerParticipant = participants.find((p: Record<string, any>) => p.role === 'owner');
+  const iRepresentOwner = Boolean(ownerParticipant && isRepresented((ownerParticipant.user_id as string) || ((ownerParticipant.user as Record<string, any>)?.id as string)));
   const otherParticipant =
     roomInfo?.type === 'gig'
       ? (iRepresentOwner
-          ? (nonCurrentParticipants.find((p: Record<string, unknown>) => p.role !== 'owner') || nonCurrentParticipants[0])
+          ? (nonCurrentParticipants.find((p: Record<string, any>) => p.role !== 'owner') || nonCurrentParticipants[0])
           : ownerParticipant || nonCurrentParticipants[0])
-      : (nonCurrentParticipants.find((p: Record<string, unknown>) => p.role !== 'owner') || nonCurrentParticipants[0]);
-  const otherUser = (otherParticipant as Record<string, unknown>)?.user as Record<string, unknown> | undefined;
+      : (nonCurrentParticipants.find((p: Record<string, any>) => p.role !== 'owner') || nonCurrentParticipants[0]);
+  const otherUser = (otherParticipant as Record<string, any>)?.user as Record<string, any> | undefined;
   const chatTitle = (otherUser?.name as string)
     || [(otherUser?.first_name as string), (otherUser?.last_name as string)].filter(Boolean).join(' ')
     || (otherUser?.username as string)
@@ -280,7 +280,7 @@ export default function ChatRoomView({
               </div>
             </div>
             {group.msgs.map((m: ChatMessage) => {
-              const sender = m.sender as Record<string, unknown> | undefined;
+              const sender = m.sender as Record<string, any> | undefined;
               const isMine = isRepresented(m.user_id || m.sender_id || (sender?.id as string));
               const who = (sender?.name as string) || (sender?.username as string) || 'Someone';
               const ts = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';

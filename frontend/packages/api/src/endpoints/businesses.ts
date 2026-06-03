@@ -26,7 +26,7 @@ export interface BusinessUser {
   tagline?: string;
   average_rating?: number;
   review_count?: number;
-  followers_count?: number;
+  profile?: BusinessProfile | null;
 }
 
 export interface BusinessProfile {
@@ -180,7 +180,6 @@ export interface BusinessDiscoverItem {
   profile_picture_url?: string;
   city?: string;
   state?: string;
-  followers_count?: number;
   average_rating?: number;
   review_count?: number;
   business_type?: string;

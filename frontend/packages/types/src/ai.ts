@@ -278,7 +278,7 @@ export interface AIDraftListingResponse {
 
 export interface AIDraftPostRequest {
   text: string;
-  surface?: 'place' | 'following' | 'connections';
+  surface?: 'place' | 'connections';
   coarseLocation?: { city?: string; state?: string };
   context?: {
     postType?: string;

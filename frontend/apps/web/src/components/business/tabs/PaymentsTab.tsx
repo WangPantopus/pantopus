@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import * as api from '@pantopus/api';
+import type { StripeAccount } from '@pantopus/types';
 
 export default function PaymentsTab() {
-  const [stripeAccount, setStripeAccount] = useState<Record<string, boolean> | null>(null);
+  const [stripeAccount, setStripeAccount] = useState<StripeAccount | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -16,6 +16,12 @@ export type PublicFetchResult<T> = {
   status: number;
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function normalizePublicProfileIdentifier(value: string): string {
+  return String(value || '').trim().replace(/^@+/, '');
+}
+
 async function fetchPublicJson<T>(path: string): Promise<PublicFetchResult<T>> {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -65,8 +71,38 @@ export const fetchPublicSupportTrain = cache(async (id: string): Promise<PublicF
 });
 
 export const fetchPublicUser = cache(async (username: string): Promise<PublicFetchResult<any>> => {
+  const identifier = normalizePublicProfileIdentifier(username);
+  if (!identifier) return { data: null, status: 404 };
+
   const result = await fetchPublicJson<any>(
-    `/api/users/username/${encodeURIComponent(username)}`
+    UUID_REGEX.test(identifier)
+      ? `/api/users/id/${encodeURIComponent(identifier)}`
+      : `/api/users/username/${encodeURIComponent(identifier)}`
+  );
+
+  if (result.data || result.status !== 404 || UUID_REGEX.test(identifier)) {
+    return { data: result.data ?? null, status: result.status };
+  }
+
+  const legacyResult = await fetchPublicJson<any>(
+    `/api/users/${encodeURIComponent(identifier)}`
+  );
+  return {
+    data: legacyResult.data?.user ?? legacyResult.data ?? null,
+    status: legacyResult.status,
+  };
+});
+
+export const fetchPublicLocalProfile = cache(async (handle: string): Promise<PublicFetchResult<any>> => {
+  const result = await fetchPublicJson<{ profile: any }>(
+    `/api/local-profiles/${encodeURIComponent(handle)}`
+  );
+  return { data: result.data?.profile ?? null, status: result.status };
+});
+
+export const fetchPublicPersona = cache(async (handle: string): Promise<PublicFetchResult<any>> => {
+  const result = await fetchPublicJson<{ persona: any; channel: any }>(
+    `/api/personas/${encodeURIComponent(handle.replace(/^@/, ''))}`
   );
   return { data: result.data ?? null, status: result.status };
 });

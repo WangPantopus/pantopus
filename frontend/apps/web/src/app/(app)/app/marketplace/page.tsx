@@ -7,10 +7,15 @@ import dynamic from 'next/dynamic';
 import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
 import MarketplaceSnapshotCard from '@/components/dashboard/MarketplaceSnapshotCard';
-import type { Listing, MarketplaceBrowseResponse, MarketplaceDiscoverResponse } from '@pantopus/api';
+import type {
+  Listing,
+  MarketplaceBrowseParams,
+  MarketplaceBrowseResponse,
+  MarketplaceDiscoverResponse,
+} from '@pantopus/api';
 import { queryKeys } from '@/lib/query-keys';
 
-import { Store, ArrowUpDown, Clock, Navigation, TrendingDown, TrendingUp, Check } from 'lucide-react';
+import { Store, ArrowUpDown, Clock, Navigation, TrendingDown, TrendingUp, Check, Maximize2, Minimize2, X } from 'lucide-react';
 import ListingCard from './ListingCard';
 import MarketplaceTabs from './MarketplaceTabs';
 import FilterPillBar from './FilterPillBar';
@@ -21,6 +26,7 @@ import MarketplaceDiscoveryFeed from '@/components/marketplace-browse/Marketplac
 import MarketplaceSearch from '@/components/marketplace-browse/MarketplaceSearch';
 import NewListingsBanner from '@/components/marketplace-browse/NewListingsBanner';
 import { useSocketEvent } from '@/hooks/useSocket';
+import { useRadiusSuggestion } from '@/hooks/useRadiusSuggestion';
 import { CATEGORIES, type MarketplaceTab, type FilterPillKey } from './constants';
 import { CategoryIcon } from './iconMap';
 import EmptyState from '@/components/ui/EmptyState';
@@ -30,19 +36,47 @@ const MarketplaceMap = dynamic(() => import('./MarketplaceMap'), { ssr: false })
 
 // ── Helpers ──────────────────────────────────────────────────
 
-/** Convert geolocation coords to a ~5-mile bounding box. */
-function boundsFromCenter(lat: number, lng: number, radiusMiles = 5) {
-  const latDelta = radiusMiles / 69;
-  const lngDelta = radiusMiles / (69 * Math.cos((lat * Math.PI) / 180));
+const DEFAULT_RADIUS_MILES = 100;
+const GLOBAL_RADIUS_MILES = 25000;
+const METERS_PER_MILE = 1609.344;
+const WORLD_BOUNDS = { south: -90, west: -180, north: 90, east: 180 };
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+/** Convert center coords and radius to API bounds. */
+function boundsFromCenter(lat: number, lng: number, radiusMiles = DEFAULT_RADIUS_MILES) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return WORLD_BOUNDS;
+
+  const radius = Number.isFinite(radiusMiles) && radiusMiles > 0
+    ? radiusMiles
+    : DEFAULT_RADIUS_MILES;
+  if (radius >= GLOBAL_RADIUS_MILES) return WORLD_BOUNDS;
+
+  const latDelta = radius / 69;
+  const cosLat = Math.max(Math.abs(Math.cos((lat * Math.PI) / 180)), 0.01);
+  const lngDelta = radius / (69 * cosLat);
+  const west = lng - lngDelta;
+  const east = lng + lngDelta;
+
   return {
-    south: lat - latDelta,
-    north: lat + latDelta,
-    west: lng - lngDelta,
-    east: lng + lngDelta,
+    south: clamp(lat - latDelta, -90, 90),
+    north: clamp(lat + latDelta, -90, 90),
+    west: west < -180 || east > 180 || lngDelta >= 180 ? -180 : west,
+    east: west < -180 || east > 180 || lngDelta >= 180 ? 180 : east,
   };
 }
 
+function formatRadiusLabel(miles: number): string {
+  return miles === GLOBAL_RADIUS_MILES ? 'Global' : `${miles} mi`;
+}
+
 type Bounds = { south: number; west: number; north: number; east: number };
+type NearestActivityCenter = { latitude: number; longitude: number };
+type MarketplaceBrowseResponseWithNearest = MarketplaceBrowseResponse & {
+  nearest_activity_center?: NearestActivityCenter | null;
+};
 type SortKey = 'newest' | 'nearest' | 'price_low' | 'price_high';
 type NewListingEvent = {
   id: string;
@@ -76,7 +110,7 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('all');
-  const [activeTab, setActiveTab] = useState<MarketplaceTab>('global');
+  const [activeTab, setActiveTab] = useState<MarketplaceTab>('near');
   const [activeFilters, setActiveFilters] = useState<FilterPillKey[]>([]);
   const [sort, setSort] = useState<SortKey>('newest');
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
@@ -84,6 +118,7 @@ export default function MarketplacePage() {
   // ── Bounds (source of truth for Browse Mode queries) ─────────
   const [activeBounds, setActiveBounds] = useState<Bounds | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [radiusMiles, setRadiusMiles] = useState(DEFAULT_RADIUS_MILES);
 
   // ── UI state ─────────────────────────────────────────────────
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -157,8 +192,8 @@ export default function MarketplacePage() {
   const activeCategory = CATEGORIES.find(c => c.key === category) || CATEGORIES[0];
 
   // ── Build filter params for /browse ──────────────────────────
-  const buildBrowseParams = useCallback((bounds: Bounds, cursorValue?: string | null) => {
-    const params: Record<string, unknown> = {
+  const buildBrowseParams = useCallback((bounds: Bounds, cursorValue?: string | null): MarketplaceBrowseParams => {
+    const params: MarketplaceBrowseParams = {
       south: bounds.south,
       west: bounds.west,
       north: bounds.north,
@@ -177,7 +212,7 @@ export default function MarketplacePage() {
       // Expand bounds significantly for global tab
       const latMid = (bounds.south + bounds.north) / 2;
       const lngMid = (bounds.west + bounds.east) / 2;
-      const globalBounds = boundsFromCenter(latMid, lngMid, 125);
+      const globalBounds = boundsFromCenter(latMid, lngMid, 25000);
       params.south = globalBounds.south;
       params.north = globalBounds.north;
       params.west = globalBounds.west;
@@ -245,13 +280,13 @@ export default function MarketplacePage() {
 
   // ── Browse: useInfiniteQuery keyed by filters ──────────────
   const browseQuery = useInfiniteQuery<
-    MarketplaceBrowseResponse,
+    MarketplaceBrowseResponseWithNearest,
     Error,
-    InfiniteData<MarketplaceBrowseResponse>,
+    InfiniteData<MarketplaceBrowseResponseWithNearest>,
     ReturnType<typeof queryKeys.marketplace>,
     string | null
   >({
-    queryKey: queryKeys.marketplace('browse', browseFilters as Record<string, unknown>),
+    queryKey: queryKeys.marketplace('browse', browseFilters as Record<string, any>),
     initialPageParam: null,
     queryFn: async ({ pageParam, signal }) => {
       if (!activeBounds) throw new Error('No bounds');
@@ -261,7 +296,7 @@ export default function MarketplacePage() {
         throw new Error('Not authenticated');
       }
       const params = buildBrowseParams(activeBounds, pageParam);
-      const result = await api.listings.browseListings(params as any);
+      const result = await api.listings.browseListings(params);
       if (signal.aborted) throw new Error('aborted');
       return result;
     },
@@ -276,13 +311,14 @@ export default function MarketplacePage() {
     queryKey: queryKeys.marketplace('discover', {
       lat: userLocation?.latitude ?? null,
       lng: userLocation?.longitude ?? null,
-    } as Record<string, unknown>),
+      radiusMiles,
+    } as Record<string, any>),
     queryFn: async ({ signal }) => {
       if (!userLocation) throw new Error('No userLocation');
       const result = await api.listings.discoverListings({
         lat: userLocation.latitude,
         lng: userLocation.longitude,
-        radius: 40234,
+        radius: Math.round(radiusMiles * METERS_PER_MILE),
       });
       if (signal.aborted) throw new Error('aborted');
       return result;
@@ -308,11 +344,30 @@ export default function MarketplacePage() {
 
   const lastBrowsePage = browseQuery.data?.pages[browseQuery.data.pages.length - 1];
   const totalInBounds = lastBrowsePage?.meta?.total_in_bounds || browseListings.length;
-  const nearestActivityCenter = (lastBrowsePage as any)?.nearest_activity_center ?? null;
+  const nearestActivityCenter = lastBrowsePage?.nearest_activity_center ?? null;
   const hasMore = browseQuery.hasNextPage ?? false;
   const loading = isDiscovery ? discoverQuery.isPending : browseQuery.isPending;
   const loadingMore = browseQuery.isFetchingNextPage;
   const discoverData = discoverQuery.data ?? null;
+  const visibleListingCount = Math.max(totalInBounds, browseListings.length);
+  const radiusSuggestionEnabled =
+    isGridView &&
+    !isDiscovery &&
+    activeTab !== 'global' &&
+    activeFilters.length === 0 &&
+    debouncedSearch.trim().length === 0 &&
+    !loading &&
+    userLocation != null;
+  const radiusSuggestion = useRadiusSuggestion(
+    visibleListingCount,
+    radiusMiles,
+    setRadiusMiles,
+    {
+      enabled: radiusSuggestionEnabled,
+      singularLabel: 'listing',
+      pluralLabel: 'listings',
+    }
+  );
 
   // ── Snapshot stats ─────────────────────────────────────────
   const marketplaceSnapshot = useMemo(() => {
@@ -332,29 +387,65 @@ export default function MarketplacePage() {
     setNewListingCount(0);
   }, [activeBounds, category, activeTab, activeFilters, sort, debouncedSearch]);
 
-  // ── Geolocation → initial bounds ─────────────────────────────
+  // ── Viewing Location/geolocation → initial bounds ───────────
   useEffect(() => {
-    if (!navigator.geolocation) {
-      // Fallback: Portland
-      const fallback = { latitude: 45.5152, longitude: -122.6784 };
-      setUserLocation(fallback);
-      setActiveBounds(boundsFromCenter(fallback.latitude, fallback.longitude));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        setUserLocation(loc);
-        setActiveBounds(boundsFromCenter(loc.latitude, loc.longitude));
-      },
-      () => {
+    let cancelled = false;
+
+    const applyLocation = (loc: { latitude: number; longitude: number }, radius = DEFAULT_RADIUS_MILES) => {
+      if (cancelled) return;
+      setUserLocation(loc);
+      setRadiusMiles(radius);
+      setActiveBounds(boundsFromCenter(loc.latitude, loc.longitude, radius));
+    };
+
+    const applyFallbackLocation = () => {
+      if (!cancelled) {
         const fallback = { latitude: 45.5152, longitude: -122.6784 };
-        setUserLocation(fallback);
-        setActiveBounds(boundsFromCenter(fallback.latitude, fallback.longitude));
-      },
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
+        applyLocation(fallback);
+      }
+    };
+
+    (async () => {
+      try {
+        const resolved = await api.location.resolveLocation();
+        const vl = resolved?.viewingLocation;
+        if (vl?.latitude != null && vl?.longitude != null) {
+          applyLocation(
+            { latitude: vl.latitude, longitude: vl.longitude },
+            vl.radiusMiles || DEFAULT_RADIUS_MILES
+          );
+          return;
+        }
+      } catch {
+        // Fall back to browser geolocation below.
+      }
+
+      if (!navigator.geolocation) {
+        applyFallbackLocation();
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          applyLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        applyFallbackLocation,
+        { enableHighAccuracy: false, timeout: 10000 }
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (viewMode !== 'grid' || !userLocation || activeTab === 'global') return;
+    setActiveBounds(boundsFromCenter(userLocation.latitude, userLocation.longitude, radiusMiles));
+  }, [viewMode, userLocation, radiusMiles, activeTab]);
 
   // ── Auto-open create modal via ?create=true ──────────────────
   useEffect(() => {
@@ -427,18 +518,17 @@ export default function MarketplacePage() {
     return () => observer.disconnect();
   }, [hasMore, loading, loadingMore, browseQuery]);
 
-  // ── View mode toggle (instant, no re-fetch in Browse) ────────
+  // ── View mode toggle ────────────────────────────────────────
   const handleViewToggle = useCallback((mode: 'grid' | 'map') => {
     setViewMode(mode);
-    // No fetch! Same dataset.
   }, []);
 
   // ── Optimistic save toggle ──────────────────────────────────
-  const browseKey = queryKeys.marketplace('browse', browseFilters as Record<string, unknown>);
+  const browseKey = queryKeys.marketplace('browse', browseFilters as Record<string, any>);
 
   // Mutate a single listing in the paginated cache.
   const updateListingInCache = useCallback((listingId: string, patch: (l: Listing) => Listing) => {
-    queryClient.setQueryData<InfiniteData<MarketplaceBrowseResponse>>(browseKey, (old) => {
+    queryClient.setQueryData<InfiniteData<MarketplaceBrowseResponseWithNearest>>(browseKey, (old) => {
       if (!old) return old;
       return {
         ...old,
@@ -749,7 +839,7 @@ export default function MarketplacePage() {
               onChange={setSearchQuery}
               onSearch={handleSearchSubmit}
               onExpandBounds={handleExpandBounds}
-              onCreateListing={(prefill) => { setShowCreateModal(true); }}
+              onCreateListing={() => { setShowCreateModal(true); }}
               resultCount={!isDiscovery ? browseListings.length : undefined}
               userLocation={userLocation}
             />
@@ -770,6 +860,32 @@ export default function MarketplacePage() {
         {newListingCount > 0 && (
           <div className="mb-4">
             <NewListingsBanner count={newListingCount} onTap={handleNewListingsTap} onDismiss={handleNewListingsDismiss} />
+          </div>
+        )}
+
+        {radiusSuggestionEnabled && radiusSuggestion.suggestion && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
+            {radiusSuggestion.suggestion.direction === 'expand' ? (
+              <Maximize2 className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300" />
+            ) : (
+              <Minimize2 className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-300" />
+            )}
+            <span className="min-w-0 flex-1">{radiusSuggestion.suggestion.reason}</span>
+            <button
+              type="button"
+              onClick={radiusSuggestion.applySuggestion}
+              className="shrink-0 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              {formatRadiusLabel(radiusSuggestion.suggestion.suggestedRadius)}
+            </button>
+            <button
+              type="button"
+              onClick={radiusSuggestion.dismiss}
+              aria-label="Dismiss radius suggestion"
+              className="shrink-0 rounded-md p-1 text-sky-700 transition hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-sky-200 dark:hover:bg-sky-900"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 
@@ -810,7 +926,7 @@ export default function MarketplacePage() {
                 {gridListings.map((item) => (
                   <ListingCard
                     key={item.id}
-                    item={item as any}
+                    item={item}
                     onSave={() => handleSave(item.id)}
                     onClick={() => router.push(`/app/marketplace/${item.id}`)}
                   />

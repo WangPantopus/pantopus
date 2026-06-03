@@ -39,7 +39,7 @@ function useDebounced(value: string, ms: number) {
 export default function PostLocationPicker({ value, onChange, accentColor = '#0284c7' }: PostLocationPickerProps) {
   const [mode, setMode] = useState<PickerMode>('closed');
   const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Record<string, unknown>[]>([]);
+  const [suggestions, setSuggestions] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -104,7 +104,7 @@ export default function PostLocationPicker({ value, onChange, accentColor = '#02
   }, [debouncedQuery, mode]);
 
   // Select a suggestion
-  const handleSelectSuggestion = async (suggestion: Record<string, unknown>) => {
+  const handleSelectSuggestion = async (suggestion: Record<string, any>) => {
     const center = suggestion?.center as { lat: number; lng: number } | undefined;
     if (!center) return;
 

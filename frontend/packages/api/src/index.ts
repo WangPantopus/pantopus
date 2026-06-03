@@ -45,7 +45,6 @@ export * as payments from './endpoints/payments';
 export * as geo from './endpoints/geo';
 export * as bids from './endpoints/bids';
 export * as homeProfile from './endpoints/homeProfile';
-export type { PollOption, PollSummary } from './endpoints/homeProfile';
 export * as notifications from './endpoints/notifications';
 export * as homeIam from './endpoints/homeIam';
 export * as upload from './endpoints/upload';       // NEW
@@ -68,6 +67,27 @@ export * as landlord from './endpoints/landlord';                  // Landlord p
 export * as tenant from './endpoints/tenant';                      // Tenant landlord verification flow
 export * as businessSeats from './endpoints/businessSeats';        // Identity Firewall — Seat management
 export * as privacy from './endpoints/privacy';                    // Identity Firewall — Privacy & blocks
+export * as localProfiles from './endpoints/localProfiles';        // Identity Firewall — Local Profile
+export * as personas from './endpoints/personas';                  // Identity Firewall — Audience Profile
+export type { MembershipStats } from './endpoints/personas';
+export * as personaTiers from './endpoints/personaTiers';          // P1.5 — Audience Profile tier CRUD
+export * as personaPayments from './endpoints/personaPayments';    // P1.7 — Stripe Connect onboarding
+export * as personaDms from './endpoints/personaDms';              // P1.12 — Persona DM threads + messages
+export type {
+  PersonaDmThreadSummary,
+  PersonaDmThreadDetail,
+  PersonaDmMessage,
+  ReplyPolicy,
+  ReplyPolicyStatus,
+} from './endpoints/personaDms';
+export * as personaMembership from './endpoints/personaMembership'; // P1.13 — fan membership lifecycle
+export type { FanMembershipPayload } from './endpoints/personaMembership';
+export * as personaBlocks from './endpoints/personaBlocks';        // P1.14 — creator-driven blocks
+export type { PersonaBlockSummary, PersonaBlockSource } from './endpoints/personaBlocks';
+export * as identitySearch from './endpoints/identitySearch';      // Identity Firewall — Profile-safe search
+export * as broadcast from './endpoints/broadcast';                // Identity Firewall — Broadcast
+export * as identityCenter from './endpoints/identityCenter';      // Identity Firewall — Identity Center
+export * as featureFlags from './endpoints/featureFlags';          // P0.8 — Feature flag visibility
 export * as magicTask from './endpoints/magicTask';                // Magic Task — AI-powered task posting
 export * as ai from './endpoints/ai';                              // AI Agent — chat, drafts, place brief
 export * as mailCompose from './endpoints/mailCompose';            // Mail Compose — four-moment flow
@@ -76,7 +96,7 @@ export * as supportTrains from './endpoints/supportTrains';        // Support Tr
 
 // Also export individual endpoint functions for convenience
 export { login, register, logout, getAuthMethods, updatePassword, reauthenticate } from './endpoints/auth';
-export { getProfile, getProfileByUsername, getMyProfile, updateProfile, followUser, sendSignals, getInviteCode, getMonthlyReceipt, getInviteProgress } from './endpoints/users';
+export { getProfile, getProfileById, getProfileByUsername, getMyProfile, updateProfile, sendSignals, getInviteCode, getMonthlyReceipt, getInviteProgress } from './endpoints/users';
 export { getGigs, getGig, getGigById, createGig, createGigV2, getGigsInBounds, placeBid, getBrowseSections, dismissGig, undismissGig, getHiddenCategories, hideCategory, unhideCategory, getGigPriceBenchmark, getRebookableGigs } from './endpoints/gigs';
 export { getHomes, attachToHome, detachFromHome } from './endpoints/homes';
 export { getChatRooms, getBusinessChatRooms, sendMessage, markMessagesAsRead, markMessagesAsReadForIdentity, getConversationMessages, markConversationAsRead } from './endpoints/chat';
@@ -98,6 +118,7 @@ export {
   uploadListingMedia,
   deleteListingMedia,
   uploadMailAttachments,
+  uploadPersonaMedia,
 } from './endpoints/upload';  // NEW
 export { createReview, getUserReviews, getGigReviews, getPendingReviews } from './endpoints/reviews';   // NEW
 export { createBusiness, getMyBusinesses, getBusiness, getBusinessDashboard, updateBusiness, getVerificationStatus, selfAttest, uploadVerificationEvidence, reviewVerificationEvidence, getFoundingOfferStatus, claimFoundingOffer } from './endpoints/businesses';
@@ -138,8 +159,8 @@ export { getLinkPreview } from './endpoints/linkPreview';
 export type { LinkPreviewData } from './endpoints/linkPreview';
 
 // Re-export commonly used types from endpoints for convenient importing
-export type { Post, PostType, PostVisibility, PostFormat, FeedSurface, PostComment, PostCreator, PostingIdentity, MapMarker, MatchedBusiness, FeedResponseV2, CursorPagination, SafetyAlertKind, LocationPrecision, VisibilityScope, PostAs, Audience, DistributionTarget, FeedScope, PrecheckResult, FeedPreferences } from './endpoints/posts';
-export type { ProfessionalCategory } from './endpoints/professional';
+export type { Post, PostType, PostVisibility, PostFormat, FeedSurface, PostComment, PostCreator, PostingIdentity, MapMarker, MatchedBusiness, FeedResponseV2, CursorPagination, SafetyAlertKind, LocationPrecision, VisibilityScope, PostAs, PersonalPostAs, PersonaPostAudience, Audience, DistributionTarget, FeedScope, PrecheckResult, FeedPreferences, ActiveSportsEvent, ActiveSportsEventsResponse } from './endpoints/posts';
+export type { ProfessionalCategory, ProfessionalProfile } from './endpoints/professional';
 export type { GigBid, GigCluster, GigStack, BrowseSections, BrowseResponse } from '@pantopus/types';
 export type { PriceBenchmark, RebookableGig } from './endpoints/gigs';
 
@@ -147,7 +168,7 @@ export type { PriceBenchmark, RebookableGig } from './endpoints/gigs';
 export type { Listing, ListingLayer, ListingType, ListingCategory, ListingCondition, ListingStatus, ListingCreator, MarketplaceBrowseParams, MarketplaceBrowseResponse, MarketplaceDiscoverResponse, MarketplaceAutocompleteResponse, ListingCategoryCluster, ListingOffer, ListingOfferStatus, ReputationScore, PriceSuggestion, TransactionReview } from './endpoints/listings';
 
 // Types from businesses
-export type { MapBusinessMarker, BusinessInsights, DiscoverySearchResult, DiscoverySearchResponse, CatalogPreviewItem, DiscoverySort, EndorsementInfo, OnboardingChecklistItem, OnboardingStatus, VerificationEvidence, VerificationStatus, FoundingOfferStatus, FoundingSlotClaim, BusinessDashboardResponse, BusinessInvoice, InvoiceLineItem, BusinessPage, BusinessMembership, BusinessReview, BusinessHours, BusinessSpecialHours } from './endpoints/businesses';
+export type { BusinessUser, BusinessProfile, BusinessLocation, BusinessDiscoverItem, MapBusinessMarker, BusinessInsights, DiscoverySearchResult, DiscoverySearchResponse, CatalogCategory, CatalogItem, CatalogPreviewItem, DiscoverySort, EndorsementInfo, OnboardingChecklistItem, OnboardingStatus, VerificationEvidence, VerificationStatus, FoundingOfferStatus, FoundingSlotClaim, BusinessDashboardResponse, BusinessInvoice, InvoiceLineItem, BusinessPage, BusinessMembership, BusinessReview, BusinessHours, BusinessSpecialHours } from './endpoints/businesses';
 
 // Types from homeOwnership
 export type {
@@ -173,6 +194,7 @@ export type {
   PropertySuggestionsResponse,
   PropertySuggestionTier,
 } from './endpoints/homes';
+export type { HomeBusinessLink } from './endpoints/homeProfile';
 
 // Types from hub
 export type { ActionItem, ActivityItem, DiscoveryItem, DiscoveryFilter, JumpBackInItem, HubHome, HubPersonalCard, HubHomeCard, HubBusinessCard, SetupStep, HubPayload, NeighborDensity } from './endpoints/hub';
@@ -181,7 +203,7 @@ export type { ActionItem, ActivityItem, DiscoveryItem, DiscoveryFilter, JumpBack
 export type { BusinessAuditEntry } from './endpoints/businessIam';
 
 // Types from homeIam
-export type { GuestPass, ScopedGrant } from './endpoints/homeIam';
+export type { AuditEntry, GuestPass, ScopedGrant } from './endpoints/homeIam';
 
 // Types from homeGuest
 export type { GuestPassView, SharedResourceView, PasscodeRequired } from './endpoints/homeGuest';
@@ -207,6 +229,14 @@ export { getMySeats, getBusinessSeats as getSeats, getSeatDetail, createSeatInvi
 
 // Convenience exports from privacy (Identity Firewall)
 export { getPrivacySettings, updatePrivacySettings, getBlocks, createBlock, removeBlock } from './endpoints/privacy';
+export { getMyLocalProfile, updateMyLocalProfile, getLocalProfile, getLocalProfileActivity, getLocalProfileGigs, getLocalProfileListings } from './endpoints/localProfiles';
+export { createPersona, getMyPersona, getMyAudienceIdentity, getPersonaCategoryPolicies, updatePersona, getPersona, getPersonaPosts, followPersona, unfollowPersona, getPersonaFollowStatus, updatePersonaFollowPreferences, getPersonaFollowers, updatePersonaFollower } from './endpoints/personas';
+export type { AudienceIdentity, PersonaCategoryPolicy } from './endpoints/personas';
+export { listOwnerTiers, listPublicTiers, updateTier, setTierVisibility, deleteTier } from './endpoints/personaTiers';
+export type { OwnerTier, PublicTier, TierStatus, TierReplyPolicy, TierUpdatePayload } from './endpoints/personaTiers';
+export { getBroadcastMessages, publishBroadcastMessage, markBroadcastMessageRead } from './endpoints/broadcast';
+export { getIdentityCenter, getViewAsPreview, updateBridgeSettings } from './endpoints/identityCenter';
+export { searchProfiles } from './endpoints/identitySearch';
 
 // Convenience exports from magicTask
 export { getMagicDraft, getBasicDraft, magicPost, undoTask, getTemplateLibrary, getSavedTemplates, saveTemplate, deleteSavedTemplate, useTemplate, getMagicSettings, updateMagicSettings } from './endpoints/magicTask';
@@ -231,4 +261,4 @@ export type { GigDraft, ListingDraft, PostDraft, ClarifyingQuestionAI, MailKeyFa
 export type { DimensionScore, HomeHealthScore, SeasonalChecklistItem, SeasonalChecklist, BillTrendData, PropertyValueData, HomeTimelineItem } from '@pantopus/types';
 
 // Types from identity (Identity Firewall)
-export type { BusinessSeat, SeatListItem, SeatDetail, MySeat, InviteDetails, UserPrivacySettings, UpdatePrivacySettingsPayload, UserProfileBlock, CreateBlockPayload, CreateSeatInvitePayload, AcceptInvitePayload, DeclineInvitePayload, UpdateSeatPayload, NotificationWithContext, SeatInviteStatus, SeatBindingMethod, SearchVisibilityLevel, ProfileVisibilityLevel, BlockScopeType, NotificationContextType, BusinessRoleBase } from '@pantopus/types';
+export type { BusinessSeat, SeatListItem, SeatDetail, MySeat, InviteDetails, UserPrivacySettings, UpdatePrivacySettingsPayload, UserProfileBlock, CreateBlockPayload, CreateSeatInvitePayload, AcceptInvitePayload, DeclineInvitePayload, UpdateSeatPayload, NotificationWithContext, SeatInviteStatus, SeatBindingMethod, SearchVisibilityLevel, ProfileVisibilityLevel, BlockScopeType, NotificationContextType, NotificationFirewallContext, BusinessRoleBase, PublicIdentityType, PersonaCategory, PersonaAudienceLabel, PersonaAudienceMode, PersonaFollowStatus, PersonaRelationshipType, PublicAuthorIdentity, LocalProfile, AudienceProfile, BroadcastChannel, BroadcastMessage, IdentityCenterPayload } from '@pantopus/types';

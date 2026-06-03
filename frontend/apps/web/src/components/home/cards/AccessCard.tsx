@@ -22,7 +22,7 @@ export function AccessCardPreview({
   secrets,
   onExpand,
 }: {
-  secrets: Record<string, unknown>[];
+  secrets: Record<string, any>[];
   onExpand: () => void;
 }) {
   return (
@@ -66,10 +66,10 @@ export default function AccessCard({
   onSecretsChange: _onSecretsChange,
   onBack,
 }: {
-  secrets: Record<string, unknown>[];
+  secrets: Record<string, any>[];
   homeId: string;
   can: (perm: string) => boolean;
-  onSecretsChange: (s: Record<string, unknown>[]) => void;
+  onSecretsChange: (s: Record<string, any>[]) => void;
   onBack: () => void;
 }) {
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
@@ -166,7 +166,7 @@ export default function AccessCard({
                     {/* Additional values (e.g., WiFi password separate from SSID) */}
                     {isRevealed && secret.values && secret.values.length > 1 && (
                       <div className="mt-1 space-y-1">
-                        {secret.values.slice(1).map((v: Record<string, unknown>, i: number) => (
+                        {secret.values.slice(1).map((v: Record<string, any>, i: number) => (
                           <div key={i} className="flex items-center gap-2">
                             <span className="text-[10px] text-app-text-muted">{v.label || `Value ${i + 2}`}:</span>
                             <code className="text-xs font-mono text-app-text-strong">{v.value}</code>

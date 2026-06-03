@@ -25,7 +25,7 @@ export default function SavedListingsPage() {
     setLoading(true);
     try {
       const result = await api.listings.getSavedListings({ limit: 50 });
-      setListings(((result as Record<string, unknown>)?.listings || []) as Listing[]);
+      setListings(((result as Record<string, any>)?.listings || []) as Listing[]);
     } catch (err) {
       console.error('Failed to load saved listings:', err);
       setListings([]);

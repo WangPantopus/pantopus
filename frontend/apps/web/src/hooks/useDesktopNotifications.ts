@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
 import { useBadges } from '@/contexts/BadgeContext';
+import { resolveWebNotificationPath } from '@/lib/notificationRoutes';
 import type { Notification } from '@pantopus/types';
 
 const BASE_TITLE = 'Pantopus';
@@ -63,7 +64,7 @@ export function useDesktopNotifications() {
         if (notif.link) {
           n.onclick = () => {
             window.focus();
-            window.location.href = notif.link!;
+            window.location.href = resolveWebNotificationPath(notif.link) || notif.link!;
             n.close();
           };
         }

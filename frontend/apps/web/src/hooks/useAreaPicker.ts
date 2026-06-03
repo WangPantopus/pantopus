@@ -14,7 +14,7 @@ export interface AreaPickerState {
   showAreaPicker: boolean;
   areaQuery: string;
   areaSearching: boolean;
-  areaSuggestions: Record<string, unknown>[];
+  areaSuggestions: Record<string, any>[];
 }
 
 export function useAreaPicker(showToast: (msg: string) => void) {
@@ -28,7 +28,7 @@ export function useAreaPicker(showToast: (msg: string) => void) {
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [areaQuery, setAreaQuery] = useState('');
   const [areaSearching, setAreaSearching] = useState(false);
-  const [areaSuggestions, setAreaSuggestions] = useState<Record<string, unknown>[]>([]);
+  const [areaSuggestions, setAreaSuggestions] = useState<Record<string, any>[]>([]);
 
   const refreshDeviceLocation = useCallback(async () => {
     if (!navigator.geolocation) return null;
@@ -125,7 +125,7 @@ export function useAreaPicker(showToast: (msg: string) => void) {
     setAreaSuggestions([]);
   }, [refreshDeviceLocation, showToast]);
 
-  const selectAreaSuggestion = useCallback((suggestion: Record<string, unknown>) => {
+  const selectAreaSuggestion = useCallback((suggestion: Record<string, any>) => {
     // Backend returns center as [lng, lat]; API type uses { lat, lng }. Accept both.
     const raw = suggestion?.center;
     let lat: number | undefined;

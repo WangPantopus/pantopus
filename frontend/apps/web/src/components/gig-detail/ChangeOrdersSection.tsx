@@ -145,11 +145,13 @@ export default function ChangeOrdersSection({
         <p className="text-sm text-app-text-secondary text-center py-3">Loading...</p>
       ) : orders.length > 0 ? (
         <div className="space-y-3 mb-4">
-          {orders.map((o) => {
-            const typeInfo = CHANGE_ORDER_TYPES.find((t) => t.value === o.type);
-            const isMyOrder = currentUserId && String(o.requested_by) === String(currentUserId);
-            const canApproveReject = o.status === 'pending' && !isMyOrder;
-            const canWithdraw = o.status === 'pending' && isMyOrder;
+	          {orders.map((o) => {
+	            const typeInfo = CHANGE_ORDER_TYPES.find((t) => t.value === o.type);
+	            const isMyOrder = currentUserId && String(o.requested_by) === String(currentUserId);
+	            const canApproveReject = o.status === 'pending' && !isMyOrder;
+	            const canWithdraw = o.status === 'pending' && isMyOrder;
+	            const amountChange = o.amount_change ?? 0;
+	            const timeChangeMinutes = o.time_change_minutes ?? 0;
 
             return (
               <div key={o.id} className="border border-app-border-subtle rounded-lg p-3">
@@ -164,14 +166,14 @@ export default function ChangeOrdersSection({
                 </div>
                 <p className="text-sm text-app-text-strong mt-1">{o.description}</p>
                 <div className="flex items-center gap-3 mt-1.5 text-xs text-app-text-muted">
-                  {o.amount_change !== 0 && (
-                    <span className={o.amount_change > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                      {o.amount_change > 0 ? '+' : ''}${Number(o.amount_change).toFixed(2)}
-                    </span>
-                  )}
-                  {o.time_change_minutes > 0 && (
-                    <span>+{o.time_change_minutes}min</span>
-                  )}
+	                  {amountChange !== 0 && (
+	                    <span className={amountChange > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+	                      {amountChange > 0 ? '+' : ''}${Number(amountChange).toFixed(2)}
+	                    </span>
+	                  )}
+	                  {timeChangeMinutes > 0 && (
+	                    <span>+{timeChangeMinutes}min</span>
+	                  )}
                   {o.requester?.username ? (
                     <UserIdentityLink
                       userId={o.requester?.id || null}

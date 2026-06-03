@@ -88,6 +88,9 @@ interface GigActorSummary {
   last_name?: string;
   name?: string;
   profile_picture_url?: string;
+  /** Some serializers / clients use alternate keys */
+  avatar_url?: string;
+  profilePicture?: string;
   city?: string;
   state?: string;
 }
@@ -100,6 +103,8 @@ interface GigFullRecord extends GigWithDetails {
   [key: string]: unknown;
   user_id?: string;
   poster_user_id?: string;
+  /** List-style gig payloads sometimes carry poster art at the root */
+  poster_profile_picture_url?: string | null;
   accepted_by?: string | null;
   acceptedBy?: string | null;
   creator_id?: string;
@@ -281,11 +286,25 @@ export default function GigDetailsPage() {
       'Anonymous';
   const posterInitial = isAnonymousPoster
     ? '?'
-    : (String(poster?.username ?? '')?.[0] || String(poster?.name ?? '')?.[0] || '?').toUpperCase();
+    : (
+        String(posterDisplayName || '').trim()[0] ||
+        String(poster?.username ?? '')?.[0] ||
+        String(poster?.name ?? '')?.[0] ||
+        '?'
+      ).toUpperCase();
   const gigCreatedAt = gig?.created_at || gig?.createdAt;
   const posterUserId = poster?.id || gig?.user_id || gig?.poster_id || null;
   const posterUsername = poster?.username || null;
-  const posterAvatar = poster?.profile_picture_url || null;
+  const posterAvatarRaw =
+    poster?.profile_picture_url ||
+    poster?.avatar_url ||
+    poster?.profilePicture ||
+    gig?.poster_profile_picture_url ||
+    null;
+  const posterAvatar =
+    typeof posterAvatarRaw === 'string' && posterAvatarRaw.trim().length > 0
+      ? posterAvatarRaw.trim()
+      : null;
 
   // Auto-open cancel modal if ?action=cancel
   useEffect(() => {
@@ -391,7 +410,7 @@ export default function GigDetailsPage() {
     ];
     attachmentCandidates
       .flatMap((list) => (Array.isArray(list) ? list : []))
-      .forEach((entry: string | Record<string, unknown>) => {
+      .forEach((entry: string | Record<string, any>) => {
         const raw = typeof entry === 'string' ? entry.trim() : (String(entry?.url ?? entry?.file_url ?? entry?.src ?? '')).trim();
         if (!raw || seen.has(raw)) return;
         seen.add(raw);
@@ -732,9 +751,21 @@ export default function GigDetailsPage() {
             <div className="bg-app-surface rounded-xl p-6 border border-app-border">
               <h3 className="text-sm font-medium text-app-text-secondary mb-4">Posted by</h3>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-lg">
-                  {posterInitial}
-                </div>
+                {posterAvatar ? (
+                  // Native img: avatars may come from any storage host without Next image remotePatterns churn.
+                  <img
+                    src={posterAvatar}
+                    alt={posterDisplayName}
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-app-border-subtle"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-lg font-semibold text-white">
+                    {posterInitial}
+                  </div>
+                )}
                 <div>
                   {isAnonymousPoster ? (
                     <p className="font-semibold text-app-text">{posterDisplayName}</p>

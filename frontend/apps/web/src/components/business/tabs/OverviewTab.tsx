@@ -16,9 +16,9 @@ interface OverviewTabProps {
   business: BusinessUser;
   profile: BusinessProfile;
   locations: BusinessLocation[];
-  team: Record<string, unknown>[];
-  catalog: Record<string, unknown>[];
-  pages: Record<string, unknown>[];
+  team: Record<string, any>[];
+  catalog: Record<string, any>[];
+  pages: Record<string, any>[];
   businessId: string;
   onboarding: OnboardingStatus | null;
   foundingOffer: FoundingOfferStatus | null;
@@ -279,7 +279,7 @@ export default function OverviewTab({
             </button>
           </div>
           <div className="space-y-2">
-            {catalog.slice(0, 5).map((item: Record<string, unknown>) => (
+            {catalog.slice(0, 5).map((item: Record<string, any>) => (
               <div key={item.id} className="flex items-center justify-between py-1.5">
                 <div>
                   <div className="text-sm font-medium text-app">{item.name}</div>

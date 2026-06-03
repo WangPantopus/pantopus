@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '@pantopus/api';
+import type { HomeMember } from '@pantopus/types';
 import TransferAdminWizard from './TransferAdminWizard';
 
 // ---- Constants ----
@@ -56,8 +57,8 @@ export default function HomeSettingsTab({
   onHomeUpdate,
 }: {
   homeId: string;
-  home: Record<string, unknown>;
-  members: Record<string, unknown>[];
+  home: Record<string, any>;
+  members: Record<string, any>[];
   can: (perm: string) => boolean;
   currentUserId: string | null;
   onHomeUpdate: () => void;
@@ -107,8 +108,8 @@ export default function HomeSettingsTab({
     setLoading(true);
     try {
       const res = await api.homeProfile.getHomeSettings(homeId);
-      const h = (res as Record<string, unknown>).home || {};
-      const prefs = (res as Record<string, unknown>).preferences || {};
+      const h = (res as Record<string, any>).home || {};
+      const prefs = (res as Record<string, any>).preferences || {};
 
       setHomeName(h.name || home?.name || '');
       setHomeType(h.home_type || home?.home_type || 'house');
@@ -149,7 +150,7 @@ export default function HomeSettingsTab({
       // Update home info
       await api.homes.updateHome(homeId, {
         home_type: homeType,
-      } as Record<string, unknown>);
+      } as Record<string, any>);
 
       // Update settings & preferences
       await api.homeProfile.updateHomeSettings(homeId, {
@@ -170,7 +171,7 @@ export default function HomeSettingsTab({
             guest_pass: notifGuestPass,
           },
         },
-      } as Record<string, unknown>);
+      } as Record<string, any>);
 
       setSaveMsg('Settings saved!');
       setTimeout(() => setSaveMsg(''), 3000);
@@ -208,7 +209,7 @@ export default function HomeSettingsTab({
         open={showTransfer}
         onClose={() => setShowTransfer(false)}
         homeId={homeId}
-        members={members}
+        members={members as HomeMember[]}
         currentUserId={currentUserId}
         onTransferred={onHomeUpdate}
       />

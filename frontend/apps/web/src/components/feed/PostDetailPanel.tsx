@@ -307,7 +307,21 @@ export default function PostDetailPanel({
   };
 
   const config = getPostTypeConfig(post?.post_type || 'general');
+  // P0.4 audit follow-up: prefer post.author (typed identity) over the
+  // legacy post.creator slot. Both are populated today; new code reads
+  // the new shape so the legacy slot can retire.
+  const publicAuthor = post?.author || null;
+  const creatorAvatarUrl =
+    publicAuthor?.avatarUrl ||
+    post?.creator?.profile_picture_url ||
+    null;
+  const creatorHandle =
+    publicAuthor?.handle ||
+    post?.creator?.username ||
+    null;
   const creatorName =
+    publicAuthor?.displayName ||
+    publicAuthor?.handle ||
     post?.creator?.name ||
     post?.creator?.username ||
     'Neighbor';
@@ -368,9 +382,9 @@ export default function PostDetailPanel({
           ) : post ? (
             <div>
               <div className="flex items-center gap-3 px-5 py-4">
-                {post.creator?.profile_picture_url ? (
+                {creatorAvatarUrl ? (
                   <Image
-                    src={post.creator.profile_picture_url}
+                    src={creatorAvatarUrl}
                     alt=""
                     className="h-10 w-10 rounded-full object-cover ring-2 ring-gray-100"
                     width={40}
@@ -387,14 +401,14 @@ export default function PostDetailPanel({
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  {post.creator?.username ? (
+                  {creatorHandle ? (
                     <UserIdentityLink
                       userId={post.creator?.id || post.user_id}
-                      username={post.creator.username}
+                      username={creatorHandle}
                       displayName={creatorName}
-                      avatarUrl={post.creator?.profile_picture_url || null}
-                      city={post.creator?.city || null}
-                      state={post.creator?.state || null}
+                      avatarUrl={creatorAvatarUrl}
+                      city={null}
+                      state={null}
                       textClassName="text-sm font-semibold text-app hover:underline"
                     />
                   ) : (
@@ -402,7 +416,6 @@ export default function PostDetailPanel({
                   )}
                   <div className="text-[11px] text-app-muted">
                     {timeAgo(post.created_at)}
-                    {post.creator?.city && ` · ${post.creator.city}`}
                     {post.is_edited && ' · edited'}
                   </div>
                 </div>

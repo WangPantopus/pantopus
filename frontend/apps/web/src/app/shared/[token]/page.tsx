@@ -317,7 +317,7 @@ function ExpiryBadge({ expiresAt }: { expiresAt: string }) {
 
 // ---- Render different resource types ----
 
-function SharedResourceContent({ type, resource }: { type: string; resource: Record<string, unknown> }) {
+function SharedResourceContent({ type, resource }: { type: string; resource: Record<string, any> }) {
   switch (type) {
     case 'document':
       return <DocumentView resource={resource} />;
@@ -336,7 +336,7 @@ function SharedResourceContent({ type, resource }: { type: string; resource: Rec
   }
 }
 
-function DocumentView({ resource }: { resource: Record<string, unknown> }) {
+function DocumentView({ resource }: { resource: Record<string, any> }) {
   return (
     <div className="space-y-4">
       <div>
@@ -366,7 +366,7 @@ function DocumentView({ resource }: { resource: Record<string, unknown> }) {
   );
 }
 
-function TaskView({ resource }: { resource: Record<string, unknown> }) {
+function TaskView({ resource }: { resource: Record<string, any> }) {
   const statusColors: Record<string, string> = {
     open: 'bg-blue-50 text-blue-700',
     in_progress: 'bg-amber-50 text-amber-700',
@@ -398,7 +398,7 @@ function TaskView({ resource }: { resource: Record<string, unknown> }) {
   );
 }
 
-function BillView({ resource }: { resource: Record<string, unknown> }) {
+function BillView({ resource }: { resource: Record<string, any> }) {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -418,7 +418,7 @@ function BillView({ resource }: { resource: Record<string, unknown> }) {
   );
 }
 
-function EventView({ resource }: { resource: Record<string, unknown> }) {
+function EventView({ resource }: { resource: Record<string, any> }) {
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -451,7 +451,7 @@ function EventView({ resource }: { resource: Record<string, unknown> }) {
   );
 }
 
-function IssueView({ resource }: { resource: Record<string, unknown> }) {
+function IssueView({ resource }: { resource: Record<string, any> }) {
   const severityColors: Record<string, string> = {
     low: 'bg-app-surface-sunken text-app-text-secondary',
     medium: 'bg-amber-50 text-amber-700',
@@ -481,7 +481,7 @@ function IssueView({ resource }: { resource: Record<string, unknown> }) {
   );
 }
 
-function PackageView({ resource }: { resource: Record<string, unknown> }) {
+function PackageView({ resource }: { resource: Record<string, any> }) {
   return (
     <div className="space-y-3">
       <div className="text-lg font-semibold text-app-text">{resource.description || resource.vendor_name || 'Package'}</div>
@@ -495,7 +495,7 @@ function PackageView({ resource }: { resource: Record<string, unknown> }) {
   );
 }
 
-function GenericView({ resource }: { resource: Record<string, unknown> }) {
+function GenericView({ resource }: { resource: Record<string, any> }) {
   // Render known fields nicely, fall back to JSON for unknown
   const knownFields = ['title', 'name', 'label', 'description', 'notes', 'status'];
   const hasKnownFields = knownFields.some((f) => resource[f]);

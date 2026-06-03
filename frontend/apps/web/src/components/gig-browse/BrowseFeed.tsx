@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import * as api from '@pantopus/api';
 import type { BrowseResponse, GigListItem } from '@pantopus/types';
@@ -168,20 +168,24 @@ function HideSimilarBanner({
 interface BrowseFeedProps {
   lat: number | null;
   lng: number | null;
+  radiusMeters?: number;
   onCategoryClick: (category: string) => void;
   onSeeAllClick: () => void;
   onError: () => void;
   onDataLoaded?: (data: BrowseResponse) => void;
+  onLoadingChange?: (loading: boolean) => void;
   refreshKey?: number;
 }
 
 export default function BrowseFeed({
   lat,
   lng,
+  radiusMeters,
   onCategoryClick,
   onSeeAllClick,
   onError,
   onDataLoaded,
+  onLoadingChange,
   refreshKey,
 }: BrowseFeedProps) {
   const [data, setData] = useState<BrowseResponse | null>(null);
@@ -193,25 +197,42 @@ export default function BrowseFeed({
     confirmHideSimilar,
     dismissHideSimilarPrompt,
   } = useDismissGig();
+  const requestIdRef = useRef(0);
 
   const fetchBrowse = useCallback(async () => {
     if (lat == null || lng == null) return;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setLoading(true);
+    onLoadingChange?.(true);
     try {
-      const result = await api.gigs.getBrowseSections({ lat, lng });
+      const result = await api.gigs.getBrowseSections({
+        lat,
+        lng,
+        ...(radiusMeters != null ? { radius: radiusMeters } : {}),
+      });
+      if (requestId !== requestIdRef.current) return;
       setData(result);
       onDataLoaded?.(result);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.warn('Browse feed fetch failed:', err);
       onError();
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        onLoadingChange?.(false);
+      }
     }
-  }, [lat, lng, onError]);
+  }, [lat, lng, radiusMeters, onDataLoaded, onLoadingChange, onError]);
 
   useEffect(() => {
     fetchBrowse();
-  }, [fetchBrowse, refreshKey]);
+    return () => {
+      requestIdRef.current += 1;
+      onLoadingChange?.(false);
+    };
+  }, [fetchBrowse, refreshKey, onLoadingChange]);
 
   const handleDismiss = useCallback(
     (gigId: string, category: string) => {

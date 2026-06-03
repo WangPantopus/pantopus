@@ -21,9 +21,9 @@ export interface UseBusinessDataReturn {
   business: BusinessUser | null;
   profile: BusinessProfile | null;
   locations: BusinessLocation[];
-  team: Record<string, unknown>[];
-  catalog: Record<string, unknown>[];
-  pages: Record<string, unknown>[];
+  team: Record<string, any>[];
+  catalog: Record<string, any>[];
+  pages: Record<string, any>[];
   access: BusinessAccess;
   onboarding: OnboardingStatus | null;
   foundingOffer: FoundingOfferStatus | null;
@@ -40,9 +40,9 @@ export function useBusinessData(businessId: string): UseBusinessDataReturn {
   const [business, setBusiness] = useState<BusinessUser | null>(null);
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [locations, setLocations] = useState<BusinessLocation[]>([]);
-  const [team, setTeam] = useState<Record<string, unknown>[]>([]);
-  const [catalog, setCatalog] = useState<Record<string, unknown>[]>([]);
-  const [pages, setPages] = useState<Record<string, unknown>[]>([]);
+  const [team, setTeam] = useState<Record<string, any>[]>([]);
+  const [catalog, setCatalog] = useState<Record<string, any>[]>([]);
+  const [pages, setPages] = useState<Record<string, any>[]>([]);
   const [access, setAccess] = useState<BusinessAccess>({ hasAccess: false, isOwner: false, role_base: null });
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [foundingOffer, setFoundingOffer] = useState<FoundingOfferStatus | null>(null);

@@ -135,6 +135,18 @@ export function buildUserProfileShareUrl(username: string): string {
   return `${APP_WEB_URL}${buildUserProfilePath(username)}`;
 }
 
+export function buildPersonaPath(handle: string): string {
+  return `/@${encodeURIComponent(handle.replace(/^@/, ''))}`;
+}
+
+export function buildPersonaShareUrl(handle: string): string {
+  return `${APP_WEB_URL}${buildPersonaPath(handle)}`;
+}
+
+export function buildPersonaAppUrl(handle: string): string {
+  return `pantopus:///persona/${encodeURIComponent(handle.replace(/^@/, ''))}`;
+}
+
 // Map Configuration
 export const DEFAULT_MAP_CENTER = {
   latitude: 45.5152, // Portland, OR

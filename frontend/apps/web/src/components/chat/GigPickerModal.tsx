@@ -33,7 +33,7 @@ export default function GigPickerModal({ open, onClose, onSelectGig }: GigPicker
     setSearchResults([]);
     api.gigs
       .getMyGigs({ limit: 50 })
-      .then((res: Record<string, unknown>) => setMyGigs((res?.gigs || res?.data || []) as GigListItem[]))
+      .then((res: Record<string, any>) => setMyGigs((res?.gigs || res?.data || []) as GigListItem[]))
       .catch(() => setMyGigs([]))
       .finally(() => setLoadingMyGigs(false));
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -58,7 +58,7 @@ export default function GigPickerModal({ open, onClose, onSelectGig }: GigPicker
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await api.gigs.searchGigs(text.trim());
-        setSearchResults(res?.gigs || []);
+        setSearchResults((res?.gigs || []) as GigListItem[]);
       } catch { setSearchResults([]); }
       setSearching(false);
     }, 400);

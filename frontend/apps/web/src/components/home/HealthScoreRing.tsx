@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Home, ArrowRight, Phone, FileText, Leaf, Users, ChevronRight, Sparkles } from 'lucide-react';
 
 interface HealthScoreRingProps {
@@ -79,7 +80,7 @@ export default function HealthScoreRing({
   // -- Empty / new-home state ---------------------------------------------
 
   if (isNewHome) {
-    const quickWins: { icon: JSX.Element; label: string; onClick: () => void }[] = [];
+    const quickWins: { icon: ReactNode; label: string; onClick: () => void }[] = [];
     if (homeId) {
       quickWins.push(
         { icon: <Phone size={16} />, label: 'Add an emergency contact', onClick: () => onActionPress(`/app/homes/${homeId}/dashboard?tab=emergency`) },

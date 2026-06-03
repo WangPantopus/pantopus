@@ -29,7 +29,7 @@ const LEGACY_ROLE_MAP: Record<string, string> = {
   caregiver: 'restricted_member',
 };
 
-function resolveRole(m: Record<string, unknown>): { base: string; display: string; config: (typeof ROLE_CONFIG)[string] } {
+function resolveRole(m: Record<string, any>): { base: string; display: string; config: (typeof ROLE_CONFIG)[string] } {
   const base = (m.role_base as string) || LEGACY_ROLE_MAP[m.role as string] || (m.role as string) || 'member';
   const config = ROLE_CONFIG[base] || ROLE_CONFIG.member;
   return { base, display: config.label, config };
@@ -46,10 +46,10 @@ export default function MembersPanel({
   onManageMember,
   canManageMembers = false,
 }: {
-  members: Record<string, unknown>[];
+  members: Record<string, any>[];
   homeOwnerId?: string;
   onInvite?: () => void;
-  onManageMember?: (member: Record<string, unknown>) => void;
+  onManageMember?: (member: Record<string, any>) => void;
   canManageMembers?: boolean;
 }) {
   const active = members.filter((m) => m.is_active !== false);
@@ -60,7 +60,7 @@ export default function MembersPanel({
     'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-teal-500',
   ];
 
-  const getColor = (m: Record<string, unknown>) => {
+  const getColor = (m: Record<string, any>) => {
     const str = (m.user_id as string) || (m.id as string) || '';
     const idx = str.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
     return avatarColors[idx % avatarColors.length];

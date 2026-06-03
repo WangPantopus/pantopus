@@ -8,11 +8,11 @@ import * as api from '@pantopus/api';
 import { toast } from '@/components/ui/toast-store';
 import { confirmStore } from '@/components/ui/confirm-store';
 
-type AnyObj = Record<string, unknown>;
+type AnyObj = Record<string, any>;
 
 /** Extended gig API methods not in base type definitions */
 interface GigsBidApiExt {
-  updateBid?: (gigId: string, bidId: string, data: Record<string, unknown>) => Promise<unknown>;
+  updateBid?: (gigId: string, bidId: string, data: Record<string, any>) => Promise<unknown>;
   cancelBid?: (gigId: string, bidId: string) => Promise<unknown>;
   deleteBid?: (gigId: string, bidId: string) => Promise<unknown>;
 }
@@ -59,8 +59,8 @@ export default function BidPanel({
     setLoadingMyBid(true);
     try {
       const resp = await api.gigs.getMyBids({ limit: 200 });
-      const bids = (resp as Record<string, unknown>)?.bids ?? [];
-      const mine = (Array.isArray(bids) ? bids : []).find((b: Record<string, unknown>) => b.gig_id === gigId || b.gigId === gigId);
+      const bids = (resp as Record<string, any>)?.bids ?? [];
+      const mine = (Array.isArray(bids) ? bids : []).find((b: Record<string, any>) => b.gig_id === gigId || b.gigId === gigId);
       setMyBid(mine || null);
       if (mine?.amount != null) setBidAmount(String(mine.amount));
       else if (mine?.bid_amount != null) setBidAmount(String(mine.bid_amount));

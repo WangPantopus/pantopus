@@ -39,6 +39,8 @@ export default function GuestSignupModal({
   const [noteToRecipient, setNoteToRecipient] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [existingAccountWarning, setExistingAccountWarning] = useState(false);
+  const [signedUpWithAccount, setSignedUpWithAccount] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,10 +81,10 @@ export default function GuestSignupModal({
     [onClose, step]
   );
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function submitGuestSignup(allowExistingAccountGuest = false) {
     if (submitting) return;
     setError(null);
+    setExistingAccountWarning(false);
     setSubmitting(true);
 
     try {
@@ -94,28 +96,41 @@ export default function GuestSignupModal({
           body: JSON.stringify({
             guest_name: name.trim(),
             guest_email: email.trim().toLowerCase(),
+            allow_guest_for_existing_account: allowExistingAccountGuest,
             contribution_mode: contributionMode,
             note_to_recipient: noteToRecipient.trim() || null,
           }),
         }
       );
 
+      const body = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
+        if (body?.error === 'ACCOUNT_EXISTS') {
+          setExistingAccountWarning(true);
+          return;
+        }
         throw new Error(body?.message || 'Failed to sign up. Please try again.');
       }
 
+      setSignedUpWithAccount(!!body?.user_id && !body?.guest_email);
       setStep('success');
       onSuccess();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : null;
       setError(
         err instanceof TypeError
           ? 'Network error. Please check your connection and try again.'
-          : err.message || 'Something went wrong. Please try again.'
+          : message || 'Something went wrong. Please try again.'
       );
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    await submitGuestSignup(false);
   }
 
   function handleOpenInApp() {
@@ -129,7 +144,6 @@ export default function GuestSignupModal({
   }
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
       onKeyDown={handleKeyDown}
@@ -155,8 +169,17 @@ export default function GuestSignupModal({
             className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
             aria-label="Close"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
             </svg>
           </button>
         )}
@@ -164,9 +187,7 @@ export default function GuestSignupModal({
         {/* Step: Choose signup method */}
         {step === 'choose' && (
           <div>
-            <h3 className="text-xl font-semibold text-gray-900">
-              Sign up for {slotLabel}
-            </h3>
+            <h3 className="text-xl font-semibold text-gray-900">Sign up for {slotLabel}</h3>
             <p className="mt-1 text-sm text-gray-500">{slotDate}</p>
 
             <div className="mt-6 space-y-3">
@@ -179,7 +200,8 @@ export default function GuestSignupModal({
                 <div>
                   <p className="font-semibold text-gray-900">Sign up on Pantopus</p>
                   <p className="mt-1 text-sm text-gray-600">
-                    One-tap signup, real-time updates, delivery coordination, and direct chat with the organizer.
+                    One-tap signup, real-time updates, delivery coordination, and direct chat with
+                    the organizer.
                   </p>
                   <span className="mt-2 inline-block rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-semibold text-primary-700">
                     Recommended
@@ -196,7 +218,8 @@ export default function GuestSignupModal({
                 <div>
                   <p className="font-semibold text-gray-900">Sign up with email</p>
                   <p className="mt-1 text-sm text-gray-600">
-                    Quick signup with just your name and email. The organizer will follow up with delivery details.
+                    Quick signup with just your name and email. The organizer will follow up with
+                    delivery details.
                   </p>
                 </div>
               </button>
@@ -211,15 +234,22 @@ export default function GuestSignupModal({
               onClick={() => setStep('choose')}
               className="mb-4 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
               </svg>
               Back
             </button>
 
-            <h3 className="text-xl font-semibold text-gray-900">
-              Sign up with email
-            </h3>
+            <h3 className="text-xl font-semibold text-gray-900">Sign up with email</h3>
             <p className="mt-1 text-sm text-gray-500">
               {slotLabel} · {slotDate}
             </p>
@@ -251,7 +281,10 @@ export default function GuestSignupModal({
                   required
                   maxLength={320}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setExistingAccountWarning(false);
+                  }}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                   placeholder="jane@example.com"
                 />
@@ -259,7 +292,10 @@ export default function GuestSignupModal({
 
               {enabledModes.length > 1 ? (
                 <div>
-                  <label htmlFor="contribution-mode" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="contribution-mode"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     How will you help?
                   </label>
                   <select
@@ -282,9 +318,11 @@ export default function GuestSignupModal({
               ) : null}
 
               <div>
-                <label htmlFor="note-to-recipient" className="block text-sm font-medium text-gray-700">
-                  Note to recipient{' '}
-                  <span className="text-gray-400">(optional)</span>
+                <label
+                  htmlFor="note-to-recipient"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Note to recipient <span className="text-gray-400">(optional)</span>
                 </label>
                 <textarea
                   id="note-to-recipient"
@@ -298,7 +336,41 @@ export default function GuestSignupModal({
               </div>
 
               {error && (
-                <p className="text-sm text-red-600" role="alert">{error}</p>
+                <p className="text-sm text-red-600" role="alert">
+                  {error}
+                </p>
+              )}
+
+              {existingAccountWarning && (
+                <div
+                  className="rounded-xl border border-primary-200 bg-primary-50 p-4"
+                  role="alert"
+                >
+                  <p className="text-sm font-semibold text-gray-900">
+                    This email already has a Pantopus account.
+                  </p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Sign up through Pantopus for chat and in-app location sharing, or continue with
+                    email as a guest.
+                  </p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={handleOpenInApp}
+                      className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+                    >
+                      Open Pantopus
+                    </button>
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => void submitGuestSignup(true)}
+                      className="rounded-full border border-primary-200 px-4 py-2 text-sm font-semibold text-primary-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Continue with email
+                    </button>
+                  </div>
+                </div>
               )}
 
               <button
@@ -316,11 +388,19 @@ export default function GuestSignupModal({
         {step === 'success' && (
           <div className="text-center">
             <div className="text-4xl">🎉</div>
-            <h3 className="mt-3 text-xl font-semibold text-gray-900">
-              You're signed up!
-            </h3>
+            <h3 className="mt-3 text-xl font-semibold text-gray-900">You&rsquo;re signed up!</h3>
             <p className="mt-2 text-sm text-gray-600">
-              We've sent a confirmation to <strong>{email}</strong>. The organizer will share delivery details closer to the date.
+              {signedUpWithAccount ? (
+                <>
+                  This signup is linked to your Pantopus account. The organizer can share delivery
+                  details with you in-app.
+                </>
+              ) : (
+                <>
+                  We&rsquo;ve sent a confirmation to <strong>{email}</strong>. The organizer will
+                  share delivery details closer to the date.
+                </>
+              )}
             </p>
 
             <div className="mt-6 space-y-3">

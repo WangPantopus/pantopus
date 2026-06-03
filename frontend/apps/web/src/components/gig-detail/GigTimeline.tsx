@@ -30,7 +30,7 @@ export default function GigTimeline({
   iAmWorker,
   onAction,
 }: {
-  gig: Record<string, unknown>;
+  gig: Record<string, any>;
   isMyGig: boolean;
   iAmWorker: boolean;
   onAction: (action: string) => void;

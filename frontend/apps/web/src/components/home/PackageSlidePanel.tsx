@@ -32,8 +32,8 @@ export default function PackageSlidePanel({
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Record<string, unknown>) => Promise<void>;
-  pkg?: Record<string, unknown> | null; // null = create, object = edit
+  onSave: (data: Record<string, any>) => Promise<void>;
+  pkg?: Record<string, any> | null; // null = create, object = edit
 }) {
   const isEdit = !!pkg;
 
@@ -74,7 +74,7 @@ export default function PackageSlidePanel({
     setSaving(true);
     setError('');
     try {
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, any> = {
         carrier: carrier || undefined,
         tracking_number: trackingNumber.trim() || undefined,
         vendor_name: vendorName.trim() || undefined,

@@ -15,6 +15,26 @@ import {
 
 type RecipientUser = { id: string; name?: string; username?: string; city?: string | null; state?: string | null };
 
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === 'object') {
+    const apiError = err as {
+      message?: unknown;
+      data?: { message?: unknown; error?: unknown };
+    };
+    if (typeof apiError.message === 'string' && apiError.message.trim()) {
+      return apiError.message;
+    }
+    if (typeof apiError.data?.message === 'string' && apiError.data.message.trim()) {
+      return apiError.data.message;
+    }
+    if (typeof apiError.data?.error === 'string' && apiError.data.error.trim()) {
+      return apiError.data.error;
+    }
+  }
+  return fallback;
+}
+
 interface ComposeMailModalProps {
   currentUserId: string;
   availableHomes: AvailableHome[];
@@ -280,7 +300,7 @@ export default function ComposeMailModal({
       onSent();
       setActionSuccess('Mail sent successfully.');
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to send mail.');
+      setActionError(getApiErrorMessage(err, 'Failed to send mail.'));
     } finally { setComposeLoading(false); }
   };
 

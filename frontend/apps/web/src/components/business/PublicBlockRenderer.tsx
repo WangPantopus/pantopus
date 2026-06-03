@@ -12,17 +12,17 @@ import Image from 'next/image';
 interface BlockData {
   id?: string;
   block_type: string;
-  data: Record<string, unknown>;
-  settings?: Record<string, unknown>;
+  data: Record<string, any>;
+  settings?: Record<string, any>;
   location_id?: string;
 }
 
 interface BusinessContext {
-  locations: Record<string, unknown>[];
-  hours: Record<string, unknown>[];
-  catalog: Record<string, unknown>[];
-  business: Record<string, unknown> | null;
-  profile: Record<string, unknown> | null;
+  locations: Record<string, any>[];
+  hours: Record<string, any>[];
+  catalog: Record<string, any>[];
+  business: Record<string, any> | null;
+  profile: Record<string, any> | null;
   onContact?: () => void | Promise<void>;
   canContact?: boolean;
 }
@@ -69,7 +69,7 @@ export function PublicBlock({ block, ctx }: { block: BlockData; ctx: BusinessCon
 
 // ─── Public Block Components ──────────────────
 
-function PublicHero({ data, business }: { data: Record<string, unknown>; business: Record<string, unknown> | null }) {
+function PublicHero({ data, business }: { data: Record<string, any>; business: Record<string, any> | null }) {
   return (
     <section className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 text-white">
       {data.background_file_id && (
@@ -84,7 +84,7 @@ function PublicHero({ data, business }: { data: Record<string, unknown>; busines
         )}
         {Array.isArray(data.cta) && data.cta.length > 0 && (
           <div className="mt-6 flex flex-wrap gap-3">
-            {(data.cta as Record<string, unknown>[]).map((c, i: number) => (
+            {(data.cta as Record<string, any>[]).map((c, i: number) => (
               <button
                 key={i}
                 className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
@@ -103,7 +103,7 @@ function PublicHero({ data, business }: { data: Record<string, unknown>; busines
   );
 }
 
-function PublicText({ data }: { data: Record<string, unknown> }) {
+function PublicText({ data }: { data: Record<string, any> }) {
   return (
     <section className="py-6">
       {data.heading && (
@@ -116,7 +116,7 @@ function PublicText({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function PublicGallery({ data }: { data: Record<string, unknown> }) {
+function PublicGallery({ data }: { data: Record<string, any> }) {
   const count = (data.image_count as number) || 6;
   return (
     <section className="py-6">
@@ -136,7 +136,7 @@ function PublicGallery({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function PublicCatalogGrid({ data, catalog }: { data: Record<string, unknown>; catalog: Record<string, unknown>[] }) {
+function PublicCatalogGrid({ data, catalog }: { data: Record<string, any>; catalog: Record<string, any>[] }) {
   let items = catalog || [];
   if (data.filter_kind) {
     items = items.filter((i) => i.kind === data.filter_kind);
@@ -196,7 +196,7 @@ function PublicCatalogGrid({ data, catalog }: { data: Record<string, unknown>; c
   );
 }
 
-function PublicHours({ data, locations, hours }: { data: Record<string, unknown>; locations: Record<string, unknown>[]; hours: Record<string, unknown>[] }) {
+function PublicHours({ data, locations, hours }: { data: Record<string, any>; locations: Record<string, any>[]; hours: Record<string, any>[] }) {
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   const formatTime = (t: string | null) => {
@@ -208,7 +208,7 @@ function PublicHours({ data, locations, hours }: { data: Record<string, unknown>
   };
 
   // Group hours by location
-  const locationHoursMap: Record<string, Record<string, unknown>[]> = {};
+  const locationHoursMap: Record<string, Record<string, any>[]> = {};
   for (const h of hours) {
     const locId = h.location_id as string;
     if (!locationHoursMap[locId]) locationHoursMap[locId] = [];
@@ -247,7 +247,7 @@ function PublicHours({ data, locations, hours }: { data: Record<string, unknown>
   );
 }
 
-function PublicLocationsMap({ data, locations }: { data: Record<string, unknown>; locations: Record<string, unknown>[] }) {
+function PublicLocationsMap({ data, locations }: { data: Record<string, any>; locations: Record<string, any>[] }) {
   if (locations.length === 0) return null;
 
   return (
@@ -279,7 +279,7 @@ function PublicLocationsMap({ data, locations }: { data: Record<string, unknown>
             </div>
             {loc.location && (
               <a
-                href={`https://maps.google.com/?q=${(loc.location as Record<string, unknown>).latitude},${(loc.location as Record<string, unknown>).longitude}`}
+                href={`https://maps.google.com/?q=${(loc.location as Record<string, any>).latitude},${(loc.location as Record<string, any>).longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3 py-1.5 rounded-lg border border-app-border text-xs font-medium text-app-text-secondary hover:bg-app-hover transition flex-shrink-0"
@@ -294,14 +294,14 @@ function PublicLocationsMap({ data, locations }: { data: Record<string, unknown>
   );
 }
 
-function PublicCta({ data, onContact }: { data: Record<string, unknown>; onContact?: () => void | Promise<void> }) {
+function PublicCta({ data, onContact }: { data: Record<string, any>; onContact?: () => void | Promise<void> }) {
   return (
     <section className="py-8 px-8 rounded-2xl bg-gradient-to-r from-violet-50 to-indigo-50 text-center">
       <h2 className="text-2xl font-bold text-app-text">{(data.heading as string) || 'Get in touch'}</h2>
       {data.subhead && <p className="text-app-text-secondary mt-2 max-w-lg mx-auto">{data.subhead as string}</p>}
       {Array.isArray(data.buttons) && data.buttons.length > 0 && (
         <div className="mt-5 flex justify-center gap-3">
-          {(data.buttons as Record<string, unknown>[]).map((b, i: number) => (
+          {(data.buttons as Record<string, any>[]).map((b, i: number) => (
             <button
               key={i}
               onClick={() => {
@@ -326,8 +326,8 @@ function PublicCta({ data, onContact }: { data: Record<string, unknown>; onConta
   );
 }
 
-function PublicFaq({ data }: { data: Record<string, unknown> }) {
-  const items = (data.items as Record<string, unknown>[]) || [];
+function PublicFaq({ data }: { data: Record<string, any> }) {
+  const items = (data.items as Record<string, any>[]) || [];
   if (items.length === 0) return null;
 
   return (
@@ -354,7 +354,7 @@ function PublicFaq({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function PublicReviews({ data, business }: { data: Record<string, unknown>; business: Record<string, unknown> | null }) {
+function PublicReviews({ data, business }: { data: Record<string, any>; business: Record<string, any> | null }) {
   const rating = (business?.average_rating as number) || 0;
   const count = (business?.review_count as number) || 0;
 
@@ -380,8 +380,8 @@ function PublicReviews({ data, business }: { data: Record<string, unknown>; busi
   );
 }
 
-function PublicStats({ data }: { data: Record<string, unknown> }) {
-  const stats = (data.stats as Record<string, unknown>[]) || [];
+function PublicStats({ data }: { data: Record<string, any> }) {
+  const stats = (data.stats as Record<string, any>[]) || [];
   if (stats.length === 0) return null;
 
   return (
@@ -400,7 +400,7 @@ function PublicStats({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function PublicTeam({ data }: { data: Record<string, unknown> }) {
+function PublicTeam({ data }: { data: Record<string, any> }) {
   return (
     <section className="py-6">
       {data.heading && (
@@ -416,7 +416,7 @@ function PublicContactForm({
   onContact,
   canContact,
 }: {
-  data: Record<string, unknown>;
+  data: Record<string, any>;
   onContact?: () => void | Promise<void>;
   canContact?: boolean;
 }) {
@@ -451,7 +451,7 @@ function PublicContactForm({
   );
 }
 
-function PublicEmbed({ data }: { data: Record<string, unknown> }) {
+function PublicEmbed({ data }: { data: Record<string, any> }) {
   if (!data.url) return null;
   return (
     <section className="py-6">
@@ -462,7 +462,7 @@ function PublicEmbed({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function PublicPostsFeed({ data }: { data: Record<string, unknown> }) {
+function PublicPostsFeed({ data }: { data: Record<string, any> }) {
   return (
     <section className="py-6">
       {data.heading && (

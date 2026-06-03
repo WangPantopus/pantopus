@@ -280,7 +280,7 @@ export default function NewHomePage() {
     };
   };
 
-  const handleCreateHomeSuccess = (res: Record<string, unknown> & { home?: { id?: string } }) => {
+  const handleCreateHomeSuccess = (res: Record<string, any> & { home?: { id?: string } }) => {
     const id = res?.home?.id;
     router.push(id ? `/app/homes/${id}/dashboard` : '/app/homes');
   };
@@ -346,7 +346,7 @@ export default function NewHomePage() {
     }
 
     const res = await api.homes.createHome(payload);
-    handleCreateHomeSuccess(res as Record<string, unknown> & { home?: { id?: string } });
+    handleCreateHomeSuccess(res as Record<string, any> & { home?: { id?: string } });
   };
 
   const handleAddressStepUpVerified = async () => {
@@ -736,12 +736,14 @@ export default function NewHomePage() {
                     if (!normalized?.city) step1Errors.city = 'City is required.';
                     if (!normalized?.state) step1Errors.state = 'State is required.';
                     if (!normalized?.zipcode) step1Errors.zipcode = 'ZIP code is required.';
-                    if (Object.keys(step1Errors).length > 0) {
-                      setFieldErrors((prev) => ({ ...prev, ...step1Errors }));
-                      setError('Please fix the highlighted fields.');
-                      return;
-                    }
-                    const ok = await verifyAddress();
+	                    if (Object.keys(step1Errors).length > 0) {
+	                      setFieldErrors((prev) => ({ ...prev, ...step1Errors }));
+	                      setError('Please fix the highlighted fields.');
+	                      return;
+	                    }
+	                    const selectedAddress = normalized;
+	                    if (!selectedAddress) return;
+	                    const ok = await verifyAddress();
                     if (ok && typeof ok === 'object' && ok.type === 'existing') {
                       setError('');
                       setPropertySuggestionNote('');
@@ -754,11 +756,11 @@ export default function NewHomePage() {
                         const verdict = v?.verdict;
                         const rn = verdict?.normalized;
                         const res = await api.homes.getPropertySuggestions({
-                          address: rn?.line1 || normalized.address,
-                          unit_number: (rn?.line2 || unit).trim() || undefined,
-                          city: rn?.city || normalized.city,
-                          state: rn?.state || normalized.state.trim().toUpperCase(),
-                          zip_code: rn?.zip || normalized.zipcode,
+	                          address: rn?.line1 || selectedAddress.address,
+	                          unit_number: (rn?.line2 || unit).trim() || undefined,
+	                          city: rn?.city || selectedAddress.city,
+	                          state: rn?.state || selectedAddress.state.trim().toUpperCase(),
+	                          zip_code: rn?.zip || selectedAddress.zipcode,
                           address_id: v?.address_id || null,
                           classification: verdict?.classification,
                         });

@@ -5,13 +5,13 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 
 interface EmojiPickerPopoverProps {
-  isOpen: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   onSelect: (emoji: string) => void;
-  anchorRef: React.RefObject<HTMLButtonElement | null>;
+  anchorRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-export default function EmojiPickerPopover({ isOpen, onClose, onSelect, anchorRef }: EmojiPickerPopoverProps) {
+export default function EmojiPickerPopover({ isOpen = true, onClose, onSelect, anchorRef }: EmojiPickerPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Close on click outside
@@ -21,7 +21,7 @@ export default function EmojiPickerPopover({ isOpen, onClose, onSelect, anchorRe
       const target = e.target as Node;
       if (
         popoverRef.current && !popoverRef.current.contains(target) &&
-        anchorRef.current && !anchorRef.current.contains(target)
+        (!anchorRef?.current || !anchorRef.current.contains(target))
       ) {
         onClose();
       }

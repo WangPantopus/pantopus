@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import * as api from '@pantopus/api';
-import type { HomeBusinessLink } from '@pantopus/api/endpoints/homeProfile';
+import type { HomeBusinessLink } from '@pantopus/api';
 import type { HomeVendor, BusinessUser } from '@pantopus/types';
 import { Building2, Star } from 'lucide-react';
 import { toast } from '@/components/ui/toast-store';
 import { confirmStore } from '@/components/ui/confirm-store';
 
 export default function VendorsTab({ homeId }: { homeId: string }) {
+  type BusinessLinkKind = HomeBusinessLink['kind'];
   const [linkedBusinesses, setLinkedBusinesses] = useState<HomeBusinessLink[]>([]);
   const [legacyVendors, setLegacyVendors] = useState<HomeVendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +19,7 @@ export default function VendorsTab({ homeId }: { homeId: string }) {
   const [searchResults, setSearchResults] = useState<BusinessUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [linkKind, setLinkKind] = useState<string>('favorite');
+  const [linkKind, setLinkKind] = useState<BusinessLinkKind>('favorite');
 
   const [showAddManual, setShowAddManual] = useState(false);
   const [manualName, setManualName] = useState('');
@@ -61,8 +62,8 @@ export default function VendorsTab({ homeId }: { homeId: string }) {
   const handleLinkBusiness = async (businessUserId: string) => {
     try {
       await api.homeProfile.linkBusiness(homeId, {
-        business_user_id: businessUserId,
-        kind: linkKind as string,
+	        business_user_id: businessUserId,
+	        kind: linkKind,
       });
       setShowSearch(false);
       setSearchQuery('');
@@ -148,7 +149,7 @@ export default function VendorsTab({ homeId }: { homeId: string }) {
             />
             <select
               value={linkKind}
-              onChange={(e) => setLinkKind(e.target.value)}
+	              onChange={(e) => setLinkKind(e.target.value as BusinessLinkKind)}
               className="rounded-lg border border-app-strong px-2 py-2 text-xs"
             >
               <option value="favorite">Favorite</option>
@@ -176,7 +177,7 @@ export default function VendorsTab({ homeId }: { homeId: string }) {
                       <div className="text-sm font-medium text-app">{biz.name}</div>
                       <div className="text-[10px] text-app-muted">
                         @{biz.username}
-                        {biz.profile?.categories?.length > 0 && ` · ${biz.profile.categories[0]}`}
+	                        {(biz.profile?.categories?.length || 0) > 0 && ` · ${biz.profile?.categories?.[0]}`}
                       </div>
                     </div>
                   </div>
@@ -265,8 +266,8 @@ export default function VendorsTab({ homeId }: { homeId: string }) {
                     </div>
                     <div className="text-xs text-app-muted truncate">
                       @{link.business?.username}
-                      {link.business?.average_rating > 0 && <><span> · </span><Star className="w-3 h-3 inline fill-current" /><span> {link.business.average_rating.toFixed(1)}</span></>}
-                      {link.profile?.categories?.length > 0 && ` · ${link.profile.categories.join(', ')}`}
+	                      {(link.business?.average_rating ?? 0) > 0 && <><span> · </span><Star className="w-3 h-3 inline fill-current" /><span> {link.business?.average_rating?.toFixed(1)}</span></>}
+	                      {(link.profile?.categories?.length || 0) > 0 && ` · ${link.profile?.categories?.join(', ')}`}
                     </div>
                     {link.notes && (
                       <div className="text-xs text-app-secondary mt-0.5 italic truncate">{link.notes}</div>

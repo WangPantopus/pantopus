@@ -37,7 +37,7 @@ export default function ListingMessagesPage() {
         api.users.getMyProfile(),
       ]);
 
-      const listingData = ((listingResult as Record<string, unknown>)?.listing ?? listingResult) as ListingDetail;
+      const listingData = ((listingResult as Record<string, any>)?.listing ?? listingResult) as ListingDetail;
       const user = userResult as { id?: string | number };
 
       // Guard: only owner can view messages

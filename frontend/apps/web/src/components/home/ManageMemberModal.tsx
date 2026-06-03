@@ -80,7 +80,7 @@ export default function ManageMemberModal({
 }: {
   open: boolean;
   onClose: () => void;
-  member: Record<string, unknown> | null;
+  member: Record<string, any> | null;
   homeId: string;
   isOwner: boolean;
   onUpdate: () => void;
@@ -115,13 +115,13 @@ export default function ManageMemberModal({
         ]);
 
         if (permsRes.status === 'fulfilled') {
-          const data = permsRes.value as Record<string, unknown>;
+          const data = permsRes.value as Record<string, any>;
           setPermissions(data.permissions || []);
           setRoleBase(data.role_base || member.role_base || 'member');
         }
 
         if (presetsRes.status === 'fulfilled') {
-          setPresets((presetsRes.value as Record<string, unknown>).presets as { key: string; display_name: string; role_base?: string; [k: string]: unknown }[] || []);
+          setPresets((presetsRes.value as Record<string, any>).presets as { key: string; display_name: string; role_base?: string; [k: string]: unknown }[] || []);
         }
       } catch {
         setError('Failed to load member details');
@@ -131,16 +131,18 @@ export default function ManageMemberModal({
     })();
   }, [open, member, homeId]);
 
-  const handleApplyPreset = async (presetKey: string) => {
-    setSaving(true);
-    setError('');
-    try {
-      const { post } = await import('@pantopus/api');
-      await post(`/api/homes/${homeId}/members/${member.user_id}/role`, { preset_key: presetKey });
+	  const handleApplyPreset = async (presetKey: string) => {
+	    if (!member) return;
+	    const memberUserId = member.user_id;
+	    setSaving(true);
+	    setError('');
+	    try {
+	      const { post } = await import('@pantopus/api');
+	      await post(`/api/homes/${homeId}/members/${memberUserId}/role`, { preset_key: presetKey });
 
-      // Reload permissions
-      const { get } = await import('@pantopus/api');
-      const data = await get(`/api/homes/${homeId}/members/${member.user_id}/permissions`) as Record<string, unknown>;
+	      // Reload permissions
+	      const { get } = await import('@pantopus/api');
+	      const data = await get(`/api/homes/${homeId}/members/${memberUserId}/permissions`) as Record<string, any>;
       setPermissions(data.permissions || []);
       setRoleBase(data.role_base || 'member');
       onUpdate();
@@ -151,12 +153,14 @@ export default function ManageMemberModal({
     }
   };
 
-  const handleTogglePermission = async (permission: string, allowed: boolean) => {
-    setSaving(true);
-    setError('');
-    try {
-      const { post } = await import('@pantopus/api');
-      await post(`/api/homes/${homeId}/members/${member.user_id}/permissions`, { permission, allowed });
+	  const handleTogglePermission = async (permission: string, allowed: boolean) => {
+	    if (!member) return;
+	    const memberUserId = member.user_id;
+	    setSaving(true);
+	    setError('');
+	    try {
+	      const { post } = await import('@pantopus/api');
+	      await post(`/api/homes/${homeId}/members/${memberUserId}/permissions`, { permission, allowed });
 
       // Update local state
       if (allowed) {
@@ -171,12 +175,14 @@ export default function ManageMemberModal({
     }
   };
 
-  const handleRemove = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      const { del } = await import('@pantopus/api');
-      await del(`/api/homes/${homeId}/members/${member.user_id}`);
+	  const handleRemove = async () => {
+	    if (!member) return;
+	    const memberUserId = member.user_id;
+	    setSaving(true);
+	    setError('');
+	    try {
+	      const { del } = await import('@pantopus/api');
+	      await del(`/api/homes/${homeId}/members/${memberUserId}`);
       onRemove();
       onClose();
     } catch (err: unknown) {

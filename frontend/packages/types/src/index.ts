@@ -26,6 +26,7 @@ export type {
   FeedSurface,
   DistributionTarget,
   PostAs,
+  PersonaPostAudience,
   Audience,
   FeedScope,
   TrustLevel,
@@ -94,6 +95,7 @@ export type {
   ProfileVisibilityLevel,
   BlockScopeType,
   NotificationContextType,
+  NotificationFirewallContext,
   BusinessSeat,
   SeatListItem,
   SeatDetail,
@@ -108,6 +110,38 @@ export type {
   DeclineInvitePayload,
   UpdateSeatPayload,
   NotificationWithContext,
+  PublicIdentityType,
+  PersonaCategory,
+  PersonaAudienceLabel,
+  PersonaAudienceMode,
+  PersonaFollowStatus,
+  PersonaRelationshipType,
+  PersonaNotificationLevel,
+  PublicAuthorIdentity,
+  LocalProfile,
+  AudienceProfile,
+  BroadcastChannel,
+  BroadcastMessage,
+  PersonaFollower,
+  PersonaFollowerCounts,
+  BeaconFollowingItem,
+  BeaconFollowingResponse,
+  BeaconFollowingSort,
+  AudienceMemberItem,
+  AudienceMembersResponse,
+  AudienceMembersSort,
+  AudienceMemberAction,
+  BroadcastAnalyticsSummary,
+  IdentityCenterPayload,
+  ViewAsPreviewSection,
+  ViewAsPreviewPost,
+  ViewAsPreviewBroadcast,
+  ViewAsPreview,
+  ProfileDiscoveryResultType,
+  ProfileDiscoveryActionKind,
+  ProfileDiscoveryLinkedProfile,
+  ProfileDiscoveryResult,
+  ProfileDiscoverySearchResponse,
 } from './identity';
 
 // ─── Re-exports from home intelligence types ────────────────
@@ -406,6 +440,9 @@ export interface User {
   name: string; // Keep this - it's the full name
   phone_number?: string;
   profile_picture_url?: string;
+  profilePicture?: string;
+  profile_picture?: string;
+  avatar_url?: string;
   bio?: string;
   date_of_birth?: string;
   location?: {
@@ -482,8 +519,11 @@ export interface UserProfile extends User {
   email_notifications?: boolean;
   push_notifications?: boolean;
   profile_visibility?: 'public' | 'registered' | 'private';
+  profileVisibility?: 'public' | 'registered' | 'private';
   show_email?: boolean;
+  showEmail?: boolean;
   show_phone?: boolean;
+  showPhone?: boolean;
   // Reviews (populated on public profiles)
   reviews?: Array<{
     id: string;
@@ -733,7 +773,9 @@ export interface AdCampaign {
 export interface ChatRoom {
   id: string;
   room_type: 'direct' | 'group' | 'gig' | 'home';
+  type?: 'direct' | 'group' | 'gig' | 'home' | string;
   room_name?: string;
+  name?: string;
   room_description?: string;
   room_image_url?: string;
   created_by?: string;
@@ -753,7 +795,11 @@ export interface ChatMessage {
   id: string;
   room_id: string;
   sender_id: string;
+  user_id?: string;
+  sender?: Pick<User, 'id' | 'username' | 'name' | 'profile_picture_url'> & Record<string, any>;
   message_text?: string;
+  message?: string;
+  content?: string;
   message_type:
     | 'text'
     | 'image'
@@ -764,16 +810,22 @@ export interface ChatMessage {
     | 'system'
     | 'gig_offer'
     | 'listing_offer';
+  type?: ChatMessage['message_type'] | string;
   topic_id?: string;
   file_ids?: string[];
+  attachments?: unknown[];
   metadata?: Record<string, any>;
   reply_to_id?: string;
   is_edited: boolean;
+  edited?: boolean;
   edited_at?: string;
   is_deleted: boolean;
   deleted_at?: string;
   created_at: string;
   reactions?: ReactionSummary[];
+  _optimistic?: boolean;
+  _failed?: boolean;
+  _clientMessageId?: string;
 }
 
 export interface ChatParticipant {
@@ -1295,6 +1347,15 @@ export interface ProfileUpdateForm {
   instagram?: string;
   facebook?: string;
   profileVisibility?: 'public' | 'registered' | 'private';
+  profile_visibility?: 'public' | 'registered' | 'private';
+  showEmail?: boolean;
+  show_email?: boolean;
+  showPhone?: boolean;
+  show_phone?: boolean;
+  emailNotifications?: boolean;
+  email_notifications?: boolean;
+  pushNotifications?: boolean;
+  push_notifications?: boolean;
   skills?: string[];
   interests?: string[];
   settings?: Record<string, any>;

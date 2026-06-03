@@ -61,7 +61,7 @@ export default function StripeProvider({
   customAppearance,
 }: StripeProviderProps) {
   const options = useMemo(() => {
-    const opts: Record<string, unknown> = {
+    const opts: Record<string, any> = {
       appearance: customAppearance || appearance,
     };
     if (clientSecret) {

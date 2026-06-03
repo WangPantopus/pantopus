@@ -18,7 +18,7 @@ export function BillsBudgetCardPreview({
   totalDue,
   onExpand,
 }: {
-  bills: Record<string, unknown>[];
+  bills: Record<string, any>[];
   totalDue: number;
   onExpand: () => void;
 }) {
@@ -75,9 +75,9 @@ export default function BillsBudgetCard({
   onBack,
   highlightBillId,
 }: {
-  bills: Record<string, unknown>[];
+  bills: Record<string, any>[];
   homeId: string;
-  members: Record<string, unknown>[];
+  members: Record<string, any>[];
   onAddBill: () => void;
   onMarkBillPaid: (billId: string) => void;
   onBack: () => void;
@@ -106,7 +106,7 @@ export default function BillsBudgetCard({
     return m?.display_name || m?.username || null;
   };
 
-  const renderBillRow = (bill: Record<string, unknown>) => {
+  const renderBillRow = (bill: Record<string, any>) => {
     const isOverdue = bill.status === 'overdue' || (bill.status === 'due' && bill.due_date && new Date(bill.due_date) < now);
 
     return (

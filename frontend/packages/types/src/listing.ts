@@ -83,7 +83,7 @@ export interface Listing {
   location_precision?: ListingLocationPrecision;
   reveal_policy?: ListingRevealPolicy;
   visibility_scope?: ListingVisibilityScope;
-  radius_miles?: number;
+  radius_miles?: number | null;
   /** Whether the viewer has access to the exact location (owner or address grantee) */
   locationUnlocked?: boolean;
 
@@ -139,11 +139,23 @@ export interface Listing {
 }
 
 /** Compact user object nested in listing API responses. */
-export type ListingUserSummary = Pick<
-  User,
-  'id' | 'username' | 'name' | 'profile_picture_url'
-> & {
+// After P0.4 the backend returns the new identity shape; legacy fields are
+// typed-optional so consumers can migrate to handle / displayName /
+// avatarUrl incrementally.
+export type ListingUserSummary = {
+  id: string;
+  /** P0.4 canonical handle. Prefer this over username. */
+  handle?: string | null;
+  /** P0.4 canonical display name. Prefer this over name/first_name. */
+  displayName?: string;
+  /** P0.4 canonical avatar URL. Prefer this over profile_picture_url. */
+  avatarUrl?: string | null;
+  /** Legacy. */
+  username?: string;
+  name?: string;
   first_name?: string;
+  last_name?: string;
+  profile_picture_url?: string;
   city?: string;
   state?: string;
 };

@@ -46,6 +46,12 @@ type PublicProfileData = UserProfile & {
 
 type ServiceEntry = NonNullable<PublicProfileData['services']>[number] | string;
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeProfileIdentifier(value: unknown): string {
+  return String(value || '').trim().replace(/^@+/, '');
+}
+
 /** Pending review stub returned by the API (not a full Review). */
 interface PendingReviewStub {
   gig_id: string;
@@ -63,6 +69,7 @@ interface PublicProfileClientProps {
 
 export default function PublicProfileClient({ username, initialProfile }: PublicProfileClientProps) {
   const router = useRouter();
+  const profileIdentifier = normalizeProfileIdentifier(username);
 
   const [profile, setProfile] = useState<PublicProfileData | null>(initialProfile);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -86,21 +93,25 @@ export default function PublicProfileClient({ username, initialProfile }: Public
   const [connectionState, setConnectionState] = useState<RelationshipState>('none');
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadCurrentUser = async () => {
+  const loadCurrentUser = useCallback(async () => {
     try {
       const token = getAuthToken();
       if (token) {
         const userData = await api.users.getMyProfile();
         setCurrentUser(userData);
+        return userData;
       }
     } catch (err) {
       console.error('Failed to load current user:', err);
     }
-  };
+    return null;
+  }, []);
 
   const loadProfile = useCallback(async () => {
     try {
-      const profileData = await api.users.getProfileByUsername(username);
+      const profileData = UUID_REGEX.test(profileIdentifier)
+        ? await api.users.getProfileById(profileIdentifier)
+        : await api.users.getProfileByUsername(profileIdentifier);
       setProfile(profileData as PublicProfileData);
 
       if (profileData.reviews && profileData.reviews.length > 0) {
@@ -111,11 +122,24 @@ export default function PublicProfileClient({ username, initialProfile }: Public
         });
       }
     } catch (err) {
+      const ownProfile = currentUser || await loadCurrentUser();
+      const currentUsername = normalizeProfileIdentifier(ownProfile?.username);
+      const isOwnProfileRoute = Boolean(
+        ownProfile &&
+        ((ownProfile.id && ownProfile.id === profileIdentifier) ||
+          (currentUsername && currentUsername === profileIdentifier))
+      );
+
+      if (isOwnProfileRoute) {
+        setProfile(ownProfile as PublicProfileData);
+        return;
+      }
+
       console.error('Failed to load profile:', err);
     } finally {
       setLoading(false);
     }
-  }, [username]);
+  }, [currentUser, loadCurrentUser, profileIdentifier]);
 
   const loadRelationshipStatus = useCallback(async () => {
     if (!profile?.id) return;
@@ -196,7 +220,7 @@ export default function PublicProfileClient({ username, initialProfile }: Public
       loadProfile();
     }
     loadCurrentUser();
-  }, [username, loadProfile, initialProfile]);
+  }, [profileIdentifier, loadProfile, loadCurrentUser, initialProfile]);
 
   useEffect(() => {
     if (profile && ['overview', 'services', 'missions', 'activity'].includes(activeTab) && userGigs.length === 0) {

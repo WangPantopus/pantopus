@@ -155,7 +155,7 @@ function HomeDashboardContent() {
   // ── Task handlers ──
 
   const handleTaskSave = useCallback(
-    async (data: Record<string, unknown>) => {
+    async (data: Record<string, any>) => {
       const mediaFiles: File[] | undefined = data._mediaFiles;
       delete data._mediaFiles;
 
@@ -220,8 +220,8 @@ function HomeDashboardContent() {
       await api.homes.inviteToHome(homeId, data);
       try {
         const membersData = await api.homes.getHomeOccupants(homeId);
-        const activeMembers = (membersData as Record<string, unknown>).occupants as Record<string, unknown>[] || [];
-        const pending = (membersData as Record<string, unknown>).pendingInvites as Record<string, unknown>[] || [];
+        const activeMembers = (membersData as Record<string, any>).occupants as Record<string, any>[] || [];
+        const pending = (membersData as Record<string, any>).pendingInvites as Record<string, any>[] || [];
         setMembers(() => [...activeMembers, ...pending]);
       } catch {
         // occupants may not reflect invite immediately
@@ -233,7 +233,7 @@ function HomeDashboardContent() {
   // ── Issue handler ──
 
   const handleIssueSave = useCallback(
-    async (data: Record<string, unknown>) => {
+    async (data: Record<string, any>) => {
       const mediaFiles: File[] | undefined = data._mediaFiles;
       delete data._mediaFiles;
 
@@ -253,7 +253,7 @@ function HomeDashboardContent() {
   // ── Bill handlers ──
 
   const handleBillSave = useCallback(
-    async (data: Record<string, unknown>) => {
+    async (data: Record<string, any>) => {
       const mediaFiles: File[] | undefined = data._mediaFiles;
       delete data._mediaFiles;
 
@@ -288,7 +288,7 @@ function HomeDashboardContent() {
   // ── Package handlers ──
 
   const handlePackageSave = useCallback(
-    async (data: Record<string, unknown>) => {
+    async (data: Record<string, any>) => {
       const mediaFiles: File[] | undefined = data._mediaFiles;
       delete data._mediaFiles;
 
@@ -447,17 +447,17 @@ function HomeDashboardContent() {
           expandedCard={expandedCard}
           onExpandCard={setExpandedCard}
           onAddTask={() => openTaskPanel()}
-          onTaskClick={(task: Record<string, unknown>) => openTaskPanel(task)}
+          onTaskClick={(task: Record<string, any>) => openTaskPanel(task)}
           onTaskStatusChange={handleTaskStatusChange}
           onTaskDelete={handleTaskDelete}
           onAddIssue={() => openIssuePanel()}
-          onViewIssue={(issue: Record<string, unknown>) => openIssuePanel(issue)}
+          onViewIssue={(issue: Record<string, any>) => openIssuePanel(issue)}
           onAddBill={() => openBillPanel()}
           onMarkBillPaid={handleBillMarkPaid}
           onAddPackage={() => openPackagePanel()}
           onMarkPackagePickedUp={handlePackageMarkPickedUp}
           onInviteMember={openInviteModal}
-          onSecretsChange={(s: Record<string, unknown>[]) => setSecrets(() => s)}
+          onSecretsChange={(s: Record<string, any>[]) => setSecrets(() => s)}
           pets={pets}
           polls={polls}
           linkedType={linkedType}
@@ -475,7 +475,7 @@ function HomeDashboardContent() {
           secrets={secrets}
           emergencies={emergencies}
           can={can}
-          onSecretsChange={(s: Record<string, unknown>[]) => setSecrets(() => s)}
+          onSecretsChange={(s: Record<string, any>[]) => setSecrets(() => s)}
         />
       )}
 
@@ -562,40 +562,40 @@ function DashboardTab({
   selectedBillType,
   onBillTypeChange,
 }: {
-  home: Record<string, unknown>;
+  home: Record<string, any>;
   homeId: string;
   activeTasks: number;
   openIssues: number;
   totalDue: number;
   pendingPkgs: number;
-  tasks: Record<string, unknown>[];
-  issues: Record<string, unknown>[];
-  bills: Record<string, unknown>[];
-  packages: Record<string, unknown>[];
-  documents: Record<string, unknown>[];
-  events: Record<string, unknown>[];
-  nearbyGigs: Record<string, unknown>[];
-  homeGigs: Record<string, unknown>[];
-  members: Record<string, unknown>[];
-  secrets: Record<string, unknown>[];
-  emergencies: Record<string, unknown>[];
+  tasks: Record<string, any>[];
+  issues: Record<string, any>[];
+  bills: Record<string, any>[];
+  packages: Record<string, any>[];
+  documents: Record<string, any>[];
+  events: Record<string, any>[];
+  nearbyGigs: Record<string, any>[];
+  homeGigs: Record<string, any>[];
+  members: Record<string, any>[];
+  secrets: Record<string, any>[];
+  emergencies: Record<string, any>[];
   can: (perm: string) => boolean;
   expandedCard: string | null;
   onExpandCard: (card: string | null) => void;
   onAddTask: () => void;
-  onTaskClick: (task: Record<string, unknown>) => void;
+  onTaskClick: (task: Record<string, any>) => void;
   onTaskStatusChange: (taskId: string, newStatus: string) => void;
   onTaskDelete: (taskId: string) => void;
   onAddIssue: () => void;
-  onViewIssue: (issue: Record<string, unknown>) => void;
+  onViewIssue: (issue: Record<string, any>) => void;
   onAddBill: () => void;
   onMarkBillPaid: (billId: string) => void;
   onAddPackage: () => void;
   onMarkPackagePickedUp: (pkgId: string) => void;
   onInviteMember: () => void;
-  onSecretsChange: (s: Record<string, unknown>[]) => void;
-  pets: Record<string, unknown>[];
-  polls: Record<string, unknown>[];
+  onSecretsChange: (s: Record<string, any>[]) => void;
+  pets: Record<string, any>[];
+  polls: Record<string, any>[];
   linkedType: string | null;
   linkedId: string;
   intelligence: ReturnType<typeof useHomeIntelligence>;

@@ -59,7 +59,7 @@ function PacketDetail({ item }: { item: MailItem }) {
 }
 
 function BillDetail({ item }: { item: MailItem }) {
-  const extracted = (item.mail_extracted || {}) as Record<string, unknown>;
+  const extracted = (item.mail_extracted || {}) as Record<string, any>;
   const amount = asNumber(extracted.amount_due ?? extracted.amount ?? extracted.total ?? extracted.balance_due);
   const dueDate = asString(extracted.due_date ?? extracted.dueDate);
   const payee = asString(extracted.payee ?? extracted.biller ?? extracted.vendor);

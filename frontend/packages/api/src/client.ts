@@ -182,8 +182,8 @@ const defaultStorage: TokenStorage = {
 
 let _storage: TokenStorage = defaultStorage;
 
-// Callback invoked on 401 (e.g. redirect to login)
-let _onUnauthorized: (() => void) | null = null;
+// Callback invoked on 401 (e.g. revoke local session, redirect to login)
+let _onUnauthorized: (() => void | Promise<void>) | null = null;
 let _onAuthEvent: ((event: AuthClientEvent) => void) | null = null;
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -238,7 +238,7 @@ function emitAuthEvent(event: AuthClientEvent): void {
  */
 export function configureApiClient(options: {
   storage?: TokenStorage;
-  onUnauthorized?: () => void;
+  onUnauthorized?: () => void | Promise<void>;
   onAuthEvent?: (event: AuthClientEvent) => void;
   baseURL?: string;
   /** Explicitly set the platform so the client uses the correct auth strategy.
@@ -588,7 +588,6 @@ apiClient.interceptors.response.use(
           }
         }
         if (refreshResult?.status === 'invalid') {
-          await clearAuthSession();
           didInvalidateSession = true;
           emitAuthEvent({
             type: 'session_invalidated',
@@ -599,9 +598,20 @@ apiClient.interceptors.response.use(
             statusCode: refreshResult.statusCode,
           });
           if (_onUnauthorized) {
-            _onUnauthorized();
+            try {
+              await _onUnauthorized();
+            } catch {
+              // Unauthorized hooks are for cleanup/navigation only; they must
+              // not replace the original API error observed by the caller.
+            } finally {
+              // Run after the hook so consumers can still read tokens for best-effort server logout.
+              await clearAuthSession();
+            }
           } else if (typeof window !== 'undefined' && window.location) {
+            await clearAuthSession();
             window.location.href = '/login';
+          } else {
+            await clearAuthSession();
           }
         } else if (refreshResult?.status === 'transient') {
           // The refresh endpoint is temporarily unreachable (5xx, timeout, network).

@@ -1,28 +1,3 @@
-# Dependencies
-node_modules/
-
-# Next.js
-.next/
-out/
-
-# Local env
-.env
-.env.*
-!.env.example
-!.env.*.example
-
 # Playwright
 test-results/
 playwright-report/
-
-# Test/build output
-coverage/
-dist/
-tsconfig.tsbuildinfo
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*

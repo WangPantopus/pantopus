@@ -550,7 +550,16 @@ export async function updatePreferences(data: Partial<Pick<MailPreferences,
   | 'blocked_senders'
   | 'email_notifications'
   | 'push_notifications'
->>): Promise<{ message: string; preferences: MailPreferences }> {
+>> & Partial<{
+  receiveAds: boolean;
+  receivePromotions: boolean;
+  receiveNewsletters: boolean;
+  maxAdsPerDay: number;
+  preferredAdCategories: string[];
+  blockedSenders: string[];
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+}>): Promise<{ message: string; preferences: MailPreferences }> {
   return patch<{ message: string; preferences: MailPreferences }>('/api/mailbox/preferences', data);
 }
 

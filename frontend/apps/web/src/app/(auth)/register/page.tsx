@@ -6,7 +6,14 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as api from '@pantopus/api';
 import PantopusBadge from '@/components/PantopusBadge';
-import { extractApiError, extractFieldErrors, normalizeEmail, safeRedirectPath } from '@/lib/auth-utils';
+import {
+  extractApiError,
+  extractFieldErrors,
+  normalizeEmail,
+  oauthRedirectParamForWeb,
+  readAuthRedirectQuery,
+  safeRedirectPath,
+} from '@/lib/auth-utils';
 
 const PASSWORD_MIN_LENGTH = 12;
 
@@ -14,7 +21,7 @@ function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefillEmail = (searchParams.get('email') || '').trim().toLowerCase();
-  const redirectTo = searchParams.get('redirectTo') || undefined;
+  const redirectTo = readAuthRedirectQuery(searchParams) || undefined;
   type FieldErrors = Record<string, string>;
   const [formData, setFormData] = useState({
     email: '',
@@ -127,7 +134,7 @@ function RegisterContent() {
         email: normalizeEmail(registerPayload.email),
       });
 
-      const respObj = response as Record<string, unknown>;
+      const respObj = response as Record<string, any>;
       const token = (respObj.accessToken || respObj.token) as string | undefined;
       if (token) {
         // Backend sets httpOnly cookies via same-origin proxy.
@@ -148,7 +155,10 @@ function RegisterContent() {
     if (oauthLoading) return;
     setOauthLoading(provider);
     try {
-      const { url } = await api.auth.getOAuthUrl(provider, redirectTo);
+      const { url } = await api.auth.getOAuthUrl(
+        provider,
+        oauthRedirectParamForWeb(redirectTo, typeof window !== 'undefined' ? window.location.origin : undefined),
+      );
       window.location.href = url;
     } catch (err: unknown) {
       setError(extractApiError(err, `Failed to start ${provider} sign-in`));
@@ -175,16 +185,12 @@ function RegisterContent() {
           <PantopusBadge />
         </div>
 
-        <p className="mt-6 text-center text-xs font-bold tracking-widest uppercase text-primary-600 dark:text-primary-400">
-          Get started
-        </p>
-
-        <h2 className="mt-2 text-center text-3xl font-bold text-app-text dark:text-white">
+        <h2 className="mt-6 text-center text-3xl font-bold text-app-text dark:text-white">
           Create your account
         </h2>
 
         <p className="mt-2 text-center text-sm text-app-text-secondary">
-          One identity, three pillars — personal, home, business.
+          Join Pantopus for free
         </p>
       </div>
 
@@ -402,32 +408,13 @@ function RegisterContent() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl shadow-md shadow-primary-600/30 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/40 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full flex justify-center py-2.5 px-4 rounded-lg shadow-sm text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/40 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
-              {loading ? (
-                'Creating account…'
-              ) : (
-                <>
-                  Create account
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M5 12h14" />
-                    <path d="m12 5 7 7-7 7" />
-                  </svg>
-                </>
-              )}
+              {loading ? 'Creating account...' : 'Create account'}
             </button>
 
             <p className="text-center text-xs text-app-text-secondary dark:text-app-text-muted">
-              By joining, you&apos;re building a safer neighborhood network with verified identity and accountability.
+              By joining, you&apos;re building a safer real-world network with verified identity and accountability.
             </p>
           </form>
 
@@ -474,28 +461,11 @@ function RegisterContent() {
         </div>
 
         <p className="mt-6 text-center text-sm text-app-text-secondary dark:text-app-text-muted">
-          I have an account.{' '}
-          <Link href="/login" className="font-semibold text-primary-700 dark:text-primary-300 hover:opacity-90">
-            Log in
+          Already have an account?{' '}
+          <Link href="/login" className="font-medium text-primary-700 dark:text-primary-300 hover:opacity-90">
+            Sign in
           </Link>
         </p>
-
-        <div className="mt-8 flex items-center justify-center gap-1.5 text-xs text-app-text-secondary dark:text-app-text-muted">
-          <svg
-            className="h-3 w-3"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
-          <span>Verified by address</span>
-        </div>
       </div>
     </div>
   );

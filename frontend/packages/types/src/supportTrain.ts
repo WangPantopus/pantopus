@@ -135,6 +135,7 @@ export interface SupportTrainReservation {
   support_train_id: string;
   user_id?: string | null;
   guest_name?: string | null;
+  guest_email?: string | null;
   status: ReservationStatus;
   contribution_mode: ContributionMode;
   dish_title?: string | null;
@@ -142,6 +143,9 @@ export interface SupportTrainReservation {
   estimated_arrival_at?: string | null;
   note_to_recipient?: string | null;
   private_note_to_organizer?: string | null;
+  guest_address_shared_at?: string | null;
+  guest_address_shared_by?: string | null;
+  guest_address_share_count?: number;
   created_at: string;
   updated_at: string;
   canceled_at?: string | null;
@@ -336,6 +340,8 @@ export interface CancelReservationRequest {
 export interface RevealSupportTrainAddressResponse {
   shared: boolean;
   already_shared: boolean;
-  helper_user_id: string;
+  helper_user_id?: string;
+  guest_email?: string;
+  guest_address_shared_at?: string;
   reservation_id: string;
 }

@@ -73,7 +73,7 @@ function toFiniteNumber(v: unknown): number | null {
   return null;
 }
 
-function coordsFromHome(h: Record<string, unknown>): { latitude: number | null; longitude: number | null } {
+function coordsFromHome(h: Record<string, any>): { latitude: number | null; longitude: number | null } {
   // 1. map_center_lat / map_center_lng — the actual flat coordinate columns on Home (see migration 082).
   //    These are the most reliable source when the home was created through the standard onboarding.
   const mapLat = toFiniteNumber(h?.map_center_lat);
@@ -83,7 +83,7 @@ function coordsFromHome(h: Record<string, unknown>): { latitude: number | null; 
   }
 
   // 2. GeoJSON { type:'Point', coordinates:[lng,lat] } — if Supabase serialized the PostGIS column.
-  const loc = h?.location as Record<string, unknown> | undefined;
+  const loc = h?.location as Record<string, any> | undefined;
   const coords = loc?.coordinates as number[] | undefined;
   if (coords && coords.length >= 2) {
     const lat = toFiniteNumber(coords[1]);
@@ -111,7 +111,7 @@ function coordsFromHome(h: Record<string, unknown>): { latitude: number | null; 
   return { latitude: null, longitude: null };
 }
 
-function homeLabel(h: Record<string, unknown>): string {
+function homeLabel(h: Record<string, any>): string {
   const line1 = [h.address, (h.address2 || h.unit_number) as string | undefined].filter(Boolean).join(' ');
   const line2 = [h.city, h.state, (h.zipcode || h.zip_code) as string | undefined].filter(Boolean).join(' ');
   return [line1, line2].filter(Boolean).join(', ');
@@ -190,7 +190,7 @@ export default function QuickModifiers({
 
   // ── Resolvers ──────────────────────────────────────────────────────────
   const resolveHome = async (home: Home) => {
-    const h = home as Home & Record<string, unknown>;
+    const h = home as Home & Record<string, any>;
     let { latitude, longitude } = coordsFromHome(h);
     let usedFallbackGeocode = false;
 
@@ -226,7 +226,7 @@ export default function QuickModifiers({
       try {
         await api.homes.updateHome(h.id, {
           location: { latitude, longitude },
-        } as Record<string, unknown>);
+        } as Record<string, any>);
       } catch {
         // Non-critical — keep the coords for this post.
       }
@@ -481,7 +481,7 @@ export default function QuickModifiers({
               </option>
               {homes.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {homeLabel(h as unknown as Record<string, unknown>)}
+                  {homeLabel(h as unknown as Record<string, any>)}
                 </option>
               ))}
             </select>

@@ -90,7 +90,7 @@ export default function TermsPage() {
         </TermsSection>
 
         <TermsSection title="4. Acceptable use">
-          <p>Pantopus is designed to be a helpful, respectful neighborhood platform. You agree not to:</p>
+          <p>Pantopus is designed to be a helpful, respectful real-world network. You agree not to:</p>
           <TermsList items={[
             'Harass, threaten, bully, stalk, or intimidate any person',
             'Impersonate another person, organization, or Pantopus itself',
@@ -248,7 +248,7 @@ function SiteNav() {
             <LayoutDashboard className="w-7 h-7 text-primary-600" />
             <div className="flex flex-col leading-none">
               <span className="text-xl font-bold tracking-tight text-primary-700 dark:text-primary-400">Pantopus</span>
-              <span className="hidden sm:block text-[10px] font-medium text-app-text-muted dark:text-app-text-secondary tracking-wide uppercase">Digital Neighborhood OS</span>
+              <span className="hidden sm:block text-[10px] font-medium text-app-text-muted dark:text-app-text-secondary tracking-wide uppercase">Your real-world network</span>
             </div>
           </Link>
           <div className="flex items-center gap-3">
@@ -272,7 +272,7 @@ function SiteFooter() {
               <span className="text-lg font-bold text-white">Pantopus</span>
             </div>
             <p className="text-sm text-app-text-secondary leading-relaxed max-w-xs">
-              Your Digital Neighborhood Operating System. Verified people, real homes, local work — all in one place.
+              Your real-world network. Verified people, real homes, local work, and Beacons in one place.
             </p>
           </div>
           <div>

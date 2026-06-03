@@ -136,8 +136,9 @@ export default function CommentThread({
   };
 
   const renderComment = (comment: PostComment, depth = 0) => {
+    // P0.4: read from the new identity shape only (displayName / handle).
     const authorName =
-      comment.author?.name || comment.author?.username || 'Neighbor';
+      comment.author?.displayName || comment.author?.handle || 'Neighbor';
     const authorInitial = authorName[0]?.toUpperCase() || '?';
     const isOwn = comment.user_id === currentUserId;
     const replies = repliesMap[comment.id] || [];
@@ -159,9 +160,12 @@ export default function CommentThread({
       <div key={comment.id} className={marginClass}>
         {/* Thread connector line for nested comments */}
         <div className={`flex gap-2.5 group py-2 ${depth > 0 ? 'border-l-2 border-app pl-3' : ''}`}>
-          {comment.author?.profile_picture_url ? (
+          {/* P0.4: comment.author is always a serializer output now (handle / */}
+          {/* displayName / avatarUrl). Legacy username / profile_picture_url */}
+          {/* aliases are gone. */}
+          {comment.author?.avatarUrl ? (
             <Image
-              src={comment.author.profile_picture_url}
+              src={comment.author.avatarUrl}
               alt={authorName}
               className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-0.5"
               width={28}
@@ -177,14 +181,14 @@ export default function CommentThread({
 
           <div className="flex-1 min-w-0">
             <div className="bg-surface-muted rounded-xl px-3 py-2 border border-app">
-              {comment.author?.username ? (
+              {comment.author?.handle ? (
                 <UserIdentityLink
                   userId={comment.author?.id || comment.user_id}
-                  username={comment.author.username}
+                  username={comment.author.handle}
                   displayName={authorName}
-                  avatarUrl={comment.author?.profile_picture_url || null}
-                  city={comment.author?.city || null}
-                  state={comment.author?.state || null}
+                  avatarUrl={comment.author?.avatarUrl || null}
+                  city={comment.author?.locality?.city || null}
+                  state={comment.author?.locality?.state || null}
                   textClassName="text-xs font-semibold text-app hover:underline"
                 />
               ) : (
