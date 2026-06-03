@@ -72,8 +72,7 @@ class MailboxRepository
             tab: String,
             limit: Int,
             offset: Int,
-        ): NetworkResult<DrawerItemsResponse> =
-            safeApiCall { v2Api.drawer(drawer = drawer, tab = tab, limit = limit, offset = offset) }
+        ): NetworkResult<DrawerItemsResponse> = safeApiCall { v2Api.drawer(drawer = drawer, tab = tab, limit = limit, offset = offset) }
 
         /** `GET /api/mailbox/v2/item/:id`. */
         suspend fun item(mailId: String): NetworkResult<MailboxV2ItemResponse> = safeApiCall { v2Api.item(mailId) }

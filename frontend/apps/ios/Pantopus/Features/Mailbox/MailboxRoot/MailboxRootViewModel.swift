@@ -239,10 +239,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// by the backend drawer key (`personal` / `home` / `business` / `earn`).
     private var drawerUnread: [String: Int] = [:]
 
-    public init(
+    /// Production initializer — uses the shared API client. Kept free of
+    /// any `APIClient` parameter so it can stay `public` (the client type
+    /// and `.shared` are module-internal).
+    public convenience init(
         initialDrawer: MailboxDrawer = .me,
         initialTab: MailboxTab = .incoming,
-        api: APIClient = .shared,
         onOpenMail: @escaping (String) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
         onOpenMap: @escaping @MainActor () -> Void = {},
@@ -254,9 +256,43 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         dataProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])? = nil,
         seededState: ListOfRowsState? = nil
     ) {
+        self.init(
+            api: .shared,
+            initialDrawer: initialDrawer,
+            initialTab: initialTab,
+            onOpenMail: onOpenMail,
+            onOpenSearch: onOpenSearch,
+            onOpenMap: onOpenMap,
+            onOpenMailDay: onOpenMailDay,
+            onOpenEarn: onOpenEarn,
+            onOpenVacationHold: onOpenVacationHold,
+            onOpenStamps: onOpenStamps,
+            onOpenUnboxing: onOpenUnboxing,
+            dataProvider: dataProvider,
+            seededState: seededState
+        )
+    }
+
+    /// Designated initializer. `api` is injectable for tests; it is
+    /// module-internal because `APIClient` is internal.
+    init(
+        api: APIClient,
+        initialDrawer: MailboxDrawer = .me,
+        initialTab: MailboxTab = .incoming,
+        onOpenMail: @escaping (String) -> Void = { _ in },
+        onOpenSearch: @escaping @MainActor () -> Void = {},
+        onOpenMap: @escaping @MainActor () -> Void = {},
+        onOpenMailDay: @escaping @MainActor () -> Void = {},
+        onOpenEarn: @escaping @MainActor () -> Void = {},
+        onOpenVacationHold: @escaping @MainActor () -> Void = {},
+        onOpenStamps: @escaping @MainActor () -> Void = {},
+        onOpenUnboxing: @escaping @MainActor () -> Void = {},
+        dataProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])? = nil,
+        seededState: ListOfRowsState? = nil
+    ) {
+        self.api = api
         selectedDrawer = initialDrawer
         selectedTab = initialTab.rawValue
-        self.api = api
         self.onOpenMail = onOpenMail
         self.onOpenSearch = onOpenSearch
         self.onOpenMap = onOpenMap
@@ -384,10 +420,9 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     private func fetchDrawerBadges() async {
         do {
             let response: DrawerListResponse = try await api.request(MailboxV2Endpoints.drawers())
-            drawerUnread = Dictionary(
-                response.drawers.map { ($0.drawer, $0.unreadCount) },
-                uniquingKeysWith: { first, _ in first }
-            )
+            drawerUnread = response.drawers.reduce(into: [String: Int]()) { counts, drawer in
+                counts[drawer.drawer] = drawer.unreadCount
+            }
         } catch {
             // Badges are non-blocking chrome — leave them empty on failure
             // so the list still renders.
