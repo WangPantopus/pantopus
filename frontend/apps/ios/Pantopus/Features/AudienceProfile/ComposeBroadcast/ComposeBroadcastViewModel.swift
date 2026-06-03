@@ -380,5 +380,7 @@ public final class ComposeBroadcastViewModel {
 /// `LocalizedError` so the composer's error banner shows the message.
 struct ComposeBroadcastError: LocalizedError {
     let message: String
-    var errorDescription: String? { message }
+    var errorDescription: String? {
+        message
+    }
 }

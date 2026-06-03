@@ -165,11 +165,10 @@ public final class MembershipDetailViewModel {
 
     private static func priceLabel(cents: Int?, currency: String?) -> String {
         guard let cents, cents > 0 else { return "Free" }
-        let symbol: String
-        if let currency, currency.lowercased() != "usd" {
-            symbol = "\(currency.uppercased()) "
+        let symbol = if let currency, currency.lowercased() != "usd" {
+            "\(currency.uppercased()) "
         } else {
-            symbol = "$"
+            "$"
         }
         if cents % 100 == 0 { return "\(symbol)\(cents / 100)" }
         return String(format: "\(symbol)%.2f", Double(cents) / 100.0)
