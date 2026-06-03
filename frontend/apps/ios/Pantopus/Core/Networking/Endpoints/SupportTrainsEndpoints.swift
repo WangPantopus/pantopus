@@ -116,6 +116,48 @@ public enum SupportTrainsEndpoints {
             path: "/api/support-trains/\(supportTrainId)/publish"
         )
     }
+
+    /// Participant-facing Support Train detail (A10.9 Detail screen).
+    /// Privacy-gated — slots, my-reservations, updates and organizers come
+    /// back scoped to the viewer's role.
+    ///
+    /// Route: `backend/routes/supportTrains.js:3444` — `GET /:id`.
+    ///
+    /// PREFIX NOTE: this whole client family targets `/api/support-trains/*`
+    /// (the six list/create endpoints above and these three siblings),
+    /// while the Express router is mounted at `/api/activities/support-trains`
+    /// (`backend/app.js:398`). If the already-shipped list feeds resolve in
+    /// production, an API-gateway alias bridges the two prefixes; if they
+    /// don't, the whole family's base path needs flipping in one change.
+    /// Either way Detail/Manage stay consistent with their siblings rather
+    /// than diverging onto a second convention. See the P1-E delivery notes.
+    public static func detail(supportTrainId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/support-trains/\(supportTrainId)")
+    }
+
+    /// Broadcast an update to the train's helpers / followers (A13.13
+    /// Manage → Send update). Body validated by `createUpdateSchema`
+    /// (`body` 1–5000 chars, optional `media_urls`).
+    ///
+    /// Route: `backend/routes/supportTrains.js:1581` — `POST /:id/updates`.
+    public static func postUpdate(supportTrainId: String, body: SupportTrainUpdateBody) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/support-trains/\(supportTrainId)/updates",
+            body: body
+        )
+    }
+
+    /// Mark the train completed (A13.13 Manage → Close train). Primary
+    /// organizer only; valid from `published` / `active` / `paused`.
+    ///
+    /// Route: `backend/routes/supportTrains.js:1508` — `POST /:id/complete`.
+    public static func complete(supportTrainId: String) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/support-trains/\(supportTrainId)/complete"
+        )
+    }
 }
 
 /// Role filter for the `me/support-trains` feed.

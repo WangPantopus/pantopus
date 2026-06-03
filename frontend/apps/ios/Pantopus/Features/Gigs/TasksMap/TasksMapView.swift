@@ -499,7 +499,7 @@ private struct PaginationDots: View {
 
 #if DEBUG
 #Preview("Populated") {
-    TasksMapView(viewModel: TasksMapViewModel())
+    TasksMapView(viewModel: TasksMapViewModel(seed: TasksMapSampleData.items))
 }
 
 #Preview("Empty") {

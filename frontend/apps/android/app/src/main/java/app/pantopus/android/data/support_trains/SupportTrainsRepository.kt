@@ -5,7 +5,9 @@ package app.pantopus.android.data.support_trains
 import app.pantopus.android.data.api.models.support_trains.AddSupportTrainSlotBody
 import app.pantopus.android.data.api.models.support_trains.CreateSupportTrainBody
 import app.pantopus.android.data.api.models.support_trains.CreateSupportTrainResponse
+import app.pantopus.android.data.api.models.support_trains.SupportTrainDetailDto
 import app.pantopus.android.data.api.models.support_trains.SupportTrainReservationsResponse
+import app.pantopus.android.data.api.models.support_trains.SupportTrainUpdateBody
 import app.pantopus.android.data.api.models.support_trains.SupportTrainsListResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainsNearbyResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -83,5 +85,33 @@ class SupportTrainsRepository
         suspend fun publish(supportTrainId: String): NetworkResult<Unit> =
             safeApiCall {
                 api.publish(supportTrainId).close()
+            }
+
+        /**
+         * `GET /api/support-trains/:id` — participant-facing detail (A10.9
+         * Detail / A13.13 Manage). Route
+         * `backend/routes/supportTrains.js:3444`.
+         */
+        suspend fun detail(supportTrainId: String): NetworkResult<SupportTrainDetailDto> = safeApiCall { api.detail(supportTrainId) }
+
+        /**
+         * `POST /api/support-trains/:id/updates` — broadcast an update.
+         * Route `backend/routes/supportTrains.js:1581`.
+         */
+        suspend fun postUpdate(
+            supportTrainId: String,
+            body: SupportTrainUpdateBody,
+        ): NetworkResult<Unit> =
+            safeApiCall {
+                api.postUpdate(supportTrainId, body).close()
+            }
+
+        /**
+         * `POST /api/support-trains/:id/complete` — mark the train
+         * completed. Route `backend/routes/supportTrains.js:1508`.
+         */
+        suspend fun complete(supportTrainId: String): NetworkResult<Unit> =
+            safeApiCall {
+                api.complete(supportTrainId).close()
             }
     }

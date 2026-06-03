@@ -24,25 +24,8 @@ final class PostGigV1SnapshotTests: XCTestCase {
         assertRenders(PostGigV1View(viewModel: vm))
     }
 
-    func test_post_gig_v1_round_trip_validation_then_success() {
-        let vm = PostGigV1ViewModel(
-            initialState: PostGigV1State(form: PostGigV1SampleData.validationErrorForm),
-            referenceNow: PostGigV1SampleData.referenceNow
-        ) {
-            "gig-v1-sofa-move"
-        }
-
-        XCTAssertNil(vm.submit())
-        XCTAssertEqual(vm.state.validationErrors.map(\.field), [.description, .price, .dateTime])
-
-        vm.updateDescription(PostGigV1SampleData.filledForm.description)
-        vm.updatePrice("80")
-        vm.updateScheduledAt(PostGigV1SampleData.filledForm.scheduledAt)
-
-        XCTAssertEqual(vm.submit(), "gig-v1-sofa-move")
-        XCTAssertTrue(vm.state.validationErrors.isEmpty)
-        XCTAssertEqual(vm.state.postedGigId, "gig-v1-sofa-move")
-    }
+    // The submit() round-trip (validation → POST /api/gigs → posted id) is
+    // covered by PostGigV1ViewModelTests now that submit() is async + wired.
 
     private func assertRenders(
         _ view: some View,

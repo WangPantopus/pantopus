@@ -63,9 +63,7 @@ public enum PostGigV1SampleData {
         PostGigV1ViewModel(
             initialState: PostGigV1State(form: filledForm),
             referenceNow: referenceNow
-        ) {
-            "gig-v1-sofa-move"
-        }
+        )
     }
 
     @MainActor
@@ -76,9 +74,7 @@ public enum PostGigV1SampleData {
                 validationErrors: validationErrors
             ),
             referenceNow: referenceNow
-        ) {
-            "gig-v1-sofa-move"
-        }
+        )
     }
 
     private static func makeDate(year: Int, month: Int, day: Int, hour: Int) -> Date {

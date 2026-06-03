@@ -150,8 +150,10 @@ public struct PostGigV1View: View {
     }
 
     private func commit() {
-        if let id = viewModel.submit() {
-            onPosted(id)
+        Task {
+            if let id = await viewModel.submit() {
+                onPosted(id)
+            }
         }
     }
 }

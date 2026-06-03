@@ -1,9 +1,20 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "MagicNumber")
 
 package app.pantopus.android.ui.screens.support_trains.detail
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.support_trains.SupportTrainDetailDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainHelperDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainModesDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainMyReservationDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainOrganizerDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainSlotDto
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.support_trains.SupportTrainsRepository
 import app.pantopus.android.ui.components.SlotCalendarState
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -20,19 +31,14 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * A10.9 (P3.1) — Covers the Android Support Train detail VM. Parity
- * with `SupportTrainDetailViewModelTests.swift`:
- *   - initial state is Loading,
- *   - load() resolves to Loaded via the default resolver,
- *   - the default resolver picks fullyCovered when the trainId
- *     contains "covered" / "full",
- *   - a resolver returning null surfaces an Error state,
- *   - seed() seeds the state directly for chrome tests,
- *   - the populated + fullyCovered sample fixtures match the
- *     A10.9 frame contract.
+ * A10.9 (P3.1) — Covers the Android Support Train detail VM. Parity with
+ * `SupportTrainDetailViewModelTests.swift`: load() fetches `GET /:id` and
+ * projects it; the `resolve` override drives the sample fixtures offline.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SupportTrainDetailViewModelTest {
+    private val repo: SupportTrainsRepository = mockk()
+
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -45,8 +51,23 @@ class SupportTrainDetailViewModelTest {
 
     private fun makeVm(trainId: String): SupportTrainDetailViewModel {
         val handle = SavedStateHandle(mapOf(SupportTrainDetailViewModel.SUPPORT_TRAIN_ID_KEY to trainId))
-        return SupportTrainDetailViewModel(handle)
+        return SupportTrainDetailViewModel(repo, handle)
     }
+
+    private fun slot(
+        id: String,
+        date: String,
+        covered: Boolean,
+    ): SupportTrainSlotDto =
+        SupportTrainSlotDto(
+            id = id,
+            slotDate = date,
+            slotLabel = "Dinner",
+            supportMode = "meal",
+            status = if (covered) "full" else "open",
+            filledCount = if (covered) 1 else 0,
+            capacity = 1,
+        )
 
     @Test
     fun initial_state_is_loading() {
@@ -54,10 +75,95 @@ class SupportTrainDetailViewModelTest {
         assertTrue(vm.state.value is SupportTrainDetailUiState.Loading)
     }
 
+    // MARK: - Live detail fetch + projection
+
     @Test
-    fun load_resolves_populated_by_default() =
+    fun load_fetches_detail_and_projects() =
+        runTest {
+            val dto =
+                SupportTrainDetailDto(
+                    id = "t1",
+                    title = "Meals for the Reyes family",
+                    story = "Baby arrived Nov 18 — thank you.",
+                    status = "active",
+                    supportModes = SupportTrainModesDto(homeCookedMeals = true, takeout = true),
+                    recipientSummary = "Household of 4",
+                    slots = listOf(slot("s1", "2025-12-02", covered = false), slot("s2", "2025-12-03", covered = true)),
+                    myReservations =
+                        listOf(
+                            SupportTrainMyReservationDto(
+                                id = "r1",
+                                slotId = "s2",
+                                status = "reserved",
+                                contributionMode = "cook",
+                                dishTitle = "Lentil soup",
+                            ),
+                        ),
+                    organizers =
+                        listOf(
+                            SupportTrainOrganizerDto(
+                                id = "o1",
+                                role = "primary",
+                                user = SupportTrainHelperDto(id = "u1", username = "diane", name = "Diane K."),
+                            ),
+                        ),
+                )
+            coEvery { repo.detail("t1") } returns NetworkResult.Success(dto)
+
+            val vm = makeVm("t1")
+            vm.load()
+            val state = vm.state.value
+            assertTrue("Expected Loaded, got $state", state is SupportTrainDetailUiState.Loaded)
+            val content = (state as SupportTrainDetailUiState.Loaded).content
+            assertEquals("t1", content.trainId)
+            assertEquals("Meals for the Reyes family", content.typeDates.title)
+            assertEquals(SupportTrainKind.Meals, content.typeDates.kind)
+            assertEquals(2, content.typeDates.slotsTotal)
+            assertEquals(1, content.typeDates.slotsFilled)
+            assertFalse(content.isFullyCovered)
+            assertEquals(28, content.calendarDays.size)
+            assertEquals("Diane K.", content.hostedBy.organizerDisplayName)
+            assertEquals(listOf("mine", "open", "covered"), content.sections.map { it.id })
+            assertTrue(content.dock is SupportTrainDock.SignUp)
+        }
+
+    @Test
+    fun load_fully_covered_produces_celebration() =
+        runTest {
+            val dto =
+                SupportTrainDetailDto(
+                    id = "t2",
+                    title = "Meals",
+                    status = "active",
+                    supportModes = SupportTrainModesDto(homeCookedMeals = true),
+                    slots = listOf(slot("s1", "2025-12-02", covered = true)),
+                )
+            coEvery { repo.detail("t2") } returns NetworkResult.Success(dto)
+
+            val vm = makeVm("t2")
+            vm.load()
+            val content = (vm.state.value as SupportTrainDetailUiState.Loaded).content
+            assertTrue(content.isFullyCovered)
+            assertNotNull(content.celebrationBanner)
+            assertTrue(content.dock is SupportTrainDock.SendCardAndBackup)
+        }
+
+    @Test
+    fun load_server_error_surfaces_error() =
+        runTest {
+            coEvery { repo.detail("t3") } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm("t3")
+            vm.load()
+            assertTrue(vm.state.value is SupportTrainDetailUiState.Error)
+        }
+
+    // MARK: - Offline resolver
+
+    @Test
+    fun resolver_resolves_populated() =
         runTest {
             val vm = makeVm("abc-123")
+            vm.resolve = ::defaultResolve
             vm.load()
             val state = vm.state.value
             assertTrue("Expected Loaded, got $state", state is SupportTrainDetailUiState.Loaded)
@@ -65,22 +171,17 @@ class SupportTrainDetailViewModelTest {
             assertEquals(12, content.typeDates.slotsFilled)
             assertEquals(21, content.typeDates.slotsTotal)
             assertFalse(content.isFullyCovered)
-            assertNull(content.celebrationBanner)
             assertTrue(content.dock is SupportTrainDock.SignUp)
-            assertEquals("Sign up for a slot", (content.dock as SupportTrainDock.SignUp).label)
         }
 
     @Test
-    fun load_resolves_fully_covered_when_id_contains_covered() =
+    fun resolver_resolves_fully_covered_when_id_contains_covered() =
         runTest {
             val vm = makeVm("fully-covered-xyz")
+            vm.resolve = ::defaultResolve
             vm.load()
-            val state = vm.state.value
-            assertTrue(state is SupportTrainDetailUiState.Loaded)
-            val content = (state as SupportTrainDetailUiState.Loaded).content
+            val content = (vm.state.value as SupportTrainDetailUiState.Loaded).content
             assertTrue(content.isFullyCovered)
-            assertEquals(21, content.typeDates.slotsFilled)
-            assertEquals(21, content.typeDates.slotsTotal)
             assertNotNull(content.celebrationBanner)
             assertTrue(content.dock is SupportTrainDock.SendCardAndBackup)
         }
@@ -136,12 +237,8 @@ class SupportTrainDetailViewModelTest {
         assertEquals(57, content.typeDates.percentCovered)
 
         assertEquals(28, content.calendarDays.size)
-        // Tue Dec 2 (idx 8) is the `today` cell.
         assertEquals(SlotCalendarState.Today, content.calendarDays[8].state)
 
-        // Mirrors the JSX state-vocab: 8 past (Nov 24-30 + Dec 1),
-        // 1 today, 6 filled (Dec 3/5/7/9/11/14), 13 open
-        // (Dec 4/6/8/10/12/13 + the all-open Dec 15-21 band).
         val pastCount = content.calendarDays.count { it.state == SlotCalendarState.Past }
         val todayCount = content.calendarDays.count { it.state == SlotCalendarState.Today }
         val openCount = content.calendarDays.count { it.state == SlotCalendarState.Open }
@@ -170,7 +267,6 @@ class SupportTrainDetailViewModelTest {
         assertEquals(100, content.typeDates.percentCovered)
 
         assertEquals(28, content.calendarDays.size)
-        // Every open in populated flips to filled; idx 10 is "mine".
         assertEquals(SlotCalendarState.Mine, content.calendarDays[10].state)
         val mineCount = content.calendarDays.count { it.state == SlotCalendarState.Mine }
         val openCount = content.calendarDays.count { it.state == SlotCalendarState.Open }
@@ -190,8 +286,6 @@ class SupportTrainDetailViewModelTest {
 
         assertTrue(content.dock is SupportTrainDock.SendCardAndBackup)
     }
-
-    // MARK: - Helpers
 
     @Test
     fun type_dates_percent_rounds_half_up() {

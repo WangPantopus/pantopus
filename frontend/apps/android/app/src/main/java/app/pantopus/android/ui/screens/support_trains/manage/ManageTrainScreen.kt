@@ -82,6 +82,8 @@ fun ManageTrainScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    LaunchedEffect(Unit) { viewModel.load() }
+
     LaunchedEffect(state.toast) {
         if (state.toast != null) {
             delay(2_500)

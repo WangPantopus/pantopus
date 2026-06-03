@@ -20,6 +20,19 @@ import XCTest
 
 @MainActor
 final class SupportTrainDetailViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
     // MARK: - State machine
 
     func testInitialStateIsLoading() {
@@ -29,8 +42,8 @@ final class SupportTrainDetailViewModelTests: XCTestCase {
         }
     }
 
-    func testLoadResolvesPopulatedFixtureByDefault() async {
-        let vm = SupportTrainDetailViewModel(trainId: "abc-123")
+    func testResolverResolvesPopulatedFixture() async {
+        let vm = SupportTrainDetailViewModel(trainId: "abc-123", resolver: SupportTrainDetailViewModel.defaultResolver)
         await vm.load()
         guard case let .loaded(content) = vm.state else {
             return XCTFail("Expected loaded, got \(vm.state)")
@@ -46,8 +59,11 @@ final class SupportTrainDetailViewModelTests: XCTestCase {
         }
     }
 
-    func testLoadResolvesFullyCoveredWhenIdContainsCovered() async {
-        let vm = SupportTrainDetailViewModel(trainId: "fully-covered-xyz")
+    func testResolverResolvesFullyCoveredWhenIdContainsCovered() async {
+        let vm = SupportTrainDetailViewModel(
+            trainId: "fully-covered-xyz",
+            resolver: SupportTrainDetailViewModel.defaultResolver
+        )
         await vm.load()
         guard case let .loaded(content) = vm.state else {
             return XCTFail("Expected loaded, got \(vm.state)")
@@ -178,10 +194,91 @@ final class SupportTrainDetailViewModelTests: XCTestCase {
     }
 
     func testCurrentContentAndIsFullyCoveredAccessors() async {
-        let vm = SupportTrainDetailViewModel(trainId: "covered-1")
+        let vm = SupportTrainDetailViewModel(trainId: "covered-1", resolver: SupportTrainDetailViewModel.defaultResolver)
         await vm.load()
         XCTAssertNotNil(vm.currentContent)
         XCTAssertTrue(vm.isFullyCovered)
+    }
+
+    // MARK: - Live detail fetch + projection
+
+    private static let detailJSON = """
+    {
+      "id":"t1","title":"Meals for the Reyes family","story":"Baby arrived Nov 18 — thank you.",
+      "status":"active",
+      "support_modes":{"home_cooked_meals":true,"takeout":true,"groceries":false,"gift_funds":false},
+      "recipient_summary":"Household of 4","household_size":4,
+      "slots":[
+        {"id":"s1","slot_date":"2025-12-02","slot_label":"Dinner","support_mode":"meal","status":"open","filled_count":0,"capacity":1},
+        {"id":"s2","slot_date":"2025-12-03","slot_label":"Dinner","support_mode":"meal","status":"full","filled_count":1,"capacity":1}
+      ],
+      "my_reservations":[
+        {"id":"r1","slot_id":"s2","status":"reserved","contribution_mode":"cook","dish_title":"Lentil soup",
+         "created_at":"2025-11-20T00:00:00Z"}
+      ],
+      "updates":[],
+      "organizers":[{"id":"o1","role":"primary","User":{"id":"u1","username":"diane","name":"Diane K."}}],
+      "viewer_level":"viewer","exact_address_shared":false,
+      "coarse_location":{"city":"Portland","state":"OR"}
+    }
+    """
+
+    func testLoadFetchesDetailAndProjects() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.detailJSON)]
+        let vm = SupportTrainDetailViewModel(trainId: "t1", api: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            return XCTFail("Expected loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(content.trainId, "t1")
+        XCTAssertEqual(content.typeDates.title, "Meals for the Reyes family")
+        XCTAssertEqual(content.typeDates.kind, .meals)
+        XCTAssertEqual(content.typeDates.slotsTotal, 2)
+        XCTAssertEqual(content.typeDates.slotsFilled, 1, "s2 (full) counts as covered")
+        XCTAssertFalse(content.isFullyCovered)
+        XCTAssertEqual(content.calendarDays.count, 28)
+        XCTAssertEqual(content.recipient.householdName, "Meals for the Reyes family")
+        XCTAssertTrue(content.recipient.quote.contains("Baby"))
+        XCTAssertEqual(content.hostedBy.organizerDisplayName, "Diane K.")
+        // Sections: my commitment + open + covered.
+        XCTAssertEqual(content.sections.map(\.id), ["mine", "open", "covered"])
+        if case .signUp = content.dock {} else {
+            XCTFail("Partially-covered train shows the sign-up dock")
+        }
+    }
+
+    func testLoadFullyCoveredProducesCelebrationDock() async {
+        let json = """
+        {
+          "id":"t2","title":"Meals","status":"active",
+          "support_modes":{"home_cooked_meals":true},
+          "slots":[
+            {"id":"s1","slot_date":"2025-12-02","slot_label":"Dinner","status":"full","filled_count":1,"capacity":1}
+          ],
+          "my_reservations":[],"updates":[],
+          "organizers":[{"id":"o1","role":"primary","User":{"id":"u1","name":"Diane K."}}]
+        }
+        """
+        SequencedURLProtocol.sequence = [.status(200, body: json)]
+        let vm = SupportTrainDetailViewModel(trainId: "t2", api: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            return XCTFail("Expected loaded, got \(vm.state)")
+        }
+        XCTAssertTrue(content.isFullyCovered)
+        XCTAssertNotNil(content.celebrationBanner)
+        if case .sendCardAndBackup = content.dock {} else {
+            XCTFail("Fully-covered train shows the send-card-and-backup dock")
+        }
+    }
+
+    func testLoadServerErrorSurfacesError() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
+        let vm = SupportTrainDetailViewModel(trainId: "t3", api: makeAPI())
+        await vm.load()
+        guard case .error = vm.state else {
+            return XCTFail("Expected error, got \(vm.state)")
+        }
     }
 
     func testCurrentContentNilOnNonLoadedState() {

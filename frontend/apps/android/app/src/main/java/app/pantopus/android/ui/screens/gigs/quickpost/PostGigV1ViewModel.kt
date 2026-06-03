@@ -3,13 +3,19 @@
 package app.pantopus.android.ui.screens.gigs.quickpost
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.gigs.CreateGigBody
+import app.pantopus.android.data.api.models.gigs.CreateGigLocation
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
-import java.util.UUID
+import java.time.ZoneId
 import javax.inject.Inject
 
 enum class PostGigV1PriceType(
@@ -85,19 +91,26 @@ sealed interface PostGigV1Event {
 @HiltViewModel
 class PostGigV1ViewModel
     @Inject
-    constructor() : ViewModel() {
+    constructor(
+        private val repo: GigsRepository,
+    ) : ViewModel() {
         private val _state = MutableStateFlow<PostGigV1UiState>(PostGigV1UiState.Content())
         val state: StateFlow<PostGigV1UiState> = _state.asStateFlow()
 
         private val _pendingEvent = MutableStateFlow<PostGigV1Event?>(null)
         val pendingEvent: StateFlow<PostGigV1Event?> = _pendingEvent.asStateFlow()
 
+        // Stashed so a post failure can flip to FatalError yet restore the
+        // filled form on retry (mirrors iOS, where the form survives .error).
+        private var lastForm: PostGigV1Form? = null
+
         fun acknowledgeEvent() {
             _pendingEvent.value = null
         }
 
         fun retry() {
-            _state.value = PostGigV1UiState.Content()
+            _state.value = PostGigV1UiState.Content(form = lastForm ?: PostGigV1Form())
+            lastForm = null
         }
 
         fun startFromEmpty() {
@@ -178,16 +191,80 @@ class PostGigV1ViewModel
             updateScheduledAt(PostGigV1SampleData.filledForm.scheduledAt)
         }
 
+        /**
+         * Validate, then create the gig via `POST /api/gigs`
+         * (`GigsRepository.create`) — the same create path the V2 composer
+         * and gigs feed use. On success the backend-issued id drives the
+         * Posted event; on failure we flip to FatalError (the form is stashed
+         * so retry restores it).
+         */
         fun submit(now: LocalDateTime = LocalDateTime.now()) {
             val current = _state.value as? PostGigV1UiState.Content ?: return
+            if (current.isSubmitting) return
             val errors = validate(current.form, now)
             if (errors.isNotEmpty()) {
                 _state.value = current.copy(validationErrors = errors)
                 return
             }
-            val gigId = "gig-v1-${UUID.randomUUID().toString().take(8)}"
-            _state.value = current.copy(validationErrors = emptyList(), postedGigId = gigId)
-            _pendingEvent.value = PostGigV1Event.Posted(gigId)
+            _state.value = current.copy(validationErrors = emptyList(), isSubmitting = true)
+            viewModelScope.launch {
+                when (val result = repo.create(buildCreateBody(current.form))) {
+                    is NetworkResult.Success -> {
+                        val gigId = result.data.gig.id
+                        _state.value = current.copy(isSubmitting = false, postedGigId = gigId)
+                        _pendingEvent.value = PostGigV1Event.Posted(gigId)
+                    }
+                    is NetworkResult.Failure -> {
+                        lastForm = current.form
+                        _state.value = PostGigV1UiState.FatalError(result.error.message)
+                    }
+                }
+            }
+        }
+
+        /**
+         * Map the V1 form onto the `POST /api/gigs` body. The legacy composer
+         * collects a free-text location only, so it rides as the `custom`
+         * location `address` with a `(0, 0)` placeholder coordinate. Pay-type
+         * maps Flat→`fixed`, Hourly→`hourly`, Free→`offers`; the backend
+         * rejects a non-positive price so Free uses a `1` sentinel.
+         */
+        private fun buildCreateBody(form: PostGigV1Form): CreateGigBody {
+            val trimmedPrice = form.price.trim().toDoubleOrNull() ?: 0.0
+            val payType: String
+            val price: Double
+            when (form.priceType) {
+                PostGigV1PriceType.Flat -> {
+                    payType = "fixed"
+                    price = if (trimmedPrice > 0.0) trimmedPrice else 1.0
+                }
+                PostGigV1PriceType.Hourly -> {
+                    payType = "hourly"
+                    price = if (trimmedPrice > 0.0) trimmedPrice else 1.0
+                }
+                PostGigV1PriceType.Free -> {
+                    payType = "offers"
+                    price = 1.0
+                }
+            }
+            return CreateGigBody(
+                title = form.title.trim(),
+                description = form.description.trim(),
+                category = if (form.category == GigsCategory.All) null else form.category.key,
+                price = price,
+                payType = payType,
+                scheduleType = "scheduled",
+                scheduledStart = form.scheduledAt.atZone(ZoneId.systemDefault()).toInstant().toString(),
+                taskFormat = null,
+                attachments = null,
+                location =
+                    CreateGigLocation(
+                        mode = "custom",
+                        latitude = 0.0,
+                        longitude = 0.0,
+                        address = form.location.trim(),
+                    ),
+            )
         }
 
         private fun updateForm(transform: (PostGigV1Form) -> PostGigV1Form) {
