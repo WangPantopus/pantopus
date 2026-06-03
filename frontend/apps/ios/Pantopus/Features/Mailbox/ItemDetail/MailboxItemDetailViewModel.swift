@@ -27,6 +27,10 @@ public struct MailboxItemDetailContent: Sendable {
     /// Category-specific sub-payload resolved from `mail.object_payload`.
     /// `.other` for categories without a dedicated body decoder.
     public let payload: MailboxCategoryPayload
+    /// Readable body projection (body text / attachments / tags) for
+    /// categories rendered through `GenericMailBody`. `nil` for categories
+    /// with a bespoke body.
+    public let genericBody: GenericMailBodyContent?
 
     public init(
         category: MailItemCategory,
@@ -39,7 +43,8 @@ public struct MailboxItemDetailContent: Sendable {
         ctaEnabled: Bool,
         isUnread: Bool = false,
         isArchived: Bool = false,
-        payload: MailboxCategoryPayload = .other
+        payload: MailboxCategoryPayload = .other,
+        genericBody: GenericMailBodyContent? = nil
     ) {
         self.category = category
         self.trust = trust
@@ -52,6 +57,7 @@ public struct MailboxItemDetailContent: Sendable {
         self.isUnread = isUnread
         self.isArchived = isArchived
         self.payload = payload
+        self.genericBody = genericBody
     }
 }
 
@@ -888,9 +894,47 @@ final class MailboxItemDetailViewModel {
                 packageInfo: nil,
                 ctaEnabled: true,
                 isUnread: !item.base.viewed,
-                isArchived: item.base.archived
+                isArchived: item.base.archived,
+                genericBody: Self.genericBody(for: item, category: category)
             )
         )
+    }
+
+    /// Projects the readable `GenericMailBody` surface from the base mail
+    /// row — body paragraphs, attachments, and tags — for any category
+    /// without a bespoke body.
+    private static func genericBody(
+        for item: MailboxV2ItemResponse.Item,
+        category: MailItemCategory
+    ) -> GenericMailBodyContent {
+        GenericMailBodyContent(
+            category: category,
+            paragraphs: bodyParagraphs(from: item.base),
+            attachments: item.base.attachments ?? [],
+            tags: item.base.tags,
+            actionLabel: actionLabel(for: item.base)
+        )
+    }
+
+    /// Splits the mail's `content` (falling back to `preview_text`) into
+    /// trimmed, non-empty paragraphs. Empty when no body text shipped.
+    private static func bodyParagraphs(from mail: MailItem) -> [String] {
+        let content = mail.content?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = (content?.isEmpty == false ? content : nil)
+            ?? mail.previewText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let source, !source.isEmpty else { return [] }
+        return source
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Warning pill copy for the generic body header when the mail asks for
+    /// acknowledgement or another action.
+    private static func actionLabel(for mail: MailItem) -> String? {
+        if mail.ackRequired == true { return "Acknowledge" }
+        if mail.actionRequired == true { return "Action needed" }
+        return nil
     }
 
     private func applyPackage(

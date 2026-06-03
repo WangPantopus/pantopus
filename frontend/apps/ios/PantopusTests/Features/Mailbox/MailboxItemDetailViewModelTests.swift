@@ -60,7 +60,7 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
         XCTAssertFalse(content.ctaEnabled)
     }
 
-    func testNonPackageFallsBackToBase() async {
+    func testNonPackageFallsBackToBase() async throws {
         let json = """
         {"mail":{
           "id":"m2","type":"bill","mail_type":"bill","created_at":"2026-04-10T00:00:00Z",
@@ -77,6 +77,43 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
         }
         XCTAssertEqual(content.category, .bill)
         XCTAssertNil(content.packageInfo)
+        // Every non-bespoke category projects a generic body so the screen
+        // renders real content instead of a NotYetAvailable placeholder.
+        let body = try XCTUnwrap(content.genericBody)
+        XCTAssertEqual(body.category, .bill)
+        // No `content` / `preview_text` shipped → the view renders the
+        // category explainer rather than going blank.
+        XCTAssertTrue(body.paragraphs.isEmpty)
+        XCTAssertNil(body.actionLabel)
+    }
+
+    func testGenericCategoryProjectsReadableBody() async throws {
+        let json = """
+        {"mail":{
+          "id":"m3","type":"notice","mail_type":"notice","created_at":"2026-04-12T00:00:00Z",
+          "sender_display":"City of Cambridge","sender_trust":"verified_gov",
+          "subject":"Street sweeping notice",
+          "content":"Street sweeping resumes April 15.\\n\\nMove your car by 8 AM to avoid a ticket.",
+          "tags":["parking","reminder"],"attachments":["notice.pdf"],"ack_required":true
+        }}
+        """
+        SequencedURLProtocol.sequence = [.status(200, body: json)]
+        let vm = MailboxItemDetailViewModel(mailId: "m3", api: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(content.category, .notice)
+        let body = try XCTUnwrap(content.genericBody)
+        XCTAssertEqual(body.category, .notice)
+        XCTAssertEqual(
+            body.paragraphs,
+            ["Street sweeping resumes April 15.", "Move your car by 8 AM to avoid a ticket."]
+        )
+        XCTAssertEqual(body.tags, ["parking", "reminder"])
+        XCTAssertEqual(body.attachments, ["notice.pdf"])
+        XCTAssertEqual(body.actionLabel, "Acknowledge")
     }
 
     func testLogAsReceivedSuccess() async {

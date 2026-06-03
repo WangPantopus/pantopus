@@ -2,8 +2,10 @@
 //  CategoryBodies.swift
 //  Pantopus
 //
-//  Category-specific body slots. `PackageBody` is concrete; the other
-//  13 render `NotYetAvailableView`.
+//  Category-specific body slots. `PackageBody` is the concrete A17.8 body;
+//  `GenericMailBody` renders the readable message (document card +
+//  attachments + tags) for every category without a bespoke body, so no
+//  category falls back to a placeholder.
 //
 
 // swiftlint:disable file_length
@@ -684,23 +686,223 @@ private struct PackageCard<Content: View>: View {
     }
 }
 
-/// Factory for the 13 placeholder bodies so the concrete screen can dispatch
-/// by category without 13 tiny struct definitions at every call site.
-public struct MailItemPlaceholderBody: View {
-    public let category: MailItemCategory
+// MARK: - Generic body
 
-    public init(category: MailItemCategory) {
+/// Projection for the generic mailbox body — the readable surface for any
+/// category without a bespoke ceremonial body (Bill, Notice, Statement,
+/// Insurance, Tax, Legal, Healthcare, Membership, Delivery, Social, …). It
+/// carries the mail's body text, attachments, and tags so the surface shows
+/// the real message rather than a placeholder.
+public struct GenericMailBodyContent: Sendable, Hashable {
+    public let category: MailItemCategory
+    /// Body paragraphs (the mail's `content` / `preview_text`, split on
+    /// blank lines). Empty when the wire payload carried no body — the view
+    /// then renders the category explainer so the surface is never blank.
+    public let paragraphs: [String]
+    /// Attachment file names surfaced as a list of file rows.
+    public let attachments: [String]
+    /// Free-form tags from the mail row.
+    public let tags: [String]
+    /// When set, a warning pill in the card header ("Action needed" /
+    /// "Acknowledge"); derived from `action_required` / `ack_required`.
+    public let actionLabel: String?
+
+    public init(
+        category: MailItemCategory,
+        paragraphs: [String] = [],
+        attachments: [String] = [],
+        tags: [String] = [],
+        actionLabel: String? = nil
+    ) {
         self.category = category
+        self.paragraphs = paragraphs
+        self.attachments = attachments
+        self.tags = tags
+        self.actionLabel = actionLabel
+    }
+}
+
+/// Generic mailbox body. Renders the mail's readable content in a themed
+/// document card plus optional attachments + tags. Replaces the former
+/// `MailItemPlaceholderBody` NotYetAvailable placeholder so every category
+/// without a bespoke body still shows real content. Mirrors the A17.1
+/// notice-text card used by `GenericMailDetailLayout`.
+@MainActor
+public struct GenericMailBody: View {
+    private let content: GenericMailBodyContent
+
+    public init(content: GenericMailBodyContent) {
+        self.content = content
+    }
+
+    /// Convenience for the defensive path — renders the category explainer
+    /// when the screen has no projected body content.
+    public init(category: MailItemCategory) {
+        self.init(content: GenericMailBodyContent(category: category))
     }
 
     public var body: some View {
-        NotYetAvailableView(
-            tabName: category.rawValue.capitalized,
-            icon: .info,
-            accent: Theme.Color.appSurfaceSunken,
-            foreground: category.accent
-        )
-        .frame(minHeight: 280)
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            documentCard
+            if !content.attachments.isEmpty {
+                attachmentsCard
+            }
+            if !content.tags.isEmpty {
+                tagRow
+            }
+        }
         .padding(.horizontal, Spacing.s4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("genericMailBody")
+    }
+
+    /// Real body text when present, otherwise the category explainer so the
+    /// card is never empty.
+    private var paragraphs: [String] {
+        content.paragraphs.isEmpty ? [Self.explainer(for: content.category)] : content.paragraphs
+    }
+
+    private var documentCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(spacing: Spacing.s2) {
+                Icon(content.category.icon, size: 15, color: content.category.accent)
+                    .frame(width: 30, height: 30)
+                    .background(content.category.rowBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                Text(content.category.label.uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: Spacing.s2)
+                if let actionLabel = content.actionLabel {
+                    actionPill(actionLabel)
+                }
+            }
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                    Text(paragraph)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel(paragraph)
+                }
+            }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .accessibilityIdentifier("genericMailBody_document")
+    }
+
+    private func actionPill(_ label: String) -> some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.alertTriangle, size: 11, color: Theme.Color.warning)
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.warning)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, Spacing.s1)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+        .accessibilityLabel(label)
+    }
+
+    private var attachmentsCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            Text("ATTACHMENTS")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .accessibilityAddTraits(.isHeader)
+            Divider().background(Theme.Color.appBorderSubtle)
+            ForEach(Array(content.attachments.enumerated()), id: \.offset) { index, name in
+                HStack(spacing: Spacing.s3) {
+                    Icon(Self.attachmentIcon(for: name), size: 14, color: Theme.Color.primary600)
+                        .frame(width: 28, height: 28)
+                        .background(Theme.Color.primary50)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                    Text(name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .lineLimit(1)
+                    Spacer(minLength: Spacing.s2)
+                    Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+                }
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Attachment: \(name)")
+                if index < content.attachments.count - 1 {
+                    Divider().background(Theme.Color.appBorderSubtle).padding(.leading, Spacing.s10)
+                }
+            }
+        }
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .accessibilityIdentifier("genericMailBody_attachments")
+    }
+
+    private var tagRow: some View {
+        ContentDetailFlowLayout(spacing: 6) {
+            ForEach(content.tags, id: \.self) { tag in
+                HStack(spacing: Spacing.s1) {
+                    Icon(.tag, size: 11, color: Theme.Color.primary700)
+                    Text(tag)
+                        .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
+                        .foregroundStyle(Theme.Color.primary700)
+                }
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s1)
+                .background(Theme.Color.primary100)
+                .clipShape(Capsule())
+            }
+        }
+        .accessibilityIdentifier("genericMailBody_tags")
+    }
+
+    /// Category-keyed one-liner shown when the mail row carried no body text,
+    /// so the surface always frames what the item is rather than going blank.
+    private static let categoryExplainers: [MailItemCategory: String] = [
+        .bill: "This looks like a bill. Review the amount due and the due date, then pay or schedule it.",
+        .statement: "An account statement. Review the balance and recent activity — usually no action is needed.",
+        .notice: "An official notice. Read the details closely; some notices ask you to respond by a deadline.",
+        .insurance: "Insurance mail. Check your coverage, claim status, or renewal date.",
+        .tax: "Tax mail. Keep this for your records and note any filing or payment deadlines.",
+        .subscription: "A subscription update. Review your plan, renewal date, or billing change.",
+        .legal: "A legal document. Read it carefully — it may need acknowledgement or a timely response.",
+        .healthcare: "Healthcare mail. Review the appointment, billing, or coverage details inside.",
+        .membership: "A membership update. Check your status, benefits, or renewal date.",
+        .delivery: "A delivery update. Track the latest status and expected arrival.",
+        .social: "A neighborhood message. Catch up on what's happening nearby.",
+        .party: "A personal invite. Open it for the details and let the host know if you're coming.",
+        .records: "An archived record. Filed for safekeeping — open it any time from your Vault.",
+        .general: "Mail from your neighborhood. Open it to read the full message."
+    ]
+
+    private static func explainer(for category: MailItemCategory) -> String {
+        categoryExplainers[category] ?? "Open this item to read the full message."
+    }
+
+    private static func attachmentIcon(for name: String) -> PantopusIcon {
+        let lower = name.lowercased()
+        if lower.hasSuffix(".pdf") { return .fileText }
+        let imageExtensions = [".jpg", ".jpeg", ".png", ".heic", ".webp"]
+        if imageExtensions.contains(where: lower.hasSuffix) { return .image }
+        return .paperclip
     }
 }

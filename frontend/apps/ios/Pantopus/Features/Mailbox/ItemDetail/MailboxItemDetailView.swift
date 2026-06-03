@@ -7,8 +7,9 @@
 import Foundation
 import SwiftUI
 
-/// Mailbox Item Detail screen. Category-aware; Package renders the
-/// concrete body, other categories fall back to `NotYetAvailable`.
+/// Mailbox Item Detail screen. Category-aware; each category renders its
+/// bespoke body, and any category without one renders `GenericMailBody`
+/// (the readable message surface) rather than a placeholder.
 /// Identifiable wrapper around `URL` so we can drive a `.sheet(item:)`.
 private struct TermsSheetItem: Identifiable {
     let id = UUID()
@@ -157,6 +158,8 @@ struct MailboxItemDetailView: View {
                 ) {
                     Task { await viewModel.performPrimaryAction() }
                 }
+            } else {
+                genericBody(for: content)
             }
         case let (.coupon, .coupon(coupon)):
             CouponBody(coupon: coupon)
@@ -183,8 +186,18 @@ struct MailboxItemDetailView: View {
         case let (.memory, .memory(memory)):
             MemoryBody(memory: memory, isSaved: memory.isSaved)
         default:
-            MailItemPlaceholderBody(category: content.category)
+            genericBody(for: content)
         }
+    }
+
+    /// Generic readable body for any category without a bespoke layout. Uses
+    /// the projected `genericBody` content (body text / attachments / tags),
+    /// falling back to the category explainer if the projection is absent so
+    /// no known category ever renders an empty or placeholder surface.
+    private func genericBody(for content: MailboxItemDetailContent) -> some View {
+        GenericMailBody(
+            content: content.genericBody ?? GenericMailBodyContent(category: content.category)
+        )
     }
 
     private func ctaContent(for content: MailboxItemDetailContent) -> MailboxCTAShelfContent? {

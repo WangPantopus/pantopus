@@ -5,7 +5,8 @@
 //  Body slots for the Content Detail shell. `GridTabsBody` is the concrete
 //  one used by HomeDashboard. The article / key-value / media bodies now
 //  ship as concrete views under `Bodies/` (see the MARK at the foot of this
-//  file); only `GridTabsBody`'s secondary-tab fallback stays a placeholder.
+//  file); `GridTabsBody`'s data-driven secondary tabs render a graceful
+//  empty state (`GridTabsEmptyTab`).
 //
 
 import SwiftUI
@@ -206,12 +207,29 @@ public struct GridTabsBody<Overview: View>: View {
                 if selectedTab == tabs.first?.id {
                     overview
                 } else if let selected = tabs.first(where: { $0.id == selectedTab }) {
-                    NotYetAvailableView(tabName: selected.label, icon: .info)
+                    GridTabsEmptyTab(label: selected.label)
                         .frame(minHeight: 320)
                 }
             }
             .padding(.horizontal, Spacing.s4)
         }
+    }
+}
+
+/// Graceful empty state for a secondary `GridTabsBody` tab. The overview tab
+/// carries the designed content; the remaining tabs are data-driven, so this
+/// renders a neutral "nothing here" surface keyed to the tab's label rather
+/// than the un-designed NotYetAvailable placeholder.
+private struct GridTabsEmptyTab: View {
+    let label: String
+
+    var body: some View {
+        EmptyState(
+            icon: .inbox,
+            headline: "Nothing in \(label) yet",
+            subcopy: "When there's something to show in \(label.lowercased()), it'll appear here."
+        )
+        .accessibilityIdentifier("gridTabs_emptyTab")
     }
 }
 
@@ -222,5 +240,5 @@ public struct GridTabsBody<Overview: View>: View {
 // views — `ArticleBody`, `KeyValueBody`, and `MediaBody` — under
 // `ContentDetail/Bodies/`, replacing the `LongFormBodyStub` /
 // `KeyValueBodyStub` / `SegmentedMediaBodyStub` NotYetAvailable placeholders.
-// `GridTabsBody` above keeps its NotYetAvailable fallback only for a
-// genuinely undesigned secondary tab.
+// `GridTabsBody` above renders `GridTabsEmptyTab` (a graceful empty state)
+// for its data-driven secondary tabs.
