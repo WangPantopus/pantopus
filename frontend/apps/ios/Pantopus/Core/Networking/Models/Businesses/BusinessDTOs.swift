@@ -315,7 +315,9 @@ public struct BusinessOnboardingItemDTO: Decodable, Sendable, Hashable, Identifi
     public let done: Bool
     public let label: String
 
-    public var id: String { key }
+    public var id: String {
+        key
+    }
 }
 
 /// The `onboarding` block: the checklist plus its completed / total tallies.

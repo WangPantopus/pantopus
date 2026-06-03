@@ -147,19 +147,17 @@ public final class BusinessOwnerViewModel {
             BusinessesEndpoints.insights(businessId: businessId),
             as: BusinessInsightsResponse.self
         )
-        let reviews = (
-            try? await client.request(
-                BusinessesEndpoints.reviews(businessId: businessId),
-                as: BusinessOwnerReviewsResponse.self
-            )
-        )?.reviews ?? []
+        let reviewsResponse = try? await client.request(
+            BusinessesEndpoints.reviews(businessId: businessId),
+            as: BusinessOwnerReviewsResponse.self
+        )
 
         state = .loaded(
             makeContent(
                 publicProfile: publicProfile,
                 dashboard: dashboard,
                 insights: insights,
-                reviews: reviews
+                reviews: reviewsResponse?.reviews ?? []
             )
         )
     }

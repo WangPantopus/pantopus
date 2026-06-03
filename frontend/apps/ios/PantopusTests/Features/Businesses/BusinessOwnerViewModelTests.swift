@@ -170,6 +170,6 @@ final class BusinessOwnerViewModelTests: XCTestCase {
 
     private func decode<T: Decodable>(_ type: T.Type, from json: String) -> T {
         // swiftlint:disable:next force_try
-        try! JSONDecoder().decode(T.self, from: Data(json.utf8))
+        try! JSONDecoder().decode(type, from: Data(json.utf8))
     }
 }
