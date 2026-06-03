@@ -877,24 +877,25 @@ public struct GenericMailBody: View {
 
     /// Category-keyed one-liner shown when the mail row carried no body text,
     /// so the surface always frames what the item is rather than going blank.
+    private static let categoryExplainers: [MailItemCategory: String] = [
+        .bill: "This looks like a bill. Review the amount due and the due date, then pay or schedule it.",
+        .statement: "An account statement. Review the balance and recent activity — usually no action is needed.",
+        .notice: "An official notice. Read the details closely; some notices ask you to respond by a deadline.",
+        .insurance: "Insurance mail. Check your coverage, claim status, or renewal date.",
+        .tax: "Tax mail. Keep this for your records and note any filing or payment deadlines.",
+        .subscription: "A subscription update. Review your plan, renewal date, or billing change.",
+        .legal: "A legal document. Read it carefully — it may need acknowledgement or a timely response.",
+        .healthcare: "Healthcare mail. Review the appointment, billing, or coverage details inside.",
+        .membership: "A membership update. Check your status, benefits, or renewal date.",
+        .delivery: "A delivery update. Track the latest status and expected arrival.",
+        .social: "A neighborhood message. Catch up on what's happening nearby.",
+        .party: "A personal invite. Open it for the details and let the host know if you're coming.",
+        .records: "An archived record. Filed for safekeeping — open it any time from your Vault.",
+        .general: "Mail from your neighborhood. Open it to read the full message."
+    ]
+
     private static func explainer(for category: MailItemCategory) -> String {
-        switch category {
-        case .bill: "This looks like a bill. Review the amount due and the due date, then pay or schedule it."
-        case .statement: "An account statement. Review the balance and recent activity — usually no action is needed."
-        case .notice: "An official notice. Read the details closely; some notices ask you to respond by a deadline."
-        case .insurance: "Insurance mail. Check your coverage, claim status, or renewal date."
-        case .tax: "Tax mail. Keep this for your records and note any filing or payment deadlines."
-        case .subscription: "A subscription update. Review your plan, renewal date, or billing change."
-        case .legal: "A legal document. Read it carefully — it may need acknowledgement or a timely response."
-        case .healthcare: "Healthcare mail. Review the appointment, billing, or coverage details inside."
-        case .membership: "A membership update. Check your status, benefits, or renewal date."
-        case .delivery: "A delivery update. Track the latest status and expected arrival."
-        case .social: "A neighborhood message. Catch up on what's happening nearby."
-        case .party: "A personal invite. Open it for the details and let the host know if you're coming."
-        case .records: "An archived record. Filed for safekeeping — open it any time from your Vault."
-        case .general: "Mail from your neighborhood. Open it to read the full message."
-        default: "Open this item to read the full message."
-        }
+        categoryExplainers[category] ?? "Open this item to read the full message."
     }
 
     private static func attachmentIcon(for name: String) -> PantopusIcon {
