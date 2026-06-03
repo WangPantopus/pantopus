@@ -167,7 +167,7 @@ public final class WalletViewModel {
     ) -> WalletActivityItem {
         let date = parseDate(tx.createdAt)
         let direction = direction(for: tx.type)
-        WalletActivityItem(
+        return WalletActivityItem(
             id: tx.id,
             day: dayLabel(date, calendar: calendar, now: now),
             dateLabel: timeLabel(date),

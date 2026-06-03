@@ -17,6 +17,8 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * crashes.
  */
 object ViewAsMapper {
+    private const val RESTRICTED_HIDDEN_FIELD_THRESHOLD = 3
+
     /** Map the audience onto the backend `surface` + `viewer` query. */
     fun backendParams(audience: ViewerAudience): Pair<String, String> =
         when (audience) {
@@ -42,7 +44,12 @@ object ViewAsMapper {
                 mutualsField(response.context, hidden),
                 contactField(visible?.viewer, hidden),
             )
-        val tone = if (fields.count { it.disclosure.isHidden } >= 3) ViewAsTone.Restricted else ViewAsTone.Info
+        val tone =
+            if (fields.count { it.disclosure.isHidden } >= RESTRICTED_HIDDEN_FIELD_THRESHOLD) {
+                ViewAsTone.Restricted
+            } else {
+                ViewAsTone.Info
+            }
         val label = response.viewerLabel ?: audience.label
         val name = visible?.displayName ?: "You"
         return ViewAsRender(

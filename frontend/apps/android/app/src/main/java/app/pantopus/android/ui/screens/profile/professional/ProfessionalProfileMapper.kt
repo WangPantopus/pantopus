@@ -51,8 +51,7 @@ object ProfessionalProfileMapper {
         }
 
     /** `pet_care` → `Pet Care`. */
-    fun categoryLabel(key: String): String =
-        key.split("_").joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+    fun categoryLabel(key: String): String = key.split("_").joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
 
     fun categoryIcon(key: String): PantopusIcon =
         when (key) {

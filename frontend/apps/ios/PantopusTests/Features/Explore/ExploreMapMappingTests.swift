@@ -45,14 +45,18 @@ final class ExploreMapMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/gigs/in-bounds": [.status(200, body: """
-            {"gigs":[{"id":"g1","title":"Mow lawn","price":40,"status":"open",\
-            "latitude":40.75,"longitude":-73.98,"bid_count":3}],"nearest_activity_center":null}
-            """)],
-            "/api/listings/in-bounds": [.status(200, body: """
-            {"listings":[{"id":"l1","title":"Road bike","price":120,\
-            "latitude":40.751,"longitude":-73.981}],"nearest_activity_center":null}
-            """)]
+            "/api/gigs/in-bounds": [
+                .status(200, body: """
+                {"gigs":[{"id":"g1","title":"Mow lawn","price":40,"status":"open",\
+                "latitude":40.75,"longitude":-73.98,"bid_count":3}],"nearest_activity_center":null}
+                """)
+            ],
+            "/api/listings/in-bounds": [
+                .status(200, body: """
+                {"listings":[{"id":"l1","title":"Road bike","price":120,\
+                "latitude":40.751,"longitude":-73.981}],"nearest_activity_center":null}
+                """)
+            ]
         ])
         let vm = ExploreMapViewModel(
             api: APIClient(session: session, retryPolicy: .none),
@@ -76,8 +80,12 @@ final class ExploreMapMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/gigs/in-bounds": [.status(500, body: "{\"error\":\"boom\"}")],
-            "/api/listings/in-bounds": [.status(500, body: "{\"error\":\"boom\"}")]
+            "/api/gigs/in-bounds": [
+                .status(500, body: "{\"error\":\"boom\"}")
+            ],
+            "/api/listings/in-bounds": [
+                .status(500, body: "{\"error\":\"boom\"}")
+            ]
         ])
         let vm = ExploreMapViewModel(
             api: APIClient(session: session, retryPolicy: .none),
@@ -93,11 +101,15 @@ final class ExploreMapMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/gigs/in-bounds": [.status(200, body: """
-            {"gigs":[{"id":"g1","title":"Mow lawn","price":40,"status":"open",\
-            "latitude":40.75,"longitude":-73.98}],"nearest_activity_center":null}
-            """)],
-            "/api/listings/in-bounds": [.status(500, body: "{\"error\":\"down\"}")]
+            "/api/gigs/in-bounds": [
+                .status(200, body: """
+                {"gigs":[{"id":"g1","title":"Mow lawn","price":40,"status":"open",\
+                "latitude":40.75,"longitude":-73.98}],"nearest_activity_center":null}
+                """)
+            ],
+            "/api/listings/in-bounds": [
+                .status(500, body: "{\"error\":\"down\"}")
+            ]
         ])
         let vm = ExploreMapViewModel(
             api: APIClient(session: session, retryPolicy: .none),

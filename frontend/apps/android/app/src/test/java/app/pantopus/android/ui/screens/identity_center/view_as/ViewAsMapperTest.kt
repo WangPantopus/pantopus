@@ -18,6 +18,7 @@ import org.junit.Test
  * `ViewAsMappingTests`).
  */
 class ViewAsMapperTest {
+    @Suppress("LongParameterList")
     private fun response(
         viewerLabel: String,
         displayName: String? = "Dana Okafor",

@@ -82,10 +82,15 @@ final class TodayDetailMappingTests: XCTestCase {
         let content = TodayDetailViewModel.makeContent(
             from: payload(
                 weather: weather(code: "freezing", label: "Hard freeze"),
-                alerts: [.init(
-                    id: "a1", severity: "severe", title: "Hard-freeze warning",
-                    startsAt: nil, endsAt: nil
-                )]
+                alerts: [
+                    .init(
+                        id: "a1",
+                        severity: "severe",
+                        title: "Hard-freeze warning",
+                        startsAt: nil,
+                        endsAt: nil
+                    )
+                ]
             )
         )
         XCTAssertTrue(content.isAlert)
@@ -124,8 +129,10 @@ final class TodayDetailMappingTests: XCTestCase {
         comps.day = 19
         comps.hour = 17
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        let instant = cal.date(from: comps)!
+        cal.timeZone = TimeZone(identifier: "UTC") ?? cal.timeZone
+        guard let instant = cal.date(from: comps) else {
+            return XCTFail("Expected valid date components")
+        }
         XCTAssertEqual(
             TodayDetailViewModel.dateLabel(instant, timezone: "America/New_York"),
             "Tue · May 19"
@@ -139,15 +146,17 @@ final class TodayDetailMappingTests: XCTestCase {
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
             // Success body is the payload at the TOP LEVEL — no `today` wrapper.
-            "/api/hub/today": [.status(200, body: """
-            {"location":{"label":"Elm Park","timezone":"America/New_York"},\
-            "summary":"Mild.","display_mode":"standard",\
-            "weather":{"current_temp_f":67,"condition_code":"clear",\
-            "condition_label":"Mostly sunny","high_f":74,"low_f":58,"precipitation_next_6h":false},\
-            "aqi":{"index":42,"category":"Good","is_noteworthy":false},"alerts":[],\
-            "signals":[{"kind":"rain","label":"Light shower","detail":"After 4pm","urgency":"low"}],\
-            "seasonal":null}
-            """)]
+            "/api/hub/today": [
+                .status(200, body: """
+                {"location":{"label":"Elm Park","timezone":"America/New_York"},\
+                "summary":"Mild.","display_mode":"standard",\
+                "weather":{"current_temp_f":67,"condition_code":"clear",\
+                "condition_label":"Mostly sunny","high_f":74,"low_f":58,"precipitation_next_6h":false},\
+                "aqi":{"index":42,"category":"Good","is_noteworthy":false},"alerts":[],\
+                "signals":[{"kind":"rain","label":"Light shower","detail":"After 4pm","urgency":"low"}],\
+                "seasonal":null}
+                """)
+            ]
         ])
         let vm = TodayDetailViewModel(api: APIClient(session: session, retryPolicy: .none))
         await vm.load()
@@ -162,7 +171,9 @@ final class TodayDetailMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/hub/today": [.status(200, body: "{\"today\":null,\"error\":\"CONTEXT_UNAVAILABLE\"}")]
+            "/api/hub/today": [
+                .status(200, body: "{\"today\":null,\"error\":\"CONTEXT_UNAVAILABLE\"}")
+            ]
         ])
         let vm = TodayDetailViewModel(api: APIClient(session: session, retryPolicy: .none))
         await vm.load()
@@ -176,9 +187,11 @@ final class TodayDetailMappingTests: XCTestCase {
         defer { SequencedURLProtocol.reset() }
         // No usable location → the orchestrator returns display_mode=hidden.
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/hub/today": [.status(200, body: """
-            {"summary":"Location not available.","display_mode":"hidden","weather":null,"signals":[]}
-            """)]
+            "/api/hub/today": [
+                .status(200, body: """
+                {"summary":"Location not available.","display_mode":"hidden","weather":null,"signals":[]}
+                """)
+            ]
         ])
         let vm = TodayDetailViewModel(api: APIClient(session: session, retryPolicy: .none))
         await vm.load()

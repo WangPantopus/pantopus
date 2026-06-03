@@ -15,8 +15,6 @@
 //  network.
 //
 
-// swiftlint:disable type_body_length
-
 import CoreLocation
 import Foundation
 import Observation

@@ -103,14 +103,16 @@ final class ViewAsMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/identity-center/view-as": [.status(200, body: """
-            {"viewer":"connection","viewerLabel":"a connection","visible":{"handle":"dana.o",\
-            "displayName":"Dana Okafor","badges":["verified_resident"],\
-            "locality":{"city":"Maple Heights","state":"NY","neighborhood":"Maple Heights"},\
-            "stats":{"reviews":38},"viewer":{"canMessage":true,"isFollowingLocal":true,\
-            "relationshipStatus":"accepted"}},"hidden":[],\
-            "context":{"isNeighbor":true,"isConnection":true}}
-            """)]
+            "/api/identity-center/view-as": [
+                .status(200, body: """
+                {"viewer":"connection","viewerLabel":"a connection","visible":{"handle":"dana.o",\
+                "displayName":"Dana Okafor","badges":["verified_resident"],\
+                "locality":{"city":"Maple Heights","state":"NY","neighborhood":"Maple Heights"},\
+                "stats":{"reviews":38},"viewer":{"canMessage":true,"isFollowingLocal":true,\
+                "relationshipStatus":"accepted"}},"hidden":[],\
+                "context":{"isNeighbor":true,"isConnection":true}}
+                """)
+            ]
         ])
         let vm = ViewAsViewModel(api: APIClient(session: session, retryPolicy: .none), selected: .connection)
         await vm.load()

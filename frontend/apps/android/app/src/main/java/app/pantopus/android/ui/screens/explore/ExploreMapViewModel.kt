@@ -106,12 +106,14 @@ class ExploreMapViewModel
             val minLon = center.longitude - 0.016
             val maxLon = center.longitude + 0.016
 
-            val gigsDeferred = viewModelScope.async {
-                gigsRepository.inBounds(minLat = minLat, minLon = minLon, maxLat = maxLat, maxLon = maxLon)
-            }
-            val listingsDeferred = viewModelScope.async {
-                listingsRepository.inBounds(south = minLat, west = minLon, north = maxLat, east = maxLon)
-            }
+            val gigsDeferred =
+                viewModelScope.async {
+                    gigsRepository.inBounds(minLat = minLat, minLon = minLon, maxLat = maxLat, maxLon = maxLon)
+                }
+            val listingsDeferred =
+                viewModelScope.async {
+                    listingsRepository.inBounds(south = minLat, west = minLon, north = maxLat, east = maxLon)
+                }
             val gigsResult = gigsDeferred.await()
             val listingsResult = listingsDeferred.await()
             val gigs = if (gigsResult is NetworkResult.Success) gigsResult.data.gigs else null

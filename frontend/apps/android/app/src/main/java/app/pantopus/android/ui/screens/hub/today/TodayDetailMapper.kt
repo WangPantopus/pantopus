@@ -21,6 +21,7 @@ import kotlin.math.roundToInt
  * Signals) map from the response; the decorative sun-arc + Share card have no
  * backend field, so they fall back to the [base] design placeholder.
  */
+@Suppress("TooManyFunctions")
 object TodayDetailMapper {
     fun fromPayload(
         payload: HubTodayPayload,
@@ -121,12 +122,12 @@ object TodayDetailMapper {
     ): PantopusIcon {
         val needle = "${kind ?: ""} ${label ?: ""}".lowercase()
         return when {
+            needle.contains("grid") || needle.contains("power") || needle.contains("energy") -> PantopusIcon.Zap
             needle.contains("rain") || needle.contains("precip") || needle.contains("storm") -> PantopusIcon.CloudRain
             needle.contains("pollen") || needle.contains("allerg") -> PantopusIcon.Flower
             needle.contains("freez") || needle.contains("snow") || needle.contains("cold") -> PantopusIcon.Snowflake
             needle.contains("air") || needle.contains("aqi") || needle.contains("smoke") -> PantopusIcon.Leaf
             needle.contains("transit") || needle.contains("commute") || needle.contains("traffic") -> PantopusIcon.Bus
-            needle.contains("grid") || needle.contains("power") || needle.contains("energy") -> PantopusIcon.Zap
             needle.contains("heat") || needle.contains("uv") || needle.contains("sun") -> PantopusIcon.SunDim
             needle.contains("water") || needle.contains("hydrat") -> PantopusIcon.Droplets
             else -> PantopusIcon.Info

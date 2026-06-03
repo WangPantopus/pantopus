@@ -59,12 +59,12 @@ final class WalletMappingTests: XCTestCase {
 
     private var utcCalendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
+        cal.timeZone = TimeZone(identifier: "UTC") ?? cal.timeZone
         return cal
     }
 
     private var fixedNow: Date {
-        WalletViewModel.parseDate("2026-06-03T18:00:00.000Z")!
+        WalletViewModel.parseDate("2026-06-03T18:00:00.000Z") ?? Date(timeIntervalSince1970: 1_780_509_600)
     }
 
     // MARK: - Formatting
@@ -195,19 +195,25 @@ final class WalletMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/wallet": [.status(200, body: """
-            {"wallet":{"id":"w1","balance":84750,"currency":"usd","frozen":false,\
-            "lifetime_withdrawals":0,"lifetime_received":84750}}
-            """)],
-            "/api/wallet/transactions": [.status(200, body: """
-            {"transactions":[{"id":"tx-1","type":"gig_income","amount":14000,\
-            "description":"Patio cleanup","currency":"usd","status":"completed",\
-            "created_at":"2026-06-03T14:14:00.000Z"}],"total":1,"limit":50,"offset":0}
-            """)],
-            "/api/wallet/pending-release": [.status(200, body: """
-            {"in_review_cents":12000,"releasing_soon_cents":6600,"total_pending_cents":18600,\
-            "in_review_count":2,"releasing_soon_count":1}
-            """)]
+            "/api/wallet": [
+                .status(200, body: """
+                {"wallet":{"id":"w1","balance":84750,"currency":"usd","frozen":false,\
+                "lifetime_withdrawals":0,"lifetime_received":84750}}
+                """)
+            ],
+            "/api/wallet/transactions": [
+                .status(200, body: """
+                {"transactions":[{"id":"tx-1","type":"gig_income","amount":14000,\
+                "description":"Patio cleanup","currency":"usd","status":"completed",\
+                "created_at":"2026-06-03T14:14:00.000Z"}],"total":1,"limit":50,"offset":0}
+                """)
+            ],
+            "/api/wallet/pending-release": [
+                .status(200, body: """
+                {"in_review_cents":12000,"releasing_soon_cents":6600,"total_pending_cents":18600,\
+                "in_review_count":2,"releasing_soon_count":1}
+                """)
+            ]
         ])
         let client = APIClient(session: session, retryPolicy: .none)
         let vm = WalletViewModel(api: client)
@@ -225,7 +231,9 @@ final class WalletMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/wallet": [.status(500, body: "{\"error\":\"boom\"}")]
+            "/api/wallet": [
+                .status(500, body: "{\"error\":\"boom\"}")
+            ]
         ])
         let client = APIClient(session: session, retryPolicy: .none)
         let vm = WalletViewModel(api: client)

@@ -196,12 +196,12 @@ final class TodayDetailViewModel {
 
     private static func signalIcon(kind: String?, label: String?) -> PantopusIcon {
         let needle = "\(kind ?? "") \(label ?? "")".lowercased()
+        if needle.contains("grid") || needle.contains("power") || needle.contains("energy") { return .zap }
         if needle.contains("rain") || needle.contains("precip") || needle.contains("storm") { return .cloudRain }
         if needle.contains("pollen") || needle.contains("allerg") { return .flower }
         if needle.contains("freez") || needle.contains("snow") || needle.contains("cold") { return .snowflake }
         if needle.contains("air") || needle.contains("aqi") || needle.contains("smoke") { return .leaf }
         if needle.contains("transit") || needle.contains("commute") || needle.contains("traffic") { return .bus }
-        if needle.contains("grid") || needle.contains("power") || needle.contains("energy") { return .zap }
         if needle.contains("heat") || needle.contains("uv") || needle.contains("sun") { return .sunDim }
         if needle.contains("water") || needle.contains("hydrat") { return .droplets }
         return .info

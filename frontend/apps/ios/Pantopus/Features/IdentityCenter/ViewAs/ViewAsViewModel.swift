@@ -193,7 +193,7 @@ public final class ViewAsViewModel {
 
     private static func mutualsField(_ context: ViewAsResponse.ViewAsContextDTO?, hidden: Set<String>) -> ViewAsField {
         let shared = (context?.isConnection == true || context?.isNeighbor == true)
-            && !hidden.contains(where: { $0.contains("mutual") || $0.contains("connection") })
+            && !hidden.contains { $0.contains("mutual") || $0.contains("connection") }
         return ViewAsField(
             id: "mutuals",
             icon: .users,
@@ -207,7 +207,7 @@ public final class ViewAsViewModel {
         hidden: Set<String>
     ) -> ViewAsField {
         let canContact = viewer?.canMessage == true
-            && !hidden.contains(where: { $0.contains("contact") || $0.contains("phone") })
+            && !hidden.contains { $0.contains("contact") || $0.contains("phone") }
         return ViewAsField(
             id: "contact",
             icon: .phone,

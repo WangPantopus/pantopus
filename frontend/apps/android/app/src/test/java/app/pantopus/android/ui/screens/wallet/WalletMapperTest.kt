@@ -71,11 +71,12 @@ class WalletMapperTest {
 
     @Test
     fun activity_item_mapping() {
-        val item = WalletMapper.activityItem(
-            tx("tx-1", "gig_income", 14_000, description = "Patio cleanup · 3 hr"),
-            utc,
-            now,
-        )
+        val item =
+            WalletMapper.activityItem(
+                tx("tx-1", "gig_income", 14_000, description = "Patio cleanup · 3 hr"),
+                utc,
+                now,
+            )
         assertEquals("140.00", item.amount)
         assertEquals(ActivityDirection.In, item.direction)
         assertEquals(ActivityCategory.Handyman, item.category)
@@ -93,16 +94,17 @@ class WalletMapperTest {
 
     @Test
     fun build_projection() {
-        val content = WalletMapper.build(
-            WalletBalanceResponse(WalletDto(id = "w1", balance = 84_750L)),
-            listOf(
-                tx("tx-1", "gig_income", 14_000, createdAt = "2026-06-03T14:14:00Z"),
-                tx("tx-2", "withdrawal", 50_000, createdAt = "2026-05-28T11:14:00Z"),
-            ),
-            WalletPendingReleaseResponse(totalPendingCents = 18_600L, inReviewCount = 2, releasingSoonCount = 1),
-            utc,
-            now,
-        )
+        val content =
+            WalletMapper.build(
+                WalletBalanceResponse(WalletDto(id = "w1", balance = 84_750L)),
+                listOf(
+                    tx("tx-1", "gig_income", 14_000, createdAt = "2026-06-03T14:14:00Z"),
+                    tx("tx-2", "withdrawal", 50_000, createdAt = "2026-05-28T11:14:00Z"),
+                ),
+                WalletPendingReleaseResponse(totalPendingCents = 18_600L, inReviewCount = 2, releasingSoonCount = 1),
+                utc,
+                now,
+            )
         assertEquals("847.50", content.available)
         assertEquals("\$186.00", content.pending)
         assertEquals(2, content.activity.size)

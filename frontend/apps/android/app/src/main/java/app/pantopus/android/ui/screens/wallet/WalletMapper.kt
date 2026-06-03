@@ -20,6 +20,7 @@ import java.util.Locale
  * Stripe — and `holdState` stays null because the hold banner copy is
  * Stripe-specific.
  */
+@Suppress("TooManyFunctions")
 object WalletMapper {
     fun build(
         balance: WalletBalanceResponse,

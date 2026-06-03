@@ -26,6 +26,5 @@ class WalletRepository
         ): NetworkResult<WalletTransactionsResponse> = safeApiCall { api.transactions(limit, offset) }
 
         /** `GET /api/wallet/pending-release`. */
-        suspend fun pendingRelease(): NetworkResult<WalletPendingReleaseResponse> =
-            safeApiCall { api.pendingRelease() }
+        suspend fun pendingRelease(): NetworkResult<WalletPendingReleaseResponse> = safeApiCall { api.pendingRelease() }
     }

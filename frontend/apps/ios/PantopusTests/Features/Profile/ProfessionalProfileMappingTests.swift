@@ -98,14 +98,18 @@ final class ProfessionalProfileMappingTests: XCTestCase {
         SequencedURLProtocol.reset()
         defer { SequencedURLProtocol.reset() }
         let session = SequencedURLProtocol.makeSession(routeResponses: [
-            "/api/professional/profile/me": [.status(200, body: """
-            {"profile":{"headline":"Licensed Handyman","bio":"Trades.",\
-            "categories":["handyman","carpentry"],"is_public":true,"is_active":false,\
-            "verification_status":"verified","service_area":{"city":"Elm Park","state":"NY"}}}
-            """)],
-            "/api/professional/verification/status": [.status(200, body: """
-            {"tier":2,"status":"verified","submitted_at":null,"completed_at":null}
-            """)]
+            "/api/professional/profile/me": [
+                .status(200, body: """
+                {"profile":{"headline":"Licensed Handyman","bio":"Trades.",\
+                "categories":["handyman","carpentry"],"is_public":true,"is_active":false,\
+                "verification_status":"verified","service_area":{"city":"Elm Park","state":"NY"}}}
+                """)
+            ],
+            "/api/professional/verification/status": [
+                .status(200, body: """
+                {"tier":2,"status":"verified","submitted_at":null,"completed_at":null}
+                """)
+            ]
         ])
         let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
         await vm.load()

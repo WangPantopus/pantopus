@@ -20,11 +20,9 @@ class ProfessionalRepository
         suspend fun profileMe(): NetworkResult<ProfessionalProfileResponse> = safeApiCall { api.profileMe() }
 
         /** `GET /api/professional/verification/status`. */
-        suspend fun verificationStatus(): NetworkResult<ProfessionalVerificationStatusResponse> =
-            safeApiCall { api.verificationStatus() }
+        suspend fun verificationStatus(): NetworkResult<ProfessionalVerificationStatusResponse> = safeApiCall { api.verificationStatus() }
 
         /** `PATCH /api/professional/profile/me`. */
-        suspend fun updateProfileMe(
-            body: ProfessionalProfileUpdateRequest,
-        ): NetworkResult<ProfessionalProfileResponse> = safeApiCall { api.updateProfileMe(body) }
+        suspend fun updateProfileMe(body: ProfessionalProfileUpdateRequest): NetworkResult<ProfessionalProfileResponse> =
+            safeApiCall { api.updateProfileMe(body) }
     }
