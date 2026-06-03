@@ -55,8 +55,12 @@ fun DueSnoozeCard(
                 CalendarBlock(due = due)
                 DueDetail(due = due)
             }
-            Spacer(modifier = Modifier.height(Spacing.s3))
-            SnoozeRow(options = options, onSnooze = onSnooze)
+            // Quick-snooze options have no backend source on the live task
+            // fetch; the row only renders when seeded (sample previews).
+            if (options.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(Spacing.s3))
+                SnoozeRow(options = options, onSnooze = onSnooze)
+            }
         }
     }
 }

@@ -93,6 +93,12 @@ fun MailTaskScreen(
             when (val current = state) {
                 MailTaskUiState.Loading -> MailTaskLoadingBody(modifier = Modifier.weight(1f))
                 is MailTaskUiState.Loaded -> LoadedBody(content = current.content, viewModel = viewModel, modifier = Modifier.weight(1f))
+                is MailTaskUiState.Error ->
+                    MailTaskErrorBody(
+                        message = current.message,
+                        onRetry = { viewModel.refresh() },
+                        modifier = Modifier.weight(1f),
+                    )
             }
         }
 
@@ -172,7 +178,14 @@ private fun TopBar(onBack: () -> Unit) {
             NavIcon(icon = PantopusIcon.Share, label = "Share")
             NavIcon(icon = PantopusIcon.MoreHorizontal, label = "More")
         }
-        Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(PantopusColors.appBorderSubtle),
+        )
     }
 }
 
@@ -190,6 +203,38 @@ private fun NavIcon(
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(icon = icon, contentDescription = label, size = 18.dp, tint = PantopusColors.appTextStrong)
+    }
+}
+
+// MARK: - Error body
+
+@Composable
+private fun MailTaskErrorBody(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(Spacing.s4)
+                .testTag("mailTask_error"),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "Couldn't load this task",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextStrong,
+        )
+        Spacer(modifier = Modifier.height(Spacing.s2))
+        Text(text = message, fontSize = 13.sp, color = PantopusColors.appTextSecondary)
+        Spacer(modifier = Modifier.height(Spacing.s3))
+        TextButton(onClick = onRetry, modifier = Modifier.testTag("mailTask_retry")) {
+            Text(text = "Retry", color = PantopusColors.primary600, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -213,30 +258,49 @@ private fun LoadedBody(
         ) {
             HeaderRow(content = content)
             TaskCard(content = content)
-            TaskElfStrip(elf = content.elf)
+            // Enrichment surfaces (elf / sub-tasks / completion / next-up) have
+            // no source on `/p3/tasks`; they render only when populated (sample
+            // previews), so the live screen hides them rather than seeding them.
+            if (content.elf.bullets.isNotEmpty()) {
+                TaskElfStrip(elf = content.elf)
+            }
             if (content.isDone) {
-                CompletionSummaryCard(completion = content.completion)
-                SubtaskChecklist(
-                    subtasks = content.subtasks,
-                    allDone = true,
-                    onToggle = { viewModel.toggleSubtask(it) },
-                    onAddStep = { viewModel.addStep() },
-                )
-                SourceMailCard(source = content.source, onOpen = { viewModel.openSourceMail() })
-                NextUpCard(nextUp = content.nextUp, onOpen = { viewModel.openNextUp() })
+                if (content.completion.rows.isNotEmpty()) {
+                    CompletionSummaryCard(completion = content.completion)
+                }
+                if (content.subtasks.isNotEmpty()) {
+                    SubtaskChecklist(
+                        subtasks = content.subtasks,
+                        allDone = true,
+                        onToggle = { viewModel.toggleSubtask(it) },
+                        onAddStep = { viewModel.addStep() },
+                    )
+                }
+                if (content.source.mailId.isNotBlank()) {
+                    SourceMailCard(source = content.source, onOpen = { viewModel.openSourceMail() })
+                }
+                if (content.nextUp.mailId.isNotBlank()) {
+                    NextUpCard(nextUp = content.nextUp, onOpen = { viewModel.openNextUp() })
+                }
             } else {
-                DueSnoozeCard(
-                    due = content.due,
-                    options = content.snoozeOptions,
-                    onSnooze = { viewModel.snooze(it) },
-                )
-                SubtaskChecklist(
-                    subtasks = content.subtasks,
-                    allDone = false,
-                    onToggle = { viewModel.toggleSubtask(it) },
-                    onAddStep = { viewModel.addStep() },
-                )
-                SourceMailCard(source = content.source, onOpen = { viewModel.openSourceMail() })
+                if (content.due.label.isNotBlank()) {
+                    DueSnoozeCard(
+                        due = content.due,
+                        options = content.snoozeOptions,
+                        onSnooze = { viewModel.snooze(it) },
+                    )
+                }
+                if (content.subtasks.isNotEmpty()) {
+                    SubtaskChecklist(
+                        subtasks = content.subtasks,
+                        allDone = false,
+                        onToggle = { viewModel.toggleSubtask(it) },
+                        onAddStep = { viewModel.addStep() },
+                    )
+                }
+                if (content.source.mailId.isNotBlank()) {
+                    SourceMailCard(source = content.source, onOpen = { viewModel.openSourceMail() })
+                }
                 DelegateHintCard(onTap = { viewModel.delegate() })
             }
         }
@@ -374,8 +438,7 @@ private fun DockPrimary(
                     } else {
                         Modifier.border(1.5.dp, PantopusColors.primary200, RoundedCornerShape(14.dp))
                     },
-                )
-                .clickable { onClick() }
+                ).clickable { onClick() }
                 .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
