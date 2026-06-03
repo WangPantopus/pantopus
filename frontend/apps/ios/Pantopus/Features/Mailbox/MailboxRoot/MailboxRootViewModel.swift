@@ -1,29 +1,3 @@
-//
-//  MailboxRootViewModel.swift
-//  Pantopus
-//
-//  B.1 — Mailbox root archetype. One screen, four drawer contexts
-//  (Me / Home / Biz / Earn) × three tabs (Incoming / Counter / Vault).
-//  Replaces the old MailboxDrawersView (drawer list) + MailboxListView
-//  (flat list) pair with a unified drawer-tabs hybrid.
-//
-//  Backs the screen via the List-of-Rows archetype: the drawer chip row
-//  and the segmented tab bar render in the shell's `customHeader` slot,
-//  and the mail list for the active (drawer, tab) flows through
-//  `ListOfRowsState`.
-//
-//  Wiring (P1-B): the default path is live —
-//    • `GET /api/mailbox/v2/drawers` seeds the per-drawer unread badges
-//      (`backend/routes/mailboxV2.js:214`), and
-//    • `GET /api/mailbox/v2/drawer/:drawer?tab=…` (`…:280`) feeds the mail
-//      list for the active (drawer, tab) with limit/offset paging.
-//  The drawer keys map `me → personal` (the backend's `personal` drawer);
-//  the tab ids (`incoming` / `counter` / `vault`) match the backend tab
-//  filter verbatim. The deterministic `MailboxRootSampleData` projection
-//  is kept as the documented preview/test seam — inject `dataProvider`
-//  (and/or `seededState`) to drive the sample frames offline.
-//
-
 import Observation
 import SwiftUI
 
