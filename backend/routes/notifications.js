@@ -5,8 +5,9 @@
  * PATCH  /api/notifications/:id/read     — mark single as read
  * POST   /api/notifications/read-all     — mark all as read
  * DELETE /api/notifications/:id          — delete single
- * POST   /api/notifications/push-token   — register Expo push token
- * DELETE /api/notifications/push-token   — unregister Expo push token
+ * POST   /api/notifications/register     — register a device token (APNs/FCM/Expo)
+ * POST   /api/notifications/push-token   — register Expo push token (legacy)
+ * DELETE /api/notifications/push-token   — unregister Expo push token (legacy)
  */
 
 const express = require('express');
@@ -258,6 +259,56 @@ router.post('/no-bid-nudge-mark-read', verifyToken, async (req, res) => {
   } catch (err) {
     logger.error('No-bid nudge mark-read error', { error: err.message });
     return res.status(500).json({ error: 'internal' });
+  }
+});
+
+/**
+ * POST /api/notifications/register
+ * Unified device-token registration for native push (APNs/FCM) and the
+ * legacy Expo path. The iOS and Android clients both POST here.
+ * Body: { token: string, platform?: "ios"|"android", provider?: "apns"|"fcm"|"expo" }
+ *
+ * `platform`/`provider` are persisted so the send path can route the
+ * token to the right transport; either may be omitted and is derived
+ * from the other (or from the token format for Expo tokens).
+ */
+router.post('/register', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { token, platform, provider } = req.body || {};
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Push token is required' });
+    }
+    if (platform && !['ios', 'android'].includes(String(platform).toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid platform' });
+    }
+    if (provider && !['apns', 'fcm', 'expo'].includes(String(provider).toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid provider' });
+    }
+
+    const saved = await pushService.saveToken(userId, token, { platform, provider });
+    if (!saved) {
+      return res.status(400).json({ error: 'Invalid push token' });
+    }
+
+    // Mirror the legacy /push-token route: the user just opted into push on
+    // their device, so ensure push_notifications is enabled at the
+    // preference level (create the row if missing, flip it on if disabled).
+    await supabaseAdmin
+      .from('MailPreferences')
+      .upsert(
+        { user_id: userId, push_notifications: true, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' },
+      )
+      .then(({ error: prefErr }) => {
+        if (prefErr) logger.warn('Failed to enable push preference', { error: prefErr.message, userId });
+      });
+
+    res.json({ message: 'Device registered for push', pushToken: saved });
+  } catch (err) {
+    logger.error('Device registration error', { error: err.message });
+    res.status(500).json({ error: 'Failed to register device' });
   }
 });
 

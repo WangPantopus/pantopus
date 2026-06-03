@@ -174,7 +174,16 @@ describe('P0.3 — CI guard against re-introducing CREATOR_SELECT', () => {
   const guard = require('../../scripts/ci/check-creator-select');
 
   test('the current repo passes the guard', () => {
-    expect(guard.run()).toBe(0);
+    // Ignore the transient synthetic fixtures that tests/unit/privacy/
+    // privacyGates.test.js writes into the scanned roots to prove each gate
+    // fires (e.g. `__p07_creator_select_violation__.js`). Jest runs test
+    // files in parallel workers over one shared filesystem, so such a file
+    // can momentarily exist while this scan walks the tree; it is never real
+    // source, so a "the real repo is clean" assertion must exclude it to
+    // stay deterministic. A genuine violation still fails this test.
+    const SYNTHETIC_FIXTURE = /__\w*violation__\.[cm]?[jt]sx?$/;
+    const violations = guard.scan().filter((v) => !SYNTHETIC_FIXTURE.test(v.file));
+    expect(violations).toEqual([]);
   });
 
   test('rule registry includes the legacy identifier and the Prisma-style select', () => {
