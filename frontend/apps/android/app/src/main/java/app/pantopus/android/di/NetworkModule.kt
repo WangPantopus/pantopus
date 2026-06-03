@@ -42,6 +42,7 @@ import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.UserReportsApi
 import app.pantopus.android.data.api.services.UsersApi
+import app.pantopus.android.data.api.services.WalletApi
 import app.pantopus.android.data.auth.AuthInterceptor
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.Rfc3339DateJsonAdapter
@@ -154,6 +155,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideHubApi(retrofit: Retrofit): HubApi = retrofit.create(HubApi::class.java)
+
+    @Provides @Singleton
+    fun provideWalletApi(retrofit: Retrofit): WalletApi = retrofit.create(WalletApi::class.java)
 
     @Provides @Singleton
     fun provideBusinessDiscoveryApi(retrofit: Retrofit): BusinessDiscoveryApi = retrofit.create(BusinessDiscoveryApi::class.java)
