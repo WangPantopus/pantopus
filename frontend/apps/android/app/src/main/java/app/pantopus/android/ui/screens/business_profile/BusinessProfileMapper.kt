@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "ReturnCount")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "ReturnCount", "LongMethod")
 
 package app.pantopus.android.ui.screens.business_profile
 
