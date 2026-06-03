@@ -2,6 +2,7 @@ package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.hub.HubDiscoveryResponse
 import app.pantopus.android.data.api.models.hub.HubResponse
+import app.pantopus.android.data.api.models.hub.HubTodayDetailResponse
 import app.pantopus.android.data.api.models.hub.HubTodayResponse
 import retrofit2.http.GET
 import retrofit2.http.Query
@@ -15,6 +16,13 @@ interface HubApi {
     /** `GET /api/hub/today` — route `backend/routes/hub.js:596`. */
     @GET("api/hub/today")
     suspend fun today(): HubTodayResponse
+
+    /**
+     * `GET /api/hub/today` (typed) — route `backend/routes/hub.js:596`. Backs
+     * the full-screen Today briefing; decodes the orchestrated payload.
+     */
+    @GET("api/hub/today")
+    suspend fun todayDetail(): HubTodayDetailResponse
 
     /**
      * `GET /api/hub/discovery` — route `backend/routes/hub.js:757`.
