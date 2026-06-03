@@ -4,12 +4,17 @@ package app.pantopus.android.ui.screens.support_trains.manage
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.support_trains.SupportTrainUpdateBody
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.support_trains.SupportTrainsRepository
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -120,34 +125,51 @@ data class ManageTrainUiState(
 /**
  * P4.3 — A13.13 — Manage train ViewModel.
  *
- * Pulls the seed content from [ManageTrainSampleData] on `load()` (no
- * backend round-trips while the route is under construction). Holds
- * the editable update draft (message body, audience selection,
- * push-to-phones toggle) and the close-train sheet draft (optional
- * thank-you note + presentation state). On `sendUpdate` we clear the
- * draft + flash a toast; on `confirmClose` we flip the train to
- * `.closed` and dismiss the sheet.
+ * `load()` fetches `GET /api/support-trains/:id` and derives the organizer
+ * dashboard ([ManageTrainProjection]); pass a `seed` to render offline
+ * (previews / tests). `sendUpdate` posts to `POST /:id/updates`;
+ * `confirmClose` marks the train completed via `POST /:id/complete`
+ * (sending the optional thank-you note as a final broadcast first). Both
+ * mutate local state optimistically so the toast / chip flip stay instant.
+ *
+ * PROJECTION GAPS (no backend field): audience segmentation + push-to-phones
+ * stay client-only (the endpoint broadcasts to everyone); dropout shows 0;
+ * there is no single "close with thanks" route.
  */
 @HiltViewModel
 class ManageTrainViewModel
     @Inject
     constructor(
+        private val repo: SupportTrainsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        @Suppress("UnusedPrivateProperty")
         private val trainId: String =
             savedStateHandle.get<String>(TRAIN_ID_KEY).orEmpty()
 
         private val _state = MutableStateFlow(ManageTrainUiState())
         val state: StateFlow<ManageTrainUiState> = _state.asStateFlow()
 
-        init {
-            load()
+        /**
+         * Load the dashboard. With a `seed` (previews / tests) it renders
+         * directly; otherwise it fetches `GET /:id` and projects it.
+         */
+        fun load(seed: ManageTrainContent? = null) {
+            if (seed != null) {
+                applyContent(seed)
+                return
+            }
+            _state.update { ManageTrainUiState(state = ManageTrainState.Loading) }
+            viewModelScope.launch {
+                when (val result = repo.detail(trainId)) {
+                    is NetworkResult.Success ->
+                        applyContent(ManageTrainProjection.project(result.data))
+                    is NetworkResult.Failure ->
+                        _state.update { it.copy(state = ManageTrainState.Error(result.error.message)) }
+                }
+            }
         }
 
-        /** Visible to tests so they can re-seed without re-instantiating. */
-        fun load(seed: ManageTrainContent? = null) {
-            val content = seed ?: ManageTrainSampleData.active
+        private fun applyContent(content: ManageTrainContent) {
             _state.update {
                 ManageTrainUiState(
                     state = ManageTrainState.Loaded(content),
@@ -186,14 +208,16 @@ class ManageTrainViewModel
         }
 
         /**
-         * Send the typed update. Clears the draft + flashes a toast so the
-         * helper count surfaces. Real `POST /api/support-trains/:id/updates`
-         * wiring lands when the backend ships.
+         * Send the typed update via `POST /api/support-trains/:id/updates`.
+         * Optimistically clears the draft + flashes the toast; the audience
+         * filter + push-to-phones toggle have no backend field (the endpoint
+         * broadcasts to everyone) so they stay client-only.
          */
         fun sendUpdate() {
             val current = _state.value
             if (!current.canSendUpdate) return
             val content = (current.state as? ManageTrainState.Loaded)?.content ?: return
+            val body = current.draftMessage
             val helperCount =
                 content.audienceChips.firstOrNull { it.id == current.selectedAudienceId }?.count
                     ?: content.helpersValue
@@ -202,6 +226,9 @@ class ManageTrainViewModel
                     draftMessage = "",
                     toast = "Update sent · $helperCount helpers",
                 )
+            }
+            viewModelScope.launch {
+                repo.postUpdate(trainId, SupportTrainUpdateBody(body = body))
             }
         }
 
@@ -224,12 +251,16 @@ class ManageTrainViewModel
         }
 
         /**
-         * Flip the train to `closed`. The sheet dismisses and the train's
-         * chip flips from "Active" green to "Closed" neutral.
+         * Close & thank. Optimistically flips the train to `closed`, then
+         * sends the thank-you note as a final broadcast (`POST /:id/updates`)
+         * when one was typed and marks the train completed
+         * (`POST /:id/complete`). The backend has no single "close with
+         * thanks" route, so this composes the two calls.
          */
         fun confirmClose() {
             val current = _state.value
             val content = (current.state as? ManageTrainState.Loaded)?.content ?: return
+            val note = current.thankYouNote.trim()
             val next = content.copy(isActive = false)
             _state.update {
                 it.copy(
@@ -237,6 +268,12 @@ class ManageTrainViewModel
                     sheetMode = ManageTrainSheetMode.CLOSED,
                     toast = "Train closed · thanks sent to ${content.helpersValue} helpers",
                 )
+            }
+            viewModelScope.launch {
+                if (note.isNotEmpty()) {
+                    repo.postUpdate(trainId, SupportTrainUpdateBody(body = note))
+                }
+                repo.complete(trainId)
             }
         }
 

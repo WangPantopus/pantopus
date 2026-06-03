@@ -1,8 +1,15 @@
-@file:Suppress("LongMethod", "PackageNaming")
+@file:Suppress("LongMethod", "PackageNaming", "MagicNumber")
 
 package app.pantopus.android.ui.screens.support_trains.manage
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.support_trains.SupportTrainDetailDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainSlotDto
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.support_trains.SupportTrainsRepository
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -19,21 +26,21 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * P4.3 / A13.13 — Manage train ViewModel. Covers the same state machine
- * as the iOS `ManageTrainViewModelTests` so the two platforms stay in
- * lock-step:
- *  - active fixture loads with seeded draft + audience + push state
- *  - character cap clamps oversize input
- *  - empty / whitespace draft disables Send
- *  - audience selector accepts known ids, rejects unknown
- *  - sendUpdate clears the draft and flashes the helper-count toast
- *  - show / hide / confirm close-train sheet
+ * P4.3 / A13.13 — Manage train ViewModel. Parity with the iOS
+ * `ManageTrainViewModelTests`: `load()` projects the seeded fixture or the
+ * live `GET /:id` payload; draft mutations stay in-memory; `sendUpdate` /
+ * `confirmClose` optimistically mutate local state and fire
+ * `POST /:id/updates` / `POST /:id/complete`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ManageTrainViewModelTest {
+    private val repo: SupportTrainsRepository = mockk()
+
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        coEvery { repo.postUpdate(any(), any()) } returns NetworkResult.Success(Unit)
+        coEvery { repo.complete(any()) } returns NetworkResult.Success(Unit)
     }
 
     @After
@@ -44,7 +51,23 @@ class ManageTrainViewModelTest {
     private fun savedState(trainId: String = ManageTrainSampleData.TRAIN_ID): SavedStateHandle =
         SavedStateHandle(mapOf(ManageTrainViewModel.TRAIN_ID_KEY to trainId))
 
-    private fun makeVm(): ManageTrainViewModel = ManageTrainViewModel(savedState())
+    /** Offline VM seeded with the design fixture (no `load()` network). */
+    private fun makeVm(): ManageTrainViewModel =
+        ManageTrainViewModel(repo, savedState()).also { it.load(ManageTrainSampleData.active) }
+
+    private fun slot(
+        id: String,
+        date: String,
+        covered: Boolean,
+    ): SupportTrainSlotDto =
+        SupportTrainSlotDto(
+            id = id,
+            slotDate = date,
+            slotLabel = "Dinner",
+            status = if (covered) "full" else "open",
+            filledCount = if (covered) 1 else 0,
+            capacity = 1,
+        )
 
     @Test
     fun load_projects_active_fixture() =
@@ -153,6 +176,47 @@ class ManageTrainViewModelTest {
                 loaded.content.isActive,
             )
             assertNotNull(vm.state.value.toast)
+        }
+
+    @Test
+    fun load_fetches_detail_and_derives_stats() =
+        runTest {
+            val dto =
+                SupportTrainDetailDto(
+                    id = "t9",
+                    title = "Meals for the Reyes family",
+                    status = "active",
+                    slots =
+                        listOf(
+                            slot("s1", "2025-12-01", covered = true),
+                            slot("s2", "2025-12-02", covered = true),
+                            slot("s3", "2025-12-03", covered = false),
+                            slot("s4", "2025-12-04", covered = false),
+                        ),
+                )
+            coEvery { repo.detail("t9") } returns NetworkResult.Success(dto)
+            val vm = ManageTrainViewModel(repo, savedState("t9"))
+            vm.load()
+            val loaded = vm.state.value.state as ManageTrainState.Loaded
+            assertEquals("Meals for the Reyes family", loaded.content.title)
+            assertTrue(loaded.content.isActive)
+            assertEquals(4, loaded.content.slotsTotal)
+            assertEquals(2, loaded.content.slotsFilled)
+            assertEquals(2, loaded.content.slotsOpen)
+            assertEquals("2/4", loaded.content.slotFillValue)
+            assertEquals(
+                listOf("edit-dates", "invite", "analytics"),
+                loaded.content.organizeRows.map { it.id },
+            )
+        }
+
+    @Test
+    fun load_server_error_surfaces_error() =
+        runTest {
+            coEvery { repo.detail("t9") } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = ManageTrainViewModel(repo, savedState("t9"))
+            vm.load()
+            assertTrue(vm.state.value.state is ManageTrainState.Error)
         }
 
     @Test

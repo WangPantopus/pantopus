@@ -5,6 +5,8 @@ package app.pantopus.android.ui.screens.support_trains.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.support_trains.SupportTrainsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +30,7 @@ import javax.inject.Inject
 class SupportTrainDetailViewModel
     @Inject
     constructor(
+        private val repo: SupportTrainsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
@@ -42,23 +45,33 @@ class SupportTrainDetailViewModel
         val state: StateFlow<SupportTrainDetailUiState> = _state.asStateFlow()
 
         /**
-         * Injectable resolver. Overridden in tests to drive deterministic
-         * outcomes; the default implementation routes `trainId`s that
-         * contain "covered" / "full" onto the fully-covered fixture and
-         * everything else onto the populated fixture so QA can swap
-         * variants from the same row tap.
+         * Optional offline override (previews / QA / tests). When null — the
+         * production default — `load()` fetches `GET /api/support-trains/:id`
+         * and projects it via [SupportTrainDetailProjection]. Set it to
+         * [::defaultResolve] to drive the sample fixtures without a backend.
          */
-        var resolve: (String) -> SupportTrainDetailContent? = ::defaultResolve
+        var resolve: ((String) -> SupportTrainDetailContent?)? = null
 
         fun load() {
             viewModelScope.launch {
                 _state.value = SupportTrainDetailUiState.Loading
-                val content = resolve(trainId)
+                val override = resolve
+                if (override != null) {
+                    val content = override(trainId)
+                    _state.value =
+                        if (content != null) {
+                            SupportTrainDetailUiState.Loaded(content)
+                        } else {
+                            SupportTrainDetailUiState.Error("Couldn't load this support train.")
+                        }
+                    return@launch
+                }
                 _state.value =
-                    if (content != null) {
-                        SupportTrainDetailUiState.Loaded(content)
-                    } else {
-                        SupportTrainDetailUiState.Error("Couldn't load this support train.")
+                    when (val result = repo.detail(trainId)) {
+                        is NetworkResult.Success ->
+                            SupportTrainDetailUiState.Loaded(SupportTrainDetailProjection.project(result.data))
+                        is NetworkResult.Failure ->
+                            SupportTrainDetailUiState.Error(result.error.message)
                     }
             }
         }
