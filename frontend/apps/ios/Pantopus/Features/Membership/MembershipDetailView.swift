@@ -489,20 +489,36 @@ public struct MembershipDetailView: View {
     private var cancelBlock: some View {
         VStack(spacing: Spacing.s2) {
             // Single-tap cancel by Pantopus policy — no confirm dialog,
-            // no retention questions, no last-second offers.
-            Button(action: onCancel) {
-                HStack(spacing: Spacing.s1) {
-                    Icon(.x, size: 13, strokeWidth: 2.4, color: Theme.Color.error)
-                    Text("Cancel membership")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.error)
+            // no retention questions, no last-second offers. Posts to the
+            // no-charge cancel route, then hands off to the host on success.
+            Button(
+                action: { Task { @MainActor in if await viewModel.cancel() { onCancel() } } },
+                label: {
+                    HStack(spacing: Spacing.s1) {
+                        if viewModel.isCancelling {
+                            ProgressView().tint(Theme.Color.error)
+                        } else {
+                            Icon(.x, size: 13, strokeWidth: 2.4, color: Theme.Color.error)
+                        }
+                        Text("Cancel membership")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.error)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-            }
+            )
             .buttonStyle(.plain)
+            .disabled(viewModel.isCancelling)
             .accessibilityLabel("Cancel membership")
             .accessibilityIdentifier("membershipDetailCancel")
+            if let actionError = viewModel.actionError {
+                Text(actionError)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.Color.error)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("membershipDetailCancelError")
+            }
             VStack(spacing: 2) {
                 Text("Single-tap cancel. No retention questions, no last-second offers.")
                     .font(.system(size: 10.5))
@@ -540,7 +556,10 @@ private struct TierInfoRowModel {
 
 #Preview("Populated") {
     MembershipDetailView(
-        viewModel: MembershipDetailViewModel(personaId: MembershipSampleData.personaId)
+        viewModel: MembershipDetailViewModel(
+            personaId: MembershipSampleData.personaId,
+            content: MembershipSampleData.populated
+        )
     )
 }
 

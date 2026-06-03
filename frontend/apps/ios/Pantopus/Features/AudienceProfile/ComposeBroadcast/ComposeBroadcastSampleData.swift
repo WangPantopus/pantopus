@@ -88,22 +88,32 @@ public enum ComposeBroadcastSampleData {
 }
 
 public extension ComposeBroadcastViewModel {
-    /// Production wiring: real persona id, seeded recent broadcasts, an
-    /// empty composer, and a send that simulates network latency so the
-    /// sending state is visible before the host pops the screen.
+    /// Production wiring: the composer starts empty and `load()` (kicked
+    /// from the View's `.task`) fills the persona, per-tier reach, and
+    /// recent broadcasts from the backend. `performSend` publishes for real
+    /// via `POST /api/broadcast/channels/:id/messages`.
     static func live(
         personaId: String,
         onSent: @escaping @MainActor () -> Void = {}
     ) -> ComposeBroadcastViewModel {
-        ComposeBroadcastViewModel(
-            personaId: personaId.isEmpty ? ComposeBroadcastSampleData.persona.id : personaId,
-            persona: ComposeBroadcastSampleData.persona,
-            recentBroadcasts: ComposeBroadcastSampleData.recentBroadcasts,
-            audienceReach: ComposeBroadcastSampleData.audienceReach,
+        let placeholder = BroadcastPersona(
+            id: personaId,
+            handle: "",
+            displayName: "",
+            kind: .personal,
+            avatarInitial: ""
+        )
+        let viewModel = ComposeBroadcastViewModel(
+            personaId: personaId,
+            persona: placeholder,
+            recentBroadcasts: [],
+            audienceReach: [:],
             onSent: onSent
-        ) { _, _ in
-            try await Task.sleep(nanoseconds: 600_000_000)
+        )
+        viewModel.performSend = { [weak viewModel] draft, _ in
+            try await viewModel?.publish(draft)
         }
+        return viewModel
     }
 
     /// FRAME 1 — drafted broadcast with body + attached media + recents.

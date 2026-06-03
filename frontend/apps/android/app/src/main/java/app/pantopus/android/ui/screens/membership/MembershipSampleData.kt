@@ -55,7 +55,7 @@ object MembershipSampleData {
             ),
         )
 
-    private const val POLICY_FOOTNOTE =
+    const val POLICY_FOOTNOTE =
         "Cancel anytime — unused days are prorated and refunded to your card. " +
             "Receipts are emailed by Stripe."
 

@@ -80,6 +80,17 @@ public enum AudienceProfileEndpoints {
             body: body
         )
     }
+
+    /// `GET /api/broadcast/channels/:channelId/messages` — broadcast
+    /// history, most-recent first. `limit`-only (no offset/cursor). Route
+    /// `backend/routes/broadcastChannels.js:315`.
+    public static func broadcastHistory(channelId: String, limit: Int = 50) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/broadcast/channels/\(channelId)/messages",
+            query: ["limit": String(limit)]
+        )
+    }
 }
 
 /// Body for the broadcast-publish route. `visibility` valid values:

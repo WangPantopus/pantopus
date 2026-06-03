@@ -62,6 +62,8 @@ fun MembershipDetailScreen(
     viewModel: MembershipDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val actionError by viewModel.actionError.collectAsStateWithLifecycle()
+    val isCancelling by viewModel.isCancelling.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
 
     Column(
@@ -83,9 +85,11 @@ fun MembershipDetailScreen(
                     onOpenPersona = onOpenPersona,
                     onChangeTier = onChangeTier,
                     onUpdatePayment = onUpdatePayment,
-                    onCancel = onCancel,
+                    onCancel = { viewModel.cancel(onCancelled = onCancel) },
                     onRequestRefund = onRequestRefund,
                     onDismissSla = viewModel::dismissSlaAlert,
+                    isCancelling = isCancelling,
+                    actionError = actionError,
                 )
             is MembershipDetailUiState.SlaMissed ->
                 MembershipLoadedContent(
@@ -94,9 +98,11 @@ fun MembershipDetailScreen(
                     onOpenPersona = onOpenPersona,
                     onChangeTier = onChangeTier,
                     onUpdatePayment = onUpdatePayment,
-                    onCancel = onCancel,
+                    onCancel = { viewModel.cancel(onCancelled = onCancel) },
                     onRequestRefund = onRequestRefund,
                     onDismissSla = viewModel::dismissSlaAlert,
+                    isCancelling = isCancelling,
+                    actionError = actionError,
                 )
         }
     }
@@ -242,6 +248,8 @@ internal fun MembershipLoadedContent(
     onCancel: () -> Unit = {},
     onRequestRefund: () -> Unit = {},
     onDismissSla: () -> Unit = {},
+    isCancelling: Boolean = false,
+    actionError: String? = null,
 ) {
     Column(
         modifier =
@@ -274,7 +282,7 @@ internal fun MembershipLoadedContent(
             BenefitsCard(benefits = content.benefits)
         }
         ChangeTierButton(onClick = onChangeTier)
-        CancelBlock(onCancel = onCancel)
+        CancelBlock(onCancel = onCancel, isCancelling = isCancelling, actionError = actionError)
         PolicyFootnote(text = content.policyFootnote)
         Spacer(modifier = Modifier.height(Spacing.s2))
     }
@@ -722,19 +730,24 @@ private fun ChangeTierButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun CancelBlock(onCancel: () -> Unit) {
+private fun CancelBlock(
+    onCancel: () -> Unit,
+    isCancelling: Boolean = false,
+    actionError: String? = null,
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         // Single-tap cancel by Pantopus policy — no confirm dialog, no
-        // retention questions, no last-second offers.
+        // retention questions, no last-second offers. Posts the no-charge
+        // cancel route, then hands off to the host on success.
         Row(
             modifier =
                 Modifier
                     .heightIn(min = 44.dp)
-                    .clickable(onClick = onCancel)
+                    .clickable(enabled = !isCancelling, onClick = onCancel)
                     .testTag("membershipDetailCancel")
                     .semantics { contentDescription = "Cancel membership" },
             verticalAlignment = Alignment.CenterVertically,
@@ -748,10 +761,20 @@ private fun CancelBlock(onCancel: () -> Unit) {
                 tint = PantopusColors.error,
             )
             Text(
-                text = "Cancel membership",
+                text = if (isCancelling) "Cancelling…" else "Cancel membership",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = PantopusColors.error,
+            )
+        }
+        if (actionError != null) {
+            Text(
+                text = actionError,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium,
+                color = PantopusColors.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.testTag("membershipDetailCancelError"),
             )
         }
         Text(
