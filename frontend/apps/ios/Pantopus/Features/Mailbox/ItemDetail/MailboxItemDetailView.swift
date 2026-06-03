@@ -194,7 +194,6 @@ struct MailboxItemDetailView: View {
     /// the projected `genericBody` content (body text / attachments / tags),
     /// falling back to the category explainer if the projection is absent so
     /// no known category ever renders an empty or placeholder surface.
-    @ViewBuilder
     private func genericBody(for content: MailboxItemDetailContent) -> some View {
         GenericMailBody(
             content: content.genericBody ?? GenericMailBodyContent(category: content.category)
