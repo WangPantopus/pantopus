@@ -154,3 +154,52 @@ public struct BlockCountsDTO: Decodable, Sendable, Hashable {
     public let personal: Int?
     public let audience: Int?
 }
+
+// MARK: - View As (GET /api/identity-center/view-as — identityCenter.js:489)
+
+/// Privacy-preview payload: the signed-in user's profile resolved for a
+/// chosen viewer. `visible` is the serialized profile the viewer sees;
+/// `hidden` lists the redacted field keys. Keys are camelCase on the wire
+/// (the route builds plain JS objects), so no `CodingKeys` are needed.
+public struct ViewAsResponse: Decodable, Sendable, Hashable {
+    public let viewer: String?
+    public let viewerLabel: String?
+    public let visible: ViewAsVisibleProfile?
+    public let hidden: [String]?
+    public let context: ViewAsContextDTO?
+
+    public struct ViewAsVisibleProfile: Decodable, Sendable, Hashable {
+        public let handle: String?
+        public let displayName: String?
+        public let bio: String?
+        public let badges: [String]?
+        public let locality: Locality?
+        public let stats: Stats?
+        public let viewer: ViewerRelationship?
+
+        public struct Locality: Decodable, Sendable, Hashable {
+            public let city: String?
+            public let state: String?
+            public let neighborhood: String?
+            public let precision: String?
+        }
+
+        public struct Stats: Decodable, Sendable, Hashable {
+            public let reviews: Int?
+            public let gigsCompleted: Int?
+        }
+
+        public struct ViewerRelationship: Decodable, Sendable, Hashable {
+            public let relationshipStatus: String?
+            public let isFollowingLocal: Bool?
+            public let canMessage: Bool?
+        }
+    }
+
+    public struct ViewAsContextDTO: Decodable, Sendable, Hashable {
+        public let isNeighbor: Bool?
+        public let isConnection: Bool?
+        public let isHouseholdMember: Bool?
+        public let isGigParticipant: Bool?
+    }
+}

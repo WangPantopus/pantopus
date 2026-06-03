@@ -1,26 +1,50 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.explore
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.listings.ListingsRepository
+import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
- * Backs the A11.2 Explore map. Holds the loaded sample entities, the top
- * type-toggle selection, the sort, the applied filter criteria, and a
- * single `selectedId` so pin taps and rail-card highlights stay in sync.
- * Filtering + clustering run locally over the sample set (no network —
- * backend removed from the repo). Mirrors `ExploreMapViewModel.swift`.
+ * Backs the A11.2 Explore map / P1-F.
+ *
+ * The production path fetches live discovery results for the viewport around
+ * the user — `GET /api/gigs/in-bounds` (tasks) + `GET /api/listings/in-bounds`
+ * (items) — and fans them into a homogeneous `List<ExploreEntity>`. Posts +
+ * Spots have no in-bounds endpoint yet, so the live map surfaces Tasks +
+ * Items; the type toggle still narrows the set client-side. Filtering, sort,
+ * and clustering run locally over the fetched window (mirrors
+ * `ExploreMapViewModel.swift`). Previews / snapshots / tests seed deterministic
+ * content via `load(scenario)`.
  */
 @HiltViewModel
 class ExploreMapViewModel
     @Inject
-    constructor() : ViewModel() {
+    constructor(
+        private val gigsRepository: GigsRepository,
+        private val listingsRepository: ListingsRepository,
+        private val locationProvider: LocationProvider,
+    ) : ViewModel() {
         private val _state = MutableStateFlow<ExploreMapUiState>(ExploreMapUiState.Loading)
         val state: StateFlow<ExploreMapUiState> = _state.asStateFlow()
 
@@ -33,20 +57,34 @@ class ExploreMapViewModel
         private val _sheetStop = MutableStateFlow(ExploreSheetStop.Standard)
         val sheetStop: StateFlow<ExploreSheetStop> = _sheetStop.asStateFlow()
 
-        private val _userCoordinate = MutableStateFlow<UserCoordinate?>(ExploreMapSampleData.center)
+        private val _userCoordinate = MutableStateFlow<UserCoordinate?>(null)
         val userCoordinate: StateFlow<UserCoordinate?> = _userCoordinate.asStateFlow()
 
         private val _filters = MutableStateFlow(ExploreFilterCriteria())
         val filters: StateFlow<ExploreFilterCriteria> = _filters.asStateFlow()
 
+        private var liveMode: Boolean = true
         private var scenario: ExploreScenario = ExploreScenario.Populated
         private var allEntities: List<ExploreEntity> = emptyList()
         private var clusterRadiusDegrees: Double = 0.005
 
-        fun load(scenario: ExploreScenario = ExploreScenario.Populated) {
+        /** Live (production) load — fetch the viewport around the user. */
+        fun load() {
+            liveMode = true
+            if (_userCoordinate.value == null) {
+                _userCoordinate.value = locationProvider.cachedCoordinate()
+            }
+            _state.value = ExploreMapUiState.Loading
+            viewModelScope.launch { fetchAroundUser() }
+        }
+
+        /** Sample/preview load — local sample entities, no network. */
+        fun load(scenario: ExploreScenario) {
+            liveMode = false
             this.scenario = scenario
             allEntities = ExploreMapSampleData.entities(scenario)
             _filters.value = ExploreMapSampleData.filters(scenario)
+            _userCoordinate.value = ExploreMapSampleData.center
             when (scenario) {
                 ExploreScenario.Loading -> _state.value = ExploreMapUiState.Loading
                 ExploreScenario.Error -> _state.value = ExploreMapUiState.Error("Couldn't load the map.")
@@ -54,7 +92,39 @@ class ExploreMapViewModel
             }
         }
 
-        fun refresh() = load(scenario)
+        fun refresh() {
+            if (liveMode) load() else load(scenario)
+        }
+
+        private suspend fun fetchAroundUser() {
+            if (_userCoordinate.value == null) {
+                _userCoordinate.value = locationProvider.requestCurrent()
+            }
+            val center = _userCoordinate.value ?: UserCoordinate(40.7484, -73.9857, 100.0)
+            val minLat = center.latitude - 0.012
+            val maxLat = center.latitude + 0.012
+            val minLon = center.longitude - 0.016
+            val maxLon = center.longitude + 0.016
+
+            val gigsDeferred =
+                viewModelScope.async {
+                    gigsRepository.inBounds(minLat = minLat, minLon = minLon, maxLat = maxLat, maxLon = maxLon)
+                }
+            val listingsDeferred =
+                viewModelScope.async {
+                    listingsRepository.inBounds(south = minLat, west = minLon, north = maxLat, east = maxLon)
+                }
+            val gigsResult = gigsDeferred.await()
+            val listingsResult = listingsDeferred.await()
+            val gigs = if (gigsResult is NetworkResult.Success) gigsResult.data.gigs else null
+            val listings = if (listingsResult is NetworkResult.Success) listingsResult.data.listings else null
+            if (gigs == null && listings == null) {
+                _state.value = ExploreMapUiState.Error("Couldn't load the map.")
+                return
+            }
+            allEntities = project(gigs ?: emptyList(), listings ?: emptyList(), center)
+            rebuild(selectedId = null)
+        }
 
         // MARK: Type toggle
 
@@ -144,6 +214,102 @@ class ExploreMapViewModel
         }
 
         companion object {
+            /** Map live gigs + listings into the unified entity vocabulary. */
+            fun project(
+                gigs: List<GigDto>,
+                listings: List<ListingDto>,
+                anchor: UserCoordinate,
+            ): List<ExploreEntity> {
+                val out = mutableListOf<ExploreEntity>()
+                gigs.forEach { gig ->
+                    val coord = coordinate(gig) ?: return@forEach
+                    val miles = distanceMiles(anchor, coord.first, coord.second)
+                    val bids = gig.bidCount ?: 0
+                    out.add(
+                        ExploreEntity(
+                            id = gig.id,
+                            kind = ExploreKind.Task,
+                            state =
+                                if (gig.status == "pending" || gig.status == "draft") {
+                                    ExploreEntityState.Pending
+                                } else {
+                                    ExploreEntityState.Confirmed
+                                },
+                            latitude = coord.first,
+                            longitude = coord.second,
+                            title = gig.title,
+                            metaLead = priceLabel(gig.price) ?: "Open",
+                            distanceLabel = distanceLabel(miles),
+                            distanceMiles = miles,
+                            badge = if (bids > 0) ExploreBadge("$bids bids", ExploreBadgeTone.Bids) else null,
+                            verified = false,
+                            openNow = gig.status == "open",
+                        ),
+                    )
+                }
+                listings.forEach { listing ->
+                    val coord = coordinate(listing) ?: return@forEach
+                    val miles = distanceMiles(anchor, coord.first, coord.second)
+                    out.add(
+                        ExploreEntity(
+                            id = listing.id,
+                            kind = ExploreKind.Item,
+                            state = ExploreEntityState.Confirmed,
+                            latitude = coord.first,
+                            longitude = coord.second,
+                            title = listing.title ?: "Listing",
+                            metaLead = priceLabel(listing.price) ?: "Free",
+                            distanceLabel = distanceLabel(miles),
+                            distanceMiles = miles,
+                            badge = null,
+                            verified = false,
+                            openNow = true,
+                        ),
+                    )
+                }
+                return out
+            }
+
+            fun distanceMiles(
+                origin: UserCoordinate,
+                latitude: Double,
+                longitude: Double,
+            ): Double {
+                val earthRadiusMiles = 3958.8
+                val dLat = Math.toRadians(latitude - origin.latitude)
+                val dLon = Math.toRadians(longitude - origin.longitude)
+                val lat1 = Math.toRadians(origin.latitude)
+                val lat2 = Math.toRadians(latitude)
+                val a = sin(dLat / 2).pow(2) + sin(dLon / 2).pow(2) * cos(lat1) * cos(lat2)
+                return earthRadiusMiles * 2 * atan2(sqrt(a), sqrt(1 - a))
+            }
+
+            private fun coordinate(gig: GigDto): Pair<Double, Double>? {
+                if (gig.latitude != null && gig.longitude != null) return gig.latitude to gig.longitude
+                val approx = gig.approxLocation
+                if (approx?.latitude != null && approx.longitude != null) return approx.latitude to approx.longitude
+                return null
+            }
+
+            private fun coordinate(listing: ListingDto): Pair<Double, Double>? {
+                if (listing.latitude != null && listing.longitude != null) return listing.latitude to listing.longitude
+                val approx = listing.approxLocation
+                if (approx?.latitude != null && approx.longitude != null) return approx.latitude to approx.longitude
+                return null
+            }
+
+            private fun distanceLabel(miles: Double): String =
+                when {
+                    miles < 0.1 -> "< 0.1 mi"
+                    miles < 10 -> String.format(Locale.US, "%.1f mi", miles)
+                    else -> "${miles.toInt()} mi"
+                }
+
+            private fun priceLabel(price: Double?): String? {
+                if (price == null || price <= 0) return null
+                return if (price % 1.0 == 0.0) "$${price.toInt()}" else String.format(Locale.US, "$%.2f", price)
+            }
+
             /** Grid-bucket clusterer — buckets of ≥2 collapse into a cluster. */
             fun cluster(
                 entities: List<ExploreEntity>,

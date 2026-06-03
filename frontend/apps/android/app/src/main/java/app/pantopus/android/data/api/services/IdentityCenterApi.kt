@@ -3,10 +3,12 @@ package app.pantopus.android.data.api.services
 import app.pantopus.android.data.api.models.identity.BridgesEchoResponse
 import app.pantopus.android.data.api.models.identity.IdentityCenterResponse
 import app.pantopus.android.data.api.models.identity.UpdateBridgesBody
+import app.pantopus.android.data.api.models.identity.ViewAsResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Identity-center endpoints from `backend/routes/identityCenter.js`.
@@ -27,4 +29,14 @@ interface IdentityCenterApi {
         @Path("personaId") personaId: String,
         @Body body: UpdateBridgesBody,
     ): BridgesEchoResponse
+
+    /** `GET /api/identity-center/view-as` — privacy preview: render the
+     *  signed-in user's profile as a chosen `viewer` would see it. Route
+     *  `backend/routes/identityCenter.js:489`. */
+    @GET("api/identity-center/view-as")
+    suspend fun viewAs(
+        @Query("surface") surface: String,
+        @Query("viewer") viewer: String,
+        @Query("handle") handle: String? = null,
+    ): ViewAsResponse
 }

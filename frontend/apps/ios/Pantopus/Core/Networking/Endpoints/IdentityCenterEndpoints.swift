@@ -16,9 +16,19 @@ public enum IdentityCenterEndpoints {
     /// signed-in user owns. Route `backend/routes/identityCenter.js:401`.
     public static let overview = Endpoint(method: .get, path: "/api/identity-center")
 
-    /// `GET /api/identity-center/view-as` — privacy preview window.
+    /// `GET /api/identity-center/view-as` — privacy preview window: render
+    /// the signed-in user's profile as a chosen `viewer` would see it.
     /// Route `backend/routes/identityCenter.js:489`.
-    public static let viewAs = Endpoint(method: .get, path: "/api/identity-center/view-as")
+    /// - Parameters:
+    ///   - surface: `local` (neighbor-facing) or `persona` (audience-facing).
+    ///   - viewer: backend viewer mode (`public`, `neighbor`, `connection`,
+    ///     `household_member`, `gig_participant`, `persona_audience_member`, …).
+    ///   - handle: optional target handle; omitted previews the owner's own.
+    public static func viewAs(surface: String, viewer: String, handle: String? = nil) -> Endpoint {
+        var query = ["surface": surface, "viewer": viewer]
+        if let handle { query["handle"] = handle }
+        return Endpoint(method: .get, path: "/api/identity-center/view-as", query: query)
+    }
 
     /// `PATCH /api/identity-center/bridges/:personaId` — toggle the
     /// "link these profiles" preferences. Route

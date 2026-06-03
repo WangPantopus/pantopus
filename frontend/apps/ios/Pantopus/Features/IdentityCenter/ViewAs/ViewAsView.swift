@@ -605,5 +605,5 @@ private struct FlowLayoutViewAs: Layout {
 }
 
 #Preview("Loading") {
-    ViewAsView(viewModel: ViewAsViewModel(startLoaded: false))
+    ViewAsView(viewModel: ViewAsViewModel(selected: .connection, startLoaded: false))
 }

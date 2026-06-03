@@ -92,3 +92,56 @@ data class UpdateBridgesBody(
 data class BridgesEchoResponse(
     val bridge: BridgesDto? = null,
 )
+
+// View As (GET /api/identity-center/view-as — identityCenter.js:489) — P1-F.
+// `visible` is the serialized profile the viewer sees; `hidden` lists redacted
+// field keys. Keys are camelCase on the wire (the route builds plain JS
+// objects), so no @Json mappings are needed.
+@JsonClass(generateAdapter = true)
+data class ViewAsResponse(
+    val viewer: String? = null,
+    val viewerLabel: String? = null,
+    val visible: ViewAsVisibleProfile? = null,
+    val hidden: List<String>? = null,
+    val context: ViewAsContextDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ViewAsVisibleProfile(
+    val handle: String? = null,
+    val displayName: String? = null,
+    val bio: String? = null,
+    val badges: List<String>? = null,
+    val locality: ViewAsLocality? = null,
+    val stats: ViewAsStats? = null,
+    val viewer: ViewAsViewerRelationship? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ViewAsLocality(
+    val city: String? = null,
+    val state: String? = null,
+    val neighborhood: String? = null,
+    val precision: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ViewAsStats(
+    val reviews: Int? = null,
+    val gigsCompleted: Int? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ViewAsViewerRelationship(
+    val relationshipStatus: String? = null,
+    val isFollowingLocal: Boolean? = null,
+    val canMessage: Boolean? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ViewAsContextDto(
+    val isNeighbor: Boolean? = null,
+    val isConnection: Boolean? = null,
+    val isHouseholdMember: Boolean? = null,
+    val isGigParticipant: Boolean? = null,
+)

@@ -36,12 +36,14 @@ import app.pantopus.android.data.api.services.OffersApi
 import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
+import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.UserReportsApi
 import app.pantopus.android.data.api.services.UsersApi
+import app.pantopus.android.data.api.services.WalletApi
 import app.pantopus.android.data.auth.AuthInterceptor
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.Rfc3339DateJsonAdapter
@@ -156,6 +158,9 @@ object NetworkModule {
     fun provideHubApi(retrofit: Retrofit): HubApi = retrofit.create(HubApi::class.java)
 
     @Provides @Singleton
+    fun provideWalletApi(retrofit: Retrofit): WalletApi = retrofit.create(WalletApi::class.java)
+
+    @Provides @Singleton
     fun provideBusinessDiscoveryApi(retrofit: Retrofit): BusinessDiscoveryApi = retrofit.create(BusinessDiscoveryApi::class.java)
 
     @Provides @Singleton
@@ -244,6 +249,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun providePrivacyHandshakeApi(retrofit: Retrofit): PrivacyHandshakeApi = retrofit.create(PrivacyHandshakeApi::class.java)
+
+    @Provides @Singleton
+    fun provideProfessionalApi(retrofit: Retrofit): ProfessionalApi = retrofit.create(ProfessionalApi::class.java)
 
     @Provides
     @Singleton

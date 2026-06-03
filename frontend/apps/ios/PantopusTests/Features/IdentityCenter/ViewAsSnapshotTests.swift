@@ -43,7 +43,7 @@ final class ViewAsSnapshotTests: XCTestCase {
 
     func test_viewAs_loading_renders() {
         assertRenders("ViewAs loading") {
-            ViewAsView(viewModel: ViewAsViewModel(startLoaded: false))
+            ViewAsView(viewModel: ViewAsViewModel(selected: .connection, startLoaded: false))
         }
     }
 
