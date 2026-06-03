@@ -147,30 +147,29 @@ export interface HubPayload {
   neighborDensity: NeighborDensity | null;
 }
 
+export interface BriefingDelivery {
+  id: string;
+  briefing_date_local: string;
+  briefing_kind: 'morning' | 'evening';
+  summary_text: string;
+  signals_snapshot: unknown[];
+  location_geohash: string | null;
+  composition_mode: string | null;
+  status: string | null;
+  delivered_at: string | null;
+  created_at: string | null;
+}
+
 // ---- Discovery Types ----
 
-/**
- * Item shape returned by `GET /api/hub/discovery`. Legacy fields
- * (`meta`, `category`, `avatarUrl`, `route`) are preserved so the
- * existing Hub Discovery rail keeps rendering unchanged. T5.4.1
- * adds the structured fields the Discover hub typed rows render.
- */
 export interface DiscoveryItem {
   id: string;
-  type: 'gig' | 'person' | 'business' | 'post' | 'listing';
+  type: 'gig' | 'person' | 'business' | 'post';
   title: string;
   meta: string | null;
-  category?: string | null;
-  avatarUrl?: string | null;
+  category?: string;
+  avatarUrl?: string;
   route: string;
-  // ---- T5.4.1 additive fields ----
-  subtitle?: string | null;
-  price?: string | null;
-  rating?: number | null;
-  verified?: boolean | null;
-  isFree?: boolean | null;
-  isWanted?: boolean | null;
-  createdAt?: string | null;
 }
 
 export interface DiscoveryResponse {
@@ -178,7 +177,7 @@ export interface DiscoveryResponse {
   items: DiscoveryItem[];
 }
 
-export type DiscoveryFilter = 'gigs' | 'people' | 'businesses' | 'posts' | 'listings';
+export type DiscoveryFilter = 'gigs' | 'people' | 'businesses' | 'posts';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -235,6 +234,13 @@ export async function getHubToday(options: {
 }
 
 /**
+ * Get a saved briefing delivery, scoped to the authenticated user.
+ */
+export async function getBriefingDelivery(id: string): Promise<{ briefing: BriefingDelivery }> {
+  return get<{ briefing: BriefingDelivery }>(`/api/hub/briefings/${id}`);
+}
+
+/**
  * Update user's hub preferences (active home, persona)
  */
 export async function updateHubContext(data: {
@@ -262,12 +268,6 @@ export async function getDiscovery(params: {
   lat?: number;
   lng?: number;
   limit?: number;
-  /** T5.4.1 chip-strip filter — `today` keeps items created in the last 24h. */
-  since?: 'today';
-  /** T5.4.1 chip-strip filter — verified people / published businesses only. */
-  verified?: boolean;
-  /** T5.4.1 chip-strip filter — `price=0` listings/gigs + `is_wanted=true` listings. */
-  freeOrWanted?: boolean;
 }): Promise<DiscoveryResponse> {
   return get<DiscoveryResponse>('/api/hub/discovery', params);
 }

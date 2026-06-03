@@ -26,11 +26,11 @@ export default function TaskList({
   onStatusChange,
   onTaskClick,
 }: {
-  tasks: Record<string, unknown>[];
-  members: Record<string, unknown>[];
+  tasks: Record<string, any>[];
+  members: Record<string, any>[];
   onAdd?: () => void;
   onStatusChange?: (taskId: string, newStatus: string) => void;
-  onTaskClick?: (task: Record<string, unknown>) => void;
+  onTaskClick?: (task: Record<string, any>) => void;
   onDelete?: (taskId: string) => void | Promise<void>;
   embedded?: boolean;
 }) {
@@ -39,7 +39,7 @@ export default function TaskList({
   const filtered = filter === 'all' ? tasks : tasks.filter((t) => t.status === filter);
 
   const memberName = (uid: string) => {
-    const m = members.find((mb: Record<string, unknown>) => mb.user_id === uid || mb.id === uid);
+    const m = members.find((mb: Record<string, any>) => mb.user_id === uid || mb.id === uid);
     return m?.user?.name || m?.user?.username || m?.name || m?.username || 'Unassigned';
   };
 

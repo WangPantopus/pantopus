@@ -71,7 +71,6 @@ export default function FeedPreferencesPanel({ open, onClose, prefs, updatePref 
                 checked={!!prefs.show_politics_place}
                 onChange={(v) => {
                   updatePref('showPoliticsPlace', v);
-                  updatePref('showPoliticsFollowing', v);
                   updatePref('showPoliticsConnections', v);
                 }}
               />

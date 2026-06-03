@@ -7,6 +7,10 @@ interface MissionsTabProps {
   postedCount: number;
 }
 
+function stringField(value: unknown, fallback = ''): string {
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
 export default function MissionsTab({ gigs, loading, completedCount, postedCount }: MissionsTabProps) {
   const router = useRouter();
 
@@ -38,18 +42,26 @@ export default function MissionsTab({ gigs, loading, completedCount, postedCount
           <p className="text-sm text-app-secondary">No mission history yet.</p>
         ) : (
           <div className="space-y-2">
-            {gigs.slice(0, 6).map((gig) => (
+            {gigs.slice(0, 6).map((gig, index) => {
+              const id = stringField(gig.id, `mission-${index}`);
+              const title = stringField(gig.title, 'Untitled mission');
+              const category = stringField(gig.category, 'General');
+              const createdAt = stringField(gig.created_at);
+              const status = stringField(gig.status, 'open');
+
+              return (
               <button
-                key={gig.id}
-                onClick={() => router.push(`/app/gigs/${gig.id}`)}
+                key={id}
+                onClick={() => router.push(`/app/gigs/${id}`)}
                 className="w-full text-left rounded-lg border border-app p-3 hover:bg-surface-raised"
               >
-                <p className="text-sm font-medium text-app">{gig.title}</p>
+                <p className="text-sm font-medium text-app">{title}</p>
                 <p className="text-xs text-app-secondary mt-1">
-                  {gig.category || 'General'} • {new Date(gig.created_at).toLocaleDateString()} • {(gig.status || 'open').toUpperCase()}
+                  {category} • {createdAt ? new Date(createdAt).toLocaleDateString() : 'Unknown date'} • {status.toUpperCase()}
                 </p>
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

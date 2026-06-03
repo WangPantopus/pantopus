@@ -11,7 +11,7 @@ type PantopusBadgeProps = {
 
 export default function PantopusBadge({
   href = '/',
-  tagline = 'Digital Neighborhood OS',
+  tagline = 'Your real-world network',
   align = 'center',
   showTagline = true,
   className = '',

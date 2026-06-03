@@ -53,43 +53,8 @@ export interface ClaimDetail {
   evidence: ClaimEvidence[];
 }
 
-export type AdminClaimBucket = 'pending' | 'approved' | 'rejected';
-
-export interface AdminClaimsResponse {
-  claims: AdminClaim[];
-  total: number;
-  /** Age (in seconds) of the oldest claim in the current bucket — only
-   *  populated when `bucket=pending`; null otherwise. Powers the queue
-   *  banner above the Pending tab. */
-  oldest_age_seconds: number | null;
-}
-
-export interface AdminClaimCounts {
-  pending: number;
-  approved: number;
-  rejected: number;
-}
-
-/**
- * Legacy shape kept for backward compatibility — equivalent to
- * `getClaimsByBucket('pending')` without the `oldest_age_seconds` field.
- */
 export async function getPendingClaims(): Promise<{ claims: AdminClaim[]; total: number }> {
   return get('/api/admin/pending-claims');
-}
-
-export async function getClaimsByBucket(
-  bucket: AdminClaimBucket,
-  opts: { limit?: number; offset?: number } = {},
-): Promise<AdminClaimsResponse> {
-  const params = new URLSearchParams({ bucket });
-  if (opts.limit != null) params.set('limit', String(opts.limit));
-  if (opts.offset != null) params.set('offset', String(opts.offset));
-  return get(`/api/admin/claims?${params.toString()}`);
-}
-
-export async function getClaimCounts(): Promise<AdminClaimCounts> {
-  return get('/api/admin/claims/counts');
 }
 
 export async function getClaimDetail(claimId: string): Promise<ClaimDetail> {

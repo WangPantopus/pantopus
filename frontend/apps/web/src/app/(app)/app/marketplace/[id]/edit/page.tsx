@@ -72,7 +72,7 @@ export default function EditListingPage() {
           api.users.getMyProfile(),
         ]);
 
-        const listing = ((listingResult as Record<string, unknown>)?.listing ?? listingResult) as ListingDetail;
+        const listing = ((listingResult as Record<string, any>)?.listing ?? listingResult) as ListingDetail;
         const user = userResult as { id?: string | number };
 
         // Guard: redirect if not the owner
@@ -122,7 +122,7 @@ export default function EditListingPage() {
     setSaving(true);
 
     try {
-      const data: Record<string, unknown> = {
+      const data: Record<string, any> = {
         title: title.trim(),
         description: description.trim() || undefined,
         category,

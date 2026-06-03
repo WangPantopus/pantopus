@@ -13,6 +13,7 @@ import type { FeedSurface, Post, PostType } from '@pantopus/api';
 import type { User } from '@pantopus/types';
 import type { PostComposerSubmitData } from '@/components/feed/PostComposer';
 import { queryKeys } from '@/lib/query-keys';
+import type { SportsMode, TopicKey } from '@/constants/feedTopics';
 
 export type FilterType = PostType | 'all';
 
@@ -27,12 +28,27 @@ interface UseFeedDataOptions {
 }
 
 type FeedPage = Awaited<ReturnType<typeof api.posts.getFeedV2>>;
-type FeedCursor = { createdAt: string; id: string } | null;
+// Sports lane returns a richer cursor tuple: (rankBucket, createdAt, id).
+type FeedCursor = { createdAt: string; id: string; rankBucket?: number } | null;
 
-// Build the full query key with location params so different locations
-// produce different cache entries. Location only applies to `place` surface.
-function buildFeedKey(surface: FeedSurface, filter: FilterType, locationKey: string) {
-  return [...queryKeys.feed(surface, filter), locationKey] as const;
+// Build the full query key with location + topic/mode params so different
+// lanes produce different cache entries. Location only applies to `place`;
+// topic/sportsMode/eventKey only apply when the Sports lane is active.
+function buildFeedKey(
+  surface: FeedSurface,
+  filter: FilterType,
+  locationKey: string,
+  topic: TopicKey | null,
+  sportsMode: SportsMode | null,
+  eventKey: string | null,
+) {
+  return [
+    ...queryKeys.feed(surface, filter),
+    locationKey,
+    topic ?? 'none',
+    topic === 'sports' ? (sportsMode ?? 'for_you') : 'na',
+    topic === 'sports' ? (eventKey ?? 'none') : 'na',
+  ] as const;
 }
 
 export function useFeedData({
@@ -49,6 +65,9 @@ export function useFeedData({
   const [user, setUser] = useState<User | null>(null);
   const [surface, setSurface] = useState<FeedSurface>('place');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [topic, setTopicState] = useState<TopicKey | null>(null);
+  const [sportsMode, setSportsMode] = useState<SportsMode>('for_you');
+  const [eventKey, setEventKey] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
 
@@ -62,12 +81,12 @@ export function useFeedData({
   const locationKey = useMemo(() => {
     if (surface !== 'place') return 'na';
     if (viewingLat == null || viewingLng == null) return 'nogeo';
-    return `${viewingLat.toFixed(4)},${viewingLng.toFixed(4)},${radiusMiles ?? 10}`;
+    return `${viewingLat.toFixed(4)},${viewingLng.toFixed(4)},${radiusMiles ?? 100}`;
   }, [surface, viewingLat, viewingLng, radiusMiles]);
 
   const currentKey = useMemo(
-    () => buildFeedKey(surface, filter, locationKey),
-    [surface, filter, locationKey],
+    () => buildFeedKey(surface, filter, locationKey, topic, sportsMode, eventKey),
+    [surface, filter, locationKey, topic, sportsMode, eventKey],
   );
 
   // Load user
@@ -110,19 +129,34 @@ export function useFeedData({
         limit: 20,
       };
 
-      if (surface === 'place' && filter !== 'all') {
+      // The Sports topic lane swaps the post-type chip row for a mode row
+      // (For You / Local / Event / Watch). Don't send postType in that case —
+      // the sports lane API ignores it and the chip filter state carries
+      // sportsMode instead.
+      const isSportsLane = surface === 'place' && topic === 'sports';
+
+      if (surface === 'place' && filter !== 'all' && !isSportsLane) {
         params.postType = filter as PostType;
+      }
+
+      if (isSportsLane) {
+        params.topic = 'sports';
+        params.sportsMode = sportsMode;
+        if (eventKey) params.eventKey = eventKey;
       }
 
       if (surface === 'place' && viewingLat != null && viewingLng != null) {
         params.latitude = viewingLat;
         params.longitude = viewingLng;
-        params.radiusMiles = radiusMiles ?? 10;
+        params.radiusMiles = radiusMiles ?? 100;
       }
 
       if (pageParam) {
         params.cursorCreatedAt = pageParam.createdAt;
         params.cursorId = pageParam.id;
+        if (pageParam.rankBucket != null) {
+          params.cursorRankBucket = pageParam.rankBucket;
+        }
       }
 
       return api.posts.getFeedV2(params);
@@ -230,12 +264,22 @@ export function useFeedData({
     [queryClient, currentKey],
   );
 
-  // Surface change handler
+  // Surface change handler — leaving Place clears the active topic (topics
+  // are Place-only in Phase 1 since the union needs a viewing location).
   const handleSurfaceChange = useCallback((newSurface: FeedSurface) => {
     if (newSurface === surface) return;
     setSurface(newSurface);
     setFilter('all');
+    if (newSurface !== 'place') setTopicState(null);
   }, [surface]);
+
+  // Topic toggle — entering a topic resets the post-type filter and sports
+  // mode; leaving returns to the default "All" chip.
+  const setTopic = useCallback((next: TopicKey | null) => {
+    setTopicState(next);
+    setFilter('all');
+    if (next != null) setSportsMode('for_you');
+  }, []);
 
   // Post actions
   const handleCreatePost = useCallback(async (data: PostComposerSubmitData) => {
@@ -243,10 +287,7 @@ export function useFeedData({
     try {
       const { mediaFiles, ...composerData } = data;
       const postData = { ...composerData } as Parameters<typeof api.posts.createPost>[0];
-      if (surface === 'following') {
-        if (postData.audience == null) postData.audience = 'followers';
-        if (postData.visibility == null) postData.visibility = 'followers';
-      } else if (surface === 'connections') {
+      if (surface === 'connections') {
         if (postData.audience == null) postData.audience = 'connections';
         if (postData.visibility == null) postData.visibility = 'connections';
       }
@@ -435,5 +476,12 @@ export function useFeedData({
     handleNotHelpful,
     handleSolved,
     patchPost,
+    // Sports topic lane
+    topic,
+    setTopic,
+    sportsMode,
+    setSportsMode,
+    eventKey,
+    setEventKey,
   };
 }

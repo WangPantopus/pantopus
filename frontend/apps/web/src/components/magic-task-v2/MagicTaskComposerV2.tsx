@@ -141,7 +141,7 @@ export default function MagicTaskComposerV2({ isOpen, onClose }: MagicTaskCompos
         location,
         source_flow: 'magic',
         ai_confidence: draft.confidence,
-        ai_draft_json: draft.draft as unknown as Record<string, unknown>,
+        ai_draft_json: draft.draft as unknown as Record<string, any>,
       });
       setPostResult(result);
       setPhase('posted');
@@ -189,7 +189,7 @@ export default function MagicTaskComposerV2({ isOpen, onClose }: MagicTaskCompos
     const physical = selectedLocation && selectedLocation.mode !== 'remote' ? selectedLocation : null;
 
     // The destination page reads a single `prefill` query param containing JSON.
-    const prefill: Record<string, unknown> = {
+    const prefill: Record<string, any> = {
       title: draft.draft.title,
       description: draft.draft.description,
       category: draft.draft.category,

@@ -6,7 +6,7 @@ import * as api from '@pantopus/api';
 import { toast } from '@/components/ui/toast-store';
 import ReportModal from '@/components/ui/ReportModal';
 
-type AnyObj = Record<string, unknown>;
+type AnyObj = Record<string, any>;
 
 interface GigHeaderProps {
   gigId: string;

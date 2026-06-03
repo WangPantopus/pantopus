@@ -1,13 +1,12 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Home as HomeIcon, Link2, Users } from 'lucide-react';
+import { Home as HomeIcon, Link2 } from 'lucide-react';
 import type { PostVisibility } from '@pantopus/api';
 
 /** Matches mobile feed + backend: nearby / social graph only (no legacy `public`). */
 const VISIBILITY_OPTIONS: { value: PostVisibility; label: string; icon: ReactNode; desc: string }[] = [
   { value: 'neighborhood', label: 'Neighborhood', icon: <HomeIcon className="w-4 h-4" />, desc: 'People nearby on Pantopus' },
-  { value: 'followers', label: 'Followers', icon: <Users className="w-4 h-4" />, desc: 'People who follow you' },
   { value: 'connections', label: 'Connections', icon: <Link2 className="w-4 h-4" />, desc: 'Your mutual connections' },
 ];
 

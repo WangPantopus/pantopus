@@ -19,13 +19,25 @@ const SPECIES_ICON: Record<string, ReactNode> = {
   other: <PawPrint className="w-4 h-4" />,
 };
 
+type PetFormData = {
+  name: string;
+  species?: string;
+  breed?: string;
+  birthday?: string;
+  weight_lbs?: number;
+  microchip_id?: string;
+  vet_name?: string;
+  vet_phone?: string;
+  notes?: string;
+};
+
 // ---- Preview ----
 
 export function PetsCardPreview({
   pets,
   onExpand,
 }: {
-  pets: Record<string, unknown>[];
+  pets: Record<string, any>[];
   onExpand: () => void;
 }) {
   return (
@@ -68,7 +80,7 @@ export default function PetsCard({
 }) {
   const [pets, setPets] = useState<HomePet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [panel, setPanel] = useState<{ open: boolean; pet?: Record<string, unknown> }>({ open: false });
+  const [panel, setPanel] = useState<{ open: boolean; pet?: HomePet }>({ open: false });
 
   const loadPets = useCallback(async () => {
     try {
@@ -82,10 +94,11 @@ export default function PetsCard({
 
   useEffect(() => { loadPets(); }, [loadPets]);
 
-  const handleSave = async (data: Record<string, unknown>) => {
-    if (panel.pet) {
-      const res = await api.homeProfile.updateHomePet(homeId, panel.pet.id, data);
-      setPets((prev) => prev.map((p) => (p.id === panel.pet.id ? { ...p, ...res.pet } : p)));
+  const handleSave = async (data: PetFormData) => {
+    const pet = panel.pet;
+    if (pet) {
+      const res = await api.homeProfile.updateHomePet(homeId, pet.id, data);
+      setPets((prev) => prev.map((p) => (p.id === pet.id ? { ...p, ...res.pet } : p)));
     } else {
       const res = await api.homeProfile.createHomePet(homeId, data);
       setPets((prev) => [res.pet, ...prev]);
@@ -214,8 +227,8 @@ function PetSlidePanel({
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Record<string, unknown>) => Promise<void>;
-  pet?: Record<string, unknown>;
+  onSave: (data: PetFormData) => Promise<void>;
+  pet?: HomePet;
 }) {
   const [name, setName] = useState('');
   const [species, setSpecies] = useState('dog');

@@ -124,11 +124,9 @@ export default function BusinessPublicProfile({ username, currentUser, initialSl
       if (following) {
         await api.businesses.unfollowBusiness(String(business.id));
         setFollowing(false);
-        setBusiness((prev) => prev ? { ...prev, followers_count: Math.max(0, ((prev as BusinessUser & { followers_count?: number }).followers_count || 1) - 1) } : prev);
       } else {
         await api.businesses.followBusiness(String(business.id));
         setFollowing(true);
-        setBusiness((prev) => prev ? { ...prev, followers_count: ((prev as BusinessUser & { followers_count?: number }).followers_count || 0) + 1 } : prev);
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to update follow status');
@@ -173,7 +171,7 @@ export default function BusinessPublicProfile({ username, currentUser, initialSl
     if (!business?.id) return;
     setOpeningChat(true);
     try {
-      const resp = await api.businesses.startBusinessInquiry(String(business.id), `Inquiry for @${username}`) as Record<string, unknown>;
+      const resp = await api.businesses.startBusinessInquiry(String(business.id), `Inquiry for @${username}`) as Record<string, any>;
       if (!resp?.roomId) throw new Error('Chat room was not created');
       router.push(`/app/chat/${resp.roomId}`);
     } catch (e: unknown) {
@@ -701,7 +699,7 @@ function CustomPageTab({
 }: {
   username: string;
   pageSlug: string;
-  ctx: Record<string, unknown>;
+  ctx: Record<string, any>;
 }) {
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -730,7 +728,7 @@ function CustomPageTab({
   return (
     <div className="space-y-4">
       {blocks.map((block: PageBlock, i: number) => (
-        <PublicBlock key={block.id || i} block={block} ctx={ctx as Record<string, unknown>} />
+        <PublicBlock key={block.id || i} block={block} ctx={ctx as Record<string, any>} />
       ))}
     </div>
   );

@@ -6,6 +6,10 @@ interface OwnerInsightsTabProps {
   displayRating: number;
 }
 
+function numberField(value: unknown): number {
+  return typeof value === 'number' ? value : 0;
+}
+
 export default function OwnerInsightsTab({ profile, displayReviewCount, displayRating }: OwnerInsightsTabProps) {
   const profileStrength = [
     profile.bio,
@@ -32,9 +36,9 @@ export default function OwnerInsightsTab({ profile, displayReviewCount, displayR
       </div>
       <div className="bg-surface rounded-xl border border-app p-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <TrustChip title="Rating" value={displayReviewCount > 0 ? displayRating.toFixed(1) : 'New'} detail={`${displayReviewCount} reviews`} />
-        <TrustChip title="Followers" value={profile.followers_count || 0} detail="community reach" />
-        <TrustChip title="Completed" value={profile.gigs_completed || 0} detail="as worker" />
-        <TrustChip title="Posted" value={profile.gigs_posted || 0} detail="as poster" />
+        <TrustChip title="Followers" value={numberField(profile.followers_count)} detail="community reach" />
+        <TrustChip title="Completed" value={numberField(profile.gigs_completed)} detail="as worker" />
+        <TrustChip title="Posted" value={numberField(profile.gigs_posted)} detail="as poster" />
       </div>
     </div>
   );

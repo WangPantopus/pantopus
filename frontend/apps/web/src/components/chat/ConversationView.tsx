@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
 import { getInitials } from '@pantopus/ui-utils';
-import type { ConversationTopic, User } from '@pantopus/types';
+import type { ConversationTopic } from '@pantopus/types';
 import { useChatMessages } from '../../hooks/useChatMessages';
 import ChatMessageList from './ChatMessageList';
 import ChatInput from './ChatInput';
@@ -34,7 +34,6 @@ export default function ConversationView({
 
   // ── Conversation-specific state ───────────────────────
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [otherUser, setOtherUser] = useState<User | null>(null);
   const [topics, setTopics] = useState<ConversationTopic[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(initialTopicId || null);
   const [showDrawer, setShowDrawer] = useState(false);
@@ -60,16 +59,7 @@ export default function ConversationView({
     })();
   }, []);
 
-  // ── Resolve other user info ───────────────────────────
-  useEffect(() => {
-    if (!otherUserId) return;
-    (async () => {
-      try {
-        const result = await api.chat.createDirectChat(otherUserId) as { otherUser?: User };
-        if (result?.otherUser) setOtherUser(result.otherUser);
-      } catch {}
-    })();
-  }, [otherUserId]);
+  const otherUser = chat.directChatPeer;
 
   // ── Fetch topics ──────────────────────────────────────
   const fetchTopics = useCallback(async () => {
@@ -102,8 +92,8 @@ export default function ConversationView({
 
   // ── Ownership check ───────────────────────────────────
   const isOwnMessage = useCallback(
-    (msg: Record<string, unknown>) => {
-      const senderId = (msg.user_id as string) || (msg.sender_id as string) || ((msg.sender as Record<string, unknown>)?.id as string);
+    (msg: Record<string, any>) => {
+      const senderId = (msg.user_id as string) || (msg.sender_id as string) || ((msg.sender as Record<string, any>)?.id as string);
       return senderId === currentUserId;
     },
     [currentUserId],
@@ -203,7 +193,7 @@ export default function ConversationView({
   }, [topics]);
 
   const renderTopicDivider = useCallback(
-    (msg: Record<string, unknown>, prevMsg: Record<string, unknown> | null) => {
+    (msg: Record<string, any>, prevMsg: Record<string, any> | null) => {
       if (selectedTopicId) return null; // no dividers when filtering
       const currTopicId = (msg.topic_id as string) || null;
       const prevTopicId = (prevMsg?.topic_id as string) || null;
@@ -225,7 +215,7 @@ export default function ConversationView({
 
   // ── Derived values ────────────────────────────────────
   const chatTitle = otherUser?.name
-    || [otherUser?.firstName, ((otherUser as Record<string, unknown>)?.last_name as string) ?? ((otherUser as Record<string, unknown>)?.lastName as string)].filter(Boolean).join(' ')
+    || [otherUser?.firstName, ((otherUser as Record<string, any>)?.last_name as string) ?? ((otherUser as Record<string, any>)?.lastName as string)].filter(Boolean).join(' ')
     || otherUser?.username
     || 'Conversation';
   const avatarUrl = otherUser?.profile_picture_url;

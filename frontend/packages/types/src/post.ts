@@ -3,6 +3,8 @@
 // Shared between web, mobile, and API packages
 // ============================================================
 
+import type { PublicAuthorIdentity } from './identity';
+
 export type PostType =
   // Place types
   | 'ask_local' | 'recommendation' | 'event' | 'lost_found'
@@ -22,26 +24,40 @@ export type SafetyAlertKind =
   | 'traffic' | 'infra_outage' | 'weather_env' | 'crime_incident' | 'public_safety';
 
 // v1.1 Feed surfaces
-export type FeedSurface = 'place' | 'following' | 'connections';
+export type FeedSurface = 'place' | 'connections' | 'personas';
 
 // v1.1 Distribution targets
-export type DistributionTarget = 'place' | 'followers' | 'connections';
+export type DistributionTarget = 'place' | 'connections' | 'persona_followers' | 'public';
 
-export type PostAs = 'personal' | 'business' | 'home';
-export type Audience = 'connections' | 'followers' | 'network' | 'nearby' | 'saved_place' | 'household' | 'neighborhood' | 'target_area';
-export type FeedScope = 'nearby' | 'following' | 'connections' | 'home' | 'saved-place';
+export type PostAs = 'personal' | 'business' | 'home' | 'persona';
+/**
+ * Personal-zone composer postAs values. Per unified-IA §4.1, the
+ * Personal-zone composer NEVER offers 'persona' as a posting-as option —
+ * persona-context posts go through the audience-zone composer (P2.5)
+ * which targets persona-specific routes.
+ */
+export type PersonalPostAs = Exclude<PostAs, 'persona'>;
+export type PersonaPostAudience = 'followers' | 'public';
+export type Audience = 'connections' | 'network' | 'nearby' | 'saved_place' | 'household' | 'neighborhood' | 'target_area' | 'public';
+export type FeedScope = 'nearby' | 'connections' | 'home' | 'saved-place';
 export type TrustLevel = 'verified_resident' | 'verified_business' | 'visitor' | 'incoming_resident' | 'remote_viewer';
 export type MapLayerType = 'post' | 'task' | 'offer' | 'business' | 'home';
 
-export interface PostCreator {
+export interface PostCreator extends Partial<Omit<PublicAuthorIdentity, 'id'>> {
   id: string;
-  username: string;
+  username?: string;
   name?: string;
   first_name?: string;
   last_name?: string;
   profile_picture_url?: string;
   city?: string;
   state?: string;
+  locality?: {
+    city?: string | null;
+    state?: string | null;
+    neighborhood?: string | null;
+    precision?: string | null;
+  };
 }
 
 export interface PostCommentAttachment {
@@ -71,11 +87,12 @@ export interface PostComment {
 }
 
 export interface PostingIdentity {
-  type: 'personal' | 'business' | 'home';
+  type: 'personal' | 'business' | 'home' | 'persona';
   id: string;
   name: string;
   role?: string;
   profile_picture_url?: string;
+  imageUrl?: string | null;
 }
 
 export interface Post {
@@ -106,7 +123,10 @@ export interface Post {
   updated_at: string;
   // Feed redesign fields
   post_as?: PostAs;
-  audience?: Audience;
+  audience?: Audience | PersonaPostAudience;
+  author_user_id?: string | null;
+  identity_context_type?: 'local' | 'persona' | 'home' | 'business' | string | null;
+  identity_context_id?: string | null;
   business_id?: string | null;
   business_author_id?: string | null;
   resolved_at?: string | null;
@@ -145,6 +165,10 @@ export interface Post {
   ref_task_id?: string | null;
   // v1.1 distribution
   distribution_targets?: DistributionTarget[];
+  broadcast_channel_id?: string | null;
+  target_tier_rank?: number | null;
+  delivered_count?: number;
+  read_count?: number;
   gps_timestamp?: string | null;
   // v1.2 social layer fields
   purpose?: string | null;
@@ -157,6 +181,7 @@ export interface Post {
   not_helpful_count?: number;
   // Relations
   creator?: PostCreator;
+  author?: PublicAuthorIdentity | null;
   business_author?: PostCreator | null;
   home?: { id: string; address?: string | null; city: string; state?: string } | null;
   userHasLiked?: boolean;

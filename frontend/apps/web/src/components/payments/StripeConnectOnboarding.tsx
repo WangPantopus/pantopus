@@ -66,14 +66,14 @@ export default function StripeConnectOnboarding({
         setError('Failed to get onboarding link.');
       }
     } catch (err: unknown) {
-      const errData = (err as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      const errData = (err as Record<string, any>)?.data as Record<string, any> | undefined;
       const code = errData?.code;
       let message: string;
       
       if (code === 'connect_not_enabled') {
         message = 'Stripe Connect is not enabled yet. The platform admin needs to set this up in the Stripe Dashboard.';
       } else {
-        message = (err as Record<string, unknown>)?.message as string || (err instanceof Error ? err.message : 'Connection failed. Please try again.');
+        message = (err as Record<string, any>)?.message as string || (err instanceof Error ? err.message : 'Connection failed. Please try again.');
       }
       
       console.error('Stripe Connect error:', err);
@@ -95,7 +95,7 @@ export default function StripeConnectOnboarding({
       }
     } catch (err: unknown) {
       const message =
-        (err as Record<string, unknown>)?.message as string ||
+        (err as Record<string, any>)?.message as string ||
         (err instanceof Error ? err.message : 'Could not open Stripe Dashboard.');
       setError(message);
     } finally {

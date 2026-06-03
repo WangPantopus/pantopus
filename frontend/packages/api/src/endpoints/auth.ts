@@ -138,7 +138,7 @@ export async function verifyEmail(params: {
   tokenHash?: string;
   token?: string;
   email?: string;
-  type?: 'signup' | 'email';
+  type?: 'signup' | 'email' | 'magiclink';
 }): Promise<ApiResponse> {
   return post<ApiResponse>('/api/users/verify-email', params);
 }

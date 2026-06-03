@@ -9,7 +9,7 @@ interface InsightsTabProps {
 export default function InsightsTab({ businessId }: InsightsTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [insights, setInsights] = useState<Record<string, unknown> | null>(null);
+  const [insights, setInsights] = useState<Record<string, any> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);

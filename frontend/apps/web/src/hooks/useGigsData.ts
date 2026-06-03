@@ -94,7 +94,7 @@ export function useGigsData() {
         if (viewerHome) {
           filters.latitude = viewerHome.lat;
           filters.longitude = viewerHome.lng;
-          filters.radiusMiles = 25;
+          filters.radiusMiles = 100;
           filters.includeRemote = includeRemote;
         }
 

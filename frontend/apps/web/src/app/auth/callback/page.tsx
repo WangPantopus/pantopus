@@ -5,7 +5,6 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as api from '@pantopus/api';
-import { getAuthToken } from '@pantopus/api';
 
 const NO_CODE_ERROR_DELAY_MS = 700;
 
@@ -39,19 +38,7 @@ function AuthCallbackPageContent() {
       // Implicit flow — verify token with backend and ensure profile exists
       (async () => {
         try {
-          const resp = await api.auth.oauthTokenCallback(accessTokenFromHash, refreshTokenFromHash);
-          const respObj = resp as Record<string, unknown>;
-          const respSession = respObj.session as Record<string, unknown> | undefined;
-          const token =
-            (respObj.token as string) ||
-            (respSession?.accessToken as string) ||
-            (respObj.accessToken as string) ||
-            (respObj.access_token as string) ||
-            getAuthToken();
-          const refreshToken =
-            (respObj.refreshToken as string) ||
-            (respObj.refresh_token as string) ||
-            (respSession?.refreshToken as string);
+          await api.auth.oauthTokenCallback(accessTokenFromHash, refreshTokenFromHash);
           router.push('/app/hub');
         } catch (err: unknown) {
           console.error('OAuth token callback error:', err);
@@ -90,19 +77,7 @@ function AuthCallbackPageContent() {
 
     (async () => {
       try {
-        const resp = await api.auth.oauthCallback(code);
-        const respObj = resp as Record<string, unknown>;
-        const respSession = respObj.session as Record<string, unknown> | undefined;
-        const token =
-          (respObj.token as string) ||
-          (respSession?.accessToken as string) ||
-          (respObj.accessToken as string) ||
-          (respObj.access_token as string) ||
-          getAuthToken();
-        const refreshToken =
-          (respObj.refreshToken as string) ||
-          (respObj.refresh_token as string) ||
-          (respSession?.refreshToken as string);
+        await api.auth.oauthCallback(code);
         router.push('/app/hub');
       } catch (err: unknown) {
         console.error('OAuth callback error:', err);

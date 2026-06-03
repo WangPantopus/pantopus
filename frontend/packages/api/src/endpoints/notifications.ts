@@ -18,19 +18,43 @@ export async function getNotifications(opts?: {
   limit?: number;
   offset?: number;
   unread?: boolean;
+  /**
+   * P2.3 / unified-IA §6.1 — firewall context filter.
+   * 'all' (default), 'personal', 'audience', 'platform'.
+   */
+  context?: 'all' | 'personal' | 'audience' | 'platform';
+  /**
+   * Legacy Identity Firewall axis for non-split bell filters.
+   */
+  context_type?: 'personal' | 'business';
+  context_id?: string;
 }): Promise<{ notifications: Notification[]; unreadCount: number; hasMore: boolean }> {
   const params = new URLSearchParams();
   if (opts?.limit) params.set('limit', String(opts.limit));
   if (opts?.offset) params.set('offset', String(opts.offset));
   if (opts?.unread) params.set('unread', 'true');
+  if (opts?.context && opts.context !== 'all') params.set('context', opts.context);
+  if (opts?.context_type) params.set('context_type', opts.context_type);
+  if (opts?.context_id) params.set('context_id', opts.context_id);
   const qs = params.toString();
   return get(`/api/notifications${qs ? `?${qs}` : ''}`);
 }
 
+export interface UnreadCountByContext {
+  personal: number;
+  audience: number;
+  platform: number;
+}
+
 /**
- * Get unread count only (lightweight, for badge)
+ * Get unread count only (lightweight, for badge).
+ * Returns the legacy `count` field plus a `byContext` breakdown so the
+ * Personal-zone bell and the Audience-zone megaphone (P2.3) can render
+ * independently from a single network call.
  */
-export async function getUnreadCount(config?: ApiRequestConfig): Promise<{ count: number }> {
+export async function getUnreadCount(
+  config?: ApiRequestConfig,
+): Promise<{ count: number; total?: number; byContext?: UnreadCountByContext }> {
   return get('/api/notifications/unread-count', undefined, config);
 }
 
@@ -41,11 +65,15 @@ export async function markAsRead(notificationId: string): Promise<{ notification
   return apiClient.patch(`/api/notifications/${notificationId}/read`).then(r => r.data);
 }
 
+export type NotificationReadScope =
+  | { context?: 'all' | 'personal' | 'audience' | 'platform'; contexts?: never; context_type?: 'personal' | 'business'; context_id?: string }
+  | { contexts?: Array<'personal' | 'audience' | 'platform'>; context?: never; context_type?: 'personal' | 'business'; context_id?: string };
+
 /**
- * Mark all notifications as read
+ * Mark notifications as read, optionally scoped to a firewall stream.
  */
-export async function markAllAsRead(): Promise<{ message: string }> {
-  return post('/api/notifications/read-all');
+export async function markAllAsRead(scope?: NotificationReadScope): Promise<{ message: string }> {
+  return post('/api/notifications/read-all', scope || {});
 }
 
 /**

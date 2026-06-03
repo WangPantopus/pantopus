@@ -18,7 +18,7 @@ import { formatTimeAgo } from '@pantopus/ui-utils';
 import type { Listing } from '@pantopus/api';
 
 // ── Leaflet icon fix ─────────────────────────────────────────
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as Record<string, any>)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: '/leaflet/marker-icon-2x.png',
   iconUrl: '/leaflet/marker-icon.png',

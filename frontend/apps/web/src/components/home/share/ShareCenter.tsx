@@ -91,11 +91,11 @@ export default function ShareCenter({
   onSecretsChange: _onSecretsChange,
 }: {
   homeId: string;
-  home: Record<string, unknown>;
-  secrets: Record<string, unknown>[];
-  emergencies: Record<string, unknown>[];
+  home: Record<string, any>;
+  secrets: Record<string, any>[];
+  emergencies: Record<string, any>[];
   can: (perm: string) => boolean;
-  onSecretsChange: (s: Record<string, unknown>[]) => void;
+  onSecretsChange: (s: Record<string, any>[]) => void;
 }) {
   const [passes, setPasses] = useState<GuestPass[]>([]);
   const [loading, setLoading] = useState(true);

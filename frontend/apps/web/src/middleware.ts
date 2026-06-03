@@ -18,6 +18,19 @@ function clearAuthCookies(res: NextResponse) {
 
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
+
+  const personaMatch = pathname.match(/^\/(?:@|%40)([^/]+)$/i);
+  if (personaMatch) {
+    const rewriteUrl = new URL(`/persona/${personaMatch[1]}`, req.url);
+    rewriteUrl.search = search;
+    return NextResponse.rewrite(rewriteUrl);
+  }
+
+  if (pathname === '/signin') {
+    const dest = new URL('/login', req.url);
+    dest.search = search;
+    return NextResponse.redirect(dest);
+  }
   const hasSessionFlag = req.cookies.get(SESSION_COOKIE)?.value === '1';
   const hasAccessCookie = Boolean(req.cookies.get(ACCESS_COOKIE)?.value);
   const isAuthenticated = hasSessionFlag && hasAccessCookie;
@@ -88,14 +101,6 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/',
-    '/app/:path*',
-    '/gigs/:path*',
-    '/login',
-    '/register',
-    '/forgot-password',
-    '/reset-password',
-    '/verify-email',
-    '/verify-email-sent',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)',
   ],
 };

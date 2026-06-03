@@ -112,7 +112,7 @@ function PostTaskPageContent() {
         setCancellationPolicy(g.cancellation_policy || 'standard');
         if (Array.isArray(g.items)) {
           const mapped = g.items.map((it: unknown) => {
-            const item = (it || {}) as Record<string, unknown>;
+            const item = (it || {}) as Record<string, any>;
             return {
               name: String(item.name || ''),
               notes: String(item.notes || ''),
@@ -300,7 +300,7 @@ function PostTaskPageContent() {
     const parsedTags = tags.split(',').map((t) => t.trim()).filter(Boolean);
     const validItems = items.filter((it) => it.name.trim());
 
-    const payload: Record<string, unknown> = {
+    const payload: Record<string, any> = {
       title: title.trim(),
       description: description.trim(),
       price: parsedPrice,
@@ -336,7 +336,7 @@ function PostTaskPageContent() {
       if (isEditMode && editGigId) {
         setUploadProgress('Saving changes...');
         const updatePayload = { ...payload };
-        delete (updatePayload as Record<string, unknown>).beneficiary_user_id;
+        delete (updatePayload as Record<string, any>).beneficiary_user_id;
         const res = await api.gigs.updateGig(editGigId, updatePayload as Parameters<typeof api.gigs.updateGig>[1]);
         targetGigId = String(res?.gig?.id || editGigId);
       } else {
@@ -380,8 +380,8 @@ function PostTaskPageContent() {
       toast.success(isEditMode ? 'Task updated' : 'Task posted');
       router.push(`/app/gigs/${targetGigId}`);
     } catch (err: unknown) {
-      const errData = err && typeof err === 'object' ? (err as Record<string, unknown>) : null;
-      const details = Array.isArray(errData?.validationDetails) ? (errData.validationDetails as Record<string, unknown>[]) : [];
+      const errData = err && typeof err === 'object' ? (err as Record<string, any>) : null;
+      const details = Array.isArray(errData?.validationDetails) ? (errData.validationDetails as Record<string, any>[]) : [];
       if (details.length > 0) {
         const nextFieldErrors: Record<string, string> = {};
         for (const d of details) {

@@ -23,7 +23,7 @@ export default function TransferAdminWizard({
   open: boolean;
   onClose: () => void;
   homeId: string;
-  members: Record<string, unknown>[];
+	  members: HomeMember[];
   currentUserId: string | null;
   onTransferred: () => void;
 }) {
@@ -51,9 +51,10 @@ export default function TransferAdminWizard({
     onClose();
   };
 
-  const handleTransfer = async () => {
-    if (confirmText !== 'TRANSFER') return;
-    setTransferring(true);
+	  const handleTransfer = async () => {
+	    if (confirmText !== 'TRANSFER') return;
+	    if (!selectedMember) return;
+	    setTransferring(true);
     setError('');
     try {
       const userId = selectedMember.user_id || selectedMember.id;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
@@ -17,6 +17,8 @@ import type { ViewMode, SearchScope, UnifiedResult } from './discoverTypes';
 import { PAGE_SIZE } from './discoverTypes';
 import { useUniversalSearch } from './useUniversalSearch';
 
+const URL_SEARCH_SCOPES: SearchScope[] = ['all', 'local_profiles', 'public_profiles', 'businesses', 'tasks', 'listings'];
+
 function loadTrustLens(): DiscoverySort {
   if (typeof window === 'undefined') return 'relevance';
   try {
@@ -30,12 +32,20 @@ function loadTrustLens(): DiscoverySort {
 
 export function useDiscoverData() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get('q')?.trim() ?? '';
+  const urlScope = searchParams.get('scope') ?? '';
+  const initialScope = URL_SEARCH_SCOPES.includes(urlScope as SearchScope)
+    ? (urlScope as SearchScope)
+    : urlQuery
+      ? 'all'
+      : 'businesses';
   const { viewerHome, loading: homeLoading, hasHome } = useViewerHome();
 
   // ── Search ────────────────────────────────────────────────
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [scope, setScope] = useState<SearchScope>('businesses');
+  const [query, setQuery] = useState(urlQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(urlQuery);
+  const [scope, setScope] = useState<SearchScope>(initialScope);
 
   // ── Trust Lens ────────────────────────────────────────────
   const [sort, setSort] = useState<DiscoverySort>('relevance');
@@ -61,6 +71,7 @@ export function useDiscoverData() {
   const [measureFrom, setMeasureFrom] = useState<MeasureFrom>('home');
 
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const handledUrlSearchRef = useRef('');
 
   // Determine whether we're in "business discovery" mode vs "universal search" mode
   const isBusinessMode = scope === 'businesses' && !debouncedQuery.trim();
@@ -74,6 +85,24 @@ export function useDiscoverData() {
   useEffect(() => {
     setSort(loadTrustLens());
   }, []);
+
+  useEffect(() => {
+    const key = `${urlQuery}\n${urlScope}`;
+    if (!urlQuery && !urlScope) return;
+    if (handledUrlSearchRef.current === key) return;
+    handledUrlSearchRef.current = key;
+
+    if (urlQuery) {
+      setQuery(urlQuery);
+      setDebouncedQuery(urlQuery);
+    }
+
+    if (URL_SEARCH_SCOPES.includes(urlScope as SearchScope)) {
+      setScope(urlScope as SearchScope);
+    } else if (urlQuery) {
+      setScope('all');
+    }
+  }, [urlQuery, urlScope]);
 
   // GPS fallback if no home
   useEffect(() => {
@@ -262,7 +291,8 @@ export function useDiscoverData() {
   const groupedUniResults = useMemo(() => {
     if (scope !== 'all') return null;
     const groups: { type: UnifiedResult['type']; label: string; items: UnifiedResult[] }[] = [
-      { type: 'person', label: 'People', items: [] },
+      { type: 'local_profile', label: 'Profiles', items: [] },
+      { type: 'public_profile', label: 'Beacons', items: [] },
       { type: 'business', label: 'Businesses', items: [] },
       { type: 'task', label: 'Tasks', items: [] },
       { type: 'listing', label: 'Listings', items: [] },

@@ -121,18 +121,13 @@ export default function InviteAcceptPage() {
   };
 
   const handleLogin = () => {
-    // Store token for after login redirect
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('pendingInviteToken', token);
-    }
-    router.push(`/login?redirect=/invite/${token}`);
+    const next = encodeURIComponent(`/invite/${token}`);
+    router.push(`/login?redirectTo=${next}`);
   };
 
   const handleSignUp = () => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('pendingInviteToken', token);
-    }
-    router.push(`/register?redirect=/invite/${token}`);
+    const next = encodeURIComponent(`/invite/${token}`);
+    router.push(`/register?redirectTo=${next}`);
   };
 
   // ==========================================

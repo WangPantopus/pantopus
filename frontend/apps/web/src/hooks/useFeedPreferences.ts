@@ -6,7 +6,6 @@ import * as api from '@pantopus/api';
 export interface FeedPrefs {
   hide_deals_place: boolean;
   hide_alerts_place: boolean;
-  show_politics_following?: boolean;
   show_politics_connections?: boolean;
   show_politics_place?: boolean;
 }
@@ -21,7 +20,7 @@ export function useFeedPreferences(showToast: (msg: string) => void, onPrefChang
 
   const updatePref = useCallback(async (key: string, value: boolean) => {
     try {
-      const res = await api.posts.updateFeedPreferences({ [key]: value } as Record<string, unknown>);
+      const res = await api.posts.updateFeedPreferences({ [key]: value } as Record<string, any>);
       setPrefs(res.preferences);
       onPrefChanged();
     } catch {

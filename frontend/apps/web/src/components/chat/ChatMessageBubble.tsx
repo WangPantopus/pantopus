@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
-import type { ReactionSummary } from '@pantopus/types';
+import type { ChatMessage } from '@pantopus/types';
 import { extractAttachments, resolveMessageType } from '../../hooks/useChatMessages';
 import ChatRichCard from './ChatRichCard';
 import UserIdentityLink from '@/components/user/UserIdentityLink';
@@ -18,29 +17,7 @@ function isEmojiOnly(text?: string): boolean {
   return EMOJI_ONLY_REGEX.test(trimmed);
 }
 
-export interface ChatMessage {
-  id: string;
-  created_at?: string;
-  message_text?: string;
-  message?: string;
-  content?: string;
-  metadata?: Record<string, unknown>;
-  _optimistic?: boolean;
-  _failed?: boolean;
-  _clientMessageId?: string;
-  user_id?: string;
-  sender_id?: string;
-  sender?: {
-    id?: string;
-    name?: string;
-    username?: string;
-    profile_picture_url?: string;
-  };
-  reactions?: ReactionSummary[];
-  edited?: boolean;
-  is_edited?: boolean;
-  reply_to_id?: string;
-}
+export type { ChatMessage };
 
 interface ChatMessageBubbleProps {
   msg: ChatMessage;
@@ -210,7 +187,7 @@ function ChatMessageBubble({ msg, isMine, showSender = false, onImageClick, onRe
             {showText && msgText}
             {attachments.length > 0 && (
               <div className={`${showText ? 'mt-2' : ''} space-y-2`}>
-                {attachments.map((a: Record<string, unknown>, i: number) => {
+                {attachments.map((a: Record<string, any>, i: number) => {
                   const mime = String(a?.mime_type || '');
                   const isImage = mime.startsWith('image/');
                   const url = a?.file_url as string | undefined;
@@ -220,16 +197,24 @@ function ChatMessageBubble({ msg, isMine, showSender = false, onImageClick, onRe
                         key={`${msg.id}-att-${i}`}
                         type="button"
                         onClick={() => onImageClick ? onImageClick(url, a.original_filename) : window.open(url, '_blank')}
-                        className="block text-left"
+                        className={`block max-w-[min(100%,240px)] overflow-hidden rounded-lg text-left ${
+                          isMine ? 'bg-primary-700/40' : 'bg-black/[0.06]'
+                        }`}
                       >
-                        <Image
+                        {/* Native img: user URLs + cookies on /api/chat/files/; avoids next/image dev sizing warnings. */}
+                        <img
                           src={url}
-                          alt={a.original_filename as string || 'Image'}
-                          className="rounded-lg max-w-[240px] max-h-[180px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          width={240}
-                          height={180}
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          quality={80}
+                          alt={(a.original_filename as string) || 'Image'}
+                          className="rounded-lg transition-opacity hover:opacity-90"
+                          loading="lazy"
+                          decoding="async"
+                          style={{
+                            width: 'auto',
+                            height: 'auto',
+                            maxWidth: '100%',
+                            maxHeight: 'min(180px, 48vw)',
+                            objectFit: 'contain',
+                          }}
                         />
                       </button>
                     );

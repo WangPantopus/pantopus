@@ -87,18 +87,17 @@ interface MemberData {
   user_id: string;
   role?: string;
   role_base?: string;
-  name?: string;
+  name?: string | null;
   created_at?: string;
-  start_at?: string;
-  end_at?: string;
+  start_at?: string | null;
+  end_at?: string | null;
   user?: {
     id?: string;
     name?: string;
     username?: string;
-    profile_picture_url?: string;
+    profile_picture_url?: string | null;
     avatar_url?: string;
   };
-  [key: string]: unknown;
 }
 
 export default function MemberDetail({
@@ -160,18 +159,20 @@ export default function MemberDetail({
     })();
   }, [open, member, homeId]);
 
-  const handleRoleChange = async (newRole: string) => {
-    setSaving(true);
-    setError('');
-    try {
-      await api.homeIam.updateMemberRole(homeId, member.user_id, {
-        role_base: newRole,
-        end_at: expiryDate || undefined,
-      });
+	  const handleRoleChange = async (newRole: string) => {
+	    if (!member) return;
+	    const memberUserId = member.user_id;
+	    setSaving(true);
+	    setError('');
+	    try {
+	      await api.homeIam.updateMemberRole(homeId, memberUserId, {
+	        role_base: newRole,
+	        end_at: expiryDate || undefined,
+	      });
       setRoleBase(newRole);
 
       // Reload permissions for updated role
-      const res = await api.homeIam.getMemberPermissions(homeId, member.user_id);
+	      const res = await api.homeIam.getMemberPermissions(homeId, memberUserId);
       setPermissions(res.permissions || []);
       onUpdate();
     } catch (err: unknown) {
@@ -180,11 +181,13 @@ export default function MemberDetail({
     setSaving(false);
   };
 
-  const handleTogglePermission = async (perm: string, allowed: boolean) => {
-    setSaving(true);
-    setError('');
-    try {
-      await api.homeIam.toggleMemberPermission(homeId, member.user_id, { permission: perm, allowed });
+	  const handleTogglePermission = async (perm: string, allowed: boolean) => {
+	    if (!member) return;
+	    const memberUserId = member.user_id;
+	    setSaving(true);
+	    setError('');
+	    try {
+	      await api.homeIam.toggleMemberPermission(homeId, memberUserId, { permission: perm, allowed });
       if (allowed) {
         setPermissions((prev) => [...new Set([...prev, perm])]);
       } else {
@@ -196,11 +199,13 @@ export default function MemberDetail({
     setSaving(false);
   };
 
-  const handleRemove = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      await api.homeIam.removeMember(homeId, member.user_id);
+	  const handleRemove = async () => {
+	    if (!member) return;
+	    const memberUserId = member.user_id;
+	    setSaving(true);
+	    setError('');
+	    try {
+	      await api.homeIam.removeMember(homeId, memberUserId);
       onRemoved();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to remove member');
@@ -208,11 +213,12 @@ export default function MemberDetail({
     setSaving(false);
   };
 
-  const handleTransfer = async () => {
-    if (transferConfirmText !== 'TRANSFER') return;
-    setSaving(true);
-    setError('');
-    try {
+	  const handleTransfer = async () => {
+	    if (!member) return;
+	    if (transferConfirmText !== 'TRANSFER') return;
+	    setSaving(true);
+	    setError('');
+	    try {
       await api.homeProfile.transferAdmin(homeId, { new_admin_user_id: member.user_id });
       setShowTransfer(false);
       onUpdate();
@@ -223,11 +229,13 @@ export default function MemberDetail({
     setSaving(false);
   };
 
-  const handleSetExpiry = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      await api.homeIam.updateMemberRole(homeId, member.user_id, {
+	  const handleSetExpiry = async () => {
+	    if (!member) return;
+	    const memberUserId = member.user_id;
+	    setSaving(true);
+	    setError('');
+	    try {
+	      await api.homeIam.updateMemberRole(homeId, memberUserId, {
         role_base: roleBase,
         end_at: expiryDate || undefined,
       });

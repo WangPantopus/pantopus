@@ -197,7 +197,44 @@ export const PURPOSE_TO_POST_TYPE: Record<string, string> = {
   story: 'general',
   event: 'event',
   deal: 'deal',
+  // Sports topic lane — composer-only keys; stored API `purpose` stays canonical (see mapComposerPurposeToApiPurpose).
+  sports_anyone_watching: 'ask_local',
+  sports_best_place_watch: 'ask_local',
+  sports_youth_signups: 'ask_local',
+  sports_pickup_weekend: 'ask_local',
 };
+
+/** Canonical `purpose` values accepted by POST /api/posts (Post_purpose_check). */
+const SPORTS_COMPOSER_TO_API_PURPOSE: Record<string, 'ask'> = {
+  sports_anyone_watching: 'ask',
+  sports_best_place_watch: 'ask',
+  sports_youth_signups: 'ask',
+  sports_pickup_weekend: 'ask',
+};
+
+/** Stable keys aligned with Pulse empty-state starters → post_metadata.starter_key */
+const SPORTS_COMPOSER_TO_STARTER_KEY: Record<string, string> = {
+  sports_anyone_watching: 'anyone_watching',
+  sports_best_place_watch: 'best_place_watch',
+  sports_youth_signups: 'youth_signups',
+  sports_pickup_weekend: 'pickup_weekend',
+};
+
+export function isSportsComposerPurpose(purpose: string | null | undefined): boolean {
+  return typeof purpose === 'string' && purpose.startsWith('sports_');
+}
+
+/** Map internal composer purpose (including sports_* keys) to API / DB purpose enum. */
+export function mapComposerPurposeToApiPurpose(purpose: string | null | undefined): string | undefined {
+  if (purpose == null || purpose === '') return undefined;
+  return SPORTS_COMPOSER_TO_API_PURPOSE[purpose] ?? purpose;
+}
+
+/** When set, callers should merge into sports postMetadata for analytics / UX continuity. */
+export function sportsComposerPurposeToStarterKey(purpose: string | null | undefined): string | undefined {
+  if (purpose == null) return undefined;
+  return SPORTS_COMPOSER_TO_STARTER_KEY[purpose];
+}
 
 /**
  * Resolve a composer purpose to its canonical post_type.

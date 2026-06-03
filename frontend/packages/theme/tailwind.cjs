@@ -9,8 +9,6 @@
 
 /** @type {Record<string, string>} */
 const primary = {
-  // 25 — off-white tinted background (unread-row tint).
-  25: '#f8fbff',
   50: '#f0f9ff',
   100: '#e0f2fe',
   200: '#bae6fd',

@@ -4,7 +4,7 @@ import Image from 'next/image';
 
 interface ChatRichCardProps {
   msgType: string;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, any>;
   msgText: string;
   isMine: boolean;
 }
@@ -111,9 +111,16 @@ export default function ChatRichCard({ msgType, metadata, msgText, isMine }: Cha
         } ${isMine ? 'rounded-br-md' : 'rounded-bl-md'} hover:opacity-90 transition-opacity`}
       >
         {imageUrl && (
-          <div className="relative">
-            <Image src={imageUrl as string} alt="" className="w-full h-32 object-cover" width={400} height={128} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" quality={80} />
-            <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-bold ${
+          <div className="relative h-32 w-full min-h-32 overflow-hidden bg-surface-muted">
+            <Image
+              src={imageUrl as string}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 400px"
+              quality={80}
+            />
+            <div className={`absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full text-xs font-bold ${
               isFree ? 'bg-green-500 text-white' : 'bg-surface text-app shadow'
             }`}>
               {isFree ? 'FREE' : price != null ? `$${Number(price).toFixed(0)}` : 'Make Offer'}

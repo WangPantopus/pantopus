@@ -1,12 +1,12 @@
 'use client';
 
-import { MapPin, Users, Link as LinkIcon } from 'lucide-react';
+import { MapPin, Link as LinkIcon, Radio } from 'lucide-react';
 import type { FeedSurface } from '@pantopus/api';
 import type { ReactNode } from 'react';
 
 const SURFACE_TABS: { key: FeedSurface; label: string; icon: ReactNode }[] = [
-  { key: 'place', label: 'Place', icon: <MapPin className="w-4 h-4" /> },
-  { key: 'following', label: 'Following', icon: <Users className="w-4 h-4" /> },
+  { key: 'place', label: 'Nearby', icon: <MapPin className="w-4 h-4" /> },
+  { key: 'personas', label: 'Beacons', icon: <Radio className="w-4 h-4" /> },
   { key: 'connections', label: 'Connections', icon: <LinkIcon className="w-4 h-4" /> },
 ];
 

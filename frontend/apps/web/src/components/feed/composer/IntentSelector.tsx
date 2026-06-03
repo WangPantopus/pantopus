@@ -40,10 +40,8 @@ interface IntentSelectorProps {
 }
 
 export default function IntentSelector({ onSelect, user, activeSurface }: IntentSelectorProps) {
-  const isNetworkSurface = activeSurface === 'following' || activeSurface === 'connections';
-  const sharePrompt = activeSurface === 'following'
-    ? 'Share something with your followers…'
-    : activeSurface === 'connections'
+  const isNetworkSurface = activeSurface === 'connections';
+  const sharePrompt = activeSurface === 'connections'
     ? 'Share something with your connections…'
     : 'Share something with your neighborhood…';
   const userInitial =

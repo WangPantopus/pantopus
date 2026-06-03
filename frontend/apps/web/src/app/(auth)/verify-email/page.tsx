@@ -43,7 +43,8 @@ function VerifyEmailPageContent() {
       const token = searchParams.get('token') || hashParams.get('token') || '';
       const email = normalizeEmail(searchParams.get('email') || hashParams.get('email') || '');
       const typeParam = searchParams.get('type') || hashParams.get('type') || 'signup';
-      const type = typeParam === 'email' ? 'email' : 'signup';
+      const allowedTypes = new Set(['email', 'signup', 'magiclink']);
+      const type = (allowedTypes.has(typeParam) ? typeParam : 'signup') as 'email' | 'signup' | 'magiclink';
 
       setEmailHint(email);
 

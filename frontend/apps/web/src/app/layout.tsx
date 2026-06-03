@@ -6,9 +6,9 @@ import './globals.css';
 import 'leaflet/dist/leaflet.css';
 
 export const metadata: Metadata = {
-  title: 'Pantopus - Your Digital Neighborhood',
+  title: 'Pantopus - Your real-world network',
   description:
-    'Connect, earn, and thrive in your local community with Pantopus - the all-in-one neighborhood super-app.',
+    'Connect, earn, and manage real-world life with Pantopus - the all-in-one network for people, homes, local work, and Beacons.',
   icons: {
     icon: '/favicon.svg',
   },

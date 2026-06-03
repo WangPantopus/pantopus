@@ -46,7 +46,7 @@ export function MaintenanceCardPreview({
   issues,
   onExpand,
 }: {
-  issues: Record<string, unknown>[];
+  issues: Record<string, any>[];
   onExpand: () => void;
 }) {
   const scheduledCount = issues.filter((i) => i.status === 'scheduled').length;
@@ -91,11 +91,11 @@ export default function MaintenanceCard({
   onViewIssue,
   onBack,
 }: {
-  issues: Record<string, unknown>[];
+  issues: Record<string, any>[];
   homeId: string;
-  home: Record<string, unknown>;
+  home: Record<string, any>;
   onAddIssue: () => void;
-  onViewIssue: (issue: Record<string, unknown>) => void;
+  onViewIssue: (issue: Record<string, any>) => void;
   onBack: () => void;
 }) {
   const router = useRouter();

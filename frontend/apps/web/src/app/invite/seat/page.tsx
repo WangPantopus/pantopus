@@ -36,7 +36,7 @@ function SeatInviteAcceptContent() {
 
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [invite, setInvite] = useState<Record<string, unknown> | null>(null);
+  const [invite, setInvite] = useState<Record<string, any> | null>(null);
   const [error, setError] = useState('');
   const [accepting, setAccepting] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -74,8 +74,8 @@ function SeatInviteAcceptContent() {
   const handleAccept = async () => {
     if (!isLoggedIn) {
       // Redirect to login with return URL
-      const returnUrl = encodeURIComponent(`/invite/seat?token=${token}`);
-      router.push(`/login?returnUrl=${returnUrl}`);
+      const next = encodeURIComponent(`/invite/seat?token=${token}`);
+      router.push(`/login?redirectTo=${next}`);
       return;
     }
     setAccepting(true);

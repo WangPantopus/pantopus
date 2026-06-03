@@ -13,7 +13,15 @@ function BreakdownRow({ label, value }: { label: string; value: string | number 
   );
 }
 
+function metricValue(value: unknown): string | number {
+  return typeof value === 'string' || typeof value === 'number' ? value : '—';
+}
+
 export default function ReliabilityPanel({ profile, reliabilityLabel, reliabilityScore }: ReliabilityPanelProps) {
+  const onTimeRate = typeof profile.on_time_rate === 'number' || typeof profile.on_time_rate === 'string'
+    ? `${profile.on_time_rate}%`
+    : '—';
+
   return (
     <div className="bg-surface rounded-xl border border-app p-5">
       <div className="flex items-start justify-between gap-3">
@@ -32,10 +40,10 @@ export default function ReliabilityPanel({ profile, reliabilityLabel, reliabilit
       </div>
 
       <div className="mt-4 space-y-2.5 text-sm">
-        <BreakdownRow label="No-shows" value={profile.no_show_count ?? '—'} />
-        <BreakdownRow label="Late cancels" value={profile.late_cancel_count ?? '—'} />
-        <BreakdownRow label="On-time rate" value={profile.on_time_rate != null ? `${profile.on_time_rate}%` : '—'} />
-        <BreakdownRow label="Disputes" value={profile.dispute_count ?? '—'} />
+        <BreakdownRow label="No-shows" value={metricValue(profile.no_show_count)} />
+        <BreakdownRow label="Late cancels" value={metricValue(profile.late_cancel_count)} />
+        <BreakdownRow label="On-time rate" value={onTimeRate} />
+        <BreakdownRow label="Disputes" value={metricValue(profile.dispute_count)} />
       </div>
     </div>
   );

@@ -21,6 +21,16 @@ export interface BadgeCounts {
   totalMessages: number;
   pendingOffers: number;
   notifications: number;
+  /**
+   * P2.3 — per-firewall breakdown of unread notifications. Lets the
+   * Personal bell and the Audience megaphone render distinct counts
+   * from one /unread-count call. Always defined; default zeros.
+   */
+  notificationsByContext: {
+    personal: number;
+    audience: number;
+    platform: number;
+  };
 }
 
 interface BadgeContextValue extends BadgeCounts {
@@ -37,6 +47,7 @@ const defaultCounts: BadgeCounts = {
   totalMessages: 0,
   pendingOffers: 0,
   notifications: 0,
+  notificationsByContext: { personal: 0, audience: 0, platform: 0 },
 };
 
 const BadgeContext = createContext<BadgeContextValue>({
@@ -67,8 +78,20 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
         api.gigs.getReceivedOffers(undefined, { suppressDevErrorOverlay: true }),
       ]);
 
-      const notifications =
-        notifRes.status === 'fulfilled' ? (notifRes.value as { count?: number })?.count ?? 0 : 0;
+      const notifPayload =
+        notifRes.status === 'fulfilled'
+          ? (notifRes.value as {
+              count?: number;
+              total?: number;
+              byContext?: { personal?: number; audience?: number; platform?: number };
+            })
+          : null;
+      const notifications = notifPayload?.total ?? notifPayload?.count ?? 0;
+      const notificationsByContext = {
+        personal: Number(notifPayload?.byContext?.personal ?? 0) || 0,
+        audience: Number(notifPayload?.byContext?.audience ?? 0) || 0,
+        platform: Number(notifPayload?.byContext?.platform ?? 0) || 0,
+      };
       const unreadMessages =
         chatRes.status === 'fulfilled'
           ? (chatRes.value as { stats?: { total_unread?: number } })?.stats?.total_unread ?? 0
@@ -84,7 +107,13 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
             ).length
           : 0;
 
-      setCounts({ unreadMessages, totalMessages, pendingOffers, notifications });
+      setCounts({
+        unreadMessages,
+        totalMessages,
+        pendingOffers,
+        notifications,
+        notificationsByContext,
+      });
     } catch {
       // silent
     }
@@ -121,13 +150,23 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!socket) return;
 
-    const handleBadgeUpdate = (data: BadgeCounts) => {
+    const handleBadgeUpdate = (data: Partial<BadgeCounts>) => {
       setCounts((prev) => ({
         ...prev,
         unreadMessages: Number(data?.unreadMessages ?? prev.unreadMessages) || 0,
         totalMessages: Number(data?.totalMessages ?? prev.totalMessages) || 0,
         pendingOffers: Number(data?.pendingOffers ?? prev.pendingOffers) || 0,
         notifications: Number(data?.notifications ?? prev.notifications) || 0,
+        // The socket contract may not yet emit byContext. Keep the prior
+        // per-context counts so the megaphone badge doesn't flicker to
+        // zero between socket updates and the next /unread-count poll.
+        notificationsByContext: data?.notificationsByContext
+          ? {
+              personal: Number(data.notificationsByContext.personal ?? prev.notificationsByContext.personal) || 0,
+              audience: Number(data.notificationsByContext.audience ?? prev.notificationsByContext.audience) || 0,
+              platform: Number(data.notificationsByContext.platform ?? prev.notificationsByContext.platform) || 0,
+            }
+          : prev.notificationsByContext,
       }));
     };
 

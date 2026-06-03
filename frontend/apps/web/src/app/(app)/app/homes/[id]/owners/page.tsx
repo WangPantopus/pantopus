@@ -1,339 +1,121 @@
 'use client';
 
-// Pantopus — P15 / T6.3g Owners screen on the shared `<ListOfRowsShell />`.
-// Re-skin of the legacy bespoke owners list onto the shared shell. The
-// page only owns the data fetch (via `@pantopus/api`) + the row
-// projection; the shell renders the chrome. Each owner row renders as
-// the avatar-first shape (40px AvatarWithBadge leading + name + role
-// subtitle + verbose proof body + optional "You" chip + kebab
-// trailing). Mirrors iOS `OwnersListView` and Android
-// `OwnersListScreen` exactly.
-//
-// FAB routes to the existing `/app/homes/[id]/owners/invite` page
-// (already wired to `homeOwnership.inviteCoOwner`); transfer
-// ownership remains reachable from the home dashboard.
-
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  Clock,
-  File as FileIcon,
-  FileText,
-  Shield,
-  ShieldCheck,
-  UserPlus,
-} from 'lucide-react';
+import { ArrowLeft, UserPlus, User, ShieldCheck, Shield, ShieldAlert, ArrowLeftRight, Users } from 'lucide-react';
 import * as api from '@pantopus/api';
+import type { HomeOwner } from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
-import { colors } from '@pantopus/theme';
-import ListOfRowsShell from '@/components/list-of-rows/ListOfRowsShell';
-import type {
-  ListOfRowsState,
-  RowChip,
-  RowModel,
-} from '@/components/list-of-rows/types';
 import { toast } from '@/components/ui/toast-store';
-import { confirmStore } from '@/components/ui/confirm-store';
 
-// ─── Proof palette ──────────────────────────────────────────────
-
-// Same proof bucket vocabulary as iOS `OwnerProofPalette.swift` and
-// Android `OwnerProofPalette.kt`. Status precedence wins — `pending`
-// always reads as Pending regardless of the verification tier the
-// claim carries.
-type OwnerProof = 'deed' | 'title' | 'document' | 'pending';
-
-interface ProofTone {
-  label: string;
-  bodyLabel: string;
-  Icon: typeof ShieldCheck;
-  bg: string;
-  fg: string;
-}
-
-const PROOF_TONES: Record<OwnerProof, ProofTone> = {
-  deed: {
-    label: 'Deed',
-    bodyLabel: 'Deed on file',
-    Icon: ShieldCheck,
-    bg: colors.identity.home.bg,
-    fg: colors.identity.home.color,
-  },
-  title: {
-    label: 'Title',
-    bodyLabel: 'Title on file',
-    Icon: FileIcon,
-    bg: colors.primary[50],
-    fg: colors.primary[700],
-  },
-  document: {
-    label: 'Document',
-    bodyLabel: 'Document on file',
-    Icon: FileText,
-    bg: colors.semantic.warningBg,
-    fg: colors.semantic.warning,
-  },
-  pending: {
-    label: 'Pending',
-    bodyLabel: 'Pending review',
-    Icon: Clock,
-    bg: colors.surface.sunken,
-    fg: colors.text.strong,
-  },
+const TIER_META: Record<string, { icon: typeof ShieldCheck; color: string; label: string }> = {
+  legal:    { icon: ShieldCheck, color: '#16a34a', label: 'Legal' },
+  strong:   { icon: ShieldCheck, color: '#0284c7', label: 'Strong' },
+  standard: { icon: Shield,      color: '#f59e0b', label: 'Standard' },
+  weak:     { icon: ShieldAlert,  color: '#6b7280', label: 'Weak' },
 };
 
-export function resolveProof(
-  ownerStatus: string,
-  verificationTier: string,
-): OwnerProof {
-  const status = ownerStatus.toLowerCase();
-  if (status === 'pending') return 'pending';
-  if (status === 'disputed' || status === 'revoked') return 'document';
-  switch (verificationTier.toLowerCase()) {
-    case 'legal':
-    case 'strong':
-      return 'deed';
-    case 'standard':
-      return 'title';
-    default:
-      return 'document';
-  }
-}
-
-// Per-position avatar tone palette. Home-green for owner 1 (matches
-// the screen's home identity), sky for owner 2, amber for owner 3,
-// business-violet for owner 4. Beyond index 3 we wrap.
-const OWNER_TONES: Array<{ start: string; end: string }> = [
-  { start: colors.identity.home.color, end: colors.semantic.successBg },
-  { start: colors.primary[500], end: colors.primary[700] },
-  { start: colors.semantic.warning, end: colors.semantic.warningLight },
-  { start: colors.identity.business.color, end: colors.identity.business.bg },
-];
-
-function toneAt(index: number): { start: string; end: string } {
-  const len = OWNER_TONES.length;
-  return OWNER_TONES[((index % len) + len) % len];
-}
-
-// ─── Page ──────────────────────────────────────────────────────
-
-interface OwnerRecord {
-  id: string;
-  subject_type: 'user' | 'business' | 'trust';
-  subject_id: string;
-  owner_status: string;
-  is_primary_owner: boolean;
-  added_via?: string;
-  verification_tier: string;
-  created_at?: string;
-  updated_at?: string;
-  user?: {
-    id: string;
-    username?: string;
-    name?: string;
-    profile_picture_url?: string | null;
-  } | null;
-}
-
-function displayName(owner: OwnerRecord): string {
-  const name = owner.user?.name?.trim();
-  if (name) return name;
-  const username = owner.user?.username?.trim();
-  if (username) return `@${username}`;
-  const suffix = owner.subject_id.slice(-4);
-  switch (owner.subject_type) {
-    case 'business':
-      return `Business · ${suffix}`;
-    case 'trust':
-      return `Trust · ${suffix}`;
-    default:
-      return `Owner · ${suffix}`;
-  }
-}
-
-function roleSubtitle(args: {
-  isPrimary: boolean;
-  total: number;
-  isPending: boolean;
-}): string {
-  if (args.isPending) return 'Invited · awaiting verification';
-  if (args.total <= 1) return 'Sole owner';
-  return args.isPrimary ? 'Primary owner' : 'Co-owner';
-}
+const STATUS_BADGE: Record<string, { color: string; bg: string; label: string }> = {
+  verified: { color: 'text-green-700', bg: 'bg-green-100', label: 'Verified' },
+  pending:  { color: 'text-amber-700', bg: 'bg-amber-100', label: 'Pending' },
+  disputed: { color: 'text-red-700',   bg: 'bg-red-100',   label: 'Disputed' },
+  revoked:  { color: 'text-gray-500',  bg: 'bg-gray-100',  label: 'Revoked' },
+};
 
 function OwnersContent() {
   const router = useRouter();
   const { id: homeId } = useParams<{ id: string }>();
 
-  const [owners, setOwners] = useState<OwnerRecord[]>([]);
+  const [owners, setOwners] = useState<HomeOwner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!getAuthToken()) router.push('/login');
-  }, [router]);
-
-  // Best-effort: resolve the viewer's id so the row mapper can surface
-  // the "You" chip. Skipped silently if the call fails — the screen
-  // still renders, just without the "You" badge.
-  useEffect(() => {
-    void (async () => {
-      try {
-        const profile = await api.users.getMyProfile();
-        const id = (profile as { user?: { id?: string } } | undefined)?.user?.id;
-        if (id) setCurrentUserId(id);
-      } catch {
-        // Non-fatal — screen still renders.
-      }
-    })();
-  }, []);
+  useEffect(() => { if (!getAuthToken()) router.push('/login'); }, [router]);
 
   const fetchOwners = useCallback(async () => {
     if (!homeId) return;
-    setErrorMessage(null);
     try {
       const res = await api.homeOwnership.getHomeOwners(homeId);
-      setOwners(((res as { owners?: OwnerRecord[] } | undefined)?.owners) || []);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load owners';
-      setErrorMessage(message);
-      toast.error('Failed to load owners');
-    }
+      setOwners(res.owners || []);
+    } catch { toast.error('Failed to load owners'); }
   }, [homeId]);
 
-  useEffect(() => {
-    setLoading(true);
-    fetchOwners().finally(() => setLoading(false));
-  }, [fetchOwners]);
+  useEffect(() => { setLoading(true); fetchOwners().finally(() => setLoading(false)); }, [fetchOwners]);
 
-  const handleRemove = useCallback(
-    async (owner: OwnerRecord) => {
-      const name = displayName(owner);
-      const yes = await confirmStore.open({
-        title: 'Remove owner?',
-        description:
-          `${name} will lose owner privileges. If other owners exist, ` +
-          'removal may need quorum approval.',
-        confirmLabel: 'Remove',
-        variant: 'destructive',
-      });
-      if (!yes || !homeId) return;
-      const previous = owners;
-      setOwners((rows) => rows.filter((o) => o.id !== owner.id));
-      try {
-        const result = await api.homeOwnership.removeOwner(homeId, owner.id);
-        if ((result as { quorum_action_id?: string }).quorum_action_id) {
-          toast.success('Removal pending — needs co-owner approval.');
-        } else {
-          toast.success('Owner removed');
-        }
-      } catch {
-        setOwners(previous);
-        toast.error('Failed to remove owner');
-      }
-    },
-    [homeId, owners],
-  );
-
-  const handleInvite = useCallback(() => {
-    if (!homeId) return;
-    router.push(`/app/homes/${homeId}/owners/invite`);
-  }, [homeId, router]);
-
-  const rows = useMemo<RowModel[]>(() => {
-    const total = owners.length;
-    return owners.map((owner, position) => {
-      const proof = resolveProof(owner.owner_status, owner.verification_tier);
-      const tone = toneAt(position);
-      const tonePalette = PROOF_TONES[proof];
-      const isYou = currentUserId !== null && currentUserId === owner.subject_id;
-      const youChip: RowChip | undefined = isYou
-        ? {
-            text: 'You',
-            tint: {
-              kind: 'custom',
-              background: colors.primary[50],
-              foreground: colors.primary[700],
-            },
-          }
-        : undefined;
-      return {
-        id: owner.id,
-        title: displayName(owner),
-        subtitle: roleSubtitle({
-          isPrimary: owner.is_primary_owner,
-          total,
-          isPending: owner.owner_status.toLowerCase() === 'pending',
-        }),
-        template: 'avatarKebab',
-        leading: {
-          kind: 'avatarWithBadge',
-          name: displayName(owner),
-          imageURL: owner.user?.profile_picture_url || null,
-          background: {
-            kind: 'gradient',
-            gradient: { start: tone.start, end: tone.end },
-          },
-          size: 'medium',
-          verified: proof !== 'pending',
-        },
-        trailing: { kind: 'kebab' },
-        onSecondary: () => void handleRemove(owner),
-        body: tonePalette.bodyLabel,
-        inlineChip: youChip,
-      } satisfies RowModel;
-    });
-  }, [owners, currentUserId, handleRemove]);
-
-  const state: ListOfRowsState = useMemo(() => {
-    if (loading) return { kind: 'loading' };
-    if (errorMessage) return { kind: 'error', message: errorMessage };
-    if (rows.length === 0) {
-      return {
-        kind: 'empty',
-        config: {
-          icon: Shield,
-          headline: 'No owners yet',
-          subcopy:
-            "Invite a spouse, sibling, or co-investor who's on the deed. " +
-            "They'll upload proof and split the share with you.",
-          ctaTitle: 'Invite an owner',
-          onCta: handleInvite,
-        },
-      };
-    }
-    return {
-      kind: 'loaded',
-      sections: [{ id: 'owners', rows }],
-      hasMore: false,
-    };
-  }, [loading, errorMessage, rows, handleInvite]);
-
-  if (!homeId) return null;
+  if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><div className="animate-spin h-8 w-8 border-3 border-emerald-600 border-t-transparent rounded-full" /></div>;
 
   return (
-    <ListOfRowsShell
-      title="Owners"
-      state={state}
-      onRefresh={() => {
-        void fetchOwners();
-      }}
-      fab={{
-        icon: UserPlus,
-        accessibilityLabel: 'Invite an owner',
-        variant: { kind: 'secondaryCreate' },
-        tint: 'home',
-        onClick: handleInvite,
-      }}
-    />
+    <div className="max-w-3xl mx-auto px-4 py-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.back()} className="p-1.5 hover:bg-app-hover rounded-lg transition">
+            <ArrowLeft className="w-5 h-5 text-app-text" />
+          </button>
+          <h1 className="text-xl font-bold text-app-text">Owners</h1>
+        </div>
+        <button
+          onClick={() => router.push(`/app/homes/${homeId}/owners/invite`)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition"
+        >
+          <UserPlus className="w-4 h-4" /> Invite
+        </button>
+      </div>
+
+      {/* Owner list */}
+      {owners.length === 0 ? (
+        <div className="text-center py-16">
+          <Users className="w-10 h-10 mx-auto text-app-text-muted mb-3" />
+          <p className="text-sm text-app-text-secondary">No owners registered</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {owners.map((owner) => {
+            const name = owner.user?.name || owner.user?.username || 'Unknown';
+            const tier = TIER_META[owner.verification_tier] || TIER_META.weak;
+            const TierIcon = tier.icon;
+            const status = STATUS_BADGE[owner.owner_status] || STATUS_BADGE.pending;
+
+            return (
+              <div key={owner.id} className="flex items-center gap-3 bg-app-surface border border-app-border rounded-xl p-4">
+                <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <User className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-app-text truncate">{name}</p>
+                    {owner.is_primary_owner && (
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase">
+                        Primary
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="inline-flex items-center gap-1 text-xs">
+                      <TierIcon className="w-3 h-3" style={{ color: tier.color }} />
+                      <span style={{ color: tier.color }} className="font-medium">{tier.label}</span>
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${status.bg} ${status.color}`}>
+                      {status.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bottom action */}
+      <div className="mt-6 pt-4 border-t border-app-border">
+        <button
+          onClick={() => router.push(`/app/homes/${homeId}/owners/transfer`)}
+          className="w-full flex items-center justify-center gap-2 py-3 border border-amber-300 bg-amber-50 text-amber-700 rounded-xl font-semibold text-sm hover:bg-amber-100 transition"
+        >
+          <ArrowLeftRight className="w-4 h-4" /> Transfer Ownership
+        </button>
+      </div>
+    </div>
   );
 }
 
-export default function OwnersPage() {
-  return (
-    <Suspense>
-      <OwnersContent />
-    </Suspense>
-  );
-}
+export default function OwnersPage() { return <Suspense><OwnersContent /></Suspense>; }

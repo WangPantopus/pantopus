@@ -60,8 +60,8 @@ export default function InviteMemberModal({
       try {
         const { get } = await import('@pantopus/api');
         const data = await get(`/api/homes/${homeId}/role-presets`);
-        if ((data as Record<string, unknown>).presets?.length) {
-          setPresets(((data as Record<string, unknown>).presets as Record<string, unknown>[]).map((p: Record<string, unknown>) => ({
+        if ((data as Record<string, any>).presets?.length) {
+          setPresets(((data as Record<string, any>).presets as Record<string, any>[]).map((p: Record<string, any>) => ({
             key: p.key as string,
             display_name: p.display_name as string,
             description: p.description as string,
@@ -104,7 +104,7 @@ export default function InviteMemberModal({
       try {
         const { get } = await import('@pantopus/api');
         const data = await get(`/api/users/search?q=${encodeURIComponent(usernameQuery)}&limit=5`);
-        setSearchResults((data as Record<string, unknown>).users as RelationshipUser[] || []);
+        setSearchResults((data as Record<string, any>).users as RelationshipUser[] || []);
       } catch {
         setSearchResults([]);
       } finally {
@@ -135,24 +135,25 @@ export default function InviteMemberModal({
       }
     }
 
-    setSending(true);
-    try {
-      const preset = presets.find(p => p.key === selectedPreset);
-      await onInvite({
-        email: mode === 'email' ? email.trim() : undefined,
-        user_id: mode === 'username' ? selectedUser.id : undefined,
-        username: mode === 'username' ? selectedUser.username : undefined,
+	    setSending(true);
+	    try {
+	      const preset = presets.find(p => p.key === selectedPreset);
+	      const inviteUser = mode === 'username' ? selectedUser : null;
+	      await onInvite({
+	        email: mode === 'email' ? email.trim() : undefined,
+	        user_id: inviteUser?.id,
+	        username: inviteUser?.username,
         relationship: preset?.role_base || 'member',
         preset_key: selectedPreset,
         message: message.trim() || undefined,
         start_at: startAt || undefined,
         end_at: endAt || undefined,
       });
-      setSuccess(
-        mode === 'email'
-          ? `Invitation sent to ${email}`
-          : `Invitation sent to @${selectedUser.username}`
-      );
+	      setSuccess(
+	        mode === 'email'
+	          ? `Invitation sent to ${email}`
+	          : `Invitation sent to @${inviteUser?.username || usernameQuery}`
+	      );
       setEmail('');
       setUsernameQuery('');
       setSelectedUser(null);

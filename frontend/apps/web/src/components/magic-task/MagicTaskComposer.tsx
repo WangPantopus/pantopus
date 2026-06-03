@@ -168,7 +168,7 @@ export default function MagicTaskComposer({
         location,
         source_flow: 'magic',
         ai_confidence: draftResult.confidence,
-        ai_draft_json: draftResult.draft as Record<string, unknown>,
+        ai_draft_json: draftResult.draft as Record<string, any>,
       });
 
       // Show undo toast

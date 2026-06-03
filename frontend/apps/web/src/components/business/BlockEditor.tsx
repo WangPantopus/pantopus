@@ -18,11 +18,11 @@ interface BlockEditorProps {
 }
 
 export default function BlockEditor({ block, onUpdate, onDelete, onClose }: BlockEditorProps) {
-  const updateData = (patch: Record<string, unknown>) => {
+  const updateData = (patch: Record<string, any>) => {
     onUpdate({ ...block, data: { ...block.data, ...patch } });
   };
 
-  const updateSettings = (patch: Record<string, unknown>) => {
+  const updateSettings = (patch: Record<string, any>) => {
     onUpdate({ ...block, settings: { ...block.settings, ...patch } });
   };
 
@@ -166,7 +166,7 @@ function BlockTypeFields({
   updateData,
 }: {
   block: BlockData;
-  updateData: (patch: Record<string, unknown>) => void;
+  updateData: (patch: Record<string, any>) => void;
   onUpdate?: (b: BlockData) => void;
 }) {
   const d = block.data || {};

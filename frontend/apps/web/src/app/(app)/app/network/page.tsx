@@ -21,7 +21,7 @@ function DiscoverPageContent() {
   const [businesses, setBusinesses] = useState<BusinessUser[]>([]);
   const [homes, setHomes] = useState<Home[]>([]);
 
-  const [personState, setPersonState] = useState<Record<string, { following: boolean; relationship: RelationshipState }>>({});
+  const [personState, setPersonState] = useState<Record<string, { relationship: RelationshipState }>>({});
   const [businessFollowing, setBusinessFollowing] = useState<Record<string, boolean>>({});
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
@@ -54,14 +54,14 @@ function DiscoverPageContent() {
       setBusinesses(nextBusinesses);
       setHomes(nextHomes);
 
-      // Hydrate per-person relationship/follow state for action buttons.
+      // Hydrate per-person relationship state for action buttons.
       const statusEntries = await Promise.all(
         nextPeople.map(async (p: UserProfile) => {
           try {
             const s = await api.users.getRelationshipStatus(p.id);
-            return [p.id, { following: !!s.following, relationship: s.relationship as RelationshipState }] as const;
+            return [p.id, { relationship: s.relationship as RelationshipState }] as const;
           } catch {
-            return [p.id, { following: false, relationship: 'none' as RelationshipState }] as const;
+            return [p.id, { relationship: 'none' as RelationshipState }] as const;
           }
         })
       );
@@ -94,40 +94,24 @@ function DiscoverPageContent() {
     return rel?.id || null;
   };
 
-  const handlePersonFollow = async (personId: string) => {
-    setActionLoading((p) => ({ ...p, [`person-follow-${personId}`]: true }));
-    try {
-      const state = personState[personId] || { following: false, relationship: 'none' as RelationshipState };
-      if (state.following) {
-        await api.users.unfollowUser(personId);
-        setPersonState((p) => ({ ...p, [personId]: { ...state, following: false } }));
-      } else {
-        await api.users.followUser(personId);
-        setPersonState((p) => ({ ...p, [personId]: { ...state, following: true } }));
-      }
-    } finally {
-      setActionLoading((p) => ({ ...p, [`person-follow-${personId}`]: false }));
-    }
-  };
-
   const handlePersonConnect = async (personId: string) => {
     setActionLoading((p) => ({ ...p, [`person-connect-${personId}`]: true }));
     try {
       const state = personState[personId]?.relationship || 'none';
       if (state === 'none') {
         await api.relationships.sendRequest(personId);
-        setPersonState((p) => ({ ...p, [personId]: { ...(p[personId] || { following: false }), relationship: 'pending_sent' } }));
+        setPersonState((p) => ({ ...p, [personId]: { relationship: 'pending_sent' } }));
       } else if (state === 'pending_received') {
         const relId = await resolveConnectionId(personId, 'pending');
         if (relId) {
           await api.relationships.acceptRequest(relId);
-          setPersonState((p) => ({ ...p, [personId]: { ...(p[personId] || { following: false }), relationship: 'connected' } }));
+          setPersonState((p) => ({ ...p, [personId]: { relationship: 'connected' } }));
         }
       } else if (state === 'connected') {
         const relId = await resolveConnectionId(personId, 'connected');
         if (relId) {
           await api.relationships.disconnect(relId);
-          setPersonState((p) => ({ ...p, [personId]: { ...(p[personId] || { following: false }), relationship: 'none' } }));
+          setPersonState((p) => ({ ...p, [personId]: { relationship: 'none' } }));
         }
       }
     } finally {
@@ -140,10 +124,10 @@ function DiscoverPageContent() {
     try {
       const following = !!businessFollowing[businessId];
       if (following) {
-        await api.users.unfollowUser(businessId);
+        await api.businesses.unfollowBusiness(businessId);
         setBusinessFollowing((p) => ({ ...p, [businessId]: false }));
       } else {
-        await api.users.followUser(businessId);
+        await api.businesses.followBusiness(businessId);
         setBusinessFollowing((p) => ({ ...p, [businessId]: true }));
       }
     } finally {
@@ -155,8 +139,8 @@ function DiscoverPageContent() {
     setActionLoading((p) => ({ ...p, [`home-claim-${homeId}`]: true }));
     try {
       const res = await api.homes.submitResidencyClaim(homeId);
-      const resObj = res as Record<string, unknown>;
-      const claim = resObj?.claim as Record<string, unknown> | undefined;
+      const resObj = res as Record<string, any>;
+      const claim = resObj?.claim as Record<string, any> | undefined;
       const status = (claim?.status || 'pending') as string;
       setHomes((prev) => prev.map((h) => (h.id === homeId ? { ...h, claim_status: status } as Home : h)));
     } finally {
@@ -240,9 +224,8 @@ function DiscoverPageContent() {
             <h2 className="text-lg font-semibold text-app mb-3">People</h2>
             <div className="grid md:grid-cols-2 gap-3">
               {people.map((p) => {
-                const status = personState[p.id] || { following: false, relationship: 'none' as RelationshipState };
+                const status = personState[p.id] || { relationship: 'none' as RelationshipState };
                 const connectBusy = !!actionLoading[`person-connect-${p.id}`];
-                const followBusy = !!actionLoading[`person-follow-${p.id}`];
                 return (
                   <div key={p.id} className="rounded-lg border border-app bg-surface p-4 flex items-center justify-between gap-4">
                     <div className="min-w-0">
@@ -266,15 +249,6 @@ function DiscoverPageContent() {
                       >
                         {connectBusy ? '...' : connectionLabel(status.relationship)}
                       </button>
-                      <button
-                        onClick={() => handlePersonFollow(p.id)}
-                        disabled={followBusy}
-                        className={`rounded-lg px-3 py-1.5 text-sm border ${
-                          status.following ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-app-strong text-app-strong'
-                        }`}
-                      >
-                        {followBusy ? '...' : status.following ? 'Following' : 'Follow'}
-                      </button>
                     </div>
                   </div>
                 );
@@ -293,7 +267,7 @@ function DiscoverPageContent() {
                 return (
                   <div key={b.id} className="rounded-lg border border-app bg-surface p-4 flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <Link href={`/${b.username}`} className="font-semibold text-app hover:underline">
+                      <Link href={b.username ? `/b/${b.username}` : '/app/discover'} className="font-semibold text-app hover:underline">
                         {b.name}
                       </Link>
                       <p className="text-xs text-app-muted">{(b.categories || []).slice(0, 3).join(' • ') || b.business_type || 'Business'}</p>

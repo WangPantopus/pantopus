@@ -32,11 +32,11 @@ function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(' ');
 }
 
-function coordsFromHome(h: Record<string, unknown>) {
+function coordsFromHome(h: Record<string, any>) {
   // Try multiple location formats
   
   // 1. GeoJSON object: { type: 'Point', coordinates: [lng, lat] }
-  const loc = h?.location as Record<string, unknown> | undefined;
+  const loc = h?.location as Record<string, any> | undefined;
   const coords = loc?.coordinates as number[] | undefined;
   if (coords && coords.length >= 2) {
     const [lng, lat] = coords;
@@ -67,7 +67,7 @@ function coordsFromHome(h: Record<string, unknown>) {
   return { latitude: null as number | null, longitude: null as number | null };
 }
 
-function homeLabel(h: Record<string, unknown>) {
+function homeLabel(h: Record<string, any>) {
   const line1 = [h.address, (h.address2 || h.unit_number) as string | undefined].filter(Boolean).join(' ');
   const line2 = [h.city, h.state, (h.zipcode || h.zip_code) as string | undefined].filter(Boolean).join(' ');
   return [line1, line2].filter(Boolean).join(', ');
@@ -115,7 +115,7 @@ export default function LocationPicker({ value, onChange, className }: Props) {
       setHomesError('');
       try {
         const res = await api.homes.getMyHomes();
-        const list = (res as Record<string, unknown>)?.homes ?? (res as Record<string, unknown>)?.data ?? res ?? [];
+        const list = (res as Record<string, any>)?.homes ?? (res as Record<string, any>)?.data ?? res ?? [];
         if (mounted) setHomes(Array.isArray(list) ? list : []);
       } catch (e: unknown) {
         if (mounted) setHomes([]);
@@ -173,7 +173,7 @@ export default function LocationPicker({ value, onChange, className }: Props) {
   };
 
   const pickHome = async (homeId: string) => {
-    const h = homes.find((x) => x.id === homeId) as (Home & Record<string, unknown>) | undefined;
+    const h = homes.find((x) => x.id === homeId) as (Home & Record<string, any>) | undefined;
     if (!h) return;
 
     setHomesError('');
@@ -200,7 +200,7 @@ export default function LocationPicker({ value, onChange, className }: Props) {
           try {
             await api.homes.updateHome(h.id, {
               location: { latitude, longitude },
-            } as Record<string, unknown>);
+            } as Record<string, any>);
           } catch {
             // Non-critical, just use the coords for this gig
           }
@@ -225,13 +225,13 @@ export default function LocationPicker({ value, onChange, className }: Props) {
       address: addr,
       city: (h.city as string) || null,
       state: (h.state as string) || null,
-      zip: ((h as Record<string, unknown>).zipcode || (h as Record<string, unknown>).zip_code) as string || null,
+      zip: ((h as Record<string, any>).zipcode || (h as Record<string, any>).zip_code) as string || null,
       label: addr,
     });
     setTab('home');
   };
 
-  const selectCustomNormalized = (n: Record<string, unknown>) => {
+  const selectCustomNormalized = (n: Record<string, any>) => {
     const latitude = n.latitude as number ?? null;
     const longitude = n.longitude as number ?? null;
 
@@ -399,7 +399,7 @@ export default function LocationPicker({ value, onChange, className }: Props) {
                 </option>
                 {homes.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {homeLabel(h as unknown as Record<string, unknown>)}
+                    {homeLabel(h as unknown as Record<string, any>)}
                   </option>
                 ))}
               </select>

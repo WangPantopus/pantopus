@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useState, useCallback, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import type { MailItemV2 } from '@/types/mailbox';
 import {
   useAssetFullDetail,
@@ -127,12 +127,10 @@ function LinkMailDrawer({
 
 // ── Main Page ────────────────────────────────────────────────
 
-export default function AssetDetailPage({
-  params,
-}: {
-  params: { asset_id: string };
-}) {
-  const assetId = params.asset_id;
+export default function AssetDetailPage() {
+  const params = useParams<{ asset_id?: string | string[] }>();
+  const rawAssetId = params?.asset_id;
+  const assetId = Array.isArray(rawAssetId) ? rawAssetId[0] || '' : rawAssetId || '';
   const home = useHomeProfile();
   const router = useRouter();
   const { data: fullDetail, isLoading } = useAssetFullDetail(assetId);

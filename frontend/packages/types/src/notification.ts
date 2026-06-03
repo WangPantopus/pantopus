@@ -14,4 +14,7 @@ export interface Notification {
   is_read: boolean;
   metadata: Record<string, any>;
   created_at: string;
+  context?: 'personal' | 'audience' | 'platform';
+  context_type?: 'personal' | 'business';
+  context_id?: string | null;
 }

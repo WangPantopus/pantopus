@@ -23,9 +23,17 @@ jest.mock('@pantopus/api', () => ({
   post: (...args: unknown[]) => mockPost(...args),
 }));
 
+// ── Mock confirm dialog store ─────────────────────────────────
+const mockConfirmOpen = jest.fn();
+jest.mock('../../src/components/ui/confirm-store', () => ({
+  confirmStore: {
+    open: (...args: unknown[]) => mockConfirmOpen(...args),
+  },
+}));
+
 // ── Mock useHomePermissions ─────────────────────────────────
 const mockReload = jest.fn();
-let mockAccess: Record<string, unknown> | null = null;
+let mockAccess: Record<string, any> | null = null;
 
 jest.mock('../../src/components/home/useHomePermissions', () => ({
   useHomePermissions: () => ({
@@ -43,7 +51,7 @@ jest.mock('../../src/components/home/useHomePermissions', () => ({
 
 // ── Helpers ─────────────────────────────────────────────────
 
-function buildAccess(overrides: Record<string, unknown> = {}) {
+function buildAccess(overrides: Record<string, any> = {}) {
   return {
     verification_status: 'unverified',
     is_in_challenge_window: false,
@@ -63,6 +71,7 @@ const HOME_ID = 'test-home-123';
 beforeEach(() => {
   mockPush.mockReset();
   mockPost.mockReset();
+  mockConfirmOpen.mockReset();
   mockReload.mockReset();
   mockAccess = null;
 });
@@ -219,9 +228,7 @@ describe('button actions', () => {
 
   test('"This isn\'t my home" calls move-out API', async () => {
     mockAccess = buildAccess({ verification_status: 'pending_postcard' });
-    // Mock window.confirm to return true
-    const originalConfirm = window.confirm;
-    window.confirm = jest.fn(() => true);
+    mockConfirmOpen.mockResolvedValueOnce(true);
     mockPost.mockResolvedValueOnce({});
 
     render(<VerificationCenter homeId={HOME_ID} />);
@@ -236,21 +243,17 @@ describe('button actions', () => {
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/app');
     });
-
-    window.confirm = originalConfirm;
   });
 
-  test('"This isn\'t my home" does nothing if user cancels confirm', () => {
+  test('"This isn\'t my home" does nothing if user cancels confirm', async () => {
     mockAccess = buildAccess({ verification_status: 'pending_postcard' });
-    const originalConfirm = window.confirm;
-    window.confirm = jest.fn(() => false);
+    mockConfirmOpen.mockResolvedValueOnce(false);
 
     render(<VerificationCenter homeId={HOME_ID} />);
 
     fireEvent.click(screen.getByText(/isn.*t my home/i));
+    await waitFor(() => expect(mockConfirmOpen).toHaveBeenCalled());
     expect(mockPost).not.toHaveBeenCalled();
-
-    window.confirm = originalConfirm;
   });
 
   test('"Check for updates" calls reload', () => {

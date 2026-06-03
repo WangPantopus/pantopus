@@ -4,7 +4,7 @@ import { useReducer, useCallback } from 'react';
 import type { PostType, PostVisibility } from '@pantopus/api';
 import type { PostLocation } from '../PostLocationPicker';
 
-export type ProfileVisibilityScope = 'public' | 'followers' | 'connections' | 'local_context' | 'hidden';
+export type ProfileVisibilityScope = 'public' | 'connections' | 'local_context' | 'hidden';
 
 export interface PostFormState {
   expanded: boolean;
@@ -29,7 +29,6 @@ export interface PostFormState {
   contactPref: string;
   serviceCategory: string;
   tags: string;
-  crossPostFollowers: boolean;
   crossPostConnections: boolean;
 
   // Media
@@ -57,7 +56,6 @@ const INITIAL_STATE: PostFormState = {
   contactPref: '',
   serviceCategory: '',
   tags: '',
-  crossPostFollowers: false,
   crossPostConnections: false,
   mediaFiles: [],
 };

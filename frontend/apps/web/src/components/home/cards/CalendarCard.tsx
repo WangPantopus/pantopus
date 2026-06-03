@@ -13,7 +13,7 @@ export function CalendarCardPreview({
   events,
   onExpand,
 }: {
-  events: Record<string, unknown>[];
+  events: Record<string, any>[];
   onExpand: () => void;
 }) {
   const now = new Date();
@@ -60,10 +60,10 @@ export default function CalendarCard({
   packages,
   onBack,
 }: {
-  tasks: Record<string, unknown>[];
-  bills: Record<string, unknown>[];
-  events: Record<string, unknown>[];
-  packages: Record<string, unknown>[];
+  tasks: Record<string, any>[];
+  bills: Record<string, any>[];
+  events: Record<string, any>[];
+  packages: Record<string, any>[];
   onBack: () => void;
 }) {
   const [viewMode, setViewMode] = useState<ViewMode>('agenda');
@@ -111,7 +111,7 @@ export default function CalendarCard({
 
 // ---- Week view ----
 
-function WeekView({ events, tasks, bills }: { events: Record<string, unknown>[]; tasks: Record<string, unknown>[]; bills: Record<string, unknown>[] }) {
+function WeekView({ events, tasks, bills }: { events: Record<string, any>[]; tasks: Record<string, any>[]; bills: Record<string, any>[] }) {
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
@@ -123,7 +123,7 @@ function WeekView({ events, tasks, bills }: { events: Record<string, unknown>[];
     return d;
   });
 
-  const getEventsForDay = (date: Date) => {
+  const getEventsForDay = (date: Date): Array<Record<string, any> & { id: string; title: string; _type: 'event' | 'task' | 'bill' }> => {
     const dayStart = new Date(date);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(date);
@@ -146,7 +146,11 @@ function WeekView({ events, tasks, bills }: { events: Record<string, unknown>[];
       return due >= dayStart && due <= dayEnd;
     });
 
-    return [...dayEvents.map((e) => ({ ...e, _type: 'event' })), ...dayTasks.map((t) => ({ ...t, _type: 'task', title: t.title })), ...dayBills.map((b) => ({ ...b, _type: 'bill', title: b.provider_name || b.bill_type }))];
+    return [
+      ...dayEvents.map((e) => ({ ...e, id: String(e.id), title: String(e.title || 'Event'), _type: 'event' as const })),
+      ...dayTasks.map((t) => ({ ...t, id: String(t.id), title: String(t.title || 'Task'), _type: 'task' as const })),
+      ...dayBills.map((b) => ({ ...b, id: String(b.id), title: String(b.provider_name || b.bill_type || 'Bill'), _type: 'bill' as const })),
+    ];
   };
 
   const isToday = (d: Date) => d.toDateString() === now.toDateString();
@@ -187,7 +191,7 @@ function WeekView({ events, tasks, bills }: { events: Record<string, unknown>[];
 
 // ---- Month view ----
 
-function MonthView({ events, tasks, bills }: { events: Record<string, unknown>[]; tasks: Record<string, unknown>[]; bills: Record<string, unknown>[] }) {
+function MonthView({ events, tasks, bills }: { events: Record<string, any>[]; tasks: Record<string, any>[]; bills: Record<string, any>[] }) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();

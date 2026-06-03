@@ -185,6 +185,7 @@ export function PlaceBriefCard({ homeId, homeName }: PlaceBriefCardProps) {
 
   const signalCount = pulse.signals.length;
   const status = pulse.overall_status;
+  const toggleExpanded = () => setExpanded((current) => !current);
 
   return (
     <div
@@ -192,11 +193,15 @@ export function PlaceBriefCard({ homeId, homeName }: PlaceBriefCardProps) {
       className={`rounded-xl border overflow-hidden bg-gradient-to-r ${statusGradient(status)} transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}
     >
       {/* ── Header (collapsed) ─────────────────────────────────── */}
-      <button
-        onClick={() => setExpanded(!expanded)}
+      <div
         className="w-full flex items-center justify-between px-4 py-3 text-left"
       >
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={toggleExpanded}
+          className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+        >
           <div
             className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${statusIconBg(status)}`}
           >
@@ -212,7 +217,7 @@ export function PlaceBriefCard({ homeId, homeName }: PlaceBriefCardProps) {
               {pulse.summary}
             </p>
           </div>
-        </div>
+        </button>
 
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           {signalCount > 0 && (
@@ -228,12 +233,20 @@ export function PlaceBriefCard({ homeId, homeName }: PlaceBriefCardProps) {
           >
             <RefreshCw className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
           </button>
-          {expanded
-            ? <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-            : <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-          }
+          <button
+            type="button"
+            aria-label={expanded ? 'Collapse neighborhood pulse' : 'Expand neighborhood pulse'}
+            aria-expanded={expanded}
+            onClick={toggleExpanded}
+            className="p-1 rounded hover:bg-white/80 dark:hover:bg-gray-800/80 transition-colors inline-flex"
+          >
+            {expanded
+              ? <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              : <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+            }
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* ── Expanded body ──────────────────────────────────────── */}
       {expanded && (
@@ -365,10 +378,11 @@ export function PlaceBriefCard({ homeId, homeName }: PlaceBriefCardProps) {
                 <button
                   onClick={async () => {
                     const msg = "I'm using Pantopus to connect with my neighborhood. Check out what's happening near your home: https://pantopus.com";
-                    if (typeof navigator !== 'undefined' && 'share' in navigator) {
-                      try { await navigator.share({ title: 'Join Pantopus', text: msg, url: 'https://pantopus.com' }); } catch { /* cancelled */ }
-                    } else {
-                      try { await navigator.clipboard.writeText('https://pantopus.com'); } catch { /* fallback */ }
+                    const nav = typeof window !== 'undefined' ? window.navigator : null;
+                    if (nav && typeof nav.share === 'function') {
+                      try { await nav.share({ title: 'Join Pantopus', text: msg, url: 'https://pantopus.com' }); } catch { /* cancelled */ }
+                    } else if (nav?.clipboard) {
+                      try { await nav.clipboard.writeText('https://pantopus.com'); } catch { /* fallback */ }
                     }
                   }}
                   className="flex items-center gap-1.5 py-1.5 px-3 bg-white dark:bg-gray-800 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 rounded-lg text-xs font-medium hover:bg-violet-50 dark:hover:bg-violet-900/20 transition"

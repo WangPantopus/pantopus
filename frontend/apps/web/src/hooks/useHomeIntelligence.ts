@@ -58,32 +58,36 @@ export function useHomeIntelligence(homeId: string | undefined) {
 
   // ── Individual fetchers ───────────────────────────────────────
 
-  const fetchHealthScore = useCallback(async (cancelled: { current: boolean }, silent = false) => {
-    if (!homeId) return;
+  const fetchHealthScore = useCallback(
+    async (cancelled: { current: boolean }, silent = false, opts?: { forceServer?: boolean }) => {
+      if (!homeId) return;
 
-    // Return cached data if fresh
-    const cached = healthCache[homeId];
-    if (cached && Date.now() - cached.ts < HEALTH_CACHE_TTL) {
-      if (!cancelled.current) {
-        setHealthScore(cached.data);
-        setHealthLoading(false);
+      if (!opts?.forceServer) {
+        const cached = healthCache[homeId];
+        if (cached && Date.now() - cached.ts < HEALTH_CACHE_TTL) {
+          if (!cancelled.current) {
+            setHealthScore(cached.data);
+            setHealthLoading(false);
+          }
+          return;
+        }
       }
-      return;
-    }
 
-    if (!silent) setHealthLoading(true);
-    try {
-      const res = await api.homeProfile.getHomeHealthScore(homeId);
-      if (!cancelled.current) {
-        setHealthScore(res ?? null);
-        if (res) healthCache[homeId] = { data: res, ts: Date.now() };
+      if (!silent) setHealthLoading(true);
+      try {
+        const res = await api.homeProfile.getHomeHealthScore(homeId, opts?.forceServer ? { force: true } : undefined);
+        if (!cancelled.current) {
+          setHealthScore(res ?? null);
+          if (res) healthCache[homeId] = { data: res, ts: Date.now() };
+        }
+      } catch (err) {
+        if (isDev) console.warn('Failed to fetch health score:', err);
+      } finally {
+        if (!cancelled.current) setHealthLoading(false);
       }
-    } catch (err) {
-      if (isDev) console.warn('Failed to fetch health score:', err);
-    } finally {
-      if (!cancelled.current) setHealthLoading(false);
-    }
-  }, [homeId]);
+    },
+    [homeId],
+  );
 
   const fetchChecklist = useCallback(async (cancelled: { current: boolean }, silent = false) => {
     if (!homeId) return;
@@ -169,8 +173,9 @@ export function useHomeIntelligence(homeId: string | undefined) {
     propertyValueFetchedRef.current = false;
 
     if (homeId) {
+      delete healthCache[homeId];
       Promise.allSettled([
-        fetchHealthScore(cancelledRef),
+        fetchHealthScore(cancelledRef, false, { forceServer: true }),
         fetchChecklist(cancelledRef),
       ]);
     }
@@ -223,7 +228,7 @@ export function useHomeIntelligence(homeId: string | undefined) {
       invalidateHealthCache();
       await Promise.allSettled([
         fetchChecklist(cancelledRef),
-        fetchHealthScore(cancelledRef, true),
+        fetchHealthScore(cancelledRef, true, { forceServer: true }),
         timelineFetchedRef.current ? fetchTimeline(cancelledRef, 1, false) : Promise.resolve(),
       ]);
     } catch (err) {
@@ -238,7 +243,7 @@ export function useHomeIntelligence(homeId: string | undefined) {
       invalidateHealthCache();
       await Promise.allSettled([
         fetchChecklist(cancelledRef),
-        fetchHealthScore(cancelledRef, true),
+        fetchHealthScore(cancelledRef, true, { forceServer: true }),
         timelineFetchedRef.current ? fetchTimeline(cancelledRef, 1, false) : Promise.resolve(),
       ]);
     } catch (err) {
@@ -274,7 +279,7 @@ export function useHomeIntelligence(homeId: string | undefined) {
   const refreshHealthScore = useCallback(async () => {
     if (!homeId) return;
     invalidateHealthCache();
-    await fetchHealthScore(cancelledRef, true);
+    await fetchHealthScore(cancelledRef, true, { forceServer: true });
   }, [homeId, fetchHealthScore, invalidateHealthCache]);
 
   const refreshAll = useCallback(async () => {
@@ -282,7 +287,7 @@ export function useHomeIntelligence(homeId: string | undefined) {
     invalidateHealthCache();
     // Stale-while-revalidate: don't show loading spinners on refresh
     await Promise.allSettled([
-      fetchHealthScore(cancelledRef, true),
+      fetchHealthScore(cancelledRef, true, { forceServer: true }),
       fetchChecklist(cancelledRef, true),
       billTrendsFetchedRef.current ? fetchBillTrends(cancelledRef, true) : Promise.resolve(),
       timelineFetchedRef.current ? fetchTimeline(cancelledRef, 1, false, true) : Promise.resolve(),

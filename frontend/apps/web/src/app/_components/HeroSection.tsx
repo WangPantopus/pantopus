@@ -1,129 +1,151 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// HeroSection — Main hero with headline, CTAs, jump links, phone mockup
-// Server component (no 'use client')
+// HeroSection — Marketing homepage redesign
+// "Identity, anchored to something that can't be faked." + envelope visual.
+// Server component (no 'use client').
 // ─────────────────────────────────────────────────────────────────────────────
-
-import Link from 'next/link';
-import Image from 'next/image';
-import { IOS_APP_STORE_URL, ANDROID_PLAY_STORE_URL } from '@pantopus/utils';
-import { HERO_JUMP_LINKS } from './constants';
-import HeroVisual from './HeroVisual';
 
 export default function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-blue-50 via-white to-white dark:from-gray-900 dark:via-gray-950 dark:to-gray-950">
-      {/* Background decorations */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full bg-primary-100/60 dark:bg-primary-900/20 blur-3xl" />
-        <div className="absolute top-20 right-10 w-64 h-64 rounded-full bg-emerald-100/40 dark:bg-emerald-900/10 blur-3xl" />
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
-        <div className="text-center max-w-4xl mx-auto">
-          {/* Kicker pill */}
-          <div className="inline-flex flex-wrap justify-center items-center gap-2 rounded-full border border-primary-200/60 dark:border-primary-700/30 bg-app-surface/80 px-5 py-2 text-sm mb-8 shadow-sm">
-            <span className="font-semibold text-primary-700 dark:text-primary-300">Verified identity</span>
-            <span className="text-gray-300 dark:text-app-text-strong">&bull;</span>
-            <span className="text-app-text-secondary dark:text-app-text-muted">Tasks &amp; marketplace</span>
-            <span className="text-gray-300 dark:text-app-text-strong">&bull;</span>
-            <span className="text-app-text-secondary dark:text-app-text-muted">Home command center</span>
-            <span className="text-gray-300 dark:text-app-text-strong">&bull;</span>
-            <span className="text-app-text-secondary dark:text-app-text-muted">Digital mailbox</span>
-          </div>
-
-          {/* Headline */}
-          <h1 className="text-5xl md:text-7xl font-extrabold text-app-text dark:text-white leading-[1.05] tracking-tight mb-6">
-            Get real things done<br />
-            <span className="text-primary-600 dark:text-primary-400">
-              with real people.
-            </span>
-          </h1>
-
-          {/* Subhead */}
-          <p className="text-xl md:text-2xl text-app-text-secondary dark:text-app-text-muted mb-4 max-w-2xl mx-auto leading-relaxed">
-            Pantopus connects you with verified, address-proven people — to hire, sell, buy, coordinate, and manage the real-world stuff that apps built for strangers can&apos;t handle.
-          </p>
-          <p className="text-sm text-app-text-muted dark:text-app-text-secondary mb-10">
-            Private by default. Verification builds trust, not exposure.
-          </p>
-
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Link
-              href="/register"
-              className="inline-flex items-center justify-center gap-2 bg-primary-600 text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/40 transition shadow-md shadow-primary-200 dark:shadow-primary-900/30"
+    <section
+      id="hero"
+      className="relative overflow-hidden flex items-center"
+      style={{ minHeight: '100vh', padding: '140px 0 80px' }}
+    >
+      <div className="w-full max-w-[1440px] mx-auto px-6 sm:px-10">
+        <div className="grid gap-12 lg:gap-16 items-center" style={{ gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 0.95fr)' }}>
+          {/* Text */}
+          <div className="max-w-[720px]">
+            <p
+              className="mh-reveal mb-8 inline-flex items-center gap-3 uppercase"
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.14em',
+                color: 'var(--ink-3)',
+              }}
             >
-              Create your account
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-            <a
-              href="#how-it-works"
-              className="inline-flex items-center justify-center gap-2 bg-app-surface text-app-text-strong px-8 py-3.5 rounded-xl text-base font-semibold border border-app-border hover:bg-app-hover dark:hover:bg-gray-800 transition"
-            >
-              See how it works
-            </a>
-          </div>
+              <span
+                className="inline-block w-[6px] h-[6px] rounded-full"
+                style={{
+                  background: 'var(--color-primary)',
+                  boxShadow: '0 0 0 4px rgba(2,132,199,0.14)',
+                }}
+                aria-hidden="true"
+              />
+              Identity infrastructure · Early access
+            </p>
 
-          {/* App Store badges */}
-          <div className="mt-5 flex justify-center items-center gap-3">
-            <a
-              href={IOS_APP_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Download on the App Store"
-            >
-              <Image
-                src="/landing/badge-appstore.svg"
-                alt="Download on the App Store"
-                width={132}
-                height={44}
-                className="block dark:hidden"
-              />
-              <Image
-                src="/landing/badge-appstore-dark.svg"
-                alt="Download on the App Store"
-                width={132}
-                height={44}
-                className="hidden dark:block"
-              />
-            </a>
-            <a
-              href={ANDROID_PLAY_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Get it on Google Play"
-            >
-              <Image
-                src="/landing/badge-playstore.svg"
-                alt="Get it on Google Play"
-                width={140}
-                height={44}
-                className="block dark:hidden"
-              />
-              <Image
-                src="/landing/badge-playstore-dark.svg"
-                alt="Get it on Google Play"
-                width={140}
-                height={44}
-                className="hidden dark:block"
-              />
-            </a>
-          </div>
+            <h1 className="mh-display-hero mh-reveal mh-reveal-d1 mb-8">
+              Identity, anchored to something that can&rsquo;t be faked.
+            </h1>
 
-          {/* Jump links */}
-          <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-app-text-muted dark:text-app-text-secondary">
-            <span className="text-gray-300 dark:text-app-text-secondary hidden sm:inline">Jump to:</span>
-            {HERO_JUMP_LINKS.map(({ label, href }) => (
-              <a key={href} href={href} className="hover:text-app-text-secondary dark:hover:text-gray-300 transition underline underline-offset-2">
-                {label}
+            <p className="mh-lede mh-reveal mh-reveal-d2 mb-10 max-w-[560px]">
+              Pantopus is built on the one piece of identity AI can&rsquo;t fabricate — your verified physical address. Everything else follows from there.
+            </p>
+
+            <div className="mh-reveal mh-reveal-d3 flex flex-wrap items-center gap-8">
+              {/* Placeholder — destination is TBD (verify-address flow not wired yet). */}
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 h-14 px-6 rounded-[14px] text-white font-semibold text-base transition-transform hover:scale-[1.02] cursor-pointer"
+                style={{
+                  background: 'var(--color-primary)',
+                  boxShadow: '0 1px 0 rgba(255,255,255,0.2) inset, var(--shadow-primary)',
+                  letterSpacing: '-0.005em',
+                  border: 0,
+                }}
+              >
+                Verify your address
+              </button>
+              <a
+                href="#primitive"
+                className="inline-flex items-center gap-2 font-semibold text-[15px] no-underline group"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                See how it works
+                <span className="inline-block transition-transform group-hover:translate-x-0.5" aria-hidden="true">→</span>
               </a>
-            ))}
+            </div>
+
+            <div
+              className="mh-reveal mh-reveal-d4 mt-16 flex flex-wrap items-center gap-x-6 gap-y-2"
+              style={{ color: 'var(--ink-3)', fontSize: '13px', letterSpacing: '0.04em' }}
+            >
+              <span>Verified by physical mail</span>
+              <span
+                className="inline-block w-1 h-1 rounded-full"
+                style={{ background: 'var(--ink-4)' }}
+                aria-hidden="true"
+              />
+              <span>Deeds &amp; leases</span>
+              <span
+                className="inline-block w-1 h-1 rounded-full"
+                style={{ background: 'var(--ink-4)' }}
+                aria-hidden="true"
+              />
+              <span>On-site confirmation</span>
+            </div>
           </div>
 
-          {/* Phone mockup with video */}
-          <HeroVisual />
+          {/* Envelope visual */}
+          <div className="relative w-full aspect-square max-w-[560px] ml-auto mh-reveal mh-reveal-d2" aria-hidden="true">
+            <div
+              className="mh-hero-glow absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                background:
+                  'radial-gradient(circle at 50% 50%, rgba(212,156,87,0.28) 0%, rgba(212,156,87,0.08) 30%, transparent 60%)',
+              }}
+            />
+            <svg
+              className="absolute"
+              style={{
+                inset: '8% 6%',
+                width: '88%',
+                height: '84%',
+                filter:
+                  'drop-shadow(0 24px 40px rgba(60,30,15,0.18)) drop-shadow(0 6px 12px rgba(60,30,15,0.08))',
+              }}
+              viewBox="0 0 400 280"
+              aria-label="Sealed envelope"
+            >
+              <defs>
+                <linearGradient id="heroPaper" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#F1E2C2" />
+                  <stop offset="0.6" stopColor="#E6D2A4" />
+                  <stop offset="1" stopColor="#CFB585" />
+                </linearGradient>
+                <linearGradient id="heroFlap" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#E7D5AE" />
+                  <stop offset="1" stopColor="#C9A974" />
+                </linearGradient>
+                <radialGradient id="heroSeal" cx="35%" cy="30%" r="70%">
+                  <stop offset="0" stopColor="#C75B40" />
+                  <stop offset="1" stopColor="#7A2A1A" />
+                </radialGradient>
+              </defs>
+              <rect x="20" y="50" width="360" height="210" rx="10" fill="url(#heroPaper)" stroke="rgba(60,30,15,0.22)" strokeWidth="1.2" />
+              <rect x="32" y="62" width="336" height="186" rx="6" fill="none" stroke="rgba(60,30,15,0.08)" strokeWidth="0.8" />
+              <path d="M20 60 L200 200 L380 60 Z" fill="url(#heroFlap)" stroke="rgba(60,30,15,0.28)" strokeWidth="1.2" strokeLinejoin="round" />
+              <path d="M20 260 L200 200 L380 260" fill="none" stroke="rgba(60,30,15,0.18)" strokeWidth="1" />
+              <g className="mh-seal-lift">
+                <circle cx="200" cy="200" r="32" fill="url(#heroSeal)" stroke="rgba(0,0,0,0.32)" strokeWidth="1.4" />
+                <circle cx="200" cy="200" r="26" fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="0.8" strokeDasharray="2 3" />
+                <text
+                  x="200"
+                  y="212"
+                  textAnchor="middle"
+                  fontFamily='Iowan Old Style, Hoefler Text, Georgia, serif'
+                  fontStyle="italic"
+                  fontSize="32"
+                  fill="rgba(255,236,210,0.95)"
+                  fontWeight="500"
+                >
+                  P
+                </text>
+              </g>
+              <ellipse cx="120" cy="80" rx="80" ry="10" fill="rgba(255,255,255,0.16)" />
+            </svg>
+          </div>
         </div>
       </div>
     </section>

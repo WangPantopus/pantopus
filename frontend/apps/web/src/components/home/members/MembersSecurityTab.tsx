@@ -28,7 +28,7 @@ const LEGACY_ROLE_MAP: Record<string, string> = {
   property_manager: 'manager', caregiver: 'restricted_member',
 };
 
-function resolveRole(m: Record<string, unknown>) {
+function resolveRole(m: Record<string, any>) {
   const base = (m.role_base as string) || LEGACY_ROLE_MAP[m.role as string] || (m.role as string) || 'member';
   const config = ROLE_CONFIG[base] || ROLE_CONFIG.member;
   return { base, config };
@@ -61,7 +61,7 @@ const AVATAR_COLORS = [
   'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-teal-500',
 ];
 
-function getAvatarColor(m: Record<string, unknown>) {
+function getAvatarColor(m: Record<string, any>) {
   const str = (m.user_id as string) || (m.id as string) || '';
   const idx = str.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
   return AVATAR_COLORS[idx % AVATAR_COLORS.length];
@@ -81,11 +81,11 @@ export default function MembersSecurityTab({
   onMembersChange,
 }: {
   homeId: string;
-  home: Record<string, unknown> & { owner_id?: string };
+  home: Record<string, any> & { owner_id?: string };
   members: HomeMember[];
   can: (perm: string) => boolean;
   currentUserId: string | null;
-  onInvite: (data: Record<string, unknown>) => Promise<void>;
+  onInvite: (data: Record<string, any>) => Promise<void>;
   onMembersChange: () => void;
 }) {
   const isOwner = home?.owner_id === currentUserId;
@@ -122,7 +122,7 @@ export default function MembersSecurityTab({
           api.homeProfile.getHomeAccessSecrets(homeId),
         ]);
         if (passesRes.status === 'fulfilled') {
-          const passes = (passesRes.value as Record<string, unknown>).passes || [];
+          const passes = (passesRes.value as Record<string, any>).passes || [];
           const active = passes.filter(
             (p: GuestPass) => !p.revoked_at && p.status !== 'revoked' && p.status !== 'expired' &&
               (!p.end_at || new Date(p.end_at) > new Date())
@@ -130,11 +130,11 @@ export default function MembersSecurityTab({
           setActivePasses(active.length);
         }
         if (settingsRes.status === 'fulfilled') {
-          const s = settingsRes.value as Record<string, unknown>;
+          const s = settingsRes.value as Record<string, any>;
           setLockdownEnabled(s?.home?.lockdown_enabled || false);
         }
         if (secretsRes.status === 'fulfilled') {
-          setSecretsCount(((secretsRes.value as Record<string, unknown>).secrets || []).length);
+          setSecretsCount(((secretsRes.value as Record<string, any>).secrets || []).length);
         }
       } catch {
         // Non-critical
@@ -175,7 +175,7 @@ export default function MembersSecurityTab({
   const active = members.filter((m) => m.is_active !== false);
   const pending = members.filter((m) => m.is_active === false);
 
-  const grouped = active.reduce<Record<string, Record<string, unknown>[]>>((acc, m) => {
+  const grouped = active.reduce<Record<string, HomeMember[]>>((acc, m) => {
     const { base } = resolveRole(m);
     if (!acc[base]) acc[base] = [];
     acc[base].push(m);
@@ -433,7 +433,7 @@ function MemberRow({
   homeOwnerId,
   onClick,
 }: {
-  member: Record<string, unknown>;
+  member: Record<string, any>;
   homeOwnerId?: string;
   onClick: () => void;
 }) {

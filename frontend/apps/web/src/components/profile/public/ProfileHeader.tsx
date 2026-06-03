@@ -32,6 +32,14 @@ interface ProfileHeaderProps {
   onShare: () => void;
 }
 
+function stringField(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function numberField(value: unknown): number {
+  return typeof value === 'number' ? value : 0;
+}
+
 export default function ProfileHeader({
   profile,
   fullName,
@@ -54,6 +62,14 @@ export default function ProfileHeader({
   onShare,
 }: ProfileHeaderProps) {
   const router = useRouter();
+  const username = stringField(profile.username);
+  const tagline = stringField(profile.tagline) || 'Helping neighbors with local services.';
+  const avatarUrl = stringField(profile.profile_picture_url) || stringField(profile.avatar_url) || stringField(profile.profilePicture);
+  const createdAt = stringField(profile.created_at) || stringField(profile.createdAt);
+  const joinedLabel = createdAt
+    ? new Date(createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    : 'Unknown';
+  const gigsCompleted = numberField(profile.gigs_completed);
 
   return (
     <>
@@ -64,9 +80,9 @@ export default function ProfileHeader({
           <div className="flex flex-col md:flex-row md:items-end gap-5">
             {/* Avatar */}
             <div className="relative w-24 h-24 md:w-28 md:h-28 shrink-0">
-              {profile.avatar_url || profile.profilePicture || profile.profile_picture_url ? (
+              {avatarUrl ? (
                 <Image
-                  src={(profile.profile_picture_url || profile.avatar_url || profile.profilePicture) as string}
+                  src={avatarUrl}
                   alt={fullName}
                   className="w-full h-full rounded-full object-cover border-4 border-white shadow"
                   width={112}
@@ -89,15 +105,15 @@ export default function ProfileHeader({
             {/* Info */}
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl md:text-3xl font-bold text-app leading-tight">{fullName}</h1>
-              <p className="text-app-secondary">@{profile.username}</p>
-              <p className="text-sm text-app-secondary mt-1">{profile.tagline || 'Helping neighbors with local services.'}</p>
+              <p className="text-app-secondary">@{username}</p>
+              <p className="text-sm text-app-secondary mt-1">{tagline}</p>
               <ResidencyHomeBlock residency={residency ?? undefined} />
 
               <div className="flex flex-wrap gap-2 mt-3">
                 {trustBadges.slice(0, 3).map((badge) => (
                   <Badge key={badge.text} icon={badge.icon} text={badge.text} color={badge.color} />
                 ))}
-                <Badge icon="📅" text={`Joined ${new Date(profile.created_at || profile.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`} color="gray" />
+                <Badge icon="📅" text={`Joined ${joinedLabel}`} color="gray" />
               </div>
             </div>
 
@@ -165,7 +181,7 @@ export default function ProfileHeader({
               value={displayReviewCount > 0 ? `${displayRating.toFixed(1)} ★` : 'New'}
               detail={displayReviewCount > 0 ? `${displayReviewCount} reviews` : 'Be their first review'}
             />
-            <TrustChip title="Completed" value={profile.gigs_completed || 0} detail="as worker" />
+            <TrustChip title="Completed" value={gigsCompleted} detail="as worker" />
             <TrustChip title="Response" value={responseTimeLabel} detail="typical response time" />
             <TrustChip
               title="Reliability"

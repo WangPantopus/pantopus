@@ -28,7 +28,7 @@ const VISIBILITY_OPTIONS = [
   { value: 'public_preview', label: 'Public Preview', desc: 'Basic info visible to others' },
 ];
 
-function parseLocation(loc: Record<string, unknown> | string | null | undefined): { latitude: number | null; longitude: number | null } {
+function parseLocation(loc: Record<string, any> | string | null | undefined): { latitude: number | null; longitude: number | null } {
   if (!loc) return { latitude: null, longitude: null };
   if (loc?.coordinates?.length >= 2) {
     const [lng, lat] = loc.coordinates;
@@ -47,7 +47,7 @@ function parseLocation(loc: Record<string, unknown> | string | null | undefined)
 export default function EditHomePage() {
   const router = useRouter();
   const params = useParams();
-  const homeId = String((params as Record<string, unknown>)?.id || '');
+  const homeId = String((params as Record<string, any>)?.id || '');
 
   const [home, setHome] = useState<Home | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +81,7 @@ export default function EditHomePage() {
     if (!token) { router.push('/login'); return; }
     try {
       const res = await api.homes.getHome(homeId);
-      const h = (res as Record<string, unknown>)?.home as Record<string, unknown> | undefined;
+      const h = (res as Record<string, any>)?.home as Record<string, any> | undefined;
       setHome(h);
 
       setName(h?.name || '');
@@ -151,7 +151,7 @@ export default function EditHomePage() {
     setSaving(true);
     setSuccessMsg('');
     try {
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, any> = {
         name: name.trim() || null,
         unit_number: unit.trim() || null,
         home_type: homeType,

@@ -48,7 +48,7 @@ export function useListingDetail() {
     if (!listingId) return;
     try {
       const result = await api.listings.getListing(listingId);
-      setListing(((result as Record<string, unknown>)?.listing ?? result) as ListingDetail);
+      setListing(((result as Record<string, any>)?.listing ?? result) as ListingDetail);
     } catch {
       setListing(null);
     }

@@ -12,10 +12,10 @@ function CalendarContent() {
   const router = useRouter();
   const { id: homeId } = useParams<{ id: string }>();
 
-  const [tasks, setTasks] = useState<Record<string, unknown>[]>([]);
-  const [bills, setBills] = useState<Record<string, unknown>[]>([]);
-  const [events, setEvents] = useState<Record<string, unknown>[]>([]);
-  const [packages, setPackages] = useState<Record<string, unknown>[]>([]);
+  const [tasks, setTasks] = useState<Record<string, any>[]>([]);
+  const [bills, setBills] = useState<Record<string, any>[]>([]);
+  const [events, setEvents] = useState<Record<string, any>[]>([]);
+  const [packages, setPackages] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Add event form
@@ -38,13 +38,13 @@ function CalendarContent() {
     ]);
 
     if (tasksRes.status === 'fulfilled')
-      setTasks(((tasksRes.value as any)?.tasks || []) as Record<string, unknown>[]);
+      setTasks(((tasksRes.value as any)?.tasks || []) as Record<string, any>[]);
     if (billsRes.status === 'fulfilled')
-      setBills(((billsRes.value as any)?.bills || []) as Record<string, unknown>[]);
+      setBills(((billsRes.value as any)?.bills || []) as Record<string, any>[]);
     if (eventsRes.status === 'fulfilled')
-      setEvents(((eventsRes.value as any)?.events || []) as Record<string, unknown>[]);
+      setEvents(((eventsRes.value as any)?.events || []) as Record<string, any>[]);
     if (pkgRes.status === 'fulfilled')
-      setPackages(((pkgRes.value as any)?.packages || []) as Record<string, unknown>[]);
+      setPackages(((pkgRes.value as any)?.packages || []) as Record<string, any>[]);
   }, [homeId]);
 
   useEffect(() => {

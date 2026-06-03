@@ -36,8 +36,8 @@ export default function BillSlidePanel({
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Record<string, unknown>) => Promise<void>;
-  bill?: Record<string, unknown>; // null = create, object = edit
+  onSave: (data: Record<string, any>) => Promise<void>;
+  bill?: Record<string, any>; // null = create, object = edit
 }) {
   const isEdit = !!bill;
 
@@ -85,7 +85,7 @@ export default function BillSlidePanel({
     setSaving(true);
     setError('');
     try {
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, any> = {
         bill_type: billType,
         provider_name: providerName.trim() || undefined,
         amount: parseFloat(amount),

@@ -92,13 +92,13 @@ export default function BusinessSettingsLegalPage() {
     try {
       const [verRes, privateRes, accessRes] = await Promise.all([
         api.businesses.getVerificationStatus(businessId),
-        api.businesses.getBusinessPrivate(businessId).catch(() => ({ private: {} as Record<string, unknown> })),
+        api.businesses.getBusinessPrivate(businessId).catch(() => ({ private: {} as Record<string, any> })),
         api.businessIam.getMyBusinessAccess(businessId).catch(() => ({ isOwner: false })),
       ]);
       setVerificationData(verRes);
       setAccess({ isOwner: (accessRes as { isOwner?: boolean }).isOwner || false });
 
-      const priv = (privateRes as { private?: Record<string, unknown> }).private || {};
+      const priv = (privateRes as { private?: Record<string, any> }).private || {};
       const privLegalName = typeof priv.legal_name === 'string' ? priv.legal_name : '';
       setLegalForm({
         legal_name: privLegalName,

@@ -89,49 +89,10 @@ export async function updateHomeIssue(homeId: string, issueId: string, data: Par
 
 // ---- HomeBill + HomeBillSplit ----
 
-/** Bill payload returned by `GET /api/homes/:id/bills` —
- *  route `backend/routes/home.js:4506`. The backend table stores
- *  `amount` as a numeric column (string over the wire). Older clients
- *  also read `amount_cents` from a now-defunct field — accept both. */
-export interface HomeBill {
-  id: string;
-  home_id: string;
-  bill_type: string;
-  provider_name: string | null;
-  amount: number | string;
-  amount_cents?: number | null;
-  currency?: string;
-  period_start?: string | null;
-  period_end?: string | null;
-  due_date: string | null;
-  status: string;
-  paid_at?: string | null;
-  paid_by?: string | null;
-  details?: Record<string, unknown> | null;
-  created_at?: string;
-  updated_at?: string;
-  // Legacy/dashboard fields some surfaces still display
-  title?: string;
-}
-
-export interface HomeBillSplit {
-  id: string;
-  bill_id: string;
-  user_id: string;
-  amount: number | string;
-  status?: string;
-  user?: {
-    id: string;
-    username?: string | null;
-    name?: string | null;
-    profile_picture_url?: string | null;
-  };
-}
-
 export async function getHomeBills(homeId: string, params?: {
   status?: string;
 }) {
-  return get<{ bills: HomeBill[] }>(`/api/homes/${homeId}/bills`, params);
+  return get<{ bills: any[] }>(`/api/homes/${homeId}/bills`, params);
 }
 
 export async function createHomeBill(homeId: string, data: {
@@ -141,85 +102,20 @@ export async function createHomeBill(homeId: string, data: {
   due_date?: string;
   period_start?: string;
   period_end?: string;
-  details?: Record<string, unknown>;
 }) {
-  return post<{ bill: HomeBill }>(`/api/homes/${homeId}/bills`, data);
+  return post<{ bill: any }>(`/api/homes/${homeId}/bills`, data);
 }
 
 export async function updateHomeBill(homeId: string, billId: string, data: Partial<{
   status: string;
   paid_at: string;
   amount: number;
-  provider_name: string;
-  due_date: string;
-  details: Record<string, unknown>;
 }>) {
-  return put<{ bill: HomeBill }>(`/api/homes/${homeId}/bills/${billId}`, data);
+  return put<{ bill: any }>(`/api/homes/${homeId}/bills/${billId}`, data);
 }
 
 export async function getHomeBillSplits(homeId: string, billId: string) {
-  return get<{ splits: HomeBillSplit[] }>(`/api/homes/${homeId}/bills/${billId}/splits`);
-}
-
-// ---- HomeMaintenance (T6.3b / P10) ----
-
-/** Maintenance task payload returned by `GET /api/homes/:id/maintenance`.
- *  Backend table extended in migration `151_home_maintenance_tasks.sql`. */
-export interface HomeMaintenanceTask {
-  id: string;
-  home_id: string;
-  task: string;
-  vendor: string | null;
-  cost: number | string | null;
-  recurrence: 'one_time' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | string;
-  due_date: string | null;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | string;
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string | null;
-}
-
-export async function getHomeMaintenance(
-  homeId: string,
-  params?: { status?: string },
-) {
-  return get<{ tasks: HomeMaintenanceTask[] }>(`/api/homes/${homeId}/maintenance`, params);
-}
-
-export async function createHomeMaintenance(
-  homeId: string,
-  data: {
-    task: string;
-    vendor?: string | null;
-    cost?: number | null;
-    recurrence?: HomeMaintenanceTask['recurrence'];
-    due_date?: string | null;
-    status?: HomeMaintenanceTask['status'];
-  },
-) {
-  return post<{ task: HomeMaintenanceTask }>(`/api/homes/${homeId}/maintenance`, data);
-}
-
-export async function updateHomeMaintenance(
-  homeId: string,
-  taskId: string,
-  data: Partial<{
-    task: string;
-    vendor: string | null;
-    cost: number | null;
-    recurrence: HomeMaintenanceTask['recurrence'];
-    due_date: string | null;
-    status: HomeMaintenanceTask['status'];
-  }>,
-) {
-  return put<{ task: HomeMaintenanceTask }>(
-    `/api/homes/${homeId}/maintenance/${taskId}`,
-    data,
-  );
-}
-
-export async function deleteHomeMaintenance(homeId: string, taskId: string) {
-  return del<void>(`/api/homes/${homeId}/maintenance/${taskId}`);
+  return get<{ splits: any[] }>(`/api/homes/${homeId}/bills/${billId}/splits`);
 }
 
 // ---- HomePackage ----
@@ -451,78 +347,33 @@ export async function deleteHomePet(homeId: string, petId: string) {
   return del<{ message: string }>(`/api/homes/${homeId}/pets/${petId}`);
 }
 
-// ---- Polls (T6.3e / P13) ----
-
-// `options` is stored as JSONB on the backend; the wire form is either a
-// bare-string array (`["Sat", "Sun"]`) or an object array
-// (`[{ id, label }, …]`). The client accepts both at decode time and
-// always emits `{ label }` objects on create.
-export type PollOption =
-  | string
-  | { id?: string; label?: string; text?: string; key?: string };
-
-export interface PollSummary {
-  id: string;
-  home_id: string;
-  title: string;
-  description?: string | null;
-  poll_type: 'single_choice' | 'multiple_choice' | 'yes_no' | 'ranking' | string;
-  options: PollOption[];
-  status: 'open' | 'closed' | 'canceled' | string;
-  closes_at?: string | null;
-  visibility?: string | null;
-  created_at?: string;
-  created_by?: string;
-  vote_count: number;
-  /** Per-option breakdown keyed by option id / label. Empty when nobody
-   *  has voted yet. */
-  option_counts?: Record<string, number>;
-  /** The current viewer's selected option keys, or null when they
-   *  haven't voted. */
-  my_vote?: string[] | null;
-}
+// ---- Polls ----
 
 export async function getHomePolls(homeId: string) {
-  return get<{ polls: PollSummary[] }>(`/api/homes/${homeId}/polls`);
+  return get<{ polls: any[] }>(`/api/homes/${homeId}/polls`);
 }
 
-export async function createHomePoll(
-  homeId: string,
-  data: {
-    title: string;
-    description?: string;
-    poll_type?: 'single_choice' | 'multiple_choice' | 'yes_no' | 'ranking';
-    options: { label: string }[];
-    closes_at?: string;
-    visibility?: 'public' | 'members' | 'managers' | 'sensitive';
-  },
-) {
-  return post<{ poll: PollSummary }>(`/api/homes/${homeId}/polls`, data);
+export async function createHomePoll(homeId: string, data: {
+  question: string;
+  poll_type?: string;
+  options?: string[];
+  closes_at?: string;
+}) {
+  return post<{ poll: any }>(`/api/homes/${homeId}/polls`, data);
 }
 
-export async function voteOnPoll(
-  homeId: string,
-  pollId: string,
-  data: {
-    /** Array of option keys (matching `PollSummary.options[].id` / label). */
-    selected_options: string[];
-  },
-) {
-  return post<{ vote: unknown }>(`/api/homes/${homeId}/polls/${pollId}/vote`, data);
+export async function voteOnPoll(homeId: string, pollId: string, data: {
+  option_index: number;
+}) {
+  return post<{ vote: any }>(`/api/homes/${homeId}/polls/${pollId}/vote`, data);
 }
 
-export async function updateHomePoll(
-  homeId: string,
-  pollId: string,
-  data: Partial<{
-    title: string;
-    description: string;
-    closes_at: string | null;
-    status: 'open' | 'closed' | 'canceled';
-    visibility: 'public' | 'members' | 'managers' | 'sensitive';
-  }>,
-) {
-  return put<{ poll: PollSummary }>(`/api/homes/${homeId}/polls/${pollId}`, data);
+export async function updateHomePoll(homeId: string, pollId: string, data: Partial<{
+  question: string;
+  closes_at: string;
+  status: string;
+}>) {
+  return put<{ poll: any }>(`/api/homes/${homeId}/polls/${pollId}`, data);
 }
 
 // ---- Activity Log ----
@@ -592,8 +443,23 @@ export async function transferAdmin(homeId: string, data: {
 
 import type { HomeHealthScore, SeasonalChecklist, SeasonalChecklistItem, SeasonalChecklistHistory, BillTrendData, PropertyValueData, HomeTimelineItem } from '@pantopus/types';
 
-export async function getHomeHealthScore(homeId: string) {
-  return get<HomeHealthScore>(`/api/homes/${homeId}/health-score`);
+export async function getHomeHealthScore(homeId: string, params?: { force?: boolean }) {
+  const force = params?.force === true;
+  const query = force
+    ? { force: 'true' as const, _ts: String(Date.now()) }
+    : undefined;
+  return get<HomeHealthScore>(
+    `/api/homes/${homeId}/health-score`,
+    query,
+    force
+      ? {
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+        }
+      : undefined,
+  );
 }
 
 export async function getSeasonalChecklist(homeId: string) {

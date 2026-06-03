@@ -7,7 +7,7 @@ export function PropertyDetailsCardPreview({
   home,
   onOpen,
 }: {
-  home: Record<string, unknown> | null;
+  home: Record<string, any> | null;
   onOpen: () => void;
 }) {
   const address = [home?.address, home?.address2]

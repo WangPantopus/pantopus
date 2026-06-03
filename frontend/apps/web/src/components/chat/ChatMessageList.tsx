@@ -91,7 +91,7 @@ export default function ChatMessageList({
               let lastSenderId: string | null = null;
               return messages.map((msg, idx) => {
                 const nodes: React.ReactNode[] = [];
-                const dKey = getDateKey(msg.created_at);
+                const dKey = getDateKey(msg.created_at || '');
 
                 // Date separator
                 if (dKey !== lastDateKey) {
@@ -110,7 +110,7 @@ export default function ChatMessageList({
                 const senderId = msg.user_id || msg.sender_id || msg.sender?.id;
                 const isMine = isOwnMessage(msg);
                 const showSender = !isMine && senderId !== lastSenderId;
-                lastSenderId = senderId;
+                lastSenderId = senderId || null;
 
                 nodes.push(
                   <ChatMessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} onImageClick={onImageClick} onReact={onReact} />

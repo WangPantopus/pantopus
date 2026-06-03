@@ -22,9 +22,9 @@ export default function IssuesList({
   onAdd,
   onViewIssue,
 }: {
-  issues: Record<string, unknown>[];
+  issues: Record<string, any>[];
   onAdd?: () => void;
-  onViewIssue?: (issue: Record<string, unknown>) => void;
+  onViewIssue?: (issue: Record<string, any>) => void;
 }) {
   const activeIssues = issues.filter((i) => i.status !== 'resolved' && i.status !== 'canceled');
   const resolvedCount = issues.filter((i) => i.status === 'resolved').length;

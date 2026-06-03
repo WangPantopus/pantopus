@@ -105,6 +105,7 @@ export interface HomePet {
   name: string;
   species: HomePetSpecies;
   breed?: string | null;
+  birthday?: string | null;
   age_years?: number | null;
   weight_lbs?: number | null;
   vet_name?: string | null;
@@ -198,17 +199,17 @@ export type HomeAccessType =
   | 'garage' | 'alarm' | 'other';
 
 export interface HomeAccessSecret {
-  id: string;
-  home_id: string;
+  id?: string;
+  home_id?: string;
   access_type: HomeAccessType;
   label: string;
   secret_value?: string | null;
   has_secret?: boolean;
   notes?: string | null;
   visibility?: HomeRecordVisibility;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ─── HomeVendor ─────────────────────────────────────────────
@@ -287,6 +288,10 @@ export interface HomeMember {
   id: string;
   home_id: string;
   user_id: string;
+  name?: string | null;
+  username?: string | null;
+  email?: string | null;
+  profile_picture_url?: string | null;
   role?: HomeRoleBase;
   role_base?: HomeRoleBase;
   age_band?: HomeAgeBand | null;
@@ -346,7 +351,7 @@ export interface HomeOwnershipClaim {
 
 // ─── HomeResidencyClaim ─────────────────────────────────────
 
-export type ResidencyClaimStatus = 'pending' | 'approved' | 'rejected';
+export type ResidencyClaimStatus = 'pending' | 'approved' | 'rejected' | 'verified';
 
 export interface HomeResidencyClaim {
   id: string;
@@ -367,6 +372,16 @@ export interface HomeResidencyClaim {
     id: string;
     username: string;
     name?: string;
+    profile_picture_url?: string | null;
+  };
+  claimant?: {
+    id: string;
+    username?: string;
+    name?: string;
+    first_name?: string;
+    last_name?: string;
+    city?: string;
+    state?: string;
     profile_picture_url?: string | null;
   };
 }

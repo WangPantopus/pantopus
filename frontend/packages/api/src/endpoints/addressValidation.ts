@@ -12,6 +12,8 @@ export type AddressVerdictStatus =
   | 'OK'
   | 'MISSING_UNIT'
   | 'MISSING_STREET_NUMBER'
+  | 'UNVERIFIED_STREET_NUMBER'
+  | 'PO_BOX'
   | 'MULTIPLE_MATCHES'
   | 'BUSINESS'
   | 'MIXED_USE'

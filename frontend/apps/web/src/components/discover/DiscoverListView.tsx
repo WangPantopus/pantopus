@@ -107,18 +107,32 @@ export default function DiscoverListView({
   hasHome,
   sentinelRef,
 }: DiscoverListViewProps) {
+  const universalPlaceholder =
+    scope === 'local_profiles'
+      ? 'Search Profiles...'
+      : scope === 'public_profiles'
+        ? 'Search Beacons...'
+        : 'Search profiles, tasks, listings...';
+  const scopeForGroup = (type: UnifiedResult['type']): SearchScope => {
+    if (type === 'local_profile') return 'local_profiles';
+    if (type === 'public_profile') return 'public_profiles';
+    if (type === 'task') return 'tasks';
+    if (type === 'listing') return 'listings';
+    return 'businesses';
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <PageHeader
         title={showBusinessUI ? 'Discover Businesses' : 'Discover'}
-        subtitle={showBusinessUI ? 'Find trusted local providers near you' : 'Search across people, businesses, tasks, and listings'}
+        subtitle={showBusinessUI ? 'Find trusted local providers near you' : 'Search across profiles, businesses, tasks, and listings'}
       >
         {/* Search bar + View toggle row */}
         <div className="flex items-center gap-3">
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder={showBusinessUI ? 'Search businesses near you...' : 'Search people, tasks, listings...'}
+            placeholder={showBusinessUI ? 'Search businesses near you...' : universalPlaceholder}
             className="max-w-lg flex-1"
           />
 
@@ -281,7 +295,7 @@ export default function DiscoverListView({
               <div className="mb-4 flex justify-center"><Search className="w-10 h-10 text-app-muted" /></div>
               <h3 className="text-lg font-semibold text-app-strong mb-1">Search Pantopus</h3>
               <p className="text-sm text-app-muted max-w-sm mx-auto">
-                Type at least 2 characters to search across {scope === 'all' ? 'people, businesses, tasks, and listings' : scope}
+                Type at least 2 characters to search across {scope === 'all' ? 'profiles, businesses, tasks, and listings' : scope.replace('_', ' ')}
               </p>
             </div>
           )}
@@ -299,7 +313,7 @@ export default function DiscoverListView({
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-semibold text-app-strong">{group.label}</h3>
                     <button
-                      onClick={() => setScope(group.type === 'person' ? 'people' : group.type === 'task' ? 'tasks' : group.type === 'listing' ? 'listings' : 'businesses')}
+                      onClick={() => setScope(scopeForGroup(group.type))}
                       className="text-xs font-semibold text-primary-600 hover:text-primary-700"
                     >
                       See all →

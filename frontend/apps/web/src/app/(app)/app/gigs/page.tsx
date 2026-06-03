@@ -8,8 +8,9 @@ import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
 import { GIG_BROWSE_CATEGORIES } from '@pantopus/ui-utils';
 import type { SortKey, PriceFilterKey } from '@pantopus/ui-utils';
-import { Search } from 'lucide-react';
+import { Maximize2, Minimize2, Search, X } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
+import { ProBadge } from '@/components/ProBadge';
 import ErrorState from '@/components/ui/ErrorState';
 import { ShimmerLine, ShimmerBlock } from '@/components/ui/Shimmer';
 import { TaskRow, FilterChipBar, BrowseFeed, CategoryRail, SupportTrainRow } from '@/components/gig-browse';
@@ -17,6 +18,7 @@ import MapTaskDrawer from '@/components/gig-browse/MapTaskDrawer';
 import SmartSearch from '@/components/gig-browse/SmartSearch';
 import NewTasksBanner from '@/components/gig-browse/NewTasksBanner';
 import { useSocketEvent } from '@/hooks/useSocket';
+import { useRadiusSuggestion } from '@/hooks/useRadiusSuggestion';
 import type { FilterState } from '@/components/gig-browse';
 import type { GigListItem, GigCluster, BrowseResponse } from '@pantopus/types';
 import type { GigMapPin } from './GigsMap';
@@ -25,6 +27,7 @@ const GigsMap = dynamic(() => import('./GigsMap'), { ssr: false });
 
 // ─── Constants ─────────────────────────────────────────────
 const PAGE_SIZE = 15;
+const METERS_PER_MILE = 1609.344;
 
 // ─── Helpers ───────────────────────────────────────────────
 
@@ -43,9 +46,10 @@ function buildApiFilters(
   filters: FilterState,
   sort: string,
   search: string,
-  pageNum: number
-): Record<string, unknown> {
-  const params: Record<string, unknown> = {
+  pageNum: number,
+  location?: { latitude: number; longitude: number; radiusMiles?: number }
+): Record<string, any> {
+  const params: Record<string, any> = {
     page: pageNum,
     limit: PAGE_SIZE,
     status: ['open'],
@@ -76,7 +80,17 @@ function buildApiFilters(
   // Deadline
   if (filters.deadline) params.deadline = filters.deadline;
 
+  if (location?.latitude != null && location?.longitude != null) {
+    params.latitude = location.latitude;
+    params.longitude = location.longitude;
+    params.radiusMiles = location.radiusMiles || 100;
+  }
+
   return params;
+}
+
+function formatRadiusLabel(miles: number): string {
+  return miles === 25000 ? 'Global' : `${miles} mi`;
 }
 
 // ─── Legacy bridge: convert FilterState to PriceFilterKey for GigsMap ──
@@ -117,6 +131,7 @@ export default function GigsBrowsePage() {
   // ── User location (for browse sections API) ──
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
+  const [radiusMiles, setRadiusMiles] = useState(100);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -163,9 +178,12 @@ export default function GigsBrowsePage() {
 
   // ── Cluster data from BrowseFeed (for CategoryRail) ──
   const [clusters, setClusters] = useState<GigCluster[]>([]);
+  const [browseTaskCount, setBrowseTaskCount] = useState(0);
+  const [browseLoading, setBrowseLoading] = useState(false);
 
   const handleBrowseDataLoaded = useCallback((data: BrowseResponse) => {
     setClusters(data.sections.clusters);
+    setBrowseTaskCount(data.total_active || 0);
   }, []);
 
   // ── Map view drawer state ──
@@ -223,7 +241,7 @@ export default function GigsBrowsePage() {
     let cancelled = false;
     setTrainsLoading(true);
     setTrainsError(null);
-    const radiusMeters = filters.max_distance ?? 25 * 1609.344;
+    const radiusMeters = filters.max_distance ?? radiusMiles * METERS_PER_MILE;
     api.supportTrains
       .listNearbySupportTrains({
         latitude: userLat,
@@ -247,7 +265,7 @@ export default function GigsBrowsePage() {
     return () => {
       cancelled = true;
     };
-  }, [feedKind, userLat, userLng, filters.max_distance]);
+  }, [feedKind, userLat, userLng, filters.max_distance, radiusMiles]);
 
   // ── Search debounce ──
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -267,10 +285,20 @@ export default function GigsBrowsePage() {
     async (pageNum = 1, append = false) => {
       try {
         setFetchError(null);
-        const apiParams = buildApiFilters(filters, sortOption, debouncedSearch, pageNum);
+        const location =
+          userLat != null && userLng != null
+            ? { latitude: userLat, longitude: userLng, radiusMiles }
+            : undefined;
+        const apiParams = buildApiFilters(
+          filters,
+          sortOption,
+          debouncedSearch,
+          pageNum,
+          location
+        );
 
         const result = await api.gigs.getGigs(apiParams);
-        const resultData = result as Record<string, unknown>;
+        const resultData = result as Record<string, any>;
         const raw = (resultData?.gigs ?? resultData?.data ?? []) as GigListItem[];
         const items = Array.isArray(raw) ? raw : [];
 
@@ -287,7 +315,7 @@ export default function GigsBrowsePage() {
         if (!append) setFetchError('Failed to load tasks. Please try again.');
       }
     },
-    [filters, debouncedSearch, sortOption]
+    [filters, debouncedSearch, sortOption, userLat, userLng, radiusMiles]
   );
 
   // Fetch flat list when NOT in section mode
@@ -358,6 +386,10 @@ export default function GigsBrowsePage() {
     setForceFlatList(true);
   }, []);
 
+  useEffect(() => {
+    if (showSectionFeed) setBrowseLoading(true);
+  }, [showSectionFeed, userLat, userLng, radiusMiles, browseRefreshKey]);
+
   // When filters are cleared, reset forceFlatList so section feed shows again
   const handleFilterChange = useCallback(
     (newFilters: FilterState) => {
@@ -376,6 +408,25 @@ export default function GigsBrowsePage() {
     }
   }, [mapSelectedGigId, mapViewportGigs]);
 
+  const visibleTaskCount = showSectionFeed ? browseTaskCount : gigs.length;
+  const radiusSuggestion = useRadiusSuggestion(
+    visibleTaskCount,
+    radiusMiles,
+    setRadiusMiles,
+    {
+      enabled:
+        isListView &&
+        feedKind === 'tasks' &&
+        !filtersActive &&
+        !loading &&
+        (!showSectionFeed || !browseLoading) &&
+        userLat != null &&
+        userLng != null,
+      singularLabel: 'task',
+      pluralLabel: 'tasks',
+    }
+  );
+
   // ── Shared header bar ──
   const headerBar = (
     <div className="bg-app-surface border-b border-app-border-subtle">
@@ -383,6 +434,7 @@ export default function GigsBrowsePage() {
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-bold text-app-text flex items-center gap-2">
             <span>💼</span> Tasks
+            <ProBadge />
           </h1>
           <div className="flex bg-app-surface-sunken rounded-lg p-0.5">
             <button
@@ -573,6 +625,32 @@ export default function GigsBrowsePage() {
                   </div>
                 )}
 
+                {feedKind === 'tasks' && radiusSuggestion.suggestion && (
+                  <div className="mb-4 flex items-center gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
+                    {radiusSuggestion.suggestion.direction === 'expand' ? (
+                      <Maximize2 className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300" />
+                    ) : (
+                      <Minimize2 className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-300" />
+                    )}
+                    <span className="min-w-0 flex-1">{radiusSuggestion.suggestion.reason}</span>
+                    <button
+                      type="button"
+                      onClick={radiusSuggestion.applySuggestion}
+                      className="shrink-0 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      {formatRadiusLabel(radiusSuggestion.suggestion.suggestedRadius)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={radiusSuggestion.dismiss}
+                      aria-label="Dismiss radius suggestion"
+                      className="shrink-0 rounded-md p-1 text-sky-700 transition hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
                 {/* ── Support Trains feed ── */}
                 {feedKind === 'support_trains' ? (
                   <div id="task-feed" role="feed" aria-label="Support Trains list">
@@ -635,10 +713,12 @@ export default function GigsBrowsePage() {
                   <BrowseFeed
                     lat={userLat}
                     lng={userLng}
+                    radiusMeters={Math.round(radiusMiles * METERS_PER_MILE)}
                     onCategoryClick={handleCategoryClick}
                     onSeeAllClick={handleSeeAllClick}
                     onError={handleBrowseError}
                     onDataLoaded={handleBrowseDataLoaded}
+                    onLoadingChange={setBrowseLoading}
                     refreshKey={browseRefreshKey}
                   />
                 ) : (

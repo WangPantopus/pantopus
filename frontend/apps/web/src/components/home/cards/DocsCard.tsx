@@ -23,7 +23,7 @@ export function DocsCardPreview({
   documents,
   onExpand,
 }: {
-  documents: Record<string, unknown>[];
+  documents: Record<string, any>[];
   onExpand: () => void;
 }) {
   const byType = useMemo(() => {
@@ -72,13 +72,13 @@ export default function DocsCard({
   onBack,
   highlightDocumentId,
 }: {
-  documents: Record<string, unknown>[];
+  documents: Record<string, any>[];
   homeId: string;
   onBack: () => void;
   highlightDocumentId?: string;
 }) {
   const grouped = useMemo(() => {
-    const groups: Record<string, Record<string, unknown>[]> = {};
+    const groups: Record<string, Record<string, any>[]> = {};
     DOC_FOLDERS.forEach((f) => { groups[f.key] = []; });
 
     documents.forEach((doc) => {
@@ -90,7 +90,7 @@ export default function DocsCard({
     return groups;
   }, [documents]);
 
-  const handleShare = async (doc: Record<string, unknown>) => {
+  const handleShare = async (doc: Record<string, any>) => {
     try {
       const res = await api.homeIam.createScopedGrant(homeId, {
         resource_type: 'document',

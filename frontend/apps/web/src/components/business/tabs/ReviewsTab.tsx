@@ -13,7 +13,7 @@ export default function ReviewsTab({ businessId, businessName }: ReviewsTabProps
   const [responding, setResponding] = useState<string | null>(null);
   const [responseText, setResponseText] = useState('');
   const [ratingFilter, setRatingFilter] = useState<number | ''>('');
-  const [reviews, setReviews] = useState<Record<string, unknown>[]>([]);
+  const [reviews, setReviews] = useState<Record<string, any>[]>([]);
   const [summary, setSummary] = useState<{ total: number; average_rating: number }>({ total: 0, average_rating: 0 });
 
   const loadReviews = useCallback(async () => {

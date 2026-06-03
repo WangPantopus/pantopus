@@ -8,6 +8,7 @@ import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
 import { toast } from '@/components/ui/toast-store';
 import type { User, UserProfile, Listing, GigListItem } from '@pantopus/types';
+import { buildUserProfilePath } from '@pantopus/utils';
 import ResidencyHomeBlock from '@/components/profile/public/ResidencyHomeBlock';
 
 export default function MyProfilePage() {
@@ -212,7 +213,7 @@ export default function MyProfilePage() {
                 <button
                   onClick={() => {
                     if (user.username) {
-                      router.push(`/${user.username}`);
+                      router.push(buildUserProfilePath(user.username));
                     } else {
                       toast.warning('Username not set. Please update your profile first.');
                       router.push('/app/profile/edit');

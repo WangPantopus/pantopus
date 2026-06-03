@@ -62,14 +62,18 @@ function ReviewClaimContent() {
   }, [homeId, fetchClaims]);
 
   const handleRelationshipAction = useCallback(async (
-    claimId: string,
+    claim: any,
     action: 'invite_to_household' | 'decline_relationship' | 'flag_unknown_person',
   ) => {
+    const claimId = claim.id;
+    const isOwnerClaim = (claim.claim_type || 'owner') === 'owner';
     const actionMeta = {
       invite_to_household: {
-        title: 'Invite claimant to household',
-        description: 'This sends the claimant a merge invitation so they can attach to the verified household after identity confirmation.',
-        confirmLabel: 'Send invite',
+        title: isOwnerClaim ? 'Invite claimant as owner' : 'Invite claimant to household',
+        description: isOwnerClaim
+          ? 'This sends a co-owner invitation. After identity confirmation, they become a verified owner of this home.'
+          : 'This sends the claimant a merge invitation so they can attach to the verified household after identity confirmation.',
+        confirmLabel: isOwnerClaim ? 'Invite as owner' : 'Send invite',
         variant: 'primary' as const,
       },
       decline_relationship: {
@@ -226,15 +230,15 @@ function ReviewClaimContent() {
                   </div>
                 ) : comparison?.incumbent?.has_verified_owner && ['initiated', 'evidence_submitted', 'under_review'].includes(claim.claim_phase_v2 || '') ? (
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleRelationshipAction(claim.id, 'invite_to_household')}
+                    <button onClick={() => handleRelationshipAction(claim, 'invite_to_household')}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 transition">
-                      <UserPlus className="w-4 h-4" /> Invite
+                      <UserPlus className="w-4 h-4" /> {(claim.claim_type || 'owner') === 'owner' ? 'Invite as owner' : 'Invite'}
                     </button>
-                    <button onClick={() => handleRelationshipAction(claim.id, 'decline_relationship')}
+                    <button onClick={() => handleRelationshipAction(claim, 'decline_relationship')}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 border border-app-border bg-app-surface-sunken text-app-text rounded-lg text-sm font-semibold hover:bg-app-hover transition">
                       Continue review
                     </button>
-                    <button onClick={() => handleRelationshipAction(claim.id, 'flag_unknown_person')} title="Flag unknown claimant"
+                    <button onClick={() => handleRelationshipAction(claim, 'flag_unknown_person')} title="Flag unknown claimant"
                       className="w-10 h-10 flex items-center justify-center border border-amber-200 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
                       <Flag className="w-4 h-4 text-amber-500" />
                     </button>

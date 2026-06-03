@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ShieldCheck, Bookmark, Gift, Package, Laptop, BedDouble, Shirt, Leaf, Baby, Trophy, Hammer, Car, BookOpen, MapPin, Globe, ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 import { CONDITION_LABELS, LAYER_COLORS, formatTimeAgo, formatDistance, formatExpiration } from './constants';
-import type { ListingListItem } from '@pantopus/types';
+import type { Listing } from '@pantopus/api';
 
 // ── Category icon map for no-image placeholder ──
 const CATEGORY_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -42,7 +42,7 @@ const CATEGORY_GRADIENT: Record<string, string> = {
 };
 
 interface ListingCardProps {
-  item: ListingListItem;
+  item: Listing;
   onSave: () => void;
   onClick: () => void;
 }
@@ -53,7 +53,25 @@ export default React.memo(function ListingCard({ item, onSave, onClick }: Listin
   const expLabel = formatExpiration(item.expires_at);
   const distLabel = formatDistance(item.distance_meters);
   const [saveAnimating, setSaveAnimating] = useState(false);
-  const creatorDisplayName = item.creator?.first_name || item.creator?.name || item.creator?.username || 'Seller';
+  // P0.4 audit follow-up: marketplace listings flow through
+  // serializeUserAsLocalIdentity, which after the helper deletion exposes
+  // displayName / handle / avatarUrl only. Read those first; legacy fields
+  // (now optional in ListingCreator) stay as a fallback during rollout.
+  const creatorDisplayName =
+    item.creator?.displayName
+    || item.creator?.handle
+    || item.creator?.first_name
+    || item.creator?.name
+    || item.creator?.username
+    || 'Seller';
+  const creatorAvatarUrl =
+    item.creator?.avatarUrl
+    || item.creator?.profile_picture_url
+    || null;
+  const creatorHandle =
+    item.creator?.handle
+    || item.creator?.username
+    || null;
 
   const CategoryIconComponent = CATEGORY_ICON_MAP[item.category] || Package;
   const gradient = CATEGORY_GRADIENT[item.category] || 'from-purple-500 to-violet-600';
@@ -194,14 +212,14 @@ export default React.memo(function ListingCard({ item, onSave, onClick }: Listin
         {/* Seller + Verified Neighbor badge */}
         {item.creator && (
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            {item.creator.profile_picture_url ? (
-              <Image src={item.creator.profile_picture_url} alt="" width={16} height={16} className="rounded-full object-cover" sizes="16px" quality={75} />
+            {creatorAvatarUrl ? (
+              <Image src={creatorAvatarUrl} alt="" width={16} height={16} className="rounded-full object-cover" sizes="16px" quality={75} />
             ) : (
               <div className="w-4 h-4 rounded-full bg-app-surface-sunken" />
             )}
-            {item.creator.username ? (
+            {creatorHandle ? (
               <Link
-                href={`/${item.creator.username}`}
+                href={`/${creatorHandle}`}
                 onClick={(e) => e.stopPropagation()}
                 className="text-[11px] text-app-text-secondary truncate max-w-[80px]"
               >

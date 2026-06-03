@@ -286,13 +286,24 @@ export default function PostDetailPage() {
   const config = getPostTypeConfig(post?.post_type || 'general');
   const TypeIcon = getTypeIcon(post?.post_type || 'general');
   const isOwn = post?.user_id === user?.id;
+  // P0.4 audit follow-up: prefer post.author (typed identity).
+  const publicAuthor = post?.author || null;
   const creatorName =
+    publicAuthor?.displayName ||
+    publicAuthor?.handle ||
     post?.creator?.name ||
-    (post?.creator?.first_name ? `${post.creator.first_name}` : null) ||
     post?.creator?.username ||
     'Neighbor';
+  const creatorAvatarUrl =
+    publicAuthor?.avatarUrl ||
+    post?.creator?.profile_picture_url ||
+    null;
+  const creatorHandle =
+    publicAuthor?.handle ||
+    post?.creator?.username ||
+    null;
   const creatorInitial = (creatorName || '?')[0]?.toUpperCase() || '?';
-  const locationText = [post?.creator?.city, post?.creator?.state].filter(Boolean).join(', ');
+  const locationText = '';
   const homeLabel = post?.home?.address || post?.home?.city || null;
 
   // ═══════════════════════════════════════════════════════════
@@ -396,9 +407,9 @@ export default function PostDetailPage() {
 
           {/* Author row */}
           <div className="flex items-center gap-3 px-5 py-4">
-            {post.creator?.profile_picture_url ? (
+            {creatorAvatarUrl ? (
               <Image
-                src={post.creator.profile_picture_url}
+                src={creatorAvatarUrl}
                 alt={creatorName || ''}
                 width={44}
                 height={44}
@@ -416,14 +427,14 @@ export default function PostDetailPage() {
             )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                {post.creator?.username ? (
+                {creatorHandle ? (
                   <UserIdentityLink
                     userId={post.creator?.id || post.user_id}
-                    username={post.creator.username}
+                    username={creatorHandle}
                     displayName={creatorName || 'Neighbor'}
-                    avatarUrl={post.creator?.profile_picture_url || null}
-                    city={post.creator?.city || null}
-                    state={post.creator?.state || null}
+                    avatarUrl={creatorAvatarUrl}
+                    city={null}
+                    state={null}
                     textClassName="text-sm font-semibold text-app hover:underline"
                   />
                 ) : (

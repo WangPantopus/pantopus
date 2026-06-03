@@ -40,7 +40,7 @@ export default function ListingPickerModal({ open, onClose, onSelectListing, oth
     setActiveTab('mine');
     setLoadingMine(true);
     api.listings.getMyListings({ limit: 50 })
-      .then((res: Record<string, unknown>) => setMyListings((res?.listings || []) as Listing[]))
+      .then((res: Record<string, any>) => setMyListings((res?.listings || []) as Listing[]))
       .catch(() => setMyListings([]))
       .finally(() => setLoadingMine(false));
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -50,7 +50,7 @@ export default function ListingPickerModal({ open, onClose, onSelectListing, oth
     if (!open || !otherUserId) { setTheirListings([]); setLoadingTheirs(false); return; }
     setLoadingTheirs(true);
     api.listings.getUserListings(otherUserId, { limit: 50 })
-      .then((res: Record<string, unknown>) => setTheirListings((res?.listings || []) as Listing[]))
+      .then((res: Record<string, any>) => setTheirListings((res?.listings || []) as Listing[]))
       .catch(() => setTheirListings([]))
       .finally(() => setLoadingTheirs(false));
   }, [open, otherUserId]);

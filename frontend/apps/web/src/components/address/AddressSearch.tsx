@@ -43,7 +43,7 @@ function useDebounced<T>(value: T, delayMs: number) {
  * Parse a geo/normalize response into structured fields.
  * The backend returns { address, city, state, zipcode } — map to our format.
  */
-function normalizedToStructured(n: Record<string, unknown>): StructuredAddress | null {
+function normalizedToStructured(n: Record<string, any>): StructuredAddress | null {
   if (!n?.address || !n?.city || !n?.state || !n?.zipcode) return null;
   return {
     line1: n.address as string,
@@ -106,7 +106,7 @@ export default function AddressSearch({
 
     try {
       const data = await api.geo.resolve(s.suggestion_id);
-      const structured = normalizedToStructured(data.normalized as unknown as Record<string, unknown>);
+      const structured = normalizedToStructured(data.normalized as unknown as Record<string, any>);
       if (!structured) throw new Error('Could not parse address');
 
       onSelect(structured, s);

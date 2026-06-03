@@ -32,11 +32,11 @@ export default function SavedGigsPage() {
     setFetchError(null);
     try {
       const result = await api.gigs.getSavedGigs();
-      setGigs(result?.gigs as SavedGig[] || (result as Record<string, unknown>)?.data as SavedGig[] || []);
+      setGigs(result?.gigs as SavedGig[] || (result as Record<string, any>)?.data as SavedGig[] || []);
     } catch (err: unknown) {
       // 404 from backend (e.g. /api/gigs/saved matched as /api/gigs/:id) = no saved gigs
-      const errObj = err && typeof err === 'object' ? (err as Record<string, unknown>) : null;
-      if (errObj?.statusCode === 404 || (errObj?.response as Record<string, unknown>)?.status === 404) {
+      const errObj = err && typeof err === 'object' ? (err as Record<string, any>) : null;
+      if (errObj?.statusCode === 404 || (errObj?.response as Record<string, any>)?.status === 404) {
         setGigs([]);
         return;
       }

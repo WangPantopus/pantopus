@@ -54,7 +54,7 @@ export default function QASection({ gigId, isMyGig, currentUserId }: QASectionPr
       if (questionFiles.length > 0) {
         setUploadingQuestionFiles(true);
         const uploadRes = await api.upload.uploadGigQuestionMedia(gigId, questionFiles);
-        attachmentUrls = (uploadRes?.media || []).map((m: Record<string, unknown>) => m.file_url).filter(Boolean) as string[];
+        attachmentUrls = (uploadRes?.media || []).map((m: Record<string, any>) => m.file_url).filter(Boolean) as string[];
       }
       await api.gigs.askGigQuestion(gigId, newQuestion.trim(), attachmentUrls);
       setNewQuestion('');
@@ -76,7 +76,7 @@ export default function QASection({ gigId, isMyGig, currentUserId }: QASectionPr
       if (answerFiles.length > 0) {
         setUploadingAnswerFiles(true);
         const uploadRes = await api.upload.uploadGigQuestionMedia(gigId, answerFiles);
-        attachmentUrls = (uploadRes?.media || []).map((m: Record<string, unknown>) => m.file_url).filter(Boolean) as string[];
+        attachmentUrls = (uploadRes?.media || []).map((m: Record<string, any>) => m.file_url).filter(Boolean) as string[];
       }
       await api.gigs.answerGigQuestion(gigId, questionId, answerText.trim(), attachmentUrls);
       setAnsweringId(null);
@@ -213,8 +213,8 @@ export default function QASection({ gigId, isMyGig, currentUserId }: QASectionPr
         <p className="text-sm text-app-text-secondary text-center py-4">No questions yet. Be the first to ask!</p>
       ) : (
         <div className="space-y-3">
-          {otherQuestions.map((q) => {
-            const asker = q.asker || {};
+	          {otherQuestions.map((q) => {
+	            const asker = (q.asker || {}) as NonNullable<GigQuestion['asker']>;
             const askerName = asker.name || [asker.first_name, asker.last_name].filter(Boolean).join(' ') || asker.username || 'Anonymous';
             const isMyQuestion = currentUserId && String(asker.id) === String(currentUserId);
             const timeAgoStr = q.created_at ? timeAgo(q.created_at) : '';

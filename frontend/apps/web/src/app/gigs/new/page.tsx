@@ -3,9 +3,7 @@ import { redirect } from 'next/navigation';
 export default async function GigNewLegacyPage({
   searchParams,
 }: {
-  searchParams?:
-    | Promise<Record<string, string | string[] | undefined>>
-    | Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const resolvedSearchParams = (await searchParams) || {};
   const query = new URLSearchParams();

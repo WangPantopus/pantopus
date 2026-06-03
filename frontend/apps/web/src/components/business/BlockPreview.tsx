@@ -15,8 +15,8 @@ export interface BlockData {
   block_type: string;
   schema_version?: number;
   sort_order: number;
-  data: Record<string, unknown>;
-  settings?: Record<string, unknown>;
+  data: Record<string, any>;
+  settings?: Record<string, any>;
   location_id?: string;
   show_from?: string;
   show_until?: string;
@@ -69,7 +69,7 @@ export function BlockPreview({ block }: { block: BlockData }) {
 
 // ─── Block Previews ───────────────────────────
 
-function HeroPreview({ data }: { data: Record<string, unknown> }) {
+function HeroPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="relative rounded-lg overflow-hidden bg-gradient-to-br from-violet-600 to-indigo-700 text-white p-8 min-h-[180px] flex flex-col justify-end">
       {data.background_file_id && (
@@ -80,7 +80,7 @@ function HeroPreview({ data }: { data: Record<string, unknown> }) {
         {data.subhead && <p className="mt-1 text-white/80 text-sm">{data.subhead as string}</p>}
         {Array.isArray(data.cta) && data.cta.length > 0 && (
           <div className="mt-3 flex gap-2">
-            {(data.cta as Record<string, unknown>[]).map((c, i: number) => (
+            {(data.cta as Record<string, any>[]).map((c, i: number) => (
               <span key={i} className="px-3 py-1.5 bg-glass/20 rounded-lg text-xs font-semibold backdrop-blur-sm">
                 {(c.label as string) || 'Button'}
               </span>
@@ -92,7 +92,7 @@ function HeroPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function TextPreview({ data }: { data: Record<string, unknown> }) {
+function TextPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-4">
       {data.heading && <h3 className="text-lg font-semibold text-app-text mb-2">{data.heading as string}</h3>}
@@ -103,7 +103,7 @@ function TextPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function GalleryPreview({ data }: { data: Record<string, unknown> }) {
+function GalleryPreview({ data }: { data: Record<string, any> }) {
   const count = (data.image_count as number) || (Array.isArray(data.images) ? data.images.length : 0) || 4;
   return (
     <div className="p-4">
@@ -119,14 +119,14 @@ function GalleryPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function CatalogGridPreview({ data }: { data: Record<string, unknown> }) {
-  const items = (data.items as Record<string, unknown>[]) || [];
+function CatalogGridPreview({ data }: { data: Record<string, any> }) {
+  const items = (data.items as Record<string, any>[]) || [];
   const placeholder = items.length === 0;
   return (
     <div className="p-4">
       <h3 className="text-base font-semibold text-app-text mb-2">{(data.heading as string) || 'Catalog'}</h3>
       <div className="grid grid-cols-2 gap-2">
-        {(placeholder ? [{}, {}, {}, {}] : items.slice(0, 8)).map((_: Record<string, unknown>, i: number) => (
+        {(placeholder ? [{}, {}, {}, {}] : items.slice(0, 8)).map((_: Record<string, any>, i: number) => (
           <div key={i} className="rounded-lg border border-app-border p-3">
             <div className="w-full h-12 rounded bg-app-surface-sunken mb-2" />
             <div className="text-xs font-medium text-app-text-strong">{(_.name as string) || 'Item name'}</div>
@@ -138,7 +138,7 @@ function CatalogGridPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function HoursPreview({ data }: { data: Record<string, unknown> }) {
+function HoursPreview({ data }: { data: Record<string, any> }) {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return (
     <div className="p-4">
@@ -155,7 +155,7 @@ function HoursPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function LocationsMapPreview({ data }: { data: Record<string, unknown> }) {
+function LocationsMapPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-4">
       <h3 className="text-base font-semibold text-app-text mb-2">{(data.heading as string) || 'Locations'}</h3>
@@ -166,13 +166,13 @@ function LocationsMapPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function CtaPreview({ data }: { data: Record<string, unknown> }) {
+function CtaPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-6 rounded-lg bg-violet-50 text-center">
       <h3 className="text-lg font-bold text-app-text">{(data.heading as string) || 'Ready to get started?'}</h3>
       {data.subhead && <p className="text-sm text-app-text-secondary mt-1">{data.subhead as string}</p>}
       <div className="mt-3 flex justify-center gap-2">
-        {((data.buttons as Record<string, unknown>[]) || [{ label: 'Contact Us' }]).map((b: Record<string, unknown>, i: number) => (
+        {((data.buttons as Record<string, any>[]) || [{ label: 'Contact Us' }]).map((b: Record<string, any>, i: number) => (
           <span key={i} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-semibold">
             {(b.label as string) || 'Button'}
           </span>
@@ -182,13 +182,13 @@ function CtaPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function FaqPreview({ data }: { data: Record<string, unknown> }) {
-  const items = (data.items as Record<string, unknown>[]) || [{ q: 'Question goes here?', a: 'Answer goes here.' }];
+function FaqPreview({ data }: { data: Record<string, any> }) {
+  const items = (data.items as Record<string, any>[]) || [{ q: 'Question goes here?', a: 'Answer goes here.' }];
   return (
     <div className="p-4">
       <h3 className="text-base font-semibold text-app-text mb-2">{(data.heading as string) || 'FAQ'}</h3>
       <div className="space-y-2">
-        {items.slice(0, 5).map((item: Record<string, unknown>, i: number) => (
+        {items.slice(0, 5).map((item: Record<string, any>, i: number) => (
           <div key={i} className="border border-app-border rounded-lg p-3">
             <div className="text-sm font-medium text-app-text">{(item.q as string) || 'Question?'}</div>
             <div className="text-xs text-app-text-secondary mt-1">{(item.a as string) || 'Answer...'}</div>
@@ -199,7 +199,7 @@ function FaqPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function ReviewsPreview({ data }: { data: Record<string, unknown> }) {
+function ReviewsPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-4">
       <h3 className="text-base font-semibold text-app-text mb-2">{(data.heading as string) || 'Reviews'}</h3>
@@ -215,15 +215,15 @@ function DividerPreview() {
   return <hr className="my-2 border-app-border" />;
 }
 
-function StatsPreview({ data }: { data: Record<string, unknown> }) {
-  const stats = (data.stats as Record<string, unknown>[]) || [
+function StatsPreview({ data }: { data: Record<string, any> }) {
+  const stats = (data.stats as Record<string, any>[]) || [
     { label: 'Customers', value: '1,000+' },
     { label: 'Years', value: '5+' },
     { label: 'Rating', value: '4.9' },
   ];
   return (
     <div className="p-4 grid grid-cols-3 gap-4 text-center">
-      {stats.map((s: Record<string, unknown>, i: number) => (
+      {stats.map((s: Record<string, any>, i: number) => (
         <div key={i}>
           <div className="text-xl font-bold text-app-text">{s.value as string}</div>
           <div className="text-xs text-app-text-secondary">{s.label as string}</div>
@@ -233,7 +233,7 @@ function StatsPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function TeamPreview({ data }: { data: Record<string, unknown> }) {
+function TeamPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-4">
       <h3 className="text-base font-semibold text-app-text mb-2">{(data.heading as string) || 'Our Team'}</h3>
@@ -249,7 +249,7 @@ function TeamPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function ContactFormPreview({ data }: { data: Record<string, unknown> }) {
+function ContactFormPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-4">
       <h3 className="text-base font-semibold text-app-text mb-2">{(data.heading as string) || 'Contact Us'}</h3>
@@ -263,7 +263,7 @@ function ContactFormPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function EmbedPreview({ data }: { data: Record<string, unknown> }) {
+function EmbedPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-4">
       <div className="w-full h-24 rounded-lg bg-app-surface-sunken border border-dashed border-app-border flex items-center justify-center text-sm text-app-text-muted">
@@ -273,7 +273,7 @@ function EmbedPreview({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function PostsFeedPreview({ data }: { data: Record<string, unknown> }) {
+function PostsFeedPreview({ data }: { data: Record<string, any> }) {
   return (
     <div className="p-4">
       <h3 className="text-base font-semibold text-app-text mb-2">{(data.heading as string) || 'Latest Posts'}</h3>
@@ -300,7 +300,7 @@ export const BLOCK_TYPE_REGISTRY: {
   label: string;
   icon: ReactNode;
   description: string;
-  defaultData: Record<string, unknown>;
+  defaultData: Record<string, any>;
 }[] = [
   {
     type: 'hero',

@@ -6,13 +6,13 @@ import { confirmStore } from '@/components/ui/confirm-store';
 import Field from '../shared/Field';
 
 interface PagesTabProps {
-  pages: Record<string, unknown>[];
+  pages: Record<string, any>[];
   businessId: string;
   onUpdate: () => void;
 }
 
 export default function PagesTab({ pages: initialPages, businessId, onUpdate }: PagesTabProps) {
-  const [pages, setPages] = useState<Record<string, unknown>[]>(initialPages);
+  const [pages, setPages] = useState<Record<string, any>[]>(initialPages);
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState({ title: '', slug: '' });
   const [saving, setSaving] = useState(false);

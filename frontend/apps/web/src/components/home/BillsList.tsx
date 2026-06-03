@@ -28,7 +28,7 @@ export default function BillsList({
   homeId,
   highlightBillId,
 }: {
-  bills: Record<string, unknown>[];
+  bills: Record<string, any>[];
   onAdd?: () => void;
   onMarkPaid?: (billId: string) => void;
   homeId?: string;
@@ -50,7 +50,7 @@ export default function BillsList({
     return new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime();
   });
 
-  const isOverdue = (bill: Record<string, unknown>) => {
+  const isOverdue = (bill: Record<string, any>) => {
     if (bill.status === 'paid' || bill.status === 'canceled') return false;
     if (!bill.due_date) return false;
     return new Date(bill.due_date) < new Date();

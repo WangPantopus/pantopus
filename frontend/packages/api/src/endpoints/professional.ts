@@ -62,7 +62,6 @@ export interface ProfessionalPublicProfile {
     profile_picture_url?: string;
     city?: string;
     state?: string;
-    followers_count: number;
   };
   professional: {
     headline?: string;
@@ -110,7 +109,7 @@ export async function createProfile(data: CreateProfileData): Promise<{
 /**
  * Get my professional profile
  */
-export async function getMyProfile(): Promise<{ profile: ProfessionalProfile }> {
+export async function getMyProfile(): Promise<{ profile: ProfessionalProfile | null }> {
   return get('/api/professional/profile/me');
 }
 

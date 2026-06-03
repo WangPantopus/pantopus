@@ -83,16 +83,29 @@ function PostCard({
   const config = getPostTypeConfig(post.post_type || 'general');
   const typeIconNode = getTypeIcon(post.post_type || 'general');
   const ctaIconNode = getTypeCtaIcon(post.post_type || 'general');
-  const isOwn = post.user_id === currentUserId;
+  const authorUserId = post.author_user_id || post.user_id;
+  const isOwn = authorUserId === currentUserId;
+  const publicAuthor = post.author || null;
 
+  // P0.4 audit follow-up: prefer the typed author shape (handle / displayName
+  // / avatarUrl). The legacy post.creator slot still ships from the backend
+  // via legacyCreatorFromAuthor, but new code reads from post.author so
+  // retiring that bridge becomes safe.
   const creatorName =
+    publicAuthor?.displayName ||
+    publicAuthor?.handle ||
     post.creator?.name ||
-    (post.creator?.first_name ? `${post.creator.first_name}` : null) ||
     post.creator?.username ||
     'Neighbor';
 
+  const creatorAvatar =
+    publicAuthor?.avatarUrl ||
+    post.creator?.profile_picture_url ||
+    null;
   const creatorInitial = creatorName[0]?.toUpperCase() || '?';
-  const locationText = [post.creator?.city, post.creator?.state].filter(Boolean).join(', ');
+  // City / state never lived on the typed author shape; the legacy reads
+  // were always a User-row leak, gone after P0.3 narrowed the SELECT.
+  const locationText = '';
   const homeLabel = post.home?.address || post.home?.city || null;
   const openFullPost = () => onOpenDetail(post.id);
 
@@ -137,9 +150,9 @@ function PostCard({
 
       {/* ─── Author row ──────────────────────────────── */}
       <div className="flex items-center gap-3 px-4 py-2">
-        {post.creator?.profile_picture_url ? (
+        {creatorAvatar ? (
           <Image
-            src={post.creator.profile_picture_url}
+            src={creatorAvatar}
             alt={creatorName}
             className="w-9 h-9 rounded-full object-cover ring-2 ring-app"
             width={36}
@@ -157,14 +170,18 @@ function PostCard({
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            {post.creator?.username ? (
+            {publicAuthor?.href ? (
+              <a href={publicAuthor.href} className="text-sm font-semibold text-app hover:underline truncate">
+                {creatorName}
+              </a>
+            ) : (publicAuthor?.handle || post.creator?.username) ? (
               <UserIdentityLink
-                userId={post.creator?.id || post.user_id}
-                username={post.creator.username}
+                userId={authorUserId}
+                username={publicAuthor?.handle || post.creator?.username || ''}
                 displayName={creatorName}
-                avatarUrl={post.creator?.profile_picture_url || null}
-                city={post.creator?.city || null}
-                state={post.creator?.state || null}
+                avatarUrl={creatorAvatar}
+                city={null}
+                state={null}
                 textClassName="text-sm font-semibold text-app hover:underline truncate"
               />
             ) : (
@@ -219,9 +236,9 @@ function PostCard({
                   Hide Post
                 </button>
               )}
-              {!isOwn && onMute && post.creator?.id && (
+              {!isOwn && onMute && authorUserId && (
                 <button
-                  onClick={async () => { const yes = await confirmStore.open({ title: 'Mute this user?', description: 'Their posts will be hidden from your Pulse.', confirmLabel: 'Mute', variant: 'destructive' }); if (yes && post.creator?.id) { onMute(post.creator.id); setMenuOpen(false); } }}
+                  onClick={async () => { const yes = await confirmStore.open({ title: 'Mute this user?', description: 'Their posts will be hidden from your Pulse.', confirmLabel: 'Mute', variant: 'destructive' }); if (yes) { onMute(authorUserId); setMenuOpen(false); } }}
                   className="w-full text-left px-3 py-2 text-xs text-app-muted hover-bg-app"
                 >
                   Mute User
@@ -450,7 +467,7 @@ function PostCard({
             onClick={async () => {
               try {
                 // Map surface tab name to DB-valid value
-                const dbSurface = surface === 'place' ? 'nearby' : surface === 'following' ? 'followers' : surface;
+                const dbSurface = surface === 'place' ? 'nearby' : surface;
                 await api.posts.markNotHelpful(post.id, dbSurface);
                 onNotHelpful?.(post.id);
                 showToast?.('Thanks — we\'ll show fewer posts like this here.');

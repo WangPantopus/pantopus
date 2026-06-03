@@ -66,13 +66,7 @@ export async function getChatRoom(
   return get<{ room: ChatRoomWithDetails }>(`/api/chat/rooms/${roomId}`, params);
 }
 
-/**
- * Create or get direct chat with another user
- */
-export async function createDirectChat(
-  otherUserId: string,
-  options?: { asBusinessUserId?: string }
-): Promise<{ 
+export type CreateDirectChatResponse = {
   roomId: string;
   otherUser: {
     id: string;
@@ -80,14 +74,34 @@ export async function createDirectChat(
     name: string;
     profile_picture_url?: string;
   };
-}> {
-  return post<{ 
-    roomId: string; 
-    otherUser: any;
-  }>('/api/chat/direct', {
-    otherUserId,
-    ...(options?.asBusinessUserId ? { asBusinessUserId: options.asBusinessUserId } : {}),
-  });
+};
+
+/** Collapses concurrent createDirectChat calls (same peer + identity) into one HTTP request. */
+const directChatInflight = new Map<string, Promise<CreateDirectChatResponse>>();
+
+function directChatCacheKey(otherUserId: string, asBusinessUserId?: string) {
+  return `${otherUserId}\0${asBusinessUserId ?? ''}`;
+}
+
+/**
+ * Create or get direct chat with another user
+ */
+export async function createDirectChat(
+  otherUserId: string,
+  options?: { asBusinessUserId?: string }
+): Promise<CreateDirectChatResponse> {
+  const key = directChatCacheKey(otherUserId, options?.asBusinessUserId);
+  let inflight = directChatInflight.get(key);
+  if (!inflight) {
+    inflight = post<CreateDirectChatResponse>('/api/chat/direct', {
+      otherUserId,
+      ...(options?.asBusinessUserId ? { asBusinessUserId: options.asBusinessUserId } : {}),
+    }).finally(() => {
+      directChatInflight.delete(key);
+    });
+    directChatInflight.set(key, inflight);
+  }
+  return inflight;
 }
 
 /**

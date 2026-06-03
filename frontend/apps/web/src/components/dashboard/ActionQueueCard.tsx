@@ -56,7 +56,7 @@ export default function ActionQueueCard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [gigs, setGigs] = useState<GigListItem[]>([]);
-  const [myBidsByGigId, setMyBidsByGigId] = useState<Record<string, Record<string, unknown>>>({});
+  const [myBidsByGigId, setMyBidsByGigId] = useState<Record<string, Record<string, any>>>({});
   const [loadingStripeStatus, setLoadingStripeStatus] = useState(true);
   const [stripeReady, setStripeReady] = useState(false);
 
@@ -66,13 +66,13 @@ export default function ActionQueueCard() {
       api.users.getMyProfile().then(setUser).catch((err) => {
         console.warn('[ActionQueueCard] Failed to load profile:', err?.message);
       }),
-      api.gigs.getGigs({ limit: 100, status: ['open'] }).then((r: Record<string, unknown>) => setGigs((r?.gigs || r?.data || []) as GigListItem[])).catch((err) => {
+      api.gigs.getGigs({ limit: 100, status: ['open'] }).then((r: Record<string, any>) => setGigs((r?.gigs || r?.data || []) as GigListItem[])).catch((err) => {
         console.warn('[ActionQueueCard] Failed to load gigs:', err?.message);
         setGigs([]);
       }),
-      api.gigs.getMyBids({ limit: 200, status: ['pending', 'accepted', 'rejected'] }).then((r: Record<string, unknown>) => {
-        const bids = (r?.bids || []) as Record<string, unknown>[];
-        const map: Record<string, Record<string, unknown>> = {};
+      api.gigs.getMyBids({ limit: 200, status: ['pending', 'accepted', 'rejected'] }).then((r: Record<string, any>) => {
+        const bids = (r?.bids || []) as Record<string, any>[];
+        const map: Record<string, Record<string, any>> = {};
         for (const b of bids) {
           if (b?.gig_id) map[String(b.gig_id)] = b;
         }
@@ -81,8 +81,8 @@ export default function ActionQueueCard() {
         console.warn('[ActionQueueCard] Failed to load bids:', err?.message);
         setMyBidsByGigId({});
       }),
-      api.payments.getStripeAccount().then((result: Record<string, unknown>) => {
-        const account = result?.account as Record<string, unknown> | undefined;
+      api.payments.getStripeAccount().then((result: Record<string, any>) => {
+        const account = result?.account as Record<string, any> | undefined;
         setStripeReady(Boolean(account?.payouts_enabled && account?.charges_enabled));
       }).catch((err) => {
         console.warn('[ActionQueueCard] Failed to load Stripe status:', err?.message);
@@ -92,15 +92,15 @@ export default function ActionQueueCard() {
   }, []);
 
   const myPendingOffers = useMemo(() => {
-    return Object.values(myBidsByGigId).filter((b: Record<string, unknown>) => String(b?.status || '').toLowerCase() === 'pending').length;
+    return Object.values(myBidsByGigId).filter((b: Record<string, any>) => String(b?.status || '').toLowerCase() === 'pending').length;
   }, [myBidsByGigId]);
 
   const actionQueue = useMemo(() => {
     const myId = String(user?.id || '');
     const gigsEnriched = gigs.map((g) => ({ ...g, myBid: myBidsByGigId[String(g.id)] || null }));
-    const mine = gigsEnriched.filter((g) => String((g as Record<string, unknown>).user_id ?? (g as Record<string, unknown>).User ?? '') === myId);
+    const mine = gigsEnriched.filter((g) => String((g as Record<string, any>).user_id ?? (g as Record<string, any>).User ?? '') === myId);
     const openMine = mine.filter((g) => String(g.status || 'open') === 'open');
-    const openMineNoOffers = openMine.filter((g) => Number((g as Record<string, unknown>).bidsCount || 0) === 0).length;
+    const openMineNoOffers = openMine.filter((g) => Number((g as Record<string, any>).bidsCount || 0) === 0).length;
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
     const urgentMine = openMine.filter((g) => {

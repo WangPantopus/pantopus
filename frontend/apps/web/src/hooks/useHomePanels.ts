@@ -5,20 +5,20 @@ import { useCallback, useState } from 'react';
 export type PanelType = 'task' | 'issue' | 'bill' | 'package' | null;
 
 export interface UseHomePanelsReturn {
-  taskPanel: { open: boolean; task?: Record<string, unknown> };
-  issuePanel: { open: boolean; issue?: Record<string, unknown> };
-  billPanel: { open: boolean; bill?: Record<string, unknown> };
-  packagePanel: { open: boolean; pkg?: Record<string, unknown> };
+  taskPanel: { open: boolean; task?: Record<string, any> };
+  issuePanel: { open: boolean; issue?: Record<string, any> };
+  billPanel: { open: boolean; bill?: Record<string, any> };
+  packagePanel: { open: boolean; pkg?: Record<string, any> };
   inviteModal: boolean;
   expandedCard: string | null;
   // Panel openers
-  openTaskPanel: (task?: Record<string, unknown>) => void;
+  openTaskPanel: (task?: Record<string, any>) => void;
   closeTaskPanel: () => void;
-  openIssuePanel: (issue?: Record<string, unknown>) => void;
+  openIssuePanel: (issue?: Record<string, any>) => void;
   closeIssuePanel: () => void;
-  openBillPanel: (bill?: Record<string, unknown>) => void;
+  openBillPanel: (bill?: Record<string, any>) => void;
   closeBillPanel: () => void;
-  openPackagePanel: (pkg?: Record<string, unknown>) => void;
+  openPackagePanel: (pkg?: Record<string, any>) => void;
   closePackagePanel: () => void;
   // Modal
   openInviteModal: () => void;
@@ -28,20 +28,20 @@ export interface UseHomePanelsReturn {
 }
 
 export function useHomePanels(): UseHomePanelsReturn {
-  const [taskPanel, setTaskPanel] = useState<{ open: boolean; task?: Record<string, unknown> }>({ open: false });
-  const [issuePanel, setIssuePanel] = useState<{ open: boolean; issue?: Record<string, unknown> }>({ open: false });
-  const [billPanel, setBillPanel] = useState<{ open: boolean; bill?: Record<string, unknown> }>({ open: false });
-  const [packagePanel, setPackagePanel] = useState<{ open: boolean; pkg?: Record<string, unknown> }>({ open: false });
+  const [taskPanel, setTaskPanel] = useState<{ open: boolean; task?: Record<string, any> }>({ open: false });
+  const [issuePanel, setIssuePanel] = useState<{ open: boolean; issue?: Record<string, any> }>({ open: false });
+  const [billPanel, setBillPanel] = useState<{ open: boolean; bill?: Record<string, any> }>({ open: false });
+  const [packagePanel, setPackagePanel] = useState<{ open: boolean; pkg?: Record<string, any> }>({ open: false });
   const [inviteModal, setInviteModal] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
-  const openTaskPanel = useCallback((task?: Record<string, unknown>) => setTaskPanel({ open: true, task }), []);
+  const openTaskPanel = useCallback((task?: Record<string, any>) => setTaskPanel({ open: true, task }), []);
   const closeTaskPanel = useCallback(() => setTaskPanel({ open: false }), []);
-  const openIssuePanel = useCallback((issue?: Record<string, unknown>) => setIssuePanel({ open: true, issue }), []);
+  const openIssuePanel = useCallback((issue?: Record<string, any>) => setIssuePanel({ open: true, issue }), []);
   const closeIssuePanel = useCallback(() => setIssuePanel({ open: false }), []);
-  const openBillPanel = useCallback((bill?: Record<string, unknown>) => setBillPanel({ open: true, bill }), []);
+  const openBillPanel = useCallback((bill?: Record<string, any>) => setBillPanel({ open: true, bill }), []);
   const closeBillPanel = useCallback(() => setBillPanel({ open: false }), []);
-  const openPackagePanel = useCallback((pkg?: Record<string, unknown>) => setPackagePanel({ open: true, pkg }), []);
+  const openPackagePanel = useCallback((pkg?: Record<string, any>) => setPackagePanel({ open: true, pkg }), []);
   const closePackagePanel = useCallback(() => setPackagePanel({ open: false }), []);
 
   const openInviteModal = useCallback(() => setInviteModal(true), []);

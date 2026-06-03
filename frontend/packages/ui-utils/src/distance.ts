@@ -4,6 +4,7 @@
 // ============================================================
 
 const METERS_PER_MILE = 1609.34;
+const MAX_MAP_LATITUDE_DELTA = 120;
 
 /**
  * Format a distance in meters to a human-readable string (imperial).
@@ -30,5 +31,6 @@ export function formatDistance(meters: number | null | undefined): string {
  * 1 degree latitude ≈ 69 miles.
  */
 export function radiusMilesToLatDelta(radiusMiles: number): number {
-  return (radiusMiles * 2) / 69;
+  if (!Number.isFinite(radiusMiles) || radiusMiles <= 0) return 1;
+  return Math.min((radiusMiles * 2) / 69, MAX_MAP_LATITUDE_DELTA);
 }

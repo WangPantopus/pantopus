@@ -50,7 +50,7 @@ export default function MiniConversationList({ onSelectConversation }: MiniConve
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   // Real-time: when a new message arrives, update preview and bump to top
-  useSocketEvent('message:new', useCallback((msg: Record<string, unknown>) => {
+  useSocketEvent('message:new', useCallback((msg: Record<string, any>) => {
     if (!msg?.room_id) return;
     const roomId = String(msg.room_id);
     const msgText = (msg.message_text as string) || (msg.message as string) || '';

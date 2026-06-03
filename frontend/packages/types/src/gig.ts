@@ -4,7 +4,7 @@
 // Gig, GigBid, Assignment, Review, GigChangeOrder, GigQuestion
 // ============================================================
 
-import type { PaymentStatus, User } from './index';
+import type { PaymentStatus } from './index';
 
 // ─── Status unions ───────────────────────────────────────────
 
@@ -165,7 +165,21 @@ export interface Gig {
 // ─── API response shapes ─────────────────────────────────────
 
 /** Compact user object nested in API responses. */
-export type GigUserSummary = Pick<User, 'id' | 'username' | 'name' | 'profile_picture_url'> & {
+export type GigUserSummary = {
+  id: string;
+  /** Canonical local identity handle. Prefer this over username. */
+  handle?: string | null;
+  /** Canonical display name. Prefer this over legacy name fields. */
+  displayName?: string | null;
+  /** Canonical avatar URL. Prefer this over profile_picture_url. */
+  avatarUrl?: string | null;
+  userId?: string | null;
+  user_id?: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  username?: string;
+  name?: string;
+  profile_picture_url?: string | null;
   first_name?: string;
   last_name?: string;
   city?: string;
@@ -206,6 +220,8 @@ export interface GigListItem extends Gig {
   locationUnlocked?: boolean;
   /** First image attachment URL for thumbnail display */
   first_image?: string | null;
+  /** Legacy budget field returned by some chat/list endpoints */
+  budget?: number | null;
 }
 
 // ─── Bid ─────────────────────────────────────────────────────
@@ -277,6 +293,7 @@ export interface GigChangeOrder {
   id: string;
   gig_id: string;
   requested_by: string;
+  requester?: GigUserSummary;
   type: ChangeOrderType;
   description: string;
   amount_change?: number;
@@ -339,10 +356,14 @@ export type QuestionStatus = 'open' | 'answered';
 export interface GigQuestion {
   id: string;
   gig_id: string;
-  asked_by: string;
+  asked_by?: string;
+  asker?: GigUserSummary;
   question: string;
   answer?: string | null;
   answered_by?: string | null;
+  answerer?: GigUserSummary | null;
+  asker_display_name?: string | null;
+  answerer_display_name?: string | null;
   answered_at?: string | null;
   is_pinned?: boolean;
   upvote_count?: number;

@@ -12,15 +12,13 @@ export const queryKeys = {
   // ── Hub ────────────────────────────────────────────────────
   hub: () => ['hub'] as const,
   hubToday: () => ['hub', 'today'] as const,
-  hubDiscovery: (filter: string, chip: string) =>
-    ['hub', 'discovery', filter, chip] as const,
 
   // ── Feed ───────────────────────────────────────────────────
   feed: (surface: string, filter: string) =>
     ['feed', surface, filter] as const,
 
   // ── Gigs ───────────────────────────────────────────────────
-  gigs: (filters: Record<string, unknown>) =>
+  gigs: (filters: Record<string, any>) =>
     ['gigs', filters] as const,
   gigDetail: (id: string) => ['gigs', 'detail', id] as const,
 
@@ -41,7 +39,7 @@ export const queryKeys = {
     ['myBids', status] as const,
 
   // ── Discover ───────────────────────────────────────────────
-  discover: (scope: string, filters: Record<string, unknown>) =>
+  discover: (scope: string, filters: Record<string, any>) =>
     ['discover', scope, filters] as const,
 
   // ── Relationships ──────────────────────────────────────────
@@ -51,7 +49,7 @@ export const queryKeys = {
   blockedUsers: () => ['blockedUsers'] as const,
 
   // ── Marketplace ────────────────────────────────────────────
-  marketplace: (mode: string, filters: Record<string, unknown>) =>
+  marketplace: (mode: string, filters: Record<string, any>) =>
     ['marketplace', mode, filters] as const,
   listingDetail: (id: string) =>
     ['marketplace', 'listing', id] as const,
@@ -66,12 +64,10 @@ export const queryKeys = {
   // ── Homes ─────────────────────────────────────────────────
   homeDetail: (id: string) => ['homes', 'detail', id] as const,
 
-  // ── Admin ─────────────────────────────────────────────────
-  adminClaims: (bucket: 'pending' | 'approved' | 'rejected') =>
-    ['admin', 'claims', bucket] as const,
-  adminClaimCounts: () => ['admin', 'claims', 'counts'] as const,
-
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>
     ['businesses', 'detail', id] as const,
+
+  // ── Audience zone (unified-IA §3.1, §3.6) ─────────────────
+  audienceMe: () => ['audience', 'me'] as const,
 } as const;

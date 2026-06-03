@@ -10,7 +10,7 @@
 import { get, post, uploadFile, apiRequest } from '@pantopus/api';
 
 /** PATCH helper — not barrel-exported from @pantopus/api */
-function patch<T>(url: string, data?: Record<string, unknown>): Promise<T> {
+function patch<T>(url: string, data?: Record<string, any>): Promise<T> {
   return apiRequest<T>('PATCH', url, data);
 }
 
@@ -274,7 +274,7 @@ export async function acknowledgeCertifiedMail(itemId: string): Promise<{
     }>('/api/mailbox/v2/p2/certified/acknowledge', { mailId: itemId });
 
     // Also fetch proof URL
-    const proof = await get<{ proof: Record<string, unknown> }>(
+    const proof = await get<{ proof: Record<string, any> }>(
       `/api/mailbox/v2/p2/certified/${itemId}/proof`,
     );
 

@@ -99,7 +99,7 @@ export default function LiveAIPanel({
 }: LiveAIPanelProps) {
   const [state, setState] = useState<PanelState>('empty');
   const [error, setError] = useState('');
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTextRef = useRef('');
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;

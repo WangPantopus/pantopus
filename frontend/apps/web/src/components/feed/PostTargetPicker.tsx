@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Navigation, Home, Building2, Users, Link as LinkIcon, ChevronRight, ChevronDown, ChevronUp, MapPin, Loader2, PlusCircle } from 'lucide-react';
+import { Navigation, Home, Building2, Link as LinkIcon, ChevronRight, ChevronDown, ChevronUp, MapPin, Loader2, PlusCircle } from 'lucide-react';
 import * as api from '@pantopus/api';
 import { toast } from '@/components/ui/toast-store';
 
@@ -9,7 +9,6 @@ export type PostingTarget =
   | { type: 'current_location'; latitude: number; longitude: number; label: string }
   | { type: 'home'; homeId: string; latitude: number; longitude: number; label: string }
   | { type: 'business'; businessId: string; latitude: number; longitude: number; label: string }
-  | { type: 'followers' }
   | { type: 'connections' };
 
 interface PostTargetPickerProps {
@@ -153,10 +152,6 @@ export default function PostTargetPicker({ open, onSelect, onClose }: PostTarget
           )}
 
           <div className="h-px bg-app-border mx-5 my-2" />
-
-          {/* Followers */}
-          <OptionRow icon={Users} iconBg="bg-blue-100" iconColor="text-blue-600" label="Followers" desc="Share with people who follow you"
-            onClick={() => onSelect({ type: 'followers' })} />
 
           {/* Connections */}
           <OptionRow icon={LinkIcon} iconBg="bg-orange-100" iconColor="text-orange-600" label="Connections" desc="Share with people you trust"

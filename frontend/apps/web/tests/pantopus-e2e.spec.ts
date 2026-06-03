@@ -92,7 +92,6 @@ async function mockApi(page: Page) {
       account_type: 'business',
       average_rating: 4.8,
       review_count: 12,
-      followers_count: 3,
       tagline: 'Trusted by neighbors',
     };
     const profile = {
