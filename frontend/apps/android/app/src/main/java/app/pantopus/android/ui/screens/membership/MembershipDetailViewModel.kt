@@ -130,7 +130,7 @@ class MembershipDetailViewModel
  * iOS `MembershipDetailViewModel.project`. Kept as a top-level object so it is
  * unit-testable without a ViewModel.
  */
-@Suppress("MagicNumber")
+@Suppress("MagicNumber", "ReturnCount")
 internal object MembershipProjection {
     fun project(dto: PersonaMembershipDto): MembershipDetailContent =
         MembershipDetailContent(

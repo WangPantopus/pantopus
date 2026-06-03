@@ -18,8 +18,6 @@
 //  `ComposeBroadcastSampleData` remains the preview/snapshot seam.
 //
 
-// swiftlint:disable type_body_length
-
 import Foundation
 import Observation
 

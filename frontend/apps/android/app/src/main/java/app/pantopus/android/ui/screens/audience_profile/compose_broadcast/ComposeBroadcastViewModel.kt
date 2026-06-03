@@ -131,8 +131,7 @@ class ComposeBroadcastViewModel
         }
 
         private suspend fun realPublish(draft: ComposeBroadcastDraft) {
-            val channel = channelId
-                ?: throw IllegalStateException("Your broadcast channel isn't ready yet. Try again in a moment.")
+            val channel = channelId ?: throw IllegalStateException("Your broadcast channel isn't ready yet. Try again in a moment.")
             val (visibility, rank) = wireFor(draft.audience)
             val body =
                 PublishUpdateBody(

@@ -491,20 +491,23 @@ public struct MembershipDetailView: View {
             // Single-tap cancel by Pantopus policy — no confirm dialog,
             // no retention questions, no last-second offers. Posts to the
             // no-charge cancel route, then hands off to the host on success.
-            Button(action: { Task { @MainActor in if await viewModel.cancel() { onCancel() } } }) {
-                HStack(spacing: Spacing.s1) {
-                    if viewModel.isCancelling {
-                        ProgressView().tint(Theme.Color.error)
-                    } else {
-                        Icon(.x, size: 13, strokeWidth: 2.4, color: Theme.Color.error)
+            Button(
+                action: { Task { @MainActor in if await viewModel.cancel() { onCancel() } } },
+                label: {
+                    HStack(spacing: Spacing.s1) {
+                        if viewModel.isCancelling {
+                            ProgressView().tint(Theme.Color.error)
+                        } else {
+                            Icon(.x, size: 13, strokeWidth: 2.4, color: Theme.Color.error)
+                        }
+                        Text("Cancel membership")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.error)
                     }
-                    Text("Cancel membership")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.error)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-            }
+            )
             .buttonStyle(.plain)
             .disabled(viewModel.isCancelling)
             .accessibilityLabel("Cancel membership")

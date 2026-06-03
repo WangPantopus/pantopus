@@ -14,10 +14,8 @@ class MembershipRepository
     constructor(
         private val api: MembershipApi,
     ) {
-        suspend fun membership(personaId: String): NetworkResult<PersonaMembershipResponse> =
-            safeApiCall { api.membership(personaId) }
+        suspend fun membership(personaId: String): NetworkResult<PersonaMembershipResponse> = safeApiCall { api.membership(personaId) }
 
         /** Single-tap cancel — no charge (Phase-1 safe). */
-        suspend fun cancel(personaId: String): NetworkResult<PersonaMembershipResponse> =
-            safeApiCall { api.cancel(personaId) }
+        suspend fun cancel(personaId: String): NetworkResult<PersonaMembershipResponse> = safeApiCall { api.cancel(personaId) }
     }
