@@ -16,18 +16,22 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * card) and 36dp (Reviewed row).
  */
 
-// MARK: - Variant / state
-
-enum class MailDayVariant { Populated, Empty }
+// MARK: - State
 
 sealed interface MailDayUiState {
     data object Loading : MailDayUiState
 
-    data class Populated(val content: MailDayContent) : MailDayUiState
+    data class Populated(
+        val content: MailDayContent,
+    ) : MailDayUiState
 
-    data class Empty(val content: MailDayContent) : MailDayUiState
+    data class Empty(
+        val content: MailDayContent,
+    ) : MailDayUiState
 
-    data class Error(val message: String) : MailDayUiState
+    data class Error(
+        val message: String,
+    ) : MailDayUiState
 }
 
 /** Composed content shared by both frames. */
@@ -68,12 +72,16 @@ data class ReviewedMailDayItem(
 
 enum class ReviewedMailAction { Routed, Junked, Returned }
 
-enum class MailDayRoutedTint(val background: Color) {
+enum class MailDayRoutedTint(
+    val background: Color,
+) {
     PersonPrimary(PantopusColors.primary100),
     HouseholdHome(PantopusColors.homeBg),
 }
 
-enum class MailDaySuggestedAvatar(val background: Color) {
+enum class MailDaySuggestedAvatar(
+    val background: Color,
+) {
     PersonalSky(PantopusColors.primary700),
     HouseholdGreen(PantopusColors.home),
 }
@@ -93,7 +101,9 @@ data class YesterdayRecap(
         val tint: SegmentTint,
     )
 
-    enum class SegmentTint(val color: Color) {
+    enum class SegmentTint(
+        val color: Color,
+    ) {
         PersonPrimary(PantopusColors.primary600),
         Household(PantopusColors.home),
         Junked(PantopusColors.error),
@@ -109,7 +119,10 @@ data class MailDaySetupNudge(
     val title: String,
     val subtitle: String,
 ) {
-    enum class NudgeTint(val foreground: Color, val background: Color) {
+    enum class NudgeTint(
+        val foreground: Color,
+        val background: Color,
+    ) {
         Primary(PantopusColors.primary600, PantopusColors.primary50),
         Home(PantopusColors.home, PantopusColors.homeBg),
     }
