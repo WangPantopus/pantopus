@@ -2,8 +2,11 @@
 //  TasksMapViewModelTests.swift
 //  PantopusTests
 //
-//  A11.1 Tasks map view-model — load → populated / empty / error, the
-//  live category filter, pin↔card selection, and client-side sort.
+//  A11.1 Tasks map view-model — the live `GET /api/gigs/in-bounds` fetch
+//  + projection, plus the client-side category filter, pin↔card
+//  selection, and sort that run on the fetched (or seeded) set. The
+//  filter/sort/selection tests drive an explicit `seed` (offline mode);
+//  the fetch tests drive a stubbed `APIClient`.
 //
 
 import XCTest
@@ -11,6 +14,23 @@ import XCTest
 
 @MainActor
 final class TasksMapViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
+    private func seeded(_ initialCategory: GigsCategory = .all) -> TasksMapViewModel {
+        TasksMapViewModel(initialCategory: initialCategory, seed: TasksMapSampleData.items)
+    }
+
     private func items(_ state: TasksMapState) -> [TaskMapItem]? {
         if case let .populated(items) = state { return items }
         return nil
@@ -26,8 +46,71 @@ final class TasksMapViewModelTests: XCTestCase {
         return nil
     }
 
+    // MARK: - Live in-bounds fetch
+
+    func testLoadFetchesInBoundsAndProjectsPins() async {
+        // Two gigs near the default anchor (40.7484, -73.9857); g1 sits
+        // closer so closest-sort (the default) leads with it.
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"gigs":[
+              {"id":"g1","title":"Fix a leaky sink","category":"handyman","price":60,
+               "pay_type":"fixed","bid_count":4,"status":"open",
+               "latitude":40.749,"longitude":-73.988},
+              {"id":"g2","title":"Walk my dog","category":"pet","price":22,
+               "pay_type":"per_walk","bid_count":1,"status":"open",
+               "latitude":40.740,"longitude":-73.978}
+            ]}
+            """)
+        ]
+        let vm = TasksMapViewModel(api: makeAPI())
+        await vm.load()
+        let visible = items(vm.state)
+        XCTAssertEqual(visible?.count, 2)
+        XCTAssertEqual(visible?.first?.id, "g1", "Closest task leads + pulses")
+        XCTAssertEqual(vm.selectedId, "g1")
+        XCTAssertEqual(visible?.first?.category, .handyman)
+        XCTAssertEqual(visible?.first?.price, "$60")
+        XCTAssertEqual(visible?.first(where: { $0.id == "g2" })?.price, "$22/walk")
+        XCTAssertEqual(visible?.first(where: { $0.id == "g2" })?.category, .petcare)
+        // Distance was computed client-side, not "—".
+        XCTAssertNotEqual(visible?.first?.distanceLabel, "—")
+    }
+
+    func testLoadDropsGigsWithoutCoordinates() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"gigs":[
+              {"id":"g1","title":"Has coords","category":"handyman","price":50,"status":"open",
+               "latitude":40.749,"longitude":-73.988},
+              {"id":"g2","title":"No coords","category":"cleaning","price":50,"status":"open"}
+            ]}
+            """)
+        ]
+        let vm = TasksMapViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertEqual(items(vm.state)?.map(\.id), ["g1"])
+    }
+
+    func testLoadEmptyResultProducesEmpty() async {
+        SequencedURLProtocol.sequence = [.status(200, body: "{\"gigs\":[]}")]
+        let vm = TasksMapViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertTrue(isEmpty(vm.state))
+        XCTAssertNil(vm.selectedId)
+    }
+
+    func testLoadServerErrorProducesError() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
+        let vm = TasksMapViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertNotNil(errorMessage(vm.state))
+    }
+
+    // MARK: - Offline seed: states + selection
+
     func testLoadProducesPopulatedWithDefaultSelection() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         XCTAssertEqual(items(vm.state)?.count, TasksMapSampleData.items.count)
         // Closest-first by default → the 0.2 mi handyman task leads + pulses.
@@ -43,13 +126,13 @@ final class TasksMapViewModelTests: XCTestCase {
     }
 
     func testLoadFailureProducesError() async {
-        let vm = TasksMapViewModel(failWith: "Couldn't load tasks")
+        let vm = TasksMapViewModel(seed: TasksMapSampleData.items, failWith: "Couldn't load tasks")
         await vm.load()
         XCTAssertEqual(errorMessage(vm.state), "Couldn't load tasks")
     }
 
     func testCategoryFilterNarrowsVisibleItems() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         vm.selectCategory(.cleaning)
         let visible = items(vm.state)
@@ -60,7 +143,7 @@ final class TasksMapViewModelTests: XCTestCase {
     }
 
     func testCategoryWithNoMatchesProducesEmpty() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         vm.selectCategory(.tech) // no tech task in the seed
         XCTAssertTrue(isEmpty(vm.state))
@@ -68,7 +151,7 @@ final class TasksMapViewModelTests: XCTestCase {
     }
 
     func testWidenFromEmptyRestoresPopulated() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         vm.selectCategory(.tech)
         XCTAssertTrue(isEmpty(vm.state))
@@ -77,14 +160,14 @@ final class TasksMapViewModelTests: XCTestCase {
     }
 
     func testSelectUpdatesSelectedId() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         vm.select("cleaning-1")
         XCTAssertEqual(vm.selectedId, "cleaning-1")
     }
 
     func testSortFewestBidsOrdersAscending() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         vm.selectSort(.fewestBids)
         let bids = items(vm.state)?.map(\.bidCount) ?? []
@@ -92,14 +175,14 @@ final class TasksMapViewModelTests: XCTestCase {
     }
 
     func testSortHighestPayLeadsWithPriciestTask() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         vm.selectSort(.highestPay)
         XCTAssertEqual(items(vm.state)?.first?.id, "cleaning-1") // $180
     }
 
     func testInitialCategoryAppliedOnLoad() async {
-        let vm = TasksMapViewModel(initialCategory: .petcare)
+        let vm = seeded(.petcare)
         await vm.load()
         let visible = items(vm.state)
         XCTAssertEqual(visible?.count, 2)
@@ -108,7 +191,7 @@ final class TasksMapViewModelTests: XCTestCase {
     }
 
     func testPinProjectionCarriesCategoryColorAndState() async {
-        let vm = TasksMapViewModel()
+        let vm = seeded()
         await vm.load()
         let pins = items(vm.state)?.map(\.pin) ?? []
         XCTAssertEqual(pins.count, TasksMapSampleData.items.count)

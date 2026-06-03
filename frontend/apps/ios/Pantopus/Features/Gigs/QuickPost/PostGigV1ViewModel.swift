@@ -2,9 +2,10 @@
 //  PostGigV1ViewModel.swift
 //  Pantopus
 //
-//  A13.8 — legacy single-screen gig composer. This is intentionally
-//  client-side only while the native mobile surface runs without backend
-//  create calls in this phase.
+//  A13.8 — legacy single-screen gig composer. `submit()` posts the form to
+//  `POST /api/gigs` (`GigsEndpoints.create`) — the same create path the V2
+//  "Magic" composer (`GigComposeViewModel`) and the gigs feed use. The V2
+//  `/api/gigs/magic-*` draft flow is separate and untouched here.
 //
 
 import Foundation
@@ -146,17 +147,17 @@ public struct PostGigV1State: Equatable, Sendable {
 public final class PostGigV1ViewModel {
     public private(set) var state: PostGigV1State
 
+    private let api: APIClient
     private let referenceNow: Date?
-    private let idGenerator: @Sendable () -> String
 
     public init(
+        api: APIClient = .shared,
         initialState: PostGigV1State = PostGigV1State(),
-        referenceNow: Date? = nil,
-        idGenerator: @escaping @Sendable () -> String = { "gig-v1-\(UUID().uuidString.prefix(8))" }
+        referenceNow: Date? = nil
     ) {
+        self.api = api
         state = initialState
         self.referenceNow = referenceNow
-        self.idGenerator = idGenerator
     }
 
     public var isPostEnabled: Bool {
@@ -227,19 +228,77 @@ public final class PostGigV1ViewModel {
         state.form.photos.removeAll { $0.id == id }
     }
 
+    /// Validate, then create the gig via `POST /api/gigs`
+    /// (`GigsEndpoints.create`). On success the backend-issued gig id is
+    /// stored in `state.postedGigId` and returned so the caller can route
+    /// to the freshly posted task; on failure the message surfaces via
+    /// `loadState = .error(_)` and `retry()` returns to the still-filled
+    /// form.
     @discardableResult
-    public func submit() -> String? {
-        guard state.loadState == .ready else { return nil }
+    public func submit() async -> String? {
+        guard state.loadState == .ready, !state.isSubmitting else { return nil }
         let errors = validate(form: state.form)
         guard errors.isEmpty else {
             state.validationErrors = errors
             return nil
         }
-
-        let gigId = idGenerator()
         state.validationErrors = []
-        state.postedGigId = gigId
-        return gigId
+        state.isSubmitting = true
+        defer { state.isSubmitting = false }
+        do {
+            let response: CreateGigResponse = try await api.request(
+                GigsEndpoints.create(buildCreateBody(from: state.form))
+            )
+            state.postedGigId = response.gig.id
+            return response.gig.id
+        } catch {
+            let message = (error as? APIError)?.errorDescription
+                ?? "Couldn't post your task. Please try again."
+            state.loadState = .error(message)
+            return nil
+        }
+    }
+
+    /// Map the V1 form onto the `POST /api/gigs` body. The legacy composer
+    /// collects a free-text location only, so we send it as the `custom`
+    /// location `address` with a `(0, 0)` placeholder coordinate — the same
+    /// fallback the V2 composer uses when it has no geocode
+    /// (`GigComposeViewModel.fallbackLocation`). Pay-type maps
+    /// flat→`fixed`, hourly→`hourly`, free→`offers`; the backend rejects a
+    /// non-positive price so free rides on a `1` sentinel (mirrors the V2
+    /// open-to-bids handling).
+    private func buildCreateBody(from form: PostGigV1Form) -> CreateGigBody {
+        let trimmedPrice = Double(form.price.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let payType: String
+        let price: Double
+        switch form.priceType {
+        case .flat:
+            payType = "fixed"
+            price = trimmedPrice > 0 ? trimmedPrice : 1
+        case .hourly:
+            payType = "hourly"
+            price = trimmedPrice > 0 ? trimmedPrice : 1
+        case .free:
+            payType = "offers"
+            price = 1
+        }
+        return CreateGigBody(
+            title: form.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: form.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            category: form.category == .all ? nil : form.category.rawValue,
+            price: price,
+            payType: payType,
+            scheduleType: "scheduled",
+            scheduledStart: ISO8601DateFormatter().string(from: form.scheduledAt),
+            taskFormat: nil,
+            attachments: nil,
+            location: CreateGigLocation(
+                mode: "custom",
+                latitude: 0,
+                longitude: 0,
+                address: form.location.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        )
     }
 
     public func error(for field: PostGigV1Field) -> String? {
