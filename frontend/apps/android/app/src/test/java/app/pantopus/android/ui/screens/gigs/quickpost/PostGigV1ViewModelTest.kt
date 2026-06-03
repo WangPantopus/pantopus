@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "MagicNumber")
 
 package app.pantopus.android.ui.screens.gigs.quickpost
 
