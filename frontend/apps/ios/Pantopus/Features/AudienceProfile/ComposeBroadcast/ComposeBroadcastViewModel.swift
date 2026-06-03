@@ -59,7 +59,7 @@ public final class ComposeBroadcastViewModel {
     /// a thrower / state-capture closure. `var` so it can be swapped post-init.
     var performSend: @MainActor (ComposeBroadcastDraft, Date?) async throws -> Void
 
-    public init(
+    init(
         personaId: String,
         persona: BroadcastPersona,
         recentBroadcasts: [RecentBroadcastContent],

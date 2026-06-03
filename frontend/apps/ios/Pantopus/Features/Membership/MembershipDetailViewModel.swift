@@ -43,7 +43,7 @@ public final class MembershipDetailViewModel {
     ///     fetch and renders the fixture.
     ///   - slaMissed: When `true` and no seed is supplied, renders the
     ///     refund-eligible sample frame (preview-only).
-    public init(
+    init(
         personaId: String,
         api: APIClient = .shared,
         content: MembershipDetailContent? = nil,
