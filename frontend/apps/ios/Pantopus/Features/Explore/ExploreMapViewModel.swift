@@ -2,13 +2,22 @@
 //  ExploreMapViewModel.swift
 //  Pantopus
 //
-//  A11.2 Explore — view-model for the cross-type discovery map. Holds the
-//  loaded sample entities, the top type-toggle selection, the sort, the
-//  applied filter criteria, and a single `selectedId` so pin taps and
-//  rail-card highlights stay in sync. Filtering + clustering run locally
-//  over the sample set (no network — backend removed from the repo).
+//  A11.2 Explore / P1-F — view-model for the cross-type discovery map.
+//
+//  The production path fetches live discovery results for the viewport
+//  around the user — `GET /api/gigs/in-bounds` (tasks) and
+//  `GET /api/listings/in-bounds` (items) — and fans them into a homogeneous
+//  `[ExploreEntity]`. Posts + Spots have no in-bounds endpoint yet, so the
+//  live map surfaces Tasks + Items; the type toggle still narrows the set
+//  client-side. Filtering, sorting, and clustering run locally over the
+//  fetched window (mirrors `NearbyMapViewModel`). Previews / snapshots /
+//  tests seed deterministic content via `init(scenario:)`, bypassing the
+//  network.
 //
 
+// swiftlint:disable type_body_length
+
+import CoreLocation
 import Foundation
 import Observation
 
@@ -33,12 +42,33 @@ public final class ExploreMapViewModel {
     /// sheet + render the active-count badge.
     public private(set) var filters: ExploreFilterCriteria
 
-    private let scenario: ExploreScenario
+    private let api: APIClient
+    private let location: any LocationProviding
+    /// Non-nil for the sample/preview path; nil for the live path.
+    private let scenario: ExploreScenario?
     private var allEntities: [ExploreEntity]
+    private var fetchTask: Task<Void, Never>?
     /// Grid-bucket cluster radius (~0.005° ≈ 500 m at NYC latitude).
     private var clusterRadiusDegrees: Double = 0.005
 
-    public init(scenario: ExploreScenario = .populated) {
+    /// Live (production) path. `api` + `location` are injectable for tests;
+    /// internal because `APIClient` is module-internal.
+    init(
+        api: APIClient = .shared,
+        location: any LocationProviding = FallbackLocationProvider.shared
+    ) {
+        self.api = api
+        self.location = location
+        scenario = nil
+        allEntities = []
+        filters = ExploreFilterCriteria()
+        userCoordinate = location.cachedCoordinate()
+    }
+
+    /// Sample/preview path — local sample entities, no network.
+    public init(scenario: ExploreScenario) {
+        api = .shared
+        location = FallbackLocationProvider.shared
         self.scenario = scenario
         allEntities = ExploreMapSampleData.entities(for: scenario)
         filters = ExploreMapSampleData.filters(for: scenario)
@@ -48,6 +78,10 @@ public final class ExploreMapViewModel {
     // MARK: - Lifecycle
 
     public func load() async {
+        guard let scenario else {
+            await fetchAroundUser()
+            return
+        }
         switch scenario {
         case .loading:
             state = .loading
@@ -131,6 +165,51 @@ public final class ExploreMapViewModel {
         }
     }
 
+    // MARK: - Live fetch
+
+    /// Build a ~1.3 km square viewport around the user (or a fallback
+    /// downtown anchor) and hit both in-bounds endpoints. A total failure
+    /// surfaces as `.error`; a partial failure renders what loaded.
+    private func fetchAroundUser() async {
+        fetchTask?.cancel()
+        if userCoordinate == nil {
+            userCoordinate = await location.requestCurrent(timeoutSeconds: 4)
+        }
+        let center = userCoordinate
+            ?? UserCoordinate(latitude: 40.7484, longitude: -73.9857, accuracyMeters: 100)
+        let halfDegLat = 0.012
+        let halfDegLon = 0.016
+        let minLat = center.latitude - halfDegLat
+        let maxLat = center.latitude + halfDegLat
+        let minLon = center.longitude - halfDegLon
+        let maxLon = center.longitude + halfDegLon
+
+        if case .loaded = state {} else { state = .loading }
+
+        let task = Task { @MainActor in
+            async let gigsResult: GigsInBoundsResponse? = try? await api.request(
+                GigsEndpoints.inBounds(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+            )
+            async let listingsResult: ListingsInBoundsResponse? = try? await api.request(
+                ListingsEndpoints.inBounds(south: minLat, west: minLon, north: maxLat, east: maxLon)
+            )
+            let gigs = await gigsResult
+            let listings = await listingsResult
+            if gigs == nil, listings == nil {
+                state = .error(message: "Couldn't load the map.")
+                return
+            }
+            allEntities = Self.project(
+                gigs: gigs?.gigs ?? [],
+                listings: listings?.listings ?? [],
+                anchor: center
+            )
+            rebuild(selectedId: nil)
+        }
+        fetchTask = task
+        _ = await task.value
+    }
+
     // MARK: - Projection
 
     private func currentSelectedId() -> String? {
@@ -156,8 +235,6 @@ public final class ExploreMapViewModel {
         case .closest:
             source.sorted { $0.distanceMiles < $1.distanceMiles }
         case .newest:
-            // No timestamps in the stub set — preserve authored order
-            // (hero entities first) as the "newest" projection.
             source
         }
     }
@@ -170,6 +247,98 @@ public final class ExploreMapViewModel {
             userCoordinate: userCoordinate,
             selectedId: selectedId
         ))
+    }
+
+    /// Map live gigs + listings into the unified entity vocabulary. Gigs →
+    /// `.task`, listings → `.item`. Rows without resolvable coordinates are
+    /// dropped (privacy-redacted remote items can't be placed on the map).
+    static func project(
+        gigs: [GigDTO],
+        listings: [ListingDTO],
+        anchor: UserCoordinate
+    ) -> [ExploreEntity] {
+        var out: [ExploreEntity] = []
+        out.reserveCapacity(gigs.count + listings.count)
+        for gig in gigs {
+            guard let coord = coordinate(of: gig) else { continue }
+            let miles = distanceMiles(from: anchor, to: coord)
+            let bids = gig.bidCount ?? 0
+            out.append(ExploreEntity(
+                id: gig.id,
+                kind: .task,
+                state: gig.status == "pending" || gig.status == "draft" ? .pending : .confirmed,
+                latitude: coord.latitude,
+                longitude: coord.longitude,
+                title: gig.title,
+                metaLead: priceLabel(gig.price) ?? "Open",
+                distanceLabel: distanceLabel(miles),
+                distanceMiles: miles,
+                badge: bids > 0 ? ExploreBadge(text: "\(bids) bids", tone: .bids) : nil,
+                verified: false,
+                openNow: gig.status == "open"
+            ))
+        }
+        for listing in listings {
+            guard let coord = coordinate(of: listing) else { continue }
+            let miles = distanceMiles(from: anchor, to: coord)
+            out.append(ExploreEntity(
+                id: listing.id,
+                kind: .item,
+                state: .confirmed,
+                latitude: coord.latitude,
+                longitude: coord.longitude,
+                title: listing.title ?? "Listing",
+                metaLead: priceLabel(listing.price) ?? "Free",
+                distanceLabel: distanceLabel(miles),
+                distanceMiles: miles,
+                badge: nil,
+                verified: false,
+                openNow: true
+            ))
+        }
+        return out
+    }
+
+    // MARK: - Coordinate / distance helpers
+
+    private static func coordinate(of gig: GigDTO) -> (latitude: Double, longitude: Double)? {
+        if let lat = gig.latitude, let lon = gig.longitude { return (lat, lon) }
+        if let approx = gig.approxLocation, let lat = approx.latitude, let lon = approx.longitude {
+            return (lat, lon)
+        }
+        return nil
+    }
+
+    private static func coordinate(of listing: ListingDTO) -> (latitude: Double, longitude: Double)? {
+        if let lat = listing.latitude, let lon = listing.longitude { return (lat, lon) }
+        if let approx = listing.approxLocation, let lat = approx.latitude, let lon = approx.longitude {
+            return (lat, lon)
+        }
+        return nil
+    }
+
+    static func distanceMiles(from origin: UserCoordinate, to coord: (latitude: Double, longitude: Double)) -> Double {
+        let earthRadiusMiles = 3958.8
+        let dLat = (coord.latitude - origin.latitude) * .pi / 180
+        let dLon = (coord.longitude - origin.longitude) * .pi / 180
+        let lat1 = origin.latitude * .pi / 180
+        let lat2 = coord.latitude * .pi / 180
+        let a = sin(dLat / 2) * sin(dLat / 2)
+            + sin(dLon / 2) * sin(dLon / 2) * cos(lat1) * cos(lat2)
+        let c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return earthRadiusMiles * c
+    }
+
+    private static func distanceLabel(_ miles: Double) -> String {
+        if miles < 0.1 { return "< 0.1 mi" }
+        if miles < 10 { return String(format: "%.1f mi", miles) }
+        return "\(Int(miles)) mi"
+    }
+
+    private static func priceLabel(_ price: Double?) -> String? {
+        guard let price, price > 0 else { return nil }
+        if price.truncatingRemainder(dividingBy: 1) == 0 { return "$\(Int(price))" }
+        return String(format: "$%.2f", price)
     }
 
     // MARK: - Clustering
