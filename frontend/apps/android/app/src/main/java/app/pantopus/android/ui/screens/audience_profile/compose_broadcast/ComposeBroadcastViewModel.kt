@@ -75,7 +75,7 @@ class ComposeBroadcastViewModel
                     scheduledLabel = null,
                     phase = ComposePhase.Idle,
                     isDirty = false,
-                    audienceReach = emptyMap(),
+                    audienceReach = ComposeBroadcastSampleData.audienceReach,
                 ),
             )
         val state: StateFlow<ComposeBroadcastUiState> = _state.asStateFlow()
@@ -131,7 +131,7 @@ class ComposeBroadcastViewModel
         }
 
         private suspend fun realPublish(draft: ComposeBroadcastDraft) {
-            val channel = channelId ?: throw IllegalStateException("Your broadcast channel isn't ready yet. Try again in a moment.")
+            val channel = channelId ?: error("Your broadcast channel isn't ready yet. Try again in a moment.")
             val (visibility, rank) = wireFor(draft.audience)
             val body =
                 PublishUpdateBody(
