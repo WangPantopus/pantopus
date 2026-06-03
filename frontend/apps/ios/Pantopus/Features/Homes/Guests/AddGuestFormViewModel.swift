@@ -54,7 +54,7 @@ public final class AddGuestFormViewModel {
     private let onSent: (String) -> Void
     private let api: APIClient
 
-    public init(
+    init(
         homeId: String,
         api: APIClient = .shared,
         onSent: @escaping (String) -> Void = { _ in }

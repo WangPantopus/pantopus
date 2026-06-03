@@ -83,11 +83,11 @@ public struct BusinessSeatBusinessDTO: Decodable, Sendable, Hashable {
 
 // MARK: - Guest pass (GET /api/homes/guest/:token)
 
-public struct GuestPassResponse: Decodable, Sendable {
-    public let pass: GuestPassDTO?
+public struct TokenAcceptGuestPassResponse: Decodable, Sendable {
+    public let pass: TokenAcceptGuestPassDTO?
 }
 
-public struct GuestPassDTO: Decodable, Sendable, Hashable {
+public struct TokenAcceptGuestPassDTO: Decodable, Sendable, Hashable {
     public let label: String?
     public let kind: String?
     public let customTitle: String?

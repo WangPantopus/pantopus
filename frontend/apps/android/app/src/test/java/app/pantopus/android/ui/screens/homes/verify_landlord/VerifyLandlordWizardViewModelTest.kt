@@ -8,7 +8,6 @@ import app.pantopus.android.data.api.models.homes.RequestPostcardResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.data.network.NetworkMonitor
-import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk

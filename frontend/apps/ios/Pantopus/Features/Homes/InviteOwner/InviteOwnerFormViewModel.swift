@@ -52,7 +52,7 @@ public final class InviteOwnerFormViewModel {
     private var originalGrantPercent: Int
     private var autoBalancesSoleOwner: Bool
 
-    public init(
+    init(
         homeId: String,
         currentUserEmail: String,
         initialDraft: InviteOwnerDraft? = nil,

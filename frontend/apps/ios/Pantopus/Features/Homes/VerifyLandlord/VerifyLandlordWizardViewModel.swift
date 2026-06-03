@@ -44,7 +44,7 @@ final class VerifyLandlordWizardViewModel: WizardModel {
     /// Test/offline seam for the postcard request. When non-nil,
     /// `submit()` calls this instead of
     /// `POST /api/homes/:id/request-postcard`.
-    public typealias PostcardRequester = @MainActor () async -> Result<Void, any Error>
+    typealias PostcardRequester = @MainActor () async -> Result<Void, any Error>
     private let postcardRequester: PostcardRequester?
 
     init(

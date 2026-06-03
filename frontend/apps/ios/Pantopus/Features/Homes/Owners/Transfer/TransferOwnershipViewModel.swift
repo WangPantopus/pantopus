@@ -66,7 +66,7 @@ public final class TransferOwnershipViewModel {
 
     // MARK: - Init
 
-    public init(
+    init(
         homeId: String,
         amount: Int = TransferOwnershipSampleData.defaultAmount,
         api: APIClient = .shared,

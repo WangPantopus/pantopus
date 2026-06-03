@@ -6,7 +6,6 @@ import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.homes.TransferOwnerResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeOwnersRepository
-import io.mockk.any
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
