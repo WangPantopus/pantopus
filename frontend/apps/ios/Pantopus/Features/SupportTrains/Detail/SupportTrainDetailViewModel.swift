@@ -265,20 +265,19 @@ extension SupportTrainDetailViewModel {
         return (0..<28).map { index in
             let date = cal.date(byAdding: .day, value: index, to: start) ?? start
             let day = cal.component(.day, from: date)
-            let state: SlotCalendarState
-            if date < today {
-                state = .past
+            let state: SlotCalendarState = if date < today {
+                .past
             } else if cal.isDate(date, inSameDayAs: today) {
-                state = .today
+                .today
             } else if mineDates.contains(date) {
-                state = .mine
+                .mine
             } else if coveredDates.contains(date) {
-                state = .filled
+                .filled
             } else if openDates.contains(date) {
-                state = .open
+                .open
             } else {
                 // No slot scheduled that future day — inert/muted tile.
-                state = .past
+                .past
             }
             return SlotCalendarDay(id: "day-\(index)", date: date, dayNumber: day, state: state)
         }
