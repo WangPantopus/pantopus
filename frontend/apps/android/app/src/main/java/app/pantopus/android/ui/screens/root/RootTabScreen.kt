@@ -56,6 +56,7 @@ import app.pantopus.android.ui.screens.businesses.create_business.CreateBusiness
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.BusinessOwnerScreen
 import app.pantopus.android.ui.screens.businesses.page_editor.EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.businesses.page_editor.EditBusinessPageScreen
+import app.pantopus.android.ui.screens.businesses.team.BusinessTeamScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
@@ -1258,6 +1259,11 @@ private object ChildRoutes {
     const val BUSINESS_OWNER = "businesses/{$BUSINESS_OWNER_ID_KEY}"
 
     fun businessOwner(businessId: String): String = "businesses/$businessId"
+
+    /** B2C — Business team & roles management. Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_TEAM = "businesses/{$BUSINESS_OWNER_ID_KEY}/team"
+
+    fun businessTeam(businessId: String): String = "businesses/$businessId/team"
 
     /** A18.5 — "View as" identity preview. */
     const val VIEW_AS = "identity/preview"
@@ -3654,7 +3660,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onEditPage = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
                         onOpenInsights = { navController.navigate(ChildRoutes.placeholder("Insights")) },
                         onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Business settings")) },
+                        onOpenTeam = { navController.navigate(ChildRoutes.businessTeam(businessId)) },
                     )
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_TEAM,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessTeamScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.VIEW_AS) {
                     ViewAsScreen(

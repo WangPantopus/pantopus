@@ -46,6 +46,7 @@ class BusinessOwnerSnapshotTest {
                     onEditPage = {},
                     onOpenInsights = {},
                     onOpenSettings = {},
+                    onOpenTeam = {},
                     onPreview = {},
                     onSubmitReply = { _, _ -> },
                 )

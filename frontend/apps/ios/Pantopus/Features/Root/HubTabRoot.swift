@@ -296,6 +296,8 @@ public enum HubRoute: Hashable {
     case earn
     /// A10.7 — Business owner view. `pantopus://businesses/:id`.
     case businessOwner(businessId: String)
+    /// B2C — Business team & roles management. `pantopus://businesses/:id/team`.
+    case businessTeam(businessId: String)
     /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
     case viewAs
     /// A18.4 — Persistent "waiting for approval" room.
@@ -2118,8 +2120,11 @@ public struct HubTabRoot: View {
                 onBack: { Task { @MainActor in pop() } },
                 onEditPage: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } },
                 onOpenInsights: { Task { @MainActor in push(.placeholder(label: "Insights")) } },
-                onOpenSettings: { Task { @MainActor in push(.placeholder(label: "Business settings")) } }
+                onOpenSettings: { Task { @MainActor in push(.placeholder(label: "Business settings")) } },
+                onOpenTeam: { Task { @MainActor in push(.businessTeam(businessId: businessId)) } }
             )
+        case let .businessTeam(businessId):
+            BusinessTeamView(businessId: businessId)
         case .viewAs:
             ViewAsView(
                 onBack: { Task { @MainActor in pop() } },
