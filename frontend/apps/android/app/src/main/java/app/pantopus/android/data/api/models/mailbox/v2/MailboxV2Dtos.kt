@@ -33,6 +33,8 @@ data class DrawerItemsResponse(
 data class DrawerMail(
     val id: String,
     val type: String,
+    @Json(name = "mail_type") val mailType: String?,
+    val subject: String?,
     @Json(name = "created_at") val createdAt: String,
     @Json(name = "display_title") val displayTitle: String?,
     @Json(name = "preview_text") val previewText: String?,
@@ -42,6 +44,8 @@ data class DrawerMail(
     val starred: Boolean = false,
     val archived: Boolean = false,
     val sender: SenderRef?,
+    @Json(name = "sender_business_name") val senderBusinessName: String?,
+    @Json(name = "sender_address") val senderAddress: String?,
     @Json(name = "sender_display") val senderDisplay: String,
     @Json(name = "sender_trust") val senderTrust: String,
     val `package`: JsonValue?,

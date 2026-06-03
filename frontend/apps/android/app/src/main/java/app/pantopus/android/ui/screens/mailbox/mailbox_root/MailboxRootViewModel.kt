@@ -4,7 +4,12 @@ package app.pantopus.android.ui.screens.mailbox.mailbox_root
 
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.mailbox.v2.DrawerMail
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.mailbox.MailboxListViewModel
+import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.theme.PantopusColors
@@ -13,6 +18,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -35,6 +41,15 @@ enum class MailboxDrawer(
     Home("home", "Home", PantopusIcon.Home, PantopusColors.home),
     Business("business", "Biz", PantopusIcon.Briefcase, PantopusColors.business),
     Earn("earn", "Earn", PantopusIcon.DollarSign, PantopusColors.primary600),
+    ;
+
+    /**
+     * Backend drawer key for `GET /api/mailbox/v2/drawer/:drawer`. The
+     * route validates `['personal', 'home', 'business', 'earn']`
+     * (`backend/routes/mailboxV2.js:286`); the UI's `Me` drawer is the
+     * backend's `personal` drawer.
+     */
+    val backendKey: String get() = if (this == Me) "personal" else id
 }
 
 /** The three tabs within a drawer. */
@@ -53,28 +68,36 @@ enum class MailboxTab(
  * Replaces the old MailboxDrawersScreen + MailboxListScreen pair with a
  * unified drawer-tabs hybrid.
  *
- * Backend has been removed, so the VM projects deterministic
- * [MailboxRootSampleData] into the [ListOfRowsUiState] render states. The
- * production path is the no-arg [Inject] constructor; the internal
- * secondary constructor is the test / preview seam (mirrors the iOS
- * `MailboxRootViewModel(initialDrawer:initialTab:dataProvider:seededState:)`).
+ * Wiring (P1-B): the production [Inject] path is live —
+ *  • `GET /api/mailbox/v2/drawers` (`backend/routes/mailboxV2.js:214`)
+ *    seeds the per-drawer unread badges, and
+ *  • `GET /api/mailbox/v2/drawer/:drawer?tab=…` (`…:280`) feeds the mail
+ *    list for the active (drawer, tab) with limit/offset paging.
+ * The internal secondary constructor is the test / preview seam: it
+ * projects deterministic [MailboxRootSampleData] into the
+ * [ListOfRowsUiState] render states and never touches the network
+ * (mirrors the iOS `dataProvider` / `seededState` seam).
  */
 @HiltViewModel
+@Suppress("TooManyFunctions")
 class MailboxRootViewModel
     @Inject
-    constructor() : ViewModel() {
-        private var dataProvider: (MailboxDrawer, MailboxTab) -> List<MailboxSampleSection> =
-            MailboxRootSampleData::sections
+    constructor(
+        // Nullable so the test/preview seam can construct without a repo;
+        // Hilt always injects the non-null singleton on the production path.
+        private val repo: MailboxRepository?,
+    ) : ViewModel() {
+        // Non-null → sample mode (offline preview/test seam); null → live.
+        private var dataProvider: ((MailboxDrawer, MailboxTab) -> List<MailboxSampleSection>)? = null
         private var seededState: ListOfRowsUiState? = null
 
-        /** Test / preview seam. */
+        /** Test / preview seam — sample-backed, never touches [repo]. */
         internal constructor(
             initialDrawer: MailboxDrawer = MailboxDrawer.Me,
             initialTab: MailboxTab = MailboxTab.Incoming,
-            dataProvider: (MailboxDrawer, MailboxTab) -> List<MailboxSampleSection> =
-                MailboxRootSampleData::sections,
+            dataProvider: (MailboxDrawer, MailboxTab) -> List<MailboxSampleSection> = MailboxRootSampleData::sections,
             seededState: ListOfRowsUiState? = null,
-        ) : this() {
+        ) : this(repo = null) {
             this.dataProvider = dataProvider
             this.seededState = seededState
             _selectedDrawer.value = initialDrawer
@@ -108,6 +131,22 @@ class MailboxRootViewModel
         // always-empty, so it acts as the launchpad into the Earn surface).
         private var onOpenEarn: () -> Unit = {}
 
+        // ── Live paging state ──────────────────────────────────────────
+        private val pageSize = 25
+        private var offset = 0
+        private var hasMore = false
+        private var loadedMail: MutableList<DrawerMail> = mutableListOf()
+        private var loading = false
+
+        /** Bumped on every combo reload so a late in-flight page from a
+         *  previous (drawer, tab) is discarded instead of clobbering the
+         *  current view. */
+        private var generation = 0
+
+        /** Per-drawer unread counts from `GET /api/mailbox/v2/drawers`,
+         *  keyed by backend drawer key (`personal`/`home`/`business`/`earn`). */
+        private var drawerUnread: Map<String, Int> = emptyMap()
+
         /** Wire nav callbacks before first load. */
         fun configureNavigation(
             onOpenMail: (String) -> Unit,
@@ -121,50 +160,174 @@ class MailboxRootViewModel
             this.onOpenEarn = onOpenEarn
         }
 
-        fun load() = rebuild()
+        fun load() {
+            seededState?.let {
+                _state.value = it
+                return
+            }
+            if (dataProvider != null) {
+                rebuildFromSample()
+                return
+            }
+            if (_state.value is ListOfRowsUiState.Loaded && loadedMail.isNotEmpty()) return
+            _state.value = ListOfRowsUiState.Loading
+            viewModelScope.launch {
+                fetchDrawerBadges()
+                reloadActiveCombo()
+            }
+        }
 
-        fun refresh() = rebuild()
+        fun refresh() {
+            if (seededState != null) return
+            if (dataProvider != null) {
+                rebuildFromSample()
+                return
+            }
+            viewModelScope.launch {
+                fetchDrawerBadges()
+                reloadActiveCombo()
+            }
+        }
+
+        /** Called when the list nears the bottom — fetches the next page. */
+        fun loadMoreIfNeeded() {
+            if (dataProvider != null || !hasMore || loading) return
+            viewModelScope.launch { fetchPage(generation) }
+        }
 
         /** Switch drawer, preserving the active tab (B.1 acceptance). */
         fun selectDrawer(drawer: MailboxDrawer) {
             if (_selectedDrawer.value == drawer) return
             _selectedDrawer.value = drawer
-            rebuild()
+            handleSelectionChange()
         }
 
         fun selectTab(tab: MailboxTab) {
             if (_selectedTab.value == tab) return
             _selectedTab.value = tab
-            rebuild()
+            handleSelectionChange()
         }
 
-        /** Unread badge for a drawer chip — total unread across its tabs. */
-        fun drawerBadge(drawer: MailboxDrawer): Int = MailboxTab.entries.sumOf { unreadCount(drawer, it) }
+        /** Unread badge for a drawer chip — total unread across its tabs.
+         *  Live reads the per-drawer `unread_count` from `GET /drawers`;
+         *  the sample path counts unviewed rows across the fixture's tabs. */
+        fun drawerBadge(drawer: MailboxDrawer): Int =
+            if (dataProvider != null) {
+                MailboxTab.entries.sumOf { unreadCount(drawer, it) }
+            } else {
+                drawerUnread[drawer.backendKey] ?: 0
+            }
 
         /**
          * Per-(drawer, tab) unread count for the segmented bar. Vault never
          * shows a count (saved mail isn't "unread"); a zero count hides the
-         * badge.
+         * badge. The live backend exposes per-*drawer* unread only (no
+         * per-tab breakdown), so the wired path returns `null` for every
+         * tab — the drawer-chip badge carries the unread signal instead.
          */
         fun tabBadge(tab: MailboxTab): Int? {
-            if (tab == MailboxTab.Vault) return null
-            val count = unreadCount(_selectedDrawer.value, tab)
-            return count.takeIf { it > 0 }
+            if (dataProvider == null || tab == MailboxTab.Vault) return null
+            return unreadCount(_selectedDrawer.value, tab).takeIf { it > 0 }
         }
 
+        /** Sample-projection helper — counts unviewed rows for a
+         *  (drawer, tab) in the injected fixture. `0` on the live path. */
         fun unreadCount(
             drawer: MailboxDrawer,
             tab: MailboxTab,
-        ): Int = dataProvider(drawer, tab).sumOf { section -> section.items.count { !it.item.viewed } }
+        ): Int {
+            val provider = dataProvider ?: return 0
+            return provider(drawer, tab).sumOf { section -> section.items.count { !it.item.viewed } }
+        }
 
-        private fun rebuild() {
-            seededState?.let {
-                _state.value = it
-                return
+        // ── Selection routing ──────────────────────────────────────────
+
+        private fun handleSelectionChange() {
+            if (seededState != null) return
+            if (dataProvider != null) {
+                rebuildFromSample()
+            } else {
+                _state.value = ListOfRowsUiState.Loading
+                viewModelScope.launch { reloadActiveCombo() }
             }
+        }
+
+        // ── Live fetch ─────────────────────────────────────────────────
+
+        private suspend fun reloadActiveCombo() {
+            val gen = ++generation
+            offset = 0
+            loadedMail = mutableListOf()
+            fetchPage(gen)
+        }
+
+        private suspend fun fetchPage(gen: Int) {
+            val repo = repo ?: return
+            loading = true
             val drawer = _selectedDrawer.value
             val tab = _selectedTab.value
-            val sections = dataProvider(drawer, tab).filter { it.items.isNotEmpty() }
+            val result = repo.drawer(drawer.backendKey, tab.id, pageSize, offset)
+            loading = false
+            // Drop late responses if the user has since switched combo.
+            if (gen != generation) return
+            when (result) {
+                is NetworkResult.Success -> {
+                    loadedMail.addAll(result.data.mail)
+                    offset = loadedMail.size
+                    hasMore = result.data.mail.size >= pageSize
+                    applyLiveState(drawer, tab)
+                }
+                is NetworkResult.Failure -> _state.value = ListOfRowsUiState.Error(result.error.message)
+            }
+        }
+
+        private suspend fun fetchDrawerBadges() {
+            val repo = repo ?: return
+            when (val result = repo.drawers()) {
+                is NetworkResult.Success ->
+                    drawerUnread = result.data.drawers.associate { it.drawer to it.unreadCount }
+                // Badges are non-blocking chrome — leave them empty on
+                // failure so the list still renders.
+                is NetworkResult.Failure -> drawerUnread = emptyMap()
+            }
+        }
+
+        private fun applyLiveState(
+            drawer: MailboxDrawer,
+            tab: MailboxTab,
+        ) {
+            if (loadedMail.isEmpty()) {
+                _state.value = emptyState(drawer, tab)
+            } else {
+                val rows =
+                    loadedMail.map { dm ->
+                        MailboxListViewModel.makeRow(
+                            id = dm.id,
+                            categoryRaw = dm.mailType ?: dm.type,
+                            title = dm.displayTitle ?: dm.senderBusinessName ?: dm.senderDisplay,
+                            subtitle = dm.senderBusinessName ?: dm.senderAddress ?: dm.senderDisplay,
+                            body = dm.previewText,
+                            createdAt = dm.createdAt,
+                            viewed = dm.viewed,
+                            trust = MailTrust.fromRaw(dm.senderTrust),
+                            onOpenMail = { onOpenMail(it) },
+                        )
+                    }
+                _state.value =
+                    ListOfRowsUiState.Loaded(
+                        sections = listOf(RowSection(id = "mail", rows = rows)),
+                        hasMore = hasMore,
+                    )
+            }
+        }
+
+        // ── Sample projection (preview/test seam) ──────────────────────
+
+        private fun rebuildFromSample() {
+            val provider = dataProvider ?: return
+            val drawer = _selectedDrawer.value
+            val tab = _selectedTab.value
+            val sections = provider(drawer, tab).filter { it.items.isNotEmpty() }
             _state.value =
                 if (sections.isEmpty()) {
                     emptyState(drawer, tab)

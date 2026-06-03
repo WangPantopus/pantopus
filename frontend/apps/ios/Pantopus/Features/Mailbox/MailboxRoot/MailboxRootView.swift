@@ -71,21 +71,36 @@ public struct MailboxRootView: View {
 }
 
 #if DEBUG
+// Previews drive the deterministic sample projection (the documented
+// preview/test seam) by injecting `dataProvider` — the default init is the
+// live path that fetches `GET /api/mailbox/v2/drawer/:drawer`.
 #Preview("Me · Incoming") {
     NavigationStack {
-        MailboxRootView(viewModel: MailboxRootViewModel(initialDrawer: .me, initialTab: .incoming))
+        MailboxRootView(viewModel: MailboxRootViewModel(
+            initialDrawer: .me,
+            initialTab: .incoming,
+            dataProvider: MailboxRootSampleData.sections
+        ))
     }
 }
 
 #Preview("Biz · Counter") {
     NavigationStack {
-        MailboxRootView(viewModel: MailboxRootViewModel(initialDrawer: .business, initialTab: .counter))
+        MailboxRootView(viewModel: MailboxRootViewModel(
+            initialDrawer: .business,
+            initialTab: .counter,
+            dataProvider: MailboxRootSampleData.sections
+        ))
     }
 }
 
 #Preview("Earn · empty") {
     NavigationStack {
-        MailboxRootView(viewModel: MailboxRootViewModel(initialDrawer: .earn, initialTab: .incoming))
+        MailboxRootView(viewModel: MailboxRootViewModel(
+            initialDrawer: .earn,
+            initialTab: .incoming,
+            dataProvider: MailboxRootSampleData.sections
+        ))
     }
 }
 #endif

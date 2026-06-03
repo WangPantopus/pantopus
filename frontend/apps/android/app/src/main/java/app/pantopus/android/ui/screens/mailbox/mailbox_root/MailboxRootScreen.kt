@@ -69,7 +69,7 @@ fun MailboxRootScreen(
         title = "Mailbox",
         state = state,
         onRefresh = { viewModel.refresh() },
-        onEndReached = {},
+        onEndReached = { viewModel.loadMoreIfNeeded() },
         topBarAction =
             TopBarAction(
                 icon = PantopusIcon.Search,
