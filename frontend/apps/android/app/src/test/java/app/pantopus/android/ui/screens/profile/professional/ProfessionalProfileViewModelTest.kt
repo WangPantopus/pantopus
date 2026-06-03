@@ -2,21 +2,51 @@
 
 package app.pantopus.android.ui.screens.profile.professional
 
+import app.pantopus.android.data.api.models.professional.ProfessionalProfileDto
+import app.pantopus.android.data.api.models.professional.ProfessionalProfileResponse
+import app.pantopus.android.data.api.models.professional.ProfessionalServiceAreaDto
+import app.pantopus.android.data.api.models.professional.ProfessionalVerificationStatusResponse
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.professional.ProfessionalRepository
+import io.mockk.coEvery
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ProfessionalProfileViewModelTest {
+    private val repository: ProfessionalRepository = mockk()
+
+    @Before fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
     private fun loaded(
         seed: ProfessionalProfileContent = ProfessionalProfileSampleData.published,
         baseline: ProfessionalProfileContent? = null,
     ): ProfessionalProfileViewModel {
-        val viewModel = ProfessionalProfileViewModel(seed = seed, baseline = baseline)
+        val viewModel = ProfessionalProfileViewModel(repository, seed = seed, baseline = baseline)
         viewModel.load()
         return viewModel
     }
+
+    // Sample seam
 
     @Test fun loadPublishedSeedIsVerifiedAndClean() {
         val viewModel = loaded()
@@ -27,7 +57,7 @@ class ProfessionalProfileViewModelTest {
     }
 
     @Test fun loadFailureIsError() {
-        val viewModel = ProfessionalProfileViewModel(simulateFailure = true)
+        val viewModel = ProfessionalProfileViewModel(repository, simulateFailure = true)
         viewModel.load()
         assertTrue(viewModel.state.value is ProfessionalProfileUiState.Error)
     }
@@ -101,4 +131,43 @@ class ProfessionalProfileViewModelTest {
         assertTrue(viewModel.state.value is ProfessionalProfileUiState.Verified)
         assertNull(viewModel.toast.value)
     }
+
+    // Live read-path
+
+    @Test fun liveLoadHydratesFromProfileMe() =
+        runTest {
+            coEvery { repository.profileMe() } returns
+                NetworkResult.Success(
+                    ProfessionalProfileResponse(
+                        ProfessionalProfileDto(
+                            headline = "Licensed Handyman",
+                            categories = listOf("handyman", "carpentry"),
+                            serviceArea = ProfessionalServiceAreaDto(city = "Elm Park", state = "NY"),
+                            isPublic = true,
+                            isActive = false,
+                            verificationStatus = "verified",
+                        ),
+                    ),
+                )
+            coEvery { repository.verificationStatus() } returns
+                NetworkResult.Success(ProfessionalVerificationStatusResponse(tier = 2, status = "verified"))
+
+            val viewModel = ProfessionalProfileViewModel(repository)
+            viewModel.load()
+
+            val state = viewModel.state.value as ProfessionalProfileUiState.Verified
+            assertEquals("Licensed Handyman", state.content.title.value)
+            assertEquals(2, state.content.skills.size)
+            assertEquals(ProVerificationStatus.Verified, state.content.company.status)
+        }
+
+    @Test fun liveLoadFailureSurfacesError() =
+        runTest {
+            coEvery { repository.profileMe() } returns NetworkResult.Failure(NetworkError.Server(500, "boom"))
+
+            val viewModel = ProfessionalProfileViewModel(repository)
+            viewModel.load()
+
+            assertTrue(viewModel.state.value is ProfessionalProfileUiState.Error)
+        }
 }

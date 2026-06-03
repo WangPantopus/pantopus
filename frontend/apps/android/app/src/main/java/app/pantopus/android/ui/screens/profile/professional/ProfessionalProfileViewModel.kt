@@ -3,11 +3,16 @@
 package app.pantopus.android.ui.screens.profile.professional
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.professional.ProfessionalProfileUpdateRequest
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.professional.ProfessionalRepository
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
@@ -19,19 +24,26 @@ data class ProfessionalProfileToast(
 @HiltViewModel
 class ProfessionalProfileViewModel
     @Inject
-    constructor() : ViewModel() {
+    constructor(
+        private val repository: ProfessionalRepository,
+    ) : ViewModel() {
         private var seed: ProfessionalProfileContent = ProfessionalProfileSampleData.published
         private var baselineSeed: ProfessionalProfileContent = seed
         private var simulateFailure: Boolean = false
+        private var useSample: Boolean = false
 
+        /** Sample/preview + test seam. Sets the deterministic seed and skips
+         *  the network on [load]. */
         internal constructor(
+            repository: ProfessionalRepository,
             seed: ProfessionalProfileContent = ProfessionalProfileSampleData.published,
             baseline: ProfessionalProfileContent? = null,
             simulateFailure: Boolean = false,
-        ) : this() {
+        ) : this(repository) {
             this.seed = seed
             baselineSeed = baseline ?: seed
             this.simulateFailure = simulateFailure
+            this.useSample = true
         }
 
         private val _state = MutableStateFlow<ProfessionalProfileUiState>(ProfessionalProfileUiState.Loading)
@@ -45,13 +57,32 @@ class ProfessionalProfileViewModel
 
         fun load() {
             _state.value = ProfessionalProfileUiState.Loading
-            if (simulateFailure) {
-                _state.value = ProfessionalProfileUiState.Error("We couldn't load your professional profile.")
+            if (useSample) {
+                if (simulateFailure) {
+                    _state.value = ProfessionalProfileUiState.Error("We couldn't load your professional profile.")
+                    return
+                }
+                content = seed
+                baseline = baselineSeed
+                recompute()
                 return
             }
-            content = seed
-            baseline = baselineSeed
-            recompute()
+            viewModelScope.launch {
+                when (val result = repository.profileMe()) {
+                    is NetworkResult.Success -> {
+                        val verificationResult = repository.verificationStatus()
+                        val verification =
+                            if (verificationResult is NetworkResult.Success) verificationResult.data else null
+                        val mapped = ProfessionalProfileMapper.build(result.data.profile, verification)
+                        content = mapped
+                        baseline = mapped
+                        recompute()
+                    }
+                    is NetworkResult.Failure -> {
+                        _state.value = ProfessionalProfileUiState.Error(result.error.message)
+                    }
+                }
+            }
         }
 
         fun refresh() = load()
@@ -168,6 +199,7 @@ class ProfessionalProfileViewModel
             content = committed
             baseline = committed
             recompute()
+            if (!useSample) persist(committed)
             _toast.value =
                 ProfessionalProfileToast(
                     if (pending > 0) {
@@ -176,6 +208,19 @@ class ProfessionalProfileViewModel
                         "Professional profile published."
                     },
                 )
+        }
+
+        /** Best-effort PATCH of the safe, unambiguous fields (headline +
+         *  public/active flags). `categories` are enum-constrained server-side,
+         *  so free-text skills are not written here. */
+        private fun persist(content: ProfessionalProfileContent) {
+            val request =
+                ProfessionalProfileUpdateRequest(
+                    headline = content.title.value,
+                    isPublic = content.visibility.firstOrNull { it.id == "publicProfile" }?.isOn,
+                    isActive = content.visibility.firstOrNull { it.id == "activeForHire" }?.isOn,
+                )
+            viewModelScope.launch { repository.updateProfileMe(request) }
         }
 
         private fun mutate(transform: (ProfessionalProfileContent) -> ProfessionalProfileContent) {

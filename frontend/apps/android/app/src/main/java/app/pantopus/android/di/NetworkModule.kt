@@ -36,6 +36,7 @@ import app.pantopus.android.data.api.services.OffersApi
 import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
+import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
@@ -248,6 +249,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun providePrivacyHandshakeApi(retrofit: Retrofit): PrivacyHandshakeApi = retrofit.create(PrivacyHandshakeApi::class.java)
+
+    @Provides @Singleton
+    fun provideProfessionalApi(retrofit: Retrofit): ProfessionalApi = retrofit.create(ProfessionalApi::class.java)
 
     @Provides
     @Singleton
