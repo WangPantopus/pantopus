@@ -27,7 +27,7 @@ combined*.log
 .pnpm-store/
 
 # Temporary production reference copy for backend/CI migration
-pantopus/
+/pantopus/
 
 # macOS
 .DS_Store
