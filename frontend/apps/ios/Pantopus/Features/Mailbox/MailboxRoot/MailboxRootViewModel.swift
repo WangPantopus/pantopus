@@ -10,9 +10,18 @@
 //  Backs the screen via the List-of-Rows archetype: the drawer chip row
 //  and the segmented tab bar render in the shell's `customHeader` slot,
 //  and the mail list for the active (drawer, tab) flows through
-//  `ListOfRowsState`. Backend has been removed from the repo, so the
-//  view-model projects deterministic `MailboxRootSampleData` into the
-//  render states (the four states still apply).
+//  `ListOfRowsState`.
+//
+//  Wiring (P1-B): the default path is live —
+//    • `GET /api/mailbox/v2/drawers` seeds the per-drawer unread badges
+//      (`backend/routes/mailboxV2.js:214`), and
+//    • `GET /api/mailbox/v2/drawer/:drawer?tab=…` (`…:280`) feeds the mail
+//      list for the active (drawer, tab) with limit/offset paging.
+//  The drawer keys map `me → personal` (the backend's `personal` drawer);
+//  the tab ids (`incoming` / `counter` / `vault`) match the backend tab
+//  filter verbatim. The deterministic `MailboxRootSampleData` projection
+//  is kept as the documented preview/test seam — inject `dataProvider`
+//  (and/or `seededState`) to drive the sample frames offline.
 //
 
 import Observation
@@ -62,6 +71,19 @@ public enum MailboxDrawer: String, CaseIterable, Hashable, Sendable, Identifiabl
         case .earn: Theme.Color.primary600
         }
     }
+
+    /// Backend drawer key for `GET /api/mailbox/v2/drawer/:drawer`. The
+    /// route validates `['personal', 'home', 'business', 'earn']`
+    /// (`backend/routes/mailboxV2.js:286`); the UI's `me` drawer is the
+    /// backend's `personal` drawer.
+    public var backendKey: String {
+        switch self {
+        case .me: "personal"
+        case .home: "home"
+        case .business: "business"
+        case .earn: "earn"
+        }
+    }
 }
 
 /// The three tabs within a drawer.
@@ -89,9 +111,9 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     public let title = "Mailbox"
 
     /// Active drawer. Changing it preserves the selected tab (B.1
-    /// acceptance) and rebuilds the list for the new (drawer, tab) combo.
+    /// acceptance) and reloads the list for the new (drawer, tab) combo.
     public private(set) var selectedDrawer: MailboxDrawer {
-        didSet { if oldValue != selectedDrawer { rebuild() } }
+        didSet { if oldValue != selectedDrawer { handleSelectionChange() } }
     }
 
     /// `ListOfRowsDataSource` tab id (holds a `MailboxTab` raw value). The
@@ -99,7 +121,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// bar renders in the `customHeader` — but this stays the single
     /// source of truth for the active tab so drawer switches preserve it.
     public var selectedTab: String {
-        didSet { if oldValue != selectedTab { rebuild() } }
+        didSet { if oldValue != selectedTab { handleSelectionChange() } }
     }
 
     /// Empty: the segmented tab bar is rendered by `MailboxRootHeader` in
@@ -144,26 +166,40 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     }
 
     /// Unread badge for a drawer chip — total unread across its three tabs.
+    /// Live path reads the per-drawer `unread_count` from
+    /// `GET /api/mailbox/v2/drawers`; the sample path counts unviewed rows
+    /// across the fixture's three tabs.
     public func drawerBadge(_ drawer: MailboxDrawer) -> Int {
-        MailboxTab.allCases.reduce(0) { $0 + unreadCount(drawer: drawer, tab: $1) }
+        if sampleProvider != nil {
+            return MailboxTab.allCases.reduce(0) { $0 + unreadCount(drawer: drawer, tab: $1) }
+        }
+        return drawerUnread[drawer.backendKey] ?? 0
     }
 
     /// Per-(drawer, tab) unread count for the segmented bar. Vault renders
     /// no count (saved mail isn't "unread"); a zero count hides the badge.
+    /// The live backend exposes per-*drawer* unread only (no per-tab
+    /// breakdown), so the wired path returns `nil` for every tab — the
+    /// drawer-chip badge carries the unread signal instead.
     public func tabBadge(_ tab: MailboxTab) -> Int? {
-        guard tab != .vault else { return nil }
+        guard sampleProvider != nil, tab != .vault else { return nil }
         let count = unreadCount(drawer: selectedDrawer, tab: tab)
         return count > 0 ? count : nil
     }
 
+    /// Sample-projection helper — counts unviewed rows for a (drawer, tab)
+    /// in the injected fixture. Returns `0` on the live path (badges there
+    /// come from `GET /drawers`).
     public func unreadCount(drawer: MailboxDrawer, tab: MailboxTab) -> Int {
-        dataProvider(drawer, tab).reduce(0) { running, section in
+        guard let sampleProvider else { return 0 }
+        return sampleProvider(drawer, tab).reduce(0) { running, section in
             running + section.items.filter { !$0.item.viewed }.count
         }
     }
 
     // MARK: - Dependencies
 
+    private let api: APIClient
     private let onOpenMail: (String) -> Void
     private let onOpenSearch: @MainActor () -> Void
     private let onOpenMap: @MainActor () -> Void
@@ -181,14 +217,32 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// A17.14 — overflow-menu "Scan an item" entry. The scan/add affordance
     /// that opens the Unboxing scan-capture flow.
     private let onOpenUnboxingHandler: @MainActor () -> Void
-    private let dataProvider: (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
+    /// Preview/test seam. Non-nil → sample mode: the screen projects this
+    /// fixture and never touches the network. Nil → live mode (production).
+    private let sampleProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])?
     /// When set, `load()` surfaces this state verbatim — lets previews and
     /// tests pin the loading / error frames.
     private let seededState: ListOfRowsState?
 
+    // MARK: - Live paging state
+
+    private let pageSize = 25
+    private var offset = 0
+    private var hasMore = false
+    private var loadedMail: [DrawerItemsResponse.DrawerMail] = []
+    private var isLoadingPage = false
+    /// Bumped on every combo reload so a late in-flight page from a
+    /// previous (drawer, tab) is discarded instead of clobbering the
+    /// current view.
+    private var loadGeneration = 0
+    /// Per-drawer unread counts from `GET /api/mailbox/v2/drawers`, keyed
+    /// by the backend drawer key (`personal` / `home` / `business` / `earn`).
+    private var drawerUnread: [String: Int] = [:]
+
     public init(
         initialDrawer: MailboxDrawer = .me,
         initialTab: MailboxTab = .incoming,
+        api: APIClient = .shared,
         onOpenMail: @escaping (String) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
         onOpenMap: @escaping @MainActor () -> Void = {},
@@ -197,12 +251,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenVacationHold: @escaping @MainActor () -> Void = {},
         onOpenStamps: @escaping @MainActor () -> Void = {},
         onOpenUnboxing: @escaping @MainActor () -> Void = {},
-        dataProvider: @escaping (MailboxDrawer, MailboxTab) -> [MailboxSampleSection]
-            = MailboxRootSampleData.sections,
+        dataProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])? = nil,
         seededState: ListOfRowsState? = nil
     ) {
         selectedDrawer = initialDrawer
         selectedTab = initialTab.rawValue
+        self.api = api
         self.onOpenMail = onOpenMail
         self.onOpenSearch = onOpenSearch
         self.onOpenMap = onOpenMap
@@ -211,7 +265,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenVacationHoldHandler = onOpenVacationHold
         onOpenStampsHandler = onOpenStamps
         onOpenUnboxingHandler = onOpenUnboxing
-        self.dataProvider = dataProvider
+        sampleProvider = dataProvider
         self.seededState = seededState
     }
 
@@ -241,15 +295,31 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
             state = seededState
             return
         }
-        rebuild()
+        if sampleProvider != nil {
+            rebuildFromSample()
+            return
+        }
+        if case .loaded = state, !loadedMail.isEmpty { return }
+        state = .loading
+        await fetchDrawerBadges()
+        await reloadActiveCombo()
     }
 
     public func refresh() async {
-        guard seededState == nil else { return }
-        rebuild()
+        if seededState != nil { return }
+        if sampleProvider != nil {
+            rebuildFromSample()
+            return
+        }
+        await fetchDrawerBadges()
+        await reloadActiveCombo()
     }
 
-    public func loadMoreIfNeeded() async {} // a drawer/tab is a fixed window.
+    public func loadMoreIfNeeded() async {
+        guard sampleProvider == nil else { return } // a sample window is fixed.
+        guard hasMore, !isLoadingPage else { return }
+        await fetchPage(generation: loadGeneration)
+    }
 
     public func selectDrawer(_ drawer: MailboxDrawer) {
         selectedDrawer = drawer
@@ -259,12 +329,95 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         selectedTab = tab.rawValue
     }
 
-    // MARK: - State projection
+    // MARK: - Selection routing
 
-    private func rebuild() {
+    /// Drawer / tab change. Sample mode re-projects synchronously (the
+    /// fixture is already in memory); live mode shows the loading skeleton
+    /// and refetches the active combo.
+    private func handleSelectionChange() {
+        guard seededState == nil else { return }
+        if sampleProvider != nil {
+            rebuildFromSample()
+        } else {
+            state = .loading
+            Task { @MainActor in await reloadActiveCombo() }
+        }
+    }
+
+    // MARK: - Live fetch
+
+    private func reloadActiveCombo() async {
+        loadGeneration &+= 1
+        let generation = loadGeneration
+        offset = 0
+        loadedMail = []
+        await fetchPage(generation: generation)
+    }
+
+    private func fetchPage(generation: Int) async {
+        isLoadingPage = true
         let drawer = selectedDrawer
         let tab = currentTab
-        let sections = dataProvider(drawer, tab).filter { !$0.items.isEmpty }
+        do {
+            let response: DrawerItemsResponse = try await api.request(
+                MailboxV2Endpoints.drawer(
+                    drawer.backendKey,
+                    tab: tab.rawValue,
+                    limit: pageSize,
+                    offset: offset
+                )
+            )
+            isLoadingPage = false
+            // Drop late responses if the user has since switched combo.
+            guard generation == loadGeneration else { return }
+            loadedMail.append(contentsOf: response.mail)
+            offset = loadedMail.count
+            hasMore = response.mail.count >= pageSize
+            applyLiveState(drawer: drawer, tab: tab)
+        } catch {
+            isLoadingPage = false
+            guard generation == loadGeneration else { return }
+            state = .error(message: (error as? APIError)?.errorDescription ?? "Couldn't load mail.")
+        }
+    }
+
+    private func fetchDrawerBadges() async {
+        do {
+            let response: DrawerListResponse = try await api.request(MailboxV2Endpoints.drawers())
+            drawerUnread = Dictionary(
+                response.drawers.map { ($0.drawer, $0.unreadCount) },
+                uniquingKeysWith: { first, _ in first }
+            )
+        } catch {
+            // Badges are non-blocking chrome — leave them empty on failure
+            // so the list still renders.
+            drawerUnread = [:]
+        }
+    }
+
+    private func applyLiveState(drawer: MailboxDrawer, tab: MailboxTab) {
+        if loadedMail.isEmpty {
+            state = .empty(emptyContent(drawer: drawer, tab: tab))
+        } else {
+            let rows = loadedMail.map { mail in
+                MailboxListViewModel.makeRow(
+                    for: mail.item,
+                    trust: MailTrust.fromRaw(mail.senderTrust)
+                ) { [weak self] mailId in
+                    Task { @MainActor in self?.onOpenMail(mailId) }
+                }
+            }
+            state = .loaded(sections: [RowSection(rows: rows)], hasMore: hasMore)
+        }
+    }
+
+    // MARK: - Sample projection (preview/test seam)
+
+    private func rebuildFromSample() {
+        guard let sampleProvider else { return }
+        let drawer = selectedDrawer
+        let tab = currentTab
+        let sections = sampleProvider(drawer, tab).filter { !$0.items.isEmpty }
         if sections.isEmpty {
             state = .empty(emptyContent(drawer: drawer, tab: tab))
         } else {

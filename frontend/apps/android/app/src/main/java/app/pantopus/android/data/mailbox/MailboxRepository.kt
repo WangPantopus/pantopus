@@ -5,6 +5,7 @@ import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.models.mailbox.MailboxListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpRequest
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpResponse
+import app.pantopus.android.data.api.models.mailbox.v2.DrawerItemsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionResponse
@@ -63,6 +64,16 @@ class MailboxRepository
 
         /** `GET /api/mailbox/v2/drawers`. */
         suspend fun drawers(): NetworkResult<DrawerListResponse> = safeApiCall { v2Api.drawers() }
+
+        /** `GET /api/mailbox/v2/drawer/:drawer?tab=…` — the (drawer, tab)
+         *  mail window backing the B.1 Mailbox root. */
+        suspend fun drawer(
+            drawer: String,
+            tab: String,
+            limit: Int,
+            offset: Int,
+        ): NetworkResult<DrawerItemsResponse> =
+            safeApiCall { v2Api.drawer(drawer = drawer, tab = tab, limit = limit, offset = offset) }
 
         /** `GET /api/mailbox/v2/item/:id`. */
         suspend fun item(mailId: String): NetworkResult<MailboxV2ItemResponse> = safeApiCall { v2Api.item(mailId) }

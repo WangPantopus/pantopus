@@ -185,12 +185,41 @@ class MailboxListViewModel
                 mail: MailItem,
                 trustOverride: MailTrust? = null,
                 onOpenMail: (String) -> Unit,
+            ): RowModel =
+                makeRow(
+                    id = mail.id,
+                    categoryRaw = mail.mailType ?: mail.type,
+                    title = mail.displayTitle ?: mail.subject ?: mail.senderBusinessName ?: "Mail",
+                    subtitle = mail.senderBusinessName ?: mail.senderAddress,
+                    body = mail.previewText,
+                    createdAt = mail.createdAt,
+                    viewed = mail.viewed,
+                    // V1 list doesn't surface sender_trust, so it defaults to
+                    // unverified; surfaces that carry trust (e.g. the B.1
+                    // Mailbox root sample data) pass it explicitly.
+                    trust = trustOverride ?: MailTrust.fromRaw(null),
+                    onOpenMail = onOpenMail,
+                )
+
+            /**
+             * Primitive-field row factory — the single source of truth for
+             * the mailbox row anatomy. The [MailItem] list rows and the B.1
+             * Mailbox root's `DrawerMail` rows both funnel through here so
+             * the two surfaces never drift.
+             */
+            @Suppress("LongParameterList")
+            fun makeRow(
+                id: String,
+                categoryRaw: String?,
+                title: String,
+                subtitle: String?,
+                body: String?,
+                createdAt: String?,
+                viewed: Boolean,
+                trust: MailTrust,
+                onOpenMail: (String) -> Unit,
             ): RowModel {
-                val category = MailItemCategory.fromRaw(mail.mailType ?: mail.type)
-                // V1 list doesn't surface sender_trust, so it defaults to
-                // unverified; surfaces that carry trust (e.g. the B.1
-                // Mailbox root sample data) pass it explicitly.
-                val trust = trustOverride ?: MailTrust.fromRaw(null)
+                val category = MailItemCategory.fromRaw(categoryRaw)
                 val chips =
                     listOf(
                         RowChip(
@@ -205,9 +234,9 @@ class MailboxListViewModel
                         ),
                     )
                 return RowModel(
-                    id = mail.id,
-                    title = mail.displayTitle ?: mail.subject ?: mail.senderBusinessName ?: "Mail",
-                    subtitle = mail.senderBusinessName ?: mail.senderAddress,
+                    id = id,
+                    title = title,
+                    subtitle = subtitle,
                     template = RowTemplate.StatusChip,
                     leading =
                         RowLeading.TypeIcon(
@@ -216,11 +245,11 @@ class MailboxListViewModel
                             foreground = category.accent,
                         ),
                     trailing = RowTrailing.None,
-                    onTap = { onOpenMail(mail.id) },
-                    body = mail.previewText,
+                    onTap = { onOpenMail(id) },
+                    body = body,
                     chips = chips,
-                    timeMeta = formatRelativeTime(mail.createdAt),
-                    highlight = if (!mail.viewed) RowHighlight.Unread else null,
+                    timeMeta = formatRelativeTime(createdAt),
+                    highlight = if (!viewed) RowHighlight.Unread else null,
                 )
             }
 
