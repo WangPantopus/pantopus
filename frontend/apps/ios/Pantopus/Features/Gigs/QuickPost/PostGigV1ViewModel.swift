@@ -150,8 +150,20 @@ public final class PostGigV1ViewModel {
     private let api: APIClient
     private let referenceNow: Date?
 
-    public init(
-        api: APIClient = .shared,
+    /// Public entry point — carries no `APIClient` (the client and `.shared`
+    /// are module-internal) so views / previews / sample data construct the
+    /// composer without referencing it.
+    public convenience init(
+        initialState: PostGigV1State = PostGigV1State(),
+        referenceNow: Date? = nil
+    ) {
+        self.init(api: .shared, initialState: initialState, referenceNow: referenceNow)
+    }
+
+    /// Designated init — module-internal because `APIClient` is. Tests
+    /// inject a stubbed client here.
+    init(
+        api: APIClient,
         initialState: PostGigV1State = PostGigV1State(),
         referenceNow: Date? = nil
     ) {

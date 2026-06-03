@@ -35,8 +35,28 @@ public final class TasksMapViewModel {
     /// The task set currently driving the map — seeded or fetched.
     private var items: [TaskMapItem] = []
 
-    public init(
-        api: APIClient = .shared,
+    /// Public entry point — carries no `APIClient` (the client and `.shared`
+    /// are module-internal) so views / previews / sample data construct the
+    /// map without referencing it.
+    public convenience init(
+        initialCategory: GigsCategory = .all,
+        anchor: MapAnchor? = TasksMapSampleData.anchor,
+        seed: [TaskMapItem]? = nil,
+        failWith: String? = nil
+    ) {
+        self.init(
+            api: .shared,
+            initialCategory: initialCategory,
+            anchor: anchor,
+            seed: seed,
+            failWith: failWith
+        )
+    }
+
+    /// Designated init — module-internal because `APIClient` is. Tests
+    /// inject a stubbed client here.
+    init(
+        api: APIClient,
         initialCategory: GigsCategory = .all,
         anchor: MapAnchor? = TasksMapSampleData.anchor,
         seed: [TaskMapItem]? = nil,

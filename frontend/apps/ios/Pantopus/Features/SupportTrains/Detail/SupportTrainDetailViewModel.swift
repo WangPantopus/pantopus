@@ -48,9 +48,18 @@ public final class SupportTrainDetailViewModel {
     /// loading + error chrome), `load()` becomes a no-op so the seed sticks.
     private let seeded: Bool
 
-    public init(
+    /// Public entry point — carries no `APIClient` (the client and `.shared`
+    /// are module-internal) so views / previews / QA construct the screen
+    /// without referencing it.
+    public convenience init(trainId: String, resolver: Resolver? = nil) {
+        self.init(trainId: trainId, api: .shared, resolver: resolver)
+    }
+
+    /// Designated init — module-internal because `APIClient` is. Tests
+    /// inject a stubbed client here.
+    init(
         trainId: String,
-        api: APIClient = .shared,
+        api: APIClient,
         resolver: Resolver? = nil
     ) {
         self.trainId = trainId
@@ -248,7 +257,7 @@ extension SupportTrainDetailViewModel {
 
         let coveredDates = Set(slots.filter(\.isCovered).compactMap { parseSlotDate($0.slotDate).map(cal.startOfDay) })
         let openDates = Set(slots.filter { !$0.isCovered }.compactMap { parseSlotDate($0.slotDate).map(cal.startOfDay) })
-        let slotById = Dictionary(slots.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let slotById = Dictionary(uniqueKeysWithValues: slots.map { ($0.id, $0) })
         let mineDates = Set(reservations.compactMap { reservation -> Date? in
             guard let slotId = reservation.slotId, let slot = slotById[slotId] else { return nil }
             return parseSlotDate(slot.slotDate).map(cal.startOfDay)
@@ -283,7 +292,7 @@ extension SupportTrainDetailViewModel {
         reservations: [SupportTrainMyReservationDTO]
     ) -> [SlotSection] {
         var sections: [SlotSection] = []
-        let slotById = Dictionary(slots.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let slotById = Dictionary(uniqueKeysWithValues: slots.map { ($0.id, $0) })
 
         let mineRows = reservations.map { reservationRow($0, slot: $0.slotId.flatMap { slotById[$0] }) }
         if !mineRows.isEmpty {
