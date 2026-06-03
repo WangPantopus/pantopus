@@ -279,7 +279,7 @@ final class MailboxRootViewModelTests: XCTestCase {
 
     func test_live_paginationSetsHasMoreWhenPageFull() async {
         // 25 items == pageSize → hasMore true.
-        let page = (0 ..< 25)
+        let page = (0..<25)
             .map { Self.drawerItem(id: "m-\($0)", title: "Item \($0)", trust: "verified_gov") }
             .joined(separator: ",")
         SequencedURLProtocol.sequence = [
