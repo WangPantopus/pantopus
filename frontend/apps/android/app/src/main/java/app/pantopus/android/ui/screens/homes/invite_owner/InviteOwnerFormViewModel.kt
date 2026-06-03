@@ -5,6 +5,9 @@ package app.pantopus.android.ui.screens.homes.invite_owner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormValidator
@@ -125,6 +128,7 @@ class InviteOwnerFormViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
+        private val homesRepo: HomesRepository,
     ) : ViewModel() {
         private val homeId: String =
             requireNotNull(savedStateHandle[INVITE_OWNER_HOME_ID_KEY]) {
@@ -259,15 +263,39 @@ class InviteOwnerFormViewModel
             }
             _state.update { it.copy(isSaving = true) }
             viewModelScope.launch {
-                delay(350)
-                _state.update {
-                    it.copy(
-                        isSaving = false,
-                        toast = ToastPayload("Invite sent.", isError = false),
-                    )
+                val email = current.fields[InviteOwnerField.Email]?.value?.trim().orEmpty()
+                val phoneRaw = current.fields[InviteOwnerField.Phone]?.value?.trim().orEmpty()
+                val phone = phoneRaw.ifEmpty { null }
+                // The invite route identifies the co-owner by email/phone;
+                // the share-split math is a client-only affordance it does
+                // not consume, so it stays local.
+                when (
+                    val result =
+                        homesRepo.inviteOwner(
+                            homeId,
+                            InviteOwnerRequest(email = email, phone = phone),
+                        )
+                ) {
+                    is NetworkResult.Success -> {
+                        _state.update {
+                            it.copy(isSaving = false, toast = ToastPayload("Invite sent.", isError = false))
+                        }
+                        delay(650)
+                        _state.update { it.copy(shouldDismiss = true) }
+                    }
+                    is NetworkResult.Failure -> {
+                        _state.update {
+                            it.copy(
+                                isSaving = false,
+                                toast =
+                                    ToastPayload(
+                                        result.error.message.ifEmpty { "Couldn't send the invite. Try again." },
+                                        isError = true,
+                                    ),
+                            )
+                        }
+                    }
                 }
-                delay(650)
-                _state.update { it.copy(shouldDismiss = true) }
             }
         }
 

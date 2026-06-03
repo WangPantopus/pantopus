@@ -8,9 +8,11 @@
 //  allowed-areas (multi-select) are enum-ish chip selections held
 //  directly.
 //
-//  No backend: issuing a pass is simulated locally — `submit()` flips a
-//  brief saving state, raises a success toast ("Pass sent to <name>"),
-//  and signals `shouldDismiss` so the host pops the modal.
+//  `submit()` issues the pass via `POST /api/homes/:id/guest-passes`
+//  (route `backend/routes/homeIam.js:667`), then raises a success toast
+//  ("Pass sent to <name>") and signals `shouldDismiss` so the host pops
+//  the modal. The contact, welcome note, and allowed-area chips are UI
+//  affordances the create endpoint doesn't model, so they stay local.
 //
 
 import Foundation
@@ -50,9 +52,15 @@ public final class AddGuestFormViewModel {
     public let welcomeMaxLength = AddGuestSampleData.welcomeMaxLength
 
     private let onSent: (String) -> Void
+    private let api: APIClient
 
-    public init(homeId: String, onSent: @escaping (String) -> Void = { _ in }) {
+    public init(
+        homeId: String,
+        api: APIClient = .shared,
+        onSent: @escaping (String) -> Void = { _ in }
+    ) {
         self.homeId = homeId
+        self.api = api
         homeContext = AddGuestSampleData.homeContext(for: homeId)
         nameField = FormFieldState(id: "name", originalValue: "")
         contactField = FormFieldState(id: "contact", originalValue: "")
@@ -163,14 +171,108 @@ public final class AddGuestFormViewModel {
     public func submit() async {
         guard isValid, !isSaving else { return }
         isSaving = true
-        // No backend in the repo — simulate the issue-pass round trip so
-        // the CTA spinner and dismiss flow behave like the real thing.
-        try? await Task.sleep(nanoseconds: 350_000_000)
+        // `label` carries the guest's name; the time window comes from the
+        // selected duration chip. Contact, welcome note, and allowed-area
+        // chips are UI affordances the create endpoint doesn't model, so
+        // they stay local (a backend follow-up would persist them).
+        let window = guestPassWindow()
+        let request = CreateGuestPassRequest(
+            label: trimmedName,
+            kind: "guest",
+            durationHours: window.durationHours,
+            startAt: window.startAt,
+            endAt: window.endAt
+        )
+        do {
+            _ = try await api.request(
+                HomesEndpoints.createGuestPass(homeId: homeId, request: request),
+                as: CreateGuestPassResponse.self
+            )
+        } catch {
+            isSaving = false
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription
+                    ?? "Couldn't issue the pass. Try again.",
+                kind: .error
+            )
+            return
+        }
         isSaving = false
         let name = firstName ?? "your guest"
         toast = ToastMessage(text: "Pass sent to \(name)", kind: .success)
         onSent(name)
         shouldDismiss = true
+    }
+
+    // MARK: - Guest-pass window
+
+    /// The backend resolves `end_at` > `duration_hours` > template
+    /// default, so the 2-hour preset sends a relative `durationHours`
+    /// while the dated presets send absolute ISO `start`/`end` stamps.
+    struct GuestPassWindow {
+        var durationHours: Int?
+        var startAt: String?
+        var endAt: String?
+    }
+
+    func guestPassWindow() -> GuestPassWindow {
+        switch duration {
+        case "2h":
+            return GuestPassWindow(durationHours: 2)
+        case "today":
+            return GuestPassWindow(endAt: Self.isoStartOfTomorrow())
+        case "weekend":
+            let (start, end) = Self.weekendWindow()
+            return GuestPassWindow(startAt: start, endAt: end)
+        case AddGuestSampleData.durationCustomId:
+            // Day-precision boundaries (parity with Android's day picker):
+            // start of the first day → start of the day after the last.
+            return GuestPassWindow(
+                startAt: customStart.map(Self.isoStartOfDay),
+                endAt: customEnd.map(Self.isoStartOfNextDay)
+            )
+        default:
+            // `isValid` guarantees a duration is chosen before submit;
+            // fall back to the 2-hour preset defensively.
+            return GuestPassWindow(durationHours: 2)
+        }
+    }
+
+    private static func iso(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: date)
+    }
+
+    private static func isoStartOfDay(_ date: Date) -> String {
+        iso(Calendar.current.startOfDay(for: date))
+    }
+
+    private static func isoStartOfNextDay(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let next = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+        return iso(next)
+    }
+
+    /// Local next-midnight — the exclusive end of "today".
+    private static func isoStartOfTomorrow() -> String {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? startOfToday
+        return iso(startOfTomorrow)
+    }
+
+    /// Upcoming (or current) Sat 00:00 → Mon 00:00 window.
+    private static func weekendWindow() -> (String, String) {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        // `.weekday`: 1 = Sunday … 7 = Saturday.
+        let weekday = calendar.component(.weekday, from: startOfToday)
+        let daysUntilSaturday = (7 - weekday) % 7
+        let saturday = calendar.date(byAdding: .day, value: daysUntilSaturday, to: startOfToday) ?? startOfToday
+        let monday = calendar.date(byAdding: .day, value: 2, to: saturday) ?? saturday
+        return (iso(saturday), iso(monday))
     }
 
     public func acknowledgeDismiss() {

@@ -5,9 +5,11 @@
 //  A13.4 — Backs the Transfer Ownership form. Holds the recipient
 //  selection, the live transfer amount (1–60% slider), the typed
 //  confirmation field, the bottom-sheet visibility, and the Face ID
-//  authentication state machine. The backend transfer endpoint is
-//  stubbed; `commitTransfer()` sleeps 1.2s and reports success via a
-//  toast + dismiss-host signal.
+//  authentication state machine. After biometric auth succeeds,
+//  `commitTransfer()` calls `POST /api/homes/:id/owners/transfer`
+//  (route `backend/routes/homeOwnership.js:1526`) and reports success
+//  via a toast + dismiss-host signal — including the co-owner-approval
+//  (quorum) branch. Tests inject `transferExecutor` to bypass the network.
 //
 
 import Foundation
@@ -54,20 +56,25 @@ public final class TransferOwnershipViewModel {
     public typealias BiometricEvaluator = @MainActor (_ reason: String) async -> Result<Void, any Error>
     private let biometricEvaluator: BiometricEvaluator
 
-    /// Stubbed backend round-trip. Replaced by a `try await api.request(…)`
-    /// once the transfer endpoint ships.
+    /// Test seam for the backend round-trip. When `nil` (the default in
+    /// the live app) `commitTransfer()` performs
+    /// `POST /api/homes/:id/owners/transfer` through `api`; tests inject
+    /// a deterministic stub so they never touch the network.
     public typealias TransferExecutor = @MainActor () async throws -> Void
-    private let transferExecutor: TransferExecutor
+    private let transferExecutor: TransferExecutor?
+    private let api: APIClient
 
     // MARK: - Init
 
     public init(
         homeId: String,
         amount: Int = TransferOwnershipSampleData.defaultAmount,
+        api: APIClient = .shared,
         biometricEvaluator: BiometricEvaluator? = nil,
         transferExecutor: TransferExecutor? = nil
     ) {
         self.homeId = homeId
+        self.api = api
         homeContext = TransferOwnershipSampleData.homeContext(for: homeId)
         recipient = TransferOwnershipSampleData.mayaFortune
         currentUser = TransferOwnershipSampleData.currentUser
@@ -75,7 +82,7 @@ public final class TransferOwnershipViewModel {
         self.amount = max(1, min(amount, currentUser.percent))
         confirmationField = FormFieldState(id: "confirmation", originalValue: "")
         self.biometricEvaluator = biometricEvaluator ?? Self.defaultBiometricEvaluator
-        self.transferExecutor = transferExecutor ?? Self.defaultTransferExecutor
+        self.transferExecutor = transferExecutor
     }
 
     // MARK: - Computed projections
@@ -256,16 +263,30 @@ public final class TransferOwnershipViewModel {
 
     private func commitTransfer() async {
         do {
-            try await transferExecutor()
+            let successText: String
+            if let transferExecutor {
+                // Test seam — deterministic stub, no network.
+                try await transferExecutor()
+                successText = "Transferred \(amount)% to \(recipient.name)"
+            } else {
+                // Identify the buyer by their account id. `effective_date`
+                // is omitted so the transfer takes effect immediately.
+                let request = TransferOwnerRequest(buyerUserId: recipient.id)
+                let response = try await api.request(
+                    HomesEndpoints.transferOwner(homeId: homeId, request: request),
+                    as: TransferOwnerResponse.self
+                )
+                successText = response.requiresQuorum
+                    ? "Transfer sent for co-owner approval."
+                    : "Transferred \(amount)% to \(recipient.name)"
+            }
             sheetPhase = .dismissing
-            toast = ToastMessage(
-                text: "Transferred \(amount)% to \(recipient.name)",
-                kind: .success
-            )
+            toast = ToastMessage(text: successText, kind: .success)
             shouldDismiss = true
         } catch {
             sheetPhase = .visible
-            biometricErrorMessage = "Couldn't complete the transfer. Try again."
+            biometricErrorMessage = (error as? APIError)?.errorDescription
+                ?? "Couldn't complete the transfer. Try again."
         }
     }
 
@@ -287,12 +308,6 @@ public final class TransferOwnershipViewModel {
                 }
             }
         }
-    }
-
-    private static let defaultTransferExecutor: TransferExecutor = {
-        // Stub: backend endpoint not in repo. Simulate the round trip so
-        // the host's spinner + dismiss flow behave like the real thing.
-        try await Task.sleep(nanoseconds: 1_200_000_000)
     }
 
     private static var biometryLabel: String {

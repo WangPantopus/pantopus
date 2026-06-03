@@ -3,6 +3,12 @@
 package app.pantopus.android.ui.screens.homes.invite_owner
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomesRepository
+import io.mockk.any
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -22,8 +28,13 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class InviteOwnerFormViewModelTest {
     private val dispatcher = StandardTestDispatcher()
+    private val homesRepo: HomesRepository = mockk(relaxed = true)
 
-    @Before fun setUp() = Dispatchers.setMain(dispatcher)
+    @Before fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        coEvery { homesRepo.inviteOwner(any(), any()) } returns
+            NetworkResult.Success(InviteOwnerResponse(message = "ok", claimId = "c1"))
+    }
 
     @After fun tearDown() {
         Dispatchers.resetMain()
@@ -41,6 +52,7 @@ class InviteOwnerFormViewModelTest {
                         INVITE_OWNER_CURRENT_EMAIL_KEY to currentEmail,
                     ),
                 ),
+            homesRepo = homesRepo,
         ).also { it.load() }
 
     @Test fun initial_state_is_clean_and_invalid_until_contact_is_entered() {

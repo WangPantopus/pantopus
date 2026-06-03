@@ -97,8 +97,15 @@ private struct LoadedBody: View {
                         MismatchBanner(data: banner)
                     }
                     PropertySection(title: "Property", rows: content.propertyFacts)
-                    PropertySection(title: "Records", rows: content.records)
-                    VerificationSectionView(sources: content.verification)
+                    // Records (ATTOM provenance) + Verification sources have
+                    // no clean backend mapping today, so they're hidden when
+                    // the projection leaves them empty.
+                    if !content.records.isEmpty {
+                        PropertySection(title: "Records", rows: content.records)
+                    }
+                    if !content.verification.isEmpty {
+                        VerificationSectionView(sources: content.verification)
+                    }
                 }
                 .padding(.horizontal, Spacing.s4)
             }

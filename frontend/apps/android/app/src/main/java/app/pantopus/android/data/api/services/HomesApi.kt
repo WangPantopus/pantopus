@@ -39,10 +39,13 @@ import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.OwnersResponse
+import app.pantopus.android.data.api.models.homes.PropertyDetailsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.TransferOwnerRequest
+import app.pantopus.android.data.api.models.homes.TransferOwnerResponse
 import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UpdateHomeEventRequest
@@ -77,6 +80,12 @@ interface HomesApi {
     suspend fun publicProfile(
         @Path("id") id: String,
     ): HomePublicProfileResponse
+
+    /** `GET /api/homes/:id/property-details` — route `backend/routes/home.js:2991`. */
+    @GET("api/homes/{id}/property-details")
+    suspend fun propertyDetails(
+        @Path("id") id: String,
+    ): PropertyDetailsResponse
 
     /** `POST /api/homes` — route `backend/routes/home.js:677`. */
     @POST("api/homes")
@@ -131,6 +140,19 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("ownerId") ownerId: String,
     ): RemoveOwnerResponse
+
+    /**
+     * `POST /api/homes/:id/owners/transfer` — route
+     * `backend/routes/homeOwnership.js:1526`. Initiates a full
+     * ownership transfer; returns a `transfer_claim_id` directly for a
+     * sole owner, or a `quorum_action_id` + `required_approvals` when
+     * co-owners must approve first.
+     */
+    @POST("api/homes/{id}/owners/transfer")
+    suspend fun transferOwner(
+        @Path("id") homeId: String,
+        @Body body: TransferOwnerRequest,
+    ): TransferOwnerResponse
 
     /**
      * `POST /api/homes/:id/ownership-claims` — route

@@ -5,6 +5,9 @@ package app.pantopus.android.ui.screens.homes.verify_landlord.postcard
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.ui.screens.homes.verify_landlord.VerifyLandlordSubmitState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -113,6 +116,7 @@ open class PostcardVerificationViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
+        private val verificationRepository: HomeVerificationRepository,
     ) : ViewModel() {
         private val homeId: String =
             requireNotNull(savedStateHandle[POSTCARD_VERIFICATION_HOME_ID_KEY]) {
@@ -121,9 +125,13 @@ open class PostcardVerificationViewModel
 
         protected open val submitDelayMillis: Long = SUBMIT_DELAY_DEFAULT_MILLIS
 
-        /** Code printed on the postcard. Replace with the per-claim
-         *  secret when the postcard issuance endpoint ships. */
-        protected open val expectedCode: String = DEFAULT_EXPECTED_CODE
+        /**
+         * Offline/preview/test seam. When non-null, [verify] checks the
+         * typed code against this value locally instead of calling the
+         * backend. Production leaves it null, so the code is validated by
+         * `POST /api/homes/:id/verify-postcard`.
+         */
+        protected open val expectedCode: String? = null
 
         private val _state =
             MutableStateFlow(
@@ -147,6 +155,9 @@ open class PostcardVerificationViewModel
 
         fun resendPostcard() {
             _state.update { it.copy(codeInput = "") }
+            // Offline/test seam (expectedCode != null) just clears input.
+            if (expectedCode != null) return
+            viewModelScope.launch { verificationRepository.requestPostcard(homeId) }
         }
 
         /**
@@ -182,20 +193,47 @@ open class PostcardVerificationViewModel
 
         private suspend fun verify() {
             _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitting) }
-            if (submitDelayMillis > 0) delay(submitDelayMillis)
-            val snapshot = _state.value
-            if (snapshot.codeInput == expectedCode) {
-                _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
-                pendingEvent.value = PostcardVerificationOutboundEvent.Verified(homeId)
-            } else {
-                _state.update {
-                    it.copy(
-                        submitState =
-                            VerifyLandlordSubmitState.Error(
-                                "That code didn't match. Double-check the postcard.",
-                            ),
-                        codeInput = "",
-                    )
+            val localExpected = expectedCode
+            if (localExpected != null) {
+                // Offline/test seam — compare locally, no network.
+                if (submitDelayMillis > 0) delay(submitDelayMillis)
+                val snapshot = _state.value
+                if (snapshot.codeInput == localExpected) {
+                    _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
+                    pendingEvent.value = PostcardVerificationOutboundEvent.Verified(homeId)
+                } else {
+                    _state.update {
+                        it.copy(
+                            submitState =
+                                VerifyLandlordSubmitState.Error(
+                                    "That code didn't match. Double-check the postcard.",
+                                ),
+                            codeInput = "",
+                        )
+                    }
+                }
+                return
+            }
+            when (val result = verificationRepository.verifyPostcard(homeId, _state.value.codeInput)) {
+                is NetworkResult.Success -> {
+                    _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
+                    pendingEvent.value = PostcardVerificationOutboundEvent.Verified(homeId)
+                }
+                is NetworkResult.Failure -> {
+                    val offline = result.error is NetworkError.Transport
+                    _state.update {
+                        it.copy(
+                            submitState =
+                                VerifyLandlordSubmitState.Error(
+                                    if (offline) {
+                                        "You're offline. Try again when you're back online."
+                                    } else {
+                                        "That code didn't match. Double-check the postcard."
+                                    },
+                                ),
+                            codeInput = if (offline) it.codeInput else "",
+                        )
+                    }
                 }
             }
         }

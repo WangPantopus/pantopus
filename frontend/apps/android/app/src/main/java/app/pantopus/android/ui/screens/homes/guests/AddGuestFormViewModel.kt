@@ -5,15 +5,21 @@ package app.pantopus.android.ui.screens.homes.guests
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.homes.CreateGuestPassRequest
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeGuestPassesRepository
 import app.pantopus.android.ui.components.ChipPickerOption
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
 /** Nav-arg key for the home id consumed via [SavedStateHandle]. */
@@ -41,6 +47,8 @@ data class AddGuestUiState(
     val selectedAreas: Set<String> = emptySet(),
     val customStartLabel: String? = null,
     val customEndLabel: String? = null,
+    val customStartEpochDay: Long? = null,
+    val customEndEpochDay: Long? = null,
     val isSaving: Boolean = false,
     val toast: GuestToast? = null,
     val shouldDismiss: Boolean = false,
@@ -97,16 +105,19 @@ data class AddGuestUiState(
 }
 
 /**
- * A13.1 — Add Guest form view-model. No backend in the repo, so issuing a
- * pass is simulated locally: [submit] flips a brief saving state, raises a
- * success toast ("Pass sent to <name>"), and signals [AddGuestUiState.shouldDismiss]
- * so the host pops the modal.
+ * A13.1 — Add Guest form view-model. [submit] issues the pass via
+ * `POST /api/homes/:id/guest-passes` (route `backend/routes/homeIam.js:667`),
+ * then raises a success toast ("Pass sent to <name>") and signals
+ * [AddGuestUiState.shouldDismiss] so the host pops the modal. The contact,
+ * welcome note, and allowed-area chips are UI affordances the create
+ * endpoint doesn't model, so they stay local.
  */
 @HiltViewModel
 class AddGuestFormViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
+        private val guestPassesRepo: HomeGuestPassesRepository,
     ) : ViewModel() {
         private val homeId: String = savedStateHandle.get<String>(ADD_GUEST_HOME_ID_KEY) ?: ""
 
@@ -151,12 +162,16 @@ class AddGuestFormViewModel
         fun setCustomRange(
             startLabel: String,
             endLabel: String,
+            startEpochDay: Long,
+            endEpochDay: Long,
         ) {
             _state.update {
                 it.copy(
                     duration = AddGuestSampleData.DURATION_CUSTOM_ID,
                     customStartLabel = startLabel,
                     customEndLabel = endLabel,
+                    customStartEpochDay = startEpochDay,
+                    customEndEpochDay = endEpochDay,
                 )
             }
         }
@@ -165,7 +180,13 @@ class AddGuestFormViewModel
             _state.update {
                 val nextDuration =
                     if (it.duration == AddGuestSampleData.DURATION_CUSTOM_ID) null else it.duration
-                it.copy(duration = nextDuration, customStartLabel = null, customEndLabel = null)
+                it.copy(
+                    duration = nextDuration,
+                    customStartLabel = null,
+                    customEndLabel = null,
+                    customStartEpochDay = null,
+                    customEndEpochDay = null,
+                )
             }
         }
 
@@ -174,15 +195,38 @@ class AddGuestFormViewModel
             if (!current.isValid || current.isSaving) return
             _state.update { it.copy(isSaving = true) }
             viewModelScope.launch {
-                // No backend in the repo — simulate the issue-pass round trip.
-                delay(350)
-                val name = _state.value.firstName ?: "your guest"
-                _state.update {
-                    it.copy(
-                        isSaving = false,
-                        toast = GuestToast("Pass sent to $name", isError = false),
-                        shouldDismiss = true,
+                val window = guestPassWindow(current)
+                val request =
+                    CreateGuestPassRequest(
+                        label = current.nameField.value.trim(),
+                        kind = "guest",
+                        durationHours = window.durationHours,
+                        startAt = window.startAt,
+                        endAt = window.endAt,
                     )
+                when (val result = guestPassesRepo.create(homeId, request)) {
+                    is NetworkResult.Success -> {
+                        val name = _state.value.firstName ?: "your guest"
+                        _state.update {
+                            it.copy(
+                                isSaving = false,
+                                toast = GuestToast("Pass sent to $name", isError = false),
+                                shouldDismiss = true,
+                            )
+                        }
+                    }
+                    is NetworkResult.Failure -> {
+                        _state.update {
+                            it.copy(
+                                isSaving = false,
+                                toast =
+                                    GuestToast(
+                                        result.error.message.ifEmpty { "Couldn't issue the pass. Try again." },
+                                        isError = true,
+                                    ),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -193,6 +237,53 @@ class AddGuestFormViewModel
 
         fun acknowledgeDismiss() {
             _state.update { it.copy(shouldDismiss = false) }
+        }
+
+        // ─── Guest-pass window ──────────────────────────────────────
+
+        private data class GuestPassWindow(
+            val durationHours: Int? = null,
+            val startAt: String? = null,
+            val endAt: String? = null,
+        )
+
+        /**
+         * Maps the selected duration chip to the backend timing fields.
+         * The handler resolves `end_at` > `duration_hours` > template
+         * default, so the 2-hour preset sends a relative duration while
+         * the dated presets send absolute ISO `start`/`end` stamps.
+         * Mirrors iOS `AddGuestFormViewModel.guestPassWindow()`.
+         */
+        private fun guestPassWindow(state: AddGuestUiState): GuestPassWindow {
+            val zone = ZoneId.systemDefault()
+            return when (state.duration) {
+                "2h" -> GuestPassWindow(durationHours = 2)
+                "today" ->
+                    GuestPassWindow(
+                        endAt = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant().toString(),
+                    )
+                "weekend" -> {
+                    val saturday = LocalDate.now(zone).with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY))
+                    val monday = saturday.plusDays(2)
+                    GuestPassWindow(
+                        startAt = saturday.atStartOfDay(zone).toInstant().toString(),
+                        endAt = monday.atStartOfDay(zone).toInstant().toString(),
+                    )
+                }
+                AddGuestSampleData.DURATION_CUSTOM_ID -> {
+                    val start = state.customStartEpochDay
+                    val end = state.customEndEpochDay
+                    if (start != null && end != null) {
+                        GuestPassWindow(
+                            startAt = LocalDate.ofEpochDay(start).atStartOfDay(zone).toInstant().toString(),
+                            endAt = LocalDate.ofEpochDay(end).plusDays(1).atStartOfDay(zone).toInstant().toString(),
+                        )
+                    } else {
+                        GuestPassWindow(durationHours = 2)
+                    }
+                }
+                else -> GuestPassWindow(durationHours = 2)
+            }
         }
     }
 

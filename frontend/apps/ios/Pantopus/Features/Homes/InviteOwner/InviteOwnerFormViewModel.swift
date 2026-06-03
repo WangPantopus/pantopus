@@ -2,9 +2,12 @@
 //  InviteOwnerFormViewModel.swift
 //  Pantopus
 //
-//  A13.2 — Invite Owner single-screen form. No backend call: the form
-//  uses deterministic sample ownership data and simulates the send flow
-//  so previews, snapshots, and local UI tests are stable.
+//  A13.2 — Invite Owner single-screen form. `submit()` sends the invite
+//  via `POST /api/homes/:id/owners/invite` (route
+//  `backend/routes/homeOwnership.js:1526`). The ownership-share split
+//  (grantPercent / owners) is a client-side affordance the invite route
+//  doesn't consume, so it still hydrates from deterministic sample data
+//  to keep previews, snapshots, and local UI tests stable.
 //
 
 import Foundation
@@ -45,6 +48,7 @@ public final class InviteOwnerFormViewModel {
 
     private let initialDraft: InviteOwnerDraft
     private let onSent: @MainActor (InviteOwnerSentInvite) -> Void
+    private let api: APIClient
     private var originalGrantPercent: Int
     private var autoBalancesSoleOwner: Bool
 
@@ -53,10 +57,12 @@ public final class InviteOwnerFormViewModel {
         currentUserEmail: String,
         initialDraft: InviteOwnerDraft? = nil,
         initialState: InviteOwnerFormState = .loading,
+        api: APIClient = .shared,
         onSent: @escaping @MainActor (InviteOwnerSentInvite) -> Void = { _ in }
     ) {
         self.homeId = homeId
         self.currentUserEmail = currentUserEmail
+        self.api = api
         let draft = initialDraft ?? InviteOwnerSampleData.initialDraft(homeId: homeId)
         self.initialDraft = draft
         homeContext = draft.homeContext
@@ -204,13 +210,38 @@ public final class InviteOwnerFormViewModel {
             return false
         }
 
+        let email = fields[.email]?.value.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let phoneRaw = fields[.phone]?.value.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let phone = phoneRaw.isEmpty ? nil : phoneRaw
+
         isSaving = true
-        try? await Task.sleep(nanoseconds: 350_000_000)
+        do {
+            // The backend invite endpoint identifies the co-owner by
+            // email/phone; the share-split math (grantPercent / owners)
+            // is a client-side affordance the invite route doesn't
+            // consume, so it stays local.
+            _ = try await api.request(
+                HomesEndpoints.inviteOwner(
+                    homeId: homeId,
+                    request: InviteOwnerRequest(email: email, phone: phone)
+                ),
+                as: InviteOwnerResponse.self
+            )
+        } catch {
+            isSaving = false
+            shakeTrigger &+= 1
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription
+                    ?? "Couldn't send the invite. Try again.",
+                kind: .error
+            )
+            return false
+        }
         isSaving = false
 
         let sent = InviteOwnerSentInvite(
-            email: fields[.email]?.value.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            phone: fields[.phone]?.value.trimmingCharacters(in: .whitespacesAndNewlines),
+            email: email,
+            phone: phone,
             grantPercent: grantPercent,
             owners: owners
         )
