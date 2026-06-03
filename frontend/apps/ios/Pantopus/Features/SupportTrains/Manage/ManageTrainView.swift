@@ -218,7 +218,7 @@ public struct ManageTrainView: View {
 
     private func stickyCTA(content _: ManageTrainContent) -> some View {
         Button {
-            viewModel.sendUpdate()
+            Task { await viewModel.sendUpdate() }
         } label: {
             HStack(spacing: Spacing.s2) {
                 Icon(.send, size: 16, color: Theme.Color.appTextInverse)
@@ -264,7 +264,7 @@ public struct ManageTrainView: View {
                         content: content.close,
                         thankYouNote: $viewModel.thankYouNote,
                         onCancel: { viewModel.hideCloseSheet() },
-                        onConfirm: { viewModel.confirmClose() }
+                        onConfirm: { Task { await viewModel.confirmClose() } }
                     )
                     .clipShape(
                         UnevenRoundedRectangle(

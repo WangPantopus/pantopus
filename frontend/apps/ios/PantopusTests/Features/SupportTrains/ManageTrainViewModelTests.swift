@@ -2,11 +2,12 @@
 //  ManageTrainViewModelTests.swift
 //  PantopusTests
 //
-//  A13.13 — covers the Manage train VM projection. No backend: `load()`
-//  emits the deterministic ACTIVE fixture, draft mutations stay
-//  in-memory, and the Close-train sheet flips the train to CLOSED on
-//  confirm. Mirrors the Android `ManageTrainViewModelTest` shape so
-//  the state machines stay in lock-step across platforms.
+//  A13.13 — covers the Manage train VM. `load()` projects the seeded
+//  fixture (offline) or the live `GET /:id` payload; draft mutations stay
+//  in-memory; `Send update` / `Close & thank` optimistically mutate local
+//  state and fire `POST /:id/updates` / `POST /:id/complete`. Mirrors the
+//  Android `ManageTrainViewModelTest` so the state machines stay in
+//  lock-step across platforms.
 //
 
 import XCTest
@@ -14,8 +15,26 @@ import XCTest
 
 @MainActor
 final class ManageTrainViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
+    /// Offline VM seeded with the design fixture (no `load()` network).
+    private func makeVM(content: ManageTrainContent = ManageTrainSampleData.active) -> ManageTrainViewModel {
+        ManageTrainViewModel(trainId: ManageTrainSampleData.trainId, api: makeAPI(), content: content)
+    }
+
     func testLoadProjectsActiveFixture() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        let vm = makeVM()
         await vm.load()
         guard case let .loaded(content) = vm.state else {
             return XCTFail("Expected .loaded, got \(vm.state)")
@@ -32,7 +51,7 @@ final class ManageTrainViewModelTests: XCTestCase {
     }
 
     func testInitialDraftMirrorsContent() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        let vm = makeVM()
         await vm.load()
         XCTAssertFalse(vm.draftMessage.isEmpty, "Active fixture seeds a typed draft")
         XCTAssertEqual(vm.selectedAudienceId, "all")
@@ -41,7 +60,7 @@ final class ManageTrainViewModelTests: XCTestCase {
     }
 
     func testCharacterCapClampsOversizeInput() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        let vm = makeVM()
         await vm.load()
         let oversized = String(repeating: "x", count: manageTrainMessageMaxChars + 50)
         vm.updateDraftMessage(oversized)
@@ -50,38 +69,39 @@ final class ManageTrainViewModelTests: XCTestCase {
     }
 
     func testEmptyDraftDisablesSend() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        let vm = makeVM()
         await vm.load()
         vm.updateDraftMessage("   \n  ")
         XCTAssertFalse(vm.canSendUpdate, "Whitespace-only draft is not sendable")
     }
 
     func testSelectAudienceUpdatesSelection() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        let vm = makeVM()
         await vm.load()
         vm.selectAudience("upcoming")
         XCTAssertEqual(vm.selectedAudienceId, "upcoming")
     }
 
     func testSelectAudienceRejectsUnknownId() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        let vm = makeVM()
         await vm.load()
         vm.selectAudience("does-not-exist")
         XCTAssertEqual(vm.selectedAudienceId, "all", "Unknown ids are dropped")
     }
 
     func testSendUpdateClearsDraftAndFlashesToast() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        SequencedURLProtocol.sequence = [.status(201, body: "{\"id\":\"u1\"}")]
+        let vm = makeVM()
         await vm.load()
         XCTAssertNil(vm.toast)
-        vm.sendUpdate()
+        await vm.sendUpdate()
         XCTAssertEqual(vm.draftMessage, "")
         XCTAssertNotNil(vm.toast, "Send fires the helpers toast")
         XCTAssertTrue(vm.toast?.contains("12") == true)
     }
 
     func testShowAndHideCloseSheet() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        let vm = makeVM()
         await vm.load()
         XCTAssertEqual(vm.sheetMode, .hidden)
         vm.showCloseSheet()
@@ -91,10 +111,11 @@ final class ManageTrainViewModelTests: XCTestCase {
     }
 
     func testConfirmCloseFlipsTrainAndFiresToast() async {
-        let vm = ManageTrainViewModel(trainId: ManageTrainSampleData.trainId)
+        SequencedURLProtocol.sequence = [.status(200, body: "{\"id\":\"t\",\"status\":\"completed\"}")]
+        let vm = makeVM()
         await vm.load()
         vm.showCloseSheet()
-        vm.confirmClose()
+        await vm.confirmClose()
         XCTAssertEqual(vm.sheetMode, .closed)
         if case let .loaded(content) = vm.state {
             XCTAssertFalse(content.isActive, "Confirm close flips the train chip to Closed")
@@ -102,6 +123,48 @@ final class ManageTrainViewModelTests: XCTestCase {
             XCTFail("Expected .loaded after confirmClose")
         }
         XCTAssertNotNil(vm.toast)
+    }
+
+    // MARK: - Live detail fetch → manage stats
+
+    func testLoadFetchesDetailAndDerivesStats() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {
+              "id":"t9","title":"Meals for the Reyes family","status":"active",
+              "slots":[
+                {"id":"s1","slot_date":"2025-12-01","slot_label":"Dinner","status":"full","filled_count":1,"capacity":1},
+                {"id":"s2","slot_date":"2025-12-02","slot_label":"Dinner","status":"full","filled_count":1,"capacity":1},
+                {"id":"s3","slot_date":"2025-12-03","slot_label":"Dinner","status":"open","filled_count":0,"capacity":1},
+                {"id":"s4","slot_date":"2025-12-04","slot_label":"Dinner","status":"open","filled_count":0,"capacity":1}
+              ],
+              "my_reservations":[],"updates":[],"organizers":[]
+            }
+            """)
+        ]
+        let vm = ManageTrainViewModel(trainId: "t9", api: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(content.trainId, "t9")
+        XCTAssertEqual(content.title, "Meals for the Reyes family")
+        XCTAssertTrue(content.isActive)
+        XCTAssertEqual(content.slotsTotal, 4)
+        XCTAssertEqual(content.slotsFilled, 2)
+        XCTAssertEqual(content.slotsOpen, 2)
+        XCTAssertEqual(content.slotFillValue, "2/4")
+        // Organize rows are static affordances even off live data.
+        XCTAssertEqual(content.organizeRows.map(\.id), ["edit-dates", "invite", "analytics"])
+    }
+
+    func testLoadServerErrorSurfacesError() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
+        let vm = ManageTrainViewModel(trainId: "t9", api: makeAPI())
+        await vm.load()
+        guard case .error = vm.state else {
+            return XCTFail("Expected error, got \(vm.state)")
+        }
     }
 
     func testSampleDataActiveFixtureMatchesDesignCopy() {

@@ -264,8 +264,7 @@ public final class PostGigV1ViewModel {
             state.postedGigId = response.gig.id
             return response.gig.id
         } catch {
-            let message = (error as? APIError)?.errorDescription
-                ?? "Couldn't post your task. Please try again."
+            let message = (error as? APIError)?.errorDescription ?? "Couldn't post your task. Please try again."
             state.loadState = .error(message)
             return nil
         }

@@ -3,12 +3,19 @@
 //  Pantopus
 //
 //  A13.13 — Manage train. Organizer-side surface for an active support
-//  train. The VM holds the editable update draft (message body, audience
-//  selection, push-to-phones toggle) and the close-train sheet draft
-//  (optional thank-you note + presentation state). On `Send update` we
-//  clear the draft + flash a toast; on `Close & thank` we flip the
-//  train to `.closed` and dismiss the sheet. No backend round-trips —
-//  the projection is purely UI state.
+//  train. `load()` fetches `GET /api/support-trains/:id`
+//  (`SupportTrainsEndpoints.detail`) and derives the stat strip from its
+//  slots. `Send update` posts to `POST /:id/updates`; `Close & thank`
+//  marks the train completed via `POST /:id/complete` (sending the
+//  optional thank-you note as a final broadcast first). Both mutate local
+//  state optimistically so the toast / chip flip stay instant.
+//
+//  PROJECTION GAPS (degrade gracefully): `/:id` exposes per-slot
+//  filled/capacity counts but not a helper roster, dropout count, or
+//  audience segmentation, and `/:id/updates` broadcasts to everyone — so
+//  the helper count is proxied from covered slots, dropout shows 0, and
+//  the audience picker + push-to-phones toggle stay client-only. The
+//  backend has no single "close with thanks" route; see the P1-E notes.
 //
 
 import Foundation
@@ -205,25 +212,54 @@ public final class ManageTrainViewModel {
     public var toast: String?
 
     private let trainId: String
+    private let api: APIClient
+    /// Explicit offline content (previews / tests). When set `load()`
+    /// renders it directly instead of hitting the network.
     private let seed: ManageTrainContent?
 
-    public init(trainId: String, content: ManageTrainContent? = nil) {
+    /// Public entry point — carries no `APIClient` (the client and `.shared`
+    /// are module-internal).
+    public convenience init(trainId: String, content: ManageTrainContent? = nil) {
+        self.init(trainId: trainId, api: .shared, content: content)
+    }
+
+    /// Designated init — module-internal because `APIClient` is. Tests
+    /// inject a stubbed client here.
+    init(trainId: String, api: APIClient, content: ManageTrainContent? = nil) {
         self.trainId = trainId
+        self.api = api
         seed = content
     }
 
     public func load() async {
-        let content = seed ?? ManageTrainSampleData.active
+        if let seed {
+            apply(seed)
+            return
+        }
+        if case .loaded = state {} else { state = .loading }
+        do {
+            let dto: SupportTrainDetailDTO = try await api.request(
+                SupportTrainsEndpoints.detail(supportTrainId: trainId)
+            )
+            apply(Self.project(dto))
+        } catch {
+            let message = (error as? APIError)?.errorDescription ?? "Couldn't load this support train."
+            state = .error(message: message)
+        }
+    }
+
+    public func refresh() async {
+        await load()
+    }
+
+    /// Push a loaded content payload into state + the editable draft fields.
+    private func apply(_ content: ManageTrainContent) {
         state = .loaded(content)
         draftMessage = content.draftMessage
         selectedAudienceId = content.selectedAudienceId
         pushToPhones = content.pushToPhones
         thankYouNote = ""
         sheetMode = .hidden
-    }
-
-    public func refresh() async {
-        await load()
     }
 
     // MARK: - Send-update form
@@ -263,15 +299,27 @@ public final class ManageTrainViewModel {
         pushToPhones = value
     }
 
-    /// Send the typed update. Clears the draft + flashes a toast so the
-    /// helper count surfaces. Real `POST /api/support-trains/:id/updates`
-    /// wiring lands when the backend ships.
-    public func sendUpdate() {
+    /// Send the typed update via `POST /api/support-trains/:id/updates`.
+    /// Optimistically clears the draft + flashes the toast; the audience
+    /// filter + push-to-phones toggle have no backend field (the endpoint
+    /// broadcasts to everyone) so they stay client-only.
+    public func sendUpdate() async {
         guard canSendUpdate, case let .loaded(content) = state else { return }
-        let helperCount = content.audienceChips.first { $0.id == selectedAudienceId }?.count
-            ?? content.helpersValue
+        let body = draftMessage
+        let helperCount = content.audienceChips.first { $0.id == selectedAudienceId }?.count ?? content.helpersValue
         draftMessage = ""
         toast = "Update sent · \(helperCount) helpers"
+        do {
+            _ = try await api.request(
+                SupportTrainsEndpoints.postUpdate(
+                    supportTrainId: trainId,
+                    body: SupportTrainUpdateBody(body: body)
+                ),
+                as: EmptyResponse.self
+            )
+        } catch {
+            // Best-effort broadcast — the optimistic toast stays put.
+        }
     }
 
     public func acknowledgeToast() {
@@ -292,10 +340,14 @@ public final class ManageTrainViewModel {
         thankYouNote = value
     }
 
-    /// Flip the train to `.closed`. The sheet dismisses and the train's
-    /// chip flips from "Active" green to "Closed" neutral.
-    public func confirmClose() {
+    /// Close & thank. Optimistically flips the train to `.closed`, then
+    /// sends the thank-you note as a final broadcast (`POST /:id/updates`)
+    /// when one was typed and marks the train completed
+    /// (`POST /:id/complete`). The backend has no single "close with
+    /// thanks" route, so this composes the two calls.
+    public func confirmClose() async {
         guard case let .loaded(content) = state else { return }
+        let note = thankYouNote.trimmingCharacters(in: .whitespacesAndNewlines)
         let next = ManageTrainContent(
             trainId: content.trainId,
             title: content.title,
@@ -321,5 +373,22 @@ public final class ManageTrainViewModel {
         state = .loaded(next)
         sheetMode = .closed
         toast = "Train closed · thanks sent to \(content.helpersValue) helpers"
+        do {
+            if !note.isEmpty {
+                _ = try await api.request(
+                    SupportTrainsEndpoints.postUpdate(
+                        supportTrainId: trainId,
+                        body: SupportTrainUpdateBody(body: note)
+                    ),
+                    as: EmptyResponse.self
+                )
+            }
+            _ = try await api.request(
+                SupportTrainsEndpoints.complete(supportTrainId: trainId),
+                as: EmptyResponse.self
+            )
+        } catch {
+            // Optimistic close already reflected; surfacing failures is a follow-up.
+        }
     }
 }

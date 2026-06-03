@@ -101,8 +101,7 @@ public final class SupportTrainDetailViewModel {
             )
             state = .loaded(Self.project(dto))
         } catch {
-            let message = (error as? APIError)?.errorDescription
-                ?? "Couldn't load this support train."
+            let message = (error as? APIError)?.errorDescription ?? "Couldn't load this support train."
             state = .error(message: message)
         }
     }
@@ -263,7 +262,7 @@ extension SupportTrainDetailViewModel {
             return parseSlotDate(slot.slotDate).map(cal.startOfDay)
         })
 
-        return (0 ..< 28).map { index in
+        return (0..<28).map { index in
             let date = cal.date(byAdding: .day, value: index, to: start) ?? start
             let day = cal.component(.day, from: date)
             let state: SlotCalendarState
