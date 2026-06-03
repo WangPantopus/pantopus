@@ -2,14 +2,23 @@
 //  ProfessionalProfileViewModel.swift
 //  Pantopus
 //
-//  A.5 (A13.11) — drives the Professional Profile editor. Backend was
-//  removed from the repo, so `load()` hydrates from
-//  `ProfessionalProfileSampleData` instead of hitting a route; the state
-//  machine and edit semantics still mirror the eventual API contract.
+//  A.5 (A13.11) / P1-F — drives the Professional Profile editor.
 //
-//  State derives purely from the working copy: a clean copy (no unsaved
-//  edits) is `.verified`; any unsaved edit flips it to `.pending`, carrying
-//  the edit count and the number of new claims awaiting 1–2 day review.
+//  The production initializer hydrates from `GET /api/professional/profile/me`
+//  (route `professional.js:164`) plus `GET /api/professional/verification/status`
+//  (route `professional.js:372`). The backend record is intentionally thin
+//  (headline / categories / pricing / verification), so the editor maps the
+//  overlapping fields — title ← headline, skills ← categories, the
+//  verification pill ← verification_status, and the visibility toggles ←
+//  is_public / is_active. Sections the backend doesn't store on `profile/me`
+//  (company name, certifications, portfolio) start empty until their
+//  dedicated endpoints are wired. Save issues a best-effort `PATCH
+//  /profile/me` for the safe fields (headline + public/active flags);
+//  `categories` is enum-constrained server-side so free-text skills are not
+//  written here.
+//
+//  Previews / tests still seed deterministic content via `init(seed:)` /
+//  `init(simulateFailure:)`, bypassing the network.
 //
 
 import Foundation
@@ -26,44 +35,89 @@ public final class ProfessionalProfileViewModel {
     private var content: ProfessionalProfileContent?
     private var baseline: ProfessionalProfileContent?
 
-    private let seed: ProfessionalProfileContent
-    private let baselineSeed: ProfessionalProfileContent
-    private let simulateFailure: Bool
+    private let api: APIClient
+    private let mode: Mode
 
-    /// - Parameters:
-    ///   - seed: Sample content to hydrate. Defaults to the published
-    ///     (verified) fixture; pass `.pendingEdits` for the dirty frame.
-    ///   - baseline: The last-saved snapshot that Discard reverts to.
-    ///     Defaults to `seed`. When seeding the pending frame, pass
-    ///     `.published` so Discard rolls back to the clean profile.
-    ///   - simulateFailure: When true, `load()` resolves to `.error` so the
-    ///     error state can be exercised in previews / tests.
-    public init(
-        seed: ProfessionalProfileContent = ProfessionalProfileSampleData.published,
-        baseline: ProfessionalProfileContent? = nil,
-        simulateFailure: Bool = false
-    ) {
-        self.seed = seed
-        baselineSeed = baseline ?? seed
-        self.simulateFailure = simulateFailure
+    private enum Mode {
+        case live
+        case sample(seed: ProfessionalProfileContent, baseline: ProfessionalProfileContent)
+        case failure
+    }
+
+    /// Production initializer — live `GET /api/professional/profile/me`.
+    /// Public-safe: no `APIClient` parameter (the client is module-internal).
+    public convenience init() {
+        self.init(api: .shared)
+    }
+
+    /// Designated live initializer. `api` injectable for tests.
+    init(api: APIClient) {
+        self.api = api
+        mode = .live
+    }
+
+    /// Sample/preview path. `baseline` defaults to `seed`; pass `.published`
+    /// when seeding the pending frame so Discard rolls back to the clean copy.
+    public init(seed: ProfessionalProfileContent, baseline: ProfessionalProfileContent? = nil) {
+        api = .shared
+        mode = .sample(seed: seed, baseline: baseline ?? seed)
+    }
+
+    /// Failure path — `load()` resolves to `.error` (previews / tests).
+    public init(simulateFailure: Bool) {
+        api = .shared
+        mode = simulateFailure ? .failure : .live
     }
 
     // MARK: - Loading
 
-    /// Hydrate from sample data. No network (backend removed).
     public func load() async {
         state = .loading
-        guard !simulateFailure else {
+        switch mode {
+        case .failure:
             state = .error(message: "We couldn't load your professional profile.")
-            return
+        case let .sample(seed, base):
+            content = seed
+            baseline = base
+            recompute()
+        case .live:
+            await fetchLive()
         }
-        content = seed
-        baseline = baselineSeed
-        recompute()
     }
 
     public func refresh() async {
         await load()
+    }
+
+    private func fetchLive() async {
+        do {
+            let response: ProfessionalProfileResponse = try await api.request(
+                ProfessionalEndpoints.profileMe()
+            )
+            let verification: ProfessionalVerificationStatusResponse? = try? await api.request(
+                ProfessionalEndpoints.verificationStatus()
+            )
+            let mapped = Self.makeContent(
+                from: response.profile,
+                verification: verification,
+                proName: currentProName()
+            )
+            content = mapped
+            baseline = mapped
+            recompute()
+        } catch {
+            state = .error(
+                message: (error as? APIError)?.errorDescription
+                    ?? "We couldn't load your professional profile."
+            )
+        }
+    }
+
+    private func currentProName() -> String {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.displayName ?? ""
+        }
+        return ""
     }
 
     // MARK: - Field edits
@@ -96,8 +150,8 @@ public final class ProfessionalProfileViewModel {
         mutate { $0.certifications.removeAll { $0.id == id } }
     }
 
-    /// Append a fresh trade chip. With no backend the chip is a placeholder;
-    /// the point is to exercise the fresh-dot + verified→pending transition.
+    /// Append a fresh trade chip. The point is to exercise the fresh-dot +
+    /// verified→pending transition.
     public func addSkill() {
         mutate {
             $0.skills.append(
@@ -149,11 +203,10 @@ public final class ProfessionalProfileViewModel {
         toast = ToastMessage(text: "Edits discarded.", kind: .neutral)
     }
 
-    /// Submit edits for verification. With no backend this commits the
-    /// working copy as the new baseline (clearing the dirty/fresh markers);
-    /// claim statuses that are pending stay pending — they await server
-    /// confirmation — so the strength caption and sticky bar still read
-    /// "in review".
+    /// Submit edits for verification. Commits the working copy as the new
+    /// baseline (clearing dirty/fresh markers); pending claim statuses stay
+    /// pending — they await server confirmation. On the live path this also
+    /// fires a best-effort `PATCH /profile/me` for the safe fields.
     public func saveAndSubmit() {
         guard var working = content, working.isDirty else { return }
         let pending = working.pendingCount
@@ -175,12 +228,118 @@ public final class ProfessionalProfileViewModel {
         content = working
         baseline = working
         recompute()
+        if case .live = mode { persist(working) }
         toast = ToastMessage(
             text: pending > 0
                 ? "Submitted — \(pending) \(pending == 1 ? "claim" : "claims") in review."
                 : "Professional profile published.",
             kind: .success
         )
+    }
+
+    /// Best-effort write of the safe, unambiguous fields.
+    private func persist(_ content: ProfessionalProfileContent) {
+        let request = ProfessionalProfileUpdateRequest(
+            headline: content.title.value,
+            isPublic: content.visibility.first { $0.id == "publicProfile" }?.isOn,
+            isActive: content.visibility.first { $0.id == "activeForHire" }?.isOn
+        )
+        let api = api
+        Task {
+            _ = try? await api.request(
+                ProfessionalEndpoints.updateProfileMe(request),
+                as: ProfessionalProfileResponse.self
+            )
+        }
+    }
+
+    // MARK: - Mapping (pure — unit-test surface)
+
+    /// Project the backend professional record into editor content. Fields
+    /// the backend doesn't store on `profile/me` start empty.
+    public static func makeContent(
+        from dto: ProfessionalProfileDTO?,
+        verification: ProfessionalVerificationStatusResponse?,
+        proName: String
+    ) -> ProfessionalProfileContent {
+        let status = verificationStatus(dto?.verificationStatus ?? verification?.status)
+        let locality = [dto?.serviceArea?.city, dto?.serviceArea?.state]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+        let skills = (dto?.categories ?? []).map {
+            ProSkill(id: $0, label: categoryLabel($0), icon: categoryIcon($0))
+        }
+        return ProfessionalProfileContent(
+            proName: proName,
+            strength: strength(for: dto),
+            title: FormFieldState(id: "title", originalValue: dto?.headline ?? ""),
+            yearsInRole: FormFieldState(id: "yearsInRole", originalValue: ""),
+            company: CompanyClaim(name: "", locality: locality, status: status),
+            skills: skills,
+            certifications: [],
+            portfolio: [],
+            visibility: visibilityRows(isPublic: dto?.isPublic ?? false, isActive: dto?.isActive ?? false)
+        )
+    }
+
+    static func verificationStatus(_ raw: String?) -> ProVerificationStatus {
+        switch raw {
+        case "verified": .verified
+        case "pending": .pending
+        default: .unverified
+        }
+    }
+
+    /// `pet_care` → `Pet Care`.
+    static func categoryLabel(_ key: String) -> String {
+        key.split(separator: "_")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+    }
+
+    static func categoryIcon(_ key: String) -> PantopusIcon {
+        switch key {
+        case "plumber": .droplet
+        case "electrician": .zap
+        case "carpentry": .hammer
+        case "cleaning": .sparkles
+        case "pet_care", "childcare", "elder_care": .users
+        default: .wrench
+        }
+    }
+
+    /// Coarse 0–100 completeness heuristic — the backend record has no
+    /// strength field, so it's derived from filled fields + verification.
+    static func strength(for dto: ProfessionalProfileDTO?) -> Int {
+        guard let dto else { return 0 }
+        var score = 40
+        if !(dto.headline ?? "").isEmpty { score += 15 }
+        if !(dto.bio ?? "").isEmpty { score += 10 }
+        if !(dto.categories ?? []).isEmpty { score += 15 }
+        switch dto.verificationStatus {
+        case "verified": score += 20
+        case "pending": score += 10
+        default: break
+        }
+        return min(score, 100)
+    }
+
+    private static func visibilityRows(isPublic: Bool, isActive: Bool) -> [ProVisibilityRow] {
+        [
+            ProVisibilityRow(
+                id: "publicProfile",
+                label: "Public profile",
+                sub: "Neighbors can open your professional profile from search and gigs.",
+                isOn: isPublic
+            ),
+            ProVisibilityRow(
+                id: "activeForHire",
+                label: "Active for hire",
+                sub: "Show as available to take on new work.",
+                isOn: isActive
+            )
+        ]
     }
 
     // MARK: - Private

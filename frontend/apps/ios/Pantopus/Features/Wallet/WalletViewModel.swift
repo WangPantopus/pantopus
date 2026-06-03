@@ -44,10 +44,21 @@ public final class WalletViewModel {
     /// `load()` is a no-op so the seed sticks.
     private let seeded: Bool
 
-    /// Live (production) path. `load()` fetches the read endpoints and maps
-    /// them into `WalletContent`.
-    public init(
-        api: APIClient = .shared,
+    /// Production initializer — uses the shared API client. Public-safe: it
+    /// takes no `APIClient` parameter (the client type + `.shared` are
+    /// module-internal). `load()` fetches the read endpoints and maps them
+    /// into `WalletContent`.
+    public convenience init(
+        calendar: Calendar = .current,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.init(api: .shared, calendar: calendar, now: now)
+    }
+
+    /// Designated live initializer. `api` is injectable for tests; internal
+    /// because `APIClient` is internal.
+    init(
+        api: APIClient,
         calendar: Calendar = .current,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
