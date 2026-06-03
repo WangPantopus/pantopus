@@ -332,7 +332,7 @@ extension SupportTrainDetailViewModel {
             state: covered ? .covered : .open,
             author: nil, // detail endpoint omits the per-slot helper
             title: covered ? label : "Open · \(label)",
-            subtitle: dropWindow(start: slot.startTime, end: slot.endTime),
+            subtitle: dropWindow(slot.endTime),
             mine: false
         )
     }
@@ -358,7 +358,7 @@ extension SupportTrainDetailViewModel {
         )
     }
 
-    private nonisolated static func dropWindow(start: String?, end: String?) -> String? {
+    private nonisolated static func dropWindow(_ end: String?) -> String? {
         guard let end, !end.isEmpty else { return nil }
         return "Drop off by \(shortTime(end))"
     }
@@ -387,6 +387,7 @@ extension SupportTrainDetailViewModel {
         guard let date else { return nil }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: date)
     }

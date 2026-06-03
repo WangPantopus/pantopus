@@ -93,21 +93,20 @@ class TasksMapViewModel
 
         /**
          * Build a ~1.3 km square viewport around the anchor and hit
-         * `GET /api/gigs/in-bounds`, narrowing to the active category. The
-         * category filter is re-applied client-side too so chip taps don't
+         * `GET /api/gigs/in-bounds` for *all* categories in view. The
+         * category chips are an instant client-side filter (`recompute`), so
+         * an initial category scope can widen back to "All" without a
          * re-fetch.
          */
         private suspend fun fetchInBounds() {
             _state.value = TasksMapUiState.Loading
             val center = anchor ?: MapAnchor(FALLBACK_LAT, FALLBACK_LON)
-            val categoryParam = _activeCategory.value.takeIf { it != GigsCategory.All }?.key
             val result =
                 repo.inBounds(
                     minLat = center.latitude - HALF_DEG_LAT,
                     minLon = center.longitude - HALF_DEG_LON,
                     maxLat = center.latitude + HALF_DEG_LAT,
                     maxLon = center.longitude + HALF_DEG_LON,
-                    category = categoryParam,
                 )
             when (result) {
                 is NetworkResult.Success -> {

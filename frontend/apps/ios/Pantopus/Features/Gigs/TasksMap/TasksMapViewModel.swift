@@ -108,22 +108,21 @@ public final class TasksMapViewModel {
     // MARK: - Fetch
 
     /// Build a ~1.3 km square viewport around the anchor and hit
-    /// `GET /api/gigs/in-bounds`, narrowing to the active category. Mirrors
-    /// `NearbyMapViewModel.fetchAroundUser`'s box; the category filter is
-    /// re-applied client-side too so chip taps don't re-fetch.
+    /// `GET /api/gigs/in-bounds` for *all* categories in view (same box as
+    /// `NearbyMapViewModel.fetchAroundUser`). The category chips are an
+    /// instant client-side filter (`recompute`), so an initial category
+    /// scope can widen back to "All" without a re-fetch.
     private func fetchInBounds() async {
         let center = anchor ?? MapAnchor(latitude: 40.7484, longitude: -73.9857)
         let halfDegLat = 0.012 // ~1.3 km
         let halfDegLon = 0.016 // ~1.3 km at 40°
-        let categoryParam = activeCategory == .all ? nil : activeCategory.rawValue
         do {
             let response: GigsInBoundsResponse = try await api.request(
                 GigsEndpoints.inBounds(
                     minLat: center.latitude - halfDegLat,
                     minLon: center.longitude - halfDegLon,
                     maxLat: center.latitude + halfDegLat,
-                    maxLon: center.longitude + halfDegLon,
-                    category: categoryParam
+                    maxLon: center.longitude + halfDegLon
                 )
             )
             items = response.gigs.compactMap { Self.project($0, anchor: center) }
