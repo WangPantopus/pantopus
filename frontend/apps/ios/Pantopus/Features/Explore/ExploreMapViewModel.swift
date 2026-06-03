@@ -51,10 +51,17 @@ public final class ExploreMapViewModel {
     /// Grid-bucket cluster radius (~0.005° ≈ 500 m at NYC latitude).
     private var clusterRadiusDegrees: Double = 0.005
 
-    /// Live (production) path. `api` + `location` are injectable for tests;
-    /// internal because `APIClient` is module-internal.
+    /// Production initializer — live discovery. Public-safe: it takes no
+    /// `APIClient` parameter (the client type + `.shared` are module-internal),
+    /// so the public `ExploreMapView.init` default argument stays valid.
+    public convenience init() {
+        self.init(api: .shared)
+    }
+
+    /// Designated live initializer. `api` + `location` are injectable for
+    /// tests; internal because `APIClient` is module-internal.
     init(
-        api: APIClient = .shared,
+        api: APIClient,
         location: any LocationProviding = FallbackLocationProvider.shared
     ) {
         self.api = api
