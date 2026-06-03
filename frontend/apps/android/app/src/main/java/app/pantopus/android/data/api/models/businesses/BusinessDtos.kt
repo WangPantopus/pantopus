@@ -213,3 +213,114 @@ data class BusinessPublicResponse(
     val hours: List<BusinessHoursDto> = emptyList(),
     val catalog: List<BusinessCatalogItemDto> = emptyList(),
 )
+
+// ---------------------------------------------------------------------------
+// P1-C — Owner dashboard DTOs
+// ---------------------------------------------------------------------------
+
+/**
+ * One onboarding-checklist row from the owner dashboard. Drives the
+ * profile-strength card's completion list (`label` + `done`).
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessOnboardingItemDto(
+    val key: String,
+    val done: Boolean,
+    val label: String,
+)
+
+/** The `onboarding` block: the checklist plus its completed / total tallies. */
+@JsonClass(generateAdapter = true)
+data class BusinessOnboardingDto(
+    val checklist: List<BusinessOnboardingItemDto> = emptyList(),
+    @Json(name = "completed_count") val completedCount: Int = 0,
+    @Json(name = "total_count") val totalCount: Int = 0,
+)
+
+/**
+ * Subset of the `profile` block the owner dashboard reads (publish state +
+ * edit recency). The public render comes from the detail fetch.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessDashboardProfileDto(
+    @Json(name = "is_published") val isPublished: Boolean? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null,
+)
+
+/**
+ * `GET /api/businesses/:businessId/dashboard` response (subset) — the
+ * owner-scoped fetch: publish state, edit recency, and the onboarding
+ * checklist behind the profile-strength card. Route
+ * `backend/routes/businesses.js:979`.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessDashboardResponse(
+    val profile: BusinessDashboardProfileDto? = null,
+    val onboarding: BusinessOnboardingDto? = null,
+    val access: BusinessAccessDto? = null,
+)
+
+/** `views` block — total + week-over-week trend percentage. */
+@JsonClass(generateAdapter = true)
+data class BusinessInsightsViewsDto(
+    val total: Int = 0,
+    val trend: Int = 0,
+)
+
+/** `followers` block — running total, new in-period, and trend. */
+@JsonClass(generateAdapter = true)
+data class BusinessInsightsFollowersDto(
+    val total: Int = 0,
+    val new: Int = 0,
+    val trend: Int = 0,
+)
+
+/** `reviews` block — in-period count, trend, and period average. */
+@JsonClass(generateAdapter = true)
+data class BusinessInsightsReviewsDto(
+    val count: Int = 0,
+    val trend: Int = 0,
+    @Json(name = "average_rating") val averageRating: Double? = null,
+)
+
+/**
+ * `GET /api/businesses/:businessId/insights` response (subset) — drives the
+ * owner dashboard's "This week" tiles. Route
+ * `backend/routes/businesses.js:3915`.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessInsightsResponse(
+    val views: BusinessInsightsViewsDto = BusinessInsightsViewsDto(),
+    val followers: BusinessInsightsFollowersDto = BusinessInsightsFollowersDto(),
+    val reviews: BusinessInsightsReviewsDto = BusinessInsightsReviewsDto(),
+)
+
+/**
+ * One enriched `Review` row from the owner reviews endpoint. `comment` is the
+ * body; `ownerResponse` is the published reply (null → the owner can reply).
+ * Route `backend/routes/businesses.js:3441`.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessOwnerReviewDto(
+    val id: String,
+    val rating: Int = 0,
+    val comment: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "owner_response") val ownerResponse: String? = null,
+    @Json(name = "reviewer_name") val reviewerName: String? = null,
+    @Json(name = "reviewer_avatar") val reviewerAvatar: String? = null,
+    @Json(name = "gig_title") val gigTitle: String? = null,
+)
+
+/** `GET /api/businesses/:businessId/reviews` response (subset). */
+@JsonClass(generateAdapter = true)
+data class BusinessOwnerReviewsResponse(
+    val reviews: List<BusinessOwnerReviewDto> = emptyList(),
+    val total: Int? = null,
+)
+
+/** Body for `POST /api/businesses/:businessId/reviews/:reviewId/respond`. */
+@JsonClass(generateAdapter = true)
+data class BusinessReviewRespondRequest(
+    val response: String,
+)

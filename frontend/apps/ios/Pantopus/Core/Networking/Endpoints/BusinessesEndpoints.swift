@@ -45,4 +45,51 @@ public enum BusinessesEndpoints {
             authenticated: false
         )
     }
+
+    /// `GET /api/businesses/:businessId/dashboard` — the owner-scoped fetch.
+    /// Returns the publish state, edit recency, and the onboarding checklist
+    /// that backs the owner dashboard's profile-strength card. 403s for a
+    /// viewer with no access. Route `backend/routes/businesses.js:979`.
+    public static func dashboard(businessId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/businesses/\(businessId)/dashboard")
+    }
+
+    /// `GET /api/businesses/:businessId/insights` — the owner analytics fetch
+    /// (views / followers / reviews + week-over-week trends) that backs the
+    /// owner dashboard's "This week" tiles. `period` is `7d | 30d | 90d`.
+    /// Route `backend/routes/businesses.js:3915`.
+    public static func insights(businessId: String, period: String = "30d") -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/businesses/\(businessId)/insights",
+            query: ["period": period]
+        )
+    }
+
+    /// `GET /api/businesses/:businessId/reviews` — the owner reviews list
+    /// (enriched with reviewer + gig + any published owner response). Backs
+    /// the owner dashboard's reply composer. Route
+    /// `backend/routes/businesses.js:3441`.
+    public static func reviews(businessId: String, page: Int = 1, limit: Int = 20) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/businesses/\(businessId)/reviews",
+            query: ["page": "\(page)", "limit": "\(limit)"]
+        )
+    }
+
+    /// `POST /api/businesses/:businessId/reviews/:reviewId/respond` — save or
+    /// update the owner's reply on a review. Route
+    /// `backend/routes/businesses.js:3552`.
+    public static func respondToReview(
+        businessId: String,
+        reviewId: String,
+        response: String
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/businesses/\(businessId)/reviews/\(reviewId)/respond",
+            body: ["response": response]
+        )
+    }
 }

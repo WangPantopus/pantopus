@@ -305,3 +305,124 @@ public struct BusinessPublicResponse: Decodable, Sendable, Hashable {
         catalog = try c.decodeIfPresent([BusinessCatalogItemDTO].self, forKey: .catalog) ?? []
     }
 }
+
+// MARK: - /:businessId/dashboard (P1-C — owner dashboard)
+
+/// One onboarding-checklist row from the owner dashboard. Drives the
+/// profile-strength card's completion list (`label` + `done`).
+public struct BusinessOnboardingItemDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let key: String
+    public let done: Bool
+    public let label: String
+
+    public var id: String {
+        key
+    }
+}
+
+/// The `onboarding` block: the checklist plus its completed / total tallies.
+public struct BusinessOnboardingDTO: Decodable, Sendable, Hashable {
+    public let checklist: [BusinessOnboardingItemDTO]
+    public let completedCount: Int
+    public let totalCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case checklist
+        case completedCount = "completed_count"
+        case totalCount = "total_count"
+    }
+}
+
+/// Subset of the `profile` block the owner dashboard reads (publish state +
+/// edit recency). The full row is far larger; we only decode what the
+/// owner chrome needs (the public render comes from the detail fetch).
+public struct BusinessDashboardProfileDTO: Decodable, Sendable, Hashable {
+    public let isPublished: Bool?
+    public let updatedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case isPublished = "is_published"
+        case updatedAt = "updated_at"
+    }
+}
+
+/// `GET /api/businesses/:businessId/dashboard` response (subset). The
+/// owner-scoped fetch: publish state, edit recency, and the onboarding
+/// checklist that drives the profile-strength card. Route
+/// `backend/routes/businesses.js:979`.
+public struct BusinessDashboardResponse: Decodable, Sendable, Hashable {
+    public let profile: BusinessDashboardProfileDTO?
+    public let onboarding: BusinessOnboardingDTO?
+    public let access: BusinessAccessDTO?
+
+    private enum CodingKeys: String, CodingKey {
+        case profile, onboarding, access
+    }
+}
+
+// MARK: - /:businessId/insights (P1-C — owner dashboard tiles)
+
+/// `views` block — total + week-over-week trend percentage.
+public struct BusinessInsightsViewsDTO: Decodable, Sendable, Hashable {
+    public let total: Int
+    public let trend: Int
+}
+
+/// `followers` block — running total, new in-period, and trend.
+public struct BusinessInsightsFollowersDTO: Decodable, Sendable, Hashable {
+    public let total: Int
+    public let new: Int
+    public let trend: Int
+}
+
+/// `reviews` block — in-period count, trend, and the period average.
+public struct BusinessInsightsReviewsDTO: Decodable, Sendable, Hashable {
+    public let count: Int
+    public let trend: Int
+    public let averageRating: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case count, trend
+        case averageRating = "average_rating"
+    }
+}
+
+/// `GET /api/businesses/:businessId/insights` response (subset). Drives the
+/// owner dashboard's "This week" insight tiles. Route
+/// `backend/routes/businesses.js:3915`.
+public struct BusinessInsightsResponse: Decodable, Sendable, Hashable {
+    public let views: BusinessInsightsViewsDTO
+    public let followers: BusinessInsightsFollowersDTO
+    public let reviews: BusinessInsightsReviewsDTO
+}
+
+// MARK: - /:businessId/reviews (P1-C — owner reviews + reply)
+
+/// One enriched `Review` row from the owner reviews endpoint. `comment` is
+/// the review body; `ownerResponse` is the business's published reply (nil
+/// → the owner can still reply). Route `backend/routes/businesses.js:3441`.
+public struct BusinessOwnerReviewDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let rating: Int
+    public let comment: String?
+    public let createdAt: String?
+    public let ownerResponse: String?
+    public let reviewerName: String?
+    public let reviewerAvatar: String?
+    public let gigTitle: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, rating, comment
+        case createdAt = "created_at"
+        case ownerResponse = "owner_response"
+        case reviewerName = "reviewer_name"
+        case reviewerAvatar = "reviewer_avatar"
+        case gigTitle = "gig_title"
+    }
+}
+
+/// `GET /api/businesses/:businessId/reviews` response (subset).
+public struct BusinessOwnerReviewsResponse: Decodable, Sendable, Hashable {
+    public let reviews: [BusinessOwnerReviewDTO]
+    public let total: Int?
+}
