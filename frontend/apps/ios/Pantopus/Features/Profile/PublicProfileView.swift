@@ -172,6 +172,7 @@ public struct PublicProfileView: View {
                         onConnect: { Task { await viewModel.connect() } },
                         onOverflow: { viewModel.showOverflow = true }
                     )
+                    ReceivedReviewsSection(userId: payload.profile.id)
                     PublicProfilePostsFeed(
                         kind: payload.kind,
                         posts: payload.posts,

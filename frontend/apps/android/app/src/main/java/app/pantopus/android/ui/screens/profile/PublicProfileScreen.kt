@@ -37,6 +37,7 @@ import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileTab
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.StatsTabsBody
+import app.pantopus.android.ui.screens.transaction_reviews.ReceivedTransactionReviewsSection
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTextStyle
@@ -124,6 +125,9 @@ fun PublicProfileScreen(
                         onConnect = { viewModel.connect() },
                         onOverflow = { viewModel.setShowOverflow(true) },
                         onUnlock = { viewModel.showSubscribeToast() },
+                        receivedReviews = {
+                            ReceivedTransactionReviewsSection(userId = content.profile.id)
+                        },
                     )
                 }
             }
@@ -196,6 +200,7 @@ internal fun PublicProfileLoadedFrame(
     onConnect: () -> Unit,
     onOverflow: () -> Unit,
     onUnlock: () -> Unit,
+    receivedReviews: @Composable () -> Unit = {},
 ) {
     val persona = content.kind == PublicProfileKind.Persona
     ContentDetailShell(
@@ -273,6 +278,7 @@ internal fun PublicProfileLoadedFrame(
                     onConnect = onConnect,
                     onOverflow = onOverflow,
                 )
+                receivedReviews()
                 PublicProfilePostsFeed(
                     kind = content.kind,
                     posts = content.posts,

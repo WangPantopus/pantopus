@@ -11,8 +11,10 @@ import app.pantopus.android.data.api.models.listings.ListingDetailResponse
 import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.listing_offers.ListingOffersRepository
 import app.pantopus.android.data.listings.ListingsRepository
+import app.pantopus.android.data.transaction_reviews.TransactionReviewsRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
@@ -39,6 +41,8 @@ import java.time.Instant
 class ListingOffersViewModelTest {
     private val offersRepo: ListingOffersRepository = mockk()
     private val listingsRepo: ListingsRepository = mockk()
+    private val authRepo: AuthRepository = mockk(relaxed = true)
+    private val txnReviewsRepo: TransactionReviewsRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -60,7 +64,7 @@ class ListingOffersViewModelTest {
                     ListingOffersViewModel.LISTING_TITLE_HINT_KEY to "Mid-century walnut credenza",
                 ),
             )
-        val vm = ListingOffersViewModel(offersRepo, listingsRepo, handle)
+        val vm = ListingOffersViewModel(offersRepo, listingsRepo, authRepo, txnReviewsRepo, handle)
         vm.bindCallbacks(
             onShareListing = {},
             onOpenBuyer = {},
@@ -309,6 +313,30 @@ class ListingOffersViewModelTest {
             val declined = rows.first { it.id == "o-daniel" }
             assertNull(declined.footer)
             assertEquals("Declined", declined.chips!![0].text)
+        }
+
+    @Test
+    fun completed_row_has_review_footer() =
+        runTest {
+            val completed =
+                offer(
+                    id = "o-done",
+                    amount = 240.0,
+                    status = "completed",
+                    buyerFirst = "Anika",
+                    buyerLast = "Reyes",
+                )
+            coEvery { listingsRepo.detail(any()) } returns
+                NetworkResult.Success(ListingDetailResponse(listing))
+            coEvery { offersRepo.listOffers(any()) } returns
+                NetworkResult.Success(ListingOffersResponse(listOf(completed)))
+            val vm = makeVm()
+            vm.load()
+            val rows = (vm.state.value as ListOfRowsUiState.Loaded).sections.first().rows
+            val row = rows.first { it.id == "o-done" }
+            assertEquals(2, row.footer?.actions?.size)
+            assertEquals("View transaction", row.footer!!.actions[0].title)
+            assertEquals("Leave a review", row.footer!!.actions[1].title)
         }
 
     @Test

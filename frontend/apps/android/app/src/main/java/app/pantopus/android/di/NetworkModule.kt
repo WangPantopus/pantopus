@@ -41,6 +41,7 @@ import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
+import app.pantopus.android.data.api.services.TransactionReviewsApi
 import app.pantopus.android.data.api.services.UserReportsApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.api.services.WalletApi
@@ -272,6 +273,11 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideReviewsApi(retrofit: Retrofit): ReviewsApi = retrofit.create(ReviewsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideTransactionReviewsApi(retrofit: Retrofit): TransactionReviewsApi =
+        retrofit.create(TransactionReviewsApi::class.java)
 
     @Provides
     @Singleton

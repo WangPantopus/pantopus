@@ -204,6 +204,32 @@ final class ListingOffersViewModelTests: ListingOffersViewModelTestCase {
         XCTAssertEqual(accepted?.footer?.actions.first?.title, "View transaction")
     }
 
+    func testRowMapping_CompletedHasReviewFooter() async {
+        let completedJSON = """
+        {"offers":[
+          {"id":"o-done","listing_id":"listing-1","buyer_id":"u_anika",
+           "seller_id":"u_me","amount":240,"status":"completed",
+           "created_at":"2026-05-15T11:48:00Z",
+           "buyer":{"id":"u_anika","first_name":"Anika","last_name":"Reyes"},
+           "seller":{"id":"u_me"}}
+        ]}
+        """
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: completedJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        let row = sections.first?.rows.first
+        XCTAssertEqual(row?.footer?.actions.count, 2)
+        XCTAssertEqual(row?.footer?.actions.first?.title, "View transaction")
+        XCTAssertEqual(row?.footer?.actions.last?.title, "Leave a review")
+    }
+
     func testRowMapping_PriceStackAndAvatar() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.listingJSON),
