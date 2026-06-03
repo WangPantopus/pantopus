@@ -3,6 +3,8 @@
 package app.pantopus.android.ui.screens.homes.property_details
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.homes.HomesRepository
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -12,9 +14,11 @@ import org.junit.Test
 class PropertyDetailsViewModelTest {
     private fun savedStateHandle(): SavedStateHandle = SavedStateHandle(mapOf(PROPERTY_DETAILS_HOME_ID_KEY to "home-1"))
 
+    private val homesRepository: HomesRepository = mockk(relaxed = true)
+
     @Test
     fun load_cleanHome_projectsCleanState() {
-        val vm = PropertyDetailsViewModel(savedStateHandle()) { _ -> PropertyDetailsSampleData.clean }
+        val vm = PropertyDetailsViewModel(savedStateHandle(), homesRepository) { _ -> PropertyDetailsSampleData.clean }
         vm.load()
 
         val state = vm.state.value
@@ -26,7 +30,7 @@ class PropertyDetailsViewModelTest {
 
     @Test
     fun load_mismatchHome_projectsMismatchState() {
-        val vm = PropertyDetailsViewModel(savedStateHandle()) { _ -> PropertyDetailsSampleData.mismatch }
+        val vm = PropertyDetailsViewModel(savedStateHandle(), homesRepository) { _ -> PropertyDetailsSampleData.mismatch }
         vm.load()
 
         val state = vm.state.value
@@ -40,7 +44,7 @@ class PropertyDetailsViewModelTest {
     @Test
     fun load_failure_projectsErrorState() {
         val vm =
-            PropertyDetailsViewModel(savedStateHandle()) { _ ->
+            PropertyDetailsViewModel(savedStateHandle(), homesRepository) { _ ->
                 error("boom")
             }
         vm.load()
@@ -52,7 +56,7 @@ class PropertyDetailsViewModelTest {
     fun load_isNoOpOnceResolved() {
         var calls = 0
         val vm =
-            PropertyDetailsViewModel(savedStateHandle()) { _ ->
+            PropertyDetailsViewModel(savedStateHandle(), homesRepository) { _ ->
                 calls += 1
                 PropertyDetailsSampleData.mismatch
             }
@@ -68,7 +72,7 @@ class PropertyDetailsViewModelTest {
         var calls = 0
         var fail = true
         val vm =
-            PropertyDetailsViewModel(savedStateHandle()) { _ ->
+            PropertyDetailsViewModel(savedStateHandle(), homesRepository) { _ ->
                 calls += 1
                 if (fail) error("boom")
                 PropertyDetailsSampleData.clean

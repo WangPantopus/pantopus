@@ -18,6 +18,14 @@ public enum HomesEndpoints {
         Endpoint(method: .get, path: "/api/homes/\(homeId)")
     }
 
+    /// `GET /api/homes/:id/property-details` — route
+    /// `backend/routes/home.js:2991`. Returns the home's property fields
+    /// (`home`) plus an opaque ATTOM payload + `source` /
+    /// `unavailable_reason` that the Property Details screen doesn't model.
+    public static func propertyDetails(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/property-details")
+    }
+
     /// `GET /api/homes/:id/public-profile` — route `backend/routes/home.js:2439`.
     public static func publicProfile(homeId: String) -> Endpoint {
         Endpoint(method: .get, path: "/api/homes/\(homeId)/public-profile")
@@ -64,6 +72,22 @@ public enum HomesEndpoints {
         Endpoint(
             method: .delete,
             path: "/api/homes/\(homeId)/owners/\(ownerId)"
+        )
+    }
+
+    /// `POST /api/homes/:id/owners/transfer` — route
+    /// `backend/routes/homeOwnership.js:1526`. Initiates a full
+    /// ownership transfer to a buyer. Returns a `transfer_claim_id`
+    /// directly for a sole owner, or a `quorum_action_id` +
+    /// `required_approvals` when co-owners must approve first.
+    public static func transferOwner(
+        homeId: String,
+        request: TransferOwnerRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/owners/transfer",
+            body: request
         )
     }
 
@@ -504,6 +528,70 @@ public enum HomesEndpoints {
     /// caller is the target it acts as a self-leave.
     public static func removeMember(homeId: String, userId: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/homes/\(homeId)/members/\(userId)")
+    }
+
+    // MARK: - Guest passes (A13.1)
+
+    /// `POST /api/homes/:id/guest-passes` — route
+    /// `backend/routes/homeIam.js:667`. Issues a short-term guest pass;
+    /// the response carries the raw share `token` exactly once.
+    public static func createGuestPass(
+        homeId: String,
+        request: CreateGuestPassRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/guest-passes",
+            body: request
+        )
+    }
+
+    /// `GET /api/homes/:id/guest-passes` — route
+    /// `backend/routes/homeIam.js:783`. Active passes only unless
+    /// `includeRevoked` is set.
+    public static func listGuestPasses(
+        homeId: String,
+        includeRevoked: Bool = false
+    ) -> Endpoint {
+        var query: [String: String] = [:]
+        if includeRevoked { query["include_revoked"] = "true" }
+        return Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/guest-passes",
+            query: query
+        )
+    }
+
+    /// `DELETE /api/homes/:id/guest-passes/:passId` — route
+    /// `backend/routes/homeIam.js:860`. Revokes (soft-deletes) the pass.
+    public static func revokeGuestPass(homeId: String, passId: String) -> Endpoint {
+        Endpoint(
+            method: .delete,
+            path: "/api/homes/\(homeId)/guest-passes/\(passId)"
+        )
+    }
+
+    // MARK: - Postcard verification (A12.5–A12.7)
+
+    /// `POST /api/homes/:id/request-postcard` — route
+    /// `backend/routes/homeOwnership.js:2452`. Mails a verification code
+    /// to the home address; takes no request body. Rate-limited; returns
+    /// 400 when a code is already pending and 429 at the address cap.
+    public static func requestPostcard(homeId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/homes/\(homeId)/request-postcard")
+    }
+
+    /// `POST /api/homes/:id/verify-postcard` — route
+    /// `backend/routes/homeOwnership.js:2548`. Verifies the mailed code.
+    public static func verifyPostcard(
+        homeId: String,
+        request: VerifyPostcardRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/verify-postcard",
+            body: request
+        )
     }
 }
 

@@ -117,16 +117,20 @@ final class PostcardVerificationViewModel {
 
     private let homeId: String
     private let submitDelayNanos: UInt64
-    /// Code printed on the postcard — for sample data this matches the
-    /// design's `4Q2K7B`. Replace with the per-claim secret when the
-    /// real postcard issuance endpoint ships.
-    private let expectedCode: String
+    private let api: APIClient
+    /// Offline/preview/test seam. When non-nil, `verify()` checks the
+    /// typed code against this value locally instead of calling the
+    /// backend — used by previews and unit/snapshot tests. Production
+    /// passes `nil`, so the code is validated by
+    /// `POST /api/homes/:id/verify-postcard`.
+    private let expectedCode: String?
 
     init(
         homeId: String,
         stage: PostcardDeliveryStage? = nil,
         content: PostcardVerificationContent? = nil,
-        expectedCode: String = "4Q2K7B",
+        expectedCode: String? = nil,
+        api: APIClient = .shared,
         submitDelayNanos: UInt64 = 800_000_000
     ) {
         let resolvedStage = stage ?? PostcardVerificationSampleData.stage(for: homeId)
@@ -135,6 +139,7 @@ final class PostcardVerificationViewModel {
             ?? PostcardVerificationSampleData.content(for: resolvedStage)
         self.homeId = homeId
         self.expectedCode = expectedCode
+        self.api = api
         self.submitDelayNanos = submitDelayNanos
     }
 
@@ -167,10 +172,18 @@ final class PostcardVerificationViewModel {
         codeInput = String(raw.uppercased().prefix(6))
     }
 
-    /// Resend the postcard — the live endpoint will reissue a new code
-    /// and reset the timeline. Sample-data mode just clears the input.
+    /// Resend the postcard — reissues a new code via
+    /// `POST /api/homes/:id/request-postcard`. The offline/test seam
+    /// (`expectedCode != nil`) just clears the input.
     func resendPostcard() {
         codeInput = ""
+        guard expectedCode == nil else { return }
+        Task { [api, homeId] in
+            _ = try? await api.request(
+                HomesEndpoints.requestPostcard(homeId: homeId),
+                as: RequestPostcardResponse.self
+            )
+        }
     }
 
     /// Used by the debug / preview tooling and the snapshot tests to
@@ -201,13 +214,35 @@ final class PostcardVerificationViewModel {
 
     private func verify() async {
         submitState = .submitting
-        try? await Task.sleep(nanoseconds: submitDelayNanos)
-        if codeInput == expectedCode {
+        if let expectedCode {
+            // Offline/test seam — compare locally, no network.
+            try? await Task.sleep(nanoseconds: submitDelayNanos)
+            if codeInput == expectedCode {
+                submitState = .submitted
+                pendingEvent = .verified(homeId: homeId)
+            } else {
+                submitState = .error(message: "That code didn't match. Double-check the postcard.")
+                codeInput = ""
+            }
+            return
+        }
+        do {
+            _ = try await api.request(
+                HomesEndpoints.verifyPostcard(
+                    homeId: homeId,
+                    request: VerifyPostcardRequest(code: codeInput)
+                ),
+                as: VerifyPostcardResponse.self
+            )
             submitState = .submitted
             pendingEvent = .verified(homeId: homeId)
-        } else {
-            submitState = .error(message: "That code didn't match. Double-check the postcard.")
-            codeInput = ""
+        } catch {
+            if case .transport = (error as? APIError) {
+                submitState = .error(message: "You're offline. Try again when you're back online.")
+            } else {
+                submitState = .error(message: "That code didn't match. Double-check the postcard.")
+                codeInput = ""
+            }
         }
     }
 }

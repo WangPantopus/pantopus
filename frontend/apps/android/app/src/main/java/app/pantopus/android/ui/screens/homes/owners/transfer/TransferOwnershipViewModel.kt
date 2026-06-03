@@ -5,12 +5,14 @@ package app.pantopus.android.ui.screens.homes.owners.transfer
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.homes.TransferOwnerRequest
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeOwnersRepository
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.screens.homes.owners.transfer.components.ConfirmSheetParty
 import app.pantopus.android.ui.screens.homes.owners.transfer.components.SplitSegment
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -172,9 +174,12 @@ data class TransferOwnershipUiState(
 }
 
 /**
- * A13.4 — Transfer Ownership form view-model. No backend in the repo,
- * so committing a transfer is simulated locally: [confirmTransfer]
- * sleeps 1.2s, raises a success toast, and signals [shouldDismiss].
+ * A13.4 — Transfer Ownership form view-model. After biometric auth
+ * succeeds, [handleBiometricResult] calls
+ * `POST /api/homes/:id/owners/transfer` (route
+ * `backend/routes/homeOwnership.js:1526`) via [HomeOwnersRepository],
+ * raises a success toast (including the co-owner-approval quorum
+ * branch), and signals [shouldDismiss].
  *
  * Biometric authentication itself is owned by the host screen — the VM
  * exposes [requestBiometric] / [handleBiometricResult] entry points so
@@ -186,6 +191,7 @@ class TransferOwnershipViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
+        private val ownersRepo: HomeOwnersRepository,
     ) : ViewModel() {
         private val homeId: String = savedStateHandle.get<String>(TRANSFER_HOME_ID_KEY) ?: ""
 
@@ -258,20 +264,41 @@ class TransferOwnershipViewModel
                 return
             }
             viewModelScope.launch {
-                // Stub: backend endpoint not in repo. Simulate the round
-                // trip so the host's spinner + dismiss flow behave like
-                // the real thing.
-                delay(1_200)
-                _state.update { current ->
-                    current.copy(
-                        sheetPhase = ConfirmSheetPhase.Dismissing,
-                        toast =
-                            TransferToast(
-                                text = "Transferred ${current.amount}% to ${current.recipient.name}",
-                                isError = false,
-                            ),
-                        shouldDismiss = true,
+                val current = _state.value
+                // Identify the buyer by their account id; effective_date
+                // is omitted so the transfer takes effect immediately.
+                val result =
+                    ownersRepo.transfer(
+                        homeId,
+                        TransferOwnerRequest(buyerUserId = current.recipient.id),
                     )
+                when (result) {
+                    is NetworkResult.Success -> {
+                        val successText =
+                            if (result.data.requiresQuorum) {
+                                "Transfer sent for co-owner approval."
+                            } else {
+                                "Transferred ${current.amount}% to ${current.recipient.name}"
+                            }
+                        _state.update {
+                            it.copy(
+                                sheetPhase = ConfirmSheetPhase.Dismissing,
+                                toast = TransferToast(text = successText, isError = false),
+                                shouldDismiss = true,
+                            )
+                        }
+                    }
+                    is NetworkResult.Failure -> {
+                        _state.update {
+                            it.copy(
+                                sheetPhase = ConfirmSheetPhase.Visible,
+                                biometricErrorMessage =
+                                    result.error.message.ifEmpty {
+                                        "Couldn't complete the transfer. Try again."
+                                    },
+                            )
+                        }
+                    }
                 }
             }
         }

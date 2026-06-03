@@ -43,7 +43,7 @@ public final class TokenAcceptViewModel {
         // Try the three resolvers in parallel; first non-nil wins.
         async let homeTask = tryDecode(HomeInviteResponse.self, endpoint: TokenAcceptEndpoints.homeInvite(token: token))
         async let seatTask = tryDecode(BusinessSeatInviteResponse.self, endpoint: TokenAcceptEndpoints.businessSeatInvite(token: token))
-        async let guestTask = tryDecode(GuestPassResponse.self, endpoint: TokenAcceptEndpoints.guestPass(token: token))
+        async let guestTask = tryDecode(TokenAcceptGuestPassResponse.self, endpoint: TokenAcceptEndpoints.guestPass(token: token))
 
         let home = await homeTask
         let seat = await seatTask
@@ -180,7 +180,7 @@ public final class TokenAcceptViewModel {
     }
 
     static func makeGuestOffer(
-        pass: GuestPassDTO,
+        pass: TokenAcceptGuestPassDTO,
         identity: IdentityChipContent
     ) -> TokenAcceptOffer {
         let venue = pass.homeName ?? pass.customTitle ?? "the host's place"

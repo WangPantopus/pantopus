@@ -82,6 +82,9 @@ open class HomesRepository
         /** `GET /api/homes/:id/public-profile`. */
         open suspend fun publicProfile(id: String) = safeApiCall { api.publicProfile(id) }
 
+        /** `GET /api/homes/:id/property-details`. */
+        open suspend fun propertyDetails(id: String) = safeApiCall { api.propertyDetails(id) }
+
         /** `POST /api/homes/property-suggestions`. */
         open suspend fun propertySuggestions(request: PropertySuggestionsRequest) = safeApiCall { api.propertySuggestions(request) }
 

@@ -19,13 +19,15 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
     private func makeVM(
         homeId: String = "home-1",
         form: VerifyLandlordForm? = nil,
-        startContent: VerifyLandlordStartContent? = nil
+        startContent: VerifyLandlordStartContent? = nil,
+        postcardRequester: VerifyLandlordWizardViewModel.PostcardRequester? = nil
     ) -> VerifyLandlordWizardViewModel {
         VerifyLandlordWizardViewModel(
             homeId: homeId,
             startContent: startContent,
             form: form,
-            submitDelayNanos: 0
+            submitDelayNanos: 0,
+            postcardRequester: postcardRequester
         )
     }
 
@@ -160,7 +162,10 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
     }
 
     func testSubmitHappyPathFiresOpenPostcardEvent() async {
-        let vm = makeVM(homeId: "home-1", form: VerifyLandlordSampleData.populatedForm)
+        let vm = makeVM(
+            homeId: "home-1",
+            form: VerifyLandlordSampleData.populatedForm
+        ) { .success(()) }
         vm.primaryTapped() // start -> details
         await vm.submit()
         await waitFor("pendingEvent == .openPostcardVerification") {

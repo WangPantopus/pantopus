@@ -148,7 +148,12 @@ fun AddGuestFormScreen(
             onDone = {
                 val start = LocalDate.ofEpochDay(customStartEpochDay)
                 val end = LocalDate.ofEpochDay(customEndEpochDay)
-                viewModel.setCustomRange(start.shortLabel(), end.shortLabel())
+                viewModel.setCustomRange(
+                    start.shortLabel(),
+                    end.shortLabel(),
+                    customStartEpochDay,
+                    customEndEpochDay,
+                )
                 showsCustomRange = false
             },
             onDismiss = { showsCustomRange = false },

@@ -6,9 +6,12 @@
 //
 //    .start → .details → submit → openPostcardVerification(homeId)
 //
-//  Stubs the network round-trip — sleeps 800ms then dispatches the
-//  outbound `openPostcardVerification` event. Wiring against the real
-//  backend lands when the verify-landlord endpoints ship.
+//  On submit it requests the verification postcard via
+//  `POST /api/homes/:id/request-postcard` (route
+//  `backend/routes/homeOwnership.js:2452`) then dispatches the outbound
+//  `openPostcardVerification` event. The landlord/PM details collected
+//  in the form have no backend representation (request-postcard takes no
+//  body), so they stay client-side.
 //
 
 import Foundation
@@ -36,18 +39,29 @@ final class VerifyLandlordWizardViewModel: WizardModel {
 
     private let homeId: String
     private let submitDelayNanos: UInt64
+    private let api: APIClient
+
+    /// Test/offline seam for the postcard request. When non-nil,
+    /// `submit()` calls this instead of
+    /// `POST /api/homes/:id/request-postcard`.
+    typealias PostcardRequester = @MainActor () async -> Result<Void, any Error>
+    private let postcardRequester: PostcardRequester?
 
     init(
         homeId: String,
         startContent: VerifyLandlordStartContent? = nil,
         form: VerifyLandlordForm? = nil,
-        submitDelayNanos: UInt64 = 800_000_000
+        api: APIClient = .shared,
+        submitDelayNanos: UInt64 = 800_000_000,
+        postcardRequester: PostcardRequester? = nil
     ) {
         self.homeId = homeId
         self.startContent = startContent
             ?? VerifyLandlordSampleData.startContent(for: homeId)
         self.form = form ?? VerifyLandlordSampleData.formSeed(for: homeId)
+        self.api = api
         self.submitDelayNanos = submitDelayNanos
+        self.postcardRequester = postcardRequester
     }
 
     // MARK: - WizardModel
@@ -185,14 +199,48 @@ final class VerifyLandlordWizardViewModel: WizardModel {
             submitState = .error(message: "You're offline. Try again when you're back online.")
             return
         }
-        // Stubbed round-trip — replace with real endpoint when the
-        // verify-landlord backend lands. The 800ms sleep mirrors the
-        // task brief's "stub the network client to return success
-        // after 800ms" contract so the Submit button animation reads
-        // realistically in QA.
-        try? await Task.sleep(nanoseconds: submitDelayNanos)
-        submitState = .submitted
-        pendingEvent = .openPostcardVerification(homeId: homeId)
+        // The landlord / property-manager details collected above have no
+        // backend representation today — `request-postcard` takes no body
+        // — so finishing the wizard simply mails the verification postcard
+        // and routes to the code-entry screen. The gathered details stay
+        // client-side (documented follow-up).
+        switch await requestPostcard() {
+        case .success:
+            submitState = .submitted
+            pendingEvent = .openPostcardVerification(homeId: homeId)
+        case let .failure(error):
+            // A pending/duplicate code (400) or address cap (429) means a
+            // postcard is already on its way — proceed to enter it. Other
+            // failures surface inline so the user can retry.
+            if case let .clientError(status, _) = (error as? APIError), status == 400 || status == 429 {
+                submitState = .submitted
+                pendingEvent = .openPostcardVerification(homeId: homeId)
+            } else {
+                submitState = .error(
+                    message: (error as? APIError)?.errorDescription
+                        ?? "Couldn't request the verification postcard. Try again."
+                )
+            }
+        }
+    }
+
+    /// Mails the verification postcard. Uses the injected
+    /// `postcardRequester` seam when present (previews/tests); otherwise
+    /// calls `POST /api/homes/:id/request-postcard`.
+    private func requestPostcard() async -> Result<Void, any Error> {
+        if let postcardRequester {
+            try? await Task.sleep(nanoseconds: submitDelayNanos)
+            return await postcardRequester()
+        }
+        do {
+            _ = try await api.request(
+                HomesEndpoints.requestPostcard(homeId: homeId),
+                as: RequestPostcardResponse.self
+            )
+            return .success(())
+        } catch {
+            return .failure(error)
+        }
     }
 
     func acknowledgePendingEvent() {

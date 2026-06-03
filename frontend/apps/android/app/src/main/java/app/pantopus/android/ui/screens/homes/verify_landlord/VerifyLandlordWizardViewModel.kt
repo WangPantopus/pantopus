@@ -1,10 +1,12 @@
-@file:Suppress("PackageNaming", "TooManyFunctions")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes.verify_landlord
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
@@ -56,10 +58,12 @@ data class VerifyLandlordUiState(
  *
  *     Start -> Details -> submit -> OpenPostcardVerification(homeId)
  *
- * Stubs the network round-trip — sleeps [submitDelayMillis] (default
- * 800ms) then dispatches the outbound `OpenPostcardVerification`
- * event. Wiring against the real backend lands when the
- * verify-landlord endpoints ship.
+ * On submit it requests the verification postcard via
+ * `POST /api/homes/:id/request-postcard` (route
+ * `backend/routes/homeOwnership.js:2452`) then dispatches the outbound
+ * `OpenPostcardVerification` event. The landlord/PM details collected in
+ * the form have no backend representation (request-postcard takes no
+ * body), so they stay client-side.
  */
 @HiltViewModel
 open class VerifyLandlordWizardViewModel
@@ -67,6 +71,7 @@ open class VerifyLandlordWizardViewModel
     constructor(
         private val networkMonitor: NetworkMonitor,
         savedStateHandle: SavedStateHandle,
+        private val verificationRepository: HomeVerificationRepository,
     ) : ViewModel(),
         WizardModel {
         private val homeId: String =
@@ -191,12 +196,38 @@ open class VerifyLandlordWizardViewModel
                 }
                 return
             }
-            // Stubbed round-trip — replace with real endpoint when
-            // the verify-landlord backend lands. Mirrors iOS'
-            // 800ms sample-data sleep so QA timing is consistent.
+            // The landlord / property-manager details collected above have
+            // no backend representation today — `request-postcard` takes no
+            // body — so finishing the wizard simply mails the verification
+            // postcard and routes to code entry. The details stay client-side.
             if (submitDelayMillis > 0) delay(submitDelayMillis)
-            _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
-            pendingEvent.value = VerifyLandlordOutboundEvent.OpenPostcardVerification(homeId)
+            when (val result = verificationRepository.requestPostcard(homeId)) {
+                is NetworkResult.Success -> {
+                    _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
+                    pendingEvent.value = VerifyLandlordOutboundEvent.OpenPostcardVerification(homeId)
+                }
+                is NetworkResult.Failure -> {
+                    // A pending/duplicate code (400) or address cap (429)
+                    // means a postcard is already on its way — proceed to
+                    // enter it. Other failures surface inline so the user
+                    // can retry.
+                    if (result.error.code == 400 || result.error.code == 429) {
+                        _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
+                        pendingEvent.value = VerifyLandlordOutboundEvent.OpenPostcardVerification(homeId)
+                    } else {
+                        _state.update {
+                            it.copy(
+                                submitState =
+                                    VerifyLandlordSubmitState.Error(
+                                        result.error.message.ifEmpty {
+                                            "Couldn't request the verification postcard. Try again."
+                                        },
+                                    ),
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // MARK: - Chrome derivation

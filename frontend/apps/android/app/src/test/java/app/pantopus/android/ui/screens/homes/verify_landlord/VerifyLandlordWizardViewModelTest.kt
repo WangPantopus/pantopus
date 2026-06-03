@@ -3,7 +3,12 @@
 package app.pantopus.android.ui.screens.homes.verify_landlord
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.homes.PostcardInfoDto
+import app.pantopus.android.data.api.models.homes.RequestPostcardResponse
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -29,8 +34,12 @@ class VerifyLandlordWizardViewModelTest {
             every { it.isOnline } returns MutableStateFlow(true)
         }
 
+    private val verificationRepository: HomeVerificationRepository = mockk(relaxed = true)
+
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        coEvery { verificationRepository.requestPostcard(any()) } returns
+            NetworkResult.Success(RequestPostcardResponse("ok", PostcardInfoDto("p1")))
     }
 
     @After fun tearDown() {
@@ -40,7 +49,8 @@ class VerifyLandlordWizardViewModelTest {
     private class TestVm(
         networkMonitor: NetworkMonitor,
         handle: SavedStateHandle,
-    ) : VerifyLandlordWizardViewModel(networkMonitor, handle) {
+        verificationRepository: HomeVerificationRepository,
+    ) : VerifyLandlordWizardViewModel(networkMonitor, handle, verificationRepository) {
         override val submitDelayMillis: Long = 0L
     }
 
@@ -48,6 +58,7 @@ class VerifyLandlordWizardViewModelTest {
         TestVm(
             networkMonitor = networkMonitor,
             handle = SavedStateHandle(mapOf(VERIFY_LANDLORD_HOME_ID_KEY to homeId)),
+            verificationRepository = verificationRepository,
         )
 
     // MARK: - Step machine

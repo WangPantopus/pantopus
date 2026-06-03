@@ -12,6 +12,7 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTheme
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -48,7 +49,7 @@ class PostcardVerificationSnapshotTest {
 
     private class TestVm(
         handle: SavedStateHandle,
-    ) : PostcardVerificationViewModel(handle) {
+    ) : PostcardVerificationViewModel(handle, mockk(relaxed = true)) {
         override val submitDelayMillis: Long = 0L
         override val expectedCode: String = DEFAULT_EXPECTED_CODE
     }

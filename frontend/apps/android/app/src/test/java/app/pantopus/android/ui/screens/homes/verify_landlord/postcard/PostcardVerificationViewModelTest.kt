@@ -3,7 +3,9 @@
 package app.pantopus.android.ui.screens.homes.verify_landlord.postcard
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.ui.screens.homes.verify_landlord.VerifyLandlordSubmitState
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -31,9 +33,10 @@ class PostcardVerificationViewModelTest {
 
     private class TestVm(
         handle: SavedStateHandle,
+        verificationRepository: HomeVerificationRepository = mockk(relaxed = true),
         override val submitDelayMillis: Long = 0L,
         override val expectedCode: String = PostcardVerificationViewModel.DEFAULT_EXPECTED_CODE,
-    ) : PostcardVerificationViewModel(handle)
+    ) : PostcardVerificationViewModel(handle, verificationRepository)
 
     private fun makeVm(
         homeId: String = "home-1",

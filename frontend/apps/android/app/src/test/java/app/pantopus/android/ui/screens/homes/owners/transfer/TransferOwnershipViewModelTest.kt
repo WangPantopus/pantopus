@@ -3,6 +3,11 @@
 package app.pantopus.android.ui.screens.homes.owners.transfer
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.homes.TransferOwnerResponse
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeOwnersRepository
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -26,9 +31,11 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TransferOwnershipViewModelTest {
     private val dispatcher = StandardTestDispatcher()
+    private val ownersRepo: HomeOwnersRepository = mockk(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
+        coEvery { ownersRepo.transfer(any(), any()) } returns NetworkResult.Success(TransferOwnerResponse(message = "ok"))
     }
 
     @After fun tearDown() {
@@ -36,7 +43,7 @@ class TransferOwnershipViewModelTest {
     }
 
     private fun makeViewModel(): TransferOwnershipViewModel =
-        TransferOwnershipViewModel(SavedStateHandle(mapOf(TRANSFER_HOME_ID_KEY to "preview")))
+        TransferOwnershipViewModel(SavedStateHandle(mapOf(TRANSFER_HOME_ID_KEY to "preview")), ownersRepo)
 
     @Test
     fun initial_state_not_ready_to_commit() {

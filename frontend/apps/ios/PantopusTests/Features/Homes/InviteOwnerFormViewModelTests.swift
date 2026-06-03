@@ -10,6 +10,19 @@ import XCTest
 
 @MainActor
 final class InviteOwnerFormViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
     private func makeVM(
         currentEmail: String = "me@example.com",
         draft: InviteOwnerDraft = InviteOwnerSampleData.initialDraft(homeId: "home-1")
@@ -18,7 +31,8 @@ final class InviteOwnerFormViewModelTests: XCTestCase {
             homeId: "home-1",
             currentUserEmail: currentEmail,
             initialDraft: draft,
-            initialState: .editing
+            initialState: .editing,
+            api: makeAPI()
         )
     }
 
@@ -126,6 +140,9 @@ final class InviteOwnerFormViewModelTests: XCTestCase {
     // MARK: - Submit
 
     func testSubmitHappyPathSetsToastAndDismiss() async {
+        SequencedURLProtocol.sequence = [
+            .status(201, body: #"{"message":"Co-owner invitation sent.","claim_id":"c1"}"#)
+        ]
         let vm = makeVM(draft: InviteOwnerSampleData.valid)
         let ok = await vm.submit()
         XCTAssertTrue(ok)

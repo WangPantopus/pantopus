@@ -2,6 +2,8 @@ package app.pantopus.android.data.homes
 
 import app.pantopus.android.data.api.models.homes.OwnersResponse
 import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
+import app.pantopus.android.data.api.models.homes.TransferOwnerRequest
+import app.pantopus.android.data.api.models.homes.TransferOwnerResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.HomesApi
@@ -30,4 +32,10 @@ open class HomeOwnersRepository
             homeId: String,
             ownerId: String,
         ): NetworkResult<RemoveOwnerResponse> = safeApiCall { api.removeOwner(homeId, ownerId) }
+
+        /** `POST /api/homes/:id/owners/transfer`. */
+        open suspend fun transfer(
+            homeId: String,
+            request: TransferOwnerRequest,
+        ): NetworkResult<TransferOwnerResponse> = safeApiCall { api.transferOwner(homeId, request) }
     }
