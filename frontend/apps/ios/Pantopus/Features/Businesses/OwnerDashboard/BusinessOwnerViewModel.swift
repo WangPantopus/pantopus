@@ -35,12 +35,20 @@ public final class BusinessOwnerViewModel {
 
     /// - Parameters:
     ///   - businessId: The owned business id.
-    ///   - client: The API client (injected for tests).
     ///   - content: Pre-built content for previews / snapshots / tests. When
     ///     `nil` the view-model fetches live owner data.
-    public init(
+    public convenience init(
         businessId: String,
-        client: APIClient = .shared,
+        content: BusinessOwnerContent? = nil
+    ) {
+        self.init(businessId: businessId, client: .shared, content: content)
+    }
+
+    /// Designated initializer. `client` is injectable for tests, and this
+    /// initializer stays internal because `APIClient` is module-internal.
+    init(
+        businessId: String,
+        client: APIClient,
         content: BusinessOwnerContent? = nil
     ) {
         self.businessId = businessId
