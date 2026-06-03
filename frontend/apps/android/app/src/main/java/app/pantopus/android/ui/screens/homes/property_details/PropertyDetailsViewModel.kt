@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 import java.util.Locale
+import javax.inject.Inject
 
 const val PROPERTY_DETAILS_HOME_ID_KEY = "homeId"
 
@@ -152,8 +152,7 @@ class PropertyDetailsViewModel
                 raw.replace('_', ' ')
                     .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
 
-            private fun formatBaths(value: Double): String =
-                if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
+            private fun formatBaths(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
 
             private fun String.nonBlank(): String? = trim().ifEmpty { null }
         }

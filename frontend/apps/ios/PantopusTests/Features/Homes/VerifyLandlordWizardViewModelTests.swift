@@ -164,9 +164,8 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
     func testSubmitHappyPathFiresOpenPostcardEvent() async {
         let vm = makeVM(
             homeId: "home-1",
-            form: VerifyLandlordSampleData.populatedForm,
-            postcardRequester: { .success(()) }
-        )
+            form: VerifyLandlordSampleData.populatedForm
+        ) { .success(()) }
         vm.primaryTapped() // start -> details
         await vm.submit()
         await waitFor("pendingEvent == .openPostcardVerification") {
