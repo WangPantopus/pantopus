@@ -2,19 +2,53 @@
 
 package app.pantopus.android.ui.screens.explore
 
+import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
+import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.models.listings.ListingsInBoundsResponse
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.listings.ListingsRepository
+import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.location.UserCoordinate
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
-/** Covers A11.2 Explore local projection: filters, clustering, empty recovery, and selection. */
+/**
+ * A11.2 Explore / P1-F — local projection (filters, clustering, selection) over
+ * sample scenarios, plus the live gigs + listings in-bounds projection.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ExploreMapViewModelTest {
+    @Before fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun makeVm(): ExploreMapViewModel = ExploreMapViewModel(mockk(), mockk(), mockk())
+
     private fun loaded(vm: ExploreMapViewModel): ExploreMapUiState.Loaded = vm.state.value as ExploreMapUiState.Loaded
 
     @Test
     fun populated_load_projects47Entities_withThreeActiveFilters() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Populated)
         val loaded = loaded(vm)
         assertEquals(47, loaded.entities.size)
@@ -24,14 +58,14 @@ class ExploreMapViewModelTest {
 
     @Test
     fun populated_markers_containAtLeastOneCluster() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Populated)
         assertTrue(loaded(vm).markers.any { it is ExploreMarker.Cluster })
     }
 
     @Test
     fun empty_load_isEmpty() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Empty)
         assertTrue(loaded(vm).isEmpty)
         assertEquals(3, vm.filters.value.activeCount)
@@ -39,7 +73,7 @@ class ExploreMapViewModelTest {
 
     @Test
     fun clearFilters_fromEmpty_revealsAllEntities() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Empty)
         vm.clearFilters()
         assertEquals(6, loaded(vm).entities.size)
@@ -49,7 +83,7 @@ class ExploreMapViewModelTest {
 
     @Test
     fun widenArea_fromEmpty_surfacesFartherNeighbors() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Empty)
         vm.widenArea()
         val entities = loaded(vm).entities
@@ -59,7 +93,7 @@ class ExploreMapViewModelTest {
 
     @Test
     fun selectKind_filtersToSingleKind() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Populated)
         vm.selectKind(ExploreKind.Spot)
         val entities = loaded(vm).entities
@@ -69,7 +103,7 @@ class ExploreMapViewModelTest {
 
     @Test
     fun applyFilters_narrowsAndUpdatesActiveCount() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Populated)
         vm.applyFilters(
             ExploreFilterCriteria(
@@ -85,7 +119,7 @@ class ExploreMapViewModelTest {
 
     @Test
     fun selectEntity_setsSelectedId() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Populated)
         val first = loaded(vm).entities.first()
         vm.selectEntity(first.id)
@@ -94,17 +128,94 @@ class ExploreMapViewModelTest {
 
     @Test
     fun errorScenario_rendersError() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Error)
         assertTrue(vm.state.value is ExploreMapUiState.Error)
     }
 
     @Test
     fun loadingScenario_staysLoading() {
-        val vm = ExploreMapViewModel()
+        val vm = makeVm()
         vm.load(ExploreScenario.Loading)
         assertTrue(vm.state.value is ExploreMapUiState.Loading)
     }
+
+    // Live in-bounds projection
+
+    @Test
+    fun project_maps_gigs_and_listings() {
+        val anchor = UserCoordinate(40.7484, -73.9857, 50.0)
+        val entities =
+            ExploreMapViewModel.project(
+                gigs =
+                    listOf(
+                        GigDto(
+                            id = "g1",
+                            title = "Mow",
+                            price = 40.0,
+                            status = "open",
+                            latitude = 40.75,
+                            longitude = -73.98,
+                            bidCount = 3,
+                        ),
+                    ),
+                listings =
+                    listOf(ListingDto(id = "l1", title = "Bike", price = 120.0, latitude = 40.751, longitude = -73.981)),
+                anchor = anchor,
+            )
+        assertEquals(2, entities.size)
+        val task = entities.first { it.kind == ExploreKind.Task }
+        assertEquals("$40", task.metaLead)
+        assertEquals("3 bids", task.badge?.text)
+        val item = entities.first { it.kind == ExploreKind.Item }
+        assertEquals("$120", item.metaLead)
+    }
+
+    @Test
+    fun distanceMiles_approx() {
+        val miles =
+            ExploreMapViewModel.distanceMiles(UserCoordinate(40.7484, -73.9857, 50.0), 40.7584, -73.9857)
+        assertEquals(0.69, miles, 0.1)
+    }
+
+    @Test
+    fun liveLoadProjectsGigsAndListings() =
+        runTest {
+            val gigsRepo: GigsRepository = mockk()
+            val listingsRepo: ListingsRepository = mockk()
+            val location: LocationProvider = mockk()
+            every { location.cachedCoordinate() } returns UserCoordinate(40.7484, -73.9857, 50.0)
+            coEvery { gigsRepo.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(
+                    GigsInBoundsResponse(
+                        listOf(
+                            GigDto(
+                                id = "g1",
+                                title = "Mow lawn",
+                                price = 40.0,
+                                status = "open",
+                                latitude = 40.75,
+                                longitude = -73.98,
+                                bidCount = 3,
+                            ),
+                        ),
+                    ),
+                )
+            coEvery { listingsRepo.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(
+                    ListingsInBoundsResponse(
+                        listOf(ListingDto(id = "l1", title = "Road bike", price = 120.0, latitude = 40.751, longitude = -73.981)),
+                    ),
+                )
+
+            val vm = ExploreMapViewModel(gigsRepo, listingsRepo, location)
+            vm.load()
+
+            val loaded = vm.state.value as ExploreMapUiState.Loaded
+            assertEquals(2, loaded.entities.size)
+        }
+
+    // Filter-criteria value type
 
     @Test
     fun filterCriteria_sectionsRoundTrip() {
