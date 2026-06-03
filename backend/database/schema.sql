@@ -763,6 +763,17 @@ CREATE TYPE "public"."subject_type" AS ENUM (
 ALTER TYPE "public"."subject_type" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."task_format" AS ENUM (
+    'in_person',
+    'drop_off',
+    'remote',
+    'hybrid'
+);
+
+
+ALTER TYPE "public"."task_format" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."user_place_kind" AS ENUM (
     'office',
     'frequent',
@@ -5672,6 +5683,9 @@ CREATE TABLE IF NOT EXISTS "public"."Gig" (
     "worker_ack_note" text,
     "worker_ack_updated_at" timestamp with time zone,
     "auto_reminder_count" integer DEFAULT 0,
+    "boosted_at" timestamp with time zone,
+    "boost_expires_at" timestamp with time zone,
+    "task_format" "public"."task_format" DEFAULT 'in_person'::"public"."task_format" NOT NULL,
     CONSTRAINT "Gig_price_check" CHECK (("price" > (0)::numeric)),
     CONSTRAINT "Gig_status_check" CHECK ((("status")::"text" = ANY (ARRAY['open'::"text", 'assigned'::"text", 'in_progress'::"text", 'completed'::"text", 'cancelled'::"text"]))),
     CONSTRAINT "gig_origin_mode_check" CHECK (("origin_mode" = ANY (ARRAY['home'::"text", 'address'::"text", 'current'::"text"]))),
@@ -10328,6 +10342,10 @@ CREATE INDEX "idx_gig_approx_location" ON "public"."Gig" USING "gist" ("approx_l
 
 
 
+CREATE INDEX "idx_gig_boost_active" ON "public"."Gig" USING "btree" ("boost_expires_at") WHERE ("boost_expires_at" IS NOT NULL);
+
+
+
 CREATE INDEX "idx_gig_bid_expires_at" ON "public"."GigBid" USING "btree" ("expires_at") WHERE (("status" = 'pending'::"text") AND ("expires_at" IS NOT NULL));
 
 
@@ -10385,6 +10403,10 @@ CREATE INDEX "idx_gig_source" ON "public"."Gig" USING "btree" ("source_type", "s
 
 
 CREATE INDEX "idx_gig_status" ON "public"."Gig" USING "btree" ("status");
+
+
+
+CREATE INDEX "idx_gig_task_format" ON "public"."Gig" USING "btree" ("task_format");
 
 
 

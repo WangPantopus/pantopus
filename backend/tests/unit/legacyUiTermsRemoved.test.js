@@ -30,10 +30,15 @@ function readSource(rel) {
 }
 
 describe('identityUiText is gone', () => {
-  for (const rel of [
+  // The native repo intentionally does not include the production React
+  // Native app, and web can diverge; enforce this check only for modules
+  // that are present in the active workspace.
+  const optionalIdentityLabelModules = [
     'frontend/apps/web/src/lib/identityLabels.ts',
     'frontend/apps/mobile/src/utils/identityLabels.ts',
-  ]) {
+  ].filter((rel) => fs.existsSync(path.join(REPO_ROOT, rel)));
+
+  for (const rel of optionalIdentityLabelModules) {
     test(`${rel} no longer exports identityUiText`, () => {
       const src = readSource(rel);
       expect(src).not.toMatch(/^\s*export\s+function\s+identityUiText\b/m);

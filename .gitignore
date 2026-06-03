@@ -20,6 +20,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+logs/
+combined*.log
+
+# Package manager caches
+.pnpm-store/
+
+# Temporary production reference copy for backend/CI migration
+pantopus/
 
 # macOS
 .DS_Store
