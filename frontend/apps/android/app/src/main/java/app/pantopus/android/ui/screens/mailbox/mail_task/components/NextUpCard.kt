@@ -121,6 +121,6 @@ fun NextUpCard(
 @Composable
 private fun NextUpCardPreview() {
     Box(modifier = Modifier.background(PantopusColors.appBg).padding(Spacing.s4)) {
-        NextUpCard(nextUp = MailTaskSampleData.task(done = true).nextUp, onOpen = {})
+        NextUpCard(nextUp = requireNotNull(MailTaskSampleData.task(done = true).nextUp), onOpen = {})
     }
 }

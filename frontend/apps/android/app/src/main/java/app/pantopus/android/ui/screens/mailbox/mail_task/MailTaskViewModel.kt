@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "TooManyFunctions")
+@file:Suppress("PackageNaming", "TooManyFunctions", "MagicNumber")
 
 package app.pantopus.android.ui.screens.mailbox.mail_task
 
@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.v2.P3TaskDto
+import app.pantopus.android.data.api.models.mailbox.v2.P3TaskUpdateRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,66 +14,42 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Locale
 import javax.inject.Inject
 
 /** Nav arg key for the A17.12 mail-task detail route (`mailbox/tasks/{taskId}`). */
 const val MAIL_TASK_TASK_ID_KEY = "taskId"
 
-private const val DEFAULT_TASK_ID = "t_412elm"
-
-/** Empty enrichment placeholders — the live `/p3/tasks` endpoint has no
- *  "elf" / sub-task / completion / next-up source, so those surfaces are
- *  fed empty and hidden by the screen (never seeded with sample data). */
-private val EMPTY_ELF = MailTaskElf(headline = "", summary = "", bullets = emptyList())
-private val EMPTY_COMPLETION = MailTaskCompletion(stamp = "", note = "", rows = emptyList())
-private val EMPTY_NEXT_UP = MailTaskNextUp(mailId = "", categoryLabel = "", title = "", due = "", from = "")
-private val BLANK_DUE =
-    MailTaskDue(weekday = "", day = "", month = "", label = "", time = "", left = "", reminderLabel = "", closesLabel = "")
-
 /**
- * A17.12 — Mail-task detail view-model. Mirrors iOS `MailTaskViewModel`.
+ * A17.12 / Block 2A — Mail-task detail view-model. The live path (no
+ * seed configured) fetches `GET /api/mailbox/v2/p3/tasks` and selects the
+ * task by id (there is no detail-by-id route), mapping the flat HomeTask
+ * fields — title / reference / priority / due / status / source-mail link
+ * — into [MailTaskContent]. The rich AI elf, subtask checklist, snooze,
+ * completion summary, and next-up slots have no backend source, so they
+ * stay null/empty and the screen hides them (never faked). Mark-done /
+ * reopen round-trip via `PATCH /p3/tasks/:id`. Configuring a [MailTaskSeed]
+ * keeps the view-model local (the preview / test seam).
  *
- * `load()` fetches mail-linked tasks from `GET /api/mailbox/v2/p3/tasks`
- * and resolves the one matching the nav-arg `taskId` (the endpoint is a
- * `{ active, completed }` list, so there is no single-task fetch). Only the
- * basic `HomeTask` fields exist there — title, due, status, the linked mail
- * id + preview/sender — so those are mapped live; the "elf" / sub-task /
- * completion / next-up enrichment is a separate `magicTask` concept with no
- * source and is left empty (the screen hides those sections rather than
- * seeding them).
- *
- * The Hilt-injected constructor reads `taskId` from the nav args and goes
- * live. The two-arg internal constructor is the test / preview seam: a null
- * repository projects [MailTaskSampleData] so QA, previews, and the parity
- * snapshots keep exercising both rich frames + the tappable checklist.
+ * Mirrors iOS `MailTaskViewModel`.
  */
 @HiltViewModel
 class MailTaskViewModel
-    internal constructor(
-        private val taskId: String,
-        initialSeed: MailTaskSeed,
-        private val repository: MailboxRepository?,
+    @Inject
+    constructor(
+        private val repository: MailboxRepository,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        @Inject
-        constructor(
-            savedStateHandle: SavedStateHandle,
-            repository: MailboxRepository,
-        ) : this(
-            taskId = savedStateHandle.get<String>(MAIL_TASK_TASK_ID_KEY) ?: DEFAULT_TASK_ID,
-            initialSeed = MailTaskSeed.Active,
-            repository = repository,
-        )
+        private val taskId: String = savedStateHandle.get<String>(MAIL_TASK_TASK_ID_KEY) ?: "t_412elm"
 
-        /** Test / preview seam — projects the sample fixture, no network. */
-        internal constructor(taskId: String, seed: MailTaskSeed) : this(taskId, seed, null)
-
-        private var seed: MailTaskSeed = initialSeed
+        /** Non-null → preview / test seam (project the sample fixture, no fetch). */
+        private var seed: MailTaskSeed? = null
 
         private val _state = MutableStateFlow<MailTaskUiState>(MailTaskUiState.Loading)
         val state: StateFlow<MailTaskUiState> = _state.asStateFlow()
@@ -83,7 +60,6 @@ class MailTaskViewModel
         private val _showsDelegateSheet = MutableStateFlow(false)
         val showsDelegateSheet: StateFlow<Boolean> = _showsDelegateSheet.asStateFlow()
 
-        /** Opens the originating / next-up mail item. Wired by the screen. */
         private var onOpenMail: (String) -> Unit = {}
         private var onBack: () -> Unit = {}
 
@@ -96,107 +72,46 @@ class MailTaskViewModel
             this.onBack = onBack
         }
 
-        /**
-         * Re-seed the frame (e.g. a deep link that lands on the done state).
-         * Only the sample (preview/test) path re-projects — the live path
-         * keeps whatever the network returned.
-         */
+        /** Preview / test seam — pin a sample frame instead of fetching. */
         fun configureSeed(seed: MailTaskSeed) {
             this.seed = seed
-            if (repository == null && _state.value is MailTaskUiState.Loaded) {
+            if (_state.value is MailTaskUiState.Loaded) {
                 _state.value = MailTaskUiState.Loaded(MailTaskSampleData.task(taskId, seed))
             }
         }
 
         fun load() {
             if (_state.value is MailTaskUiState.Loaded) return
-            if (repository == null) {
-                _state.value = MailTaskUiState.Loaded(MailTaskSampleData.task(taskId, seed))
-                return
-            }
-            fetch()
-        }
-
-        /** Re-fetch (Retry / pull-to-refresh). */
-        fun refresh() {
-            if (repository == null) {
+            val seed = this.seed
+            if (seed != null) {
                 _state.value = MailTaskUiState.Loaded(MailTaskSampleData.task(taskId, seed))
             } else {
                 fetch()
             }
         }
 
+        /** Retry after an error frame. */
+        fun retry() = fetch()
+
         private fun fetch() {
-            val repo = repository ?: return
             _state.value = MailTaskUiState.Loading
             viewModelScope.launch {
-                when (val result = repo.p3Tasks()) {
+                when (val result = repository.p3Tasks()) {
                     is NetworkResult.Success -> {
-                        val match =
-                            (result.data.active + result.data.completed)
-                                .firstOrNull { it.id == taskId }
+                        val all = result.data.active + result.data.completed
+                        val dto = all.firstOrNull { it.id == taskId }
                         _state.value =
-                            if (match != null) {
-                                MailTaskUiState.Loaded(mapTask(match))
+                            if (dto != null) {
+                                MailTaskUiState.Loaded(contentFrom(dto))
                             } else {
-                                MailTaskUiState.Error("That task could not be found.")
+                                MailTaskUiState.Error("This task is no longer available.")
                             }
                     }
-                    is NetworkResult.Failure -> _state.value = MailTaskUiState.Error(result.error.message)
+                    is NetworkResult.Failure -> {
+                        _state.value = MailTaskUiState.Error(result.error.message)
+                    }
                 }
             }
-        }
-
-        /**
-         * Map a live `HomeTask` row onto the render model. Basic fields are
-         * real; the enrichment slots are empty (hidden by the screen).
-         */
-        private fun mapTask(dto: P3TaskDto): MailTaskContent {
-            val done = dto.status == "done" || dto.status == "completed"
-            return MailTaskContent(
-                taskId = dto.id,
-                timeLabel = "",
-                title = dto.title.orEmpty(),
-                reference = "",
-                priority = MailTaskPriority.Medium,
-                subtasks = emptyList(),
-                due = formatDue(dto.dueAt),
-                snoozeOptions = emptyList(),
-                source =
-                    MailTaskSourceMail(
-                        mailId = dto.mailId.orEmpty(),
-                        categoryLabel = "",
-                        sender = dto.mailSender.orEmpty(),
-                        title = dto.mailPreview.orEmpty(),
-                        snippet = "",
-                        time = "",
-                    ),
-                elfOpen = EMPTY_ELF,
-                elfDone = EMPTY_ELF,
-                completion = EMPTY_COMPLETION,
-                nextUp = EMPTY_NEXT_UP,
-                isDone = done,
-            )
-        }
-
-        /** Format an ISO `due_at` into the calendar-block strings, or blank. */
-        private fun formatDue(dueAt: String?): MailTaskDue {
-            if (dueAt.isNullOrBlank()) return BLANK_DUE
-            val instant =
-                runCatching { Instant.parse(dueAt) }.getOrNull()
-                    ?: runCatching { OffsetDateTime.parse(dueAt).toInstant() }.getOrNull()
-                    ?: return BLANK_DUE
-            val zoned = instant.atZone(ZoneId.systemDefault())
-            return MailTaskDue(
-                weekday = zoned.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US).uppercase(Locale.US),
-                day = zoned.dayOfMonth.toString(),
-                month = zoned.month.getDisplayName(TextStyle.SHORT, Locale.US).uppercase(Locale.US),
-                label = "Due ${zoned.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.US)}",
-                time = zoned.format(DateTimeFormatter.ofPattern("h:mm a", Locale.US)),
-                left = "",
-                reminderLabel = "",
-                closesLabel = "",
-            )
         }
 
         // MARK: - Derived chrome
@@ -214,9 +129,8 @@ class MailTaskViewModel
         fun tapBack() = onBack()
 
         /**
-         * Toggle a checklist subtask. Persists to local state so the
-         * progress bar + hero count update immediately. No-op once the
-         * task is done (every step already reads complete).
+         * Toggle a checklist subtask. Live tasks carry no subtasks, so this
+         * only fires in the sample/preview path. No-op once done.
          */
         fun toggleSubtask(id: String) {
             val current = _state.value as? MailTaskUiState.Loaded ?: return
@@ -228,20 +142,38 @@ class MailTaskViewModel
             _state.value = MailTaskUiState.Loaded(current.content.copy(subtasks = updated))
         }
 
-        /** Mark the whole task done — flips to the completion frame. */
+        /** Mark the whole task done — optimistic flip + `PATCH status=completed`. */
         fun markDone() {
             val current = _state.value as? MailTaskUiState.Loaded ?: return
             if (current.content.isDone) return
             _state.value = MailTaskUiState.Loaded(current.content.copy(isDone = true))
             _toast.value = "Marked done"
+            persistStatus("completed", rollbackDoneTo = false)
         }
 
-        /** Reopen a completed task — returns to the open frame. */
+        /** Reopen a completed task — optimistic flip + `PATCH status=pending`. */
         fun reopen() {
             val current = _state.value as? MailTaskUiState.Loaded ?: return
             if (!current.content.isDone) return
             _state.value = MailTaskUiState.Loaded(current.content.copy(isDone = false))
             _toast.value = "Task reopened"
+            persistStatus("pending", rollbackDoneTo = true)
+        }
+
+        /** Persist the done/open flip. No-op in the seeded path; rolls back on failure. */
+        private fun persistStatus(
+            status: String,
+            rollbackDoneTo: Boolean,
+        ) {
+            if (seed != null) return
+            viewModelScope.launch {
+                val result = repository.updateP3Task(taskId, P3TaskUpdateRequest(status = status))
+                if (result is NetworkResult.Failure) {
+                    val current = _state.value as? MailTaskUiState.Loaded ?: return@launch
+                    _state.value = MailTaskUiState.Loaded(current.content.copy(isDone = rollbackDoneTo))
+                    _toast.value = "Couldn't save — try again"
+                }
+            }
         }
 
         /** Quick-snooze tap. Persistence is stubbed; surface a toast. */
@@ -267,14 +199,14 @@ class MailTaskViewModel
 
         /** Open the originating mail ([SourceMailCard] tap). */
         fun openSourceMail() {
-            val current = _state.value as? MailTaskUiState.Loaded ?: return
-            onOpenMail(current.content.source.mailId)
+            val content = (_state.value as? MailTaskUiState.Loaded)?.content ?: return
+            content.source?.let { onOpenMail(it.mailId) }
         }
 
         /** Open the next-up suggestion ([NextUpCard] tap, done frame). */
         fun openNextUp() {
-            val current = _state.value as? MailTaskUiState.Loaded ?: return
-            onOpenMail(current.content.nextUp.mailId)
+            val content = (_state.value as? MailTaskUiState.Loaded)?.content ?: return
+            content.nextUp?.let { onOpenMail(it.mailId) }
         }
 
         /** Add-a-step affordance on the checklist header. Stubbed. */
@@ -295,5 +227,92 @@ class MailTaskViewModel
         /** Archive dock chip (done frame) — stubbed. */
         fun archive() {
             _toast.value = "Archived"
+        }
+
+        // MARK: - DTO → projection
+
+        private fun contentFrom(dto: P3TaskDto): MailTaskContent {
+            val priority =
+                when (dto.priority) {
+                    "high" -> MailTaskPriority.High
+                    "low" -> MailTaskPriority.Low
+                    else -> MailTaskPriority.Medium
+                }
+            return MailTaskContent(
+                taskId = dto.id,
+                timeLabel = timeLabel(dto.createdAt),
+                title = dto.title,
+                reference = dto.description.orEmpty(),
+                priority = priority,
+                due = dueFrom(dto.dueAt),
+                source = sourceFrom(dto),
+                isDone = dto.status == "completed",
+            )
+        }
+
+        private fun sourceFrom(dto: P3TaskDto): MailTaskSourceMail? {
+            val mailId = dto.mailId?.takeIf { it.isNotEmpty() } ?: return null
+            return MailTaskSourceMail(
+                mailId = mailId,
+                categoryLabel = "Mail",
+                sender = dto.mailSender.orEmpty(),
+                title = dto.mailPreview ?: "Original mail",
+                snippet = "",
+                time = "",
+            )
+        }
+
+        private fun timeLabel(createdAt: String?): String {
+            val instant = parseInstant(createdAt) ?: return "Auto-created"
+            val minutes = Duration.between(instant, Instant.now()).toMinutes().coerceAtLeast(0)
+            val relative =
+                when {
+                    minutes < 1 -> "just now"
+                    minutes < 60 -> "${minutes}m ago"
+                    minutes < 1440 -> "${minutes / 60}h ago"
+                    else -> "${minutes / 1440}d ago"
+                }
+            return "Auto-created · $relative"
+        }
+
+        private fun dueFrom(dueAt: String?): MailTaskDue? {
+            val instant = parseInstant(dueAt) ?: return null
+            val zoned = instant.atZone(ZoneId.systemDefault())
+            return MailTaskDue(
+                weekday = zoned.format(WEEKDAY_FORMAT).uppercase(Locale.US),
+                day = zoned.dayOfMonth.toString(),
+                month = zoned.format(MONTH_FORMAT).uppercase(Locale.US),
+                label = dueLabel(zoned.toLocalDate()),
+                time = zoned.format(TIME_FORMAT),
+                // No backend source — the live path hides the DueSnoozeCard
+                // that would render these, so they stay blank rather than faked.
+                left = "",
+                reminderLabel = "",
+                closesLabel = "",
+            )
+        }
+
+        private fun dueLabel(date: LocalDate): String {
+            val today = LocalDate.now()
+            return when (date) {
+                today -> "Due today"
+                today.plusDays(1) -> "Due tomorrow"
+                else -> "Due ${date.format(DAY_MONTH_FORMAT)}"
+            }
+        }
+
+        private fun parseInstant(value: String?): Instant? {
+            value ?: return null
+            return runCatching { OffsetDateTime.parse(value).toInstant() }
+                .recoverCatching { Instant.parse(value) }
+                .recoverCatching { LocalDate.parse(value).atStartOfDay(ZoneId.systemDefault()).toInstant() }
+                .getOrNull()
+        }
+
+        private companion object {
+            private val WEEKDAY_FORMAT = DateTimeFormatter.ofPattern("EEE", Locale.US)
+            private val MONTH_FORMAT = DateTimeFormatter.ofPattern("MMM", Locale.US)
+            private val TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
+            private val DAY_MONTH_FORMAT = DateTimeFormatter.ofPattern("MMM d", Locale.US)
         }
     }

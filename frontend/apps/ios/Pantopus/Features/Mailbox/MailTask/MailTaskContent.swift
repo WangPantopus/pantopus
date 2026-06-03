@@ -253,13 +253,16 @@ public struct MailTaskContent: Sendable, Hashable {
     public let reference: String
     public let priority: MailTaskPriority
     public var subtasks: [MailTaskSubtask]
-    public let due: MailTaskDue
+    // The slots below have no backend source on the native task API today,
+    // so the live path leaves them nil/empty (the view hides them) while
+    // `MailTaskSampleData` fills them for previews + snapshots.
+    public let due: MailTaskDue?
     public let snoozeOptions: [MailTaskSnoozeOption]
-    public let source: MailTaskSourceMail
-    public let elfOpen: MailTaskElf
-    public let elfDone: MailTaskElf
-    public let completion: MailTaskCompletion
-    public let nextUp: MailTaskNextUp
+    public let source: MailTaskSourceMail?
+    public let elfOpen: MailTaskElf?
+    public let elfDone: MailTaskElf?
+    public let completion: MailTaskCompletion?
+    public let nextUp: MailTaskNextUp?
     public var isDone: Bool
 
     public init(
@@ -268,14 +271,14 @@ public struct MailTaskContent: Sendable, Hashable {
         title: String,
         reference: String,
         priority: MailTaskPriority,
-        subtasks: [MailTaskSubtask],
-        due: MailTaskDue,
-        snoozeOptions: [MailTaskSnoozeOption],
-        source: MailTaskSourceMail,
-        elfOpen: MailTaskElf,
-        elfDone: MailTaskElf,
-        completion: MailTaskCompletion,
-        nextUp: MailTaskNextUp,
+        subtasks: [MailTaskSubtask] = [],
+        due: MailTaskDue? = nil,
+        snoozeOptions: [MailTaskSnoozeOption] = [],
+        source: MailTaskSourceMail? = nil,
+        elfOpen: MailTaskElf? = nil,
+        elfDone: MailTaskElf? = nil,
+        completion: MailTaskCompletion? = nil,
+        nextUp: MailTaskNextUp? = nil,
         isDone: Bool = false
     ) {
         self.taskId = taskId
@@ -311,8 +314,8 @@ public struct MailTaskContent: Sendable, Hashable {
         return Double(finishedSteps) / Double(totalSteps)
     }
 
-    /// The elf payload for the current frame.
-    public var elf: MailTaskElf {
+    /// The elf payload for the current frame (nil on the live path).
+    public var elf: MailTaskElf? {
         isDone ? elfDone : elfOpen
     }
 }
@@ -324,6 +327,7 @@ public struct MailTaskContent: Sendable, Hashable {
 public enum MailTaskState {
     case loading
     case loaded(MailTaskContent)
+    case error(message: String)
 }
 
 /// Initial seed for the screen — `active` (open) or `done`.

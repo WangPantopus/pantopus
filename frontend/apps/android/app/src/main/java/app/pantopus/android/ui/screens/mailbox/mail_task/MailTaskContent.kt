@@ -120,14 +120,17 @@ data class MailTaskContent(
     val title: String,
     val reference: String,
     val priority: MailTaskPriority,
-    val subtasks: List<MailTaskSubtask>,
-    val due: MailTaskDue,
-    val snoozeOptions: List<MailTaskSnoozeOption>,
-    val source: MailTaskSourceMail,
-    val elfOpen: MailTaskElf,
-    val elfDone: MailTaskElf,
-    val completion: MailTaskCompletion,
-    val nextUp: MailTaskNextUp,
+    val subtasks: List<MailTaskSubtask> = emptyList(),
+    // The slots below have no backend source on the native task API today,
+    // so the live path leaves them null/empty (the screen hides them)
+    // while [MailTaskSampleData] fills them for previews + snapshots.
+    val due: MailTaskDue? = null,
+    val snoozeOptions: List<MailTaskSnoozeOption> = emptyList(),
+    val source: MailTaskSourceMail? = null,
+    val elfOpen: MailTaskElf? = null,
+    val elfDone: MailTaskElf? = null,
+    val completion: MailTaskCompletion? = null,
+    val nextUp: MailTaskNextUp? = null,
     val isDone: Boolean = false,
 ) {
     /** Total subtasks. */
@@ -141,21 +144,17 @@ data class MailTaskContent(
     val progress: Float
         get() = if (totalSteps == 0) 0f else finishedSteps.toFloat() / totalSteps.toFloat()
 
-    /** The elf payload for the current frame. */
-    val elf: MailTaskElf get() = if (isDone) elfDone else elfOpen
+    /** The elf payload for the current frame (null on the live path). */
+    val elf: MailTaskElf? get() = if (isDone) elfDone else elfOpen
 }
 
 /** Lifecycle state for the Mail-task screen. */
 sealed interface MailTaskUiState {
     data object Loading : MailTaskUiState
 
-    data class Loaded(
-        val content: MailTaskContent,
-    ) : MailTaskUiState
+    data class Loaded(val content: MailTaskContent) : MailTaskUiState
 
-    data class Error(
-        val message: String,
-    ) : MailTaskUiState
+    data class Error(val message: String) : MailTaskUiState
 }
 
 /** Initial seed for the screen — `active` (open) or `done`. */

@@ -150,8 +150,12 @@ struct DueSnoozeCard: View {
 #if DEBUG
 #Preview {
     let task = MailTaskSampleData.task()
-    return DueSnoozeCard(due: task.due, options: task.snoozeOptions) { _ in }
-        .padding()
-        .background(Theme.Color.appBg)
+    return Group {
+        if let due = task.due {
+            DueSnoozeCard(due: due, options: task.snoozeOptions) { _ in }
+        }
+    }
+    .padding()
+    .background(Theme.Color.appBg)
 }
 #endif

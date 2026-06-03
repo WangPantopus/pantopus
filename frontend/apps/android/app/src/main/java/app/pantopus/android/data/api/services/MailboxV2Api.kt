@@ -10,6 +10,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.LogEventResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2ItemResponse
+import app.pantopus.android.data.api.models.mailbox.v2.P3TaskResponse
+import app.pantopus.android.data.api.models.mailbox.v2.P3TaskUpdateRequest
 import app.pantopus.android.data.api.models.mailbox.v2.P3TasksResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateRequest
@@ -133,4 +135,15 @@ interface MailboxV2Api {
     /** `GET /api/mailbox/v2/earn/balance` — route `backend/routes/mailboxV2.js:831`. */
     @GET("api/mailbox/v2/earn/balance")
     suspend fun earnBalance(): EarnBalanceResponse
+
+    /**
+     * `PATCH /api/mailbox/v2/p3/tasks/:id` — route
+     * `backend/routes/mailboxV2Phase3.js:935`. Partial task update
+     * (status / title / priority / dueAt).
+     */
+    @PATCH("api/mailbox/v2/p3/tasks/{id}")
+    suspend fun updateP3Task(
+        @Path("id") id: String,
+        @Body body: P3TaskUpdateRequest,
+    ): P3TaskResponse
 }

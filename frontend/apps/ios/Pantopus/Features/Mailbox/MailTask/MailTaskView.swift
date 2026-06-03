@@ -114,38 +114,62 @@ public struct MailTaskView: View {
             MailTaskLoadingView()
         case let .loaded(task):
             loaded(task)
+        case let .error(message):
+            errorView(message)
         }
     }
 
+    // The AI elf, subtask checklist, snooze row, completion summary,
+    // next-up suggestion, and delegate hint have no backend source on the
+    // live task API, so they only render when the projection carries them
+    // (i.e. the sample/preview path) — never faked from live data.
     private func loaded(_ task: MailTaskContent) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 headerRow(task)
                 TaskCard(content: task)
-                TaskElfStrip(elf: task.elf)
+                if let elf = task.elf {
+                    TaskElfStrip(elf: elf)
+                }
                 if task.isDone {
-                    CompletionSummaryCard(completion: task.completion)
-                    SubtaskChecklist(
-                        subtasks: task.subtasks,
-                        allDone: true,
-                        onToggle: { viewModel.toggleSubtask(id: $0) },
-                        onAddStep: { viewModel.addStep() }
-                    )
-                    SourceMailCard(source: task.source) { viewModel.openSourceMail() }
-                    NextUpCard(nextUp: task.nextUp) { viewModel.openNextUp() }
+                    if let completion = task.completion {
+                        CompletionSummaryCard(completion: completion)
+                    }
+                    if !task.subtasks.isEmpty {
+                        SubtaskChecklist(
+                            subtasks: task.subtasks,
+                            allDone: true,
+                            onToggle: { viewModel.toggleSubtask(id: $0) },
+                            onAddStep: { viewModel.addStep() }
+                        )
+                    }
+                    if let source = task.source {
+                        SourceMailCard(source: source) { viewModel.openSourceMail() }
+                    }
+                    if let nextUp = task.nextUp {
+                        NextUpCard(nextUp: nextUp) { viewModel.openNextUp() }
+                    }
                 } else {
-                    DueSnoozeCard(
-                        due: task.due,
-                        options: task.snoozeOptions
-                    ) { viewModel.snooze(optionId: $0) }
-                    SubtaskChecklist(
-                        subtasks: task.subtasks,
-                        allDone: false,
-                        onToggle: { viewModel.toggleSubtask(id: $0) },
-                        onAddStep: { viewModel.addStep() }
-                    )
-                    SourceMailCard(source: task.source) { viewModel.openSourceMail() }
-                    DelegateHintCard { viewModel.delegate() }
+                    if let due = task.due, !task.snoozeOptions.isEmpty {
+                        DueSnoozeCard(
+                            due: due,
+                            options: task.snoozeOptions
+                        ) { viewModel.snooze(optionId: $0) }
+                    }
+                    if !task.subtasks.isEmpty {
+                        SubtaskChecklist(
+                            subtasks: task.subtasks,
+                            allDone: false,
+                            onToggle: { viewModel.toggleSubtask(id: $0) },
+                            onAddStep: { viewModel.addStep() }
+                        )
+                    }
+                    if let source = task.source {
+                        SourceMailCard(source: source) { viewModel.openSourceMail() }
+                    }
+                    if task.elf != nil {
+                        DelegateHintCard { viewModel.delegate() }
+                    }
                 }
             }
             .padding(.horizontal, Spacing.s4)
@@ -155,6 +179,16 @@ public struct MailTaskView: View {
         .safeAreaInset(edge: .bottom) {
             actionDock(task)
         }
+    }
+
+    private func errorView(_ message: String) -> some View {
+        EmptyState(
+            icon: .alertCircle,
+            headline: "Couldn't load this task",
+            subcopy: message,
+            cta: EmptyState.CTA(title: "Try again") { await viewModel.retry() }
+        )
+        .accessibilityIdentifier("mailTask_error")
     }
 
     private func headerRow(_ task: MailTaskContent) -> some View {

@@ -27,8 +27,12 @@ struct TaskCard: View {
                 topRow
                 titleRow
                     .padding(.top, Spacing.s3)
-                progress
-                    .padding(.top, 14)
+                // The step checklist has no backend source on the live path,
+                // so hide the progress bar when there are no subtasks.
+                if content.totalSteps > 0 {
+                    progress
+                        .padding(.top, 14)
+                }
                 dueChip
                     .padding(.top, 14)
             }
@@ -158,24 +162,30 @@ struct TaskCard: View {
                 background: Theme.Color.successBg,
                 border: Theme.Color.successLight
             ) {
-                Text(content.completion.stamp)
-                    .font(.system(size: 12.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.success)
-                Text("· \(content.completion.note)")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.success)
+                if let completion = content.completion {
+                    Text(completion.stamp)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.success)
+                    Text("· \(completion.note)")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.success)
+                } else {
+                    Text("Completed")
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.success)
+                }
             }
-        } else {
+        } else if let due = content.due {
             chip(
                 icon: .clock,
                 tint: Theme.Color.error,
                 background: Theme.Color.errorBg,
                 border: Theme.Color.errorLight
             ) {
-                Text(content.due.label)
+                Text(due.label)
                     .font(.system(size: 12.5, weight: .bold))
                     .foregroundStyle(Theme.Color.error)
-                Text("· \(weekdayTitle) \(monthTitle) \(content.due.day) · \(content.due.time)")
+                Text("· \(Self.titleCased(due.weekday)) \(Self.titleCased(due.month)) \(due.day) · \(due.time)")
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.error)
                     .lineLimit(1)
@@ -204,14 +214,6 @@ struct TaskCard: View {
                 .stroke(border, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private var weekdayTitle: String {
-        Self.titleCased(content.due.weekday)
-    }
-
-    private var monthTitle: String {
-        Self.titleCased(content.due.month)
     }
 
     /// "FRI" → "Fri", "MAY" → "May".

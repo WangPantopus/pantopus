@@ -95,6 +95,23 @@ public enum MailboxV2Endpoints {
             body: TranslateMailRequest(mailId: mailId, targetLang: targetLang)
         )
     }
+
+    /// `GET /api/mailbox/v2/p3/tasks` — route
+    /// `backend/routes/mailboxV2Phase3.js:831`. Mail-linked tasks split
+    /// into `{ active, completed }`. No detail-by-id route exists, so the
+    /// Mail-task screen fetches this list and selects by id.
+    public static func p3Tasks(homeId: String? = nil) -> Endpoint {
+        var query: [String: String] = [:]
+        if let homeId { query["homeId"] = homeId }
+        return Endpoint(method: .get, path: "/api/mailbox/v2/p3/tasks", query: query)
+    }
+
+    /// `PATCH /api/mailbox/v2/p3/tasks/:id` — route
+    /// `backend/routes/mailboxV2Phase3.js:935`. Partial task update
+    /// (status / title / priority / dueAt).
+    public static func updateP3Task(taskId: String, request: P3TaskUpdateRequest) -> Endpoint {
+        Endpoint(method: .patch, path: "/api/mailbox/v2/p3/tasks/\(taskId)", body: request)
+    }
 }
 
 /// Wire body for `POST /api/mailbox/v2/p3/translate`. The backend

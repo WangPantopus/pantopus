@@ -84,7 +84,7 @@ class MailTaskSnapshotTest {
     fun due_snooze_card() {
         val task = MailTaskSampleData.task()
         paparazzi.snapshot {
-            Root { DueSnoozeCard(due = task.due, options = task.snoozeOptions, onSnooze = {}) }
+            Root { DueSnoozeCard(due = requireNotNull(task.due), options = task.snoozeOptions, onSnooze = {}) }
         }
     }
 
@@ -104,13 +104,13 @@ class MailTaskSnapshotTest {
 
     @Test
     fun source_mail_card() {
-        paparazzi.snapshot { Root { SourceMailCard(source = MailTaskSampleData.task().source, onOpen = {}) } }
+        paparazzi.snapshot { Root { SourceMailCard(source = requireNotNull(MailTaskSampleData.task().source), onOpen = {}) } }
     }
 
     @Test
     fun completion_summary_card() {
         paparazzi.snapshot {
-            Root { CompletionSummaryCard(completion = MailTaskSampleData.task(done = true).completion) }
+            Root { CompletionSummaryCard(completion = requireNotNull(MailTaskSampleData.task(done = true).completion)) }
         }
     }
 
@@ -119,7 +119,7 @@ class MailTaskSnapshotTest {
         paparazzi.snapshot {
             Root {
                 app.pantopus.android.ui.screens.mailbox.mail_task.components
-                    .NextUpCard(nextUp = MailTaskSampleData.task(done = true).nextUp, onOpen = {})
+                    .NextUpCard(nextUp = requireNotNull(MailTaskSampleData.task(done = true).nextUp), onOpen = {})
             }
         }
     }
