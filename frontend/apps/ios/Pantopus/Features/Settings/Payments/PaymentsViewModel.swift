@@ -222,13 +222,12 @@ public final class PaymentsViewModel {
         let name = isBank ? (dto.bankName ?? "Bank account") : cardName(dto.cardBrand)
         let label = "\(name) •• \(last4)"
 
-        let subtext: String?
-        if isBank {
-            subtext = dto.bankAccountType.map { "\($0.capitalized) account" }
+        let subtext: String? = if isBank {
+            dto.bankAccountType.map { "\($0.capitalized) account" }
         } else if let month = dto.cardExpMonth, let year = dto.cardExpYear {
-            subtext = String(format: "Expires %02d/%02d", month, year % 100)
+            String(format: "Expires %02d/%02d", month, year % 100)
         } else {
-            subtext = nil
+            nil
         }
 
         return PaymentMethod(
