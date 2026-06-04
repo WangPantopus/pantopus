@@ -53,14 +53,20 @@ class PaymentsScreenSnapshotTest {
 
     @Test
     fun payments_populated() {
-        val vm = PaymentsViewModel().apply { seed(PaymentsSeed.Populated) }
-        vm.load()
+        // Render the pure content surface so the harness needs no Activity
+        // (PaymentSheet) — the visual contract is identical to the live
+        // wrapper for a given Loaded state.
         paparazzi.snapshot {
             Frame {
-                PaymentsScreen(
+                PaymentsScreenContent(
+                    state = PaymentsUiState.Loaded(PaymentsSampleData.populated),
                     onBack = {},
-                    viewModel = vm,
-                    seed = PaymentsSeed.Populated,
+                    onAddMethod = {},
+                    onSetDefault = {},
+                    onRemove = {},
+                    onTapRow = {},
+                    onCloseAccount = {},
+                    onRetry = {},
                 )
             }
         }
@@ -68,14 +74,17 @@ class PaymentsScreenSnapshotTest {
 
     @Test
     fun payments_empty() {
-        val vm = PaymentsViewModel().apply { seed(PaymentsSeed.Empty) }
-        vm.load()
         paparazzi.snapshot {
             Frame {
-                PaymentsScreen(
+                PaymentsScreenContent(
+                    state = PaymentsUiState.Loaded(PaymentsSampleData.empty),
                     onBack = {},
-                    viewModel = vm,
-                    seed = PaymentsSeed.Empty,
+                    onAddMethod = {},
+                    onSetDefault = {},
+                    onRemove = {},
+                    onTapRow = {},
+                    onCloseAccount = {},
+                    onRetry = {},
                 )
             }
         }

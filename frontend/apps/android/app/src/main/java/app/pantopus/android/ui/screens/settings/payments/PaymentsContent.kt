@@ -72,6 +72,12 @@ enum class PaymentMethodBrand {
     ApplePay,
     Bank,
     Stripe,
+
+    /**
+     * Generic card mark for brands without a bespoke badge (Discover, JCB,
+     * Diners, UnionPay, …) so real saved cards always render.
+     */
+    Card,
 }
 
 /** Small status chip rendered before the trailing chevron. */

@@ -105,4 +105,216 @@ final class PaymentsViewModelTests: XCTestCase {
         if case .loading = vm.state { return }
         XCTFail("VM should start in .loading until load() runs")
     }
+
+    // MARK: - Live path (Phase 3 / 3A)
+
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
+    private static func cardJSON(
+        id: String,
+        brand: String,
+        last4: String,
+        expMonth: Int,
+        expYear: Int,
+        isDefault: Bool
+    ) -> String {
+        """
+        {"id":"\(id)","payment_method_type":"card","card_brand":"\(brand)",
+         "card_last4":"\(last4)","card_exp_month":\(expMonth),
+         "card_exp_year":\(expYear),"is_default":\(isDefault)}
+        """
+    }
+
+    private static func methodsResponse(_ cards: String...) -> String {
+        "{\"paymentMethods\":[\(cards.joined(separator: ","))]}"
+    }
+
+    private static let methodsJSON = methodsResponse(
+        cardJSON(id: "pm_1", brand: "visa", last4: "4242", expMonth: 3, expYear: 2027, isDefault: true),
+        cardJSON(id: "pm_2", brand: "mastercard", last4: "4444", expMonth: 11, expYear: 2026, isDefault: false)
+    )
+
+    private static let addCardParamsJSON = """
+    {"setupIntent":"seti_123_secret_abc","ephemeralKey":"ek_test_123","customer":"cus_123","publishableKey":"pk_test_x"}
+    """
+
+    func testLiveLoadProjectsRealMethods() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.methodsJSON)]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(loaded.methods.count, 2)
+        XCTAssertEqual(loaded.methods[0].brand, .visa)
+        XCTAssertEqual(loaded.methods[0].label, "Visa •• 4242")
+        XCTAssertEqual(loaded.methods[0].subtext, "Expires 03/27")
+        XCTAssertEqual(loaded.methods[0].chip?.label, "Default")
+        XCTAssertEqual(loaded.methods[1].brand, .mastercard)
+        XCTAssertNil(loaded.methods[1].chip, "Only the default method carries a chip")
+        // Live frame never fabricates a balance — Payouts/Connect land in 3C.
+        XCTAssertNil(loaded.balance)
+        if case let .ctaChip(label, _) = loaded.payouts.stripe.trailing {
+            XCTAssertEqual(label, "Connect")
+        } else {
+            XCTFail("Live frame should expose the Stripe Connect CTA")
+        }
+    }
+
+    func testLiveLoadEmptyMethods() async {
+        SequencedURLProtocol.sequence = [.status(200, body: "{\"paymentMethods\":[]}")]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertTrue(loaded.methods.isEmpty)
+    }
+
+    func testLiveLoadFailureTransitionsError() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case .error = vm.state else {
+            XCTFail("Expected .error, got \(vm.state)")
+            return
+        }
+    }
+
+    func testAddCardCompletedRefreshesMethods() async {
+        // load (empty) → add-card params → reload (now one card).
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.addCardParamsJSON),
+            .status(200, body: Self.methodsJSON)
+        ]
+        let presenter = StubPaymentSheetPresenter()
+        presenter.addCardOutcome = .completed
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: presenter)
+        await vm.load()
+        await vm.tapAddMethod()
+        XCTAssertEqual(presenter.presentAddCardCallCount, 1)
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(loaded.methods.count, 2, "Completed add-card refreshes from the backend")
+        XCTAssertNil(vm.actionError)
+    }
+
+    func testAddCardCanceledDoesNotRefresh() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.addCardParamsJSON)
+        ]
+        let presenter = StubPaymentSheetPresenter()
+        presenter.addCardOutcome = .canceled
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: presenter)
+        await vm.load()
+        await vm.tapAddMethod()
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertTrue(loaded.methods.isEmpty, "Cancel leaves the list untouched")
+        XCTAssertNil(vm.actionError)
+    }
+
+    func testSetDefaultOptimisticThenReconcile() async {
+        // load → PUT default → reload (pm_2 now default).
+        let reorderedJSON = Self.methodsResponse(
+            Self.cardJSON(id: "pm_2", brand: "mastercard", last4: "4444", expMonth: 11, expYear: 2026, isDefault: true),
+            Self.cardJSON(id: "pm_1", brand: "visa", last4: "4242", expMonth: 3, expYear: 2027, isDefault: false)
+        )
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: "{\"message\":\"ok\"}"),
+            .status(200, body: reorderedJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        await vm.setDefault("pm_2")
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        let defaultMethod = loaded.methods.first { $0.chip?.tone == .primary }
+        XCTAssertEqual(defaultMethod?.id, "pm_2")
+    }
+
+    func testSetDefaultFailureRevertsAndSurfacesError() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(500, body: "{\"error\":\"boom\"}")
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        await vm.setDefault("pm_2")
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        // Reverted: pm_1 is still the default.
+        XCTAssertEqual(loaded.methods.first { $0.chip?.tone == .primary }?.id, "pm_1")
+        XCTAssertNotNil(vm.actionError)
+    }
+
+    func testRemoveMethodOptimisticThenReconcile() async {
+        let afterRemovalJSON = Self.methodsResponse(
+            Self.cardJSON(id: "pm_1", brand: "visa", last4: "4242", expMonth: 3, expYear: 2027, isDefault: true)
+        )
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: "{\"message\":\"ok\"}"),
+            .status(200, body: afterRemovalJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        await vm.removeMethod("pm_2")
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(loaded.methods.count, 1)
+        XCTAssertEqual(loaded.methods.first?.id, "pm_1")
+    }
+}
+
+/// Records presentation calls and returns a scripted outcome so the
+/// view-model's add-card branch is unit-testable without the Stripe SDK.
+@MainActor
+private final class StubPaymentSheetPresenter: PaymentSheetPresenting {
+    var addCardOutcome: PaymentSheetOutcome = .completed
+    private(set) var presentAddCardCallCount = 0
+
+    func presentAddCard(
+        setupIntentClientSecret _: String,
+        customer _: String,
+        ephemeralKey _: String
+    ) async -> PaymentSheetOutcome {
+        presentAddCardCallCount += 1
+        return addCardOutcome
+    }
+
+    func presentPayment(
+        clientSecret _: String,
+        customer _: String,
+        ephemeralKey _: String,
+        isSetupIntent _: Bool
+    ) async -> PaymentSheetOutcome {
+        .completed
+    }
 }

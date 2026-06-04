@@ -20,13 +20,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -38,6 +45,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroPayoutFooter
+import app.pantopus.android.ui.components.ToastController
+import app.pantopus.android.ui.components.ToastHost
 import app.pantopus.android.ui.screens.settings.payments.components.PaymentMethodRow
 import app.pantopus.android.ui.screens.settings.payments.components.PaymentMethodRowModel
 import app.pantopus.android.ui.theme.PantopusColors
@@ -45,6 +54,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import com.stripe.android.paymentsheet.rememberPaymentSheet
 
 /**
  * P5.2 / A14.6 — Settings → Payments. Payments-OUT surface (cards on
@@ -53,18 +63,80 @@ import app.pantopus.android.ui.theme.Spacing
  * under an optional balance hero, with an "Add payment method" blue
  * row as the final item in the Payment methods card (iOS convention)
  * and a destructive Close-account card on the populated frame only.
+ *
+ * Phase 3 (3A) wires the Payment-methods card to the real backend: list
+ * saved methods, add a card via Stripe PaymentSheet, set-default and
+ * remove (optimistic). PaymentSheet presentation lives here (it needs the
+ * Activity's `ActivityResultRegistry`); the view-model emits intents via
+ * [PaymentsViewModel.events]. The Payouts / balance / Activity sections
+ * render an honest scaffold until 3C wires Stripe Connect.
  */
 @Composable
 fun PaymentsScreen(
     onBack: () -> Unit = {},
     viewModel: PaymentsViewModel = hiltViewModel(),
-    seed: PaymentsSeed = PaymentsSeed.Populated,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(seed) {
-        viewModel.seed(seed)
-        viewModel.load()
+    val toastController = remember { ToastController() }
+
+    // Stripe PaymentSheet must be created in composition (it registers an
+    // ActivityResult launcher). We never build a card form — PaymentSheet
+    // collects the card and handles SCA.
+    val paymentSheet =
+        rememberPaymentSheet { result ->
+            viewModel.onAddCardOutcome(StripePaymentSheets.outcome(result))
+        }
+
+    LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is PaymentsEvent.PresentAddCardSheet ->
+                    paymentSheet.presentWithSetupIntent(
+                        setupIntentClientSecret = event.params.setupIntent,
+                        configuration =
+                            StripePaymentSheets.configuration(
+                                customerId = event.params.customer,
+                                ephemeralKey = event.params.ephemeralKey,
+                            ),
+                    )
+                is PaymentsEvent.ShowMessage -> toastController.error(event.text)
+            }
+        }
     }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        PaymentsScreenContent(
+            state = state,
+            onBack = onBack,
+            onAddMethod = viewModel::tapAddMethod,
+            onSetDefault = viewModel::setDefault,
+            onRemove = viewModel::removeMethod,
+            onTapRow = viewModel::tapRow,
+            onCloseAccount = viewModel::tapCloseAccount,
+            onRetry = viewModel::refresh,
+        )
+        ToastHost(controller = toastController)
+    }
+}
+
+/**
+ * Pure render surface — no Stripe SDK, no view-model. Snapshot tests drive
+ * this directly with a seeded [PaymentsUiState] so the visual contract is
+ * locked without needing an Activity (PaymentSheet) in the harness.
+ */
+@Composable
+internal fun PaymentsScreenContent(
+    state: PaymentsUiState,
+    onBack: () -> Unit,
+    onAddMethod: () -> Unit,
+    onSetDefault: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onTapRow: (String) -> Unit,
+    onCloseAccount: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    var selectedMethod by remember { mutableStateOf<PaymentMethod?>(null) }
 
     Column(
         modifier =
@@ -79,16 +151,104 @@ fun PaymentsScreen(
             is PaymentsUiState.Loaded ->
                 LoadedFrame(
                     loaded = current.content,
-                    onTapRow = viewModel::tapRow,
-                    onAddMethod = viewModel::tapAddMethod,
-                    onCloseAccount = viewModel::tapCloseAccount,
+                    onTapMethod = { selectedMethod = it },
+                    onAddMethod = onAddMethod,
+                    onTapRow = onTapRow,
+                    onCloseAccount = onCloseAccount,
                 )
             is PaymentsUiState.Error ->
                 ErrorFrame(
                     message = current.message,
-                    onRetry = viewModel::refresh,
+                    onRetry = onRetry,
                 )
         }
+    }
+
+    selectedMethod?.let { method ->
+        MethodActionSheet(
+            method = method,
+            onSetDefault = onSetDefault,
+            onRemove = onRemove,
+            onDismiss = { selectedMethod = null },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MethodActionSheet(
+    method: PaymentMethod,
+    onSetDefault: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = PantopusColors.appSurface,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = Spacing.s6)
+                    .testTag("paymentsMethodActions"),
+        ) {
+            Text(
+                text = method.label,
+                color = PantopusColors.appTextSecondary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+            )
+            if (method.chip?.tone != PaymentsChipTone.Primary) {
+                ActionSheetRow(
+                    label = "Set as default",
+                    color = PantopusColors.appText,
+                    testTag = "paymentsRow_${method.id}_setDefault",
+                    onClick = {
+                        onSetDefault(method.id)
+                        onDismiss()
+                    },
+                )
+            }
+            ActionSheetRow(
+                label = "Remove card",
+                color = PantopusColors.error,
+                testTag = "paymentsRow_${method.id}_remove",
+                onClick = {
+                    onRemove(method.id)
+                    onDismiss()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionSheetRow(
+    label: String,
+    color: Color,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
+                .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = color,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
@@ -144,8 +304,9 @@ private fun TopBar(onBack: () -> Unit) {
 @Composable
 private fun LoadedFrame(
     loaded: PaymentsLoaded,
-    onTapRow: (String) -> Unit,
+    onTapMethod: (PaymentMethod) -> Unit,
     onAddMethod: () -> Unit,
+    onTapRow: (String) -> Unit,
     onCloseAccount: () -> Unit,
 ) {
     LazyColumn(
@@ -159,7 +320,7 @@ private fun LoadedFrame(
         }
         item(key = "overline_methods") { SectionOverline("Payment methods", id = "methods") }
         item(key = "card_methods") {
-            MethodsCard(methods = loaded.methods, onTapRow = onTapRow, onAddMethod = onAddMethod)
+            MethodsCard(methods = loaded.methods, onTapMethod = onTapMethod, onAddMethod = onAddMethod)
         }
         item(key = "overline_payouts") { SectionOverline("Payouts", id = "payouts") }
         item(key = "card_payouts") {
@@ -230,7 +391,7 @@ private fun BalanceHeroSection(balance: PaymentsBalance) {
 @Composable
 private fun MethodsCard(
     methods: List<PaymentMethod>,
-    onTapRow: (String) -> Unit,
+    onTapMethod: (PaymentMethod) -> Unit,
     onAddMethod: () -> Unit,
 ) {
     Card(id = "methods") {
@@ -252,8 +413,10 @@ private fun MethodsCard(
                             subtext = method.subtext,
                             chip = method.chip,
                             trailing = PaymentsRowTrailing.Chevron,
+                            chipTestTag =
+                                if (method.chip != null) "paymentsRow_${method.id}_defaultBadge" else null,
                         ),
-                    modifier = Modifier.clickable { onTapRow(method.id) },
+                    modifier = Modifier.clickable { onTapMethod(method) },
                 )
                 if (index < methods.size - 1) {
                     Divider()

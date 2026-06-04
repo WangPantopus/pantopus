@@ -78,7 +78,13 @@ fun PaymentMethodRow(
             }
         }
         if (model.chip != null) {
-            PaymentsChipView(label = model.chip.label, tone = model.chip.tone)
+            if (model.chipTestTag != null) {
+                Box(modifier = Modifier.testTag(model.chipTestTag)) {
+                    PaymentsChipView(label = model.chip.label, tone = model.chip.tone)
+                }
+            } else {
+                PaymentsChipView(label = model.chip.label, tone = model.chip.tone)
+            }
         }
         TrailingView(rowIdentifier = model.rowIdentifier, trailing = model.trailing)
     }
@@ -151,6 +157,7 @@ fun PaymentBrandBadge(brand: PaymentMethodBrand) {
             PaymentMethodBrand.ApplePay -> PantopusColors.appText
             PaymentMethodBrand.Bank -> PantopusColors.primary100
             PaymentMethodBrand.Stripe -> PantopusColors.magic
+            PaymentMethodBrand.Card -> PantopusColors.appSurfaceSunken
         }
     Box(
         modifier =
@@ -218,6 +225,14 @@ fun PaymentBrandBadge(brand: PaymentMethodBrand) {
                     fontSize = 9.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.2.sp,
+                )
+            PaymentMethodBrand.Card ->
+                PantopusIconImage(
+                    icon = PantopusIcon.CreditCard,
+                    contentDescription = null,
+                    size = 14.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextSecondary,
                 )
         }
     }
