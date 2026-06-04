@@ -214,7 +214,12 @@ class HomeSettingsViewModel
                 rows =
                     listOf(
                         GroupedListRow("address", "Address", subtext = subtexts.address, control = addressControl),
-                        GroupedListRow("propertyDetails", "Property details", subtext = subtexts.propertyDetails, control = RowControl.Chevron),
+                        GroupedListRow(
+                            "propertyDetails",
+                            "Property details",
+                            subtext = subtexts.propertyDetails,
+                            control = RowControl.Chevron,
+                        ),
                         GroupedListRow("photos", "Photos", subtext = subtexts.photos, control = RowControl.Chevron),
                         GroupedListRow("documents", "Documents", subtext = subtexts.documents, control = RowControl.Chevron),
                     ),
@@ -228,7 +233,12 @@ class HomeSettingsViewModel
                 rows =
                     listOf(
                         GroupedListRow("accessCodes", "Access codes", subtext = subtexts.accessCodes, control = RowControl.Chevron),
-                        GroupedListRow("trustedNeighbors", "Trusted neighbors", subtext = subtexts.trustedNeighbors, control = RowControl.Chevron),
+                        GroupedListRow(
+                            "trustedNeighbors",
+                            "Trusted neighbors",
+                            subtext = subtexts.trustedNeighbors,
+                            control = RowControl.Chevron,
+                        ),
                         GroupedListRow("privacy", "Privacy", subtext = subtexts.privacy, control = RowControl.Chevron),
                     ),
             )
@@ -250,7 +260,12 @@ class HomeSettingsViewModel
                 overline = "Notifications",
                 rows =
                     listOf(
-                        GroupedListRow("homeNotifications", "Home notifications", subtext = subtexts.notifications, control = RowControl.Chevron),
+                        GroupedListRow(
+                            "homeNotifications",
+                            "Home notifications",
+                            subtext = subtexts.notifications,
+                            control = RowControl.Chevron,
+                        ),
                     ),
             )
 

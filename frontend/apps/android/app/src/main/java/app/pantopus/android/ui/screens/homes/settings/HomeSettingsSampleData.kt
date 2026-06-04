@@ -90,7 +90,12 @@ object HomeSettingsSampleData {
                         rows =
                             listOf(
                                 GroupedListRow("address", "Address", subtext = "14 Elm Park Lane", control = addressControl),
-                                GroupedListRow("propertyDetails", "Property details", subtext = "3 bed · 2 bath · Built 1998", control = RowControl.Chevron),
+                                GroupedListRow(
+                                    "propertyDetails",
+                                    "Property details",
+                                    subtext = "3 bed · 2 bath · Built 1998",
+                                    control = RowControl.Chevron,
+                                ),
                                 GroupedListRow("photos", "Photos", subtext = "Front porch · added Mar 2024", control = RowControl.Chevron),
                                 GroupedListRow("documents", "Documents", subtext = "Lease, HOA, Tax", control = RowControl.Chevron),
                             ),
@@ -101,7 +106,12 @@ object HomeSettingsSampleData {
                         rows =
                             listOf(
                                 GroupedListRow("accessCodes", "Access codes", subtext = "2 active codes", control = RowControl.Chevron),
-                                GroupedListRow("trustedNeighbors", "Trusted neighbors", subtext = "3 approved", control = RowControl.Chevron),
+                                GroupedListRow(
+                                    "trustedNeighbors",
+                                    "Trusted neighbors",
+                                    subtext = "3 approved",
+                                    control = RowControl.Chevron,
+                                ),
                                 GroupedListRow("privacy", "Privacy", subtext = "Verified neighbors only", control = RowControl.Chevron),
                             ),
                     ),
@@ -111,13 +121,26 @@ object HomeSettingsSampleData {
                         rows =
                             listOf(
                                 GroupedListRow("people", "People", subtext = "4 members · 1 pending", control = RowControl.Chevron),
-                                GroupedListRow("inviteLink", "Invite link", subtext = "Active · expires in 12 days", control = RowControl.Chevron),
+                                GroupedListRow(
+                                    "inviteLink",
+                                    "Invite link",
+                                    subtext = "Active · expires in 12 days",
+                                    control = RowControl.Chevron,
+                                ),
                             ),
                     ),
                     GroupedListGroup(
                         id = "notifications",
                         overline = "Notifications",
-                        rows = listOf(GroupedListRow("homeNotifications", "Home notifications", subtext = "Push, email digest", control = RowControl.Chevron)),
+                        rows =
+                            listOf(
+                                GroupedListRow(
+                                    "homeNotifications",
+                                    "Home notifications",
+                                    subtext = "Push, email digest",
+                                    control = RowControl.Chevron,
+                                ),
+                            ),
                     ),
                     GroupedListGroup(
                         id = "windDown",
@@ -135,7 +158,12 @@ object HomeSettingsSampleData {
                                 GroupedListRow("address", "Address", subtext = "42 Magnolia Court", control = addressControl),
                                 GroupedListRow("propertyDetails", "Property details", subtext = "Not set", control = RowControl.Chevron),
                                 GroupedListRow("photos", "Photos", subtext = "Add a photo", control = RowControl.Chevron),
-                                GroupedListRow("documents", "Documents", subtext = "Available after verification", control = RowControl.Chevron),
+                                GroupedListRow(
+                                    "documents",
+                                    "Documents",
+                                    subtext = "Available after verification",
+                                    control = RowControl.Chevron,
+                                ),
                             ),
                     ),
                     GroupedListGroup(
@@ -144,8 +172,18 @@ object HomeSettingsSampleData {
                         rows =
                             listOf(
                                 GroupedListRow("accessCodes", "Access codes", subtext = "Not set", control = RowControl.Chevron),
-                                GroupedListRow("trustedNeighbors", "Trusted neighbors", subtext = "Available after verification", control = RowControl.Chevron),
-                                GroupedListRow("privacy", "Privacy", subtext = "Available after verification", control = RowControl.Chevron),
+                                GroupedListRow(
+                                    "trustedNeighbors",
+                                    "Trusted neighbors",
+                                    subtext = "Available after verification",
+                                    control = RowControl.Chevron,
+                                ),
+                                GroupedListRow(
+                                    "privacy",
+                                    "Privacy",
+                                    subtext = "Available after verification",
+                                    control = RowControl.Chevron,
+                                ),
                             ),
                     ),
                     GroupedListGroup(
@@ -154,13 +192,26 @@ object HomeSettingsSampleData {
                         rows =
                             listOf(
                                 GroupedListRow("people", "People", subtext = "Just you", control = RowControl.Chevron),
-                                GroupedListRow("inviteLink", "Invite link", subtext = "Available after verification", control = RowControl.Chevron),
+                                GroupedListRow(
+                                    "inviteLink",
+                                    "Invite link",
+                                    subtext = "Available after verification",
+                                    control = RowControl.Chevron,
+                                ),
                             ),
                     ),
                     GroupedListGroup(
                         id = "notifications",
                         overline = "Notifications",
-                        rows = listOf(GroupedListRow("homeNotifications", "Home notifications", subtext = "Default", control = RowControl.Chevron)),
+                        rows =
+                            listOf(
+                                GroupedListRow(
+                                    "homeNotifications",
+                                    "Home notifications",
+                                    subtext = "Default",
+                                    control = RowControl.Chevron,
+                                ),
+                            ),
                     ),
                     GroupedListGroup(
                         id = "windDown",

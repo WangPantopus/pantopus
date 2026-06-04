@@ -2,7 +2,6 @@
 
 package app.pantopus.android.ui.screens.mailbox.earn
 
-import app.pantopus.android.data.mailbox.MailboxRepository
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

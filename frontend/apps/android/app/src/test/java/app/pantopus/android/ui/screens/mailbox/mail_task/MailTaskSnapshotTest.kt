@@ -8,14 +8,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.SavedStateHandle
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.DueSnoozeCard
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.SourceMailCard
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.SubtaskChecklist
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.TaskCard
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.Spacing
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -138,7 +141,10 @@ class MailTaskSnapshotTest {
     }
 
     private fun loadedViewModel(seed: MailTaskSeed): MailTaskViewModel =
-        MailTaskViewModel("t_412elm", seed).apply {
+        MailTaskViewModel(
+            repository = mockk<MailboxRepository>(relaxed = true),
+            savedStateHandle = SavedStateHandle(mapOf(MAIL_TASK_TASK_ID_KEY to "t_412elm")),
+        ).apply {
             configureSeed(seed)
             load()
         }

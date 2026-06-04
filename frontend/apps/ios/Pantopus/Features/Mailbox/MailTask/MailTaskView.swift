@@ -119,10 +119,10 @@ public struct MailTaskView: View {
         }
     }
 
-    // The AI elf, subtask checklist, snooze row, completion summary,
-    // next-up suggestion, and delegate hint have no backend source on the
-    // live task API, so they only render when the projection carries them
-    // (i.e. the sample/preview path) — never faked from live data.
+    /// The AI elf, subtask checklist, snooze row, completion summary,
+    /// next-up suggestion, and delegate hint have no backend source on the
+    /// live task API, so they only render when the projection carries them
+    /// (i.e. the sample/preview path) — never faked from live data.
     private func loaded(_ task: MailTaskContent) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {

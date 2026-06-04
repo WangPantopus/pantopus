@@ -44,7 +44,12 @@ public final class EarnViewModel {
     private let client: APIClient
 
     /// Live earner. The default `EarnView` view-model — fetches on `load()`.
-    public init(client: APIClient = .shared) {
+    public init() {
+        source = .live
+        client = .shared
+    }
+
+    init(client: APIClient) {
         source = .live
         self.client = client
     }
@@ -91,7 +96,7 @@ public final class EarnViewModel {
             as: EarningsHistoryResponse.self
         )
         let summary = await summaryResult
-        let history = (try? (await historyResult).get())?.earnings ?? []
+        let history = await (try? (historyResult).get())?.earnings ?? []
 
         switch summary {
         case let .success(summaryDto):

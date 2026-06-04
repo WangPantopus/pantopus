@@ -37,7 +37,7 @@ public final class MailTaskViewModel {
     private let onOpenMail: @MainActor (String) -> Void
     private let onBack: @MainActor () -> Void
 
-    public init(
+    init(
         taskId: String,
         seed: MailTaskSeed? = nil,
         client: APIClient = .shared,

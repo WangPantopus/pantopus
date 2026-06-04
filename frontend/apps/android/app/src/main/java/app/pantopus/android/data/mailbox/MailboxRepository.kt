@@ -137,22 +137,19 @@ class MailboxRepository
         suspend fun p3Tasks(homeId: String? = null): NetworkResult<P3TasksResponse> = safeApiCall { v2Api.p3Tasks(homeId) }
 
         /** `GET /api/mailbox/earnings/summary` — Earn dashboard balance. */
-        suspend fun earningsSummary(): NetworkResult<EarningsSummaryResponse> =
-            safeApiCall { mailboxApi.earningsSummary() }
+        suspend fun earningsSummary(): NetworkResult<EarningsSummaryResponse> = safeApiCall { mailboxApi.earningsSummary() }
 
         /** `GET /api/mailbox/earnings/history` — Earn dashboard recent earnings. */
         suspend fun earningsHistory(
             limit: Int = 50,
             offset: Int = 0,
-        ): NetworkResult<EarningsHistoryResponse> =
-            safeApiCall { mailboxApi.earningsHistory(limit, offset) }
+        ): NetworkResult<EarningsHistoryResponse> = safeApiCall { mailboxApi.earningsHistory(limit, offset) }
 
         /** `PATCH /api/mailbox/v2/p3/tasks/:id` — partial task update. */
         suspend fun updateP3Task(
             taskId: String,
             request: P3TaskUpdateRequest,
-        ): NetworkResult<P3TaskResponse> =
-            safeApiCall { v2Api.updateP3Task(taskId, request) }
+        ): NetworkResult<P3TaskResponse> = safeApiCall { v2Api.updateP3Task(taskId, request) }
 
         /** `GET /api/mailbox/v2/earn/balance` — cleared / pending payout sums. */
         suspend fun earnBalance(): NetworkResult<EarnBalanceResponse> = safeApiCall { v2Api.earnBalance() }

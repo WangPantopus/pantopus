@@ -97,7 +97,7 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
 
     private let onNavigate: @MainActor (HomeSettingsRoute) -> Void
 
-    public init(
+    init(
         homeId: String,
         frame: HomeSettingsSampleData.Frame? = nil,
         client: APIClient = .shared,
@@ -135,11 +135,11 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
                 as: HomeDetailResponse.self
             )
             async let occupantsResult = client.perform(
-                HomesEndpoints.occupants(homeId: homeId),
+                HomesEndpoints.listOccupants(homeId: homeId),
                 as: OccupantsResponse.self
             )
             let detail = try await detailRequest
-            let occupants = try? (await occupantsResult).get()
+            let occupants = try? await (occupantsResult).get()
             apply(detail: detail.home, occupants: occupants)
             state = .loaded(groups())
         } catch {
