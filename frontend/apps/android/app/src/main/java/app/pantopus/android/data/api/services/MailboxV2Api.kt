@@ -1,7 +1,12 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.mailbox.v2.CancelVacationRequest
+import app.pantopus.android.data.api.models.mailbox.v2.CancelVacationResponse
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpRequest
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpResponse
+import app.pantopus.android.data.api.models.mailbox.v2.CreateMapPinRequest
+import app.pantopus.android.data.api.models.mailbox.v2.CreateMapPinResponse
+import app.pantopus.android.data.api.models.mailbox.v2.DeleteMapPinResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerItemsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.EarnBalanceResponse
@@ -10,6 +15,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.LogEventResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2ItemResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MapPinDetailResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MapPinsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.P3TaskResponse
 import app.pantopus.android.data.api.models.mailbox.v2.P3TaskUpdateRequest
 import app.pantopus.android.data.api.models.mailbox.v2.P3TasksResponse
@@ -21,9 +28,13 @@ import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
 import app.pantopus.android.data.api.models.mailbox.v2.RouteMailRequest
 import app.pantopus.android.data.api.models.mailbox.v2.RouteMailResponse
+import app.pantopus.android.data.api.models.mailbox.v2.StartVacationRequest
+import app.pantopus.android.data.api.models.mailbox.v2.StartVacationResponse
 import app.pantopus.android.data.api.models.mailbox.v2.TranslateMailRequest
 import app.pantopus.android.data.api.models.mailbox.v2.TranslationResult
+import app.pantopus.android.data.api.models.mailbox.v2.VacationStatusResponse
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -146,4 +157,75 @@ interface MailboxV2Api {
         @Path("id") id: String,
         @Body body: P3TaskUpdateRequest,
     ): P3TaskResponse
+
+    /**
+     * `GET /api/mailbox/v2/p3/vacation/status` — route
+     * `backend/routes/mailboxV2Phase3.js:1523`. Current scheduled / active
+     * `VacationHold` (`{ active, upcoming }`).
+     */
+    @GET("api/mailbox/v2/p3/vacation/status")
+    suspend fun vacationStatus(): VacationStatusResponse
+
+    /**
+     * `POST /api/mailbox/v2/p3/vacation/start` — route
+     * `backend/routes/mailboxV2Phase3.js:1546`. Creates a hold; the backend
+     * marks it `active` when the start date is past, else `scheduled`.
+     */
+    @POST("api/mailbox/v2/p3/vacation/start")
+    suspend fun startVacation(
+        @Body body: StartVacationRequest,
+    ): StartVacationResponse
+
+    /**
+     * `POST /api/mailbox/v2/p3/vacation/cancel` — route
+     * `backend/routes/mailboxV2Phase3.js:1601`. Ends a hold by id.
+     */
+    @POST("api/mailbox/v2/p3/vacation/cancel")
+    suspend fun cancelVacation(
+        @Body body: CancelVacationRequest,
+    ): CancelVacationResponse
+
+    /**
+     * `GET /api/mailbox/v2/p3/map/pins` — route
+     * `backend/routes/mailboxV2Phase3.js:431`. `HomeMapPin` rows for the
+     * accessible homes (optionally scoped by `homeId` / `type` / bounds).
+     */
+    @Suppress("LongParameterList")
+    @GET("api/mailbox/v2/p3/map/pins")
+    suspend fun mapPins(
+        @Query("homeId") homeId: String? = null,
+        @Query("type") type: String? = null,
+        @Query("north") north: Double? = null,
+        @Query("south") south: Double? = null,
+        @Query("east") east: Double? = null,
+        @Query("west") west: Double? = null,
+    ): MapPinsResponse
+
+    /**
+     * `POST /api/mailbox/v2/p3/map/pin` — route
+     * `backend/routes/mailboxV2Phase3.js:472`. Creates a `HomeMapPin`.
+     */
+    @POST("api/mailbox/v2/p3/map/pin")
+    suspend fun createMapPin(
+        @Body body: CreateMapPinRequest,
+    ): CreateMapPinResponse
+
+    /**
+     * `GET /api/mailbox/v2/p3/map/pin/:id` — route
+     * `backend/routes/mailboxV2Phase3.js:511`. Pin detail (folds optional
+     * `linked_mail`).
+     */
+    @GET("api/mailbox/v2/p3/map/pin/{id}")
+    suspend fun mapPin(
+        @Path("id") id: String,
+    ): MapPinDetailResponse
+
+    /**
+     * `DELETE /api/mailbox/v2/p3/map/pin/:id` — route
+     * `backend/routes/mailboxV2Phase3.js:540`. Deletes a pin (owner only).
+     */
+    @DELETE("api/mailbox/v2/p3/map/pin/{id}")
+    suspend fun deleteMapPin(
+        @Path("id") id: String,
+    ): DeleteMapPinResponse
 }
