@@ -40,7 +40,9 @@ public enum InviteTeammateStep: Int, CaseIterable, Sendable, Equatable {
     }
 
     /// 1-of-3 readout in the top bar.
-    public var stepNumber: Int { rawValue + 1 }
+    public var stepNumber: Int {
+        rawValue + 1
+    }
 }
 
 /// Form snapshot. Lives on the VM and is sent over the wire on submit.

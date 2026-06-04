@@ -67,7 +67,7 @@ final class BusinessTeamViewModelTests: XCTestCase {
      "permissions":["team.view"]}
     """
 
-    // owner + admin + editor
+    /// owner + admin + editor
     private static let membersJSON = """
     {"members":[
       {"id":"t_owner","role_base":"owner","title":"Founder","joined_at":"2024-03-01T00:00:00Z",
@@ -79,7 +79,7 @@ final class BusinessTeamViewModelTests: XCTestCase {
     ]}
     """
 
-    // one pending seat + one accepted seat (accepted must be dropped)
+    /// one pending seat + one accepted seat (accepted must be dropped)
     private static let seatsJSON = """
     {"seats":[
       {"id":"s_pending","display_name":"Front Desk","role_base":"viewer","invite_status":"pending",
@@ -113,7 +113,7 @@ final class BusinessTeamViewModelTests: XCTestCase {
             .status(200, body: access),
             .status(200, body: members),
             .status(200, body: seats),
-            .status(200, body: presets),
+            .status(200, body: presets)
         ]
     }
 
@@ -127,7 +127,7 @@ final class BusinessTeamViewModelTests: XCTestCase {
             return XCTFail("Expected .loaded, got \(vm.state)")
         }
         XCTAssertEqual(content.sections.map(\.role), [.owner, .admin, .editor])
-        XCTAssertEqual(content.sections.map { $0.rows.count }, [1, 1, 1])
+        XCTAssertEqual(content.sections.map(\.rows.count), [1, 1, 1])
         XCTAssertEqual(content.sections.first?.rows.first?.name, "Maria Kovacs")
         XCTAssertEqual(content.sections.first?.rows.first?.email, "maria@x.com")
     }
@@ -148,7 +148,7 @@ final class BusinessTeamViewModelTests: XCTestCase {
     func testLoadMembersFailureTransitionsToError() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.accessOwner),
-            .status(500, body: "{}"),
+            .status(500, body: "{}")
         ]
         let vm = makeVM()
         await vm.load()
@@ -171,7 +171,7 @@ final class BusinessTeamViewModelTests: XCTestCase {
             .status(200, body: Self.accessOwner),
             .status(200, body: Self.emptyMembers),
             .status(200, body: Self.emptySeats),
-            .status(200, body: Self.presetsJSON),
+            .status(200, body: Self.presetsJSON)
         ]
         let vm = makeVM()
         await vm.load()

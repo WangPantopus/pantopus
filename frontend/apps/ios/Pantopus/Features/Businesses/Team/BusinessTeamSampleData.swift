@@ -19,7 +19,7 @@ public enum BusinessTeamSampleData {
         permissions: [
             "team.view", "team.invite", "team.manage",
             "profile.edit", "catalog.manage", "pages.publish",
-            "reviews.respond", "gigs.manage", "finance.manage", "insights.view",
+            "reviews.respond", "gigs.manage", "finance.manage", "insights.view"
         ]
     )
 
@@ -63,7 +63,7 @@ public enum BusinessTeamSampleData {
             roleBase: "viewer",
             iconKey: "eye",
             sortOrder: 50
-        ),
+        )
     ]
 
     public static let members: [BusinessTeamMemberDTO] = [
@@ -118,7 +118,7 @@ public enum BusinessTeamSampleData {
                 email: "rio@marlowco.com",
                 profilePictureUrl: nil
             )
-        ),
+        )
     ]
 
     public static let pendingSeats: [BusinessSeatDTO] = [
@@ -130,6 +130,6 @@ public enum BusinessTeamSampleData {
             inviteEmail: "frontdesk@marlowco.com",
             createdAt: "2025-05-30T12:00:00Z",
             isYou: false
-        ),
+        )
     ]
 }

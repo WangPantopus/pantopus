@@ -70,7 +70,9 @@ public struct BusinessRolePresetDTO: Decodable, Sendable, Hashable, Identifiable
     public let iconKey: String?
     public let sortOrder: Int
 
-    public var id: String { key }
+    public var id: String {
+        key
+    }
 
     public init(
         key: String,

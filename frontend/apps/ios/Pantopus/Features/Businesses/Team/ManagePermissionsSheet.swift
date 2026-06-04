@@ -16,7 +16,9 @@ struct BusinessPermissionOption: Identifiable, Hashable {
     let key: String
     let label: String
     let group: String
-    var id: String { key }
+    var id: String {
+        key
+    }
 }
 
 /// The curated catalog the sheet exposes. A faithful subset of the
@@ -32,7 +34,7 @@ enum BusinessPermissionCatalog {
         BusinessPermissionOption(key: "team.invite", label: "Invite teammates", group: "Team"),
         BusinessPermissionOption(key: "team.manage", label: "Manage team", group: "Team"),
         BusinessPermissionOption(key: "finance.manage", label: "Manage finances", group: "Money"),
-        BusinessPermissionOption(key: "insights.view", label: "View insights", group: "Money"),
+        BusinessPermissionOption(key: "insights.view", label: "View insights", group: "Money")
     ]
 
     /// Group keys in stable display order.

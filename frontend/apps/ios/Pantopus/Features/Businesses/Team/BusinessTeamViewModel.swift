@@ -27,7 +27,9 @@ public struct BusinessTeamSection: Identifiable, Sendable, Equatable {
     public let role: BusinessRole
     public let rows: [BusinessTeamMemberRow]
 
-    public var headerTitle: String { role.pluralLabel }
+    public var headerTitle: String {
+        role.pluralLabel
+    }
 }
 
 /// One pending seat-invite row.
@@ -169,9 +171,9 @@ public final class BusinessTeamViewModel {
 
             // Pending seats + role presets are best-effort — the screen
             // still renders the roster if either is unavailable.
-            pendingSeats = (try? await fetchPendingSeats()) ?? pendingSeats
+            pendingSeats = await (try? fetchPendingSeats()) ?? pendingSeats
             if rolePresets.isEmpty {
-                rolePresets = (try? await fetchPresets()) ?? []
+                rolePresets = await (try? fetchPresets()) ?? []
             }
 
             loadedOnce = true
