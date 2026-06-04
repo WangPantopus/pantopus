@@ -81,7 +81,9 @@ fun MailDayScreen(
 
     // Tick the undo countdown every second when there's an active timer.
     val hasActiveCountdown =
-        (state as? MailDayUiState.Populated)?.content?.reviewed
+        (state as? MailDayUiState.Populated)
+            ?.content
+            ?.reviewed
             ?.any { (it.undoCountdown ?: 0) > 0 } ?: false
     LaunchedEffect(hasActiveCountdown) {
         while (hasActiveCountdown) {
@@ -104,6 +106,7 @@ fun MailDayScreen(
                             junked = viewModel.junkedCount,
                             returned = viewModel.returnedCount,
                             remaining = viewModel.remaining,
+                            onFinish = { viewModel.finishDay() },
                         )
                     },
                     onClose = onClose,
@@ -176,6 +179,7 @@ internal fun MailDayPopulatedFrame(
                 junked = junkedCount,
                 returned = returnedCount,
                 remaining = remaining,
+                onFinish = {},
             )
         },
         onClose = {},
@@ -393,6 +397,7 @@ private fun FinishDayBar(
     junked: Int,
     returned: Int,
     remaining: Int,
+    onFinish: () -> Unit,
 ) {
     val ctaLabel =
         when {
@@ -413,7 +418,7 @@ private fun FinishDayBar(
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             SummaryLine(routed = routed, junked = junked, returned = returned, remaining = remaining)
-            FinishCTA(isEnabled = isEnabled, label = ctaLabel)
+            FinishCTA(isEnabled = isEnabled, label = ctaLabel, onFinish = onFinish)
         }
         Spacer(modifier = Modifier.height(Spacing.s6))
     }
@@ -493,6 +498,7 @@ private fun DotSep() {
 private fun FinishCTA(
     isEnabled: Boolean,
     label: String,
+    onFinish: () -> Unit,
 ) {
     val background = if (isEnabled) PantopusColors.primary600 else PantopusColors.appSurfaceSunken
     val foreground = if (isEnabled) PantopusColors.appTextInverse else PantopusColors.appTextMuted
@@ -507,9 +513,8 @@ private fun FinishCTA(
                     shape = RoundedCornerShape(Radii.lg),
                     ambientColor = PantopusColors.primary600,
                     spotColor = PantopusColors.primary600,
-                )
-                .background(background, shape = RoundedCornerShape(Radii.lg))
-                .clickable(enabled = isEnabled) { /* commit — out of scope */ }
+                ).background(background, shape = RoundedCornerShape(Radii.lg))
+                .clickable(enabled = isEnabled) { onFinish() }
                 .testTag("mailDayFinishDayCTA")
                 .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,

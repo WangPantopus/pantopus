@@ -4,46 +4,75 @@ package app.pantopus.android.ui.screens.mailbox.mail_task
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.mailbox.v2.P3TaskDto
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.mailbox.MailboxRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 import javax.inject.Inject
 
 /** Nav arg key for the A17.12 mail-task detail route (`mailbox/tasks/{taskId}`). */
 const val MAIL_TASK_TASK_ID_KEY = "taskId"
 
+private const val DEFAULT_TASK_ID = "t_412elm"
+
+/** Empty enrichment placeholders — the live `/p3/tasks` endpoint has no
+ *  "elf" / sub-task / completion / next-up source, so those surfaces are
+ *  fed empty and hidden by the screen (never seeded with sample data). */
+private val EMPTY_ELF = MailTaskElf(headline = "", summary = "", bullets = emptyList())
+private val EMPTY_COMPLETION = MailTaskCompletion(stamp = "", note = "", rows = emptyList())
+private val EMPTY_NEXT_UP = MailTaskNextUp(mailId = "", categoryLabel = "", title = "", due = "", from = "")
+private val BLANK_DUE =
+    MailTaskDue(weekday = "", day = "", month = "", label = "", time = "", left = "", reminderLabel = "", closesLabel = "")
+
 /**
- * A17.12 — Mail-task detail view-model. Drives the open / done frames
- * from a single loaded [MailTaskContent]. Mirrors iOS
- * `MailTaskViewModel`.
+ * A17.12 — Mail-task detail view-model. Mirrors iOS `MailTaskViewModel`.
  *
- * The native task API isn't wired yet (web uses `useTasks` /
- * `useUpdateTask` / `useEscalateTaskToGig`); until it lands the VM seeds
- * from [MailTaskSampleData] and mutates the projection locally so QA,
- * previews, and the parity snapshots exercise both frames plus the
- * tappable checklist.
+ * `load()` fetches mail-linked tasks from `GET /api/mailbox/v2/p3/tasks`
+ * and resolves the one matching the nav-arg `taskId` (the endpoint is a
+ * `{ active, completed }` list, so there is no single-task fetch). Only the
+ * basic `HomeTask` fields exist there — title, due, status, the linked mail
+ * id + preview/sender — so those are mapped live; the "elf" / sub-task /
+ * completion / next-up enrichment is a separate `magicTask` concept with no
+ * source and is left empty (the screen hides those sections rather than
+ * seeding them).
  *
- * The Hilt-injected constructor reads `taskId` from the nav args. The
- * internal secondary constructor is the test / preview seam.
+ * The Hilt-injected constructor reads `taskId` from the nav args and goes
+ * live. The two-arg internal constructor is the test / preview seam: a null
+ * repository projects [MailTaskSampleData] so QA, previews, and the parity
+ * snapshots keep exercising both rich frames + the tappable checklist.
  */
 @HiltViewModel
 class MailTaskViewModel
-    @Inject
-    constructor(
-        savedStateHandle: SavedStateHandle,
+    internal constructor(
+        private val taskId: String,
+        initialSeed: MailTaskSeed,
+        private val repository: MailboxRepository?,
     ) : ViewModel() {
-        private val taskId: String = savedStateHandle.get<String>(MAIL_TASK_TASK_ID_KEY) ?: "t_412elm"
+        @Inject
+        constructor(
+            savedStateHandle: SavedStateHandle,
+            repository: MailboxRepository,
+        ) : this(
+            taskId = savedStateHandle.get<String>(MAIL_TASK_TASK_ID_KEY) ?: DEFAULT_TASK_ID,
+            initialSeed = MailTaskSeed.Active,
+            repository = repository,
+        )
 
-        private var seed: MailTaskSeed = MailTaskSeed.Active
+        /** Test / preview seam — projects the sample fixture, no network. */
+        internal constructor(taskId: String, seed: MailTaskSeed) : this(taskId, seed, null)
 
-        /**
-         * Test / preview seam — fixes the seed + id without going through
-         * SavedStateHandle. Mirrors iOS `MailTaskViewModel(taskId:seed:)`.
-         */
-        internal constructor(taskId: String, seed: MailTaskSeed) : this(SavedStateHandle(mapOf(MAIL_TASK_TASK_ID_KEY to taskId))) {
-            this.seed = seed
-        }
+        private var seed: MailTaskSeed = initialSeed
 
         private val _state = MutableStateFlow<MailTaskUiState>(MailTaskUiState.Loading)
         val state: StateFlow<MailTaskUiState> = _state.asStateFlow()
@@ -67,17 +96,107 @@ class MailTaskViewModel
             this.onBack = onBack
         }
 
-        /** Re-seed the frame (e.g. a deep link that lands on the done state). */
+        /**
+         * Re-seed the frame (e.g. a deep link that lands on the done state).
+         * Only the sample (preview/test) path re-projects — the live path
+         * keeps whatever the network returned.
+         */
         fun configureSeed(seed: MailTaskSeed) {
             this.seed = seed
-            if (_state.value is MailTaskUiState.Loaded) {
+            if (repository == null && _state.value is MailTaskUiState.Loaded) {
                 _state.value = MailTaskUiState.Loaded(MailTaskSampleData.task(taskId, seed))
             }
         }
 
         fun load() {
             if (_state.value is MailTaskUiState.Loaded) return
-            _state.value = MailTaskUiState.Loaded(MailTaskSampleData.task(taskId, seed))
+            if (repository == null) {
+                _state.value = MailTaskUiState.Loaded(MailTaskSampleData.task(taskId, seed))
+                return
+            }
+            fetch()
+        }
+
+        /** Re-fetch (Retry / pull-to-refresh). */
+        fun refresh() {
+            if (repository == null) {
+                _state.value = MailTaskUiState.Loaded(MailTaskSampleData.task(taskId, seed))
+            } else {
+                fetch()
+            }
+        }
+
+        private fun fetch() {
+            val repo = repository ?: return
+            _state.value = MailTaskUiState.Loading
+            viewModelScope.launch {
+                when (val result = repo.p3Tasks()) {
+                    is NetworkResult.Success -> {
+                        val match =
+                            (result.data.active + result.data.completed)
+                                .firstOrNull { it.id == taskId }
+                        _state.value =
+                            if (match != null) {
+                                MailTaskUiState.Loaded(mapTask(match))
+                            } else {
+                                MailTaskUiState.Error("That task could not be found.")
+                            }
+                    }
+                    is NetworkResult.Failure -> _state.value = MailTaskUiState.Error(result.error.message)
+                }
+            }
+        }
+
+        /**
+         * Map a live `HomeTask` row onto the render model. Basic fields are
+         * real; the enrichment slots are empty (hidden by the screen).
+         */
+        private fun mapTask(dto: P3TaskDto): MailTaskContent {
+            val done = dto.status == "done" || dto.status == "completed"
+            return MailTaskContent(
+                taskId = dto.id,
+                timeLabel = "",
+                title = dto.title.orEmpty(),
+                reference = "",
+                priority = MailTaskPriority.Medium,
+                subtasks = emptyList(),
+                due = formatDue(dto.dueAt),
+                snoozeOptions = emptyList(),
+                source =
+                    MailTaskSourceMail(
+                        mailId = dto.mailId.orEmpty(),
+                        categoryLabel = "",
+                        sender = dto.mailSender.orEmpty(),
+                        title = dto.mailPreview.orEmpty(),
+                        snippet = "",
+                        time = "",
+                    ),
+                elfOpen = EMPTY_ELF,
+                elfDone = EMPTY_ELF,
+                completion = EMPTY_COMPLETION,
+                nextUp = EMPTY_NEXT_UP,
+                isDone = done,
+            )
+        }
+
+        /** Format an ISO `due_at` into the calendar-block strings, or blank. */
+        private fun formatDue(dueAt: String?): MailTaskDue {
+            if (dueAt.isNullOrBlank()) return BLANK_DUE
+            val instant =
+                runCatching { Instant.parse(dueAt) }.getOrNull()
+                    ?: runCatching { OffsetDateTime.parse(dueAt).toInstant() }.getOrNull()
+                    ?: return BLANK_DUE
+            val zoned = instant.atZone(ZoneId.systemDefault())
+            return MailTaskDue(
+                weekday = zoned.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US).uppercase(Locale.US),
+                day = zoned.dayOfMonth.toString(),
+                month = zoned.month.getDisplayName(TextStyle.SHORT, Locale.US).uppercase(Locale.US),
+                label = "Due ${zoned.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.US)}",
+                time = zoned.format(DateTimeFormatter.ofPattern("h:mm a", Locale.US)),
+                left = "",
+                reminderLabel = "",
+                closesLabel = "",
+            )
         }
 
         // MARK: - Derived chrome

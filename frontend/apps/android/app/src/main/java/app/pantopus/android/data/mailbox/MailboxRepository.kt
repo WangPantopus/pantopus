@@ -7,14 +7,21 @@ import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpRequest
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerItemsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
+import app.pantopus.android.data.api.models.mailbox.v2.EarnBalanceResponse
+import app.pantopus.android.data.api.models.mailbox.v2.LogEventRequest
+import app.pantopus.android.data.api.models.mailbox.v2.LogEventResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2ItemResponse
+import app.pantopus.android.data.api.models.mailbox.v2.P3TasksResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateRequest
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateResponse
+import app.pantopus.android.data.api.models.mailbox.v2.PendingResponse
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
+import app.pantopus.android.data.api.models.mailbox.v2.RouteMailRequest
+import app.pantopus.android.data.api.models.mailbox.v2.RouteMailResponse
 import app.pantopus.android.data.api.models.mailbox.v2.TranslateMailRequest
 import app.pantopus.android.data.api.models.mailbox.v2.TranslationResult
 import app.pantopus.android.data.api.net.NetworkResult
@@ -107,4 +114,24 @@ class MailboxRepository
             targetLang: String = "en",
         ): NetworkResult<TranslationResult> =
             safeApiCall { v2Api.translate(TranslateMailRequest(mailId = mailId, targetLang = targetLang)) }
+
+        /** `GET /api/mailbox/v2/pending` — A11 mail-day triage list. */
+        suspend fun pending(): NetworkResult<PendingResponse> = safeApiCall { v2Api.pending() }
+
+        /** `POST /api/mailbox/v2/route` — ingest/route a new mail item. */
+        suspend fun route(mailId: String): NetworkResult<RouteMailResponse> = safeApiCall { v2Api.route(RouteMailRequest(mailId = mailId)) }
+
+        /** `POST /api/mailbox/v2/event` — client-side telemetry (e.g. mail-day finished). */
+        suspend fun logEvent(
+            eventType: String,
+            mailId: String? = null,
+            metadata: Map<String, String>? = null,
+        ): NetworkResult<LogEventResponse> =
+            safeApiCall { v2Api.logEvent(LogEventRequest(eventType = eventType, mailId = mailId, metadata = metadata)) }
+
+        /** `GET /api/mailbox/v2/p3/tasks` — mail-linked tasks (active / completed). */
+        suspend fun p3Tasks(homeId: String? = null): NetworkResult<P3TasksResponse> = safeApiCall { v2Api.p3Tasks(homeId) }
+
+        /** `GET /api/mailbox/v2/earn/balance` — cleared / pending payout sums. */
+        suspend fun earnBalance(): NetworkResult<EarnBalanceResponse> = safeApiCall { v2Api.earnBalance() }
     }

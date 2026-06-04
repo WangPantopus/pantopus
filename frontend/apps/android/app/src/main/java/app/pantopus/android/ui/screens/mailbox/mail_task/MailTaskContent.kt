@@ -149,7 +149,13 @@ data class MailTaskContent(
 sealed interface MailTaskUiState {
     data object Loading : MailTaskUiState
 
-    data class Loaded(val content: MailTaskContent) : MailTaskUiState
+    data class Loaded(
+        val content: MailTaskContent,
+    ) : MailTaskUiState
+
+    data class Error(
+        val message: String,
+    ) : MailTaskUiState
 }
 
 /** Initial seed for the screen — `active` (open) or `done`. */
