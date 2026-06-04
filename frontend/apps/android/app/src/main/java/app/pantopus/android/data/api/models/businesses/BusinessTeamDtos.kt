@@ -23,16 +23,6 @@ import com.squareup.moshi.JsonClass
  *  - DELETE `/api/businesses/:id/seats/:seatId`            — businessSeats.js:698
  */
 
-/** The caller's access for a business — drives action gating. A 403 returns
- *  `{ hasAccess: false, role_base: null, permissions: [] }`. */
-@JsonClass(generateAdapter = true)
-data class BusinessAccessDto(
-    val hasAccess: Boolean = false,
-    val isOwner: Boolean = false,
-    @Json(name = "role_base") val roleBase: String? = null,
-    val permissions: List<String> = emptyList(),
-)
-
 /** One assignable role preset. The change-role picker posts `key` back as
  *  `preset_key`. */
 @JsonClass(generateAdapter = true)
