@@ -157,10 +157,22 @@ object DeepLinkRouter {
 
         /**
          * `pantopus://businesses/:id` — A10.7 Business owner view. The public
-         * profile (A10.6) is the singular `pantopus://business/:username` and
-         * has no typed Android deep-link destination yet.
+         * profile (A10.6) is the singular `pantopus://business/:username`,
+         * routed to [BusinessProfile].
          */
         data class BusinessOwner(val businessId: String) : Destination
+
+        /**
+         * `pantopus://business/:username` — A10.6 public business profile
+         * (singular path). Mirrors iOS `businessProfile`.
+         */
+        data class BusinessProfile(val businessId: String) : Destination
+
+        /**
+         * `pantopus://businesses/:id/page-editor` — A13.10 Edit Business Page
+         * (owner-only). Mirrors iOS `editBusinessPage`.
+         */
+        data class EditBusinessPage(val businessId: String) : Destination
 
         /** `pantopus://identity/preview` — A18.5 "View as" identity preview. */
         data object ViewAs : Destination
@@ -305,16 +317,23 @@ object DeepLinkRouter {
             }
             "businesses" -> {
                 // `pantopus://businesses/new` opens the Create Business wizard.
-                // `pantopus://businesses/:id` opens the A10.7 Business owner
-                // view (B1.6). Trailing paths (e.g. `/page-editor`) have no
-                // typed Android destination yet, so they fall back to Unknown.
+                // `pantopus://businesses/:id/page-editor` opens the owner-only
+                // A13.10 editor. `pantopus://businesses/:id` opens the A10.7
+                // Business owner view. Mirrors iOS `businessesDestination`.
                 val id = segments.getOrNull(1)
+                val trailing = segments.getOrNull(2)
                 when {
                     id == "new" -> Destination.CreateBusiness
                     id.isNullOrBlank() -> Destination.Unknown(raw)
-                    segments.drop(2).isNotEmpty() -> Destination.Unknown(raw)
+                    trailing == "page-editor" || trailing == "page_editor" ->
+                        Destination.EditBusinessPage(id)
                     else -> Destination.BusinessOwner(id)
                 }
+            }
+            "business" -> {
+                // Singular `business/:username` is the A10.6 public profile.
+                val id = segments.getOrNull(1)
+                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.BusinessProfile(id)
             }
             "chat", "message", "messages", "conversation" -> {
                 val id = segments.getOrNull(1)
