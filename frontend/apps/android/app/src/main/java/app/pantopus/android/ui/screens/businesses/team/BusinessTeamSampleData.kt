@@ -21,14 +21,26 @@ object BusinessTeamSampleData {
             roleBase = "owner",
             permissions =
                 listOf(
-                    "team.view", "team.invite", "team.manage",
-                    "profile.edit", "catalog.manage", "reviews.respond", "insights.view",
+                    "team.view",
+                    "team.invite",
+                    "team.manage",
+                    "profile.edit",
+                    "catalog.manage",
+                    "reviews.respond",
+                    "insights.view",
                 ),
         )
 
     val presets =
         listOf(
-            BusinessRolePresetDto("business_owner", "Owner", "Full control over the business", "owner", "crown", 10),
+            BusinessRolePresetDto(
+                "business_owner",
+                "Owner",
+                "Full control over the business",
+                "owner",
+                "crown",
+                10,
+            ),
             BusinessRolePresetDto(
                 key = "business_admin",
                 displayName = "Administrator",
@@ -53,7 +65,14 @@ object BusinessTeamSampleData {
                 iconKey = "briefcase",
                 sortOrder = 40,
             ),
-            BusinessRolePresetDto("read_only", "Viewer", "Read-only access to public business info", "viewer", "eye", 50),
+            BusinessRolePresetDto(
+                "read_only",
+                "Viewer",
+                "Read-only access to public business info",
+                "viewer",
+                "eye",
+                50,
+            ),
         )
 
     val members =

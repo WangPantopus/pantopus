@@ -1,20 +1,5 @@
-//
-//  BusinessTeamViewModel.swift
-//  Pantopus
-//
-//  Owner-side business team & roles roster. Cloned from the per-home
-//  `MembersListViewModel` but pointed at the businessIam members list
-//  (grouped by `role_base`) plus the businessSeats pending-invite list.
-//
-//  Tab → data-source mapping:
-//    - Members: GET /api/businesses/:id/members, grouped by role tier.
-//    - Pending: GET /api/businesses/:id/seats, rows where
-//      `invite_status == "pending"`.
-//
-//  Action gating is driven by GET /api/businesses/:id/me — overflow
-//  actions require `team.manage`; the invite affordance requires
-//  `team.invite`.
-//
+// Owner-side business team and roles roster. Members are sourced from
+// businessIam, pending invites from businessSeats, and action gating from /me.
 
 import Foundation
 import Observation
@@ -95,12 +80,12 @@ public final class BusinessTeamViewModel {
 
     // MARK: Raw state
 
-    private var access: BusinessAccessDTO?
+    private var access: BusinessTeamAccessDTO?
     private var members: [BusinessTeamMemberDTO] = []
     private var pendingSeats: [BusinessSeatDTO] = []
     private var loadedOnce = false
 
-    public init(
+    init(
         businessId: String,
         api: APIClient = .shared,
         now: @escaping @Sendable () -> Date = { Date() },
@@ -126,13 +111,13 @@ public final class BusinessTeamViewModel {
     /// Preview/test seed bundle so SwiftUI previews and unit tests can
     /// render the loaded state without a network round-trip.
     public struct Seed: Sendable {
-        public let access: BusinessAccessDTO
+        public let access: BusinessTeamAccessDTO
         public let members: [BusinessTeamMemberDTO]
         public let pendingSeats: [BusinessSeatDTO]
         public let presets: [BusinessRolePresetDTO]
 
         public init(
-            access: BusinessAccessDTO,
+            access: BusinessTeamAccessDTO,
             members: [BusinessTeamMemberDTO],
             pendingSeats: [BusinessSeatDTO],
             presets: [BusinessRolePresetDTO]
@@ -168,7 +153,7 @@ public final class BusinessTeamViewModel {
         do {
             // Access gate first — a 403 here means the viewer can't see
             // the team at all.
-            let access: BusinessAccessDTO = try await api.request(
+            let access: BusinessTeamAccessDTO = try await api.request(
                 BusinessTeamEndpoints.access(businessId: businessId)
             )
             self.access = access
@@ -298,7 +283,7 @@ public final class BusinessTeamViewModel {
     // MARK: - Permissions (Manage permissions sheet)
 
     /// Fetch the effective permission set for one member.
-    public func memberPermissions(userId: String) async -> Result<[String], String> {
+    public func memberPermissions(userId: String) async -> BusinessPermissionLoadResult {
         do {
             let response: BusinessMemberPermissionsResponse = try await api.request(
                 BusinessTeamEndpoints.memberPermissions(businessId: businessId, userId: userId)
@@ -306,7 +291,9 @@ public final class BusinessTeamViewModel {
             return .success(response.permissions)
         } catch {
             return .failure(
-                (error as? APIError)?.errorDescription ?? "Couldn't load permissions."
+                BusinessPermissionsLoadError(
+                    message: (error as? APIError)?.errorDescription ?? "Couldn't load permissions."
+                )
             )
         }
     }
@@ -402,10 +389,7 @@ public final class BusinessTeamViewModel {
     // MARK: - Helpers (pure)
 
     static func displayName(for member: BusinessTeamMemberDTO) -> String {
-        if let name = member.user?.name?.nilIfBlank { return name }
-        if let username = member.user?.username?.nilIfBlank { return "@\(username)" }
-        if let email = member.user?.email?.nilIfBlank { return email }
-        return "Team member"
+        BusinessTeamProjection.displayName(for: member)
     }
 
     private func joinedText(for member: BusinessTeamMemberDTO) -> String? {
@@ -433,26 +417,38 @@ public final class BusinessTeamViewModel {
         return "Invited \(relative)"
     }
 
-    // MARK: - Date helpers (mirror Members)
-
-    private static let iso8601: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private static let iso8601NoFraction: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    private static func parseDate(_ raw: String?) -> Date? {
-        guard let raw, !raw.isEmpty else { return nil }
-        return iso8601.date(from: raw) ?? iso8601NoFraction.date(from: raw)
-    }
-
     public static func formatRelativeTime(
+        _ raw: String?,
+        now: Date,
+        calendar: Calendar,
+        timeZone: TimeZone
+    ) -> String? {
+        BusinessTeamDateFormatter.formatRelativeTime(
+            raw,
+            now: now,
+            calendar: calendar,
+            timeZone: timeZone
+        )
+    }
+}
+
+public struct BusinessPermissionsLoadError: Error, Sendable, Equatable {
+    public let message: String
+}
+
+public typealias BusinessPermissionLoadResult = Result<[String], BusinessPermissionsLoadError>
+
+private enum BusinessTeamProjection {
+    static func displayName(for member: BusinessTeamMemberDTO) -> String {
+        if let name = member.user?.name?.nilIfBlank { return name }
+        if let username = member.user?.username?.nilIfBlank { return "@\(username)" }
+        if let email = member.user?.email?.nilIfBlank { return email }
+        return "Team member"
+    }
+}
+
+private enum BusinessTeamDateFormatter {
+    static func formatRelativeTime(
         _ raw: String?,
         now: Date,
         calendar: Calendar,
@@ -476,6 +472,15 @@ public final class BusinessTeamViewModel {
         formatter.timeZone = timeZone
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
+    }
+
+    private static func parseDate(_ raw: String?) -> Date? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let iso8601 = ISO8601DateFormatter()
+        iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let iso8601NoFraction = ISO8601DateFormatter()
+        iso8601NoFraction.formatOptions = [.withInternetDateTime]
+        return iso8601.date(from: raw) ?? iso8601NoFraction.date(from: raw)
     }
 }
 

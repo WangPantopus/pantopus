@@ -12,7 +12,7 @@ import Foundation
 /// Static fixtures mirroring the businessIam `/members`, businessSeats
 /// `/seats`, `/role-presets`, and `/me` payload shapes.
 public enum BusinessTeamSampleData {
-    public static let access = BusinessAccessDTO(
+    public static let access = BusinessTeamAccessDTO(
         hasAccess: true,
         isOwner: true,
         roleBase: "owner",

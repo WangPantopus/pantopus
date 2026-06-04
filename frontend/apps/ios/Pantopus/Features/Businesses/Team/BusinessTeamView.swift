@@ -364,6 +364,7 @@ private struct PendingRowCard: View {
 
 // MARK: - Shared row bits
 
+@MainActor
 private func metaLine(text: String, icon: PantopusIcon) -> some View {
     HStack(alignment: .center, spacing: Spacing.s1) {
         Icon(icon, size: 11, color: Theme.Color.appTextSecondary)

@@ -50,7 +50,7 @@ public struct ManagePermissionsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private let memberName: String
-    private let loadPermissions: () async -> Result<[String], String>
+    private let loadPermissions: () async -> BusinessPermissionLoadResult
     private let toggle: (String, Bool) async -> Bool
 
     @State private var load: PermissionsLoad = .loading
@@ -59,7 +59,7 @@ public struct ManagePermissionsSheet: View {
 
     public init(
         memberName: String,
-        loadPermissions: @escaping () async -> Result<[String], String>,
+        loadPermissions: @escaping () async -> BusinessPermissionLoadResult,
         toggle: @escaping (String, Bool) async -> Bool
     ) {
         self.memberName = memberName
@@ -161,8 +161,8 @@ public struct ManagePermissionsSheet: View {
         case let .success(permissions):
             granted = Set(permissions)
             load = .loaded
-        case let .failure(message):
-            load = .error(message)
+        case let .failure(error):
+            load = .error(error.message)
         }
     }
 

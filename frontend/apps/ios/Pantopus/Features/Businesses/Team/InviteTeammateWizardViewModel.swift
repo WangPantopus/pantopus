@@ -194,7 +194,7 @@ public final class InviteTeammateWizardViewModel: WizardModel {
             notes: trimmedNote.isEmpty ? nil : trimmedNote
         )
         do {
-            let response: BusinessSeatInviteResponse = try await api.request(
+            let response: BusinessTeamSeatInviteResponse = try await api.request(
                 BusinessTeamEndpoints.inviteSeat(businessId: businessId, request: request)
             )
             pendingEvent = .submitted(response.seat)

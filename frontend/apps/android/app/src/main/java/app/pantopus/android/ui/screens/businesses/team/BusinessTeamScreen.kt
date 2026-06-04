@@ -478,8 +478,7 @@ private fun TeamAvatar(
     }
 }
 
-private fun initials(name: String): String =
-    name.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }
+private fun initials(name: String): String = name.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }
 
 @Composable
 private fun InviteFab(

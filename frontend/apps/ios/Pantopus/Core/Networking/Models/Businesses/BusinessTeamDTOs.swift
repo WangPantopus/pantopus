@@ -30,7 +30,7 @@ import Foundation
 /// The current user's access for a business — drives the `team.view` /
 /// `team.manage` / `team.invite` action gating. On a 403 the backend
 /// returns `{ hasAccess: false, role_base: null, permissions: [] }`.
-public struct BusinessAccessDTO: Decodable, Sendable, Hashable {
+public struct BusinessTeamAccessDTO: Decodable, Sendable, Hashable {
     public let hasAccess: Bool
     public let isOwner: Bool?
     public let roleBase: String?
@@ -273,7 +273,7 @@ public struct BusinessSeatInviteRequest: Encodable, Sendable, Hashable {
 }
 
 /// Envelope for `POST /api/businesses/:id/seats/invite`.
-public struct BusinessSeatInviteResponse: Decodable, Sendable, Hashable {
+public struct BusinessTeamSeatInviteResponse: Decodable, Sendable, Hashable {
     public let seat: BusinessSeatDTO
     public let inviteToken: String?
 

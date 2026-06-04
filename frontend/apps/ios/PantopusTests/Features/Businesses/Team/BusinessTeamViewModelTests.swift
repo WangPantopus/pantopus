@@ -20,8 +20,6 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length
-
 @MainActor
 final class BusinessTeamViewModelTests: XCTestCase {
     override func setUp() {
@@ -47,10 +45,11 @@ final class BusinessTeamViewModelTests: XCTestCase {
     }()
 
     private func makeVM(businessId: String = "biz_1") -> BusinessTeamViewModel {
-        BusinessTeamViewModel(
+        let fixedNow = Self.fixedNow
+        return BusinessTeamViewModel(
             businessId: businessId,
             api: makeAPI(),
-            now: { Self.fixedNow },
+            now: { fixedNow },
             calendar: Self.utcCalendar,
             timeZone: Self.utc
         )
@@ -230,8 +229,12 @@ final class BusinessTeamViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         let toViewer = BusinessRolePresetDTO(
-            key: "read_only", displayName: "Viewer", description: "Read-only",
-            roleBase: "viewer", iconKey: "eye", sortOrder: 50
+            key: "read_only",
+            displayName: "Viewer",
+            description: "Read-only",
+            roleBase: "viewer",
+            iconKey: "eye",
+            sortOrder: 50
         )
         await vm.changeRole(userId: "u_admin", preset: toViewer)
         guard case let .loaded(content) = vm.state else {
@@ -249,8 +252,12 @@ final class BusinessTeamViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         let toViewer = BusinessRolePresetDTO(
-            key: "read_only", displayName: "Viewer", description: "Read-only",
-            roleBase: "viewer", iconKey: "eye", sortOrder: 50
+            key: "read_only",
+            displayName: "Viewer",
+            description: "Read-only",
+            roleBase: "viewer",
+            iconKey: "eye",
+            sortOrder: 50
         )
         await vm.changeRole(userId: "u_admin", preset: toViewer)
         guard case let .loaded(content) = vm.state else {
@@ -336,19 +343,22 @@ final class BusinessTeamViewModelTests: XCTestCase {
 
     func testDisplayNameFallsBackToUsernameThenEmail() {
         let withName = BusinessTeamMemberDTO(
-            id: "1", roleBase: "staff",
+            id: "1",
+            roleBase: "staff",
             user: BusinessTeamUserDTO(id: "u", username: "u", name: "Real Name", email: "e@x.com")
         )
         XCTAssertEqual(BusinessTeamViewModel.displayName(for: withName), "Real Name")
 
         let usernameOnly = BusinessTeamMemberDTO(
-            id: "2", roleBase: "staff",
+            id: "2",
+            roleBase: "staff",
             user: BusinessTeamUserDTO(id: "u", username: "handle", name: nil, email: nil)
         )
         XCTAssertEqual(BusinessTeamViewModel.displayName(for: usernameOnly), "@handle")
 
         let emailOnly = BusinessTeamMemberDTO(
-            id: "3", roleBase: "staff",
+            id: "3",
+            roleBase: "staff",
             user: BusinessTeamUserDTO(id: "u", username: nil, name: nil, email: "only@x.com")
         )
         XCTAssertEqual(BusinessTeamViewModel.displayName(for: emailOnly), "only@x.com")
