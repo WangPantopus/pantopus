@@ -49,9 +49,22 @@ public final class HomeSecurityViewModel: GroupedListDataSource {
     /// returns from the backend.
     public enum Variant: Sendable, Hashable { case balanced, strict }
 
-    public init(
+    public convenience init(
         homeId: String,
-        api: APIClient = .shared,
+        variant: Variant = .balanced,
+        homeName: String = "14 Elm Park Lane"
+    ) {
+        self.init(
+            homeId: homeId,
+            api: .shared,
+            variant: variant,
+            homeName: homeName
+        )
+    }
+
+    init(
+        homeId: String,
+        api: APIClient,
         variant: Variant = .balanced,
         homeName: String = "14 Elm Park Lane"
     ) {

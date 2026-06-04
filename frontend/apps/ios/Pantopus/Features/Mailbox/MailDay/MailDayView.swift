@@ -77,9 +77,8 @@ public struct MailDayView: View {
                             routed: viewModel.routedCount,
                             junked: viewModel.junkedCount,
                             returned: viewModel.returnedCount,
-                            remaining: viewModel.remaining,
-                            onFinish: { Task { await viewModel.finishDay() } }
-                        )
+                            remaining: viewModel.remaining
+                        ) { Task { await viewModel.finishDay() } }
                     )
                 }
             )

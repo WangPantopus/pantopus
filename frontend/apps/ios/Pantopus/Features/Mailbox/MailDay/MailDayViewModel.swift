@@ -41,15 +41,28 @@ public final class MailDayViewModel {
     /// - Parameters:
     ///   - variant: Which fixture to fall back to when the fetch can't
     ///     complete (offline / previews / tests). Defaults to `.populated`.
-    ///   - api: Networking client. Defaults to `.shared`.
     ///   - content: Optional seed (tests / previews) overriding the
     ///     sample fixture for this variant.
     ///   - onScanRequested: Invoked when the user taps any Scan CTA
     ///     (top scan-more card or empty-hero primary). Out of scope to
     ///     wire to the real scanner here — the host hands a closure.
-    public init(
+    public convenience init(
         variant: MailDayVariant = .populated,
-        api: APIClient = .shared,
+        content: MailDayContent? = nil,
+        onScanRequested: @escaping @MainActor () -> Void = {}
+    ) {
+        self.init(
+            variant: variant,
+            api: .shared,
+            content: content,
+            onScanRequested: onScanRequested
+        )
+    }
+
+    /// Test/internal initializer with injectable networking.
+    init(
+        variant: MailDayVariant = .populated,
+        api: APIClient,
         content: MailDayContent? = nil,
         onScanRequested: @escaping @MainActor () -> Void = {}
     ) {
