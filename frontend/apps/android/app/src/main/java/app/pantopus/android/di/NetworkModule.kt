@@ -34,6 +34,7 @@ import app.pantopus.android.data.api.services.MailboxVaultApi
 import app.pantopus.android.data.api.services.MembershipApi
 import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.OffersApi
+import app.pantopus.android.data.api.services.PaymentsApi
 import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
@@ -162,6 +163,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideWalletApi(retrofit: Retrofit): WalletApi = retrofit.create(WalletApi::class.java)
+
+    @Provides @Singleton
+    fun providePaymentsApi(retrofit: Retrofit): PaymentsApi = retrofit.create(PaymentsApi::class.java)
 
     @Provides @Singleton
     fun provideBusinessDiscoveryApi(retrofit: Retrofit): BusinessDiscoveryApi = retrofit.create(BusinessDiscoveryApi::class.java)

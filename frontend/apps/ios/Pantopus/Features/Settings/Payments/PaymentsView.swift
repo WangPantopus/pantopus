@@ -18,6 +18,7 @@ import SwiftUI
 
 public struct PaymentsView: View {
     @State private var viewModel: PaymentsViewModel
+    @State private var actionMethod: PaymentMethod?
     private let onBack: @MainActor () -> Void
 
     public init(
@@ -37,6 +38,43 @@ public struct PaymentsView: View {
         .background(Theme.Color.appBg)
         .task { await viewModel.load() }
         .accessibilityIdentifier("payments")
+        .confirmationDialog(
+            actionMethod?.label ?? "Payment method",
+            isPresented: Binding(
+                get: { actionMethod != nil },
+                set: { if !$0 { actionMethod = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            methodActions
+        }
+        .alert(
+            "Something went wrong",
+            isPresented: Binding(
+                get: { viewModel.actionError != nil },
+                set: { if !$0 { viewModel.clearActionError() } }
+            )
+        ) {
+            Button("OK", role: .cancel) { viewModel.clearActionError() }
+        } message: {
+            Text(viewModel.actionError ?? "")
+        }
+    }
+
+    @ViewBuilder private var methodActions: some View {
+        if let method = actionMethod {
+            if method.chip?.tone != .primary {
+                Button("Set as Default") {
+                    Task { await viewModel.setDefault(method.id) }
+                }
+                .accessibilityIdentifier("paymentsRow_\(method.id)_setDefault")
+            }
+            Button("Remove Card", role: .destructive) {
+                Task { await viewModel.removeMethod(method.id) }
+            }
+            .accessibilityIdentifier("paymentsRow_\(method.id)_remove")
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }
 
@@ -109,7 +147,7 @@ private extension PaymentsView {
                 } else {
                     ForEach(Array(methods.enumerated()), id: \.element.id) { index, method in
                         Button(action: {
-                            Task { await viewModel.tapRow(method.id) }
+                            actionMethod = method
                         }, label: {
                             PaymentMethodRow(
                                 brand: method.brand,
@@ -117,7 +155,10 @@ private extension PaymentsView {
                                 subtext: method.subtext,
                                 chip: method.chip,
                                 trailing: .chevron,
-                                rowIdentifier: method.id
+                                rowIdentifier: method.id,
+                                chipIdentifier: method.chip != nil
+                                    ? "paymentsRow_\(method.id)_defaultBadge"
+                                    : nil
                             )
                         })
                         .buttonStyle(.plain)

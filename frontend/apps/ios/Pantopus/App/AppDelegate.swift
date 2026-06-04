@@ -19,6 +19,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         MainActor.assumeIsolated {
             Observability.shared.start(environment: AppEnvironment.current)
+            // Phase 3 (3A) — configure the Stripe SDK once at launch with the
+            // publishable key resolved from Info.plist (xcconfig / .env). The
+            // SDK is already linked (project.yml); we only set the key here.
+            StripeBootstrap.configure(publishableKey: AppEnvironment.current.stripePublishableKey)
         }
         UNUserNotificationCenter.current().delegate = self
         requestNotificationPermission()

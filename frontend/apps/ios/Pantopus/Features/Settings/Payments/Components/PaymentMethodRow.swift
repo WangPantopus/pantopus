@@ -19,6 +19,9 @@ struct PaymentMethodRow: View {
     let trailing: PaymentsRowTrailing
     let rowIdentifier: String
     var labelColor: Color = Theme.Color.appText
+    /// Accessibility id applied to the status chip (e.g. the "Default"
+    /// badge on a saved method). `nil` leaves the chip untagged.
+    var chipIdentifier: String?
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
@@ -39,7 +42,12 @@ struct PaymentMethodRow: View {
             }
             Spacer(minLength: Spacing.s0)
             if let chip {
-                PaymentsChipView(label: chip.label, tone: chip.tone)
+                if let chipIdentifier {
+                    PaymentsChipView(label: chip.label, tone: chip.tone)
+                        .accessibilityIdentifier(chipIdentifier)
+                } else {
+                    PaymentsChipView(label: chip.label, tone: chip.tone)
+                }
             }
             trailingView
         }
@@ -114,6 +122,9 @@ struct PaymentBrandBadge: View {
         case .stripe:
             // Stripe brand purple — closest token is `magic`.
             Theme.Color.magic
+        case .card:
+            // Neutral surface for un-branded cards.
+            Theme.Color.appSurfaceSunken
         }
     }
 
@@ -147,6 +158,8 @@ struct PaymentBrandBadge: View {
                 .font(.system(size: 9, weight: .heavy))
                 .tracking(0.2)
                 .foregroundStyle(.white)
+        case .card:
+            Icon(.creditCard, size: 14, strokeWidth: 2, color: Theme.Color.appTextSecondary)
         }
     }
 }

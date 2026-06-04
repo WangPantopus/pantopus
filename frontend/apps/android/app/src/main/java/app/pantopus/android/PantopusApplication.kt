@@ -7,6 +7,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.stripe.android.PaymentConfiguration
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import java.io.File
@@ -35,6 +36,15 @@ class PantopusApplication :
         // see Observability.start(). No extra tree needed.
         observability.start(this)
         Analytics.bind(observability)
+
+        // Phase 3 (3A) — configure the Stripe SDK once at launch with the
+        // publishable key from BuildConfig (.env → build.gradle.kts). The SDK
+        // is already on the classpath (libs.stripe.android); we only init the
+        // publishable key. PaymentSheet handles all card entry + SCA.
+        val stripeKey = BuildConfig.STRIPE_PUBLISHABLE_KEY
+        if (stripeKey.isNotBlank() && !stripeKey.startsWith("pk_test_REPLACE")) {
+            PaymentConfiguration.init(this, stripeKey)
+        }
     }
 
     /**
