@@ -52,7 +52,7 @@ public struct HomePrivacyDTO: Decodable, Sendable, Hashable {
             "notificationPreviews": notificationPreviews,
             "docLock": docLock,
             "photoBlur": photoBlur,
-            "vaultAutoLock": vaultAutoLock,
+            "vaultAutoLock": vaultAutoLock
         ]
     }
 }
@@ -88,7 +88,7 @@ public struct UpdateHomePrivacyRequest: Encodable, Sendable {
         "notificationPreviews": .notificationPreviews,
         "docLock": .docLock,
         "photoBlur": .photoBlur,
-        "vaultAutoLock": .vaultAutoLock,
+        "vaultAutoLock": .vaultAutoLock
     ]
 
     public func encode(to encoder: any Encoder) throws {
