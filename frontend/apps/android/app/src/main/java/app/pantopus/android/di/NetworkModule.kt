@@ -19,6 +19,7 @@ import app.pantopus.android.data.api.services.GigsApi
 import app.pantopus.android.data.api.services.HomeGuestPassesApi
 import app.pantopus.android.data.api.services.HomeMembersApi
 import app.pantopus.android.data.api.services.HomePetsApi
+import app.pantopus.android.data.api.services.HomePrivacyApi
 import app.pantopus.android.data.api.services.HomeTasksApi
 import app.pantopus.android.data.api.services.HomeVerificationApi
 import app.pantopus.android.data.api.services.HomesApi
@@ -28,6 +29,7 @@ import app.pantopus.android.data.api.services.ListingOffersApi
 import app.pantopus.android.data.api.services.ListingsMutationApi
 import app.pantopus.android.data.api.services.ListingsReadApi
 import app.pantopus.android.data.api.services.MailComposeApi
+import app.pantopus.android.data.api.services.MailDayApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
 import app.pantopus.android.data.api.services.MailboxVaultApi
@@ -195,6 +197,9 @@ object NetworkModule {
     fun provideHomeVerificationApi(retrofit: Retrofit): HomeVerificationApi = retrofit.create(HomeVerificationApi::class.java)
 
     @Provides @Singleton
+    fun provideHomePrivacyApi(retrofit: Retrofit): HomePrivacyApi = retrofit.create(HomePrivacyApi::class.java)
+
+    @Provides @Singleton
     fun provideFilesApi(retrofit: Retrofit): FilesApi = retrofit.create(FilesApi::class.java)
 
     @Provides @Singleton
@@ -205,6 +210,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideMailboxVaultApi(retrofit: Retrofit): MailboxVaultApi = retrofit.create(MailboxVaultApi::class.java)
+
+    @Provides @Singleton
+    fun provideMailDayApi(retrofit: Retrofit): MailDayApi = retrofit.create(MailDayApi::class.java)
 
     @Provides @Singleton
     fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)

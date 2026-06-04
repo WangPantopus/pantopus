@@ -11,10 +11,13 @@
 //    `.empty` — no scans yet today; the hero + recap + setup-nudges
 //      render off the same `MailDayContent`.
 //
-//  Backend has been removed from the repo, so `load()` projects a
-//  deterministic fixture (`MailDaySampleData`). Action handlers
-//  (`route` / `junk` / `undo`) flip in-memory state — they don't write
-//  to the wire — and exist so the screen feels real in previews.
+//  P3F wiring: `load()` reads the live day frame from
+//  `GET /api/mailbox/v2/mailday/today` and maps it into `MailDayContent`.
+//  `acceptSuggestion` optimistically moves a piece to the reviewed rail
+//  and POSTs `/items/:id/route` (rolling back on failure); `finishDay`
+//  POSTs `/finish` and reflects the bumped streak. The fixture
+//  (`MailDaySampleData`, keyed by `variant`) is the offline / preview /
+//  test fallback when the fetch can't complete.
 //
 
 import Foundation
@@ -33,20 +36,38 @@ public final class MailDayViewModel {
     public var variant: MailDayVariant
     private let seededContent: MailDayContent?
     private let onScanRequested: @MainActor () -> Void
+    private let api: APIClient
 
     /// - Parameters:
-    ///   - variant: Which fixture to project. Defaults to `.populated`.
+    ///   - variant: Which fixture to fall back to when the fetch can't
+    ///     complete (offline / previews / tests). Defaults to `.populated`.
     ///   - content: Optional seed (tests / previews) overriding the
     ///     sample fixture for this variant.
     ///   - onScanRequested: Invoked when the user taps any Scan CTA
     ///     (top scan-more card or empty-hero primary). Out of scope to
     ///     wire to the real scanner here — the host hands a closure.
-    public init(
+    public convenience init(
         variant: MailDayVariant = .populated,
         content: MailDayContent? = nil,
         onScanRequested: @escaping @MainActor () -> Void = {}
     ) {
+        self.init(
+            variant: variant,
+            api: .shared,
+            content: content,
+            onScanRequested: onScanRequested
+        )
+    }
+
+    /// Test/internal initializer with injectable networking.
+    init(
+        variant: MailDayVariant = .populated,
+        api: APIClient,
+        content: MailDayContent? = nil,
+        onScanRequested: @escaping @MainActor () -> Void = {}
+    ) {
         self.variant = variant
+        self.api = api
         seededContent = content
         self.onScanRequested = onScanRequested
     }
@@ -54,11 +75,29 @@ public final class MailDayViewModel {
     // MARK: - Lifecycle
 
     public func load() async {
-        state = projectedState()
+        state = .loading
+        await fetch()
     }
 
     public func refresh() async {
-        state = projectedState()
+        await fetch()
+    }
+
+    private func fetch() async {
+        do {
+            let response: MailDayTodayResponse = try await api.request(MailDayEndpoints.today())
+            let content = Self.content(from: response)
+            // A day with any piece (reviewed or unreviewed) stays populated
+            // so the reviewed rail + finish bar show; only a day with no
+            // pieces at all falls to the empty hero.
+            state = (content.unreviewed.isEmpty && content.reviewed.isEmpty)
+                ? .empty(content)
+                : .populated(content)
+        } catch {
+            // Offline / preview / tests without a stub fall back to the
+            // fixture for this variant so the screen still renders.
+            state = projectedState()
+        }
     }
 
     private func projectedState() -> MailDayState {
@@ -155,11 +194,15 @@ public final class MailDayViewModel {
         )
     }
 
-    /// Move an unreviewed piece into the reviewed list as `.routed` —
-    /// the AI suggestion is treated as accepted.
-    public func acceptSuggestion(for itemId: String) {
+    /// Move an unreviewed piece into the reviewed list as `.routed` — the AI
+    /// suggestion is treated as accepted. Optimistic: the move shows
+    /// immediately, then `POST /items/:id/route` persists it (the server
+    /// derives the same recipient + tint from the stored suggestion). On
+    /// failure the prior content is restored.
+    public func acceptSuggestion(for itemId: String) async {
         guard case let .populated(content) = state else { return }
         guard let index = content.unreviewed.firstIndex(where: { $0.id == itemId }) else { return }
+        let previous = content
         let item = content.unreviewed[index]
         var unreviewed = content.unreviewed
         unreviewed.remove(at: index)
@@ -187,6 +230,34 @@ public final class MailDayViewModel {
                 setupNudges: content.setupNudges
             )
         )
+        do {
+            _ = try await api.request(MailDayEndpoints.route(itemId: itemId))
+        } catch {
+            state = .populated(previous)
+        }
+    }
+
+    /// Close out the day: `POST /finish` bumps the streak server-side; the
+    /// reviewed day stays on screen with the new streak. No-op unless every
+    /// piece has a decision.
+    public func finishDay() async {
+        guard canFinishDay, case let .populated(content) = state else { return }
+        do {
+            let response: MailDayFinishResponse = try await api.request(MailDayEndpoints.finish())
+            state = .populated(
+                MailDayContent(
+                    dateLabel: content.dateLabel,
+                    streakDays: response.streakDays,
+                    lastScanLabel: content.lastScanLabel,
+                    unreviewed: content.unreviewed,
+                    reviewed: content.reviewed,
+                    yesterdayRecap: content.yesterdayRecap,
+                    setupNudges: content.setupNudges
+                )
+            )
+        } catch {
+            // Leave the day open on failure.
+        }
     }
 
     /// Clear `undoCountdown` from every prior row so only the latest
@@ -204,5 +275,94 @@ public final class MailDayViewModel {
                 undoCountdown: nil
             )
         }
+    }
+
+    // MARK: - DTO mapping (wire → render model)
+
+    static func content(from dto: MailDayTodayResponse) -> MailDayContent {
+        MailDayContent(
+            dateLabel: dto.dateLabel,
+            streakDays: dto.streakDays,
+            lastScanLabel: dto.lastScanLabel,
+            unreviewed: dto.unreviewed.map(mapUnreviewed),
+            reviewed: dto.reviewed.map(mapReviewed),
+            yesterdayRecap: dto.yesterdayRecap.map(mapRecap),
+            setupNudges: dto.setupNudges.map(mapNudge)
+        )
+    }
+
+    private static func mapKind(_ raw: String) -> MailDayKind {
+        MailDayKind(rawValue: raw) ?? .envelope
+    }
+
+    private static func mapAvatar(_ raw: String) -> MailDaySuggestedAvatar {
+        raw == "household_green" ? .householdGreen : .personalSky
+    }
+
+    private static func mapAction(_ raw: String) -> ReviewedMailAction {
+        ReviewedMailAction(rawValue: raw) ?? .routed
+    }
+
+    private static func mapRoutedTint(_ raw: String?) -> MailDayRoutedTint? {
+        guard let raw else { return nil }
+        return raw == "household_home" ? .householdHome : .personPrimary
+    }
+
+    private static func mapSegmentTint(_ raw: String) -> YesterdayRecap.SegmentTint {
+        switch raw {
+        case "household": .household
+        case "junked": .junked
+        case "returned": .returned
+        default: .personPrimary
+        }
+    }
+
+    private static func mapUnreviewed(_ dto: MailDayUnreviewedDTO) -> UnreviewedMailDayItem {
+        UnreviewedMailDayItem(
+            id: dto.id,
+            kind: mapKind(dto.kind),
+            label: dto.label,
+            sender: dto.sender,
+            suggestedName: dto.suggestedName,
+            suggestedAvatar: mapAvatar(dto.suggestedAvatar),
+            confidencePercent: dto.confidencePercent,
+            secondaryLabel: dto.secondaryLabel
+        )
+    }
+
+    private static func mapReviewed(_ dto: MailDayReviewedDTO) -> ReviewedMailDayItem {
+        ReviewedMailDayItem(
+            id: dto.id,
+            kind: mapKind(dto.kind),
+            label: dto.label,
+            action: mapAction(dto.action),
+            routedTo: dto.routedTo,
+            routedTint: mapRoutedTint(dto.routedTint),
+            whenLabel: dto.whenLabel,
+            undoCountdown: dto.undoCountdown
+        )
+    }
+
+    private static func mapRecap(_ dto: MailDayRecapDTO) -> YesterdayRecap {
+        YesterdayRecap(
+            dateLabel: dto.dateLabel,
+            pieces: dto.pieces,
+            closedAtLabel: dto.closedAtLabel,
+            segments: dto.segments.map { segment in
+                YesterdayRecap.Segment(
+                    id: segment.id,
+                    percent: segment.percent,
+                    label: segment.label,
+                    tint: mapSegmentTint(segment.tint)
+                )
+            }
+        )
+    }
+
+    private static func mapNudge(_ dto: MailDayNudgeDTO) -> MailDaySetupNudge {
+        // The id is stable; the icon + tint are the client's design.
+        let icon: PantopusIcon = dto.id == "auto-route" ? .users : .bell
+        let tint: MailDaySetupNudge.MailDayNudgeTint = dto.id == "auto-route" ? .home : .primary
+        return MailDaySetupNudge(id: dto.id, icon: icon, tint: tint, title: dto.title, subtitle: dto.subtitle)
     }
 }
