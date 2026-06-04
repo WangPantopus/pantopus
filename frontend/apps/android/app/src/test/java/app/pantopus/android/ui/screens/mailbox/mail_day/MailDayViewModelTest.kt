@@ -2,15 +2,16 @@
 
 package app.pantopus.android.ui.screens.mailbox.mail_day
 
-import app.pantopus.android.data.api.models.mailbox.v2.LogEventResponse
-import app.pantopus.android.data.api.models.mailbox.v2.PendingItemDto
-import app.pantopus.android.data.api.models.mailbox.v2.PendingMailDto
-import app.pantopus.android.data.api.models.mailbox.v2.PendingResponse
-import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
-import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayActionResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayFinishResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayRecapDto
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayRecapSegmentDto
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayReviewedDto
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayTodayResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayUnreviewedDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.mailbox.MailboxRepository
+import app.pantopus.android.data.mailday.MailDayRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -23,21 +24,22 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
- * A13.16 — coverage for the live My Mail Day view-model. The triage list
- * now comes from `GET /api/mailbox/v2/pending`; accepting a suggestion
+ * A13.16 — coverage for the live My Mail Day view-model. The triage frame
+ * comes from `GET /api/mailbox/v2/mailday/today`; accepting a suggestion
  * optimistically moves the card to the reviewed list and calls
- * `POST /resolve` (rolling back on failure); finishing the day logs
- * `POST /event`. Counts are derived client-side.
+ * `POST /items/:id/route` (rolling back on failure); finishing the day
+ * POSTs `/finish` and reflects the bumped streak.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MailDayViewModelTest {
-    private val repository: MailboxRepository = mockk()
+    private val repository: MailDayRepository = mockk()
 
     @Before
     fun setUp() {
@@ -49,162 +51,157 @@ class MailDayViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun pendingItem(
+    private fun unreviewed(
         id: String,
-        name: String = "Alex Rivera",
-        confidence: Double = 0.9,
-    ) = PendingItemDto(
-        mailId = id,
-        recipientNameRaw = name,
-        bestMatchUserId = "u_$id",
-        bestMatchConfidence = confidence,
-        mail =
-            PendingMailDto(
-                subject = "Subject $id",
-                senderDisplay = "Sender $id",
-                category = "personal",
-                mailObjectType = "envelope",
-            ),
+        name: String = "Maria Kovács",
+        avatar: String = "personal_sky",
+    ) = MailDayUnreviewedDto(
+        id = id,
+        kind = "bill",
+        label = "Con Edison bill",
+        sender = "Con Edison · NY",
+        suggestedName = name,
+        suggestedAvatar = avatar,
+        confidencePercent = 94,
+        secondaryLabel = "Other",
     )
 
-    private fun vmWithPending(vararg items: PendingItemDto): MailDayViewModel {
-        coEvery { repository.pending() } returns NetworkResult.Success(PendingResponse(items.toList()))
-        coEvery { repository.resolve(any()) } returns NetworkResult.Success(ResolveRoutingResponse("Routing resolved", "personal"))
-        coEvery { repository.logEvent(any(), any(), any()) } returns NetworkResult.Success(LogEventResponse(logged = true))
+    private fun reviewed(id: String) =
+        MailDayReviewedDto(
+            id = id,
+            kind = "magazine",
+            label = "The New Yorker",
+            action = "routed",
+            routedTo = "Marcus",
+            routedTint = "household_home",
+            whenLabel = "2 min ago",
+            undoCountdown = null,
+        )
+
+    private fun today(
+        unreviewed: List<MailDayUnreviewedDto> = emptyList(),
+        reviewed: List<MailDayReviewedDto> = emptyList(),
+        recap: MailDayRecapDto? = null,
+    ) = MailDayTodayResponse(
+        dateLabel = "Thu · Oct 9",
+        streakDays = 12,
+        lastScanLabel = "22 min ago",
+        unreviewed = unreviewed,
+        reviewed = reviewed,
+        yesterdayRecap = recap,
+    )
+
+    private fun vmWith(response: MailDayTodayResponse): MailDayViewModel {
+        coEvery { repository.today() } returns NetworkResult.Success(response)
+        coEvery { repository.route(any()) } returns NetworkResult.Success(MailDayActionResponse(reviewed("x")))
+        coEvery { repository.finish() } returns NetworkResult.Success(MailDayFinishResponse(streakDays = 13))
         return MailDayViewModel(repository)
     }
 
     @Test
-    fun loadProjectsTriageListFromPending() =
+    fun loadProjectsTriageList() =
         runTest {
-            val vm = vmWithPending(pendingItem("m1"), pendingItem("m2"))
+            val vm = vmWith(today(unreviewed = listOf(unreviewed("m1"), unreviewed("m2"))))
             vm.load()
             val state = vm.state.value
             assertTrue("Expected Populated, got $state", state is MailDayUiState.Populated)
             val content = (state as MailDayUiState.Populated).content
             assertEquals(2, content.unreviewed.size)
             assertEquals(0, content.reviewed.size)
-            assertEquals("m1", content.unreviewed[0].id)
+            assertEquals(MailDayKind.Bill, content.unreviewed[0].kind)
+            assertEquals(MailDaySuggestedAvatar.PersonalSky, content.unreviewed[0].suggestedAvatar)
+            assertEquals(94, content.unreviewed[0].confidencePercent)
+            assertEquals(12, content.streakDays)
             assertEquals(2, vm.total)
-            assertEquals(0, vm.done)
             assertEquals(2, vm.remaining)
-            assertFalse("Finish day is disabled while pieces pending", vm.canFinishDay)
+            assertFalse(vm.canFinishDay)
         }
 
     @Test
-    fun loadProjectsEmptyWhenNothingPending() =
+    fun loadProjectsEmptyWhenNothingToday() =
         runTest {
-            val vm = vmWithPending()
+            val vm = vmWith(today())
+            vm.load()
+            assertTrue(vm.state.value is MailDayUiState.Empty)
+        }
+
+    @Test
+    fun loadKeepsPopulatedWhenOnlyReviewed() =
+        runTest {
+            // A fully-triaged day stays populated (reviewed rail + finish bar).
+            val vm = vmWith(today(reviewed = listOf(reviewed("r1"))))
             vm.load()
             val state = vm.state.value
-            assertTrue("Expected Empty, got $state", state is MailDayUiState.Empty)
-            val content = (state as MailDayUiState.Empty).content
-            assertEquals(0, content.unreviewed.size)
-            // Recap / nudges / streak have no source on the live frame.
-            assertNull(content.yesterdayRecap)
-            assertTrue(content.setupNudges.isEmpty())
+            assertTrue("Expected Populated, got $state", state is MailDayUiState.Populated)
+            val content = (state as MailDayUiState.Populated).content
+            assertEquals(MailDayRoutedTint.HouseholdHome, content.reviewed[0].routedTint)
+            assertTrue(vm.canFinishDay)
         }
 
     @Test
-    fun loadSurfacesErrorOnFailure() =
+    fun loadSurfacesError() =
         runTest {
-            coEvery { repository.pending() } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            coEvery { repository.today() } returns NetworkResult.Failure(NetworkError.Server(500, null))
             val vm = MailDayViewModel(repository)
             vm.load()
-            assertTrue("Expected Error, got ${vm.state.value}", vm.state.value is MailDayUiState.Error)
+            assertTrue(vm.state.value is MailDayUiState.Error)
         }
 
     @Test
-    fun acceptSuggestionMovesToReviewedAndResolves() =
+    fun acceptSuggestionMovesToReviewedAndRoutes() =
         runTest {
-            val vm = vmWithPending(pendingItem("m1"), pendingItem("m2"))
+            val vm = vmWith(today(unreviewed = listOf(unreviewed("m1"), unreviewed("m2"))))
             vm.load()
             val target = (vm.state.value as MailDayUiState.Populated).content.unreviewed[0]
             vm.acceptSuggestion(target.id)
-            val updated = vm.state.value as MailDayUiState.Populated
-            assertEquals(1, updated.content.unreviewed.size)
-            assertEquals(1, updated.content.reviewed.size)
-            assertEquals(
-                target.id,
-                updated.content.reviewed
-                    .first()
-                    .id,
-            )
-            assertEquals(
-                ReviewedMailAction.Routed,
-                updated.content.reviewed
-                    .first()
-                    .action,
-            )
-            assertEquals(
-                5,
-                updated.content.reviewed
-                    .first()
-                    .undoCountdown,
-            )
-            coVerify { repository.resolve(ResolveRoutingRequest(mailId = target.id, drawer = "personal")) }
+            val updated = (vm.state.value as MailDayUiState.Populated).content
+            assertEquals(1, updated.unreviewed.size)
+            assertEquals(1, updated.reviewed.size)
+            assertEquals(target.id, updated.reviewed.first().id)
+            assertEquals(ReviewedMailAction.Routed, updated.reviewed.first().action)
+            assertEquals(5, updated.reviewed.first().undoCountdown)
+            coVerify { repository.route(target.id) }
         }
 
     @Test
-    fun acceptSuggestionRollsBackWhenResolveFails() =
+    fun acceptSuggestionRollsBackOnFailure() =
         runTest {
-            val vm = vmWithPending(pendingItem("m1"), pendingItem("m2"))
-            coEvery { repository.resolve(any()) } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = vmWith(today(unreviewed = listOf(unreviewed("m1"), unreviewed("m2"))))
+            coEvery { repository.route(any()) } returns NetworkResult.Failure(NetworkError.Server(500, null))
             vm.load()
             val target = (vm.state.value as MailDayUiState.Populated).content.unreviewed[0]
             vm.acceptSuggestion(target.id)
-            val rolledBack = vm.state.value as MailDayUiState.Populated
-            assertEquals(2, rolledBack.content.unreviewed.size)
-            assertEquals(0, rolledBack.content.reviewed.size)
+            val rolledBack = (vm.state.value as MailDayUiState.Populated).content
+            assertEquals(2, rolledBack.unreviewed.size)
+            assertEquals(0, rolledBack.reviewed.size)
         }
 
     @Test
     fun tickUndoDecrementsLatestAfterAccept() =
         runTest {
-            val vm = vmWithPending(pendingItem("m1"), pendingItem("m2"))
+            val vm = vmWith(today(unreviewed = listOf(unreviewed("m1"))))
             vm.load()
             val target = (vm.state.value as MailDayUiState.Populated).content.unreviewed[0]
             vm.acceptSuggestion(target.id)
             vm.tickUndo()
-            val state = vm.state.value as MailDayUiState.Populated
-            assertEquals(
-                4,
-                state.content.reviewed
-                    .first()
-                    .undoCountdown,
-            )
+            assertEquals(4, (vm.state.value as MailDayUiState.Populated).content.reviewed.first().undoCountdown)
         }
 
     @Test
     fun tickUndoClearsAtZero() =
         runTest {
-            val vm = vmWithPending(pendingItem("m1"), pendingItem("m2"))
+            val vm = vmWith(today(unreviewed = listOf(unreviewed("m1"))))
             vm.load()
             val target = (vm.state.value as MailDayUiState.Populated).content.unreviewed[0]
             vm.acceptSuggestion(target.id)
             repeat(5) { vm.tickUndo() }
-            val state = vm.state.value as MailDayUiState.Populated
-            assertNull(
-                "Should clear once seconds hit 0",
-                state.content.reviewed
-                    .first()
-                    .undoCountdown,
-            )
-        }
-
-    @Test
-    fun tickUndoNoOpOnEmpty() =
-        runTest {
-            val vm = vmWithPending()
-            vm.load()
-            vm.tickUndo() // should not crash
-            assertTrue(vm.state.value is MailDayUiState.Empty)
+            assertNull((vm.state.value as MailDayUiState.Populated).content.reviewed.first().undoCountdown)
         }
 
     @Test
     fun canFinishDayOnceEverythingReviewed() =
         runTest {
-            val vm = vmWithPending(pendingItem("m1"))
+            val vm = vmWith(today(unreviewed = listOf(unreviewed("m1"))))
             vm.load()
             assertFalse(vm.canFinishDay)
             val target = (vm.state.value as MailDayUiState.Populated).content.unreviewed[0]
@@ -213,20 +210,42 @@ class MailDayViewModelTest {
         }
 
     @Test
-    fun finishDayLogsTelemetryEvent() =
+    fun finishDayBumpsStreak() =
         runTest {
-            val vm = vmWithPending(pendingItem("m1"))
+            val vm = vmWith(today(reviewed = listOf(reviewed("r1"))))
             vm.load()
-            val target = (vm.state.value as MailDayUiState.Populated).content.unreviewed[0]
-            vm.acceptSuggestion(target.id)
+            assertTrue(vm.canFinishDay)
             vm.finishDay()
-            coVerify { repository.logEvent(eventType = "mailday_finished", mailId = any(), metadata = any()) }
+            coVerify { repository.finish() }
+            assertEquals(13, (vm.state.value as MailDayUiState.Populated).content.streakDays)
+        }
+
+    @Test
+    fun mapsYesterdayRecapSegments() =
+        runTest {
+            val recap =
+                MailDayRecapDto(
+                    dateLabel = "Wed · Oct 8",
+                    pieces = 2,
+                    closedAtLabel = "closed 6:42 PM",
+                    segments =
+                        listOf(
+                            MailDayRecapSegmentDto(id = "maria", percent = 0.5, label = "1 to Maria", tint = "person_primary"),
+                            MailDayRecapSegmentDto(id = "junked", percent = 0.5, label = "1 junked", tint = "junked"),
+                        ),
+                )
+            val vm = vmWith(today(recap = recap))
+            vm.load()
+            val content = (vm.state.value as MailDayUiState.Empty).content
+            assertNotNull(content.yesterdayRecap)
+            assertEquals(2, content.yesterdayRecap!!.segments.size)
+            assertEquals(YesterdayRecap.SegmentTint.Junked, content.yesterdayRecap!!.segments[1].tint)
         }
 
     @Test
     fun requestScanInvokesConfiguredCallback() =
         runTest {
-            val vm = vmWithPending()
+            val vm = vmWith(today())
             vm.load()
             var scanCalls = 0
             vm.configure(onScanRequested = { scanCalls++ })

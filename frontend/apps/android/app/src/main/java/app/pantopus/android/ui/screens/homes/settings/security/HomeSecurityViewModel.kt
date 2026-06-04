@@ -4,6 +4,11 @@ package app.pantopus.android.ui.screens.homes.settings.security
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.homes.HomePrivacyDto
+import app.pantopus.android.data.api.models.homes.UpdateHomePrivacyRequest
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomePrivacyRepository
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListRow
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListUiState
@@ -12,6 +17,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Nav key carrying the home id into the per-home Security stack. */
@@ -25,8 +31,11 @@ const val HOME_SECURITY_HOME_ID_KEY = "homeId"
  * every toggle in the group is on, and an "off" warning when the
  * headline toggle is flipped off.
  *
- * Backend persistence is out of scope for P5.1; toggles flip local
- * state only.
+ * P3F wiring: [load] reads the persisted toggle set from
+ * `GET /api/homes/:id/privacy`; each flip optimistically updates and
+ * PATCHes the single key, rolling back on failure. The [Variant.Balanced]
+ * seed is the in-flight / offline baseline (and the test/preview seam via
+ * [setVariant]).
  *
  * Two variant frames cover the design parity audit:
  *   - [Variant.Balanced] 5 of 9 toggles on
@@ -37,6 +46,7 @@ const val HOME_SECURITY_HOME_ID_KEY = "homeId"
 class HomeSecurityViewModel
     @Inject
     constructor(
+        private val repository: HomePrivacyRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         enum class Variant { Balanced, Strict }
@@ -57,7 +67,19 @@ class HomeSecurityViewModel
         val state: StateFlow<GroupedListUiState> = _state.asStateFlow()
 
         fun load() {
+            // Render the seeded baseline immediately, then reconcile from
+            // the backend. A failed fetch keeps the baseline (settings
+            // tolerate offline) rather than erroring the whole screen.
             _state.value = GroupedListUiState.Loaded(groups())
+            viewModelScope.launch {
+                when (val result = repository.getPrivacy(homeId)) {
+                    is NetworkResult.Success -> {
+                        applyServer(result.data.privacy)
+                        _state.value = GroupedListUiState.Loaded(groups())
+                    }
+                    is NetworkResult.Failure -> Unit
+                }
+            }
         }
 
         /** Test / preview seam: swap the underlying toggle seed. */
@@ -72,9 +94,48 @@ class HomeSecurityViewModel
             isOn: Boolean,
         ) {
             if (!_toggles.containsKey(rowId)) return
+            val previous = _toggles[rowId] ?: return
+            // Optimistic flip.
             _toggles[rowId] = isOn
             _state.value = GroupedListUiState.Loaded(groups())
+            viewModelScope.launch {
+                val result = repository.updatePrivacy(homeId, requestFor(rowId, isOn))
+                if (result is NetworkResult.Failure) {
+                    // Roll back the single key.
+                    _toggles[rowId] = previous
+                    _state.value = GroupedListUiState.Loaded(groups())
+                }
+            }
         }
+
+        private fun applyServer(dto: HomePrivacyDto) {
+            _toggles[HomeSecurityToggles.GUEST_APPROVAL] = dto.guestApproval
+            _toggles[HomeSecurityToggles.MEMBER_NAME_VISIBILITY] = dto.memberNameVisibility
+            _toggles[HomeSecurityToggles.ADDRESS_PRECISION] = dto.addressPrecision
+            _toggles[HomeSecurityToggles.ACTIVITY_VISIBILITY] = dto.activityVisibility
+            _toggles[HomeSecurityToggles.MAP_OPT_OUT] = dto.mapOptOut
+            _toggles[HomeSecurityToggles.NOTIFICATION_PREVIEWS] = dto.notificationPreviews
+            _toggles[HomeSecurityToggles.DOC_LOCK] = dto.docLock
+            _toggles[HomeSecurityToggles.PHOTO_BLUR] = dto.photoBlur
+            _toggles[HomeSecurityToggles.VAULT_AUTO_LOCK] = dto.vaultAutoLock
+        }
+
+        private fun requestFor(
+            rowId: String,
+            isOn: Boolean,
+        ): UpdateHomePrivacyRequest =
+            when (rowId) {
+                HomeSecurityToggles.GUEST_APPROVAL -> UpdateHomePrivacyRequest(guestApproval = isOn)
+                HomeSecurityToggles.MEMBER_NAME_VISIBILITY -> UpdateHomePrivacyRequest(memberNameVisibility = isOn)
+                HomeSecurityToggles.ADDRESS_PRECISION -> UpdateHomePrivacyRequest(addressPrecision = isOn)
+                HomeSecurityToggles.ACTIVITY_VISIBILITY -> UpdateHomePrivacyRequest(activityVisibility = isOn)
+                HomeSecurityToggles.MAP_OPT_OUT -> UpdateHomePrivacyRequest(mapOptOut = isOn)
+                HomeSecurityToggles.NOTIFICATION_PREVIEWS -> UpdateHomePrivacyRequest(notificationPreviews = isOn)
+                HomeSecurityToggles.DOC_LOCK -> UpdateHomePrivacyRequest(docLock = isOn)
+                HomeSecurityToggles.PHOTO_BLUR -> UpdateHomePrivacyRequest(photoBlur = isOn)
+                HomeSecurityToggles.VAULT_AUTO_LOCK -> UpdateHomePrivacyRequest(vaultAutoLock = isOn)
+                else -> UpdateHomePrivacyRequest()
+            }
 
         private val footerHomeName: String get() = "14 Elm Park Lane"
 

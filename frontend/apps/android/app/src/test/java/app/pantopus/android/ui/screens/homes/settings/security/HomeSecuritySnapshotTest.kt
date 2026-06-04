@@ -10,11 +10,13 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.SavedStateHandle
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.pantopus.android.data.homes.HomePrivacyRepository
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListCallbacks
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListScreen
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListUiState
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTheme
+import io.mockk.mockk
 import org.junit.Rule
 import org.junit.Test
 
@@ -53,6 +55,8 @@ class HomeSecuritySnapshotTest {
     private fun renderFrame(variant: HomeSecurityViewModel.Variant) {
         val vm =
             HomeSecurityViewModel(
+                // setVariant drives the seed synchronously; the repo is unused here.
+                repository = mockk(relaxed = true),
                 savedStateHandle = SavedStateHandle(mapOf(HOME_SECURITY_HOME_ID_KEY to "home-1")),
             )
         vm.setVariant(variant)

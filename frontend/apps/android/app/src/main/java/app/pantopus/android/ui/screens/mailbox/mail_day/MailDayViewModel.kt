@@ -4,46 +4,42 @@ package app.pantopus.android.ui.screens.mailbox.mail_day
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.pantopus.android.data.api.models.mailbox.v2.PendingItemDto
-import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayNudgeDto
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayRecapDto
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayReviewedDto
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayTodayResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MailDayUnreviewedDto
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.mailbox.MailboxRepository
+import app.pantopus.android.data.mailday.MailDayRepository
+import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import javax.inject.Inject
 
 /** Nav-arg key for the variant (`populated` or `empty`) — kept for the
- *  deep-link route; the live screen now derives the frame from the data. */
+ *  deep-link route; the live screen derives the frame from the data. */
 const val MAIL_DAY_VARIANT_KEY = "variant"
 
 private const val UNDO_SECONDS = 5
-private const val CONFIDENCE_SCALE = 100
 
 /**
- * A13.16 — Backs the My Mail Day triage editor.
+ * A13.16 — Backs the My Mail Day physical-mail triage editor.
  *
- * `load()` fetches the unresolved routing queue from
- * `GET /api/mailbox/v2/pending` and renders each item as an "needs a call"
- * card. Accepting a suggestion optimistically moves the card into the
- * reviewed list and calls `POST /api/mailbox/v2/resolve`, rolling back on
- * failure. Finishing the day logs `POST /api/mailbox/v2/event` telemetry.
- *
- * Counts (routed / junked / returned / remaining / total) are derived
- * client-side — no summary endpoint returns them. Junk / return-to-sender
- * and per-item undo have no backend route, so those affordances remain
- * out of scope (the reviewed list only grows via accepted suggestions).
+ * `load()` fetches the day frame from `GET /api/mailbox/v2/mailday/today`
+ * (unreviewed + reviewed pieces, streak, last-scan, yesterday recap, setup
+ * nudges). Accepting a suggestion optimistically moves the card to the
+ * reviewed rail and POSTs `/items/:id/route`, rolling back on failure.
+ * Finishing the day POSTs `/finish` and reflects the bumped streak. Counts
+ * are derived client-side from the rendered content.
  */
 @HiltViewModel
 class MailDayViewModel
     @Inject
     constructor(
-        private val repository: MailboxRepository,
+        private val repository: MailDayRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<MailDayUiState>(MailDayUiState.Loading)
         val state: StateFlow<MailDayUiState> = _state.asStateFlow()
@@ -58,8 +54,8 @@ class MailDayViewModel
             _state.value = MailDayUiState.Loading
             viewModelScope.launch {
                 _state.value =
-                    when (val result = repository.pending()) {
-                        is NetworkResult.Success -> project(result.data.pending)
+                    when (val result = repository.today()) {
+                        is NetworkResult.Success -> project(result.data)
                         is NetworkResult.Failure -> MailDayUiState.Error(result.error.message)
                     }
             }
@@ -68,55 +64,28 @@ class MailDayViewModel
         fun refresh() = load()
 
         /**
-         * Build a render frame from the pending queue. The reviewed list
-         * starts empty (it grows as the user triages this session); the
-         * yesterday-recap + setup-nudges + streak surfaces have no source
-         * on `/pending`, so they are left empty and the screen hides them.
+         * Build a render frame from the day response. A day with any piece
+         * (reviewed or unreviewed) stays populated so the reviewed rail +
+         * finish bar show; only a day with no pieces at all falls to the
+         * empty hero (recap + setup nudges).
          */
-        private fun project(pending: List<PendingItemDto>): MailDayUiState {
-            val unreviewed = pending.map(::mapItem)
+        private fun project(dto: MailDayTodayResponse): MailDayUiState {
             val content =
                 MailDayContent(
-                    dateLabel = todayLabel(),
-                    streakDays = 0,
-                    lastScanLabel = "",
-                    unreviewed = unreviewed,
-                    reviewed = emptyList(),
-                    yesterdayRecap = null,
-                    setupNudges = emptyList(),
+                    dateLabel = dto.dateLabel,
+                    streakDays = dto.streakDays,
+                    lastScanLabel = dto.lastScanLabel,
+                    unreviewed = dto.unreviewed.map(::mapUnreviewed),
+                    reviewed = dto.reviewed.map(::mapReviewed),
+                    yesterdayRecap = dto.yesterdayRecap?.let(::mapRecap),
+                    setupNudges = dto.setupNudges.map(::mapNudge),
                 )
-            return if (unreviewed.isEmpty()) MailDayUiState.Empty(content) else MailDayUiState.Populated(content)
-        }
-
-        private fun mapItem(dto: PendingItemDto): UnreviewedMailDayItem {
-            val mail = dto.mail
-            return UnreviewedMailDayItem(
-                id = dto.mailId,
-                kind = kindFor(mail?.mailObjectType, mail?.category),
-                label = mail?.subject?.takeIf { it.isNotBlank() } ?: "Mail",
-                sender = mail?.senderDisplay ?: mail?.senderBusinessName ?: "Unknown sender",
-                suggestedName = dto.recipientNameRaw.orEmpty(),
-                suggestedAvatar = MailDaySuggestedAvatar.PersonalSky,
-                confidencePercent = ((dto.bestMatchConfidence ?: 0.0) * CONFIDENCE_SCALE).toInt().coerceIn(0, CONFIDENCE_SCALE),
-                secondaryLabel = "Other",
-            )
-        }
-
-        private fun kindFor(
-            objectType: String?,
-            category: String?,
-        ): MailDayKind {
-            if (category?.contains("bill", ignoreCase = true) == true) return MailDayKind.Bill
-            return when (objectType) {
-                "package" -> MailDayKind.Package
-                "postcard" -> MailDayKind.Postcard
-                "booklet" -> MailDayKind.Magazine
-                "bundle" -> MailDayKind.Flyer
-                else -> MailDayKind.Envelope
+            return if (content.unreviewed.isEmpty() && content.reviewed.isEmpty()) {
+                MailDayUiState.Empty(content)
+            } else {
+                MailDayUiState.Populated(content)
             }
         }
-
-        private fun todayLabel(): String = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US))
 
         fun requestScan() {
             onScanRequested()
@@ -124,19 +93,14 @@ class MailDayViewModel
 
         /**
          * Accept the AI suggestion: optimistically move the card to the
-         * reviewed list, then resolve the routing on the backend. On failure
-         * the previous content is restored.
+         * reviewed list, then `POST /items/:id/route`. On failure the
+         * previous content is restored.
          */
         fun acceptSuggestion(id: String) {
             val current = _state.value as? MailDayUiState.Populated ?: return
             val target = current.content.unreviewed.firstOrNull { it.id == id } ?: return
             val previous = current.content
             val firstName = target.suggestedName.substringBefore(" ", target.suggestedName)
-            val drawer =
-                when (target.suggestedAvatar) {
-                    MailDaySuggestedAvatar.PersonalSky -> "personal"
-                    MailDaySuggestedAvatar.HouseholdGreen -> "home"
-                }
             val newReviewed =
                 listOf(
                     ReviewedMailDayItem(
@@ -162,26 +126,23 @@ class MailDayViewModel
                     ),
                 )
             viewModelScope.launch {
-                val result = repository.resolve(ResolveRoutingRequest(mailId = id, drawer = drawer))
-                if (result is NetworkResult.Failure) {
+                if (repository.route(id) is NetworkResult.Failure) {
                     _state.value = MailDayUiState.Populated(previous)
                 }
             }
         }
 
-        /** Finish-day commit — no persistence route exists, so log telemetry. */
+        /** Finish-day commit — `POST /finish` bumps the streak server-side. */
         fun finishDay() {
             if (!canFinishDay) return
+            val current = _state.value as? MailDayUiState.Populated ?: return
             viewModelScope.launch {
-                repository.logEvent(
-                    eventType = "mailday_finished",
-                    metadata =
-                        mapOf(
-                            "routed" to routedCount.toString(),
-                            "junked" to junkedCount.toString(),
-                            "returned" to returnedCount.toString(),
-                        ),
-                )
+                when (val result = repository.finish()) {
+                    is NetworkResult.Success ->
+                        _state.value =
+                            MailDayUiState.Populated(current.content.copy(streakDays = result.data.streakDays))
+                    is NetworkResult.Failure -> Unit
+                }
             }
         }
 
@@ -194,6 +155,95 @@ class MailDayViewModel
             reviewed[index] = reviewed[index].copy(undoCountdown = if (next > 0) next else null)
             _state.value = MailDayUiState.Populated(current.content.copy(reviewed = reviewed))
         }
+
+        // ---- DTO → render-model mapping ----
+
+        private fun mapUnreviewed(dto: MailDayUnreviewedDto): UnreviewedMailDayItem =
+            UnreviewedMailDayItem(
+                id = dto.id,
+                kind = mapKind(dto.kind),
+                label = dto.label,
+                sender = dto.sender,
+                suggestedName = dto.suggestedName,
+                suggestedAvatar = mapAvatar(dto.suggestedAvatar),
+                confidencePercent = dto.confidencePercent.coerceIn(0, 100),
+                secondaryLabel = dto.secondaryLabel,
+            )
+
+        private fun mapReviewed(dto: MailDayReviewedDto): ReviewedMailDayItem =
+            ReviewedMailDayItem(
+                id = dto.id,
+                kind = mapKind(dto.kind),
+                label = dto.label,
+                action = mapAction(dto.action),
+                routedTo = dto.routedTo,
+                routedTint = mapRoutedTint(dto.routedTint),
+                whenLabel = dto.whenLabel,
+                undoCountdown = dto.undoCountdown,
+            )
+
+        private fun mapRecap(dto: MailDayRecapDto): YesterdayRecap =
+            YesterdayRecap(
+                dateLabel = dto.dateLabel,
+                pieces = dto.pieces,
+                closedAtLabel = dto.closedAtLabel,
+                segments =
+                    dto.segments.map { segment ->
+                        YesterdayRecap.Segment(
+                            id = segment.id,
+                            percent = segment.percent.toFloat(),
+                            label = segment.label,
+                            tint = mapSegmentTint(segment.tint),
+                        )
+                    },
+            )
+
+        private fun mapNudge(dto: MailDayNudgeDto): MailDaySetupNudge {
+            // The id is stable; the icon + tint are the client's design.
+            val autoRoute = dto.id == "auto-route"
+            return MailDaySetupNudge(
+                id = dto.id,
+                icon = if (autoRoute) PantopusIcon.Users else PantopusIcon.Bell,
+                tint = if (autoRoute) MailDaySetupNudge.NudgeTint.Home else MailDaySetupNudge.NudgeTint.Primary,
+                title = dto.title,
+                subtitle = dto.subtitle,
+            )
+        }
+
+        private fun mapKind(raw: String): MailDayKind =
+            when (raw) {
+                "magazine" -> MailDayKind.Magazine
+                "postcard" -> MailDayKind.Postcard
+                "bill" -> MailDayKind.Bill
+                "package" -> MailDayKind.Package
+                "flyer" -> MailDayKind.Flyer
+                else -> MailDayKind.Envelope
+            }
+
+        private fun mapAvatar(raw: String): MailDaySuggestedAvatar =
+            if (raw == "household_green") MailDaySuggestedAvatar.HouseholdGreen else MailDaySuggestedAvatar.PersonalSky
+
+        private fun mapAction(raw: String): ReviewedMailAction =
+            when (raw) {
+                "junked" -> ReviewedMailAction.Junked
+                "returned" -> ReviewedMailAction.Returned
+                else -> ReviewedMailAction.Routed
+            }
+
+        private fun mapRoutedTint(raw: String?): MailDayRoutedTint? =
+            when (raw) {
+                "household_home" -> MailDayRoutedTint.HouseholdHome
+                "person_primary" -> MailDayRoutedTint.PersonPrimary
+                else -> null
+            }
+
+        private fun mapSegmentTint(raw: String): YesterdayRecap.SegmentTint =
+            when (raw) {
+                "household" -> YesterdayRecap.SegmentTint.Household
+                "junked" -> YesterdayRecap.SegmentTint.Junked
+                "returned" -> YesterdayRecap.SegmentTint.Returned
+                else -> YesterdayRecap.SegmentTint.PersonPrimary
+            }
 
         // ---- Derived counters used by the FinishDay bar + DayHeader ----
 

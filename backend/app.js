@@ -310,6 +310,7 @@ app.use('/api/gigs', require('./routes/gigsV2'));     // Gigs MVP v2 endpoints (
 app.use('/api/v2', require('./routes/offersV2'));      // Offers v2 with scoring & trust capsules
 app.use('/api/mailbox/compose', require('./routes/mailCompose'));   // Mail Compose — four-moment flow
 app.use('/api/mailbox', mailboxRoutes);
+app.use('/api/mailbox/v2/mailday', require('./routes/mailDay'));   // My Mail Day physical-mail triage (before v2 so /mailday/* matches)
 app.use('/api/mailbox/v2', require('./routes/mailboxV2'));
 app.use('/api/mailbox/v2/p2', require('./routes/mailboxV2Phase2'));
 app.use('/api/mailbox/v2/p3', require('./routes/mailboxV2Phase3'));
@@ -318,6 +319,7 @@ app.use('/api/mailbox/v2/p3', require('./routes/mailboxV2Phase3'));
 app.use('/api/homes', require('./routes/homeGuest'));    // Public guest/shared endpoints (no auth)
 app.use('/api/homes', require('./routes/homeIam'));
 app.use('/api/homes', require('./routes/homeOwnership'));
+app.use('/api/homes', require('./routes/homePrivacy'));   // Per-home privacy/security toggles (/:id/privacy)
 app.use('/api/homes', homeRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/sports', require('./routes/sports'));  // Sports topic lane (active events)

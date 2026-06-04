@@ -77,7 +77,8 @@ public struct MailDayView: View {
                             routed: viewModel.routedCount,
                             junked: viewModel.junkedCount,
                             returned: viewModel.returnedCount,
-                            remaining: viewModel.remaining
+                            remaining: viewModel.remaining,
+                            onFinish: { Task { await viewModel.finishDay() } }
                         )
                     )
                 }
@@ -148,7 +149,7 @@ public struct MailDayView: View {
                 ForEach(items) { item in
                     UnreviewedItem(
                         item: item,
-                        onRoute: { viewModel.acceptSuggestion(for: item.id) },
+                        onRoute: { Task { await viewModel.acceptSuggestion(for: item.id) } },
                         onSecondary: { /* Other-recipient sheet — out of scope */ }
                     )
                 }
@@ -294,6 +295,7 @@ struct FinishDayBar: View {
     let junked: Int
     let returned: Int
     let remaining: Int
+    var onFinish: @MainActor () -> Void = {}
 
     var body: some View {
         VStack(spacing: Spacing.s2) {
@@ -353,7 +355,7 @@ struct FinishDayBar: View {
 
     private var primaryCTA: some View {
         Button(
-            action: { /* commit — out of scope */ },
+            action: { onFinish() },
             label: {
                 HStack(spacing: 6) {
                     Icon(
