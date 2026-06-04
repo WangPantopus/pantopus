@@ -85,7 +85,7 @@ public struct ExploreMapView: View {
 
     /// Bottom-floated Undo snackbar + error toast for save/unsave mutations.
     /// Content-sized so it never blocks map gestures.
-    @ViewBuilder private var savedAffordanceOverlay: some View {
+    private var savedAffordanceOverlay: some View {
         VStack(spacing: Spacing.s2) {
             if let undo = savedStore.undo {
                 HStack(spacing: Spacing.s3) {
@@ -609,11 +609,12 @@ public struct ExploreMapView: View {
                             ),
                             onToggleSave: {
                                 savedStore.toggle(pendingPlace(for: entity))
+                            },
+                            onTap: {
+                                viewModel.selectEntity(entity.id)
+                                onOpenEntity(entity)
                             }
-                        ) {
-                            viewModel.selectEntity(entity.id)
-                            onOpenEntity(entity)
-                        }
+                        )
                     }
                 }
                 .padding(.horizontal, Spacing.s4)

@@ -30,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -47,20 +46,6 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-
-/**
- * Seed for the Save-place sheet — the place the user is about to save,
- * prefilled from the row / detail it was triggered from.
- */
-data class PendingSavePlace(
-    val label: String,
-    val latitude: Double,
-    val longitude: Double,
-    val city: String? = null,
-    val state: String? = null,
-    val geocodePlaceId: String? = null,
-    val sourceId: String? = null,
-)
 
 /**
  * BLOCK 2E Frame 6 — the bookmark save toggle on Explore/Discover rows + place

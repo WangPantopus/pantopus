@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.api.models.saved_places.SavedPlaceDto
 import app.pantopus.android.ui.components.AvatarWithIdentityRing
 import app.pantopus.android.ui.components.BizBannerHeader
 import app.pantopus.android.ui.components.BizStatusBadge
@@ -880,9 +881,7 @@ private fun BusinessProfileSaveToast(
     }
 }
 
-private fun List<app.pantopus.android.data.api.models.saved_places.SavedPlaceDto>.isSaved(
-    pending: PendingSavePlace,
-): Boolean =
+private fun List<SavedPlaceDto>.isSaved(pending: PendingSavePlace): Boolean =
     any { dto ->
         savedPlaceMatchKey(dto.geocodePlaceId, dto.latitude, dto.longitude) ==
             savedPlaceMatchKey(pending.geocodePlaceId, pending.latitude, pending.longitude)

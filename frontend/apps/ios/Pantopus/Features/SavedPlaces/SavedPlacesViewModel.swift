@@ -238,7 +238,7 @@ enum SavedPlacesSampleData {
         _ type: String,
         daysAgo: Double
     ) -> SavedPlaceDTO {
-        let date = Date().addingTimeInterval(-daysAgo * 86_400)
+        let date = Date().addingTimeInterval(-daysAgo * 86400)
         let iso = ISO8601DateFormatter().string(from: date)
         return SavedPlaceDTO(
             id: id,

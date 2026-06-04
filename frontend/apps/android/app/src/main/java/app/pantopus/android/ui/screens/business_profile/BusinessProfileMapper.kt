@@ -10,8 +10,8 @@ import app.pantopus.android.data.api.models.businesses.BusinessProfileDetailDto
 import app.pantopus.android.data.api.models.businesses.BusinessPublicResponse
 import app.pantopus.android.data.api.models.businesses.BusinessUserDetailDto
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
-import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
+import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
 import app.pantopus.android.ui.theme.PantopusIcon
 import java.time.Duration
 import java.time.Instant

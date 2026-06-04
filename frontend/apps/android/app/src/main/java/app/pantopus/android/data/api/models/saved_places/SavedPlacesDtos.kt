@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming")
+
 package app.pantopus.android.data.api.models.saved_places
 
 import com.squareup.moshi.Json

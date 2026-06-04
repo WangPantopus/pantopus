@@ -125,7 +125,7 @@ public struct BusinessProfileView: View {
         )
     }
 
-    @ViewBuilder private var savedAffordanceOverlay: some View {
+    private var savedAffordanceOverlay: some View {
         VStack(spacing: Spacing.s2) {
             if let undo = savedStore.undo {
                 HStack(spacing: Spacing.s3) {

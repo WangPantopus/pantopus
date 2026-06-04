@@ -3,8 +3,8 @@
 package app.pantopus.android.ui.screens.business_profile
 
 import androidx.lifecycle.SavedStateHandle
-import app.pantopus.android.data.api.models.businesses.BusinessCatalogItemDto
 import app.pantopus.android.data.api.models.businesses.BusinessAccessDto
+import app.pantopus.android.data.api.models.businesses.BusinessCatalogItemDto
 import app.pantopus.android.data.api.models.businesses.BusinessDetailResponse
 import app.pantopus.android.data.api.models.businesses.BusinessGeoPoint
 import app.pantopus.android.data.api.models.businesses.BusinessHoursDto

@@ -86,7 +86,9 @@ public final class MeViewModel {
             return nil
         }
     }
+}
 
+private extension MeViewModel {
     // MARK: - Projections
 
     /// Debug-only deep-link section appended to every identity in

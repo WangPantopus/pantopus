@@ -1389,6 +1389,7 @@ private fun ExploreKindTag(kind: ExploreKind) {
         )
     }
 }
+
 @Composable
 private fun ExploreBadgeChip(badge: ExploreBadge) {
     val colors = exploreBadgeColors(badge.tone)

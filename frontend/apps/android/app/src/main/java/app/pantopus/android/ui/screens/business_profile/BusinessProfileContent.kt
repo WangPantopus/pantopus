@@ -3,7 +3,6 @@
 package app.pantopus.android.ui.screens.business_profile
 
 import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
-
 import app.pantopus.android.ui.theme.PantopusIcon
 
 // A10.6 — render-only models for the single-scroll Business Profile.

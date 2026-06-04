@@ -240,7 +240,7 @@ public enum SavedPlacesProjection {
     static func relativeSaved(from iso: String?, now: Date) -> String {
         guard let date = parseDate(iso) else { return "Saved" }
         let seconds = max(0, now.timeIntervalSince(date))
-        let day = 86_400.0
+        let day = 86400.0
         let days = Int(seconds / day)
         switch days {
         case 0: return "Saved today"
