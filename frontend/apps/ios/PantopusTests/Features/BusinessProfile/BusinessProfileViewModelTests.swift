@@ -230,6 +230,12 @@ final class BusinessProfileViewModelTests: XCTestCase {
 
         XCTAssertNotNil(content.serviceArea)
         XCTAssertEqual(content.serviceArea?.serviceArea, "Serves Cambridge & Somerville")
+        XCTAssertEqual(content.savedPlace?.label, "Elm Park Coffee")
+        XCTAssertEqual(content.savedPlace?.latitude, 42.37)
+        XCTAssertEqual(content.savedPlace?.longitude, -71.11)
+        XCTAssertEqual(content.savedPlace?.city, "Cambridge")
+        XCTAssertEqual(content.savedPlace?.state, "MA")
+        XCTAssertEqual(content.savedPlace?.sourceId, "biz-1")
 
         XCTAssertEqual(content.services.count, 1)
         XCTAssertEqual(content.services.first?.name, "Pour over")
@@ -240,6 +246,21 @@ final class BusinessProfileViewModelTests: XCTestCase {
         XCTAssertEqual(content.reviews.first?.reviewerName, "Sam")
 
         XCTAssertNotNil(content.websiteURL)
+    }
+
+    func testLoadedSuppressesSavedPlaceForOwnedBusiness() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.detailJSON.replacingOccurrences(of: "\"isOwner\": false", with: "\"isOwner\": true")),
+            .status(200, body: Self.publicJSON),
+            .status(200, body: Self.reviewsJSON)
+        ]
+        let vm = BusinessProfileViewModel(businessId: "biz-1", client: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertTrue(content.viewerIsOwner)
+        XCTAssertNil(content.savedPlace)
     }
 
     // MARK: - Empty services / hours → empty-section frames

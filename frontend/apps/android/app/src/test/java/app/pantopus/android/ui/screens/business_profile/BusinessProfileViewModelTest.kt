@@ -4,7 +4,9 @@ package app.pantopus.android.ui.screens.business_profile
 
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.businesses.BusinessCatalogItemDto
+import app.pantopus.android.data.api.models.businesses.BusinessAccessDto
 import app.pantopus.android.data.api.models.businesses.BusinessDetailResponse
+import app.pantopus.android.data.api.models.businesses.BusinessGeoPoint
 import app.pantopus.android.data.api.models.businesses.BusinessHoursDto
 import app.pantopus.android.data.api.models.businesses.BusinessLocationDto
 import app.pantopus.android.data.api.models.businesses.BusinessProfileDetailDto
@@ -95,7 +97,7 @@ class BusinessProfileViewModelTest {
                             state = "MA",
                             zipcode = "02139",
                             country = "US",
-                            location = null,
+                            location = BusinessGeoPoint(lat = 42.37, lng = -71.11),
                         ),
                 ),
             locations = emptyList(),
@@ -184,6 +186,12 @@ class BusinessProfileViewModelTest {
 
             assertNotNull(c.serviceArea)
             assertEquals("Serves Cambridge & Somerville", c.serviceArea?.serviceArea)
+            assertEquals("Elm Park Coffee", c.savedPlace?.label)
+            assertEquals(42.37, c.savedPlace?.latitude)
+            assertEquals(-71.11, c.savedPlace?.longitude)
+            assertEquals("Cambridge", c.savedPlace?.city)
+            assertEquals("MA", c.savedPlace?.state)
+            assertEquals("biz-1", c.savedPlace?.sourceId)
 
             assertEquals(1, c.services.size)
             assertEquals("$5", c.services.first().priceLabel)
@@ -191,6 +199,22 @@ class BusinessProfileViewModelTest {
             assertEquals(12, c.reviewSummary?.count)
             assertEquals(1, c.reviews.size)
             assertEquals("Sam", c.reviews.first().reviewerName)
+        }
+
+    @Test
+    fun load_suppressesSavedPlaceForOwnedBusiness() =
+        runTest {
+            coEvery { businesses.business("biz-1") } returns
+                NetworkResult.Success(sampleDetail().copy(access = BusinessAccessDto(hasAccess = true, isOwner = true)))
+            coEvery { businesses.publicBusiness("elmpark-coffee") } returns NetworkResult.Success(samplePublic())
+            coEvery { profiles.publicProfile("biz-1") } returns NetworkResult.Success(samplePublicProfile())
+
+            val vm = makeVm()
+            vm.load()
+
+            val c = (vm.state.value as BusinessProfileUiState.Loaded).content
+            assertTrue(c.viewerIsOwner)
+            assertNull(c.savedPlace)
         }
 
     @Test

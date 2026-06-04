@@ -342,6 +342,8 @@ public struct BusinessProfileContent: Sendable, Hashable {
     public let reviewSummary: BusinessReviewSummary?
     public let reviews: [BusinessReviewCard]
     public let dock: BusinessActionDock
+    /// Seed for the Saved Places bookmark affordance when this profile has a saveable location.
+    public let savedPlace: PendingSavePlace?
     /// Drives the "Just opened on Pantopus" trust note + empty sections.
     public let isNewlyClaimed: Bool
     /// Used by the "Call" dock action (`tel:` link).
@@ -367,6 +369,7 @@ public struct BusinessProfileContent: Sendable, Hashable {
         reviewSummary: BusinessReviewSummary?,
         reviews: [BusinessReviewCard],
         dock: BusinessActionDock,
+        savedPlace: PendingSavePlace? = nil,
         isNewlyClaimed: Bool,
         phoneNumber: String?,
         websiteURL: URL?,
@@ -386,6 +389,7 @@ public struct BusinessProfileContent: Sendable, Hashable {
         self.reviewSummary = reviewSummary
         self.reviews = reviews
         self.dock = dock
+        self.savedPlace = savedPlace
         self.isNewlyClaimed = isNewlyClaimed
         self.phoneNumber = phoneNumber
         self.websiteURL = websiteURL

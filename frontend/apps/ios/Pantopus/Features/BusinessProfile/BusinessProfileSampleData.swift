@@ -115,6 +115,13 @@ enum BusinessProfileSampleData {
             )
         ],
         dock: BusinessActionDock(secondary: .book, note: nil),
+        savedPlace: PendingSavePlace(
+            label: "Marlow & Co. Cleaning",
+            latitude: 42.37,
+            longitude: -71.11,
+            city: "Elm Park",
+            sourceId: "marlow"
+        ),
         isNewlyClaimed: false,
         phoneNumber: "+15555550100",
         websiteURL: nil,

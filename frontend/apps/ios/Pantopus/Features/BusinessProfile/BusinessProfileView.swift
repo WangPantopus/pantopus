@@ -22,6 +22,7 @@ import SwiftUI
 @MainActor
 public struct BusinessProfileView: View {
     @State private var viewModel: BusinessProfileViewModel
+    @State private var savedStore = SavedPlacesStore()
     private let onBack: @MainActor () -> Void
     private let onOpenMessages: @MainActor () -> Void
     private let onShare: @MainActor () -> Void
@@ -53,7 +54,8 @@ public struct BusinessProfileView: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .bottom) {
+        @Bindable var savedBindable = savedStore
+        return ZStack(alignment: .bottom) {
             content
             if let toast = viewModel.toastMessage {
                 ToastView(message: ToastMessage(text: toast, kind: .neutral))
@@ -64,6 +66,7 @@ public struct BusinessProfileView: View {
                         viewModel.toastMessage = nil
                     }
             }
+            savedAffordanceOverlay
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .confirmationDialog(
@@ -77,13 +80,27 @@ public struct BusinessProfileView: View {
             if viewerOwnsLoadedBusiness {
                 Button("Edit business page") { onEdit() }
             }
-            Button("Save business") { Task { await viewModel.save() } }
+            if let pending = loadedSavedPlace {
+                Button(savedPlaceIsSaved(pending) ? "Remove saved place" : "Save business") {
+                    savedStore.toggle(pending)
+                }
+            }
             Button("Share business") { onShare() }
             Button("Report", role: .destructive) { onOpenReport() }
             Button("Cancel", role: .cancel) {}
         }
         .accessibilityIdentifier("businessProfile")
         .task { await viewModel.load() }
+        .task { await savedStore.loadIfNeeded() }
+        .sheet(item: $savedBindable.pendingSave) { pending in
+            SavePlaceSheet(
+                pending: pending,
+                onSave: { label, choice in
+                    Task { await savedStore.commitSave(label: label, choice: choice) }
+                },
+                onClose: { savedStore.pendingSave = nil }
+            )
+        }
     }
 
     private var viewerOwnsLoadedBusiness: Bool {
@@ -93,6 +110,60 @@ public struct BusinessProfileView: View {
         return false
     }
 
+    private var loadedSavedPlace: PendingSavePlace? {
+        if case let .loaded(payload) = viewModel.state {
+            return payload.savedPlace
+        }
+        return nil
+    }
+
+    private func savedPlaceIsSaved(_ pending: PendingSavePlace) -> Bool {
+        savedStore.isSaved(
+            geocodePlaceId: pending.geocodePlaceId,
+            latitude: pending.latitude,
+            longitude: pending.longitude
+        )
+    }
+
+    @ViewBuilder private var savedAffordanceOverlay: some View {
+        VStack(spacing: Spacing.s2) {
+            if let undo = savedStore.undo {
+                HStack(spacing: Spacing.s3) {
+                    Icon(.checkCircle, size: 18, color: Theme.Color.appTextInverse)
+                    Text("Removed \u{201C}\(undo.dto.label)\u{201D}")
+                        .font(.system(size: 13.5, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .lineLimit(1)
+                    Spacer(minLength: Spacing.s2)
+                    Button { Task { await savedStore.undoRemove() } } label: {
+                        Text("Undo")
+                            .font(.system(size: 13.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.primary300)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s3)
+                .background(Capsule().fill(Theme.Color.appText.opacity(0.95)))
+                .padding(.horizontal, Spacing.s4)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task(id: undo) {
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    savedStore.dismissUndo()
+                }
+                .accessibilityIdentifier("savedPlaces.undoSnackbar")
+            }
+            if let toast = savedStore.toast {
+                ToastView(message: toast)
+                    .task(id: toast) {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        savedStore.toast = nil
+                    }
+            }
+        }
+        .padding(.bottom, Spacing.s16)
+    }
+
     @ViewBuilder private var content: some View {
         switch viewModel.state {
         case .loading:
@@ -100,9 +171,15 @@ public struct BusinessProfileView: View {
         case let .loaded(payload):
             BusinessProfileLoadedView(
                 content: payload,
+                isSaved: payload.savedPlace.map(savedPlaceIsSaved) ?? false,
                 onBack: onBack,
                 onShare: onShare,
                 onMore: presentOverflow,
+                onToggleSavedPlace: {
+                    if let pending = payload.savedPlace {
+                        savedStore.toggle(pending)
+                    }
+                },
                 onContact: onOpenMessages,
                 onBook: onBook,
                 onCall: callBusiness
@@ -136,9 +213,11 @@ public struct BusinessProfileView: View {
 @MainActor
 struct BusinessProfileLoadedView: View {
     let content: BusinessProfileContent
+    let isSaved: Bool
     let onBack: @MainActor () -> Void
     let onShare: @MainActor () -> Void
     let onMore: @MainActor () -> Void
+    let onToggleSavedPlace: @MainActor () -> Void
     let onContact: @MainActor () -> Void
     let onBook: @MainActor () -> Void
     let onCall: @MainActor () -> Void
@@ -165,7 +244,14 @@ struct BusinessProfileLoadedView: View {
             }
             .ignoresSafeArea(edges: .top)
 
-            FloatingControls(onBack: onBack, onShare: onShare, onMore: onMore)
+            FloatingControls(
+                onBack: onBack,
+                onShare: onShare,
+                onMore: onMore,
+                showsSave: content.savedPlace != nil,
+                isSaved: isSaved,
+                onToggleSavedPlace: onToggleSavedPlace
+            )
         }
         .background(Theme.Color.appBg)
         .overlay(alignment: .bottom) {
@@ -586,12 +672,18 @@ private struct FloatingControls: View {
     let onBack: @MainActor () -> Void
     let onShare: @MainActor () -> Void
     let onMore: @MainActor () -> Void
+    let showsSave: Bool
+    let isSaved: Bool
+    let onToggleSavedPlace: @MainActor () -> Void
 
     var body: some View {
         HStack {
             control(.chevronLeft, label: "Back", action: onBack)
             Spacer()
             HStack(spacing: Spacing.s2) {
+                if showsSave {
+                    SaveBookmarkButton(isSaved: isSaved, size: 34, onToggle: onToggleSavedPlace)
+                }
                 control(.share, label: "Share", action: onShare)
                 control(.moreHorizontal, label: "More actions", action: onMore)
             }
@@ -699,9 +791,11 @@ private struct ErrorLayout: View {
 #Preview("Populated") {
     BusinessProfileLoadedView(
         content: BusinessProfileSampleData.populated,
+        isSaved: false,
         onBack: {},
         onShare: {},
         onMore: {},
+        onToggleSavedPlace: {},
         onContact: {},
         onBook: {},
         onCall: {}
@@ -711,9 +805,11 @@ private struct ErrorLayout: View {
 #Preview("Newly claimed + closed") {
     BusinessProfileLoadedView(
         content: BusinessProfileSampleData.newlyClaimed,
+        isSaved: false,
         onBack: {},
         onShare: {},
         onMore: {},
+        onToggleSavedPlace: {},
         onContact: {},
         onBook: {},
         onCall: {}

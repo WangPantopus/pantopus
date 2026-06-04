@@ -67,6 +67,12 @@ import app.pantopus.android.ui.screens.business_profile.components.EmptyBlock
 import app.pantopus.android.ui.screens.business_profile.components.HoursTable
 import app.pantopus.android.ui.screens.business_profile.components.ServicesList
 import app.pantopus.android.ui.screens.business_profile.components.StatStrip
+import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
+import app.pantopus.android.ui.screens.saved_places.SaveBookmarkButton
+import app.pantopus.android.ui.screens.saved_places.SavePlaceSheet
+import app.pantopus.android.ui.screens.saved_places.SavedPlaceUndo
+import app.pantopus.android.ui.screens.saved_places.SavedPlacesStoreViewModel
+import app.pantopus.android.ui.screens.saved_places.SavedPlacesToast
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -75,6 +81,7 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 /**
  * A10.6 — public Business Profile, reshaped (B3.1) from the old tabbed
@@ -94,18 +101,37 @@ fun BusinessProfileScreen(
     onBook: () -> Unit = {},
     onEdit: () -> Unit = {},
     viewModel: BusinessProfileViewModel = hiltViewModel(),
+    savedPlacesStore: SavedPlacesStoreViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val saveState by viewModel.saveState.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
+    val savedPlaces by savedPlacesStore.saved.collectAsStateWithLifecycle()
+    val pendingSave by savedPlacesStore.pendingSave.collectAsStateWithLifecycle()
+    val undo by savedPlacesStore.undo.collectAsStateWithLifecycle()
+    val savedPlacesToast by savedPlacesStore.toast.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) {
+        viewModel.load()
+        savedPlacesStore.loadIfNeeded()
+    }
     LaunchedEffect(toast) {
         if (toast != null) {
             delay(2_000)
             viewModel.dismissToast()
+        }
+    }
+    LaunchedEffect(undo) {
+        if (undo != null) {
+            delay(4_000)
+            savedPlacesStore.dismissUndo()
+        }
+    }
+    LaunchedEffect(savedPlacesToast) {
+        if (savedPlacesToast != null) {
+            delay(2_500)
+            savedPlacesStore.dismissToast()
         }
     }
 
@@ -122,15 +148,21 @@ fun BusinessProfileScreen(
             is BusinessProfileUiState.Error ->
                 ErrorLayout(onBack = onBack, message = current.message, onRetry = viewModel::refresh)
             is BusinessProfileUiState.Loaded ->
-                BusinessProfileLoadedFrame(
-                    content = current.content,
-                    onBack = onBack,
-                    onShare = onShare,
-                    onMore = { viewModel.setShowOverflow(true) },
-                    onContact = onOpenMessages,
-                    onBook = onBook,
-                    onCall = { telUri(current.content.phoneNumber)?.let(onOpenWebsite) },
-                )
+                run {
+                    val pending = current.content.savedPlace
+                    val isSaved = pending != null && savedPlaces.isSaved(pending)
+                    BusinessProfileLoadedFrame(
+                        content = current.content,
+                        isSaved = isSaved,
+                        onBack = onBack,
+                        onShare = onShare,
+                        onMore = { viewModel.setShowOverflow(true) },
+                        onToggleSavedPlace = { pending?.let(savedPlacesStore::toggle) },
+                        onContact = onOpenMessages,
+                        onBook = onBook,
+                        onCall = { telUri(current.content.phoneNumber)?.let(onOpenWebsite) },
+                    )
+                }
         }
 
         toast?.let { message ->
@@ -146,19 +178,45 @@ fun BusinessProfileScreen(
                 Text(text = message, style = PantopusTextStyle.small, color = PantopusColors.appTextInverse)
             }
         }
+        undo?.let { snapshot ->
+            BusinessProfileSaveUndoSnackbar(
+                undo = snapshot,
+                onUndo = savedPlacesStore::undoRemove,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 112.dp),
+            )
+        }
+        savedPlacesToast?.let { saveToast ->
+            BusinessProfileSaveToast(
+                toast = saveToast,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp),
+            )
+        }
+
+        pendingSave?.let {
+            SavePlaceSheet(
+                pending = it,
+                onSave = savedPlacesStore::commitSave,
+                onClose = savedPlacesStore::closeSheet,
+            )
+        }
 
         if (showOverflow) {
-            val viewerIsOwner = (state as? BusinessProfileUiState.Loaded)?.content?.viewerIsOwner == true
+            val content = (state as? BusinessProfileUiState.Loaded)?.content
+            val viewerIsOwner = content?.viewerIsOwner == true
+            val pending = content?.savedPlace
+            val isSaved = pending != null && savedPlaces.isSaved(pending)
             ModalBottomSheet(onDismissRequest = { viewModel.setShowOverflow(false) }, sheetState = sheetState) {
                 OverflowSheetContent(
                     showEdit = viewerIsOwner,
+                    showSave = pending != null,
+                    saveLabel = if (isSaved) "Remove saved place" else "Save business",
                     onEdit = {
                         viewModel.setShowOverflow(false)
                         onEdit()
                     },
                     onSave = {
                         viewModel.setShowOverflow(false)
-                        viewModel.save()
+                        pending?.let(savedPlacesStore::toggle)
                     },
                     onShare = {
                         viewModel.setShowOverflow(false)
@@ -191,9 +249,11 @@ private fun telUri(phone: String?): String? {
 @Composable
 internal fun BusinessProfileLoadedFrame(
     content: BusinessProfileContent,
+    isSaved: Boolean,
     onBack: () -> Unit,
     onShare: () -> Unit,
     onMore: () -> Unit,
+    onToggleSavedPlace: () -> Unit,
     onContact: () -> Unit,
     onBook: () -> Unit,
     onCall: () -> Unit,
@@ -227,6 +287,9 @@ internal fun BusinessProfileLoadedFrame(
             onBack = onBack,
             onShare = onShare,
             onMore = onMore,
+            showsSave = content.savedPlace != null,
+            isSaved = isSaved,
+            onToggleSavedPlace = onToggleSavedPlace,
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
         )
 
@@ -619,6 +682,9 @@ private fun FloatingControls(
     onBack: () -> Unit,
     onShare: () -> Unit,
     onMore: () -> Unit,
+    showsSave: Boolean,
+    isSaved: Boolean,
+    onToggleSavedPlace: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -628,6 +694,9 @@ private fun FloatingControls(
         ControlButton(icon = PantopusIcon.ChevronLeft, label = "Back", onClick = onBack)
         Spacer(modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            if (showsSave) {
+                SaveBookmarkButton(isSaved = isSaved, onToggle = onToggleSavedPlace, size = 34.dp)
+            }
             ControlButton(icon = PantopusIcon.Share, label = "Share", onClick = onShare)
             ControlButton(icon = PantopusIcon.MoreHorizontal, label = "More actions", onClick = onMore)
         }
@@ -734,6 +803,8 @@ private fun OverflowSheetContent(
     onReport: () -> Unit,
     onCancel: () -> Unit,
     showEdit: Boolean = false,
+    showSave: Boolean = true,
+    saveLabel: String = "Save business",
     onEdit: () -> Unit = {},
 ) {
     Column(
@@ -743,12 +814,90 @@ private fun OverflowSheetContent(
         if (showEdit) {
             OverflowRow(label = "Edit business page", onClick = onEdit)
         }
-        OverflowRow(label = "Save business", onClick = onSave)
+        if (showSave) {
+            OverflowRow(label = saveLabel, onClick = onSave)
+        }
         OverflowRow(label = "Share business", onClick = onShare)
         OverflowRow(label = "Report", destructive = true, onClick = onReport)
         OverflowRow(label = "Cancel", onClick = onCancel)
     }
 }
+
+@Composable
+private fun BusinessProfileSaveUndoSnackbar(
+    undo: SavedPlaceUndo,
+    onUndo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appText.copy(alpha = 0.95f))
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                .testTag("savedPlaces.undoSnackbar"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(PantopusIcon.CheckCircle, contentDescription = null, size = 18.dp, tint = PantopusColors.appTextInverse)
+        Text(
+            text = "Removed \"${undo.dto.label}\"",
+            color = PantopusColors.appTextInverse,
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = Spacing.s3).weight(1f),
+        )
+        Text(
+            text = "Undo",
+            color = PantopusColors.primary300,
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Bold,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .clickable(onClick = onUndo)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
+                    .testTag("savedPlaces.undoSnackbar.undo"),
+        )
+    }
+}
+
+@Composable
+private fun BusinessProfileSaveToast(
+    toast: SavedPlacesToast,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(if (toast.isError) PantopusColors.error else PantopusColors.appText.copy(alpha = 0.9f))
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                .testTag("savedPlaces.toast"),
+    ) {
+        Text(text = toast.text, style = PantopusTextStyle.small, color = PantopusColors.appTextInverse)
+    }
+}
+
+private fun List<app.pantopus.android.data.api.models.saved_places.SavedPlaceDto>.isSaved(
+    pending: PendingSavePlace,
+): Boolean =
+    any { dto ->
+        savedPlaceMatchKey(dto.geocodePlaceId, dto.latitude, dto.longitude) ==
+            savedPlaceMatchKey(pending.geocodePlaceId, pending.latitude, pending.longitude)
+    }
+
+private fun savedPlaceMatchKey(
+    geocodePlaceId: String?,
+    latitude: Double,
+    longitude: Double,
+): String =
+    if (!geocodePlaceId.isNullOrBlank()) {
+        "gid:$geocodePlaceId"
+    } else {
+        String.format(Locale.US, "ll:%.5f,%.5f", latitude, longitude)
+    }
 
 @Composable
 private fun OverflowRow(

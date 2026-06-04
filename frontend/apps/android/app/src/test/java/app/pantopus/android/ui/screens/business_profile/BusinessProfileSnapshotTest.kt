@@ -67,9 +67,11 @@ class BusinessProfileSnapshotTest {
     private fun LoadedFrame(content: BusinessProfileContent) {
         BusinessProfileLoadedFrame(
             content = content,
+            isSaved = false,
             onBack = {},
             onShare = {},
             onMore = {},
+            onToggleSavedPlace = {},
             onContact = {},
             onBook = {},
             onCall = {},
