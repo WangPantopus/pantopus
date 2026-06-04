@@ -61,3 +61,18 @@ data class WalletPendingReleaseResponse(
     @Json(name = "in_review_count") val inReviewCount: Int = 0,
     @Json(name = "releasing_soon_count") val releasingSoonCount: Int = 0,
 )
+
+// POST /api/wallet/withdraw — backend/routes/wallet.js:84 (Block 3C)
+@JsonClass(generateAdapter = true)
+data class WalletWithdrawRequest(
+    /** Amount in integer cents (min 100). */
+    val amount: Long,
+    val idempotencyKey: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class WalletWithdrawResponse(
+    val success: Boolean = false,
+    val transaction: WalletTransactionDto? = null,
+    val message: String? = null,
+)

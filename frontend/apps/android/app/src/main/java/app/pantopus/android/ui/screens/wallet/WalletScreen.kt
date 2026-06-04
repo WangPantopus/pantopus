@@ -2,6 +2,8 @@
 
 package app.pantopus.android.ui.screens.wallet
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,20 +16,31 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -37,11 +50,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroSplitCell
 import app.pantopus.android.ui.components.BalanceHeroTone
 import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.ToastController
+import app.pantopus.android.ui.components.ToastHost
 import app.pantopus.android.ui.screens.wallet.components.ActivityRow
 import app.pantopus.android.ui.screens.wallet.components.HoldBanner
 import app.pantopus.android.ui.screens.wallet.components.PayoutMethodCard
@@ -66,31 +83,187 @@ import app.pantopus.android.ui.theme.pantopusShadow
  * (bank verification expired — amber banner, locked withdraw,
  * re-verify CTA in the payout method card).
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletScreen(
     onBack: () -> Unit,
     onOpenHistory: () -> Unit = {},
-    onWithdraw: () -> Unit = {},
-    onManagePayout: () -> Unit = {},
-    onReverifyPayout: () -> Unit = {},
     onOpenTaxDocs: () -> Unit = {},
     onSeeAllActivity: () -> Unit = {},
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val action by viewModel.action.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val toastController = remember { ToastController() }
+    var showWithdrawSheet by remember { mutableStateOf(false) }
+    var awaitingConnectReturn by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+
     LaunchedEffect(Unit) { viewModel.load() }
 
-    WalletScreenContent(
-        state = state,
-        onBack = onBack,
-        onOpenHistory = onOpenHistory,
-        onWithdraw = onWithdraw,
-        onManagePayout = onManagePayout,
-        onReverifyPayout = onReverifyPayout,
-        onOpenTaxDocs = onOpenTaxDocs,
-        onSeeAllActivity = onSeeAllActivity,
-        onRetry = { viewModel.refresh() },
-    )
+    // Open the Stripe-hosted onboarding / dashboard URL in the browser.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is WalletEvent.OpenUrl -> {
+                    if (event.refreshOnReturn) awaitingConnectReturn = true
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(event.url)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            },
+                        )
+                    }.onFailure { toastController.error("Couldn't open the payout page.") }
+                }
+            }
+        }
+    }
+
+    // Re-read Connect status when the seller returns from hosted onboarding.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, e ->
+                if (e == Lifecycle.Event.ON_RESUME && awaitingConnectReturn) {
+                    awaitingConnectReturn = false
+                    viewModel.onReturnFromConnect()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Surface the payout action result as a toast + dismiss the sheet.
+    LaunchedEffect(action) {
+        when (val current = action) {
+            is WalletAction.WithdrawSucceeded -> {
+                showWithdrawSheet = false
+                toastController.success(current.message)
+            }
+            is WalletAction.WithdrawFailed -> {
+                showWithdrawSheet = false
+                toastController.error(current.message)
+            }
+            is WalletAction.ActionFailed -> toastController.error(current.message)
+            else -> Unit
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        WalletScreenContent(
+            state = state,
+            onBack = onBack,
+            onOpenHistory = onOpenHistory,
+            onWithdraw = { showWithdrawSheet = true },
+            onSetupPayouts = { viewModel.setupPayouts() },
+            onManagePayout = { viewModel.openDashboard() },
+            onReverifyPayout = { viewModel.setupPayouts() },
+            onOpenTaxDocs = onOpenTaxDocs,
+            onSeeAllActivity = onSeeAllActivity,
+            onRetry = { viewModel.refresh() },
+        )
+        PayoutResultMarker(action)
+        ToastHost(controller = toastController)
+    }
+
+    if (showWithdrawSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showWithdrawSheet = false },
+            sheetState = sheetState,
+        ) {
+            WithdrawConfirmSheet(
+                amount = currentAvailable(state),
+                processing = action is WalletAction.Withdrawing,
+                onConfirm = { viewModel.withdraw() },
+                onCancel = { showWithdrawSheet = false },
+            )
+        }
+    }
+}
+
+private fun currentAvailable(state: WalletUiState): String =
+    when (state) {
+        is WalletUiState.Populated -> state.content.available
+        is WalletUiState.Hold -> state.content.available
+        else -> "0.00"
+    }
+
+@Composable
+private fun WithdrawConfirmSheet(
+    amount: String,
+    processing: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(Spacing.s5)
+                .testTag("wallet.withdrawSheet"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ArrowDownToLine,
+            contentDescription = null,
+            size = 32.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "Withdraw to your bank",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text = "\$$amount transfers to your bank account. Funds arrive in 2–3 business days.",
+            fontSize = 13.sp,
+            color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
+        )
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.primary600)
+                    .clickable(enabled = !processing, onClick = onConfirm)
+                    .heightIn(min = 48.dp)
+                    .testTag("wallet.withdrawBtn"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = if (processing) "Processing…" else "Confirm withdrawal",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+        Text(
+            text = "Cancel",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.clickable(onClick = onCancel),
+        )
+        Spacer(Modifier.height(Spacing.s5))
+    }
+}
+
+/** Invisible test anchor mirroring the last terminal payout outcome. */
+@Composable
+private fun PayoutResultMarker(action: WalletAction) {
+    val tag =
+        when (action) {
+            is WalletAction.WithdrawSucceeded -> "wallet.withdrawSuccess"
+            is WalletAction.WithdrawFailed, is WalletAction.ActionFailed -> "wallet.actionError"
+            else -> null
+        }
+    if (tag != null) {
+        Box(modifier = Modifier.size(0.dp).testTag(tag))
+    }
 }
 
 @Composable
@@ -99,6 +272,7 @@ internal fun WalletScreenContent(
     onBack: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onWithdraw: () -> Unit = {},
+    onSetupPayouts: () -> Unit = {},
     onManagePayout: () -> Unit = {},
     onReverifyPayout: () -> Unit = {},
     onOpenTaxDocs: () -> Unit = {},
@@ -119,6 +293,7 @@ internal fun WalletScreenContent(
                 WalletBody(
                     content = current.content,
                     onWithdraw = onWithdraw,
+                    onSetupPayouts = onSetupPayouts,
                     onManagePayout = onManagePayout,
                     onReverifyPayout = onReverifyPayout,
                     onOpenTaxDocs = onOpenTaxDocs,
@@ -128,6 +303,7 @@ internal fun WalletScreenContent(
                 WalletBody(
                     content = current.content,
                     onWithdraw = onWithdraw,
+                    onSetupPayouts = onSetupPayouts,
                     onManagePayout = onManagePayout,
                     onReverifyPayout = onReverifyPayout,
                     onOpenTaxDocs = onOpenTaxDocs,
@@ -226,6 +402,7 @@ private fun IconButton(
 private fun WalletBody(
     content: WalletContent,
     onWithdraw: () -> Unit,
+    onSetupPayouts: () -> Unit,
     onManagePayout: () -> Unit,
     onReverifyPayout: () -> Unit,
     onOpenTaxDocs: () -> Unit,
@@ -268,6 +445,7 @@ private fun WalletBody(
             content = content,
             modifier = Modifier.align(Alignment.BottomCenter),
             onWithdraw = onWithdraw,
+            onSetupPayouts = onSetupPayouts,
         )
     }
 }
@@ -386,6 +564,7 @@ private fun WalletBottomBar(
     content: WalletContent,
     modifier: Modifier = Modifier,
     onWithdraw: () -> Unit,
+    onSetupPayouts: () -> Unit,
 ) {
     Column(
         modifier =
@@ -420,9 +599,57 @@ private fun WalletBottomBar(
                             .testTag("walletWithdrawFootnote"),
                 )
             }
+        } else if (!content.payoutsEnabled) {
+            // Block 3C — withdraw is gated behind Stripe Connect payouts.
+            SetupPayoutsCta(onClick = onSetupPayouts)
+            Text(
+                text = "Set up payouts to withdraw your earnings.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 10.5.sp,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("wallet.connectStatus"),
+            )
         } else {
             WithdrawCta(amount = content.available, onClick = onWithdraw)
         }
+    }
+}
+
+@Composable
+private fun SetupPayoutsCta(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .pantopusShadow(PantopusElevations.primary, shape)
+                .clip(shape)
+                .background(PantopusColors.primary600)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 18.dp)
+                .testTag("wallet.setupPayoutsBtn"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ShieldCheck,
+            contentDescription = null,
+            size = 17.dp,
+            strokeWidth = 2.2f,
+            tint = Color.White,
+        )
+        Spacer(Modifier.width(Spacing.s2))
+        Text(
+            text = "Set up payouts",
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.15).sp,
+        )
     }
 }
 

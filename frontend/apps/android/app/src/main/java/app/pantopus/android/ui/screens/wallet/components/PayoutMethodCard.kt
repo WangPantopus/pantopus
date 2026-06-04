@@ -163,7 +163,8 @@ private fun ManageButton(onClick: () -> Unit) {
                 .clip(RoundedCornerShape(Radii.md))
                 .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s1)
-                .testTag("walletManagePayoutButton"),
+                // Block 3C — "Manage" opens the seller's Stripe Express dashboard.
+                .testTag("wallet.openDashboardBtn"),
         contentAlignment = Alignment.Center,
     ) {
         Text(

@@ -3513,19 +3513,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     TodayDetailScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.WALLET) {
+                    // Withdraw + payout setup (Block 3C) are handled inside
+                    // WalletScreen via WalletViewModel (Stripe Connect onboarding /
+                    // dashboard / withdraw); only navigation stays as callbacks.
                     WalletScreen(
                         onBack = { navController.popBackStack() },
                         onOpenHistory = {
                             navController.navigate(ChildRoutes.placeholder("Wallet history"))
-                        },
-                        onWithdraw = {
-                            navController.navigate(ChildRoutes.placeholder("Withdraw"))
-                        },
-                        onManagePayout = {
-                            navController.navigate(ChildRoutes.placeholder("Manage payout method"))
-                        },
-                        onReverifyPayout = {
-                            navController.navigate(ChildRoutes.placeholder("Re-verify bank"))
                         },
                         onOpenTaxDocs = {
                             navController.navigate(ChildRoutes.placeholder("Tax documents"))

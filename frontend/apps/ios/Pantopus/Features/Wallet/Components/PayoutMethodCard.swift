@@ -118,7 +118,8 @@ struct PayoutMethodCard: View {
                     .frame(minHeight: 30)
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("walletManagePayoutButton")
+            // Block 3C — "Manage" opens the seller's Stripe Express dashboard.
+            .accessibilityIdentifier("wallet.openDashboardBtn")
         }
     }
 }

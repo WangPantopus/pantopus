@@ -161,6 +161,11 @@ public struct WalletContent: Equatable, Sendable {
     public let taxDocs: WalletTaxDocs
     /// Populated only in the `.hold` variant.
     public let holdState: WalletHoldState?
+    /// Block 3C — whether the seller's Stripe Connect account has payouts
+    /// enabled. `false` gates the Withdraw CTA behind a "Set up payouts" entry.
+    /// Defaults `true` so the existing fixtures / snapshots render the Withdraw
+    /// CTA unchanged; the live path sets it from `GET /connect/account`.
+    public let payoutsEnabled: Bool
 
     public var isOnHold: Bool {
         holdState != nil
@@ -175,7 +180,8 @@ public struct WalletContent: Equatable, Sendable {
         activity: [WalletActivityItem],
         payoutMethod: WalletPayoutMethod,
         taxDocs: WalletTaxDocs,
-        holdState: WalletHoldState? = nil
+        holdState: WalletHoldState? = nil,
+        payoutsEnabled: Bool = true
     ) {
         self.available = available
         self.pending = pending
@@ -186,5 +192,6 @@ public struct WalletContent: Equatable, Sendable {
         self.payoutMethod = payoutMethod
         self.taxDocs = taxDocs
         self.holdState = holdState
+        self.payoutsEnabled = payoutsEnabled
     }
 }

@@ -18,11 +18,10 @@ import SwiftUI
 
 public struct WalletView: View {
     @State private var viewModel: WalletViewModel
+    @State private var showWithdrawSheet = false
+    @State private var toast: ToastMessage?
     private let onBack: () -> Void
     private let onOpenHistory: () -> Void
-    private let onWithdraw: () -> Void
-    private let onManagePayout: () -> Void
-    private let onReverifyPayout: () -> Void
     private let onOpenTaxDocs: () -> Void
     private let onSeeAllActivity: () -> Void
 
@@ -30,18 +29,12 @@ public struct WalletView: View {
         viewModel: WalletViewModel = WalletViewModel(),
         onBack: @escaping () -> Void = {},
         onOpenHistory: @escaping () -> Void = {},
-        onWithdraw: @escaping () -> Void = {},
-        onManagePayout: @escaping () -> Void = {},
-        onReverifyPayout: @escaping () -> Void = {},
         onOpenTaxDocs: @escaping () -> Void = {},
         onSeeAllActivity: @escaping () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
         self.onOpenHistory = onOpenHistory
-        self.onWithdraw = onWithdraw
-        self.onManagePayout = onManagePayout
-        self.onReverifyPayout = onReverifyPayout
         self.onOpenTaxDocs = onOpenTaxDocs
         self.onSeeAllActivity = onSeeAllActivity
     }
@@ -55,6 +48,9 @@ public struct WalletView: View {
         .accessibilityIdentifier("wallet")
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
+        .sheet(isPresented: $showWithdrawSheet) { withdrawSheet }
+        .overlay(alignment: .bottom) { toastOverlay }
+        .onChange(of: viewModel.action) { _, newAction in handle(newAction) }
     }
 
     @ViewBuilder private var content: some View {
@@ -90,9 +86,10 @@ public struct WalletView: View {
                 section(overline: "Payout method") {
                     PayoutMethodCard(
                         method: content.payoutMethod,
-                        onManage: onManagePayout,
-                        onReverify: onReverifyPayout
-                    )
+                        onManage: { Task { await viewModel.openDashboard() } }
+                    ) {
+                        Task { await viewModel.setupPayouts() }
+                    }
                 }
                 section(overline: "Taxes") {
                     TaxDocsRow(docs: content.taxDocs, onTap: onOpenTaxDocs)
@@ -186,8 +183,17 @@ public struct WalletView: View {
                             .frame(maxWidth: .infinity)
                             .accessibilityIdentifier("walletWithdrawFootnote")
                     }
+                } else if !content.payoutsEnabled {
+                    // Block 3C — withdraw is gated behind Stripe Connect payouts.
+                    SetupPayoutsCTA { Task { await viewModel.setupPayouts() } }
+                    Text("Set up payouts to withdraw your earnings.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("wallet.connectStatus")
                 } else {
-                    WithdrawCTA(amount: content.available, onTap: onWithdraw)
+                    WithdrawCTA(amount: content.available) { showWithdrawSheet = true }
                 }
             }
             .padding(.horizontal, Spacing.s4)
@@ -201,7 +207,7 @@ public struct WalletView: View {
     /// sticky bottom bar. Hold-state needs more headroom for the
     /// footnote.
     private func bottomBarReservedHeight(for content: WalletContent) -> CGFloat {
-        content.isOnHold ? 120 : 96
+        (content.isOnHold || !content.payoutsEnabled) ? 120 : 96
     }
 
     private var loadingShell: some View {
@@ -228,6 +234,117 @@ public struct WalletView: View {
             cta: EmptyState.CTA(title: "Try again") { await viewModel.refresh() }
         )
         .accessibilityIdentifier("walletError")
+    }
+
+    // MARK: - Withdraw confirm (Block 3C)
+
+    /// Available balance string for whichever loaded frame is showing.
+    private var currentAvailable: String {
+        switch viewModel.state {
+        case let .populated(content), let .hold(content): content.available
+        default: "0.00"
+        }
+    }
+
+    private var withdrawSheet: some View {
+        VStack(spacing: Spacing.s4) {
+            Icon(.arrowDownToLine, size: 32, color: Theme.Color.primary600)
+            Text("Withdraw to your bank")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text("$\(currentAvailable) transfers to your bank account. "
+                + "Funds arrive in 2–3 business days.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { await viewModel.withdraw() }
+            } label: {
+                Text(viewModel.action == .withdrawing ? "Processing…" : "Confirm withdrawal")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Theme.Color.primary600)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.action == .withdrawing)
+            .accessibilityIdentifier("wallet.withdrawBtn")
+            Button("Cancel") { showWithdrawSheet = false }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .buttonStyle(.plain)
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity)
+        .presentationDetents([.height(280)])
+        .accessibilityIdentifier("wallet.withdrawSheet")
+    }
+
+    // MARK: - Result toast
+
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast {
+            ToastView(message: toast)
+                .padding(.bottom, Spacing.s10)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .accessibilityIdentifier(toastIdentifier(for: toast.kind))
+                .task(id: toast) {
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    self.toast = nil
+                }
+        }
+    }
+
+    private func toastIdentifier(for kind: ToastKind) -> String {
+        switch kind {
+        case .success: "wallet.withdrawSuccess"
+        case .error: "wallet.actionError"
+        case .neutral: "wallet.actionStatus"
+        }
+    }
+
+    private func handle(_ action: WalletViewModel.Action) {
+        switch action {
+        case .idle, .withdrawing, .connecting:
+            break
+        case let .withdrawSucceeded(message):
+            showWithdrawSheet = false
+            toast = ToastMessage(text: message, kind: .success)
+            viewModel.clearAction()
+        case let .withdrawFailed(message), let .actionFailed(message):
+            showWithdrawSheet = false
+            toast = ToastMessage(text: message, kind: .error)
+            viewModel.clearAction()
+        }
+    }
+}
+
+// MARK: - Set-up-payouts CTA (Block 3C — withdraw gate)
+
+private struct SetupPayoutsCTA: View {
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.shieldCheck, size: 17, strokeWidth: 2.2, color: .white)
+                Text("Set up payouts")
+                    .font(.system(size: 15, weight: .bold))
+                    .tracking(-0.15)
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(Theme.Color.primary600)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg + 2, style: .continuous))
+            .pantopusShadow(.primary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Set up payouts")
+        .accessibilityIdentifier("wallet.setupPayoutsBtn")
     }
 }
 

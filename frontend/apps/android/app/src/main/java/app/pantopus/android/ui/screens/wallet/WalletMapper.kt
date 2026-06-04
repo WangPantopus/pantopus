@@ -26,6 +26,7 @@ object WalletMapper {
         balance: WalletBalanceResponse,
         transactions: List<WalletTransactionDto>,
         pending: WalletPendingReleaseResponse?,
+        payoutsEnabled: Boolean = true,
         zone: ZoneId = ZoneId.systemDefault(),
         now: Instant = Instant.now(),
     ): WalletContent {
@@ -42,6 +43,7 @@ object WalletMapper {
             payoutMethod = placeholder.payoutMethod,
             taxDocs = placeholder.taxDocs,
             holdState = null,
+            payoutsEnabled = payoutsEnabled,
         )
     }
 

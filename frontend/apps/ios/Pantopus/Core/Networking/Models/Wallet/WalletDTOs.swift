@@ -79,6 +79,29 @@ public struct WalletTransactionDTO: Decodable, Sendable, Hashable, Identifiable 
     }
 }
 
+// MARK: - Withdraw (POST /api/wallet/withdraw — backend/routes/wallet.js:84)
+
+/// Body for `POST /api/wallet/withdraw`. `amount` is integer cents (min 100).
+/// `idempotencyKey` deduplicates double-taps server-side.
+public struct WalletWithdrawRequest: Encodable, Sendable, Hashable {
+    public let amount: Int
+    public let idempotencyKey: String?
+
+    public init(amount: Int, idempotencyKey: String? = nil) {
+        self.amount = amount
+        self.idempotencyKey = idempotencyKey
+    }
+}
+
+/// `POST /api/wallet/withdraw` envelope. The new outbound `WalletTransaction`
+/// row is returned so the client can optimistically reflect it; we still
+/// refresh from the backend (source of truth).
+public struct WalletWithdrawResponse: Decodable, Sendable, Hashable {
+    public let success: Bool
+    public let transaction: WalletTransactionDTO?
+    public let message: String?
+}
+
 // MARK: - Pending release (GET /api/wallet/pending-release — backend/routes/wallet.js:160)
 
 /// `GET /api/wallet/pending-release` — escrow breakdown. All values are
