@@ -5,8 +5,13 @@ import app.pantopus.android.data.api.models.mailbox.EarningsHistoryResponse
 import app.pantopus.android.data.api.models.mailbox.EarningsSummaryResponse
 import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.models.mailbox.MailboxListResponse
+import app.pantopus.android.data.api.models.mailbox.v2.CancelVacationRequest
+import app.pantopus.android.data.api.models.mailbox.v2.CancelVacationResponse
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpRequest
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpResponse
+import app.pantopus.android.data.api.models.mailbox.v2.CreateMapPinRequest
+import app.pantopus.android.data.api.models.mailbox.v2.CreateMapPinResponse
+import app.pantopus.android.data.api.models.mailbox.v2.DeleteMapPinResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerItemsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.EarnBalanceResponse
@@ -15,6 +20,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.LogEventResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2ItemResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MapPinDetailResponse
+import app.pantopus.android.data.api.models.mailbox.v2.MapPinsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.P3TaskResponse
 import app.pantopus.android.data.api.models.mailbox.v2.P3TaskUpdateRequest
 import app.pantopus.android.data.api.models.mailbox.v2.P3TasksResponse
@@ -26,8 +33,11 @@ import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
 import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
 import app.pantopus.android.data.api.models.mailbox.v2.RouteMailRequest
 import app.pantopus.android.data.api.models.mailbox.v2.RouteMailResponse
+import app.pantopus.android.data.api.models.mailbox.v2.StartVacationRequest
+import app.pantopus.android.data.api.models.mailbox.v2.StartVacationResponse
 import app.pantopus.android.data.api.models.mailbox.v2.TranslateMailRequest
 import app.pantopus.android.data.api.models.mailbox.v2.TranslationResult
+import app.pantopus.android.data.api.models.mailbox.v2.VacationStatusResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.MailboxApi
@@ -154,4 +164,31 @@ class MailboxRepository
 
         /** `GET /api/mailbox/v2/earn/balance` — cleared / pending payout sums. */
         suspend fun earnBalance(): NetworkResult<EarnBalanceResponse> = safeApiCall { v2Api.earnBalance() }
+
+        /** `GET /api/mailbox/v2/p3/vacation/status` — A14.8 active / upcoming hold. */
+        suspend fun vacationStatus(): NetworkResult<VacationStatusResponse> = safeApiCall { v2Api.vacationStatus() }
+
+        /** `POST /api/mailbox/v2/p3/vacation/start` — A14.8 schedule a hold. */
+        suspend fun startVacation(request: StartVacationRequest): NetworkResult<StartVacationResponse> =
+            safeApiCall { v2Api.startVacation(request) }
+
+        /** `POST /api/mailbox/v2/p3/vacation/cancel` — A14.8 end the active hold. */
+        suspend fun cancelVacation(holdId: String): NetworkResult<CancelVacationResponse> =
+            safeApiCall { v2Api.cancelVacation(CancelVacationRequest(holdId = holdId)) }
+
+        /** `GET /api/mailbox/v2/p3/map/pins` — A11.4 `HomeMapPin` rows. */
+        suspend fun mapPins(
+            homeId: String? = null,
+            type: String? = null,
+        ): NetworkResult<MapPinsResponse> = safeApiCall { v2Api.mapPins(homeId = homeId, type = type) }
+
+        /** `GET /api/mailbox/v2/p3/map/pin/:id` — A11.4 pin detail. */
+        suspend fun mapPin(id: String): NetworkResult<MapPinDetailResponse> = safeApiCall { v2Api.mapPin(id) }
+
+        /** `POST /api/mailbox/v2/p3/map/pin` — A11.4 create a pin. */
+        suspend fun createMapPin(request: CreateMapPinRequest): NetworkResult<CreateMapPinResponse> =
+            safeApiCall { v2Api.createMapPin(request) }
+
+        /** `DELETE /api/mailbox/v2/p3/map/pin/:id` — A11.4 delete a pin. */
+        suspend fun deleteMapPin(id: String): NetworkResult<DeleteMapPinResponse> = safeApiCall { v2Api.deleteMapPin(id) }
     }

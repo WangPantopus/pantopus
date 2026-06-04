@@ -3,6 +3,11 @@
 package app.pantopus.android.ui.screens.audience_profile.edit_persona
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.audience.AudienceProfileRepository
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,8 +28,13 @@ import org.junit.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditPersonaViewModelTest {
+    private val repository: AudienceProfileRepository = mockk()
+
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // No live persona overlay in these tests — `me()` fails so `load()`
+        // falls back to the pure sample frame the assertions below pin.
+        coEvery { repository.me() } returns NetworkResult.Failure(NetworkError.Unauthorized)
     }
 
     @After fun tearDown() {
@@ -32,7 +42,10 @@ class EditPersonaViewModelTest {
     }
 
     private fun makeVm(personaId: String): EditPersonaViewModel =
-        EditPersonaViewModel(SavedStateHandle(mapOf(EDIT_PERSONA_PERSONA_ID_KEY to personaId)))
+        EditPersonaViewModel(
+            SavedStateHandle(mapOf(EDIT_PERSONA_PERSONA_ID_KEY to personaId)),
+            repository,
+        )
 
     @Test
     fun loadProjectsLiveFrame() =

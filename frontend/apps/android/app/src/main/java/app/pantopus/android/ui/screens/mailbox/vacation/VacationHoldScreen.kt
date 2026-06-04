@@ -82,7 +82,7 @@ fun VacationHoldScreen(
     val mode by viewModel.mode.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.configureSeed(seed)
+        viewModel.load(seed)
         viewModel.configureNavigation(
             onBack = onBack,
             onEditForwarding = onEditForwarding,
