@@ -42,7 +42,7 @@ public final class PaymentsViewModel {
     }
 
     /// Live with injected collaborators — used by the live-path unit tests.
-    public init(api: APIClient, sheetPresenter: any PaymentSheetPresenting) {
+    init(api: APIClient, sheetPresenter: any PaymentSheetPresenting) {
         self.api = api
         self.sheetPresenter = sheetPresenter
         seed = nil

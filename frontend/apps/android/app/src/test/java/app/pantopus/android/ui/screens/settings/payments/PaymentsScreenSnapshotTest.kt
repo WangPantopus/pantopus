@@ -60,13 +60,7 @@ class PaymentsScreenSnapshotTest {
             Frame {
                 PaymentsScreenContent(
                     state = PaymentsUiState.Loaded(PaymentsSampleData.populated),
-                    onBack = {},
-                    onAddMethod = {},
-                    onSetDefault = {},
-                    onRemove = {},
-                    onTapRow = {},
-                    onCloseAccount = {},
-                    onRetry = {},
+                    actions = noOpActions(),
                 )
             }
         }
@@ -78,17 +72,22 @@ class PaymentsScreenSnapshotTest {
             Frame {
                 PaymentsScreenContent(
                     state = PaymentsUiState.Loaded(PaymentsSampleData.empty),
-                    onBack = {},
-                    onAddMethod = {},
-                    onSetDefault = {},
-                    onRemove = {},
-                    onTapRow = {},
-                    onCloseAccount = {},
-                    onRetry = {},
+                    actions = noOpActions(),
                 )
             }
         }
     }
+
+    private fun noOpActions(): PaymentsScreenActions =
+        PaymentsScreenActions(
+            onBack = {},
+            onAddMethod = {},
+            onSetDefault = {},
+            onRemove = {},
+            onTapRow = {},
+            onCloseAccount = {},
+            onRetry = {},
+        )
 
     @Composable
     private fun Frame(content: @Composable () -> Unit) {

@@ -108,17 +108,30 @@ fun PaymentsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         PaymentsScreenContent(
             state = state,
-            onBack = onBack,
-            onAddMethod = viewModel::tapAddMethod,
-            onSetDefault = viewModel::setDefault,
-            onRemove = viewModel::removeMethod,
-            onTapRow = viewModel::tapRow,
-            onCloseAccount = viewModel::tapCloseAccount,
-            onRetry = viewModel::refresh,
+            actions =
+                PaymentsScreenActions(
+                    onBack = onBack,
+                    onAddMethod = viewModel::tapAddMethod,
+                    onSetDefault = viewModel::setDefault,
+                    onRemove = viewModel::removeMethod,
+                    onTapRow = viewModel::tapRow,
+                    onCloseAccount = viewModel::tapCloseAccount,
+                    onRetry = viewModel::refresh,
+                ),
         )
         ToastHost(controller = toastController)
     }
 }
+
+internal data class PaymentsScreenActions(
+    val onBack: () -> Unit,
+    val onAddMethod: () -> Unit,
+    val onSetDefault: (String) -> Unit,
+    val onRemove: (String) -> Unit,
+    val onTapRow: (String) -> Unit,
+    val onCloseAccount: () -> Unit,
+    val onRetry: () -> Unit,
+)
 
 /**
  * Pure render surface — no Stripe SDK, no view-model. Snapshot tests drive
@@ -128,13 +141,7 @@ fun PaymentsScreen(
 @Composable
 internal fun PaymentsScreenContent(
     state: PaymentsUiState,
-    onBack: () -> Unit,
-    onAddMethod: () -> Unit,
-    onSetDefault: (String) -> Unit,
-    onRemove: (String) -> Unit,
-    onTapRow: (String) -> Unit,
-    onCloseAccount: () -> Unit,
-    onRetry: () -> Unit,
+    actions: PaymentsScreenActions,
 ) {
     var selectedMethod by remember { mutableStateOf<PaymentMethod?>(null) }
 
@@ -145,21 +152,21 @@ internal fun PaymentsScreenContent(
                 .background(PantopusColors.appBg)
                 .testTag("payments"),
     ) {
-        TopBar(onBack = onBack)
+        TopBar(onBack = actions.onBack)
         when (val current = state) {
             is PaymentsUiState.Loading -> LoadingFrame()
             is PaymentsUiState.Loaded ->
                 LoadedFrame(
                     loaded = current.content,
                     onTapMethod = { selectedMethod = it },
-                    onAddMethod = onAddMethod,
-                    onTapRow = onTapRow,
-                    onCloseAccount = onCloseAccount,
+                    onAddMethod = actions.onAddMethod,
+                    onTapRow = actions.onTapRow,
+                    onCloseAccount = actions.onCloseAccount,
                 )
             is PaymentsUiState.Error ->
                 ErrorFrame(
                     message = current.message,
-                    onRetry = onRetry,
+                    onRetry = actions.onRetry,
                 )
         }
     }
@@ -167,8 +174,8 @@ internal fun PaymentsScreenContent(
     selectedMethod?.let { method ->
         MethodActionSheet(
             method = method,
-            onSetDefault = onSetDefault,
-            onRemove = onRemove,
+            onSetDefault = actions.onSetDefault,
+            onRemove = actions.onRemove,
             onDismiss = { selectedMethod = null },
         )
     }

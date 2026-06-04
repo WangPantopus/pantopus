@@ -3,11 +3,11 @@ package app.pantopus.android
 import android.app.Application
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.observability.Observability
-import com.stripe.android.PaymentConfiguration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.stripe.android.PaymentConfiguration
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import java.io.File

@@ -121,18 +121,20 @@ final class PaymentsViewModelTests: XCTestCase {
         )
     }
 
-    private static func cardJSON(
-        id: String,
-        brand: String,
-        last4: String,
-        expMonth: Int,
-        expYear: Int,
-        isDefault: Bool
-    ) -> String {
+    private struct CardFixture {
+        let id: String
+        let brand: String
+        let last4: String
+        let expMonth: Int
+        let expYear: Int
+        let isDefault: Bool
+    }
+
+    private static func cardJSON(_ card: CardFixture) -> String {
         """
-        {"id":"\(id)","payment_method_type":"card","card_brand":"\(brand)",
-         "card_last4":"\(last4)","card_exp_month":\(expMonth),
-         "card_exp_year":\(expYear),"is_default":\(isDefault)}
+        {"id":"\(card.id)","payment_method_type":"card","card_brand":"\(card.brand)",
+         "card_last4":"\(card.last4)","card_exp_month":\(card.expMonth),
+         "card_exp_year":\(card.expYear),"is_default":\(card.isDefault)}
         """
     }
 
@@ -140,9 +142,45 @@ final class PaymentsViewModelTests: XCTestCase {
         "{\"paymentMethods\":[\(cards.joined(separator: ","))]}"
     }
 
+    private static let defaultVisa = CardFixture(
+        id: "pm_1",
+        brand: "visa",
+        last4: "4242",
+        expMonth: 3,
+        expYear: 2027,
+        isDefault: true
+    )
+
+    private static let alternateMastercard = CardFixture(
+        id: "pm_2",
+        brand: "mastercard",
+        last4: "4444",
+        expMonth: 11,
+        expYear: 2026,
+        isDefault: false
+    )
+
+    private static let defaultMastercard = CardFixture(
+        id: "pm_2",
+        brand: "mastercard",
+        last4: "4444",
+        expMonth: 11,
+        expYear: 2026,
+        isDefault: true
+    )
+
+    private static let alternateVisa = CardFixture(
+        id: "pm_1",
+        brand: "visa",
+        last4: "4242",
+        expMonth: 3,
+        expYear: 2027,
+        isDefault: false
+    )
+
     private static let methodsJSON = methodsResponse(
-        cardJSON(id: "pm_1", brand: "visa", last4: "4242", expMonth: 3, expYear: 2027, isDefault: true),
-        cardJSON(id: "pm_2", brand: "mastercard", last4: "4444", expMonth: 11, expYear: 2026, isDefault: false)
+        cardJSON(defaultVisa),
+        cardJSON(alternateMastercard)
     )
 
     private static let addCardParamsJSON = """
@@ -236,8 +274,8 @@ final class PaymentsViewModelTests: XCTestCase {
     func testSetDefaultOptimisticThenReconcile() async {
         // load → PUT default → reload (pm_2 now default).
         let reorderedJSON = Self.methodsResponse(
-            Self.cardJSON(id: "pm_2", brand: "mastercard", last4: "4444", expMonth: 11, expYear: 2026, isDefault: true),
-            Self.cardJSON(id: "pm_1", brand: "visa", last4: "4242", expMonth: 3, expYear: 2027, isDefault: false)
+            Self.cardJSON(Self.defaultMastercard),
+            Self.cardJSON(Self.alternateVisa)
         )
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
@@ -274,7 +312,7 @@ final class PaymentsViewModelTests: XCTestCase {
 
     func testRemoveMethodOptimisticThenReconcile() async {
         let afterRemovalJSON = Self.methodsResponse(
-            Self.cardJSON(id: "pm_1", brand: "visa", last4: "4242", expMonth: 3, expYear: 2027, isDefault: true)
+            Self.cardJSON(Self.defaultVisa)
         )
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
