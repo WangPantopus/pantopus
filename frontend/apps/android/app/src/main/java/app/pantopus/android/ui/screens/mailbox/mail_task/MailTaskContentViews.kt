@@ -31,7 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.MailTaskAccentCard
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -255,13 +255,11 @@ fun MailTaskErrorBody(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    EmptyState(
-        icon = PantopusIcon.AlertCircle,
+    ErrorState(
         headline = "Couldn't load this task",
-        subcopy = message,
+        message = message,
         modifier = modifier.testTag("mailTask_error"),
-        ctaTitle = "Try again",
-        onCta = onRetry,
+        onRetry = onRetry,
     )
 }
 

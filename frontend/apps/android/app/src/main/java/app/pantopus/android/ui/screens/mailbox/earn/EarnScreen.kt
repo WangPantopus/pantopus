@@ -39,7 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroSplitCell
-import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.mailbox.earn.components.EarnEarningsList
 import app.pantopus.android.ui.screens.mailbox.earn.components.EarnLockedRow
 import app.pantopus.android.ui.screens.mailbox.earn.components.EarnPayoutNudge
@@ -152,13 +152,11 @@ internal fun EarnScreenContent(
                     onAddBank = onAddBank,
                 )
             is EarnUiState.Error ->
-                EmptyState(
-                    icon = PantopusIcon.AlertCircle,
+                ErrorState(
                     headline = "Couldn't load Earn",
-                    subcopy = current.message,
+                    message = current.message,
                     modifier = Modifier.testTag("earnError"),
-                    ctaTitle = "Try again",
-                    onCta = onRetry,
+                    onRetry = onRetry,
                 )
         }
     }

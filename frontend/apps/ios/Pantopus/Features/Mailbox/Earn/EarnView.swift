@@ -268,12 +268,9 @@ public struct EarnView: View {
     }
 
     private func errorShell(_ message: String) -> some View {
-        EmptyState(
-            icon: .alertCircle,
-            headline: "Couldn't load Earn",
-            subcopy: message,
-            cta: EmptyState.CTA(title: "Try again") { await viewModel.refresh() }
-        )
+        ErrorState(headline: "Couldn't load Earn", message: message) {
+            await viewModel.refresh()
+        }
         .accessibilityIdentifier("earnError")
     }
 }
