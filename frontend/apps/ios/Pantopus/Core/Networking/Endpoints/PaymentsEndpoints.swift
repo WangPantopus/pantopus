@@ -27,6 +27,19 @@ public enum PaymentsEndpoints {
         Endpoint(method: .post, path: "/api/payments/payment-sheet-add-card")
     }
 
+    /// `POST /api/payments/intent` — route `backend/routes/pays.js:280`.
+    /// Block 3B checkout: creates a PaymentIntent for the gig / marketplace
+    /// order and returns the full set of params the mobile PaymentSheet
+    /// needs (`clientSecret` + `customer` + `ephemeralKey` +
+    /// `publishableKey`). The server owns the amount; the client passes the
+    /// order reference (gig / listing / offer id) + agreed amount. The
+    /// charge is reconciled into the `Payment` table by Stripe webhooks, so
+    /// the client refreshes the order from the backend on success — it never
+    /// marks paid locally.
+    public static func intent(body: CreatePaymentIntentBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/payments/intent", body: body)
+    }
+
     /// `PUT /api/payments/methods/{id}/default` — route
     /// `backend/routes/pays.js:754`. Promote a saved method to default.
     public static func setDefaultMethod(id: String) -> Endpoint {

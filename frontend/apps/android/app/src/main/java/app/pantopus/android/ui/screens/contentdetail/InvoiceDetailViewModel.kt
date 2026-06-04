@@ -4,23 +4,36 @@ package app.pantopus.android.ui.screens.contentdetail
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.payments.CreatePaymentIntentRequest
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.payments.PaymentsRepository
+import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * T2.6 ships the invoice frame with hardcoded fixture data — the
- * backend wiring (paymentOps.js + wallet.js + Stripe PaymentIntent)
- * lands alongside the Stripe payment-sheet integration in a follow-up.
+ * T2.6 ships the invoice frame with hardcoded fixture data; Block 3B wires the
+ * "Pay" CTA to the real Stripe PaymentSheet. The invoice itself still projects
+ * from a fixture (the invoice/order backend lands separately), but the pay
+ * step is real: it creates a PaymentIntent (`POST /api/payments/intent`),
+ * presents PaymentSheet, and on success re-reads server state — it never marks
+ * the invoice paid client-side (webhooks reconcile the `Payment`).
  */
 @HiltViewModel
 class InvoiceDetailViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
+        private val paymentsRepository: PaymentsRepository,
     ) : ViewModel() {
         companion object {
             const val INVOICE_ID_KEY = "invoiceId"
@@ -31,8 +44,67 @@ class InvoiceDetailViewModel
         private val _state = MutableStateFlow<ContentDetailUiState>(ContentDetailUiState.Loading)
         val state: StateFlow<ContentDetailUiState> = _state.asStateFlow()
 
+        private val _paymentStatus = MutableStateFlow<InvoicePaymentStatus>(InvoicePaymentStatus.Idle)
+        val paymentStatus: StateFlow<InvoicePaymentStatus> = _paymentStatus.asStateFlow()
+
+        private val _events = MutableSharedFlow<InvoiceDetailEvent>(extraBufferCapacity = 4)
+        val events: SharedFlow<InvoiceDetailEvent> = _events.asSharedFlow()
+
+        /**
+         * The order this invoice bills for. Real invoices carry the payee +
+         * amount; until the invoice backend lands we derive a request from the
+         * fixture so the pay step is exercised end-to-end.
+         */
+        private val checkoutRequest: CheckoutRequest =
+            CheckoutRequest(
+                payeeId = "00000000-0000-4000-8000-000000000b51",
+                amountCents = 64285,
+                description = "Holiday lighting · install + takedown",
+            )
+
         fun load() {
             _state.value = ContentDetailUiState.Loaded(Projection.fixture(invoiceId))
+        }
+
+        /** Tapped "Pay" — create the PaymentIntent, then ask the screen to present the sheet. */
+        fun pay() {
+            _paymentStatus.value = InvoicePaymentStatus.Paying
+            viewModelScope.launch {
+                val req =
+                    CreatePaymentIntentRequest(
+                        payeeId = checkoutRequest.payeeId,
+                        amount = checkoutRequest.amountCents,
+                        gigId = checkoutRequest.gigId,
+                        listingId = checkoutRequest.listingId,
+                        offerId = checkoutRequest.offerId,
+                        description = checkoutRequest.description,
+                    )
+                when (val result = paymentsRepository.createPaymentIntent(req)) {
+                    is NetworkResult.Success -> _events.emit(InvoiceDetailEvent.PresentCheckout(result.data))
+                    is NetworkResult.Failure ->
+                        _paymentStatus.value = InvoicePaymentStatus.Declined(result.error.message)
+                }
+            }
+        }
+
+        /** Result of presenting PaymentSheet, mapped from Stripe in the screen. */
+        fun onCheckoutOutcome(outcome: CheckoutOutcome) {
+            when (outcome) {
+                CheckoutOutcome.Paid -> {
+                    _paymentStatus.value = InvoicePaymentStatus.Paid
+                    // Re-read the source of truth rather than flipping locally.
+                    load()
+                }
+                CheckoutOutcome.Canceled -> _paymentStatus.value = InvoicePaymentStatus.Canceled
+                is CheckoutOutcome.Declined ->
+                    _paymentStatus.value =
+                        InvoicePaymentStatus.Declined(outcome.message ?: "Your card was declined.")
+            }
+        }
+
+        /** Clear a result toast once the screen has shown it. */
+        fun clearPaymentStatus() {
+            _paymentStatus.value = InvoicePaymentStatus.Idle
         }
 
         object Projection {

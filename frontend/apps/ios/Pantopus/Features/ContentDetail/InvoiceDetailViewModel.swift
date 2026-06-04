@@ -2,41 +2,98 @@
 //  InvoiceDetailViewModel.swift
 //  Pantopus
 //
-//  T2.6 ships the invoice frame with hardcoded fixture data — the
-//  backend wiring (backend/routes/paymentOps.js + wallet.js + Stripe
-//  PaymentIntent) lands alongside the Stripe payment-sheet integration
-//  in a follow-up. The shell already supports the variable
-//  jsonb_modules[] surface so plumbing real invoice modules through
-//  later changes the VM only. Both designed A09.4 states (due + paid)
-//  are projected here.
+//  T2.6 ships the invoice frame with hardcoded fixture data; Block 3B wires
+//  the "Pay" CTA to the real Stripe PaymentSheet via the shared
+//  `CheckoutCoordinator`. The invoice itself still projects from a fixture
+//  (the invoice/order backend lands separately), but the pay step is real:
+//  it creates a PaymentIntent (`POST /api/payments/intent`), presents
+//  PaymentSheet, and on success re-reads server state — we never mark the
+//  invoice paid client-side (webhooks reconcile the `Payment`). The shell
+//  already supports the variable jsonb_modules[] surface so plumbing real
+//  invoice modules through later changes the VM only. Both designed A09.4
+//  states (due + paid) are projected here.
 //
 
 import Foundation
 import Observation
 
+/// Where the "Pay" CTA currently sits, so the view can surface the right
+/// result toast (success / declined / canceled) after PaymentSheet returns.
+public enum InvoicePaymentStatus: Sendable, Equatable {
+    case idle
+    case paying
+    case paid
+    case canceled
+    case declined(message: String)
+}
+
 @Observable
 @MainActor
 public final class InvoiceDetailViewModel {
     public private(set) var state: ContentDetailState = .loading
+    /// Drives the post-checkout toast in the view (`checkout.*` surfaces).
+    public private(set) var paymentStatus: InvoicePaymentStatus = .idle
 
     private let invoiceId: String
     private let paid: Bool
+    private let checkout: CheckoutCoordinator
+    /// The order this invoice bills for. Real invoices carry the payee +
+    /// amount; until the invoice backend lands we derive a request from the
+    /// fixture so the pay step is exercised end-to-end. `nil` disables pay.
+    private let checkoutRequest: CheckoutRequest?
 
-    public init(invoiceId: String, paid: Bool = false) {
+    public init(
+        invoiceId: String,
+        paid: Bool = false,
+        checkout: CheckoutCoordinator = CheckoutCoordinator(),
+        checkoutRequest: CheckoutRequest? = nil
+    ) {
         self.invoiceId = invoiceId
         self.paid = paid
+        self.checkout = checkout
+        self.checkoutRequest = checkoutRequest ?? Self.fixtureCheckoutRequest
     }
 
     public func load() async {
         state = .loaded(paid ? Self.paidFixture(invoiceId: invoiceId) : Self.fixture(invoiceId: invoiceId))
     }
 
-    public func payNow() async -> Bool {
-        // Real implementation hands off to Stripe.confirmPayment(...).
-        // Stub returns false so the host can show a "not yet available"
-        // sheet until the backend integration lands.
-        false
+    /// Run the PaymentSheet checkout for this invoice. On success we re-read
+    /// from the backend (the source of truth) rather than flipping the state
+    /// locally — for the fixture that re-projects the same frame; once a real
+    /// invoice backend lands, `load()` reflects the paid state.
+    public func payNow() async {
+        guard !paid else { return }
+        guard let request = checkoutRequest else {
+            paymentStatus = .declined(message: "This invoice can't be paid yet.")
+            return
+        }
+        paymentStatus = .paying
+        let outcome = await checkout.pay(request)
+        switch outcome {
+        case .paid:
+            paymentStatus = .paid
+            await load()
+        case .canceled:
+            paymentStatus = .canceled
+        case let .declined(message), let .failed(message):
+            paymentStatus = .declined(message: message)
+        }
     }
+
+    /// Clear a result toast once the view has shown it.
+    public func clearPaymentStatus() {
+        paymentStatus = .idle
+    }
+
+    /// Fixture order reference. The fixture total is $642.85 → 64 285 cents,
+    /// paid to the issuing business ("Brightside Outdoor"). The payee id is a
+    /// stand-in until the invoice backend supplies the real one.
+    private static let fixtureCheckoutRequest = CheckoutRequest(
+        payeeId: "00000000-0000-4000-8000-000000000b51",
+        amountCents: 64285,
+        description: "Holiday lighting · install + takedown"
+    )
 
     // MARK: - Fixtures
 

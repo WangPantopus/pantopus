@@ -30,10 +30,54 @@ object StripePaymentSheets {
                 ),
         )
 
+    /**
+     * Configuration for a one-off checkout (Block 3B). The customer +
+     * ephemeral key are best-effort: when the backend couldn't mint a key we
+     * still collect a card against the client secret rather than failing.
+     */
+    fun paymentConfiguration(
+        customerId: String?,
+        ephemeralKey: String?,
+    ): PaymentSheet.Configuration {
+        val customer =
+            if (!customerId.isNullOrBlank() && !ephemeralKey.isNullOrBlank()) {
+                PaymentSheet.CustomerConfiguration(id = customerId, ephemeralKeySecret = ephemeralKey)
+            } else {
+                null
+            }
+        return PaymentSheet.Configuration(
+            merchantDisplayName = MERCHANT_DISPLAY_NAME,
+            customer = customer,
+        )
+    }
+
     fun outcome(result: PaymentSheetResult): AddCardOutcome =
         when (result) {
             is PaymentSheetResult.Completed -> AddCardOutcome.Completed
             is PaymentSheetResult.Canceled -> AddCardOutcome.Canceled
             is PaymentSheetResult.Failed -> AddCardOutcome.Failed(result.error.message)
         }
+
+    /** Map Stripe's result into the SDK-free [CheckoutOutcome] the VM consumes. */
+    fun checkoutOutcome(result: PaymentSheetResult): CheckoutOutcome =
+        when (result) {
+            is PaymentSheetResult.Completed -> CheckoutOutcome.Paid
+            is PaymentSheetResult.Canceled -> CheckoutOutcome.Canceled
+            is PaymentSheetResult.Failed -> CheckoutOutcome.Declined(result.error.message)
+        }
+}
+
+/**
+ * Result of a checkout PaymentSheet, mapped from Stripe's `PaymentSheetResult`
+ * in the screen so the view-model stays SDK-free. Mirrors iOS `CheckoutOutcome`.
+ */
+sealed interface CheckoutOutcome {
+    /** PaymentSheet completed — re-read server state. */
+    data object Paid : CheckoutOutcome
+
+    /** Buyer dismissed the sheet without paying. */
+    data object Canceled : CheckoutOutcome
+
+    /** Card declined / SCA failed. */
+    data class Declined(val message: String?) : CheckoutOutcome
 }

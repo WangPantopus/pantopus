@@ -84,7 +84,13 @@ public final class StripePaymentSheetPresenter: PaymentSheetPresenting {
     private func makeConfiguration(customer: String, ephemeralKey: String) -> PaymentSheet.Configuration {
         var configuration = PaymentSheet.Configuration()
         configuration.merchantDisplayName = merchantDisplayName
-        configuration.customer = .init(id: customer, ephemeralKeySecret: ephemeralKey)
+        // The customer + ephemeral key let PaymentSheet show saved cards and
+        // save new ones. They're best-effort for one-off checkouts (3B): when
+        // the backend couldn't mint a key we still collect a card against the
+        // client secret rather than failing the whole flow.
+        if !customer.isEmpty, !ephemeralKey.isEmpty {
+            configuration.customer = .init(id: customer, ephemeralKeySecret: ephemeralKey)
+        }
         // Apple Pay is intentionally left unconfigured until a merchant ID +
         // entitlement are provisioned; PaymentSheet still collects cards.
         // (Enabling it later is a one-liner here — see project.yml's

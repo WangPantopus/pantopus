@@ -1,113 +1,100 @@
-@file:Suppress("MagicNumber", "PackageNaming")
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:Suppress("MagicNumber", "PackageNaming", "FunctionNaming")
 
 package app.pantopus.android.ui.screens.contentdetail
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusIcon
-import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.theme.Radii
-import app.pantopus.android.ui.theme.Spacing
+import app.pantopus.android.ui.components.ToastController
+import app.pantopus.android.ui.components.ToastHost
+import app.pantopus.android.ui.screens.settings.payments.StripePaymentSheets
+import com.stripe.android.paymentsheet.rememberPaymentSheet
 
+/**
+ * T2.6 invoice detail. Block 3B wires the "Pay" CTA to the real Stripe
+ * PaymentSheet: the VM creates a PaymentIntent and emits
+ * [InvoiceDetailEvent.PresentCheckout]; PaymentSheet (created in composition —
+ * it registers an ActivityResult launcher) collects the card + handles SCA,
+ * and the outcome drives a success / declined / canceled toast. We never mark
+ * the invoice paid here — the VM re-reads server state on success.
+ */
 @Composable
 fun InvoiceDetailScreen(
     onBack: () -> Unit = {},
     viewModel: InvoiceDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var sheetVisible by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    val paymentStatus by viewModel.paymentStatus.collectAsStateWithLifecycle()
+    val toastController = remember { ToastController() }
+
+    val paymentSheet =
+        rememberPaymentSheet { result ->
+            viewModel.onCheckoutOutcome(StripePaymentSheets.checkoutOutcome(result))
+        }
 
     LaunchedEffect(Unit) { viewModel.load() }
-
-    ContentDetailShell(
-        state = state,
-        onBack = onBack,
-        onPrimaryAction = { sheetVisible = true },
-        onSecondaryAction = null,
-        onRetry = { viewModel.load() },
-        onMessageCounterparty = null,
-    )
-
-    if (sheetVisible) {
-        ModalBottomSheet(
-            onDismissRequest = { sheetVisible = false },
-            sheetState = sheetState,
-        ) {
-            PaySheetStub(onDismiss = { sheetVisible = false })
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is InvoiceDetailEvent.PresentCheckout ->
+                    paymentSheet.presentWithPaymentIntent(
+                        paymentIntentClientSecret = event.params.clientSecret.orEmpty(),
+                        configuration =
+                            StripePaymentSheets.paymentConfiguration(
+                                customerId = event.params.customer,
+                                ephemeralKey = event.params.ephemeralKey,
+                            ),
+                    )
+            }
         }
+    }
+
+    // Surface the post-checkout result as a (self-dismissing) toast. The
+    // status itself sticks until the next pay() so the checkout.* marker stays
+    // assertable by UI tests.
+    LaunchedEffect(paymentStatus) {
+        when (val status = paymentStatus) {
+            is InvoicePaymentStatus.Paid -> toastController.success("Payment complete.")
+            is InvoicePaymentStatus.Canceled -> toastController.info("Payment canceled.")
+            is InvoicePaymentStatus.Declined -> toastController.error(status.message)
+            else -> Unit
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().testTag("checkout.paymentSheet")) {
+        ContentDetailShell(
+            state = state,
+            onBack = onBack,
+            onPrimaryAction = { viewModel.pay() },
+            onSecondaryAction = null,
+            onRetry = { viewModel.load() },
+            onMessageCounterparty = null,
+        )
+        PaymentResultMarker(paymentStatus)
+        ToastHost(controller = toastController)
     }
 }
 
+/** Invisible test anchor that mirrors the last terminal checkout outcome. */
 @Composable
-private fun PaySheetStub(onDismiss: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.s5),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.ShieldCheck,
-            contentDescription = null,
-            size = 36.dp,
-            tint = PantopusColors.primary600,
-        )
-        Text(
-            text = "Stripe payment sheet",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appText,
-        )
-        Text(
-            text =
-                "The real payment flow hooks the existing two-intent + sensitive-action-guard plumbing. " +
-                    "Stub for now.",
-            fontSize = 13.sp,
-            color = PantopusColors.appTextSecondary,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(Spacing.s1))
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.primary600)
-                    .clickable(onClick = onDismiss)
-                    .heightIn(min = 48.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = "Got it", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
+private fun PaymentResultMarker(status: InvoicePaymentStatus) {
+    val tag =
+        when (status) {
+            is InvoicePaymentStatus.Paid -> "checkout.paySuccess"
+            is InvoicePaymentStatus.Declined -> "checkout.payDeclined"
+            is InvoicePaymentStatus.Canceled -> "checkout.cancel"
+            else -> null
         }
-        Spacer(modifier = Modifier.height(Spacing.s5))
+    if (tag != null) {
+        Box(modifier = Modifier.size(0.dp).testTag(tag))
     }
 }

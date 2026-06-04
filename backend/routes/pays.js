@@ -129,6 +129,11 @@ const createPaymentSchema = Joi.object({
   payeeId: Joi.string().uuid().required(),
   amount: Joi.number().integer().min(50).required(), // Min $0.50
   gigId: Joi.string().uuid().optional(),
+  // Marketplace checkout (Block 3B): the listing/offer being paid for. The
+  // listing-offer flow has no Payment row of its own yet, so we attribute the
+  // PaymentIntent via metadata until the marketplace-payments backend lands.
+  listingId: Joi.string().uuid().optional(),
+  offerId: Joi.string().uuid().optional(),
   description: Joi.string().max(500).optional(),
   paymentMethodId: Joi.string().optional(), // Stripe payment method ID
   metadata: Joi.object().optional()
@@ -280,8 +285,8 @@ router.post('/connect/dashboard', verifyToken, async (req, res) => {
 router.post('/intent', verifyToken, validate(createPaymentSchema), async (req, res) => {
   try {
     const payerId = req.user.id;
-    const { payeeId, amount, gigId, description, metadata } = req.body;
-    
+    const { payeeId, amount, gigId, listingId, offerId, description, metadata } = req.body;
+
     // Verify gig exists and payee is owner
     if (gigId) {
       const { data: gig, error: gigError } = await supabaseAdmin
@@ -289,20 +294,29 @@ router.post('/intent', verifyToken, validate(createPaymentSchema), async (req, r
         .select('user_id, title, status')
         .eq('id', gigId)
         .single();
-      
+
       if (gigError || !gig) {
         return res.status(404).json({ error: 'Gig not found' });
       }
-      
+
       if (gig.user_id !== payeeId) {
         return res.status(400).json({ error: 'Payee is not gig owner' });
       }
-      
+
       if (gig.status !== 'active') {
         return res.status(400).json({ error: 'Gig is not active' });
       }
     }
-    
+
+    // Attribute marketplace/listing checkouts on the PaymentIntent so the
+    // Payment row + webhooks can reconcile them later (the ListingOffer has
+    // no Payment of its own today).
+    const intentMetadata = {
+      ...(metadata || {}),
+      ...(listingId ? { listing_id: listingId } : {}),
+      ...(offerId ? { offer_id: offerId } : {}),
+    };
+
     // Create payment intent
     const result = await stripeService.createPaymentIntent({
       payerId,
@@ -310,20 +324,38 @@ router.post('/intent', verifyToken, validate(createPaymentSchema), async (req, r
       amount,
       gigId,
       description,
-      metadata
+      metadata: intentMetadata
     });
-    
+
+    // The mobile PaymentSheet needs the buyer's Stripe customer + a
+    // short-lived ephemeral key to render saved cards (and save new ones).
+    // The PaymentIntent was created against getOrCreateCustomer(payerId);
+    // mint a key for that same customer. Non-fatal if it fails — the sheet
+    // still works card-only against the client secret.
+    let customer = null;
+    let ephemeralKey = null;
+    try {
+      customer = await stripeService.getOrCreateCustomer(payerId);
+      const ek = await stripeService.createEphemeralKey(customer);
+      ephemeralKey = ek?.secret || null;
+    } catch (ekErr) {
+      logger.warn('Payment intent: ephemeral key creation failed (non-fatal)', { error: ekErr.message });
+    }
+
     res.status(201).json({
       clientSecret: result.clientSecret,
       paymentIntentId: result.paymentIntentId,
-      payment: result.payment
+      payment: result.payment,
+      customer,
+      ephemeralKey,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
     });
-    
+
   } catch (err) {
     logger.error('Payment intent creation error', { error: err.message });
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to create payment intent',
-      message: err.message 
+      message: err.message
     });
   }
 });
