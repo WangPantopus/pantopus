@@ -1493,6 +1493,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.businessOwner(pending.businessId))
                 DeepLinkRouter.consume()
             }
+            is DeepLinkRouter.Destination.BusinessProfile -> {
+                navController.navigate(ChildRoutes.businessProfile(pending.businessId))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.EditBusinessPage -> {
+                navController.navigate(ChildRoutes.editBusinessPage(pending.businessId))
+                DeepLinkRouter.consume()
+            }
             DeepLinkRouter.Destination.ViewAs -> {
                 navController.navigate(ChildRoutes.VIEW_AS)
                 DeepLinkRouter.consume()

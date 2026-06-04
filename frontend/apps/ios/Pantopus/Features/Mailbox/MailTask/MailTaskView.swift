@@ -182,12 +182,9 @@ public struct MailTaskView: View {
     }
 
     private func errorView(_ message: String) -> some View {
-        EmptyState(
-            icon: .alertCircle,
-            headline: "Couldn't load this task",
-            subcopy: message,
-            cta: EmptyState.CTA(title: "Try again") { await viewModel.retry() }
-        )
+        ErrorState(headline: "Couldn't load this task", message: message) {
+            await viewModel.retry()
+        }
         .accessibilityIdentifier("mailTask_error")
     }
 

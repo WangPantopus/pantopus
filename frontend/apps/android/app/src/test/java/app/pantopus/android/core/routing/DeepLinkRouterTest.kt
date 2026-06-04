@@ -492,8 +492,8 @@ class DeepLinkRouterTest {
 
     /**
      * A10.7 — plural `businesses/:id` resolves to the owner view; `new` keeps
-     * its Create Business meaning. (The public profile A10.6 is the singular
-     * `business/:username`, which has no typed Android deep-link destination.)
+     * its Create Business meaning. The public profile A10.6 is the singular
+     * `business/:username` (see [business_profile_route]).
      */
     @Test
     fun business_owner_route() {
@@ -504,6 +504,32 @@ class DeepLinkRouterTest {
         assertEquals(
             DeepLinkRouter.Destination.BusinessOwner("biz_42"),
             DeepLinkRouter.resolveString("https://pantopus.app/businesses/biz_42"),
+        )
+    }
+
+    /** A10.6 — the singular `business/:username` resolves to the public profile. */
+    @Test
+    fun business_profile_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.BusinessProfile("biz_42"),
+            DeepLinkRouter.resolveString("pantopus://business/biz_42"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.BusinessProfile("acme"),
+            DeepLinkRouter.resolveString("https://pantopus.app/business/acme"),
+        )
+    }
+
+    /** P4.2 — `businesses/:id/page-editor` opens the owner-only A13.10 editor. */
+    @Test
+    fun edit_business_page_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.EditBusinessPage("biz_42"),
+            DeepLinkRouter.resolveString("pantopus://businesses/biz_42/page-editor"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.EditBusinessPage("biz_42"),
+            DeepLinkRouter.resolveString("https://pantopus.app/businesses/biz_42/page-editor"),
         )
     }
 

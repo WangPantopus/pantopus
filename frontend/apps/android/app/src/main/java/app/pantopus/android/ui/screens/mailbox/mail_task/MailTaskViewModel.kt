@@ -108,7 +108,12 @@ class MailTaskViewModel
                             }
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = MailTaskUiState.Error(result.error.message)
+                        // Fixed copy mirrors iOS MailTaskViewModel for cross-platform
+                        // parity (Block 2G) — not the raw repository message.
+                        _state.value =
+                            MailTaskUiState.Error(
+                                "We couldn't load this task. Check your connection and try again.",
+                            )
                     }
                 }
             }

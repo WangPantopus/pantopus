@@ -45,6 +45,13 @@ final class ComponentRenderTests: XCTestCase {
         }
     }
 
+    func testErrorStateRenders() {
+        assertRenders("ErrorState default") { ErrorState {} }
+        assertRenders("ErrorState screen copy") {
+            ErrorState(headline: "Couldn't load Earn", message: "Try again in a moment.") {}
+        }
+    }
+
     func testSectionHeaderRenders() {
         assertRenders("SectionHeader") { SectionHeader("Section") }
         assertRenders("SectionHeaderWithAction") {

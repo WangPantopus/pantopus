@@ -79,7 +79,12 @@ class EarnViewModel
                             }
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = EarnUiState.Error(summary.error.message)
+                        // Fixed copy mirrors iOS EarnViewModel for cross-platform
+                        // parity (Block 2G) — not the raw repository message.
+                        _state.value =
+                            EarnUiState.Error(
+                                "We couldn't load your earnings. Check your connection and try again.",
+                            )
                     }
                 }
             }
