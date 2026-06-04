@@ -29,6 +29,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /** V2 mailbox routes from `backend/routes/mailboxV2.js`. */
+@Suppress("TooManyFunctions")
 interface MailboxV2Api {
     /** `GET /api/mailbox/v2/drawers` — route `backend/routes/mailboxV2.js:214`. */
     @GET("api/mailbox/v2/drawers")
