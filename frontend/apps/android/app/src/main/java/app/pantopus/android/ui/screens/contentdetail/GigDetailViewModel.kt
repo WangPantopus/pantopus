@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.contentdetail
 
@@ -8,15 +8,21 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
+import app.pantopus.android.data.api.models.payments.TipRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.ui.screens.gigs.GigsCategory
+import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -30,6 +36,7 @@ class GigDetailViewModel
         private val repo: GigsRepository,
         private val authRepo: AuthRepository,
         private val filesRepo: FilesRepository,
+        private val paymentsRepo: PaymentsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
@@ -49,6 +56,20 @@ class GigDetailViewModel
                 if (gig.acceptedBy != currentUserId) return false
                 return gig.status?.lowercase() == "in_progress"
             }
+
+            /**
+             * Tip gate (Block 3D): the poster, on a completed + owner-confirmed
+             * gig with an assigned worker. Mirrors the `/tip` preconditions.
+             */
+            fun viewerCanTip(
+                gig: GigDto,
+                currentUserId: String?,
+            ): Boolean {
+                if (currentUserId.isNullOrEmpty() || gig.userId != currentUserId) return false
+                if (gig.acceptedBy.isNullOrEmpty()) return false
+                if (gig.status?.lowercase() != "completed") return false
+                return !gig.ownerConfirmedAt.isNullOrEmpty()
+            }
         }
 
         private val gigId: String = savedStateHandle.get<String>(GIG_ID_KEY) ?: ""
@@ -56,14 +77,27 @@ class GigDetailViewModel
         private val _state = MutableStateFlow<ContentDetailUiState>(ContentDetailUiState.Loading)
         val state: StateFlow<ContentDetailUiState> = _state.asStateFlow()
 
+        private val _tipStatus = MutableStateFlow<TipStatus>(TipStatus.Idle)
+        val tipStatus: StateFlow<TipStatus> = _tipStatus.asStateFlow()
+
+        private val _events = MutableSharedFlow<GigTipEvent>(extraBufferCapacity = 4)
+        val events: SharedFlow<GigTipEvent> = _events.asSharedFlow()
+
         private var rawGig: GigDto? = null
         private var canMarkDelivered = false
+        private var canTip = false
+
+        /** Payment id of the in-flight tip, used to reconcile after PaymentSheet. */
+        private var pendingTipPaymentId: String? = null
 
         /** Current gig snapshot — null until the first fetch resolves. */
         fun gigSnapshot(): GigDto? = rawGig
 
         /** True when the viewer is the assigned worker on an in-progress task. */
         fun canMarkDelivered(): Boolean = canMarkDelivered
+
+        /** True when the poster can tip the worker on this completed gig (3D). */
+        fun canTip(): Boolean = canTip
 
         private fun currentUserId(): String? = (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
 
@@ -74,13 +108,16 @@ class GigDetailViewModel
                     is NetworkResult.Success -> {
                         rawGig = result.data.gig
                         canMarkDelivered = viewerCanMarkDelivered(result.data.gig, currentUserId())
+                        canTip = viewerCanTip(result.data.gig, currentUserId())
                         var bids: List<GigBidDto> = emptyList()
                         when (val bidsResult = repo.bids(gigId)) {
                             is NetworkResult.Success -> bids = bidsResult.data.bids
                             else -> Unit
                         }
                         _state.value =
-                            ContentDetailUiState.Loaded(Projection.project(result.data.gig, bids, canMarkDelivered))
+                            ContentDetailUiState.Loaded(
+                                Projection.project(result.data.gig, bids, canMarkDelivered, canTip),
+                            )
                     }
                     is NetworkResult.Failure -> {
                         _state.value = ContentDetailUiState.Error(result.error.message)
@@ -163,6 +200,48 @@ class GigDetailViewModel
         /** Returns the gig id wired from `SavedStateHandle`. */
         fun currentGigId(): String = gigId
 
+        // MARK: - Tip (Block 3D)
+
+        /** Tap "Send a tip" → create the tip payment, then ask the screen to present PaymentSheet. */
+        fun sendTip(amountCents: Int) {
+            if (!canTip) return
+            _tipStatus.value = TipStatus.Sending
+            viewModelScope.launch {
+                when (val result = paymentsRepo.tip(TipRequest(gigId = gigId, amount = amountCents))) {
+                    is NetworkResult.Success -> {
+                        pendingTipPaymentId = result.data.paymentId
+                        _events.emit(GigTipEvent.PresentTipSheet(result.data.sheetParams()))
+                    }
+                    is NetworkResult.Failure -> {
+                        _tipStatus.value = TipStatus.Failed(result.error.message)
+                    }
+                }
+            }
+        }
+
+        /** Result of presenting the tip PaymentSheet, mapped from Stripe in the screen. */
+        fun onTipOutcome(outcome: CheckoutOutcome) {
+            when (outcome) {
+                CheckoutOutcome.Paid -> {
+                    _tipStatus.value = TipStatus.Succeeded
+                    viewModelScope.launch {
+                        // Best-effort reconcile (mobile PaymentSheet may beat the webhook), then refresh.
+                        pendingTipPaymentId?.let { paymentsRepo.tipRefreshStatus(it) }
+                        pendingTipPaymentId = null
+                        load()
+                    }
+                }
+                CheckoutOutcome.Canceled -> _tipStatus.value = TipStatus.Canceled
+                is CheckoutOutcome.Declined ->
+                    _tipStatus.value = TipStatus.Failed(outcome.message ?: "Your card was declined.")
+            }
+        }
+
+        /** Clear the tip toast once the screen has shown it. */
+        fun clearTipStatus() {
+            _tipStatus.value = TipStatus.Idle
+        }
+
         object Projection {
             /**
              * Splits on the explicit `is_v2` discriminator: V2 ("Magic Task")
@@ -175,18 +254,27 @@ class GigDetailViewModel
                 gig: GigDto,
                 bids: List<GigBidDto>,
                 canMarkDelivered: Boolean = false,
+                canTip: Boolean = false,
             ): ContentDetailContent {
                 return if (gig.isV2 == true) {
-                    projectTaskV2(gig, bids, canMarkDelivered)
+                    projectTaskV2(gig, bids, canMarkDelivered, canTip)
                 } else {
-                    projectGigV1(gig, bids)
+                    projectGigV1(gig, bids, canTip)
                 }
             }
+
+            /** Poster dock on a completed gig — primary becomes "Send a tip" (3D). */
+            val tipDock =
+                ContentDetailDock(
+                    secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                    primary = ContentDetailDockButton(label = "Send a tip", icon = PantopusIcon.HandCoins),
+                )
 
             private fun projectTaskV2(
                 gig: GigDto,
                 bids: List<GigBidDto>,
                 canMarkDelivered: Boolean,
+                canTip: Boolean = false,
             ): ContentDetailContent {
                 val category = GigsCategory.fromBackendKey(gig.category)
                 val bidCount = gig.bidCount ?: bids.size
@@ -295,7 +383,9 @@ class GigDetailViewModel
                         tone = ContentDetailPill.Tone.Warning,
                     )
                 val dock =
-                    if (canMarkDelivered) {
+                    if (canTip) {
+                        tipDock
+                    } else if (canMarkDelivered) {
                         ContentDetailDock(
                             secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
                             primary = ContentDetailDockButton(label = "Mark as delivered", icon = PantopusIcon.CheckCheck),
@@ -362,6 +452,7 @@ class GigDetailViewModel
             private fun projectGigV1(
                 gig: GigDto,
                 bids: List<GigBidDto>,
+                canTip: Boolean = false,
             ): ContentDetailContent {
                 val awarded = isAwarded(gig)
                 val bidCount = gig.bidCount ?: bids.size
@@ -444,7 +535,9 @@ class GigDetailViewModel
                     modules = modules,
                     trustCapsules = emptyList(),
                     dock =
-                        if (awarded) {
+                        if (canTip) {
+                            tipDock
+                        } else if (awarded) {
                             ContentDetailDock(
                                 secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
                                 primary = ContentDetailDockButton(label = "Bidding closed", icon = PantopusIcon.Lock, enabled = false),

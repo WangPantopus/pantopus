@@ -42,6 +42,8 @@ data class GigDto(
     @Json(name = "user_id") val userId: String? = null,
     @Json(name = "accepted_by") val acceptedBy: String? = null,
     @Json(name = "accepted_at") val acceptedAt: String? = null,
+    // Set when the poster confirms completion — gates the Block 3D tip affordance.
+    @Json(name = "owner_confirmed_at") val ownerConfirmedAt: String? = null,
     @Json(name = "scheduled_start") val scheduledStart: String? = null,
     @Json(name = "payment_status") val paymentStatus: String? = null,
     @Json(name = "engagement_mode") val engagementMode: String? = null,

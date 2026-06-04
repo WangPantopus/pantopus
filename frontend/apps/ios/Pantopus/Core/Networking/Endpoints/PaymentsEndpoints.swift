@@ -40,6 +40,22 @@ public enum PaymentsEndpoints {
         Endpoint(method: .post, path: "/api/payments/intent", body: body)
     }
 
+    /// `POST /api/payments/tip` — route `backend/routes/pays.js:913`.
+    /// Block 3D: the gig poster tips the assigned worker on a completed +
+    /// owner-confirmed gig. Returns the mobile PaymentSheet params
+    /// (`clientSecret` + `customer` + `ephemeralKey` + `publishableKey`) plus
+    /// the `paymentId` used to reconcile via `tipRefreshStatus`.
+    public static func tip(body: TipRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/api/payments/tip", body: body)
+    }
+
+    /// `POST /api/payments/tip/{paymentId}/refresh-status` — route
+    /// `backend/routes/pays.js:1012`. Best-effort status sync after the mobile
+    /// PaymentSheet succeeds (before the webhook lands).
+    public static func tipRefreshStatus(paymentId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/payments/tip/\(paymentId)/refresh-status")
+    }
+
     /// `PUT /api/payments/methods/{id}/default` — route
     /// `backend/routes/pays.js:754`. Promote a saved method to default.
     public static func setDefaultMethod(id: String) -> Endpoint {

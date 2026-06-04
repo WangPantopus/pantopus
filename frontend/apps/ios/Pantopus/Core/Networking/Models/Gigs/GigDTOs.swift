@@ -24,6 +24,9 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     public let userId: String?
     public let acceptedBy: String?
     public let acceptedAt: String?
+    /// Set when the poster confirms completion — gates the Block 3D tip
+    /// affordance (the `/tip` route requires a completed + confirmed gig).
+    public let ownerConfirmedAt: String?
     public let scheduledStart: String?
     public let paymentStatus: String?
     public let engagementMode: String?
@@ -54,6 +57,7 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case userId = "user_id"
         case acceptedBy = "accepted_by"
         case acceptedAt = "accepted_at"
+        case ownerConfirmedAt = "owner_confirmed_at"
         case scheduledStart = "scheduled_start"
         case paymentStatus = "payment_status"
         case engagementMode = "engagement_mode"

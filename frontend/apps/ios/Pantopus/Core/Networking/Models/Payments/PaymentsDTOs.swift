@@ -129,3 +129,47 @@ public struct PaymentIntentSheetParams: Decodable, Sendable, Hashable {
         self.isSetupIntent = isSetupIntent
     }
 }
+
+/// Body for `POST /api/payments/tip` (Block 3D). The poster tips the worker on
+/// a completed gig; `amount` is integer cents (min 50).
+public struct TipRequest: Encodable, Sendable, Hashable {
+    public let gigId: String
+    public let amount: Int
+
+    public init(gigId: String, amount: Int) {
+        self.gigId = gigId
+        self.amount = amount
+    }
+}
+
+/// `POST /api/payments/tip` response — the mobile PaymentSheet params + the
+/// `paymentId` used to reconcile via `tipRefreshStatus`.
+public struct TipResponse: Decodable, Sendable, Hashable {
+    public let success: Bool
+    public let clientSecret: String?
+    public let paymentId: String?
+    public let paymentIntentId: String?
+    public let customer: String?
+    public let ephemeralKey: String?
+    public let publishableKey: String?
+
+    /// Adapt to the shared PaymentSheet params so `CheckoutCoordinator.present`
+    /// can present the tip charge with the same plumbing as 3B/3C.
+    public var sheetParams: PaymentIntentSheetParams {
+        PaymentIntentSheetParams(
+            clientSecret: clientSecret,
+            paymentIntentId: paymentIntentId,
+            customer: customer,
+            ephemeralKey: ephemeralKey,
+            publishableKey: publishableKey
+        )
+    }
+}
+
+/// `POST /api/payments/tip/{paymentId}/refresh-status` response.
+public struct TipRefreshStatusResponse: Decodable, Sendable, Hashable {
+    public let paymentStatus: String?
+    public let previousPaymentStatus: String?
+    public let changed: Bool?
+    public let stripeStatus: String?
+}

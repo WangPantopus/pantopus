@@ -5,6 +5,9 @@ import app.pantopus.android.data.api.models.payments.CreatePaymentIntentRequest
 import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import app.pantopus.android.data.api.models.payments.PaymentMethodAckResponse
 import app.pantopus.android.data.api.models.payments.PaymentMethodsResponse
+import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
+import app.pantopus.android.data.api.models.payments.TipRequest
+import app.pantopus.android.data.api.models.payments.TipResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.PaymentsApi
@@ -28,6 +31,14 @@ class PaymentsRepository
         suspend fun createPaymentIntent(
             request: CreatePaymentIntentRequest,
         ): NetworkResult<PaymentIntentSheetParamsDto> = safeApiCall { api.createIntent(request) }
+
+        /** `POST /api/payments/tip` — tip the worker on a completed gig (Block 3D). */
+        suspend fun tip(request: TipRequest): NetworkResult<TipResponse> = safeApiCall { api.tip(request) }
+
+        /** `POST /api/payments/tip/{paymentId}/refresh-status` — reconcile a tip. */
+        suspend fun tipRefreshStatus(
+            paymentId: String,
+        ): NetworkResult<TipRefreshStatusResponse> = safeApiCall { api.tipRefreshStatus(paymentId) }
 
         /** `PUT /api/payments/methods/{id}/default`. */
         suspend fun setDefault(id: String): NetworkResult<PaymentMethodAckResponse> = safeApiCall { api.setDefault(id) }
