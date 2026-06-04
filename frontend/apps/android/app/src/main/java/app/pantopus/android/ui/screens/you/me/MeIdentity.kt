@@ -84,6 +84,7 @@ data class MeSectionRow(
     val value: String? = null,
     val routeKey: String,
     val routeArgs: Map<String, String> = emptyMap(),
+    val testTag: String? = null,
 )
 
 /** A grouped section in the lower stack (Profile & Privacy · Activity · Help & Legal). */

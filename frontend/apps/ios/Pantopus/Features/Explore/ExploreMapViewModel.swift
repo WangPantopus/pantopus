@@ -279,6 +279,8 @@ public final class ExploreMapViewModel {
                 distanceLabel: distanceLabel(miles),
                 distanceMiles: miles,
                 badge: bids > 0 ? ExploreBadge(text: "\(bids) bids", tone: .bids) : nil,
+                city: gig.approxLocation?.label,
+                sourceId: gig.id,
                 verified: false,
                 openNow: gig.status == "open"
             ))
@@ -297,6 +299,8 @@ public final class ExploreMapViewModel {
                 distanceLabel: distanceLabel(miles),
                 distanceMiles: miles,
                 badge: nil,
+                city: listing.locationName ?? listing.approxLocation?.label,
+                sourceId: listing.id,
                 verified: false,
                 openNow: true
             ))

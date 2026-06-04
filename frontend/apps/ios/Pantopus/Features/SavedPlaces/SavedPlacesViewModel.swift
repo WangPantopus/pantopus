@@ -42,8 +42,23 @@ public final class SavedPlacesViewModel {
     private var items: [SavedPlaceDTO] = []
     private var loadedAtLeastOnce = false
 
-    public init(
-        api: APIClient = .shared,
+    public convenience init(
+        onBack: @escaping @MainActor () -> Void = {},
+        onExplore: @escaping @MainActor () -> Void = {},
+        onOpenMap: @escaping @MainActor (Double, Double, String) -> Void = { _, _, _ in },
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.init(
+            api: .shared,
+            onBack: onBack,
+            onExplore: onExplore,
+            onOpenMap: onOpenMap,
+            now: now
+        )
+    }
+
+    init(
+        api: APIClient,
         onBack: @escaping @MainActor () -> Void = {},
         onExplore: @escaping @MainActor () -> Void = {},
         onOpenMap: @escaping @MainActor (Double, Double, String) -> Void = { _, _, _ in },

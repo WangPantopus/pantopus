@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.root
 
+import android.net.Uri
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -77,6 +78,7 @@ import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
 import app.pantopus.android.ui.screens.explore.ExploreEntity
 import app.pantopus.android.ui.screens.explore.ExploreKind
+import app.pantopus.android.ui.screens.explore.ExploreMapFocus
 import app.pantopus.android.ui.screens.explore.ExploreMapScreen
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.beacons.BeaconsFeedScreen
@@ -251,6 +253,7 @@ import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
+import app.pantopus.android.ui.screens.saved_places.SavedPlacesScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
 import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
@@ -1184,6 +1187,20 @@ private object ChildRoutes {
 
     /** A.x — Explore (neighbourhood discovery surface). */
     const val EXPLORE = "explore"
+    const val EXPLORE_LAT_KEY = "lat"
+    const val EXPLORE_LNG_KEY = "lng"
+    const val EXPLORE_LABEL_KEY = "label"
+    const val EXPLORE_ROUTE =
+        "$EXPLORE?$EXPLORE_LAT_KEY={$EXPLORE_LAT_KEY}&$EXPLORE_LNG_KEY={$EXPLORE_LNG_KEY}&$EXPLORE_LABEL_KEY={$EXPLORE_LABEL_KEY}"
+
+    /** BLOCK 2E — Saved Places list. */
+    const val SAVED_PLACES = "saved-places"
+
+    fun explore(
+        latitude: Double,
+        longitude: Double,
+        label: String,
+    ): String = "$EXPLORE?$EXPLORE_LAT_KEY=$latitude&$EXPLORE_LNG_KEY=$longitude&$EXPLORE_LABEL_KEY=${Uri.encode(label)}"
 
     /** B.1 prerequisite — Mailbox root archetype. */
     const val MAILBOX_ROOT = "mailbox/root"
@@ -1645,6 +1662,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenIdentityCenter = { navController.navigate(ChildRoutes.IDENTITY_CENTER) },
                         onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                         onOpenCreatorInbox = { navController.navigate(ChildRoutes.CREATOR_INBOX) },
+                        onOpenSavedPlaces = { navController.navigate(ChildRoutes.SAVED_PLACES) },
                         onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                         onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
                         onOpenHomeCalendar = { homeId ->
@@ -3554,8 +3572,41 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onBack = { navController.popBackStack() },
                     )
                 }
-                composable(ChildRoutes.EXPLORE) {
+                composable(
+                    route = ChildRoutes.EXPLORE_ROUTE,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.EXPLORE_LAT_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                            navArgument(ChildRoutes.EXPLORE_LNG_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                            navArgument(ChildRoutes.EXPLORE_LABEL_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) { entry ->
+                    val latitude = entry.arguments?.getString(ChildRoutes.EXPLORE_LAT_KEY)?.toDoubleOrNull()
+                    val longitude = entry.arguments?.getString(ChildRoutes.EXPLORE_LNG_KEY)?.toDoubleOrNull()
+                    val focus =
+                        if (latitude != null && longitude != null) {
+                            ExploreMapFocus(
+                                latitude = latitude,
+                                longitude = longitude,
+                                label = entry.arguments?.getString(ChildRoutes.EXPLORE_LABEL_KEY).orEmpty(),
+                            )
+                        } else {
+                            null
+                        }
                     ExploreMapScreen(
+                        focus = focus,
                         onOpenEntity = { entity: ExploreEntity ->
                             when (entity.kind) {
                                 ExploreKind.Task -> navController.navigate(ChildRoutes.gigDetail(entity.id))
@@ -3564,7 +3615,25 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 ExploreKind.Spot -> navController.navigate(ChildRoutes.businessProfile(entity.id))
                             }
                         },
+                        onOpenSaved = { navController.navigate(ChildRoutes.SAVED_PLACES) },
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.SAVED_PLACES) {
+                    SavedPlacesScreen(
+                        onBack = { navController.popBackStack() },
+                        onExplore = {
+                            navController.navigate(ChildRoutes.EXPLORE) {
+                                popUpTo(ChildRoutes.SAVED_PLACES) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenMap = { latitude, longitude, label ->
+                            navController.navigate(ChildRoutes.explore(latitude, longitude, label)) {
+                                popUpTo(ChildRoutes.SAVED_PLACES) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
                     )
                 }
                 composable(ChildRoutes.MAILBOX_ROOT) {

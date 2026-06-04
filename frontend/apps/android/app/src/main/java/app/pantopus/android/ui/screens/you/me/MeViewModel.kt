@@ -173,6 +173,13 @@ class MeViewModel
                                         MeSectionRow("bids", PantopusIcon.Hammer, "My bids", routeKey = "me.bids"),
                                         MeSectionRow("gigs", PantopusIcon.ClipboardList, "My tasks", routeKey = "me.gigs"),
                                         MeSectionRow("offers", PantopusIcon.HandCoins, "Offers", routeKey = "me.offers"),
+                                        MeSectionRow(
+                                            "savedPlaces",
+                                            PantopusIcon.Bookmark,
+                                            "Saved places",
+                                            routeKey = "me.savedPlaces",
+                                            testTag = "savedPlaces.entry.profile",
+                                        ),
                                         MeSectionRow("homes", PantopusIcon.Home, "My homes", routeKey = "me.homes"),
                                         MeSectionRow("businesses", PantopusIcon.ShoppingBag, "My businesses", routeKey = "me.businesses"),
                                     ),

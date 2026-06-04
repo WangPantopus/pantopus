@@ -24,17 +24,20 @@ public struct ExploreMapView: View {
     @State private var showFilterSheet = false
     /// BLOCK 2E — backs the per-row bookmark toggle + the Save-place sheet.
     @State private var savedStore = SavedPlacesStore()
+    private let focus: ExploreMapFocus?
     private let onOpenEntity: @MainActor (ExploreEntity) -> Void
     private let onBack: (@MainActor () -> Void)?
     private let onOpenSaved: (@MainActor () -> Void)?
 
     public init(
         viewModel: ExploreMapViewModel = ExploreMapViewModel(),
+        focus: ExploreMapFocus? = nil,
         onOpenEntity: @escaping @MainActor (ExploreEntity) -> Void = { _ in },
         onBack: (@MainActor () -> Void)? = nil,
         onOpenSaved: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
+        self.focus = focus
         self.onOpenEntity = onOpenEntity
         self.onBack = onBack
         self.onOpenSaved = onOpenSaved
@@ -57,6 +60,8 @@ public struct ExploreMapView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .overlay(alignment: .bottom) { savedAffordanceOverlay }
+        .onAppear { focusOnMap(focus) }
+        .onChange(of: focus) { _, newValue in focusOnMap(newValue) }
         .task { await viewModel.load() }
         .task { await savedStore.loadIfNeeded() }
         .sheet(isPresented: $showFilterSheet) {
@@ -178,7 +183,9 @@ public struct ExploreMapView: View {
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .onChange(of: viewModel.userCoordinate) { _, newCoord in
-            recenter(on: newCoord)
+            if focus == nil {
+                recenter(on: newCoord)
+            }
         }
         // Collapse the constantly-changing MapKit a11y subtree to a single
         // labeled element (same rationale as the Nearby map) — the sheet
@@ -192,6 +199,16 @@ public struct ExploreMapView: View {
         cameraPosition = .region(MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
             span: MKCoordinateSpan(latitudeDelta: 0.024, longitudeDelta: 0.024)
+        ))
+    }
+
+    private func focusOnMap(_ target: ExploreMapFocus?) {
+        guard let target else { return }
+        viewModel.selectEntity(nil)
+        viewModel.setSheetStop(.standard)
+        cameraPosition = .region(MKCoordinateRegion(
+            center: target.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
         ))
     }
 
@@ -584,7 +601,15 @@ public struct ExploreMapView: View {
                     ForEach(loaded.entities.prefix(12)) { entity in
                         ExploreEntityCard(
                             entity: entity,
-                            selected: loaded.selectedId == entity.id
+                            selected: loaded.selectedId == entity.id,
+                            isSaved: savedStore.isSaved(
+                                geocodePlaceId: entity.geocodePlaceId,
+                                latitude: entity.latitude,
+                                longitude: entity.longitude
+                            ),
+                            onToggleSave: {
+                                savedStore.toggle(pendingPlace(for: entity))
+                            }
                         ) {
                             viewModel.selectEntity(entity.id)
                             onOpenEntity(entity)
@@ -607,7 +632,7 @@ public struct ExploreMapView: View {
                         entity: entity,
                         selected: loaded.selectedId == entity.id,
                         isSaved: savedStore.isSaved(
-                            geocodePlaceId: nil,
+                            geocodePlaceId: entity.geocodePlaceId,
                             latitude: entity.latitude,
                             longitude: entity.longitude
                         ),
@@ -616,13 +641,7 @@ public struct ExploreMapView: View {
                             onOpenEntity(entity)
                         },
                         onToggleSave: {
-                            savedStore.toggle(
-                                PendingSavePlace(
-                                    label: entity.title,
-                                    latitude: entity.latitude,
-                                    longitude: entity.longitude
-                                )
-                            )
+                            savedStore.toggle(pendingPlace(for: entity))
                         }
                     )
                 }
@@ -703,6 +722,18 @@ public struct ExploreMapView: View {
         .padding(.top, 10)
         .frame(maxWidth: .infinity, alignment: .top)
         .accessibilityIdentifier("exploreEmptyState")
+    }
+
+    private func pendingPlace(for entity: ExploreEntity) -> PendingSavePlace {
+        PendingSavePlace(
+            label: entity.title,
+            latitude: entity.latitude,
+            longitude: entity.longitude,
+            city: entity.city,
+            state: entity.stateName,
+            geocodePlaceId: entity.geocodePlaceId,
+            sourceId: entity.sourceId
+        )
     }
 }
 
@@ -847,54 +878,69 @@ private struct ExploreKindTag: View {
 private struct ExploreEntityCard: View {
     let entity: ExploreEntity
     let selected: Bool
+    let isSaved: Bool
+    let onToggleSave: () -> Void
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: entity.kind.isSquarePin ? 8 : 10, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [entity.kind.color, entity.kind.color.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Icon(entity.kind.glyph, size: 22, color: .white)
+        HStack(spacing: 10) {
+            Button(action: onTap) {
+                HStack(spacing: 10) {
+                    tile
+                    textColumn
                 }
-                .frame(width: 48, height: 48)
-                VStack(alignment: .leading, spacing: 3) {
-                    ExploreKindTag(kind: entity.kind)
-                    Text(entity.title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    HStack(spacing: Spacing.s2) {
-                        Text("\(entity.metaLead) · \(entity.distanceLabel)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                            .lineLimit(1)
-                        if let badge = entity.badge {
-                            Spacer(minLength: Spacing.s0)
-                            ExploreBadgeChip(badge: badge)
-                        }
-                    }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            SaveBookmarkButton(isSaved: isSaved, size: 30, onToggle: onToggleSave)
+        }
+        .padding(Spacing.s3)
+        .frame(width: 240, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(selected ? entity.kind.color : Theme.Color.appBorder, lineWidth: selected ? 2 : 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 2)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("exploreCard_\(entity.id)")
+    }
+
+    private var tile: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: entity.kind.isSquarePin ? 8 : 10, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [entity.kind.color, entity.kind.color.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            Icon(entity.kind.glyph, size: 22, color: .white)
+        }
+        .frame(width: 48, height: 48)
+    }
+
+    private var textColumn: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ExploreKindTag(kind: entity.kind)
+            Text(entity.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            HStack(spacing: Spacing.s2) {
+                Text("\(entity.metaLead) · \(entity.distanceLabel)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .lineLimit(1)
+                if let badge = entity.badge {
+                    Spacer(minLength: Spacing.s0)
+                    ExploreBadgeChip(badge: badge)
                 }
             }
-            .padding(Spacing.s3)
-            .frame(width: 240, alignment: .leading)
-            .background(Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(selected ? entity.kind.color : Theme.Color.appBorder, lineWidth: selected ? 2 : 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 2)
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("exploreCard_\(entity.id)")
     }
 }
 

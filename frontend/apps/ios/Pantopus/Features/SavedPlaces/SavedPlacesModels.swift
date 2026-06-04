@@ -25,14 +25,13 @@ public enum SavedPlaceType: String, Sendable, Hashable {
         SavedPlaceType(rawValue: raw.lowercased()) ?? .saved
     }
 
-    /// Leading icon-tile glyph (Home → house, Work → briefcase, the rest →
-    /// bookmark; searched keeps the map-pin from the design).
+    /// Leading icon-tile glyph (Home → house, Work → briefcase, Saved/Searched → bookmark).
     public var icon: PantopusIcon {
         switch self {
         case .home: .home
         case .work: .briefcase
         case .saved: .bookmark
-        case .searched: .mapPin
+        case .searched: .bookmark
         }
     }
 

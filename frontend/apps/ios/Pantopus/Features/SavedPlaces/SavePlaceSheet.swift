@@ -245,7 +245,11 @@ public final class SavedPlacesStore {
     private let api: APIClient
     private var loaded = false
 
-    public init(api: APIClient = .shared) {
+    public init() {
+        self.api = .shared
+    }
+
+    init(api: APIClient) {
         self.api = api
     }
 

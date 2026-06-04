@@ -478,7 +478,7 @@ private fun MeSectionGroup(
                             .clickable { onTap(row) }
                             .heightIn(min = 48.dp)
                             .padding(horizontal = 14.dp, vertical = Spacing.s3)
-                            .testTag("meSectionRow_${section.id}_${row.id}"),
+                            .testTag(row.testTag ?: "meSectionRow_${section.id}_${row.id}"),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 ) {

@@ -52,6 +52,8 @@ public enum YouRoute: Hashable {
     case gigSearch
     /// Map/list browse for available neighbour gigs.
     case tasksMap(categoryKey: String)
+    /// Explore map, optionally focused on a saved place coordinate.
+    case explore(focus: ExploreMapFocus?)
     /// P2.2 — Post-a-Task wizard. Pushed from the My tasks FAB / empty
     /// CTA. Routes to the new gig's detail on success.
     case composeTask
@@ -1432,15 +1434,41 @@ public struct YouTabRoot: View {
                     }
                 )
             )
+        case let .explore(focus):
+            ExploreMapView(
+                focus: focus,
+                onOpenEntity: { entity in
+                    Task { @MainActor in
+                        switch entity.kind {
+                        case .task: path.append(.gigDetail(gigId: entity.id))
+                        case .item: path.append(.listingDetail(listingId: entity.id))
+                        case .post: path.append(.pulsePost(postId: entity.id))
+                        case .spot: path.append(.businessProfile(businessId: entity.id))
+                        }
+                    }
+                },
+                onBack: { Task { @MainActor in pop() } },
+                onOpenSaved: { Task { @MainActor in path.append(.savedPlaces) } }
+            )
         case .savedPlaces:
             SavedPlacesView(
                 viewModel: SavedPlacesViewModel(
                     onBack: { Task { @MainActor in pop() } },
                     onExplore: {
-                        Task { @MainActor in path.append(.placeholder(label: "Explore")) }
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                            path.append(.explore(focus: nil))
+                        }
                     },
-                    onOpenMap: { _, _, _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Place on map")) }
+                    onOpenMap: { latitude, longitude, label in
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                            path.append(.explore(focus: ExploreMapFocus(
+                                latitude: latitude,
+                                longitude: longitude,
+                                label: label
+                            )))
+                        }
                     }
                 )
             )

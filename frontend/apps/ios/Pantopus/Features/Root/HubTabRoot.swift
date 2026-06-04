@@ -330,6 +330,7 @@ public struct HubTabRoot: View {
     /// button (repurposed from "open Settings"). Settings now lives as a row
     /// inside the drawer.
     @State private var showNavDrawer = false
+    @State private var savedPlaceMapFocus: ExploreMapFocus?
     /// Identity Center presented when the drawer's context pill is tapped
     /// (LAUNCHER / Option A switching path).
     @State private var navDrawerIdentityCenter = false
@@ -2020,6 +2021,7 @@ public struct HubTabRoot: View {
             )
         case .explore:
             ExploreMapView(
+                focus: savedPlaceMapFocus,
                 onOpenEntity: { entity in
                     Task { @MainActor in
                         switch entity.kind {
@@ -2038,7 +2040,17 @@ public struct HubTabRoot: View {
                 viewModel: SavedPlacesViewModel(
                     onBack: { Task { @MainActor in pop() } },
                     onExplore: { Task { @MainActor in pop() } },
-                    onOpenMap: { _, _, _ in Task { @MainActor in pop() } }
+                    onOpenMap: { latitude, longitude, label in
+                        Task { @MainActor in
+                            savedPlaceMapFocus = ExploreMapFocus(latitude: latitude, longitude: longitude, label: label)
+                            while let last = path.last, last != .explore {
+                                path.removeLast()
+                            }
+                            if !path.contains(.explore) {
+                                path.append(.explore)
+                            }
+                        }
+                    }
                 )
             )
         case .mailboxRoot:

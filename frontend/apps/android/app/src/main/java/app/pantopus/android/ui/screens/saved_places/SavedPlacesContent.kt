@@ -29,7 +29,7 @@ enum class SavedPlaceType(
     Home(PantopusIcon.Home, PantopusColors.home, PantopusColors.homeBg, "Home", SavedPlaceFilter.Home),
     Work(PantopusIcon.Briefcase, PantopusColors.business, PantopusColors.businessBg, "Work", SavedPlaceFilter.Work),
     Saved(PantopusIcon.Bookmark, PantopusColors.primary600, PantopusColors.primary100, null, SavedPlaceFilter.Saved),
-    Searched(PantopusIcon.MapPin, PantopusColors.primary600, PantopusColors.primary100, null, SavedPlaceFilter.Saved),
+    Searched(PantopusIcon.Bookmark, PantopusColors.primary600, PantopusColors.primary100, null, SavedPlaceFilter.Saved),
     ;
 
     companion object {
