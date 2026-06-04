@@ -359,9 +359,11 @@ internal fun OwnerPreviewFrame(
         PreviewBar(onExit = onExit)
         BusinessProfileLoadedFrame(
             content = content,
+            isSaved = false,
             onBack = onExit,
             onShare = {},
             onMore = {},
+            onToggleSavedPlace = {},
             onContact = {},
             onBook = {},
             onCall = {},

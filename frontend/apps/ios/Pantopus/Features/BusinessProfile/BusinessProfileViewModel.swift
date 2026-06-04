@@ -189,6 +189,14 @@ extension BusinessProfileViewModel {
             if let tagline = business.tagline, !tagline.isEmpty { return tagline }
             return nil
         }()
+        let serviceArea = buildServiceArea(location: primaryLocation, profile: profile)
+        let pendingSavePlace = savedPlace(
+            business: business,
+            label: resolvedDisplayName,
+            location: primaryLocation,
+            serviceArea: serviceArea,
+            viewerIsOwner: detail.access?.isOwner ?? false
+        )
 
         return BusinessProfileContent(
             businessId: business.id,
@@ -199,12 +207,13 @@ extension BusinessProfileViewModel {
             aboutChips: buildAboutChips(profile: profile),
             status: status,
             hours: hours,
-            serviceArea: buildServiceArea(location: primaryLocation, profile: profile),
+            serviceArea: serviceArea,
             services: (publicResponse?.catalog ?? []).map(buildService),
             gallery: [],
             reviewSummary: buildReviewSummary(business: business, reviewsResponse: reviewsResponse),
             reviews: (reviewsResponse?.reviews ?? []).map(buildReview),
             dock: buildDock(status: status, isNewlyClaimed: isNewlyClaimed),
+            savedPlace: pendingSavePlace,
             isNewlyClaimed: isNewlyClaimed,
             phoneNumber: profile?.publicPhone ?? primaryLocation?.phone,
             websiteURL: normalizedWebsite(profile?.website),
@@ -456,6 +465,26 @@ extension BusinessProfileViewModel {
             serviceArea: serviceAreaText,
             latitude: location.location?.lat,
             longitude: location.location?.lng
+        )
+    }
+
+    private func savedPlace(
+        business: BusinessUserDetailDTO,
+        label: String,
+        location: BusinessLocationDTO?,
+        serviceArea: BusinessServiceArea?,
+        viewerIsOwner: Bool
+    ) -> PendingSavePlace? {
+        guard !viewerIsOwner,
+              let latitude = serviceArea?.latitude,
+              let longitude = serviceArea?.longitude else { return nil }
+        return PendingSavePlace(
+            label: label,
+            latitude: latitude,
+            longitude: longitude,
+            city: location?.city ?? business.city,
+            state: location?.state ?? business.state,
+            sourceId: business.id
         )
     }
 

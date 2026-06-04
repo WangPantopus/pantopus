@@ -40,6 +40,7 @@ import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ReviewsApi
+import app.pantopus.android.data.api.services.SavedPlacesApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.TransactionReviewsApi
@@ -209,6 +210,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideFollowingApi(retrofit: Retrofit): FollowingApi = retrofit.create(FollowingApi::class.java)
+
+    @Provides @Singleton
+    fun provideSavedPlacesApi(retrofit: Retrofit): SavedPlacesApi = retrofit.create(SavedPlacesApi::class.java)
 
     @Provides @Singleton
     fun provideBlocksApi(retrofit: Retrofit): BlocksApi = retrofit.create(BlocksApi::class.java)

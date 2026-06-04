@@ -14,6 +14,24 @@ import CoreLocation
 import Foundation
 import SwiftUI
 
+/// Coordinate target used when another surface asks Explore to open a saved
+/// place on the map.
+public struct ExploreMapFocus: Sendable, Hashable {
+    public let latitude: Double
+    public let longitude: Double
+    public let label: String
+
+    public init(latitude: Double, longitude: Double, label: String) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.label = label
+    }
+
+    public var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 /// The four discovery entity kinds the Explore map mixes. Each carries
 /// its accent color (token-only), pin glyph, and pin shape.
 public enum ExploreKind: String, CaseIterable, Sendable, Hashable, Identifiable {
@@ -120,6 +138,10 @@ public struct ExploreEntity: Identifiable, Sendable, Hashable {
     /// Numeric distance (miles) used by the distance-radius filter.
     public let distanceMiles: Double
     public let badge: ExploreBadge?
+    public let city: String?
+    public let stateName: String?
+    public let geocodePlaceId: String?
+    public let sourceId: String?
     /// Honoured by the "Verified only" filter toggle.
     public let verified: Bool
     /// Honoured by the "Open now" filter toggle.
@@ -136,6 +158,10 @@ public struct ExploreEntity: Identifiable, Sendable, Hashable {
         distanceLabel: String,
         distanceMiles: Double,
         badge: ExploreBadge?,
+        city: String? = nil,
+        stateName: String? = nil,
+        geocodePlaceId: String? = nil,
+        sourceId: String? = nil,
         verified: Bool,
         openNow: Bool
     ) {
@@ -149,6 +175,10 @@ public struct ExploreEntity: Identifiable, Sendable, Hashable {
         self.distanceLabel = distanceLabel
         self.distanceMiles = distanceMiles
         self.badge = badge
+        self.city = city
+        self.stateName = stateName
+        self.geocodePlaceId = geocodePlaceId
+        self.sourceId = sourceId
         self.verified = verified
         self.openNow = openNow
     }

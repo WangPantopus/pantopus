@@ -69,6 +69,14 @@ enum class ExploreEntityState { Confirmed, Pending }
 /** Per-type badge tone — resolves to a token color pair at render time. */
 enum class ExploreBadgeTone { Bids, New, Replies, Rating }
 
+/** Coordinate target used when another surface asks Explore to open a saved place on the map. */
+@Immutable
+data class ExploreMapFocus(
+    val latitude: Double,
+    val longitude: Double,
+    val label: String,
+)
+
 @Immutable
 data class ExploreBadge(
     val text: String,
@@ -89,6 +97,10 @@ data class ExploreEntity(
     val distanceLabel: String,
     val distanceMiles: Double,
     val badge: ExploreBadge?,
+    val city: String? = null,
+    val stateName: String? = null,
+    val geocodePlaceId: String? = null,
+    val sourceId: String? = null,
     val verified: Boolean,
     val openNow: Boolean,
 )

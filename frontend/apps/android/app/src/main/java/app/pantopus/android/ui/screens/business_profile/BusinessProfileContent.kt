@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.business_profile
 
+import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
 import app.pantopus.android.ui.theme.PantopusIcon
 
 // A10.6 — render-only models for the single-scroll Business Profile.
@@ -147,6 +148,7 @@ data class BusinessProfileContent(
     val reviewSummary: BusinessReviewSummary?,
     val reviews: List<BusinessReviewCard>,
     val dock: BusinessActionDock,
+    val savedPlace: PendingSavePlace? = null,
     val isNewlyClaimed: Boolean,
     val phoneNumber: String?,
     val websiteUrl: String?,

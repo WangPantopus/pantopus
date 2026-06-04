@@ -86,7 +86,9 @@ public final class MeViewModel {
             return nil
         }
     }
+}
 
+private extension MeViewModel {
     // MARK: - Projections
 
     /// Debug-only deep-link section appended to every identity in
@@ -180,6 +182,13 @@ public final class MeViewModel {
                     MeSectionRow(id: "bids", icon: .hammer, label: "My bids", routeKey: "me.bids"),
                     MeSectionRow(id: "gigs", icon: .clipboardList, label: "My tasks", routeKey: "me.gigs"),
                     MeSectionRow(id: "offers", icon: .handCoins, label: "Offers", routeKey: "me.offers"),
+                    MeSectionRow(
+                        id: "savedPlaces",
+                        icon: .bookmark,
+                        label: "Saved places",
+                        routeKey: "me.savedPlaces",
+                        accessibilityID: "savedPlaces.entry.profile"
+                    ),
                     MeSectionRow(id: "homes", icon: .home, label: "My homes", routeKey: "me.homes"),
                     MeSectionRow(id: "businesses", icon: .shoppingBag, label: "My businesses", routeKey: "me.businesses")
                 ]),

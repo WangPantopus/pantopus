@@ -73,8 +73,15 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.R
+import app.pantopus.android.data.api.models.saved_places.SavedPlaceDto
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
+import app.pantopus.android.ui.screens.saved_places.SaveBookmarkButton
+import app.pantopus.android.ui.screens.saved_places.SavePlaceSheet
+import app.pantopus.android.ui.screens.saved_places.SavedPlaceUndo
+import app.pantopus.android.ui.screens.saved_places.SavedPlacesStoreViewModel
+import app.pantopus.android.ui.screens.saved_places.SavedPlacesToast
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -93,7 +100,9 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ln
 
@@ -104,9 +113,12 @@ import kotlin.math.ln
  */
 @Composable
 fun ExploreMapScreen(
+    focus: ExploreMapFocus? = null,
     onOpenEntity: (ExploreEntity) -> Unit = {},
+    onOpenSaved: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: ExploreMapViewModel = hiltViewModel(),
+    savedPlacesStore: SavedPlacesStoreViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeKind by viewModel.activeKind.collectAsStateWithLifecycle()
@@ -114,10 +126,15 @@ fun ExploreMapScreen(
     val sheetStop by viewModel.sheetStop.collectAsStateWithLifecycle()
     val userCoord by viewModel.userCoordinate.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
+    val savedPlaces by savedPlacesStore.saved.collectAsStateWithLifecycle()
+    val pendingSave by savedPlacesStore.pendingSave.collectAsStateWithLifecycle()
+    val undo by savedPlacesStore.undo.collectAsStateWithLifecycle()
+    val saveToast by savedPlacesStore.toast.collectAsStateWithLifecycle()
     var showFilters by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.load()
+        savedPlacesStore.loadIfNeeded()
     }
 
     val cameraState =
@@ -128,9 +145,18 @@ fun ExploreMapScreen(
                     15f,
                 )
         }
-    LaunchedEffect(userCoord) {
-        userCoord?.let { coord ->
-            cameraState.position = CameraPosition.fromLatLngZoom(LatLng(coord.latitude, coord.longitude), 15f)
+    LaunchedEffect(userCoord, focus) {
+        if (focus == null) {
+            userCoord?.let { coord ->
+                cameraState.position = CameraPosition.fromLatLngZoom(LatLng(coord.latitude, coord.longitude), 15f)
+            }
+        }
+    }
+    LaunchedEffect(focus) {
+        focus?.let { target ->
+            viewModel.selectEntity(null)
+            viewModel.setSheetStop(ExploreSheetStop.Standard)
+            cameraState.position = CameraPosition.fromLatLngZoom(LatLng(target.latitude, target.longitude), 15f)
         }
     }
 
@@ -168,6 +194,7 @@ fun ExploreMapScreen(
         ExploreFloatingPill(
             activeFilterCount = filters.activeCount,
             onBack = onBack,
+            onOpenSaved = onOpenSaved,
             onOpenFilters = { showFilters = true },
             modifier =
                 Modifier
@@ -192,6 +219,7 @@ fun ExploreMapScreen(
             activeFilterCount = filters.activeCount,
             sheetStop = sheetStop,
             screenHeightPx = screenHeightPx,
+            savedPlaces = savedPlaces,
             onSelectSort = viewModel::selectSort,
             onSelectStop = viewModel::setSheetStop,
             onTapEntity = { entity ->
@@ -201,6 +229,7 @@ fun ExploreMapScreen(
             onClearFilters = viewModel::clearFilters,
             onWidenArea = viewModel::widenArea,
             onRefresh = viewModel::refresh,
+            onToggleSave = { entity -> savedPlacesStore.toggle(entity.pendingSavePlace()) },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         ExploreMapControls(
@@ -221,6 +250,44 @@ fun ExploreMapScreen(
                 onDismiss = { showFilters = false },
             )
         }
+        undo?.let { snapshot ->
+            ExploreSaveUndoSnackbar(
+                undo = snapshot,
+                onUndo = savedPlacesStore::undoRemove,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = Spacing.s12, start = Spacing.s4, end = Spacing.s4),
+            )
+        }
+        saveToast?.let { toast ->
+            ExploreSaveToast(
+                toast = toast,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 88.dp, start = Spacing.s4, end = Spacing.s4),
+            )
+        }
+    }
+    LaunchedEffect(undo) {
+        if (undo != null) {
+            delay(4_000L)
+            savedPlacesStore.dismissUndo()
+        }
+    }
+    LaunchedEffect(saveToast) {
+        if (saveToast != null) {
+            delay(2_500L)
+            savedPlacesStore.dismissToast()
+        }
+    }
+    pendingSave?.let { pending ->
+        SavePlaceSheet(
+            pending = pending,
+            onSave = savedPlacesStore::commitSave,
+            onClose = savedPlacesStore::closeSheet,
+        )
     }
 }
 
@@ -478,6 +545,7 @@ internal fun ExploreYouAreHereDot() {
 private fun ExploreFloatingPill(
     activeFilterCount: Int,
     onBack: (() -> Unit)?,
+    onOpenSaved: () -> Unit,
     onOpenFilters: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -506,6 +574,13 @@ private fun ExploreFloatingPill(
             color = PantopusColors.appText,
             modifier = Modifier.weight(1f).semantics { heading() },
             textAlign = TextAlign.Center,
+        )
+        ExploreTopActionButton(
+            icon = PantopusIcon.Bookmark,
+            label = "Saved",
+            contentDescription = "Saved places",
+            testTag = "savedPlaces.entry.explore",
+            onClick = onOpenSaved,
         )
         Box(
             modifier =
@@ -554,6 +629,47 @@ private fun ExploreFloatingPill(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ExploreTopActionButton(
+    icon: PantopusIcon,
+    label: String,
+    contentDescription: String,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .height(32.dp)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.pill))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 11.dp)
+                .semantics {
+                    this.contentDescription = contentDescription
+                    role = Role.Button
+                }
+                .testTag(testTag),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2.4f,
+            tint = PantopusColors.primary700,
+        )
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.primary700,
+        )
     }
 }
 
@@ -732,12 +848,14 @@ private fun ExploreBottomSheet(
     activeFilterCount: Int,
     sheetStop: ExploreSheetStop,
     screenHeightPx: Float,
+    savedPlaces: List<SavedPlaceDto>,
     onSelectSort: (ExploreSort) -> Unit,
     onSelectStop: (ExploreSheetStop) -> Unit,
     onTapEntity: (ExploreEntity) -> Unit,
     onClearFilters: () -> Unit,
     onWidenArea: () -> Unit,
     onRefresh: () -> Unit,
+    onToggleSave: (ExploreEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -791,9 +909,21 @@ private fun ExploreBottomSheet(
                     when (sheetStop) {
                         ExploreSheetStop.Collapsed -> ExploreCollapsedBody(onExpand = { onSelectStop(ExploreSheetStop.Standard) })
                         ExploreSheetStop.Standard ->
-                            ExploreStandardBody(entities = state.entities, selectedId = state.selectedId, onTap = onTapEntity)
+                            ExploreStandardBody(
+                                entities = state.entities,
+                                selectedId = state.selectedId,
+                                savedPlaces = savedPlaces,
+                                onTap = onTapEntity,
+                                onToggleSave = onToggleSave,
+                            )
                         ExploreSheetStop.Expanded ->
-                            ExploreExpandedBody(entities = state.entities, selectedId = state.selectedId, onTap = onTapEntity)
+                            ExploreExpandedBody(
+                                entities = state.entities,
+                                selectedId = state.selectedId,
+                                savedPlaces = savedPlaces,
+                                onTap = onTapEntity,
+                                onToggleSave = onToggleSave,
+                            )
                     }
                 }
         }
@@ -1016,7 +1146,9 @@ private fun ExploreCollapsedBody(onExpand: () -> Unit) {
 private fun ExploreStandardBody(
     entities: List<ExploreEntity>,
     selectedId: String?,
+    savedPlaces: List<SavedPlaceDto>,
     onTap: (ExploreEntity) -> Unit,
+    onToggleSave: (ExploreEntity) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -1037,7 +1169,13 @@ private fun ExploreStandardBody(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(items = entities.take(12), key = { it.id }) { entity ->
-                ExploreEntityCard(entity = entity, selected = entity.id == selectedId, onTap = { onTap(entity) })
+                ExploreEntityCard(
+                    entity = entity,
+                    selected = entity.id == selectedId,
+                    isSaved = savedPlaces.isSaved(entity),
+                    onTap = { onTap(entity) },
+                    onToggleSave = { onToggleSave(entity) },
+                )
             }
         }
         ExplorePaginationDots(total = minOf(entities.size, 4), index = 0)
@@ -1048,14 +1186,22 @@ private fun ExploreStandardBody(
 private fun ExploreExpandedBody(
     entities: List<ExploreEntity>,
     selectedId: String?,
+    savedPlaces: List<SavedPlaceDto>,
     onTap: (ExploreEntity) -> Unit,
+    onToggleSave: (ExploreEntity) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("exploreSheetList"),
         contentPadding = PaddingValues(bottom = 80.dp),
     ) {
         items(items = entities, key = { it.id }) { entity ->
-            ExploreEntityRow(entity = entity, selected = entity.id == selectedId, onTap = { onTap(entity) })
+            ExploreEntityRow(
+                entity = entity,
+                selected = entity.id == selectedId,
+                isSaved = savedPlaces.isSaved(entity),
+                onTap = { onTap(entity) },
+                onToggleSave = { onToggleSave(entity) },
+            )
         }
     }
 }
@@ -1064,7 +1210,9 @@ private fun ExploreExpandedBody(
 internal fun ExploreEntityCard(
     entity: ExploreEntity,
     selected: Boolean,
+    isSaved: Boolean,
     onTap: () -> Unit,
+    onToggleSave: () -> Unit,
 ) {
     Row(
         modifier =
@@ -1078,7 +1226,6 @@ internal fun ExploreEntityCard(
                     shape = RoundedCornerShape(14.dp),
                 )
                 .shadow(elevation = 2.dp, shape = RoundedCornerShape(14.dp))
-                .clickable(onClick = onTap)
                 .padding(Spacing.s3)
                 .testTag("exploreCard_${entity.id}")
                 .semantics {
@@ -1088,39 +1235,46 @@ internal fun ExploreEntityCard(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ExploreEntityTile(entity.kind, size = 48.dp, iconSize = 22.dp)
-        Column(modifier = Modifier.weight(1f)) {
-            ExploreKindTag(kind = entity.kind)
-            Text(
-                text = entity.title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 17.sp,
-                modifier = Modifier.padding(top = 3.dp),
-            )
-            Row(
-                modifier = Modifier.padding(top = Spacing.s1),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
+        Row(
+            modifier = Modifier.weight(1f).clickable(onClick = onTap),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ExploreEntityTile(entity.kind, size = 48.dp, iconSize = 22.dp)
+            Column(modifier = Modifier.weight(1f)) {
+                ExploreKindTag(kind = entity.kind)
                 Text(
-                    text = "${entity.metaLead} · ${entity.distanceLabel}",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = PantopusColors.appTextSecondary,
-                    maxLines = 1,
+                    text = entity.title,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 3.dp),
                 )
-                if (entity.badge != null) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    ExploreBadgeChip(badge = entity.badge)
+                Row(
+                    modifier = Modifier.padding(top = Spacing.s1),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    Text(
+                        text = "${entity.metaLead} · ${entity.distanceLabel}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PantopusColors.appTextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (entity.badge != null) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        ExploreBadgeChip(badge = entity.badge)
+                    }
                 }
             }
         }
+        SaveBookmarkButton(isSaved = isSaved, onToggle = onToggleSave, size = 30.dp)
     }
 }
 
@@ -1128,14 +1282,15 @@ internal fun ExploreEntityCard(
 private fun ExploreEntityRow(
     entity: ExploreEntity,
     selected: Boolean,
+    isSaved: Boolean,
     onTap: () -> Unit,
+    onToggleSave: () -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(if (selected) entity.kind.color.copy(alpha = 0.06f) else PantopusColors.appSurface)
-                .clickable(onClick = onTap)
                 .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag("exploreRow_${entity.id}")
                 .semantics {
@@ -1145,45 +1300,52 @@ private fun ExploreEntityRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ExploreEntityTile(entity.kind, size = 44.dp, iconSize = 20.dp)
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                ExploreKindTag(kind = entity.kind)
+        Row(
+            modifier = Modifier.weight(1f).clickable(onClick = onTap),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ExploreEntityTile(entity.kind, size = 44.dp, iconSize = 20.dp)
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    ExploreKindTag(kind = entity.kind)
+                    Text(
+                        text = entity.distanceLabel,
+                        fontSize = 10.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
                 Text(
-                    text = entity.distanceLabel,
-                    fontSize = 10.sp,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
-            Text(
-                text = entity.title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 17.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-            Row(
-                modifier = Modifier.padding(top = Spacing.s1),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
-                Text(
-                    text = entity.metaLead,
-                    fontSize = 12.sp,
+                    text = entity.title,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.appTextStrong,
+                    color = PantopusColors.appText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
-                if (entity.badge != null) {
-                    ExploreBadgeChip(badge = entity.badge)
+                Row(
+                    modifier = Modifier.padding(top = Spacing.s1),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    Text(
+                        text = entity.metaLead,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextStrong,
+                    )
+                    if (entity.badge != null) {
+                        ExploreBadgeChip(badge = entity.badge)
+                    }
                 }
             }
         }
+        SaveBookmarkButton(isSaved = isSaved, onToggle = onToggleSave, size = 32.dp)
     }
 }
 
@@ -1444,6 +1606,98 @@ private fun ExplorePaginationDots(
         }
     }
 }
+
+// MARK: - Saved-place helpers
+
+@Composable
+private fun ExploreSaveUndoSnackbar(
+    undo: SavedPlaceUndo,
+    onUndo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appText.copy(alpha = 0.95f))
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                .testTag("savedPlaces.undoSnackbar"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.CheckCircle,
+            contentDescription = null,
+            size = 18.dp,
+            tint = PantopusColors.appTextInverse,
+        )
+        Text(
+            text = "Removed \"${undo.dto.label}\"",
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextInverse,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Text(
+            text = "Undo",
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.primary300,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .clickable(onClick = onUndo)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+        )
+    }
+}
+
+@Composable
+private fun ExploreSaveToast(
+    toast: SavedPlacesToast,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = toast.text,
+        color = PantopusColors.appTextInverse,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(if (toast.isError) PantopusColors.error else PantopusColors.appText)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+    )
+}
+
+private fun ExploreEntity.pendingSavePlace(): PendingSavePlace =
+    PendingSavePlace(
+        label = title,
+        latitude = latitude,
+        longitude = longitude,
+        city = city,
+        state = stateName,
+        geocodePlaceId = geocodePlaceId,
+        sourceId = sourceId,
+    )
+
+private fun List<SavedPlaceDto>.isSaved(entity: ExploreEntity): Boolean {
+    val target = savedPlaceMatchKey(entity.geocodePlaceId, entity.latitude, entity.longitude)
+    return any { dto -> savedPlaceMatchKey(dto.geocodePlaceId, dto.latitude, dto.longitude) == target }
+}
+
+private fun savedPlaceMatchKey(
+    geocodePlaceId: String?,
+    latitude: Double,
+    longitude: Double,
+): String =
+    if (!geocodePlaceId.isNullOrBlank()) {
+        "gid:$geocodePlaceId"
+    } else {
+        String.format(Locale.US, "ll:%.5f,%.5f", latitude, longitude)
+    }
 
 // MARK: - Camera helpers
 

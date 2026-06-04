@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.business_profile
 
+import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
@@ -127,6 +128,14 @@ object BusinessProfileSampleData {
                     ),
                 ),
             dock = BusinessActionDock(BusinessActionDock.Secondary.Book, note = null),
+            savedPlace =
+                PendingSavePlace(
+                    label = "Marlow & Co. Cleaning",
+                    latitude = 42.37,
+                    longitude = -71.11,
+                    city = "Elm Park",
+                    sourceId = "marlow",
+                ),
             isNewlyClaimed = false,
             phoneNumber = "+15555550100",
             websiteUrl = null,

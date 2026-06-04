@@ -119,6 +119,11 @@ public struct MeSectionRow: Identifiable, Sendable, Hashable {
     public let value: String?
     public let routeKey: String
     public let routeArgs: [String: String]
+    /// Optional verbatim contract identifier override. When set, the row
+    /// renders with this `accessibilityIdentifier` instead of the generated
+    /// `meSectionRow_<section>_<row>` one (used for cross-platform entry-point
+    /// tags like `savedPlaces.entry.profile`).
+    public let accessibilityID: String?
 
     public init(
         id: String,
@@ -126,7 +131,8 @@ public struct MeSectionRow: Identifiable, Sendable, Hashable {
         label: String,
         value: String? = nil,
         routeKey: String,
-        routeArgs: [String: String] = [:]
+        routeArgs: [String: String] = [:],
+        accessibilityID: String? = nil
     ) {
         self.id = id
         self.icon = icon
@@ -134,6 +140,7 @@ public struct MeSectionRow: Identifiable, Sendable, Hashable {
         self.value = value
         self.routeKey = routeKey
         self.routeArgs = routeArgs
+        self.accessibilityID = accessibilityID
     }
 }
 

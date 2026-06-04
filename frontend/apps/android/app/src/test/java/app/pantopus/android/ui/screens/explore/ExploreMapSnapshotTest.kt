@@ -79,7 +79,13 @@ class ExploreMapSnapshotTest {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     entities.forEachIndexed { index, entity ->
-                        ExploreEntityCard(entity = entity, selected = index == 0, onTap = {})
+                        ExploreEntityCard(
+                            entity = entity,
+                            selected = index == 0,
+                            isSaved = false,
+                            onTap = {},
+                            onToggleSave = {},
+                        )
                     }
                 }
             }

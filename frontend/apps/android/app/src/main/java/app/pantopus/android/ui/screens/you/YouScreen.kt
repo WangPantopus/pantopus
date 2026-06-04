@@ -91,6 +91,7 @@ fun YouScreen(
     onOpenIdentityCenter: () -> Unit = {},
     onOpenAudienceProfile: () -> Unit = {},
     onOpenCreatorInbox: () -> Unit = {},
+    onOpenSavedPlaces: () -> Unit = {},
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
     onOpenHomeCalendar: (String) -> Unit = {},
@@ -189,6 +190,7 @@ fun YouScreen(
                 "me.identityCenter" -> onOpenIdentityCenter()
                 "me.audience" -> onOpenAudienceProfile()
                 "me.creatorInbox" -> onOpenCreatorInbox()
+                "me.savedPlaces" -> onOpenSavedPlaces()
                 "me.bills" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(row.label)

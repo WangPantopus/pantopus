@@ -11,6 +11,7 @@ import app.pantopus.android.data.api.models.businesses.BusinessPublicResponse
 import app.pantopus.android.data.api.models.businesses.BusinessUserDetailDto
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
+import app.pantopus.android.ui.screens.saved_places.PendingSavePlace
 import app.pantopus.android.ui.theme.PantopusIcon
 import java.time.Duration
 import java.time.Instant
@@ -71,6 +72,8 @@ object BusinessProfileMapper {
                 ?: business.bio?.takeIf { it.isNotEmpty() }
                 ?: business.tagline?.takeIf { it.isNotEmpty() }
 
+        val serviceArea = buildServiceArea(primaryLocation, profile)
+
         return BusinessProfileContent(
             businessId = business.id,
             header = header,
@@ -80,12 +83,13 @@ object BusinessProfileMapper {
             aboutChips = buildAboutChips(profile),
             status = status,
             hours = hours,
-            serviceArea = buildServiceArea(primaryLocation, profile),
+            serviceArea = serviceArea,
             services = (publicResponse?.catalog ?: emptyList()).map { buildService(it) },
             gallery = emptyList(),
             reviewSummary = buildReviewSummary(business, reviewsResponse),
             reviews = (reviewsResponse?.reviews ?: emptyList()).map { buildReview(it) },
             dock = buildDock(status, isNewlyClaimed),
+            savedPlace = savedPlace(business, header.displayName, primaryLocation, serviceArea, detail.access?.isOwner == true),
             isNewlyClaimed = isNewlyClaimed,
             phoneNumber = profile?.publicPhone ?: primaryLocation?.phone,
             websiteUrl = normalizedWebsite(profile?.website),
@@ -372,6 +376,26 @@ object BusinessProfileMapper {
             serviceArea = serviceAreaText,
             latitude = location.location?.lat,
             longitude = location.location?.lng,
+        )
+    }
+
+    private fun savedPlace(
+        business: BusinessUserDetailDto,
+        label: String,
+        location: BusinessLocationDto?,
+        serviceArea: BusinessServiceArea?,
+        viewerIsOwner: Boolean,
+    ): PendingSavePlace? {
+        val latitude = serviceArea?.latitude ?: return null
+        val longitude = serviceArea.longitude ?: return null
+        if (viewerIsOwner) return null
+        return PendingSavePlace(
+            label = label,
+            latitude = latitude,
+            longitude = longitude,
+            city = location?.city ?: business.city,
+            state = location?.state ?: business.state,
+            sourceId = business.id,
         )
     }
 

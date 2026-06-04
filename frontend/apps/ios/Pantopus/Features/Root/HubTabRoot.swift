@@ -265,6 +265,9 @@ public enum HubRoute: Hashable {
     case tasksMap(categoryKey: String)
     /// A.x — Explore (neighbourhood discovery surface).
     case explore
+    /// BLOCK 2E — "Saved places". Reached from the Explore map header's
+    /// "Saved" affordance.
+    case savedPlaces
     /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
     /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
@@ -327,6 +330,7 @@ public struct HubTabRoot: View {
     /// button (repurposed from "open Settings"). Settings now lives as a row
     /// inside the drawer.
     @State private var showNavDrawer = false
+    @State private var savedPlaceMapFocus: ExploreMapFocus?
     /// Identity Center presented when the drawer's context pill is tapped
     /// (LAUNCHER / Option A switching path).
     @State private var navDrawerIdentityCenter = false
@@ -2017,6 +2021,7 @@ public struct HubTabRoot: View {
             )
         case .explore:
             ExploreMapView(
+                focus: savedPlaceMapFocus,
                 onOpenEntity: { entity in
                     Task { @MainActor in
                         switch entity.kind {
@@ -2027,7 +2032,26 @@ public struct HubTabRoot: View {
                         }
                     }
                 },
-                onBack: { pop() }
+                onBack: { pop() },
+                onOpenSaved: { Task { @MainActor in push(.savedPlaces) } }
+            )
+        case .savedPlaces:
+            SavedPlacesView(
+                viewModel: SavedPlacesViewModel(
+                    onBack: { Task { @MainActor in pop() } },
+                    onExplore: { Task { @MainActor in pop() } },
+                    onOpenMap: { latitude, longitude, label in
+                        Task { @MainActor in
+                            savedPlaceMapFocus = ExploreMapFocus(latitude: latitude, longitude: longitude, label: label)
+                            while let last = path.last, last != .explore {
+                                path.removeLast()
+                            }
+                            if !path.contains(.explore) {
+                                path.append(.explore)
+                            }
+                        }
+                    }
+                )
             )
         case .mailboxRoot:
             MailboxRootView(

@@ -296,9 +296,11 @@ struct OwnerPreviewFrame: View {
             PreviewBar(onExit: onExit)
             BusinessProfileLoadedView(
                 content: content,
+                isSaved: false,
                 onBack: onExit,
                 onShare: {},
                 onMore: {},
+                onToggleSavedPlace: {},
                 onContact: {},
                 onBook: {},
                 onCall: {}
