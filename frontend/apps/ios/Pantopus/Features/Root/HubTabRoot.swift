@@ -265,6 +265,9 @@ public enum HubRoute: Hashable {
     case tasksMap(categoryKey: String)
     /// A.x — Explore (neighbourhood discovery surface).
     case explore
+    /// BLOCK 2E — "Saved places". Reached from the Explore map header's
+    /// "Saved" affordance.
+    case savedPlaces
     /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
     /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
@@ -2027,7 +2030,16 @@ public struct HubTabRoot: View {
                         }
                     }
                 },
-                onBack: { pop() }
+                onBack: { pop() },
+                onOpenSaved: { Task { @MainActor in push(.savedPlaces) } }
+            )
+        case .savedPlaces:
+            SavedPlacesView(
+                viewModel: SavedPlacesViewModel(
+                    onBack: { Task { @MainActor in pop() } },
+                    onExplore: { Task { @MainActor in pop() } },
+                    onOpenMap: { _, _, _ in Task { @MainActor in pop() } }
+                )
             )
         case .mailboxRoot:
             MailboxRootView(

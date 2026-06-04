@@ -397,7 +397,7 @@ private struct MeSectionGroup: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("meSectionRow_\(section.id)_\(row.id)")
+                    .accessibilityIdentifier(row.accessibilityID ?? "meSectionRow_\(section.id)_\(row.id)")
                     if index < section.rows.count - 1 {
                         Rectangle()
                             .fill(Theme.Color.appBorderSubtle)

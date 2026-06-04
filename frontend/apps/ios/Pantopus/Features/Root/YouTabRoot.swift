@@ -125,6 +125,9 @@ public enum YouRoute: Hashable {
     /// §1A① — "Following": the Beacons the signed-in user follows, reached
     /// from the Audience Profile "Following" entry row.
     case following
+    /// BLOCK 2E — "Saved places": the places the user has bookmarked from
+    /// Explore. Reached from the Me profile "Saved places" Activity row.
+    case savedPlaces
     case privacyHandshake(personaHandle: String)
     /// P1.3 — Broadcast detail full-screen takeover, pushed when the
     /// creator taps an update card on the Audience Profile. The
@@ -629,6 +632,9 @@ public struct YouTabRoot: View {
             return
         case "me.audience":
             path.append(.audienceProfile)
+            return
+        case "me.savedPlaces":
+            path.append(.savedPlaces)
             return
         case "me.creatorInbox":
             path.append(.creatorInbox)
@@ -1423,6 +1429,18 @@ public struct YouTabRoot: View {
                     },
                     onOpenPersona: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Beacon")) }
+                    }
+                )
+            )
+        case .savedPlaces:
+            SavedPlacesView(
+                viewModel: SavedPlacesViewModel(
+                    onBack: { Task { @MainActor in pop() } },
+                    onExplore: {
+                        Task { @MainActor in path.append(.placeholder(label: "Explore")) }
+                    },
+                    onOpenMap: { _, _, _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Place on map")) }
                     }
                 )
             )
