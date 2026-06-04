@@ -106,6 +106,7 @@ fun BusinessOwnerScreen(
     onEditPage: () -> Unit = {},
     onOpenInsights: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenTeam: () -> Unit = {},
     viewModel: BusinessOwnerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -148,6 +149,7 @@ fun BusinessOwnerScreen(
                                 onEditPage = onEditPage,
                                 onOpenInsights = onOpenInsights,
                                 onOpenSettings = onOpenSettings,
+                                onOpenTeam = onOpenTeam,
                                 onPreview = { mode = OwnerViewMode.Preview },
                                 onSubmitReply = { id, text -> viewModel.submitReply(id, text) },
                             )
@@ -174,6 +176,7 @@ internal fun OwnerEditFrame(
     onEditPage: () -> Unit,
     onOpenInsights: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTeam: () -> Unit,
     onPreview: () -> Unit,
     onSubmitReply: (String, String) -> Unit,
 ) {
@@ -205,6 +208,7 @@ internal fun OwnerEditFrame(
                         profile = profile,
                         onEditPage = onEditPage,
                         onOpenInsights = onOpenInsights,
+                        onOpenTeam = onOpenTeam,
                         onSubmitReply = onSubmitReply,
                     )
                 }
@@ -229,6 +233,7 @@ private fun OwnerSections(
     profile: BusinessProfileContent,
     onEditPage: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenTeam: () -> Unit,
     onSubmitReply: (String, String) -> Unit,
 ) {
     InsightTiles(
@@ -304,6 +309,9 @@ private fun OwnerSections(
 
     OwnerSectionHeader(title = "Photos")
     ManageGalleryRail(gallery = profile.gallery, onAdd = onEditPage, onEditTile = onEditPage)
+
+    OwnerSectionHeader(title = "Team", actionLabel = "Manage", actionIcon = PantopusIcon.Users, onAction = onOpenTeam)
+    TeamSummaryRow(onOpen = onOpenTeam)
 
     OwnerSectionHeader(title = "Reviews", actionLabel = content.reviewsToReplyLabel, actionIcon = PantopusIcon.MessageSquare)
     val summary = profile.reviewSummary
@@ -637,6 +645,56 @@ private fun galleryTint(tint: BusinessGalleryTint): Color =
         BusinessGalleryTint.Slate -> PantopusColors.slate
         BusinessGalleryTint.Deep -> PantopusColors.businessDark
     }
+
+// MARK: - Team summary row
+
+/** B2C — entry-point card on the owner dashboard that opens the Team &
+ *  roles management screen. */
+@Composable
+private fun TeamSummaryRow(onOpen: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .clickable(onClick = onOpen)
+                .padding(horizontal = 14.dp, vertical = Spacing.s3)
+                .testTag("businessOwner.teamRow"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.businessBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Users,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.business,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Team & roles",
+                color = PantopusColors.appText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.1).sp,
+            )
+            Text(
+                text = "Invite teammates and manage what each role can do",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 11.sp,
+                maxLines = 1,
+            )
+        }
+        PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
+    }
+}
 
 // MARK: - Service area card (owner)
 

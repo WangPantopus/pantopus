@@ -145,15 +145,14 @@ data class BusinessProfileDetailDto(
 )
 
 /**
- * `access` sub-object on the detail response. Tells the caller whether
- * the viewer owns / staffs the business — P1.6 only uses `isOwner` to
- * suppress the Save affordance for self-views.
+ * `access` sub-object returned by business detail and team endpoints.
  */
 @JsonClass(generateAdapter = true)
 data class BusinessAccessDto(
     val hasAccess: Boolean = false,
     val isOwner: Boolean = false,
     @Json(name = "role_base") val roleBase: String? = null,
+    val permissions: List<String> = emptyList(),
 )
 
 /**

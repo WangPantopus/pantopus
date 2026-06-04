@@ -36,6 +36,8 @@ public struct BusinessOwnerView: View {
     /// Owner-only deep dives (insights / settings) — stubbed by the host.
     private let onOpenInsights: @MainActor () -> Void
     private let onOpenSettings: @MainActor () -> Void
+    /// B2C — opens the Team & roles management screen.
+    private let onOpenTeam: @MainActor () -> Void
 
     public init(
         businessId: String,
@@ -43,6 +45,7 @@ public struct BusinessOwnerView: View {
         onEditPage: @escaping @MainActor () -> Void = {},
         onOpenInsights: @escaping @MainActor () -> Void = {},
         onOpenSettings: @escaping @MainActor () -> Void = {},
+        onOpenTeam: @escaping @MainActor () -> Void = {},
         content: BusinessOwnerContent? = nil
     ) {
         _viewModel = State(initialValue: BusinessOwnerViewModel(businessId: businessId, content: content))
@@ -50,6 +53,7 @@ public struct BusinessOwnerView: View {
         self.onEditPage = onEditPage
         self.onOpenInsights = onOpenInsights
         self.onOpenSettings = onOpenSettings
+        self.onOpenTeam = onOpenTeam
     }
 
     public var body: some View {
@@ -72,6 +76,7 @@ public struct BusinessOwnerView: View {
                         onEditPage: onEditPage,
                         onOpenInsights: onOpenInsights,
                         onOpenSettings: onOpenSettings,
+                        onOpenTeam: onOpenTeam,
                         onPreview: { mode = .preview },
                         onSubmitReply: { reviewId, text in
                             viewModel.submitReply(reviewId: reviewId, text: text)
@@ -119,6 +124,7 @@ struct OwnerEditFrame: View {
     let onEditPage: @MainActor () -> Void
     let onOpenInsights: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
+    let onOpenTeam: @MainActor () -> Void
     let onPreview: @MainActor () -> Void
     let onSubmitReply: @MainActor (String, String) -> Void
 
@@ -190,6 +196,9 @@ struct OwnerEditFrame: View {
 
             OwnerSectionHeader(title: "Photos")
             ManageGalleryRail(gallery: profile.gallery, onAdd: onEditPage, onEditTile: onEditPage)
+
+            OwnerSectionHeader(title: "Team", actionLabel: "Manage", actionIcon: .users, onAction: onOpenTeam)
+            TeamSummaryRow(onOpen: onOpenTeam)
 
             OwnerSectionHeader(
                 title: "Reviews",
@@ -584,6 +593,51 @@ struct OwnerServiceAreaCard: View {
     }
 }
 
+// MARK: - Team summary row
+
+/// B2C — entry-point card on the owner dashboard that opens the Team &
+/// roles management screen.
+@MainActor
+struct TeamSummaryRow: View {
+    let onOpen: @MainActor () -> Void
+
+    var body: some View {
+        Button { onOpen() } label: {
+            HStack(spacing: Spacing.s3) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .fill(Theme.Color.businessBg)
+                        .frame(width: 34, height: 34)
+                    Icon(.users, size: 16, strokeWidth: 2, color: Theme.Color.business)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Team & roles")
+                        .font(.system(size: 13, weight: .semibold))
+                        .tracking(-0.1)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Invite teammates and manage what each role can do")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: Spacing.s2)
+                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, Spacing.s3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .accessibilityIdentifier("businessOwner.teamRow")
+    }
+}
+
 // MARK: - Owner dock (Preview · Edit page)
 
 @MainActor
@@ -708,6 +762,7 @@ private struct OwnerMessageLayout: View {
         onEditPage: {},
         onOpenInsights: {},
         onOpenSettings: {},
+        onOpenTeam: {},
         onPreview: {},
         onSubmitReply: { _, _ in }
     )
