@@ -43,7 +43,9 @@ public struct EarnEarning: Identifiable, Equatable, Sendable {
     public let description: String
     /// Counterparty ("Marcus P." / "Reyes household").
     public let counterparty: String
-    public let category: EarnCategory
+    /// Gig category drives the row's tinted tile. Live ad-payout rows have
+    /// no gig category, so this is nil and the row renders a neutral tile.
+    public let category: EarnCategory?
     public let status: EarnStatus
     /// Pre-formatted amount string without the leading sign or "$" —
     /// e.g. `"140.00"`. The row renders "+$140.00".
@@ -55,7 +57,7 @@ public struct EarnEarning: Identifiable, Equatable, Sendable {
         dateLabel: String,
         description: String,
         counterparty: String,
-        category: EarnCategory,
+        category: EarnCategory? = nil,
         status: EarnStatus,
         amount: String
     ) {
@@ -194,12 +196,16 @@ public struct EarnContent: Equatable, Sendable {
     /// Pending / on-hold earnings (hero split cell), e.g. `"$60.00"`.
     public let pending: String
     public let pendingMeta: String
-    public let weeklyGoal: EarnWeeklyGoal
+    // The weekly-goal target, linked payout method, auto-cash-out, and
+    // 1099 tax docs have no source on `/earnings/*` (the last three are
+    // Stripe Connect — Phase 3), so the live path leaves them nil and the
+    // view hides them. `EarnSampleData` fills them for previews/snapshots.
+    public let weeklyGoal: EarnWeeklyGoal?
     public let waysToEarn: [EarnWayToEarn]
     public let earnings: [EarnEarning]
-    public let payoutMethod: EarnPayoutMethod
-    public let autoCashOut: EarnAutoCashOut
-    public let taxDocs: EarnTaxDocs
+    public let payoutMethod: EarnPayoutMethod?
+    public let autoCashOut: EarnAutoCashOut?
+    public let taxDocs: EarnTaxDocs?
 
     public init(
         available: String,
@@ -207,12 +213,12 @@ public struct EarnContent: Equatable, Sendable {
         thisWeekMeta: String,
         pending: String,
         pendingMeta: String,
-        weeklyGoal: EarnWeeklyGoal,
+        weeklyGoal: EarnWeeklyGoal? = nil,
         waysToEarn: [EarnWayToEarn],
         earnings: [EarnEarning],
-        payoutMethod: EarnPayoutMethod,
-        autoCashOut: EarnAutoCashOut,
-        taxDocs: EarnTaxDocs
+        payoutMethod: EarnPayoutMethod? = nil,
+        autoCashOut: EarnAutoCashOut? = nil,
+        taxDocs: EarnTaxDocs? = nil
     ) {
         self.available = available
         self.thisWeek = thisWeek

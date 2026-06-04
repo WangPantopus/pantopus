@@ -33,8 +33,8 @@ final class EarnViewModelTests: XCTestCase {
         XCTAssertEqual(content.available, "312.40")
         XCTAssertEqual(content.thisWeek, "$148.00")
         XCTAssertEqual(content.pending, "$60.00")
-        XCTAssertEqual(content.payoutMethod.last4, "7421")
-        XCTAssertTrue(content.autoCashOut.isOn)
+        XCTAssertEqual(content.payoutMethod?.last4, "7421")
+        XCTAssertEqual(content.autoCashOut?.isOn, true)
     }
 
     func testLoadResolvesToEmptyForNewEarner() async {
@@ -70,10 +70,10 @@ final class EarnViewModelTests: XCTestCase {
     func testPopulatedFixtureShape() {
         let content = EarnSampleData.populated
         XCTAssertEqual(content.earnings.count, 4)
-        XCTAssertEqual(content.weeklyGoal.ringLabel, "74%")
-        XCTAssertEqual(content.weeklyGoal.headline, "$52 to go")
-        XCTAssertEqual(content.taxDocs.bodyText, "YTD earnings $4,920 · 1099 available mid-Jan")
-        XCTAssertEqual(content.autoCashOut.detail, "Every Friday · cleared balance")
+        XCTAssertEqual(content.weeklyGoal?.ringLabel, "74%")
+        XCTAssertEqual(content.weeklyGoal?.headline, "$52 to go")
+        XCTAssertEqual(content.taxDocs?.bodyText, "YTD earnings $4,920 · 1099 available mid-Jan")
+        XCTAssertEqual(content.autoCashOut?.detail, "Every Friday · cleared balance")
         // First row is "Today"; the pending row is grouped under "Nov 29".
         XCTAssertEqual(content.earnings.first?.day, "Today")
     }
@@ -103,7 +103,7 @@ final class EarnViewModelTests: XCTestCase {
     }
 
     func testEarningCategoriesAreMoneyInSubset() {
-        let cats = Set(EarnSampleData.populated.earnings.map(\.category))
+        let cats = Set(EarnSampleData.populated.earnings.compactMap(\.category))
         // Earn is money-in only — no bank / fee rows (those are Wallet's).
         XCTAssertEqual(cats, [.cleaning, .petCare, .handyman, .childCare])
     }

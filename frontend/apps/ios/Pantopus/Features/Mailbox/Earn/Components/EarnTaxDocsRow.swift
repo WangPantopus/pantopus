@@ -56,7 +56,9 @@ struct EarnTaxDocsRow: View {
 
 #Preview("Tax docs row") {
     VStack(spacing: Spacing.s4) {
-        EarnTaxDocsRow(docs: EarnSampleData.populated.taxDocs)
+        if let docs = EarnSampleData.populated.taxDocs {
+            EarnTaxDocsRow(docs: docs)
+        }
         EarnLockedRow(
             title: "Tax documents",
             subcopy: "Your 1099 and YTD totals appear after your first paid task.",

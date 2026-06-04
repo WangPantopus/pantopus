@@ -260,8 +260,14 @@ private fun PopulatedBody(
                     .padding(top = Spacing.s3, bottom = 116.dp),
         ) {
             Hero(content)
-            Spacer(Modifier.height(Spacing.s3))
-            WeeklyGoalCard(goal = content.weeklyGoal)
+            // Weekly-goal target, payout method, auto-cash-out, and 1099 tax
+            // docs have no `/earnings/*` source (the last three are Stripe
+            // Connect — Phase 3), so they render only when the projection
+            // carries them (sample/preview) — never faked.
+            content.weeklyGoal?.let { goal ->
+                Spacer(Modifier.height(Spacing.s3))
+                WeeklyGoalCard(goal = goal)
+            }
             SectionOverline(
                 title = "Ways to earn",
                 actionLabel = "Find work",
@@ -274,14 +280,20 @@ private fun PopulatedBody(
                 onAction = onSeeAllEarnings,
             )
             EarnEarningsList(items = content.earnings)
-            SectionOverline(title = "Payout settings")
-            EarnPayoutSettingsCard(
-                method = content.payoutMethod,
-                autoCashOut = content.autoCashOut,
-                onManage = onManagePayout,
-            )
-            SectionOverline(title = "Taxes")
-            EarnTaxDocsRow(docs = content.taxDocs, onClick = onOpenTaxDocs)
+            val payoutMethod = content.payoutMethod
+            val autoCashOut = content.autoCashOut
+            if (payoutMethod != null && autoCashOut != null) {
+                SectionOverline(title = "Payout settings")
+                EarnPayoutSettingsCard(
+                    method = payoutMethod,
+                    autoCashOut = autoCashOut,
+                    onManage = onManagePayout,
+                )
+            }
+            content.taxDocs?.let { docs ->
+                SectionOverline(title = "Taxes")
+                EarnTaxDocsRow(docs = docs, onClick = onOpenTaxDocs)
+            }
         }
         EarnBottomBar(modifier = Modifier.align(Alignment.BottomCenter)) {
             CashOutCta(amount = content.available, onClick = onCashOut)

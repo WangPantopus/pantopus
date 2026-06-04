@@ -250,7 +250,7 @@ fun EarnLockedRow(
 }
 
 @Composable
-private fun CategoryTile(category: EarnCategory) {
+private fun CategoryTile(category: EarnCategory?) {
     Box(
         modifier =
             Modifier
@@ -325,27 +325,30 @@ internal fun Modifier.earnDashedBorder(
  * read as siblings.
  */
 internal object EarnCategoryPalette {
-    fun background(category: EarnCategory): Color =
+    fun background(category: EarnCategory?): Color =
         when (category) {
             EarnCategory.Cleaning -> PantopusColors.homeBg
             EarnCategory.ChildCare -> PantopusColors.warmAmberBg
             EarnCategory.Handyman -> PantopusColors.handyman.copy(alpha = 0.18f)
             EarnCategory.PetCare -> PantopusColors.errorLight
+            null -> PantopusColors.appSurfaceSunken
         }
 
-    fun foreground(category: EarnCategory): Color =
+    fun foreground(category: EarnCategory?): Color =
         when (category) {
             EarnCategory.Cleaning -> PantopusColors.homeDark
             EarnCategory.ChildCare -> PantopusColors.warmAmber
             EarnCategory.Handyman -> PantopusColors.handyman
             EarnCategory.PetCare -> PantopusColors.error
+            null -> PantopusColors.appTextSecondary
         }
 
-    fun icon(category: EarnCategory): PantopusIcon =
+    fun icon(category: EarnCategory?): PantopusIcon =
         when (category) {
             EarnCategory.Cleaning -> PantopusIcon.Sparkles
             EarnCategory.ChildCare -> PantopusIcon.Baby
             EarnCategory.Handyman -> PantopusIcon.Wrench
             EarnCategory.PetCare -> PantopusIcon.Dog
+            null -> PantopusIcon.MailOpen
         }
 }

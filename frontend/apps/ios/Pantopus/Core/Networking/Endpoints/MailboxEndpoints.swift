@@ -40,4 +40,22 @@ public enum MailboxEndpoints {
     public static func acknowledge(mailId: String) -> Endpoint {
         Endpoint(method: .patch, path: "/api/mailbox/\(mailId)/ack")
     }
+
+    /// `GET /api/mailbox/earnings/summary` — route
+    /// `backend/routes/mailbox.js:2899`. `{ pendingEarnings, totalEarned,
+    /// currency }`. Backs the Earn dashboard's balance hero.
+    public static func earningsSummary() -> Endpoint {
+        Endpoint(method: .get, path: "/api/mailbox/earnings/summary")
+    }
+
+    /// `GET /api/mailbox/earnings/history` — route
+    /// `backend/routes/mailbox.js:2935`. Paginated ad-view payout rows;
+    /// backs the Earn dashboard's recent-earnings list.
+    public static func earningsHistory(limit: Int = 50, offset: Int = 0) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/mailbox/earnings/history",
+            query: ["limit": String(limit), "offset": String(offset)]
+        )
+    }
 }

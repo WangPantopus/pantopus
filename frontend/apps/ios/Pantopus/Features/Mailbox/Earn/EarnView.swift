@@ -92,23 +92,33 @@ public struct EarnView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.s0) {
                 heroSection(content)
-                WeeklyGoalCard(goal: content.weeklyGoal)
-                    .padding(.top, Spacing.s3)
+                // Weekly-goal target, payout method, auto-cash-out, and 1099
+                // tax docs have no `/earnings/*` source (the last three are
+                // Stripe Connect — Phase 3), so they render only when the
+                // projection carries them (sample/preview) — never faked.
+                if let weeklyGoal = content.weeklyGoal {
+                    WeeklyGoalCard(goal: weeklyGoal)
+                        .padding(.top, Spacing.s3)
+                }
                 section(overline: "Ways to earn", action: "Find work", onAction: onBrowseTasks) {
                     EarnWaysToEarnCard(items: content.waysToEarn, onSelect: dispatchWay)
                 }
                 section(overline: "Recent earnings", action: "See all", onAction: onSeeAllEarnings) {
                     EarnEarningsList(items: content.earnings)
                 }
-                section(overline: "Payout settings") {
-                    EarnPayoutSettingsCard(
-                        method: content.payoutMethod,
-                        autoCashOut: content.autoCashOut,
-                        onManage: onManagePayout
-                    )
+                if let payoutMethod = content.payoutMethod, let autoCashOut = content.autoCashOut {
+                    section(overline: "Payout settings") {
+                        EarnPayoutSettingsCard(
+                            method: payoutMethod,
+                            autoCashOut: autoCashOut,
+                            onManage: onManagePayout
+                        )
+                    }
                 }
-                section(overline: "Taxes") {
-                    EarnTaxDocsRow(docs: content.taxDocs, onTap: onOpenTaxDocs)
+                if let taxDocs = content.taxDocs {
+                    section(overline: "Taxes") {
+                        EarnTaxDocsRow(docs: taxDocs, onTap: onOpenTaxDocs)
+                    }
                 }
                 Spacer().frame(height: 96)
             }
