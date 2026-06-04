@@ -17,9 +17,13 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferDto
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferUserDto
 import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.models.transaction_reviews.CreateTransactionReviewBody
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.listing_offers.ListingOffersRepository
 import app.pantopus.android.data.listings.ListingsRepository
+import app.pantopus.android.data.transaction_reviews.TransactionReviewsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
@@ -41,6 +45,10 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.ThumbnailImage
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
+import app.pantopus.android.ui.screens.transaction_reviews.TransactionReviewContext
+import app.pantopus.android.ui.screens.transaction_reviews.TransactionReviewDraft
+import app.pantopus.android.ui.screens.transaction_reviews.TransactionReviewSheetTarget
+import app.pantopus.android.ui.screens.transaction_reviews.TransactionReviewSubmitResult
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -118,6 +126,7 @@ enum class ListingOfferFooter {
     RespondPending,
     UndoCounter,
     ViewTransaction,
+    ReviewTransaction,
     None,
 }
 
@@ -268,6 +277,8 @@ class ListingOffersViewModel
     constructor(
         private val offersRepo: ListingOffersRepository,
         private val listingsRepo: ListingsRepository,
+        private val authRepo: AuthRepository,
+        private val transactionReviewsRepo: TransactionReviewsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
@@ -339,8 +350,8 @@ class ListingOffersViewModel
                 when (status) {
                     ListingOfferStatus.Pending -> ListingOfferFooter.RespondPending
                     ListingOfferStatus.Countered -> ListingOfferFooter.UndoCounter
-                    ListingOfferStatus.Accepted, ListingOfferStatus.Completed ->
-                        ListingOfferFooter.ViewTransaction
+                    ListingOfferStatus.Accepted -> ListingOfferFooter.ViewTransaction
+                    ListingOfferStatus.Completed -> ListingOfferFooter.ReviewTransaction
                     else -> ListingOfferFooter.None
                 }
 
@@ -395,6 +406,24 @@ class ListingOffersViewModel
                                         icon = PantopusIcon.FileText,
                                         variant = CompactButtonVariant.Primary,
                                         onClick = callbacks.onViewTransaction,
+                                    ),
+                                ),
+                        )
+                    ListingOfferFooter.ReviewTransaction ->
+                        RowFooter(
+                            actions =
+                                listOf(
+                                    RowFooterAction(
+                                        title = "View transaction",
+                                        icon = PantopusIcon.FileText,
+                                        variant = CompactButtonVariant.Ghost,
+                                        onClick = callbacks.onViewTransaction,
+                                    ),
+                                    RowFooterAction(
+                                        title = "Leave a review",
+                                        icon = PantopusIcon.Star,
+                                        variant = CompactButtonVariant.Primary,
+                                        onClick = callbacks.onLeaveReview,
                                     ),
                                 ),
                         )
@@ -587,6 +616,10 @@ class ListingOffersViewModel
         private val _counterTarget = MutableStateFlow<CounterSheetTarget?>(null)
         val counterTarget: StateFlow<CounterSheetTarget?> = _counterTarget.asStateFlow()
 
+        // BLOCK 2D — transaction-review sheet on a completed offer.
+        private val _leaveReviewTarget = MutableStateFlow<TransactionReviewSheetTarget?>(null)
+        val leaveReviewTarget: StateFlow<TransactionReviewSheetTarget?> = _leaveReviewTarget.asStateFlow()
+
         private var listing: ListingDto? = null
         private var offers: List<ListingOfferDto> = emptyList()
         private var loadedAtLeastOnce = false
@@ -772,6 +805,7 @@ class ListingOffersViewModel
             val onCounter: () -> Unit = {},
             val onDecline: () -> Unit = {},
             val onViewTransaction: () -> Unit = {},
+            val onLeaveReview: () -> Unit = {},
         )
 
         private fun callbacksFor(dto: ListingOfferDto): RowCallbacks =
@@ -781,6 +815,7 @@ class ListingOffersViewModel
                 onCounter = { requestCounter(dto) },
                 onDecline = { declineOffer(dto) },
                 onViewTransaction = { openTransactionHandler(dto) },
+                onLeaveReview = { requestLeaveReview(dto) },
             )
 
         // MARK: - Mutations
@@ -825,6 +860,78 @@ class ListingOffersViewModel
 
         fun cancelCounter() {
             _counterTarget.value = null
+        }
+
+        // MARK: - Leave review (BLOCK 2D)
+
+        private fun currentUserId(): String? = (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
+
+        /**
+         * Open the transaction-review sheet for a completed offer. The
+         * reviewee is whichever party the signed-in viewer is not; this panel
+         * is seller-side, so it defaults to reviewing the buyer.
+         */
+        fun requestLeaveReview(dto: ListingOfferDto) {
+            val me = currentUserId()
+            val reviewedId: String?
+            val reviewedName: String?
+            if (me != null && me == dto.buyerId) {
+                reviewedId = dto.sellerId ?: dto.seller?.id
+                reviewedName = displayName(dto.seller)
+            } else {
+                reviewedId = dto.buyerId ?: dto.buyer?.id
+                reviewedName = displayName(dto.buyer)
+            }
+            if (reviewedId == null) return
+            _leaveReviewTarget.value =
+                TransactionReviewSheetTarget(
+                    id = dto.id,
+                    context = TransactionReviewContext.ListingSale,
+                    reviewedId = reviewedId,
+                    reviewedName = reviewedName,
+                    transactionTitle = listing?.title ?: listingTitleHint ?: "this sale",
+                    listingId = dto.listingId,
+                    offerId = dto.id,
+                )
+        }
+
+        fun cancelLeaveReview() {
+            _leaveReviewTarget.value = null
+        }
+
+        /**
+         * Submit the review draft. The sheet renders the result (submitted /
+         * duplicate / failed); only [cancelLeaveReview] dismisses it.
+         */
+        suspend fun submitLeaveReview(draft: TransactionReviewDraft): TransactionReviewSubmitResult {
+            val target =
+                _leaveReviewTarget.value
+                    ?: return TransactionReviewSubmitResult.Failed("No review in progress.")
+            val body =
+                CreateTransactionReviewBody(
+                    reviewedId = target.reviewedId,
+                    context = target.context.wireValue,
+                    listingId = target.listingId,
+                    offerId = target.offerId,
+                    tradeId = target.tradeId,
+                    gigId = target.gigId,
+                    rating = draft.rating,
+                    comment = draft.comment,
+                    communicationRating = draft.communicationRating,
+                    accuracyRating = draft.accuracyRating,
+                    punctualityRating = draft.punctualityRating,
+                )
+            return when (val result = transactionReviewsRepo.create(body)) {
+                is NetworkResult.Success -> TransactionReviewSubmitResult.Submitted
+                is NetworkResult.Failure -> {
+                    val error = result.error
+                    if (error is NetworkError.ClientError && error.code == 409) {
+                        TransactionReviewSubmitResult.Duplicate
+                    } else {
+                        TransactionReviewSubmitResult.Failed(error.message)
+                    }
+                }
+            }
         }
 
         fun confirmCounter(

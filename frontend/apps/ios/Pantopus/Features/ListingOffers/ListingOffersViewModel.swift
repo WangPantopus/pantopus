@@ -131,6 +131,10 @@ public enum ListingOfferFooter: Sendable, Hashable {
     case undoCounter
     /// Accepted offer — single full-width "View transaction" button.
     case viewTransaction
+    /// Completed offer — "View transaction" + "Leave a review" (BLOCK 2D).
+    /// The review POSTs to `/api/transaction-reviews`; the backend only
+    /// accepts reviews on `completed` transactions.
+    case reviewTransaction
     /// Declined offer — no footer.
     case none
 }
@@ -327,6 +331,10 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     /// confirmation flow.
     public var counterTarget: CounterSheetTarget?
 
+    /// Bound to the view's `.sheet(item:)` to drive the transaction-review
+    /// flow on a completed offer (BLOCK 2D).
+    public var leaveReviewTarget: TransactionReviewSheetTarget?
+
     // MARK: - Dependencies
 
     private let listingId: String
@@ -336,6 +344,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     private let onOpenBuyer: @MainActor (ListingOfferUserDTO) -> Void
     private let onOpenTransaction: @MainActor (ListingOfferDTO) -> Void
     private let onEditPrice: @MainActor () -> Void
+    private let currentUserId: @MainActor () -> String?
     private let now: @Sendable () -> Date
 
     // MARK: - Local data
@@ -372,6 +381,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         onOpenBuyer: @escaping @MainActor (ListingOfferUserDTO) -> Void = { _ in },
         onOpenTransaction: @escaping @MainActor (ListingOfferDTO) -> Void = { _ in },
         onEditPrice: @escaping @MainActor () -> Void = {},
+        currentUserId: @escaping @MainActor () -> String? = ListingOffersViewModel.currentSignedInUserId,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.listingId = listingId
@@ -381,6 +391,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         self.onOpenBuyer = onOpenBuyer
         self.onOpenTransaction = onOpenTransaction
         self.onEditPrice = onEditPrice
+        self.currentUserId = currentUserId
         self.now = now
     }
 
@@ -491,19 +502,22 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         public let onCounter: @Sendable () -> Void
         public let onDecline: @Sendable () -> Void
         public let onViewTransaction: @Sendable () -> Void
+        public let onLeaveReview: @Sendable () -> Void
 
         public init(
             onTap: @escaping @Sendable () -> Void = {},
             onAccept: @escaping @Sendable () -> Void = {},
             onCounter: @escaping @Sendable () -> Void = {},
             onDecline: @escaping @Sendable () -> Void = {},
-            onViewTransaction: @escaping @Sendable () -> Void = {}
+            onViewTransaction: @escaping @Sendable () -> Void = {},
+            onLeaveReview: @escaping @Sendable () -> Void = {}
         ) {
             self.onTap = onTap
             self.onAccept = onAccept
             self.onCounter = onCounter
             self.onDecline = onDecline
             self.onViewTransaction = onViewTransaction
+            self.onLeaveReview = onLeaveReview
         }
     }
 
@@ -553,6 +567,10 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             onViewTransaction: { [weak self] in
                 guard let self else { return }
                 Task { @MainActor in self.onOpenTransaction(dto) }
+            },
+            onLeaveReview: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.requestLeaveReview(dto) }
             }
         )
     }
@@ -608,6 +626,81 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
 
     public func cancelCounter() {
         counterTarget = nil
+    }
+
+    // MARK: - Leave review (BLOCK 2D)
+
+    /// Resolve the signed-in user id so the panel can address the *other*
+    /// party as the reviewee. Mirrors `GigDetailViewModel`'s accessor.
+    @MainActor
+    public static func currentSignedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state { return user.id }
+        return nil
+    }
+
+    /// Open the transaction-review sheet for a completed offer. The reviewee
+    /// is whichever party the signed-in viewer is not; this panel is
+    /// seller-side, so it defaults to reviewing the buyer.
+    public func requestLeaveReview(_ dto: ListingOfferDTO) {
+        let me = currentUserId()
+        let reviewedId: String?
+        let reviewedName: String?
+        if let me, me == dto.buyerId {
+            reviewedId = dto.sellerId ?? dto.seller?.id
+            reviewedName = Self.displayName(for: dto.seller)
+        } else {
+            reviewedId = dto.buyerId ?? dto.buyer?.id
+            reviewedName = Self.displayName(for: dto.buyer)
+        }
+        guard let reviewedId else { return }
+        leaveReviewTarget = TransactionReviewSheetTarget(
+            id: dto.id,
+            context: .listingSale,
+            reviewedId: reviewedId,
+            reviewedName: reviewedName,
+            transactionTitle: listing?.title ?? listingTitleHint ?? "this sale",
+            listingId: dto.listingId,
+            offerId: dto.id
+        )
+    }
+
+    /// Tear down the review sheet without committing.
+    public func cancelLeaveReview() {
+        leaveReviewTarget = nil
+    }
+
+    /// Submit the review draft. The sheet renders the result (submitted /
+    /// duplicate / failed); only `cancelLeaveReview` dismisses it.
+    public func submitLeaveReview(
+        _ draft: TransactionReviewDraft
+    ) async -> TransactionReviewSubmitResult {
+        guard let target = leaveReviewTarget else { return .failed("No review in progress.") }
+        let body = CreateTransactionReviewBody(
+            reviewedId: target.reviewedId,
+            context: target.context.wireValue,
+            listingId: target.listingId,
+            offerId: target.offerId,
+            tradeId: target.tradeId,
+            gigId: target.gigId,
+            rating: draft.rating,
+            comment: draft.comment,
+            communicationRating: draft.communicationRating,
+            accuracyRating: draft.accuracyRating,
+            punctualityRating: draft.punctualityRating
+        )
+        do {
+            _ = try await api.request(
+                TransactionReviewsEndpoints.create(body: body),
+                as: EmptyResponse.self
+            )
+            return .submitted
+        } catch let APIError.clientError(status, _) where status == 409 {
+            return .duplicate
+        } catch {
+            return .failed(
+                (error as? APIError)?.errorDescription ?? "Couldn't submit your review."
+            )
+        }
     }
 
     /// Send the counter offer. Reverts the optimistic update on failure
@@ -750,7 +843,8 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         switch status {
         case .pending: .respondPending
         case .countered: .undoCounter
-        case .accepted, .completed: .viewTransaction
+        case .accepted: .viewTransaction
+        case .completed: .reviewTransaction
         case .declined, .expired, .withdrawn: .none
         }
     }
@@ -973,6 +1067,21 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
                     icon: .fileText,
                     variant: .primary,
                     handler: callbacks.onViewTransaction
+                )
+            ])
+        case .reviewTransaction:
+            RowFooter(actions: [
+                RowFooterAction(
+                    title: "View transaction",
+                    icon: .fileText,
+                    variant: .ghost,
+                    handler: callbacks.onViewTransaction
+                ),
+                RowFooterAction(
+                    title: "Leave a review",
+                    icon: .star,
+                    variant: .primary,
+                    handler: callbacks.onLeaveReview
                 )
             ])
         }

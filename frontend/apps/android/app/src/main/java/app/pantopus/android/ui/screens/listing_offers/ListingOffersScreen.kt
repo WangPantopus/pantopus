@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferDto
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferUserDto
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
+import app.pantopus.android.ui.screens.transaction_reviews.TransactionReviewSheetContent
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
@@ -74,6 +75,7 @@ fun ListingOffersScreen(
     val listingContext by viewModel.listingContext.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val counterTarget by viewModel.counterTarget.collectAsStateWithLifecycle()
+    val leaveReviewTarget by viewModel.leaveReviewTarget.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
@@ -109,6 +111,22 @@ fun ListingOffersScreen(
                     target = target,
                     onCancel = { viewModel.cancelCounter() },
                     onConfirm = { amount, message -> viewModel.confirmCounter(amount, message) },
+                )
+            }
+        }
+
+        val reviewTarget = leaveReviewTarget
+        if (reviewTarget != null) {
+            val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.cancelLeaveReview() },
+                sheetState = reviewSheetState,
+                containerColor = PantopusColors.appBg,
+            ) {
+                TransactionReviewSheetContent(
+                    target = reviewTarget,
+                    onSubmit = { draft -> viewModel.submitLeaveReview(draft) },
+                    onClose = { viewModel.cancelLeaveReview() },
                 )
             }
         }

@@ -33,6 +33,16 @@ public struct ListingOffersView: View {
                 )
                 .presentationDetents([.medium])
             }
+            .sheet(item: $bindable.leaveReviewTarget) { target in
+                TransactionReviewSheetView(
+                    target: target,
+                    onSubmit: { draft in
+                        await viewModel.submitLeaveReview(draft)
+                    },
+                    onClose: { viewModel.cancelLeaveReview() }
+                )
+                .presentationDetents([.medium, .large])
+            }
     }
 }
 
