@@ -120,8 +120,12 @@ struct SourceMailCard: View {
 
 #if DEBUG
 #Preview {
-    SourceMailCard(source: MailTaskSampleData.task().source) {}
-        .padding()
-        .background(Theme.Color.appBg)
+    Group {
+        if let source = MailTaskSampleData.task().source {
+            SourceMailCard(source: source) {}
+        }
+    }
+    .padding()
+    .background(Theme.Color.appBg)
 }
 #endif

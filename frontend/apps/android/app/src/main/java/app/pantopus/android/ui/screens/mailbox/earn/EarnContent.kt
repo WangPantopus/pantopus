@@ -38,7 +38,9 @@ data class EarnEarning(
     val dateLabel: String,
     val description: String,
     val counterparty: String,
-    val category: EarnCategory,
+    /** Gig category drives the tinted tile. Live ad-payout rows have no
+     *  gig category, so this is null and the row renders a neutral tile. */
+    val category: EarnCategory? = null,
     val status: EarnStatus,
     /**
      * Pre-formatted amount string without the leading sign or "$" —
@@ -126,12 +128,16 @@ data class EarnContent(
     val thisWeekMeta: String,
     val pending: String,
     val pendingMeta: String,
-    val weeklyGoal: EarnWeeklyGoal,
+    // The weekly-goal target, linked payout method, auto-cash-out, and 1099
+    // tax docs have no `/earnings/*` source (the last three are Stripe
+    // Connect — Phase 3), so the live path leaves them null and the screen
+    // hides them. [EarnSampleData] fills them for previews/snapshots.
+    val weeklyGoal: EarnWeeklyGoal? = null,
     val waysToEarn: List<EarnWayToEarn>,
     val earnings: List<EarnEarning>,
-    val payoutMethod: EarnPayoutMethod,
-    val autoCashOut: EarnAutoCashOut,
-    val taxDocs: EarnTaxDocs,
+    val payoutMethod: EarnPayoutMethod? = null,
+    val autoCashOut: EarnAutoCashOut? = null,
+    val taxDocs: EarnTaxDocs? = null,
 )
 
 /**

@@ -2,12 +2,16 @@
 //  MailTaskViewModel.swift
 //  Pantopus
 //
-//  A17.12 — Mail-task detail view-model. Drives the open / done frames
-//  from a single loaded `MailTaskContent`. The native task API isn't
-//  wired yet (web uses `useTasks` / `useUpdateTask` / `useEscalateTaskToGig`);
-//  until it lands the VM seeds from `MailTaskSampleData` and mutates the
-//  projection locally so QA, previews, and the parity snapshots exercise
-//  both frames plus the tappable checklist.
+//  A17.12 / Block 2A — Mail-task detail view-model. The live path (no
+//  explicit `seed`) fetches `GET /api/mailbox/v2/p3/tasks` and selects
+//  the task by id (there is no detail-by-id route), mapping the flat
+//  `HomeTask` fields — title / reference / priority / due / status / the
+//  source-mail link — into `MailTaskContent`. The rich AI elf, subtask
+//  checklist, snooze, completion summary, and next-up slots have no
+//  backend source today, so they stay nil/empty and the view hides them
+//  (never faked). Mark-done / reopen round-trip via
+//  `PATCH /p3/tasks/:id`. An explicit `seed` keeps the view-model local
+//  (the preview / test seam) and projects `MailTaskSampleData`.
 //
 //  Mirrors `ui/screens/mailbox/mail_task/MailTaskViewModel.kt` on Android.
 //
@@ -25,20 +29,24 @@ public final class MailTaskViewModel {
     public var showsDelegateSheet: Bool = false
 
     private let taskId: String
-    private let seed: MailTaskSeed
+    /// Non-nil → preview / test seam (project the sample fixture, no fetch).
+    private let seed: MailTaskSeed?
+    private let client: APIClient
     /// Opens the originating / next-up mail item detail. Injected by the
     /// tab root so the card taps push `.mailItemDetail`.
     private let onOpenMail: @MainActor (String) -> Void
     private let onBack: @MainActor () -> Void
 
-    public init(
+    init(
         taskId: String,
-        seed: MailTaskSeed = .active,
+        seed: MailTaskSeed? = nil,
+        client: APIClient = .shared,
         onOpenMail: @escaping @MainActor (String) -> Void = { _ in },
         onBack: @escaping @MainActor () -> Void = {}
     ) {
         self.taskId = taskId
         self.seed = seed
+        self.client = client
         self.onOpenMail = onOpenMail
         self.onBack = onBack
     }
@@ -46,8 +54,33 @@ public final class MailTaskViewModel {
     // MARK: - Lifecycle
 
     public func load() async {
-        guard case .loading = state else { return }
-        state = .loaded(MailTaskSampleData.task(taskId: taskId, seed: seed))
+        // Preview / test seam: an explicit seed keeps the screen local.
+        if let seed {
+            state = .loaded(MailTaskSampleData.task(taskId: taskId, seed: seed))
+            return
+        }
+        await fetch()
+    }
+
+    /// Retry after an error frame.
+    public func retry() async {
+        await fetch()
+    }
+
+    private func fetch() async {
+        state = .loading
+        let result = await client.perform(MailboxV2Endpoints.p3Tasks(), as: P3TasksResponse.self)
+        switch result {
+        case let .success(response):
+            let all = response.active + response.completed
+            if let dto = all.first(where: { $0.id == taskId }) {
+                state = .loaded(Self.content(from: dto))
+            } else {
+                state = .error(message: "This task is no longer available.")
+            }
+        case .failure:
+            state = .error(message: "We couldn't load this task. Check your connection and try again.")
+        }
     }
 
     // MARK: - Derived chrome
@@ -64,9 +97,8 @@ public final class MailTaskViewModel {
         onBack()
     }
 
-    /// Toggle a checklist subtask. Persists to local state so the progress
-    /// bar + hero count update immediately. No-op once the task is done
-    /// (every step already reads complete).
+    /// Toggle a checklist subtask. Live tasks carry no subtasks, so this
+    /// only fires in the sample/preview path. No-op once done.
     public func toggleSubtask(id: String) {
         guard case var .loaded(content) = state, !content.isDone else { return }
         guard let index = content.subtasks.firstIndex(where: { $0.id == id }) else { return }
@@ -74,21 +106,40 @@ public final class MailTaskViewModel {
         state = .loaded(content)
     }
 
-    /// Mark the whole task done — flips to the completion frame.
+    /// Mark the whole task done — optimistic flip + `PATCH status=completed`.
     public func markDone() {
         guard case var .loaded(content) = state, !content.isDone else { return }
         content.isDone = true
         state = .loaded(content)
         toast = "Marked done"
+        persistStatus("completed", rollbackDoneTo: false)
     }
 
-    /// Reopen a completed task — returns to the open frame, restoring the
-    /// per-step flags the user left it in.
+    /// Reopen a completed task — optimistic flip + `PATCH status=pending`.
     public func reopen() {
         guard case var .loaded(content) = state, content.isDone else { return }
         content.isDone = false
         state = .loaded(content)
         toast = "Task reopened"
+        persistStatus("pending", rollbackDoneTo: true)
+    }
+
+    /// Persist the done/open flip. No-op in the seeded preview/test path;
+    /// rolls the optimistic flip back on failure.
+    private func persistStatus(_ status: String, rollbackDoneTo previous: Bool) {
+        guard seed == nil else { return }
+        let id = taskId
+        Task {
+            let result = await client.perform(
+                MailboxV2Endpoints.updateP3Task(taskId: id, request: P3TaskUpdateRequest(status: status)),
+                as: P3TaskResponse.self
+            )
+            if case .failure = result, case var .loaded(content) = state {
+                content.isDone = previous
+                state = .loaded(content)
+                toast = "Couldn't save — try again"
+            }
+        }
     }
 
     /// Quick-snooze tap. Persistence is stubbed; surface a toast so QA can
@@ -99,8 +150,7 @@ public final class MailTaskViewModel {
         toast = "Snoozed · \(option.label)"
     }
 
-    /// Open the snooze picker from the dock chip. Reuses the quick-row;
-    /// today we just toast since the time picker isn't wired.
+    /// Open the snooze picker from the dock chip. Stubbed.
     public func snoozeFromDock() {
         toast = "Snooze options"
     }
@@ -112,14 +162,14 @@ public final class MailTaskViewModel {
 
     /// Open the originating mail (`SourceMailCard` tap).
     public func openSourceMail() {
-        guard case let .loaded(content) = state else { return }
-        onOpenMail(content.source.mailId)
+        guard case let .loaded(content) = state, let source = content.source else { return }
+        onOpenMail(source.mailId)
     }
 
     /// Open the next-up suggestion (`NextUpCard` tap, done frame).
     public func openNextUp() {
-        guard case let .loaded(content) = state else { return }
-        onOpenMail(content.nextUp.mailId)
+        guard case let .loaded(content) = state, let nextUp = content.nextUp else { return }
+        onOpenMail(nextUp.mailId)
     }
 
     /// Add-a-step affordance on the checklist header. Stubbed.
@@ -141,4 +191,92 @@ public final class MailTaskViewModel {
     public func archive() {
         toast = "Archived"
     }
+
+    // MARK: - DTO → projection
+
+    private static func content(from dto: P3TaskDTO) -> MailTaskContent {
+        let priority = MailTaskPriority(rawValue: dto.priority ?? "medium") ?? .medium
+        let isDone = (dto.status ?? "") == "completed"
+        return MailTaskContent(
+            taskId: dto.id,
+            timeLabel: timeLabel(createdAt: dto.createdAt),
+            title: dto.title,
+            reference: dto.description ?? "",
+            priority: priority,
+            due: due(from: dto.dueAt),
+            source: source(from: dto),
+            isDone: isDone
+        )
+    }
+
+    private static func source(from dto: P3TaskDTO) -> MailTaskSourceMail? {
+        guard let mailId = dto.mailId, !mailId.isEmpty else { return nil }
+        return MailTaskSourceMail(
+            mailId: mailId,
+            categoryLabel: "Mail",
+            sender: dto.mailSender ?? "",
+            title: dto.mailPreview ?? "Original mail",
+            snippet: "",
+            time: ""
+        )
+    }
+
+    private static func timeLabel(createdAt: String?) -> String {
+        guard let createdAt, let date = parseDate(createdAt) else { return "Auto-created" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return "Auto-created · \(formatter.localizedString(for: date, relativeTo: Date()))"
+    }
+
+    private static func due(from dueAt: String?) -> MailTaskDue? {
+        guard let dueAt, let date = parseDate(dueAt) else { return nil }
+        let calendar = Calendar.current
+        return MailTaskDue(
+            weekday: weekdayFormatter.string(from: date).uppercased(),
+            day: String(calendar.component(.day, from: date)),
+            month: monthFormatter.string(from: date).uppercased(),
+            label: dueLabel(for: date, calendar: calendar),
+            time: timeFormatter.string(from: date),
+            // No backend source — the live path hides the DueSnoozeCard that
+            // would render these, so they stay blank rather than faked.
+            left: "",
+            reminderLabel: "",
+            closesLabel: ""
+        )
+    }
+
+    private static func dueLabel(for date: Date, calendar: Calendar) -> String {
+        if calendar.isDateInToday(date) { return "Due today" }
+        if calendar.isDateInTomorrow(date) { return "Due tomorrow" }
+        return "Due \(dayMonthFormatter.string(from: date))"
+    }
+
+    // MARK: - Date parsing / formatting
+
+    private static func parseDate(_ value: String) -> Date? {
+        isoFractional.date(from: value)
+            ?? isoPlain.date(from: value)
+            ?? dateOnlyFormatter.date(from: value)
+    }
+
+    private static let isoFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let isoPlain = ISO8601DateFormatter()
+
+    private static func displayFormatter(_ pattern: String) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = pattern
+        return formatter
+    }
+
+    private static let dateOnlyFormatter = displayFormatter("yyyy-MM-dd")
+    private static let weekdayFormatter = displayFormatter("EEE")
+    private static let monthFormatter = displayFormatter("MMM")
+    private static let timeFormatter = displayFormatter("h:mm a")
+    private static let dayMonthFormatter = displayFormatter("MMM d")
 }

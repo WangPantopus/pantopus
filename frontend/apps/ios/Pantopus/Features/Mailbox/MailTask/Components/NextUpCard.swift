@@ -78,8 +78,12 @@ struct NextUpCard: View {
 
 #if DEBUG
 #Preview {
-    NextUpCard(nextUp: MailTaskSampleData.task().nextUp) {}
-        .padding()
-        .background(Theme.Color.appBg)
+    Group {
+        if let nextUp = MailTaskSampleData.task().nextUp {
+            NextUpCard(nextUp: nextUp) {}
+        }
+    }
+    .padding()
+    .background(Theme.Color.appBg)
 }
 #endif

@@ -8,14 +8,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.SavedStateHandle
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.DueSnoozeCard
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.SourceMailCard
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.SubtaskChecklist
 import app.pantopus.android.ui.screens.mailbox.mail_task.components.TaskCard
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.Spacing
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -84,7 +87,7 @@ class MailTaskSnapshotTest {
     fun due_snooze_card() {
         val task = MailTaskSampleData.task()
         paparazzi.snapshot {
-            Root { DueSnoozeCard(due = task.due, options = task.snoozeOptions, onSnooze = {}) }
+            Root { DueSnoozeCard(due = requireNotNull(task.due), options = task.snoozeOptions, onSnooze = {}) }
         }
     }
 
@@ -104,13 +107,13 @@ class MailTaskSnapshotTest {
 
     @Test
     fun source_mail_card() {
-        paparazzi.snapshot { Root { SourceMailCard(source = MailTaskSampleData.task().source, onOpen = {}) } }
+        paparazzi.snapshot { Root { SourceMailCard(source = requireNotNull(MailTaskSampleData.task().source), onOpen = {}) } }
     }
 
     @Test
     fun completion_summary_card() {
         paparazzi.snapshot {
-            Root { CompletionSummaryCard(completion = MailTaskSampleData.task(done = true).completion) }
+            Root { CompletionSummaryCard(completion = requireNotNull(MailTaskSampleData.task(done = true).completion)) }
         }
     }
 
@@ -119,7 +122,7 @@ class MailTaskSnapshotTest {
         paparazzi.snapshot {
             Root {
                 app.pantopus.android.ui.screens.mailbox.mail_task.components
-                    .NextUpCard(nextUp = MailTaskSampleData.task(done = true).nextUp, onOpen = {})
+                    .NextUpCard(nextUp = requireNotNull(MailTaskSampleData.task(done = true).nextUp), onOpen = {})
             }
         }
     }
@@ -138,7 +141,10 @@ class MailTaskSnapshotTest {
     }
 
     private fun loadedViewModel(seed: MailTaskSeed): MailTaskViewModel =
-        MailTaskViewModel("t_412elm", seed).apply {
+        MailTaskViewModel(
+            repository = mockk<MailboxRepository>(relaxed = true),
+            savedStateHandle = SavedStateHandle(mapOf(MAIL_TASK_TASK_ID_KEY to "t_412elm")),
+        ).apply {
             configureSeed(seed)
             load()
         }

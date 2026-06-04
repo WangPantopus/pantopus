@@ -170,7 +170,7 @@ public final class WalletViewModel {
         return WalletActivityItem(
             id: tx.id,
             day: dayLabel(date, calendar: calendar, now: now),
-            dateLabel: timeLabel(date),
+            dateLabel: timeLabel(date, calendar: calendar),
             description: tx.description ?? typeLabel(for: tx.type),
             counterparty: counterpartyLabel(for: tx.type),
             category: category(for: tx.type),
@@ -338,10 +338,12 @@ public final class WalletViewModel {
     }
 
     /// Time-of-day sub-label: "2:14 pm".
-    static func timeLabel(_ date: Date?) -> String {
+    static func timeLabel(_ date: Date?, calendar: Calendar = .current) -> String {
         guard let date else { return "" }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "h:mm a"
         formatter.amSymbol = "am"
         formatter.pmSymbol = "pm"

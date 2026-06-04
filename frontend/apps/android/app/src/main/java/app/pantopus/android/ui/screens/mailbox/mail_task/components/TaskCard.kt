@@ -56,8 +56,12 @@ fun TaskCard(
             TopRow(content = content)
             Spacer(modifier = Modifier.height(Spacing.s3))
             TitleRow(content = content)
-            Spacer(modifier = Modifier.height(14.dp))
-            Progress(content = content, accent = accent)
+            // The step checklist has no backend source on the live path, so
+            // hide the progress bar when there are no subtasks.
+            if (content.totalSteps > 0) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Progress(content = content, accent = accent)
+            }
             Spacer(modifier = Modifier.height(14.dp))
             DueChip(content = content)
         }
@@ -226,25 +230,30 @@ fun MailTaskProgressTrack(
 @Composable
 private fun DueChip(content: MailTaskContent) {
     if (content.isDone) {
+        val completion = content.completion
         Chip(
             icon = PantopusIcon.CheckCircle,
             tint = PantopusColors.success,
             background = PantopusColors.successBg,
             border = PantopusColors.successLight,
-            bold = content.completion.stamp,
-            trailing = "· ${content.completion.note}",
+            bold = completion?.stamp ?: "Completed",
+            trailing = completion?.let { "· ${it.note}" }.orEmpty(),
         )
     } else {
-        Chip(
-            icon = PantopusIcon.Clock,
-            tint = PantopusColors.error,
-            background = PantopusColors.errorBg,
-            border = PantopusColors.errorLight,
-            bold = content.due.label,
-            trailing =
-                "· ${titleCase(content.due.weekday)} ${titleCase(content.due.month)} " +
-                    "${content.due.day} · ${content.due.time}",
-        )
+        // No backend due date → no chip rather than a faked one.
+        val due = content.due
+        if (due != null) {
+            Chip(
+                icon = PantopusIcon.Clock,
+                tint = PantopusColors.error,
+                background = PantopusColors.errorBg,
+                border = PantopusColors.errorLight,
+                bold = due.label,
+                trailing =
+                    "· ${titleCase(due.weekday)} ${titleCase(due.month)} " +
+                        "${due.day} · ${due.time}",
+            )
+        }
     }
 }
 

@@ -46,6 +46,8 @@ fun HomeSettingsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val navigation by viewModel.navigation.collectAsStateWithLifecycle()
+    val identity by viewModel.identity.collectAsStateWithLifecycle()
+    val footerCaption by viewModel.footerCaption.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(navigation) {
@@ -58,14 +60,14 @@ fun HomeSettingsScreen(
     GroupedListScreen(
         title = viewModel.title,
         state = state,
-        footerCaption = viewModel.footerCaption,
+        footerCaption = footerCaption,
         callbacks =
             GroupedListCallbacks(
                 onBack = onBack,
                 onTapRow = viewModel::onRow,
-                onRetry = viewModel::load,
+                onRetry = viewModel::refresh,
             ),
-        header = { HomeSettingsIdentityCard(identity = viewModel.identity) },
+        header = { HomeSettingsIdentityCard(identity = identity) },
     )
 }
 

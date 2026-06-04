@@ -58,10 +58,11 @@ final class MailTaskSnapshotTests: XCTestCase {
         assertRenders(TaskCard(content: MailTaskSampleData.task(done: true)), size: CGSize(width: 390, height: 280))
     }
 
-    func test_dueSnoozeCard_renders() {
+    func test_dueSnoozeCard_renders() throws {
         let task = MailTaskSampleData.task()
+        let due = try XCTUnwrap(task.due)
         assertRenders(
-            DueSnoozeCard(due: task.due, options: task.snoozeOptions) { _ in },
+            DueSnoozeCard(due: due, options: task.snoozeOptions) { _ in },
             size: CGSize(width: 390, height: 240)
         )
     }
@@ -78,23 +79,26 @@ final class MailTaskSnapshotTests: XCTestCase {
         )
     }
 
-    func test_sourceMailCard_renders() {
+    func test_sourceMailCard_renders() throws {
+        let source = try XCTUnwrap(MailTaskSampleData.task().source)
         assertRenders(
-            SourceMailCard(source: MailTaskSampleData.task().source) {},
+            SourceMailCard(source: source) {},
             size: CGSize(width: 390, height: 220)
         )
     }
 
-    func test_completionSummary_renders() {
+    func test_completionSummary_renders() throws {
+        let completion = try XCTUnwrap(MailTaskSampleData.task(done: true).completion)
         assertRenders(
-            CompletionSummaryCard(completion: MailTaskSampleData.task(done: true).completion),
+            CompletionSummaryCard(completion: completion),
             size: CGSize(width: 390, height: 240)
         )
     }
 
-    func test_nextUpCard_renders() {
+    func test_nextUpCard_renders() throws {
+        let nextUp = try XCTUnwrap(MailTaskSampleData.task(done: true).nextUp)
         assertRenders(
-            NextUpCard(nextUp: MailTaskSampleData.task(done: true).nextUp) {},
+            NextUpCard(nextUp: nextUp) {},
             size: CGSize(width: 390, height: 140)
         )
     }

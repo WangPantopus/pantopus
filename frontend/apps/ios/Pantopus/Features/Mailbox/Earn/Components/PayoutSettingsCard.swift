@@ -202,10 +202,10 @@ struct EarnPayoutNudge: View {
 
 #Preview("Payout settings") {
     VStack(spacing: Spacing.s4) {
-        EarnPayoutSettingsCard(
-            method: EarnSampleData.populated.payoutMethod,
-            autoCashOut: EarnSampleData.populated.autoCashOut
-        )
+        if let method = EarnSampleData.populated.payoutMethod,
+           let autoCashOut = EarnSampleData.populated.autoCashOut {
+            EarnPayoutSettingsCard(method: method, autoCashOut: autoCashOut)
+        }
         EarnPayoutNudge()
     }
     .padding(Spacing.s4)

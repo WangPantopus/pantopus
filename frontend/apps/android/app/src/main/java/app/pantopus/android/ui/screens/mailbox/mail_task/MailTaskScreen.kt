@@ -63,7 +63,7 @@ fun MailTaskScreen(
     onBack: () -> Unit,
     onOpenMail: (String) -> Unit = {},
     viewModel: MailTaskViewModel = hiltViewModel(),
-    seed: MailTaskSeed = MailTaskSeed.Active,
+    seed: MailTaskSeed? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
@@ -71,7 +71,8 @@ fun MailTaskScreen(
 
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(onOpenMail = onOpenMail, onBack = onBack)
-        viewModel.configureSeed(seed)
+        // A non-null seed is the preview/test seam; live leaves it null to fetch.
+        seed?.let { viewModel.configureSeed(it) }
         viewModel.load()
     }
     LaunchedEffect(toast) {
@@ -96,7 +97,7 @@ fun MailTaskScreen(
                 is MailTaskUiState.Error ->
                     MailTaskErrorBody(
                         message = current.message,
-                        onRetry = { viewModel.refresh() },
+                        onRetry = { viewModel.retry() },
                         modifier = Modifier.weight(1f),
                     )
             }
@@ -178,14 +179,7 @@ private fun TopBar(onBack: () -> Unit) {
             NavIcon(icon = PantopusIcon.Share, label = "Share")
             NavIcon(icon = PantopusIcon.MoreHorizontal, label = "More")
         }
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(PantopusColors.appBorderSubtle),
-        )
+        Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
     }
 }
 
@@ -203,38 +197,6 @@ private fun NavIcon(
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(icon = icon, contentDescription = label, size = 18.dp, tint = PantopusColors.appTextStrong)
-    }
-}
-
-// MARK: - Error body
-
-@Composable
-private fun MailTaskErrorBody(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(Spacing.s4)
-                .testTag("mailTask_error"),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = "Couldn't load this task",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appTextStrong,
-        )
-        Spacer(modifier = Modifier.height(Spacing.s2))
-        Text(text = message, fontSize = 13.sp, color = PantopusColors.appTextSecondary)
-        Spacer(modifier = Modifier.height(Spacing.s3))
-        TextButton(onClick = onRetry, modifier = Modifier.testTag("mailTask_retry")) {
-            Text(text = "Retry", color = PantopusColors.primary600, fontWeight = FontWeight.Bold)
-        }
     }
 }
 
@@ -256,18 +218,15 @@ private fun LoadedBody(
                     .padding(top = Spacing.s3, bottom = Spacing.s6),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // The AI elf, subtask checklist, snooze, completion summary,
+            // next-up, and delegate hint have no backend source on the live
+            // task API, so they only render when the projection carries them
+            // (the sample/preview path) — never faked from live data.
             HeaderRow(content = content)
             TaskCard(content = content)
-            // Enrichment surfaces (elf / sub-tasks / completion / next-up) have
-            // no source on `/p3/tasks`; they render only when populated (sample
-            // previews), so the live screen hides them rather than seeding them.
-            if (content.elf.bullets.isNotEmpty()) {
-                TaskElfStrip(elf = content.elf)
-            }
+            content.elf?.let { TaskElfStrip(elf = it) }
             if (content.isDone) {
-                if (content.completion.rows.isNotEmpty()) {
-                    CompletionSummaryCard(completion = content.completion)
-                }
+                content.completion?.let { CompletionSummaryCard(completion = it) }
                 if (content.subtasks.isNotEmpty()) {
                     SubtaskChecklist(
                         subtasks = content.subtasks,
@@ -276,14 +235,14 @@ private fun LoadedBody(
                         onAddStep = { viewModel.addStep() },
                     )
                 }
-                if (content.source.mailId.isNotBlank()) {
-                    SourceMailCard(source = content.source, onOpen = { viewModel.openSourceMail() })
+                content.source?.let { source ->
+                    SourceMailCard(source = source, onOpen = { viewModel.openSourceMail() })
                 }
-                if (content.nextUp.mailId.isNotBlank()) {
-                    NextUpCard(nextUp = content.nextUp, onOpen = { viewModel.openNextUp() })
+                content.nextUp?.let { nextUp ->
+                    NextUpCard(nextUp = nextUp, onOpen = { viewModel.openNextUp() })
                 }
             } else {
-                if (content.due.label.isNotBlank()) {
+                if (content.due != null && content.snoozeOptions.isNotEmpty()) {
                     DueSnoozeCard(
                         due = content.due,
                         options = content.snoozeOptions,
@@ -298,10 +257,12 @@ private fun LoadedBody(
                         onAddStep = { viewModel.addStep() },
                     )
                 }
-                if (content.source.mailId.isNotBlank()) {
-                    SourceMailCard(source = content.source, onOpen = { viewModel.openSourceMail() })
+                content.source?.let { source ->
+                    SourceMailCard(source = source, onOpen = { viewModel.openSourceMail() })
                 }
-                DelegateHintCard(onTap = { viewModel.delegate() })
+                if (content.elf != null) {
+                    DelegateHintCard(onTap = { viewModel.delegate() })
+                }
             }
         }
         ActionDock(content = content, viewModel = viewModel)
@@ -438,7 +399,8 @@ private fun DockPrimary(
                     } else {
                         Modifier.border(1.5.dp, PantopusColors.primary200, RoundedCornerShape(14.dp))
                     },
-                ).clickable { onClick() }
+                )
+                .clickable { onClick() }
                 .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,

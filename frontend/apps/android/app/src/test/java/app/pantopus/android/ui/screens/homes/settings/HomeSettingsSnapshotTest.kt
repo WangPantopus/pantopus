@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.SavedStateHandle
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListCallbacks
@@ -41,7 +40,7 @@ class HomeSettingsSnapshotTest {
     fun home_settings_populated() {
         paparazzi.snapshot {
             Frame {
-                renderFrame(HomeSettingsSampleData.Frame.Populated, homeId = "home-1")
+                renderFrame(HomeSettingsSampleData.Frame.Populated)
             }
         }
     }
@@ -50,29 +49,19 @@ class HomeSettingsSnapshotTest {
     fun home_settings_pending() {
         paparazzi.snapshot {
             Frame {
-                renderFrame(HomeSettingsSampleData.Frame.Pending, homeId = "pending-1")
+                renderFrame(HomeSettingsSampleData.Frame.Pending)
             }
         }
     }
 
     @Composable
-    private fun renderFrame(
-        frame: HomeSettingsSampleData.Frame,
-        homeId: String,
-    ) {
-        // Build a fully-resolved Loaded state from the deterministic
-        // sample data so the snapshot doesn't depend on coroutine
-        // dispatching.
-        val vm =
-            HomeSettingsViewModel(
-                savedStateHandle = SavedStateHandle(mapOf(HOME_SETTINGS_HOME_ID_KEY to homeId)),
-            )
-        vm.load()
-        val state = vm.state.value as GroupedListUiState.Loaded
+    private fun renderFrame(frame: HomeSettingsSampleData.Frame) {
+        // Render the deterministic sample projection directly so the
+        // snapshot doesn't depend on the view-model's live fetch.
         GroupedListScreen(
-            title = vm.title,
-            state = state,
-            footerCaption = vm.footerCaption,
+            title = "Home settings",
+            state = GroupedListUiState.Loaded(HomeSettingsSampleData.sampleGroups(frame)),
+            footerCaption = HomeSettingsSampleData.footer(frame),
             callbacks = GroupedListCallbacks(onBack = {}),
             header = { HomeSettingsIdentityCard(identity = HomeSettingsSampleData.identity(frame)) },
         )

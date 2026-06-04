@@ -60,7 +60,11 @@ struct WeeklyGoalCard: View {
 }
 
 #Preview("WeeklyGoalCard") {
-    WeeklyGoalCard(goal: EarnSampleData.populated.weeklyGoal)
-        .padding(Spacing.s4)
-        .background(Theme.Color.appBg)
+    Group {
+        if let goal = EarnSampleData.populated.weeklyGoal {
+            WeeklyGoalCard(goal: goal)
+        }
+    }
+    .padding(Spacing.s4)
+    .background(Theme.Color.appBg)
 }

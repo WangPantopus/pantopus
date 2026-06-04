@@ -1,6 +1,8 @@
 package app.pantopus.android.data.mailbox
 
 import app.pantopus.android.data.api.models.mailbox.AckResponse
+import app.pantopus.android.data.api.models.mailbox.EarningsHistoryResponse
+import app.pantopus.android.data.api.models.mailbox.EarningsSummaryResponse
 import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.models.mailbox.MailboxListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpRequest
@@ -13,6 +15,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.LogEventResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2ItemResponse
+import app.pantopus.android.data.api.models.mailbox.v2.P3TaskResponse
+import app.pantopus.android.data.api.models.mailbox.v2.P3TaskUpdateRequest
 import app.pantopus.android.data.api.models.mailbox.v2.P3TasksResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateRequest
@@ -36,6 +40,7 @@ import javax.inject.Singleton
  * [NetworkResult] taxonomy.
  */
 @Singleton
+@Suppress("TooManyFunctions")
 class MailboxRepository
     @Inject
     constructor(
@@ -131,6 +136,21 @@ class MailboxRepository
 
         /** `GET /api/mailbox/v2/p3/tasks` — mail-linked tasks (active / completed). */
         suspend fun p3Tasks(homeId: String? = null): NetworkResult<P3TasksResponse> = safeApiCall { v2Api.p3Tasks(homeId) }
+
+        /** `GET /api/mailbox/earnings/summary` — Earn dashboard balance. */
+        suspend fun earningsSummary(): NetworkResult<EarningsSummaryResponse> = safeApiCall { mailboxApi.earningsSummary() }
+
+        /** `GET /api/mailbox/earnings/history` — Earn dashboard recent earnings. */
+        suspend fun earningsHistory(
+            limit: Int = 50,
+            offset: Int = 0,
+        ): NetworkResult<EarningsHistoryResponse> = safeApiCall { mailboxApi.earningsHistory(limit, offset) }
+
+        /** `PATCH /api/mailbox/v2/p3/tasks/:id` — partial task update. */
+        suspend fun updateP3Task(
+            taskId: String,
+            request: P3TaskUpdateRequest,
+        ): NetworkResult<P3TaskResponse> = safeApiCall { v2Api.updateP3Task(taskId, request) }
 
         /** `GET /api/mailbox/v2/earn/balance` — cleared / pending payout sums. */
         suspend fun earnBalance(): NetworkResult<EarnBalanceResponse> = safeApiCall { v2Api.earnBalance() }

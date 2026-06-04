@@ -193,30 +193,33 @@ struct EarnLockedRow: View {
 /// the Wallet activity palette, reusing the same tokens so the two
 /// surfaces read as siblings.
 enum EarnCategoryPalette {
-    static func background(for category: EarnCategory) -> Color {
+    static func background(for category: EarnCategory?) -> Color {
         switch category {
         case .cleaning: Theme.Color.homeBg
         case .childCare: Theme.Color.warmAmberBg
         case .handyman: Theme.Color.handyman.opacity(0.18)
         case .petCare: Theme.Color.errorLight
+        case nil: Theme.Color.appSurfaceSunken
         }
     }
 
-    static func foreground(for category: EarnCategory) -> Color {
+    static func foreground(for category: EarnCategory?) -> Color {
         switch category {
         case .cleaning: Theme.Color.homeDark
         case .childCare: Theme.Color.warmAmber
         case .handyman: Theme.Color.handyman
         case .petCare: Theme.Color.error
+        case nil: Theme.Color.appTextSecondary
         }
     }
 
-    static func icon(for category: EarnCategory) -> PantopusIcon {
+    static func icon(for category: EarnCategory?) -> PantopusIcon {
         switch category {
         case .cleaning: .sparkles
         case .childCare: .baby
         case .handyman: .wrench
         case .petCare: .dog
+        case nil: .mailOpen
         }
     }
 }

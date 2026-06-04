@@ -173,6 +173,6 @@ private fun Footer() {
 @Composable
 private fun SourceMailCardPreview() {
     Box(modifier = Modifier.background(PantopusColors.appBg).padding(Spacing.s4)) {
-        SourceMailCard(source = MailTaskSampleData.task().source, onOpen = {})
+        SourceMailCard(source = requireNotNull(MailTaskSampleData.task().source), onOpen = {})
     }
 }
