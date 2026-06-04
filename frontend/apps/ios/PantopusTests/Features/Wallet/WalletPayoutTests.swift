@@ -27,7 +27,8 @@ final class WalletPayoutTests: XCTestCase {
     private static let connectEnabledJSON =
         #"{"account":{"stripe_account_id":"acct_1","charges_enabled":true,"payouts_enabled":true,"details_submitted":true}}"#
     private static let withdrawOkJSON =
-        #"{"success":true,"message":"$847.50 withdrawal initiated.","transaction":{"id":"wtx1","type":"withdrawal","amount":84750,"status":"completed"}}"#
+        #"{"success":true,"message":"$847.50 withdrawal initiated.","#
+            + #""transaction":{"id":"wtx1","type":"withdrawal","amount":84750,"status":"completed"}}"#
 
     /// Live-fetch reads 4 endpoints in order: balance, transactions,
     /// pending-release, connect/account.

@@ -66,7 +66,8 @@ final class GigTipTests: XCTestCase {
     // MARK: - Send tip round-trip
 
     private static let gigEnvelope =
-        #"{"gig":{"id":"g1","title":"Patio cleanup","user_id":"owner-1","status":"completed","accepted_by":"worker-1","owner_confirmed_at":"2026-06-01T00:00:00Z"}}"#
+        #"{"gig":{"id":"g1","title":"Patio cleanup","user_id":"owner-1","status":"completed","#
+            + #""accepted_by":"worker-1","owner_confirmed_at":"2026-06-01T00:00:00Z"}}"#
     private static let bidsJSON = #"{"bids":[]}"#
     private static let tipJSON =
         #"{"success":true,"clientSecret":"pi_tip","paymentId":"pay-tip-1","customer":"cus","ephemeralKey":"ek","publishableKey":"pk"}"#

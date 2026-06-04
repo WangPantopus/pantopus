@@ -238,6 +238,23 @@ extension GigDetailViewModel {
         primary: ContentDetailDockButton(label: "Send a tip", icon: .handCoins)
     )
 
+    /// V2 dock: tip (poster, completed) → mark-delivered (worker, in-progress)
+    /// → place-bid. Factored out to keep `projectTaskV2` under the body-length
+    /// limit.
+    private static func taskV2Dock(canMarkDelivered: Bool, canTip: Bool) -> ContentDetailDock {
+        if canTip { return tipDock }
+        if canMarkDelivered {
+            return ContentDetailDock(
+                secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                primary: ContentDetailDockButton(label: "Mark as delivered", icon: .checkCheck)
+            )
+        }
+        return ContentDetailDock(
+            secondary: ContentDetailDockButton(label: "Message", icon: .send),
+            primary: ContentDetailDockButton(label: "Place bid")
+        )
+    }
+
     // MARK: V2 (Task) — Magic Task surface
 
     private static func projectTaskV2(
@@ -299,19 +316,7 @@ extension GigDetailViewModel {
         let statusPill = canMarkDelivered
             ? ContentDetailPill(label: "In progress", icon: .circle, tone: .warning)
             : ContentDetailPill(label: statusLabel, icon: .circle, tone: .warning)
-        let dock: ContentDetailDock = if canTip {
-            tipDock
-        } else if canMarkDelivered {
-            ContentDetailDock(
-                secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                primary: ContentDetailDockButton(label: "Mark as delivered", icon: .checkCheck)
-            )
-        } else {
-            ContentDetailDock(
-                secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                primary: ContentDetailDockButton(label: "Place bid")
-            )
-        }
+        let dock = taskV2Dock(canMarkDelivered: canMarkDelivered, canTip: canTip)
         return ContentDetailContent(
             kind: .gig,
             statusPill: statusPill,
