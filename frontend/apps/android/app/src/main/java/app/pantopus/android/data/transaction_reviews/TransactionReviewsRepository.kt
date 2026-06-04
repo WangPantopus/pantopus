@@ -24,6 +24,5 @@ class TransactionReviewsRepository
         suspend fun create(body: CreateTransactionReviewBody): NetworkResult<CreateTransactionReviewResponse> =
             safeApiCall { api.create(body) }
 
-        suspend fun userReviews(userId: String): NetworkResult<TransactionReviewsResponse> =
-            safeApiCall { api.userReviews(userId) }
+        suspend fun userReviews(userId: String): NetworkResult<TransactionReviewsResponse> = safeApiCall { api.userReviews(userId) }
     }

@@ -17,22 +17,26 @@ import java.time.Instant
 class ReceivedReviewsViewModelTest {
     private val now: Instant = Instant.parse("2026-05-15T12:00:00Z")
 
+    private data class ReviewRatings(
+        val overall: Int,
+        val communication: Int? = null,
+        val accuracy: Int? = null,
+        val punctuality: Int? = null,
+    )
+
     private fun review(
         id: String,
-        rating: Int,
-        communication: Int? = null,
-        accuracy: Int? = null,
-        punctuality: Int? = null,
+        ratings: ReviewRatings,
         isBuyer: Boolean? = null,
         context: String = "listing_sale",
         reviewer: TransactionReviewerDto? = null,
     ) = TransactionReviewDto(
         id = id,
         context = context,
-        rating = rating,
-        communicationRating = communication,
-        accuracyRating = accuracy,
-        punctualityRating = punctuality,
+        rating = ratings.overall,
+        communicationRating = ratings.communication,
+        accuracyRating = ratings.accuracy,
+        punctualityRating = ratings.punctuality,
         isBuyer = isBuyer,
         createdAt = "2026-05-14T12:00:00Z",
         reviewer = reviewer,
@@ -44,9 +48,17 @@ class ReceivedReviewsViewModelTest {
             TransactionReviewsResponse(
                 reviews =
                     listOf(
-                        review(id = "r1", rating = 5, communication = 5, accuracy = 4, isBuyer = true),
-                        review(id = "r2", rating = 4, communication = 3, punctuality = 4, isBuyer = false),
-                        review(id = "r3", rating = 5),
+                        review(
+                            id = "r1",
+                            ratings = ReviewRatings(overall = 5, communication = 5, accuracy = 4),
+                            isBuyer = true,
+                        ),
+                        review(
+                            id = "r2",
+                            ratings = ReviewRatings(overall = 4, communication = 3, punctuality = 4),
+                            isBuyer = false,
+                        ),
+                        review(id = "r3", ratings = ReviewRatings(overall = 5)),
                     ),
                 averageRating = 4.67,
                 total = 3,
@@ -76,17 +88,17 @@ class ReceivedReviewsViewModelTest {
                     listOf(
                         review(
                             id = "r1",
-                            rating = 5,
+                            ratings = ReviewRatings(overall = 5),
                             isBuyer = true,
                             reviewer = TransactionReviewerDto(id = "a", firstName = "Anika", lastName = "Reyes"),
                         ),
                         review(
                             id = "r2",
-                            rating = 4,
+                            ratings = ReviewRatings(overall = 4),
                             isBuyer = false,
                             reviewer = TransactionReviewerDto(id = "b", username = "marcus"),
                         ),
-                        review(id = "r3", rating = 3),
+                        review(id = "r3", ratings = ReviewRatings(overall = 3)),
                     ),
                 averageRating = 4.0,
                 total = 3,
@@ -108,7 +120,7 @@ class ReceivedReviewsViewModelTest {
     fun summarize_omits_criteria_when_all_null() {
         val response =
             TransactionReviewsResponse(
-                reviews = listOf(review(id = "r1", rating = 5)),
+                reviews = listOf(review(id = "r1", ratings = ReviewRatings(overall = 5))),
                 averageRating = 5.0,
                 total = 1,
             )

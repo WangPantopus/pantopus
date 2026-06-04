@@ -61,7 +61,7 @@ public final class ReceivedReviewsViewModel {
     private let now: @Sendable () -> Date
     private var loadedOnce = false
 
-    public init(
+    init(
         userId: String,
         api: APIClient = .shared,
         now: @escaping @Sendable () -> Date = { Date() }
@@ -163,7 +163,7 @@ public final class ReceivedReviewsViewModel {
 
     static func initials(from name: String) -> String {
         let parts = name.split(separator: " ").prefix(2)
-        let letters = parts.compactMap { $0.first }.map(String.init)
+        let letters = parts.compactMap(\.first).map(String.init)
         let joined = letters.joined().uppercased()
         return joined.isEmpty ? "?" : joined
     }

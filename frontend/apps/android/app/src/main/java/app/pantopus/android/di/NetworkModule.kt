@@ -276,8 +276,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideTransactionReviewsApi(retrofit: Retrofit): TransactionReviewsApi =
-        retrofit.create(TransactionReviewsApi::class.java)
+    fun provideTransactionReviewsApi(retrofit: Retrofit): TransactionReviewsApi = retrofit.create(TransactionReviewsApi::class.java)
 
     @Provides
     @Singleton

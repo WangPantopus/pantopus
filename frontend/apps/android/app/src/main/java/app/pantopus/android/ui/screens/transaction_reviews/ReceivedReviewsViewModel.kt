@@ -5,8 +5,8 @@ package app.pantopus.android.ui.screens.transaction_reviews
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.transaction_reviews.TransactionReviewDto
-import app.pantopus.android.data.api.models.transaction_reviews.TransactionReviewsResponse
 import app.pantopus.android.data.api.models.transaction_reviews.TransactionReviewerDto
+import app.pantopus.android.data.api.models.transaction_reviews.TransactionReviewsResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.transaction_reviews.TransactionReviewsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel

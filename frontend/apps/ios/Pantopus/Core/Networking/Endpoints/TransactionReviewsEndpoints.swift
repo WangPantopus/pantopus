@@ -19,7 +19,9 @@ public enum TransactionReviewContext: String, Sendable, Hashable {
     case gig
 
     /// snake_case wire value sent in the POST body.
-    public var wireValue: String { rawValue }
+    public var wireValue: String {
+        rawValue
+    }
 
     /// Short label for the received-reviews row chip.
     public var shortLabel: String {
