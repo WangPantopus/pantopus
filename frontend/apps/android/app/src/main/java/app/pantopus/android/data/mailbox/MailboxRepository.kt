@@ -40,6 +40,7 @@ import javax.inject.Singleton
  * [NetworkResult] taxonomy.
  */
 @Singleton
+@Suppress("TooManyFunctions")
 class MailboxRepository
     @Inject
     constructor(
