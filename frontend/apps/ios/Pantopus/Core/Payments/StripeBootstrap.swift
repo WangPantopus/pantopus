@@ -18,10 +18,14 @@ import StripePaymentSheet
 public enum StripeBootstrap {
     public static func configure(publishableKey: String) {
         let trimmed = publishableKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Skip empty / unsubstituted xcconfig placeholders so a developer
-        // without a key can still launch the app. Real card flows will
-        // surface a backend/Stripe error rather than a crash.
-        guard !trimmed.isEmpty, !trimmed.hasPrefix("$(") else { return }
+        // Skip empty / unsubstituted xcconfig placeholders (including the
+        // pk_test_REPLACE_ME / pk_live_REPLACE_ME committed defaults) so a
+        // developer without a key can still launch, and a misconfigured
+        // release never registers a fake key. Real card flows surface a
+        // backend/Stripe error rather than a crash.
+        guard !trimmed.isEmpty,
+              !trimmed.hasPrefix("$("),
+              !trimmed.contains("REPLACE_ME") else { return }
         StripeAPI.defaultPublishableKey = trimmed
     }
 }
