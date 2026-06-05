@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.businesses.BusinessAccessDto
 import app.pantopus.android.data.api.models.businesses.BusinessCatalogItemDto
 import app.pantopus.android.data.api.models.businesses.BusinessDetailResponse
+import app.pantopus.android.data.api.models.businesses.BusinessFollowResponse
 import app.pantopus.android.data.api.models.businesses.BusinessGeoPoint
 import app.pantopus.android.data.api.models.businesses.BusinessHoursDto
 import app.pantopus.android.data.api.models.businesses.BusinessLocationDto
@@ -157,6 +158,7 @@ class BusinessProfileViewModelTest {
             coEvery { businesses.business("biz-1") } returns NetworkResult.Success(sampleDetail())
             coEvery { businesses.publicBusiness("elmpark-coffee") } returns NetworkResult.Success(samplePublic())
             coEvery { profiles.publicProfile("biz-1") } returns NetworkResult.Success(samplePublicProfile())
+            coEvery { businesses.followBusiness("biz-1") } returns NetworkResult.Success(BusinessFollowResponse(following = true))
 
             val vm = makeVm()
             vm.load()
@@ -232,6 +234,18 @@ class BusinessProfileViewModelTest {
             assertTrue(c.services.isEmpty())
             assertTrue(c.hours.isEmpty())
             assertNull(c.status)
+        }
+
+    @Test
+    fun save_callsFollowEndpointAndEmitsToast() =
+        runTest {
+            coEvery { businesses.followBusiness("biz-1") } returns NetworkResult.Success(BusinessFollowResponse(following = true))
+
+            val vm = makeVm()
+            vm.save()
+
+            assertEquals(BusinessProfileSaveState.Saved, vm.saveState.value)
+            assertEquals("Saved", vm.toastMessage.value)
         }
 
     @Test
@@ -331,6 +345,7 @@ class BusinessProfileViewModelTest {
             coEvery { businesses.business("biz-1") } returns NetworkResult.Success(sampleDetail())
             coEvery { businesses.publicBusiness("elmpark-coffee") } returns NetworkResult.Success(samplePublic())
             coEvery { profiles.publicProfile("biz-1") } returns NetworkResult.Success(samplePublicProfile())
+            coEvery { businesses.followBusiness("biz-1") } returns NetworkResult.Success(BusinessFollowResponse(following = true))
 
             val vm = makeVm()
             vm.load()

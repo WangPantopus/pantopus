@@ -2,6 +2,7 @@ package app.pantopus.android.data.businesses
 
 import app.pantopus.android.data.api.models.businesses.BusinessDashboardResponse
 import app.pantopus.android.data.api.models.businesses.BusinessDetailResponse
+import app.pantopus.android.data.api.models.businesses.BusinessFollowResponse
 import app.pantopus.android.data.api.models.businesses.BusinessInsightsResponse
 import app.pantopus.android.data.api.models.businesses.BusinessOwnerReviewsResponse
 import app.pantopus.android.data.api.models.businesses.BusinessPublicResponse
@@ -51,4 +52,7 @@ open class BusinessesRepository
             reviewId: String,
             response: String,
         ): NetworkResult<Unit> = safeApiCall { api.respondToReview(businessId, reviewId, BusinessReviewRespondRequest(response)) }
+
+        /** P1.6 — save/follow a public business profile. */
+        open suspend fun followBusiness(businessId: String): NetworkResult<BusinessFollowResponse> = safeApiCall { api.follow(businessId) }
     }

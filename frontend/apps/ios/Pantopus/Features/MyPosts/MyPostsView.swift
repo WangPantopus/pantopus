@@ -93,13 +93,13 @@ public struct MyPostsView: View {
         // The VM expects the DTO; we already know the id matches a row.
         // Look up via the loaded state.
         if let dto = currentDTO(for: postId) {
-            viewModel.archive(dto)
+            Task { @MainActor in await viewModel.archive(dto) }
         }
     }
 
     private func restore(postId: String) {
         if let dto = currentDTO(for: postId) {
-            viewModel.unarchive(dto)
+            Task { @MainActor in await viewModel.unarchive(dto) }
         }
     }
 

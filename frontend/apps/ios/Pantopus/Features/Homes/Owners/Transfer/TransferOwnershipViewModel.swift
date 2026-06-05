@@ -5,11 +5,10 @@
 //  A13.4 — Backs the Transfer Ownership form. Holds the recipient
 //  selection, the live transfer amount (1–60% slider), the typed
 //  confirmation field, the bottom-sheet visibility, and the Face ID
-//  authentication state machine. After biometric auth succeeds,
-//  `commitTransfer()` calls `POST /api/homes/:id/owners/transfer`
-//  (route `backend/routes/homeOwnership.js:1526`) and reports success
-//  via a toast + dismiss-host signal — including the co-owner-approval
-//  (quorum) branch. Tests inject `transferExecutor` to bypass the network.
+//  authentication state machine. The current recipient projection is
+//  sample-only, so the live app blocks the backend mutation until recipient
+//  selection is backed by real owner data. Tests can opt into the transfer
+//  executor seam to keep the post-auth state machine covered.
 //
 
 import Foundation
@@ -35,6 +34,7 @@ public final class TransferOwnershipViewModel {
     public let recipient: TransferOwnershipSampleData.RecipientSeed
     public let currentUser: TransferOwnershipSampleData.OwnerSeed
     public let coOwners: [TransferOwnershipSampleData.OwnerSeed]
+    public let recipientIsBackendBacked: Bool
     public let presets: [Int] = TransferOwnershipSampleData.presets
     public let sliderRange: ClosedRange<Int> = TransferOwnershipSampleData.sliderRange
     public let confirmationPhrase: String = TransferOwnershipSampleData.confirmationPhrase
@@ -71,10 +71,12 @@ public final class TransferOwnershipViewModel {
         amount: Int = TransferOwnershipSampleData.defaultAmount,
         api: APIClient = .shared,
         biometricEvaluator: BiometricEvaluator? = nil,
-        transferExecutor: TransferExecutor? = nil
+        transferExecutor: TransferExecutor? = nil,
+        recipientIsBackendBacked: Bool = false
     ) {
         self.homeId = homeId
         self.api = api
+        self.recipientIsBackendBacked = recipientIsBackendBacked
         homeContext = TransferOwnershipSampleData.homeContext(for: homeId)
         recipient = TransferOwnershipSampleData.mayaFortune
         currentUser = TransferOwnershipSampleData.currentUser
@@ -98,7 +100,7 @@ public final class TransferOwnershipViewModel {
 
     /// Whether the sticky CTA is active.
     public var isReadyToCommit: Bool {
-        amount > 0 && amount <= maxAmount && confirmationMatches
+        amount > 0 && amount <= maxAmount && confirmationMatches && recipientIsBackendBacked
     }
 
     /// Whether the host should arm the dirty-close confirm. Any input
@@ -115,7 +117,12 @@ public final class TransferOwnershipViewModel {
     }
 
     public var ctaLabel: String {
-        "Transfer \(amount)% to \(recipient.name.split(separator: " ").first.map(String.init) ?? recipient.name)"
+        if !recipientIsBackendBacked { return "Transfer ownership unavailable" }
+        return "Transfer \(amount)% to \(recipient.name.split(separator: " ").first.map(String.init) ?? recipient.name)"
+    }
+
+    public var setupBlockMessage: String? {
+        recipientIsBackendBacked ? nil : "Recipient selection is not connected to live owner data yet."
     }
 
     public var warningCopy: String {
@@ -225,6 +232,10 @@ public final class TransferOwnershipViewModel {
     }
 
     public func presentConfirmSheet() {
+        if let setupBlockMessage {
+            toast = ToastMessage(text: setupBlockMessage, kind: .error)
+            return
+        }
         guard isReadyToCommit else { return }
         sheetPhase = .visible
         biometricErrorMessage = nil
@@ -262,6 +273,11 @@ public final class TransferOwnershipViewModel {
     }
 
     private func commitTransfer() async {
+        if let setupBlockMessage {
+            sheetPhase = .visible
+            biometricErrorMessage = setupBlockMessage
+            return
+        }
         do {
             let successText: String
             if let transferExecutor {

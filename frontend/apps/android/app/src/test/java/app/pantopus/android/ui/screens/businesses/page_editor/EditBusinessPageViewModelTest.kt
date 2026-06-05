@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -68,6 +69,18 @@ class EditBusinessPageViewModelTest {
             assertTrue(mode is EditBusinessPageMode.Published)
             assertEquals(0, (mode as EditBusinessPageMode.Published).unsavedCount)
             assertEquals("Saved", vm.toast.value)
+        }
+
+    @Test
+    fun liveLoadedSaveDoesNotPretendToPersist() =
+        runTest {
+            val vm = makeVm()
+            vm.load()
+            advanceUntilIdle()
+
+            vm.save()
+
+            assertEquals("Business page editing is not connected to the backend yet.", vm.toast.value)
         }
 
     @Test

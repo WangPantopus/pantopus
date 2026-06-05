@@ -93,6 +93,15 @@ fun PickCategorySearchStep(
         label = state.searchText.trim(),
         onTap = onSubmitCustom,
     )
+
+    state.submitError?.let { message ->
+        Text(
+            text = message,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.error,
+            modifier = Modifier.testTag("createBusinessSubmitError"),
+        )
+    }
 }
 
 // MARK: - Search results header

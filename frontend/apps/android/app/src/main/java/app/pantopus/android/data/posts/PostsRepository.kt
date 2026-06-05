@@ -2,6 +2,7 @@ package app.pantopus.android.data.posts
 
 import app.pantopus.android.data.api.models.feed.FeedResponse
 import app.pantopus.android.data.api.models.posts.MyPostsResponse
+import app.pantopus.android.data.api.models.posts.PostArchiveResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
 import app.pantopus.android.data.api.models.posts.PostCommentsResponse
@@ -83,4 +84,10 @@ class PostsRepository
 
         /** `DELETE /api/posts/:id`. */
         suspend fun deletePost(id: String): NetworkResult<Unit> = safeApiCall { api.deletePost(id) }
+
+        /** `POST /api/posts/:id/archive`. */
+        suspend fun archivePost(id: String): NetworkResult<PostArchiveResponse> = safeApiCall { api.archivePost(id) }
+
+        /** `POST /api/posts/:id/unarchive`. */
+        suspend fun unarchivePost(id: String): NetworkResult<PostArchiveResponse> = safeApiCall { api.unarchivePost(id) }
     }

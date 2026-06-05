@@ -62,15 +62,25 @@ public final class BusinessProfileViewModel {
         await fetch()
     }
 
-    /// Pop the "Save" toast. B3.1 wires the optimistic UX but the backend
-    /// follow endpoint for businesses ships later; until then we just emit
-    /// the toast so the affordance reads as live.
+    /// Save/follow this business through the backend.
     public func save() async {
         guard saveState != .inFlight, saveState != .saved else { return }
         saveState = .inFlight
-        try? await Task.sleep(nanoseconds: 200_000_000)
-        saveState = .saved
-        toastMessage = "Saved"
+        do {
+            let response = try await client.request(
+                BusinessesEndpoints.follow(businessId: businessId),
+                as: BusinessFollowResponse.self
+            )
+            saveState = .saved
+            toastMessage = response.following ? "Saved" : "Updated"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            saveState = .failed(message: message)
+            toastMessage = message
+        } catch {
+            saveState = .failed(message: "Something went wrong. Try again.")
+            toastMessage = "Something went wrong. Try again."
+        }
     }
 
     private func fetch() async {

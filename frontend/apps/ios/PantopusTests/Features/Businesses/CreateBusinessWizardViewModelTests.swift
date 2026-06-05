@@ -4,7 +4,7 @@
 //
 //  Covers the A12.10 Create Business wizard state machine: step
 //  transitions, category selection, search filtering, custom-category
-//  submit stub, and the chrome's dirty-tracking.
+//  backend blocking, and the chrome's dirty-tracking.
 //
 
 import Foundation
@@ -109,13 +109,15 @@ final class CreateBusinessWizardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.pendingEvent, .dismiss)
     }
 
-    func testCustomCategorySubmitStubAdvancesToLegalInfoWithOtherSelected() {
+    func testCustomCategorySubmitStaysOnPickCategoryWithBackendError() {
         let vm = makeVM()
         vm.searchText = "alpaca grooming"
         vm.submitCustomCategory()
-        XCTAssertEqual(vm.selectedCategoryId, .other)
-        XCTAssertEqual(vm.currentStep, .legalInfo)
-        XCTAssertEqual(vm.searchText, "")
+        XCTAssertEqual(vm.selectedCategoryId, .home)
+        XCTAssertEqual(vm.currentStep, .pickCategory)
+        XCTAssertEqual(vm.searchText, "alpaca grooming")
+        XCTAssertEqual(vm.submitError, "Custom categories are not accepted by the backend yet.")
+        XCTAssertFalse(vm.isSubmittingCustom)
     }
 
     func testCustomCategorySubmitNoopOnEmptyQuery() {

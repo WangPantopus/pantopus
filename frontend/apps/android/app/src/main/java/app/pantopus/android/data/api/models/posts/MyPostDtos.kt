@@ -41,3 +41,10 @@ data class MyPostDto(
 data class MyPostsResponse(
     val posts: List<MyPostDto> = emptyList(),
 )
+
+/** Response for `POST /api/posts/:id/archive` and `/unarchive`. */
+@JsonClass(generateAdapter = true)
+data class PostArchiveResponse(
+    val archived: Boolean,
+    @Json(name = "archived_at") val archivedAt: String? = null,
+)

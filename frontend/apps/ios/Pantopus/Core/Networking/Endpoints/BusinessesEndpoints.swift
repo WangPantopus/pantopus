@@ -92,4 +92,10 @@ public enum BusinessesEndpoints {
             body: ["response": response]
         )
     }
+
+    /// `POST /api/businesses/:businessId/follow` — save/follow a public
+    /// business. Route `backend/routes/businesses.js:3621`.
+    public static func follow(businessId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/businesses/\(businessId)/follow")
+    }
 }

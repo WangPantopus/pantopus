@@ -29,6 +29,19 @@ final class TransferOwnershipViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.isReadyToCommit)
     }
 
+    func test_production_default_blocks_sample_recipient_transfer() {
+        let viewModel = TransferOwnershipViewModel(homeId: "preview")
+        viewModel.updateConfirmation("TRANSFER")
+
+        XCTAssertTrue(viewModel.confirmationMatches)
+        XCTAssertFalse(viewModel.isReadyToCommit)
+
+        viewModel.presentConfirmSheet()
+
+        XCTAssertEqual(viewModel.sheetPhase, .hidden)
+        XCTAssertEqual(viewModel.toast?.kind, .error)
+    }
+
     func test_typing_wrong_phrase_does_not_arm_cta() {
         let viewModel = makeViewModel()
         viewModel.updateConfirmation("transfer")
@@ -154,7 +167,8 @@ final class TransferOwnershipViewModelTests: XCTestCase {
             },
             transferExecutor: {
                 if transferShouldThrow { throw StubError() }
-            }
+            },
+            recipientIsBackendBacked: true
         )
     }
 }

@@ -119,3 +119,14 @@ public struct MyPostsResponse: Decodable, Sendable {
         posts = try c.decodeIfPresent([MyPostDTO].self, forKey: .posts) ?? []
     }
 }
+
+/// Response for `POST /api/posts/:id/archive` and `/unarchive`.
+public struct PostArchiveResponse: Decodable, Sendable, Hashable {
+    public let archived: Bool
+    public let archivedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case archived
+        case archivedAt = "archived_at"
+    }
+}

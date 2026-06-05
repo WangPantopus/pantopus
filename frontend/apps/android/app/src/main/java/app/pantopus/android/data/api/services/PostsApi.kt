@@ -2,6 +2,7 @@ package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.feed.FeedResponse
 import app.pantopus.android.data.api.models.posts.MyPostsResponse
+import app.pantopus.android.data.api.models.posts.PostArchiveResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
 import app.pantopus.android.data.api.models.posts.PostCommentsResponse
@@ -20,6 +21,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /** Feed / detail / reaction / comment routes from `backend/routes/posts.js`. */
+@Suppress("TooManyFunctions")
 interface PostsApi {
     /**
      * `GET /api/posts/feed` — paged feed for the Pulse tab. Route
@@ -105,4 +107,16 @@ interface PostsApi {
     suspend fun deletePost(
         @Path("id") id: String,
     )
+
+    /** `POST /api/posts/:id/archive` — author-only archive. */
+    @POST("api/posts/{id}/archive")
+    suspend fun archivePost(
+        @Path("id") id: String,
+    ): PostArchiveResponse
+
+    /** `POST /api/posts/:id/unarchive` — author-only restore. */
+    @POST("api/posts/{id}/unarchive")
+    suspend fun unarchivePost(
+        @Path("id") id: String,
+    ): PostArchiveResponse
 }

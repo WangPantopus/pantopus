@@ -426,3 +426,8 @@ public struct BusinessOwnerReviewsResponse: Decodable, Sendable, Hashable {
     public let reviews: [BusinessOwnerReviewDTO]
     public let total: Int?
 }
+
+/// `POST /api/businesses/:businessId/follow` response.
+public struct BusinessFollowResponse: Decodable, Sendable, Hashable {
+    public let following: Bool
+}

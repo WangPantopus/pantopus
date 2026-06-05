@@ -2496,6 +2496,54 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
+router.post('/:id/archive', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { data: existing } = await supabaseAdmin.from('Post').select('user_id').eq('id', id).single();
+    if (!existing) return res.status(404).json({ error: 'Post not found' });
+    if (existing.user_id !== userId) return res.status(403).json({ error: 'You can only archive your own posts' });
+
+    const archivedAt = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from('Post')
+      .update({ archived_at: archivedAt, updated_at: archivedAt })
+      .eq('id', id);
+    if (error) {
+      logger.error('Error archiving post', { error: error.message, postId: id });
+      return res.status(500).json({ error: 'Failed to archive post' });
+    }
+    res.json({ archived: true, archived_at: archivedAt });
+  } catch (err) {
+    logger.error('Post archive error', { error: err.message, postId: req.params.id });
+    res.status(500).json({ error: 'Failed to archive post' });
+  }
+});
+
+router.post('/:id/unarchive', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { data: existing } = await supabaseAdmin.from('Post').select('user_id').eq('id', id).single();
+    if (!existing) return res.status(404).json({ error: 'Post not found' });
+    if (existing.user_id !== userId) return res.status(403).json({ error: 'You can only restore your own posts' });
+
+    const updatedAt = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from('Post')
+      .update({ archived_at: null, updated_at: updatedAt })
+      .eq('id', id);
+    if (error) {
+      logger.error('Error unarchiving post', { error: error.message, postId: id });
+      return res.status(500).json({ error: 'Failed to restore post' });
+    }
+    res.json({ archived: false, archived_at: null });
+  } catch (err) {
+    logger.error('Post unarchive error', { error: err.message, postId: req.params.id });
+    res.status(500).json({ error: 'Failed to restore post' });
+  }
+});
+
 // ============ MATCHED BUSINESSES (ORGANIC) ============
 
 router.get('/:id/matched-businesses', verifyToken, async (req, res) => {

@@ -47,6 +47,18 @@ final class EditBusinessPageViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.toastMessage, "Saved")
     }
 
+    func test_liveLoadedSaveDoesNotPretendToPersist() async {
+        let viewModel = EditBusinessPageViewModel(businessId: "biz-1")
+        await viewModel.load()
+
+        await viewModel.save()
+
+        XCTAssertEqual(
+            viewModel.toastMessage,
+            "Business page editing is not connected to the backend yet."
+        )
+    }
+
     func test_discardConfirmed_revertsCurrentToOriginal() async {
         var seed = EditBusinessPageSampleData.publishedRoostCafe
         seed = withModifiedName(seed, current: "Roost Café & Bakery")

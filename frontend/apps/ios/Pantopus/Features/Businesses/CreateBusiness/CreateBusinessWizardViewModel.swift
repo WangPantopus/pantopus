@@ -9,11 +9,8 @@
 //  stub-step plumbing once design hands off the remaining frames.
 //
 //  The custom-category submit (search frame's "Add as custom category"
-//  fallback) routes through a stub helper marked TODO — per audit open
-//  question #3 the backend doesn't yet accept the payload. The wizard
-//  surfaces a success-looking advance to step 2 so the UI flow can be
-//  exercised end-to-end against the design; the network call moves
-//  behind a real endpoint once backend ships it.
+//  fallback) stays on step 1 with an explicit backend-unavailable error
+//  until a real custom-category endpoint exists.
 //
 
 import Foundation
@@ -22,7 +19,7 @@ import Observation
 
 /// View model backing `CreateBusinessWizardView`. Owns the step machine,
 /// the category selection, the search query, and the custom-category
-/// submit-stub.
+/// backend-blocked custom-category submit.
 @Observable
 @MainActor
 final class CreateBusinessWizardViewModel: WizardModel {
@@ -100,11 +97,7 @@ final class CreateBusinessWizardViewModel: WizardModel {
         case .profile:
             currentStep = .confirm
         case .confirm:
-            // Stub: confirm step has no real submit yet — pop back to
-            // the host so the design can be exercised without a backend
-            // round-trip. Replaced in the follow-on prompt that builds
-            // the real confirm step.
-            pendingEvent = .dismiss
+            submitError = "Business name, username, and email are required before this can be submitted."
         }
     }
 
@@ -129,26 +122,21 @@ final class CreateBusinessWizardViewModel: WizardModel {
 
     /// Submit the typed search string as a custom category candidate.
     /// Per audit open question #3 the backend doesn't yet accept the
-    /// payload, so this routes through `BusinessesEndpoints.submit-
-    /// CustomCategory` once that lands. For now the helper marks the
-    /// wizard as submitting, advances to the legal-info stub, and logs
-    /// the payload so QA can see it fire.
+    /// payload. Keep the user on the search step with an explicit error
+    /// until a real `POST /api/businesses/custom-categories` route ships.
     func submitCustomCategory() {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isSubmittingCustom else { return }
         isSubmittingCustom = true
         submitError = nil
         // TODO(audit-q3): wire to `POST /api/businesses/custom-categories`
-        // once backend accepts the payload. For now log + advance so
-        // the design flow is exercisable.
+        // once backend accepts the payload.
         logger.info("custom-category submit", metadata: [
             "label": .string(trimmed)
         ])
         Analytics.track(.ctaCreateBusinessCustomCategorySubmit(label: trimmed))
-        selectedCategoryId = .other
-        searchText = ""
         isSubmittingCustom = false
-        currentStep = .legalInfo
+        submitError = "Custom categories are not accepted by the backend yet."
     }
 
     func acknowledgePendingEvent() {
@@ -187,9 +175,11 @@ final class CreateBusinessWizardViewModel: WizardModel {
         case .pickCategory:
             // Disabled if the user is mid-search with no selection.
             selectedCategoryId != nil && !isSubmittingCustom
-        case .legalInfo, .profile, .confirm:
+        case .legalInfo, .profile:
             // Stubs gate the CTA open so the flow can be walked end-to-end.
             true
+        case .confirm:
+            false
         }
     }
 
