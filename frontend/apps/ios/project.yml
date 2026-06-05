@@ -71,6 +71,12 @@ targets:
       - path: Pantopus
         excludes:
           - "**/*.md"
+          # Bundled explicitly below so it always lands in Copy Bundle
+          # Resources (Apple requires PrivacyInfo.xcprivacy at the .app root).
+          - "PrivacyInfo.xcprivacy"
+      # App privacy manifest — see docs/compliance/privacy-data-inventory.md.
+      - path: Pantopus/PrivacyInfo.xcprivacy
+        buildPhase: resources
     resources:
       - path: Pantopus/Resources/Assets.xcassets
       - path: "Pantopus/Preview Content"
