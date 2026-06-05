@@ -286,17 +286,21 @@ enum class AnalyticsResult(
 
 /**
  * Analytics shim. Feature code calls
- * `Analytics.track(AnalyticsEvent.ScreenHubViewed)` and we route to
- * the [Observability] layer (which mirrors into Sentry breadcrumbs).
+ * `Analytics.track(AnalyticsEvent.ScreenHubViewed)` and we fan the event
+ * out to two sinks:
+ *   1. [Observability] — mirrors the event into the Sentry breadcrumb
+ *      stream so it shows up as context on the next crash / error.
+ *   2. [AnalyticsVendor] — the product-analytics vendor (PostHog). Matches
+ *      iOS (same vendor + event names). No-ops until `POSTHOG_API_KEY` is
+ *      configured, so dev / CI stay silent.
  *
  * In Debug builds the event also lands in `Timber` so it shows up in
  * Logcat for quick verification.
- *
- * TODO(analytics): wire this to a real analytics vendor (Amplitude /
- * Mixpanel / PostHog) — today we only mirror events into Sentry.
  */
 object Analytics {
     @Volatile private var observability: Observability? = null
+
+    @Volatile private var vendor: AnalyticsVendor? = null
 
     /**
      * Wire the singleton [Observability] instance into the shim. Call
@@ -305,6 +309,15 @@ object Analytics {
      */
     fun bind(observability: Observability) {
         this.observability = observability
+    }
+
+    /**
+     * Wire the product-analytics vendor. Call once from
+     * `PantopusApplication.onCreate` after [PostHogAnalytics.create]
+     * returns a non-null vendor (blank API key → null → stays a no-op).
+     */
+    fun bindVendor(vendor: AnalyticsVendor?) {
+        this.vendor = vendor
     }
 
     /** For test harnesses to swap the bound observability. */
@@ -324,5 +337,19 @@ object Analytics {
             Timber.tag("analytics").i("📊 ${event.eventName}$props")
         }
         observability?.track(event.eventName, event.properties)
+        vendor?.capture(event.eventName, event.properties)
+    }
+
+    /**
+     * Associate (or, with `null`, clear) the app user id on the analytics
+     * vendor. Mirror of [Observability.identify]; pass the user id only —
+     * never email / name — so the vendor stays pseudonymous.
+     */
+    fun identify(userId: String?) {
+        if (userId != null) {
+            vendor?.identify(userId)
+        } else {
+            vendor?.reset()
+        }
     }
 }

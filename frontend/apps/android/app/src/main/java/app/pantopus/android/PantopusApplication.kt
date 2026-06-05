@@ -2,6 +2,7 @@ package app.pantopus.android
 
 import android.app.Application
 import app.pantopus.android.data.analytics.Analytics
+import app.pantopus.android.data.analytics.PostHogAnalytics
 import app.pantopus.android.data.observability.Observability
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -36,6 +37,16 @@ class PantopusApplication :
         // see Observability.start(). No extra tree needed.
         observability.start(this)
         Analytics.bind(observability)
+
+        // Product analytics (PostHog). No-ops until POSTHOG_API_KEY is set, so
+        // dev / CI builds send nothing. Matches iOS's vendor + event names.
+        Analytics.bindVendor(
+            PostHogAnalytics.create(
+                context = this,
+                apiKey = BuildConfig.POSTHOG_API_KEY,
+                host = BuildConfig.POSTHOG_HOST,
+            ),
+        )
 
         // Phase 3 (3A) — configure the Stripe SDK once at launch with the
         // publishable key from BuildConfig (.env → build.gradle.kts). The SDK

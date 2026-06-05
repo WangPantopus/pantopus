@@ -124,6 +124,7 @@ final class AuthManager {
                 let user = UserDTO(from: response.user)
                 state = .signedIn(user)
                 Observability.shared.identify(userId: user.id, email: user.email)
+                Analytics.identify(userId: user.id)
                 logger.info("Session restored", metadata: ["userId": .string(user.id)])
             } catch {
                 logger.info("Session restore failed, signing out", metadata: ["error": .string("\(error)")])
@@ -153,6 +154,7 @@ final class AuthManager {
             let user = UserDTO(from: response.user)
             state = .signedIn(user)
             Observability.shared.identify(userId: response.user.id, email: response.user.email)
+            Analytics.identify(userId: response.user.id)
             Observability.shared.track("auth.signed_in")
             logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
         } catch let apiError as APIError {
@@ -321,6 +323,7 @@ final class AuthManager {
         state = .signedOut
         SocketClient.shared.disconnect()
         Observability.shared.identify(userId: nil)
+        Analytics.identify(userId: nil)
         Observability.shared.track("auth.signed_out")
     }
 
