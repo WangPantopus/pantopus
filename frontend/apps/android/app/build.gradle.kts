@@ -169,10 +169,11 @@ val requireProdProp = project.findProperty("pantopus.requireProdConfig") as Stri
 val requireProdEnv = System.getenv("PANTOPUS_REQUIRE_PROD_CONFIG")
 val requireProdConfig = (requireProdProp ?: requireProdEnv)?.toBoolean() ?: false
 
-val buildingRelease = gradle.startParameter.taskNames.any { name ->
-    val task = name.substringAfterLast(':')
-    task.endsWith("Release", ignoreCase = true) || task.startsWith("publish")
-}
+val buildingRelease =
+    gradle.startParameter.taskNames.any { name ->
+        val task = name.substringAfterLast(':')
+        task.endsWith("Release", ignoreCase = true) || task.startsWith("publish")
+    }
 
 if (buildingRelease) {
     val apiIsLocal = apiBaseUrl.contains("localhost") || apiBaseUrl.contains("10.0.2.2")
@@ -188,7 +189,7 @@ if (buildingRelease) {
         val detail = problems.joinToString("\n  - ", prefix = "\n  - ")
         val message =
             "Release build is using non-production config:$detail" +
-            "\nSupply PANTOPUS_API_BASE_URL / STRIPE_PUBLISHABLE_KEY via .env or CI secrets."
+                "\nSupply PANTOPUS_API_BASE_URL / STRIPE_PUBLISHABLE_KEY via .env or CI secrets."
         if (requireProdConfig) {
             throw GradleException(message)
         } else {
