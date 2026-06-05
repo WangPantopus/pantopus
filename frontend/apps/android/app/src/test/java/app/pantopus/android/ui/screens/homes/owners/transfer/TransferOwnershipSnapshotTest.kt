@@ -20,8 +20,8 @@ import org.junit.Test
  * A13.4 Paparazzi baselines for the Transfer Ownership form.
  *
  * Locks the two design frames:
- *  - ready: Maya selected, 25% slider, before/after diff, TRANSFER typed,
- *    CTA armed.
+ *  - ready: Maya selected, backend-backed preview recipient, 25% slider,
+ *    before/after diff, TRANSFER typed, CTA armed.
  *  - confirm_sheet: Face ID / biometric bottom sheet over the form's
  *    diff card (rendered standalone so the scrim doesn't dominate the
  *    baseline diff).
@@ -92,6 +92,7 @@ class TransferOwnershipSnapshotTest {
             recipient = TransferOwnershipSampleData.mayaFortune,
             currentUser = TransferOwnershipSampleData.currentUser,
             coOwners = TransferOwnershipSampleData.coOwners,
+            recipientIsBackendBacked = true,
             amount = TransferOwnershipSampleData.DEFAULT_AMOUNT,
             confirmationField =
                 FormFieldState(
