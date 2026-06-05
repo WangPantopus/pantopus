@@ -4,12 +4,14 @@
 //
 //  Typed analytics taxonomy + shim. The taxonomy is closed — any new
 //  event must be added to `AnalyticsEvent` so untyped strings never
-//  reach the wire. In Debug builds events log to the console; in
-//  Release they currently no-op (vendor SDK lands later).
+//  reach the wire. In Debug builds events log to the console.
 //
-//  TODO(analytics): wire `track(_:)` to the real vendor (Amplitude /
-//  Mixpanel / PostHog). Today we only mirror events into the Sentry
-//  breadcrumb stream via `Observability.shared.track`.
+//  `track(_:)` fans out to two sinks:
+//    1. `Observability` — mirrors the event into the Sentry breadcrumb
+//       stream so it shows up as context on the next crash / error.
+//    2. `PostHogAnalytics` — the product-analytics vendor. Matches the
+//       Android vendor (PostHog) and sends the SAME event names. No-ops
+//       until `POSTHOG_API_KEY` is configured, so dev / CI stay silent.
 //
 
 import Foundation
@@ -255,9 +257,17 @@ public enum AnalyticsResult: String, Sendable {
 }
 
 /// Analytics shim. Feature code calls `Analytics.track(.screenHubViewed)`
-/// and we route to the Observability layer. In Debug builds the event
-/// also lands in the Xcode console for quick verification.
+/// and we fan the event out to Observability (Sentry breadcrumb) and the
+/// PostHog product-analytics vendor. In Debug builds the event also lands
+/// in the Xcode console for quick verification.
 public enum Analytics {
+    /// Boot the analytics vendor. Call once from `AppDelegate` at launch,
+    /// alongside `Observability.shared.start`.
+    @MainActor
+    static func start(environment: AppEnvironment) {
+        PostHogAnalytics.shared.start(environment: environment)
+    }
+
     public static func track(_ event: AnalyticsEvent) {
         #if DEBUG
         let propsDescription = event.properties.isEmpty
@@ -265,8 +275,23 @@ public enum Analytics {
             : " " + event.properties.map { "\($0.key)=\($0.value)" }.joined(separator: " ")
         print("📊 analytics \(event.name)\(propsDescription)")
         #endif
+        let name = event.name
+        let properties = event.properties
         Task { @MainActor in
-            Observability.shared.track(event.name, properties: event.properties)
+            Observability.shared.track(name, properties: properties)
+            PostHogAnalytics.shared.capture(name, properties: properties)
+        }
+    }
+
+    /// Associate (or, with `nil`, clear) the app user id on the analytics
+    /// vendor. Mirror of `Observability.identify`; pass the user id only —
+    /// never email / name — so the vendor stays pseudonymous.
+    @MainActor
+    static func identify(userId: String?) {
+        if let userId {
+            PostHogAnalytics.shared.identify(userId: userId)
+        } else {
+            PostHogAnalytics.shared.reset()
         }
     }
 }

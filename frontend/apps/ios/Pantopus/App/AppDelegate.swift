@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         MainActor.assumeIsolated {
             Observability.shared.start(environment: AppEnvironment.current)
+            // Product analytics (PostHog). No-ops until POSTHOG_API_KEY is set,
+            // so dev / CI builds send nothing. Matches Android's vendor + names.
+            Analytics.start(environment: AppEnvironment.current)
             // Phase 3 (3A) — configure the Stripe SDK once at launch with the
             // publishable key resolved from Info.plist (xcconfig / .env). The
             // SDK is already linked (project.yml); we only set the key here.

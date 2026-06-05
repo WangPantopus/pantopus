@@ -51,6 +51,11 @@ android {
         buildConfigField("String", "SENTRY_DSN", "\"${envOr("SENTRY_DSN", "")}\"")
         buildConfigField("String", "PANTOPUS_ENV", "\"${envOr("PANTOPUS_ENV", "local")}\"")
 
+        // PostHog product analytics — matches iOS. Empty key disables the
+        // vendor (analytics no-ops in dev / CI); host defaults to EU Cloud.
+        buildConfigField("String", "POSTHOG_API_KEY", "\"${envOr("POSTHOG_API_KEY", "")}\"")
+        buildConfigField("String", "POSTHOG_HOST", "\"${envOr("POSTHOG_HOST", "https://eu.i.posthog.com")}\"")
+
         // Google Maps API key — read from gradle.properties, ~/.gradle/gradle.properties,
         // or the env. Never hard-code a real key here.
         manifestPlaceholders["MAPS_API_KEY"] = envOr("MAPS_API_KEY", "")
@@ -207,6 +212,9 @@ dependencies {
     implementation(libs.sentry.android)
     implementation(libs.sentry.android.timber)
     implementation(libs.sentry.android.okhttp)
+
+    // Product analytics (PostHog) — same vendor + event names as iOS.
+    implementation(libs.posthog.android)
 
     // Testing
     testImplementation(libs.junit)

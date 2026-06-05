@@ -11,5 +11,9 @@ PANTOPUS_API_BASE_URL = http:/$()/localhost:8000
 PANTOPUS_SOCKET_URL = http:/$()/localhost:8000
 STRIPE_PUBLISHABLE_KEY = pk_test_REPLACE_ME
 SENTRY_DSN =
+// Product analytics (PostHog). Blank key = analytics disabled. Host defaults
+// to PostHog EU Cloud; override in .env for US Cloud or a self-hosted instance.
+POSTHOG_API_KEY =
+POSTHOG_HOST = https:/$()/eu.i.posthog.com
 
 #include? "Secrets.xcconfig"

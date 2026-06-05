@@ -165,8 +165,11 @@ final class Observability {
 
     // MARK: - Breadcrumbs & analytics
 
-    /// Lightweight analytics event. For now this is a structured log + Sentry breadcrumb;
-    /// wire in a real analytics SDK (Amplitude / Mixpanel / PostHog) by extending this method.
+    /// Mirror an analytics event into the crash context: a structured log +
+    /// Sentry breadcrumb, so the event shows up as context on the next crash.
+    /// The product-analytics vendor (PostHog) is a separate sink — see
+    /// `Analytics.track`, which fans out to both this method and
+    /// `PostHogAnalytics`.
     func track(_ name: String, properties: [String: String] = [:]) {
         logger.info("analytics", metadata: [
             "event": .string(name),

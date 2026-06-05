@@ -62,6 +62,11 @@ packages:
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     from: "8.36.0"
+  # Product analytics — matches Android's vendor (PostHog). Gated on
+  # POSTHOG_API_KEY so dev / CI builds send nothing.
+  PostHog:
+    url: https://github.com/PostHog/posthog-ios
+    from: "3.15.0"
 
 targets:
   Pantopus:
@@ -91,6 +96,8 @@ targets:
         PantopusSocketURL: $(PANTOPUS_SOCKET_URL)
         StripePublishableKey: $(STRIPE_PUBLISHABLE_KEY)
         SentryDSN: $(SENTRY_DSN)
+        PostHogAPIKey: $(POSTHOG_API_KEY)
+        PostHogHost: $(POSTHOG_HOST)
         LSRequiresIPhoneOS: true
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
@@ -155,6 +162,8 @@ targets:
         product: Logging
       - package: Sentry
         product: Sentry
+      - package: PostHog
+        product: PostHog
     scheme:
       testTargets:
         - PantopusTests

@@ -2,6 +2,7 @@
 
 package app.pantopus.android.data.auth
 
+import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.auth.AuthErrorBody
 import app.pantopus.android.data.api.models.auth.AuthenticatedUser
@@ -125,6 +126,7 @@ class AuthRepository
                 val profile = api.me().user
                 val user = profile.toSessionUser()
                 observability.identify(userId = user.id, email = user.email)
+                Analytics.identify(userId = user.id)
                 _state.value = State.SignedIn(user)
             } catch (t: Throwable) {
                 tokenStorage.clear()
@@ -146,6 +148,7 @@ class AuthRepository
                     userId = response.user.id,
                 )
                 observability.identify(userId = user.id, email = user.email)
+                Analytics.identify(userId = user.id)
                 observability.track("auth.signed_in")
                 _state.value = State.SignedIn(user)
                 user
@@ -289,6 +292,7 @@ class AuthRepository
         suspend fun signOut() {
             tokenStorage.clear()
             observability.identify(userId = null)
+            Analytics.identify(userId = null)
             observability.track("auth.signed_out")
             _state.value = State.SignedOut
         }
