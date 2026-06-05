@@ -4,26 +4,61 @@ package app.pantopus.android.ui.screens.contentdetail
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.payments.CreatePaymentIntentRequest
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.payments.PaymentsRepository
+import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * T2.6 ships the invoice frame with hardcoded fixture data — the
- * backend wiring (paymentOps.js + wallet.js + Stripe PaymentIntent)
- * lands alongside the Stripe payment-sheet integration in a follow-up.
+ * T2.6 ships the invoice frame from fixture display data. Block 3B wires the
+ * "Pay" CTA to Stripe PaymentSheet only when a real backend order reference is
+ * provided through navigation args; fixture invoices leave checkout disabled
+ * rather than sending placeholder payee/amount data.
  */
 @HiltViewModel
 class InvoiceDetailViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
+        private val paymentsRepository: PaymentsRepository,
     ) : ViewModel() {
         companion object {
             const val INVOICE_ID_KEY = "invoiceId"
+            const val GIG_ID_KEY = "gigId"
+            const val LISTING_ID_KEY = "listingId"
+            const val OFFER_ID_KEY = "offerId"
+
+            fun checkoutRequestFrom(savedStateHandle: SavedStateHandle): CheckoutRequest? {
+                val gigId = savedStateHandle.get<String>(GIG_ID_KEY)?.takeIf { it.isNotBlank() }
+                if (gigId != null) {
+                    return CheckoutRequest(
+                        gigId = gigId,
+                        description = "Invoice ${savedStateHandle.get<String>(INVOICE_ID_KEY) ?: ""}".trim(),
+                    )
+                }
+                val listingId = savedStateHandle.get<String>(LISTING_ID_KEY)?.takeIf { it.isNotBlank() }
+                val offerId = savedStateHandle.get<String>(OFFER_ID_KEY)?.takeIf { it.isNotBlank() }
+                return if (listingId != null && offerId != null) {
+                    CheckoutRequest(
+                        listingId = listingId,
+                        offerId = offerId,
+                        description = "Invoice ${savedStateHandle.get<String>(INVOICE_ID_KEY) ?: ""}".trim(),
+                    )
+                } else {
+                    null
+                }
+            }
         }
 
         private val invoiceId: String = savedStateHandle.get<String>(INVOICE_ID_KEY) ?: "INV-00247"
@@ -31,8 +66,64 @@ class InvoiceDetailViewModel
         private val _state = MutableStateFlow<ContentDetailUiState>(ContentDetailUiState.Loading)
         val state: StateFlow<ContentDetailUiState> = _state.asStateFlow()
 
+        private val _paymentStatus = MutableStateFlow<InvoicePaymentStatus>(InvoicePaymentStatus.Idle)
+        val paymentStatus: StateFlow<InvoicePaymentStatus> = _paymentStatus.asStateFlow()
+
+        private val _events = MutableSharedFlow<InvoiceDetailEvent>(extraBufferCapacity = 4)
+        val events: SharedFlow<InvoiceDetailEvent> = _events.asSharedFlow()
+
+        /**
+         * The order this invoice bills for. Real invoices must carry a backend
+         * order reference; fixture invoices leave this null so pay is disabled.
+         */
+        private val checkoutRequest: CheckoutRequest? = checkoutRequestFrom(savedStateHandle)
+
         fun load() {
             _state.value = ContentDetailUiState.Loaded(Projection.fixture(invoiceId))
+        }
+
+        /** Tapped "Pay" — create the PaymentIntent, then ask the screen to present the sheet. */
+        fun pay() {
+            val checkoutRequest = checkoutRequest
+            if (checkoutRequest == null) {
+                _paymentStatus.value = InvoicePaymentStatus.Declined("This invoice can't be paid yet.")
+                return
+            }
+            _paymentStatus.value = InvoicePaymentStatus.Paying
+            viewModelScope.launch {
+                val req =
+                    CreatePaymentIntentRequest(
+                        gigId = checkoutRequest.gigId,
+                        listingId = checkoutRequest.listingId,
+                        offerId = checkoutRequest.offerId,
+                        description = checkoutRequest.description,
+                    )
+                when (val result = paymentsRepository.createPaymentIntent(req)) {
+                    is NetworkResult.Success -> _events.emit(InvoiceDetailEvent.PresentCheckout(result.data))
+                    is NetworkResult.Failure ->
+                        _paymentStatus.value = InvoicePaymentStatus.Declined(result.error.message)
+                }
+            }
+        }
+
+        /** Result of presenting PaymentSheet, mapped from Stripe in the screen. */
+        fun onCheckoutOutcome(outcome: CheckoutOutcome) {
+            when (outcome) {
+                CheckoutOutcome.Paid -> {
+                    _paymentStatus.value = InvoicePaymentStatus.Paid
+                    // Re-read the source of truth rather than flipping locally.
+                    load()
+                }
+                CheckoutOutcome.Canceled -> _paymentStatus.value = InvoicePaymentStatus.Canceled
+                is CheckoutOutcome.Declined ->
+                    _paymentStatus.value =
+                        InvoicePaymentStatus.Declined(outcome.message ?: "Your card was declined.")
+            }
+        }
+
+        /** Clear a result toast once the screen has shown it. */
+        fun clearPaymentStatus() {
+            _paymentStatus.value = InvoicePaymentStatus.Idle
         }
 
         object Projection {

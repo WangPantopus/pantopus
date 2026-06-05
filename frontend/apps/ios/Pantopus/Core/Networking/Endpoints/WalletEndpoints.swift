@@ -2,11 +2,11 @@
 //  WalletEndpoints.swift
 //  Pantopus
 //
-//  Read-path endpoint builders for `backend/routes/wallet.js`. P1-F wires
-//  the READ surface only — balance, transaction history, and the
-//  pending-release breakdown. `POST /api/wallet/withdraw` and any payout
-//  action are intentionally NOT modelled here; they land with the Stripe
-//  Connect integration in Phase 3.
+//  Endpoint builders for `backend/routes/wallet.js`. P1-F wired the READ
+//  surface (balance, transaction history, pending-release). Block 3C adds the
+//  WITHDRAW action (`POST /api/wallet/withdraw`) so a seller can move earned
+//  funds to their bank — gated server-side on a verified Stripe Connect
+//  account with payouts enabled.
 //
 
 import Foundation
@@ -35,5 +35,14 @@ public enum WalletEndpoints {
     /// available balance trails total earnings.
     public static func pendingRelease() -> Endpoint {
         Endpoint(method: .get, path: "/api/wallet/pending-release")
+    }
+
+    /// `POST /api/wallet/withdraw` — route `backend/routes/wallet.js:84`.
+    /// Withdraw earned funds to the seller's bank via a Stripe Transfer to
+    /// their connected account. The server debits the wallet atomically; the
+    /// client refreshes balance + activity on success (never marks the row
+    /// locally). Min $1.00 (100 cents). Requires payouts-enabled Connect.
+    public static func withdraw(body: WalletWithdrawRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/api/wallet/withdraw", body: body)
     }
 }

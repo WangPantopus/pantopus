@@ -16,6 +16,7 @@ data class PaymentMethodRowModel(
     val subtext: String? = null,
     val chip: PaymentMethodChip? = null,
     val labelColor: Color = PantopusColors.appText,
+    val rowTestTag: String? = null,
     /**
      * testTag applied to the status chip (e.g. the "Default" badge on a
      * saved method). `null` leaves the chip untagged.

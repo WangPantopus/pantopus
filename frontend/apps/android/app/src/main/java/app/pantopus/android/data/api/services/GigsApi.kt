@@ -5,6 +5,7 @@ import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
+import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -87,6 +88,27 @@ interface GigsApi {
         @Path("gigId") gigId: String,
         @Body body: PlaceBidBody,
     ): PlaceBidResponse
+
+    /** `POST /api/gigs/:gigId/bids/:bidId/accept` — poster accepts a bid. */
+    @POST("api/gigs/{gigId}/bids/{bidId}/accept")
+    suspend fun acceptBid(
+        @Path("gigId") gigId: String,
+        @Path("bidId") bidId: String,
+    ): GigBidAcceptResponse
+
+    /** `POST /api/gigs/:gigId/bids/:bidId/finalize-accept` after PaymentSheet. */
+    @POST("api/gigs/{gigId}/bids/{bidId}/finalize-accept")
+    suspend fun finalizeAcceptBid(
+        @Path("gigId") gigId: String,
+        @Path("bidId") bidId: String,
+    ): GigBidAcceptResponse
+
+    /** `POST /api/gigs/:gigId/bids/:bidId/abort-accept` after cancel/decline. */
+    @POST("api/gigs/{gigId}/bids/{bidId}/abort-accept")
+    suspend fun abortAcceptBid(
+        @Path("gigId") gigId: String,
+        @Path("bidId") bidId: String,
+    ): GigBidAcceptResponse
 
     /** `POST /api/gigs/:id/save` — bookmark. */
     @POST("api/gigs/{id}/save")

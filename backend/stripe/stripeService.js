@@ -875,6 +875,8 @@ class StripeService {
    * @param {string} [opts.existingPaymentId] - If updating an existing Payment record (e.g., from SetupIntent flow)
    * @param {string} [opts.homeId] - Optional home FK
    * @param {object} [opts.metadata] - Extra metadata
+   * @param {string} [opts.description] - Stripe/Payment description
+   * @param {string} [opts.idempotencyKey] - Stable Stripe idempotency key for this order
    */
   async createPaymentIntentForGig({
     payerId,
@@ -886,6 +888,8 @@ class StripeService {
     existingPaymentId,
     homeId,
     metadata = {},
+    description,
+    idempotencyKey,
   }) {
     try {
       const payeeAccount = await this._getPayeeAccountOptional(payeeId);
@@ -912,7 +916,7 @@ class StripeService {
         customer: customerId,
         capture_method: 'manual', // Hold, don't capture
         metadata: piMetadata,
-        description: `Pantopus Gig Payment - ${gigId || 'unknown'}`,
+        description: description || `Pantopus Gig Payment - ${gigId || 'unknown'}`,
       };
 
       if (paymentMethodId) {
@@ -924,7 +928,9 @@ class StripeService {
         piParams.metadata.off_session = 'true';
       }
 
-      const paymentIntent = await stripe.paymentIntents.create(piParams);
+      const paymentIntent = idempotencyKey
+        ? await stripe.paymentIntents.create(piParams, { idempotencyKey })
+        : await stripe.paymentIntents.create(piParams);
 
       // Determine initial status based on Stripe response
       let initialStatus = PAYMENT_STATES.AUTHORIZE_PENDING;
@@ -943,6 +949,8 @@ class StripeService {
           authorization_expires_at: initialStatus === PAYMENT_STATES.AUTHORIZED ? authExpires : null,
           payment_attempted_at: now,
           payment_succeeded_at: initialStatus === PAYMENT_STATES.AUTHORIZED ? now : null,
+          metadata,
+          ...(description ? { description } : {}),
         });
 
         const { data: updated } = await supabaseAdmin
@@ -990,12 +998,32 @@ class StripeService {
             authorization_expires_at: initialStatus === PAYMENT_STATES.AUTHORIZED ? authExpires : null,
             payment_attempted_at: now,
             payment_succeeded_at: initialStatus === PAYMENT_STATES.AUTHORIZED ? now : null,
+            description: description || null,
             metadata,
           })
           .select()
           .single();
 
         if (dbError) {
+          if (dbError.code === '23505' && paymentIntent.id) {
+            const { data: existingPayment } = await supabaseAdmin
+              .from('Payment')
+              .select('*')
+              .eq('stripe_payment_intent_id', paymentIntent.id)
+              .single();
+
+            if (existingPayment) {
+              return {
+                success: true,
+                clientSecret: paymentIntent.client_secret,
+                paymentIntentId: paymentIntent.id,
+                paymentId: existingPayment.id,
+                payment: existingPayment,
+                reused: true,
+              };
+            }
+          }
+
           logger.error('Error saving payment record', { error: dbError.message });
           throw new Error(`Failed to save payment: ${dbError.message}`);
         }
@@ -1801,6 +1829,40 @@ class StripeService {
         .from('PaymentMethod')
         .delete()
         .eq('id', paymentMethodId);
+
+      if (method.is_default) {
+        const { data: fallbackMethods, error: fallbackError } = await supabaseAdmin
+          .from('PaymentMethod')
+          .select('id, stripe_payment_method_id')
+          .eq('user_id', userId)
+          .neq('id', paymentMethodId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (fallbackError) {
+          logger.error('Error finding replacement default payment method', {
+            error: fallbackError.message,
+            userId,
+          });
+        }
+
+        const fallback = Array.isArray(fallbackMethods) ? fallbackMethods[0] : null;
+        if (fallback?.id) {
+          await supabaseAdmin
+            .from('PaymentMethod')
+            .update({ is_default: true })
+            .eq('id', fallback.id);
+          if (method.stripe_customer_id) {
+            await stripe.customers.update(method.stripe_customer_id, {
+              invoice_settings: { default_payment_method: fallback.stripe_payment_method_id },
+            });
+          }
+        } else if (method.stripe_customer_id) {
+          await stripe.customers.update(method.stripe_customer_id, {
+            invoice_settings: { default_payment_method: null },
+          });
+        }
+      }
 
       logger.info('Payment method deleted', { userId, paymentMethodId });
       return { success: true };

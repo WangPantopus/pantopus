@@ -351,11 +351,19 @@ function createQueryBuilder(tableName) {
     },
     contains(field, values) {
       const f = fieldFor(field);
-      // Supabase .contains() — array column must include ALL of the given values
+      // Supabase .contains() — array column must include ALL of the given
+      // values; JSON/object columns must contain every provided key/value.
       filters.push((row) => {
         const col = row[f];
-        if (!Array.isArray(col)) return false;
-        return values.every((v) => col.includes(v));
+        if (Array.isArray(values)) {
+          if (!Array.isArray(col)) return false;
+          return values.every((v) => col.includes(v));
+        }
+        if (values && typeof values === 'object') {
+          if (!col || typeof col !== 'object' || Array.isArray(col)) return false;
+          return Object.entries(values).every(([key, value]) => col[key] === value);
+        }
+        return false;
       });
       return builder;
     },

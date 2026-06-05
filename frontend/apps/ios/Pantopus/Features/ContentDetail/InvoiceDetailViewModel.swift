@@ -2,40 +2,83 @@
 //  InvoiceDetailViewModel.swift
 //  Pantopus
 //
-//  T2.6 ships the invoice frame with hardcoded fixture data — the
-//  backend wiring (backend/routes/paymentOps.js + wallet.js + Stripe
-//  PaymentIntent) lands alongside the Stripe payment-sheet integration
-//  in a follow-up. The shell already supports the variable
-//  jsonb_modules[] surface so plumbing real invoice modules through
-//  later changes the VM only. Both designed A09.4 states (due + paid)
-//  are projected here.
+//  T2.6 ships the invoice frame from fixture display data. Block 3B wires
+//  the "Pay" CTA to Stripe PaymentSheet only when a real backend order
+//  reference is injected; fixture invoices leave checkout disabled rather
+//  than sending placeholder payee/amount data. On success we re-read server
+//  state and never mark the invoice paid client-side.
 //
 
 import Foundation
 import Observation
 
+/// Where the "Pay" CTA currently sits, so the view can surface the right
+/// result toast (success / declined / canceled) after PaymentSheet returns.
+public enum InvoicePaymentStatus: Sendable, Equatable {
+    case idle
+    case paying
+    case paid
+    case canceled
+    case declined(message: String)
+}
+
 @Observable
 @MainActor
 public final class InvoiceDetailViewModel {
     public private(set) var state: ContentDetailState = .loading
+    /// Drives the post-checkout toast in the view (`checkout.*` surfaces).
+    public private(set) var paymentStatus: InvoicePaymentStatus = .idle
 
     private let invoiceId: String
     private let paid: Bool
+    private let checkout: CheckoutCoordinator
+    /// The order this invoice bills for. Real invoices must carry a backend
+    /// order reference; fixture invoices leave this nil so pay is disabled
+    /// rather than charging against placeholder IDs.
+    private let checkoutRequest: CheckoutRequest?
 
-    public init(invoiceId: String, paid: Bool = false) {
+    public init(
+        invoiceId: String,
+        paid: Bool = false,
+        checkout: CheckoutCoordinator = CheckoutCoordinator(),
+        checkoutRequest: CheckoutRequest? = nil
+    ) {
         self.invoiceId = invoiceId
         self.paid = paid
+        self.checkout = checkout
+        self.checkoutRequest = checkoutRequest
     }
 
     public func load() async {
         state = .loaded(paid ? Self.paidFixture(invoiceId: invoiceId) : Self.fixture(invoiceId: invoiceId))
     }
 
-    public func payNow() async -> Bool {
-        // Real implementation hands off to Stripe.confirmPayment(...).
-        // Stub returns false so the host can show a "not yet available"
-        // sheet until the backend integration lands.
-        false
+    /// Run the PaymentSheet checkout for this invoice. On success we re-read
+    /// from the backend (the source of truth) rather than flipping the state
+    /// locally — for the fixture that re-projects the same frame; once a real
+    /// invoice backend lands, `load()` reflects the paid state.
+    public func payNow() async {
+        guard !paid else { return }
+        guard let request = checkoutRequest else {
+            paymentStatus = .declined(message: "This invoice can't be paid yet.")
+            return
+        }
+        paymentStatus = .paying
+        let outcome = await checkout.pay(request)
+        switch outcome {
+        case .paid:
+            paymentStatus = .paid
+            await load()
+        case .canceled:
+            paymentStatus = .canceled
+        case let .declined(message), let .failed(message):
+            paymentStatus = .declined(message: message)
+        }
+    }
+
+    /// Clear a result toast once the view has shown it.
+    public func clearPaymentStatus() {
+        paymentStatus = .idle
     }
 
     // MARK: - Fixtures

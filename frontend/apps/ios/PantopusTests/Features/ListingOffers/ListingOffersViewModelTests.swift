@@ -349,6 +349,35 @@ final class ListingOffersViewModelTests: ListingOffersViewModelTestCase {
         XCTAssertEqual(sections.first?.rows.first?.footer?.actions.first?.title, "View transaction")
     }
 
+    func testAccept_ByBuyerOfCounteredOfferPresentsCheckout() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.threeOffersJSON),
+            .status(200, body: "{\"offer\":{\"id\":\"o-marcus\",\"status\":\"accepted\"}}"),
+            .status(201, body: Self.intentJSON),
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.oneAcceptedJSON)
+        ]
+        let presenter = ListingOfferCheckoutPresenter()
+        let vm = makeVM(
+            api: makeAPI(),
+            checkout: CheckoutCoordinator(api: makeAPI(), presenter: presenter)
+        ) { "u_marcus" }
+        await vm.load()
+        let dto = ListingOfferDTO(
+            id: "o-marcus",
+            listingId: "listing-1",
+            buyerId: "u_marcus",
+            status: "countered"
+        )
+
+        await vm.acceptOffer(dto)
+
+        XCTAssertEqual(presenter.presentPaymentCallCount, 1)
+        XCTAssertEqual(presenter.lastClientSecret, "pi_secret_1")
+        XCTAssertEqual(presenter.lastPublishableKey, "pk_test")
+    }
+
     func testDecline_OptimisticThenConfirmedOn200() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.listingJSON),
@@ -387,5 +416,34 @@ final class ListingOffersViewModelTests: ListingOffersViewModelTestCase {
         }
         XCTAssertEqual(sections.first?.rows.first?.chips?.first?.text, "Countered")
         XCTAssertEqual(sections.first?.rows.first?.chips?.last?.text, "Your counter $230")
+    }
+}
+
+@MainActor
+private final class ListingOfferCheckoutPresenter: PaymentSheetPresenting {
+    private(set) var presentPaymentCallCount = 0
+    private(set) var lastClientSecret: String?
+    private(set) var lastPublishableKey: String?
+
+    func presentAddCard(
+        setupIntentClientSecret _: String,
+        customer _: String,
+        ephemeralKey _: String,
+        publishableKey _: String?
+    ) async -> PaymentSheetOutcome {
+        .completed
+    }
+
+    func presentPayment(
+        clientSecret: String,
+        customer _: String,
+        ephemeralKey _: String,
+        isSetupIntent _: Bool,
+        publishableKey: String?
+    ) async -> PaymentSheetOutcome {
+        presentPaymentCallCount += 1
+        lastClientSecret = clientSecret
+        lastPublishableKey = publishableKey
+        return .completed
     }
 }

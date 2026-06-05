@@ -3,6 +3,8 @@ package app.pantopus.android.data.wallet
 import app.pantopus.android.data.api.models.wallet.WalletBalanceResponse
 import app.pantopus.android.data.api.models.wallet.WalletPendingReleaseResponse
 import app.pantopus.android.data.api.models.wallet.WalletTransactionsResponse
+import app.pantopus.android.data.api.models.wallet.WalletWithdrawRequest
+import app.pantopus.android.data.api.models.wallet.WalletWithdrawResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.WalletApi
@@ -27,4 +29,7 @@ class WalletRepository
 
         /** `GET /api/wallet/pending-release`. */
         suspend fun pendingRelease(): NetworkResult<WalletPendingReleaseResponse> = safeApiCall { api.pendingRelease() }
+
+        /** `POST /api/wallet/withdraw` — earned funds to bank (Block 3C). */
+        suspend fun withdraw(request: WalletWithdrawRequest): NetworkResult<WalletWithdrawResponse> = safeApiCall { api.withdraw(request) }
     }

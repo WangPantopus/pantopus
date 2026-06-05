@@ -51,3 +51,73 @@ data class AddCardSheetParamsDto(
 data class PaymentMethodAckResponse(
     val message: String? = null,
 )
+
+/**
+ * Body for `POST /api/payments/intent` (Block 3B checkout). The server
+ * computes the payee and amount from the referenced order.
+ */
+@JsonClass(generateAdapter = true)
+data class CreatePaymentIntentRequest(
+    val gigId: String? = null,
+    val listingId: String? = null,
+    val offerId: String? = null,
+    val description: String? = null,
+)
+
+/**
+ * Response from `POST /api/payments/intent` — the params the mobile
+ * PaymentSheet needs to present a charge. `customer` + `ephemeralKey` are
+ * best-effort (the sheet still works card-only without them). The shape is a
+ * superset of the gig bid-accept payment payload so the same checkout flow can
+ * present either. Keys are camelCase server-side.
+ */
+@JsonClass(generateAdapter = true)
+data class PaymentIntentSheetParamsDto(
+    val clientSecret: String? = null,
+    val paymentIntentId: String? = null,
+    val customer: String? = null,
+    val ephemeralKey: String? = null,
+    val publishableKey: String? = null,
+    val isSetupIntent: Boolean? = null,
+)
+
+/**
+ * Body for `POST /api/payments/tip` (Block 3D). The poster tips the worker on a
+ * completed gig; `amount` is integer cents (min 50).
+ */
+@JsonClass(generateAdapter = true)
+data class TipRequest(
+    val gigId: String,
+    val amount: Int,
+)
+
+/** `POST /api/payments/tip` response — mobile PaymentSheet params + paymentId. */
+@JsonClass(generateAdapter = true)
+data class TipResponse(
+    val success: Boolean = false,
+    val clientSecret: String? = null,
+    val paymentId: String? = null,
+    val paymentIntentId: String? = null,
+    val customer: String? = null,
+    val ephemeralKey: String? = null,
+    val publishableKey: String? = null,
+) {
+    /** Adapt to the shared PaymentSheet params used by the checkout flow. */
+    fun sheetParams(): PaymentIntentSheetParamsDto =
+        PaymentIntentSheetParamsDto(
+            clientSecret = clientSecret,
+            paymentIntentId = paymentIntentId,
+            customer = customer,
+            ephemeralKey = ephemeralKey,
+            publishableKey = publishableKey,
+        )
+}
+
+/** `POST /api/payments/tip/{paymentId}/refresh-status` response. */
+@JsonClass(generateAdapter = true)
+data class TipRefreshStatusResponse(
+    val paymentStatus: String? = null,
+    val previousPaymentStatus: String? = null,
+    val changed: Boolean? = null,
+    val stripeStatus: String? = null,
+)

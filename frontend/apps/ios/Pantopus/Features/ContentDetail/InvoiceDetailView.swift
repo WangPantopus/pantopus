@@ -3,16 +3,20 @@
 //  Pantopus
 //
 //  T2.6 invoice detail. Wraps `TransactionalDetailShell` with the same
-//  vocabulary as gig + listing. The "Pay" CTA hands off to a Stripe
-//  payment sheet once the backend integration lands; until then it
-//  surfaces a placeholder.
+//  vocabulary as gig + listing. Block 3B wires the "Pay" CTA to the real
+//  Stripe PaymentSheet via the view-model's `CheckoutCoordinator`:
+//  PaymentSheet (presented by the SDK over the current screen) collects the
+//  card + handles SCA/3-D Secure, and the result drives a success / declined /
+//  canceled toast. We never mark the invoice paid here — the VM re-reads
+//  server state on success.
 //
 
 import SwiftUI
 
 public struct InvoiceDetailView: View {
     @State private var viewModel: InvoiceDetailViewModel
-    @State private var paySheetVisible = false
+    @State private var toast: ToastMessage?
+    @State private var isPaying = false
     private let onBack: @MainActor () -> Void
 
     public init(
@@ -27,42 +31,64 @@ public struct InvoiceDetailView: View {
         TransactionalDetailShell(
             state: viewModel.state,
             onBack: onBack,
-            onPrimaryAction: { paySheetVisible = true },
+            onPrimaryAction: { pay() },
             onSecondaryAction: nil,
             onRetry: { Task { await viewModel.load() } },
             onMessageCounterparty: nil
         )
         .task { await viewModel.load() }
-        .sheet(isPresented: $paySheetVisible) {
-            paySheet
+        // Marks the surface as checkout-enabled (the Stripe sheet itself is
+        // presented by the SDK, not a SwiftUI sheet we own).
+        .accessibilityIdentifier("checkout.paymentSheet")
+        .overlay(alignment: .bottom) { toastOverlay }
+        .onChange(of: viewModel.paymentStatus) { _, status in
+            handle(status)
         }
     }
 
-    private var paySheet: some View {
-        VStack(spacing: 14) {
-            Icon(.shieldCheck, size: 36, color: Theme.Color.primary600)
-            Text("Stripe payment sheet")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-            Text("The real payment flow hooks the existing two-intent + sensitive-action-guard plumbing. Stub for now.")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
-            Button {
-                paySheetVisible = false
-            } label: {
-                Text("Got it")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("invoiceDetailDismiss")
+    private func pay() {
+        guard !isPaying else { return }
+        isPaying = true
+        Task {
+            await viewModel.payNow()
+            isPaying = false
         }
-        .padding(Spacing.s5)
-        .presentationDetents([.fraction(0.4)])
+    }
+
+    private func handle(_ status: InvoicePaymentStatus) {
+        switch status {
+        case .idle, .paying:
+            break
+        case .paid:
+            toast = ToastMessage(text: "Payment complete.", kind: .success)
+            viewModel.clearPaymentStatus()
+        case .canceled:
+            toast = ToastMessage(text: "Payment canceled.", kind: .neutral)
+            viewModel.clearPaymentStatus()
+        case let .declined(message):
+            toast = ToastMessage(text: message, kind: .error)
+            viewModel.clearPaymentStatus()
+        }
+    }
+
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast {
+            ToastView(message: toast)
+                .padding(.bottom, Spacing.s8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .accessibilityIdentifier(identifier(for: toast.kind))
+                .task(id: toast) {
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    self.toast = nil
+                }
+        }
+    }
+
+    private func identifier(for kind: ToastKind) -> String {
+        switch kind {
+        case .success: "checkout.paySuccess"
+        case .error: "checkout.payDeclined"
+        case .neutral: "checkout.cancel"
+        }
     }
 }

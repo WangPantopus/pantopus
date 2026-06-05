@@ -324,6 +324,7 @@ extension ContentDetailProjectionTests {
             userId: "owner",
             acceptedBy: spec.acceptedBy,
             acceptedAt: spec.acceptedBy == nil ? nil : "2025-11-14T17:30:00Z",
+            ownerConfirmedAt: nil,
             scheduledStart: nil,
             paymentStatus: nil,
             engagementMode: nil,

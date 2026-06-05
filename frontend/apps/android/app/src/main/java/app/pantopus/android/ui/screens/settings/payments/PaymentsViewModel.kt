@@ -142,7 +142,7 @@ class PaymentsViewModel
             }
         }
 
-        /** Stripe Connect / payout routing / destructive close land with 3C. */
+        /** Non-wallet rows can still be observed here; payout rows route from the screen into Wallet. */
         fun tapRow(
             @Suppress("UNUSED_PARAMETER") id: String,
         ) = Unit

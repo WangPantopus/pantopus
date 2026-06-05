@@ -14,6 +14,7 @@ datastore = "1.1.1"
 securityCrypto = "1.1.0-alpha06"
 camerax = "1.4.0"
 biometric = "1.1.0"
+browser = "1.8.0"
 
 # Hilt
 hilt = "2.52"
@@ -80,6 +81,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 
 # DataStore — retained for the one-shot v1 → v2 token migration that
 # drains the plain-text store on first launch. New code should not depend

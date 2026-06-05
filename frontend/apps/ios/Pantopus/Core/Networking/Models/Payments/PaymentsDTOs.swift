@@ -68,3 +68,99 @@ public struct AddCardSheetParams: Decodable, Sendable, Hashable {
     public let customer: String
     public let publishableKey: String?
 }
+
+/// Body for `POST /api/payments/intent` (Block 3B checkout). The server
+/// computes the payee and amount from the referenced order.
+public struct CreatePaymentIntentBody: Encodable, Sendable, Hashable {
+    public let gigId: String?
+    public let listingId: String?
+    public let offerId: String?
+    public let description: String?
+
+    public init(
+        gigId: String? = nil,
+        listingId: String? = nil,
+        offerId: String? = nil,
+        description: String? = nil
+    ) {
+        self.gigId = gigId
+        self.listingId = listingId
+        self.offerId = offerId
+        self.description = description
+    }
+}
+
+/// Response from `POST /api/payments/intent` — the params the mobile
+/// PaymentSheet needs to present a charge. `customer` + `ephemeralKey` are
+/// best-effort (the sheet still works card-only without them); `clientSecret`
+/// is the PaymentIntent secret PaymentSheet confirms. Keys are camelCase
+/// server-side. The shape is a superset of the gig bid-accept payment payload
+/// so the same `CheckoutCoordinator` can present either.
+public struct PaymentIntentSheetParams: Decodable, Sendable, Hashable {
+    public let clientSecret: String?
+    public let paymentIntentId: String?
+    public let customer: String?
+    public let ephemeralKey: String?
+    public let publishableKey: String?
+    public let isSetupIntent: Bool?
+
+    public init(
+        clientSecret: String?,
+        paymentIntentId: String? = nil,
+        customer: String? = nil,
+        ephemeralKey: String? = nil,
+        publishableKey: String? = nil,
+        isSetupIntent: Bool? = nil
+    ) {
+        self.clientSecret = clientSecret
+        self.paymentIntentId = paymentIntentId
+        self.customer = customer
+        self.ephemeralKey = ephemeralKey
+        self.publishableKey = publishableKey
+        self.isSetupIntent = isSetupIntent
+    }
+}
+
+/// Body for `POST /api/payments/tip` (Block 3D). The poster tips the worker on
+/// a completed gig; `amount` is integer cents (min 50).
+public struct TipRequest: Encodable, Sendable, Hashable {
+    public let gigId: String
+    public let amount: Int
+
+    public init(gigId: String, amount: Int) {
+        self.gigId = gigId
+        self.amount = amount
+    }
+}
+
+/// `POST /api/payments/tip` response — the mobile PaymentSheet params + the
+/// `paymentId` used to reconcile via `tipRefreshStatus`.
+public struct TipResponse: Decodable, Sendable, Hashable {
+    public let success: Bool
+    public let clientSecret: String?
+    public let paymentId: String?
+    public let paymentIntentId: String?
+    public let customer: String?
+    public let ephemeralKey: String?
+    public let publishableKey: String?
+
+    /// Adapt to the shared PaymentSheet params so `CheckoutCoordinator.present`
+    /// can present the tip charge with the same plumbing as 3B/3C.
+    public var sheetParams: PaymentIntentSheetParams {
+        PaymentIntentSheetParams(
+            clientSecret: clientSecret,
+            paymentIntentId: paymentIntentId,
+            customer: customer,
+            ephemeralKey: ephemeralKey,
+            publishableKey: publishableKey
+        )
+    }
+}
+
+/// `POST /api/payments/tip/{paymentId}/refresh-status` response.
+public struct TipRefreshStatusResponse: Decodable, Sendable, Hashable {
+    public let paymentStatus: String?
+    public let previousPaymentStatus: String?
+    public let changed: Bool?
+    public let stripeStatus: String?
+}

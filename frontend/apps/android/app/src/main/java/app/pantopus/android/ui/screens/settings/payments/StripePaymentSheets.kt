@@ -2,6 +2,8 @@
 
 package app.pantopus.android.ui.screens.settings.payments
 
+import android.content.Context
+import com.stripe.android.PaymentConfiguration
 import com.stripe.android.paymentsheet.PaymentSheet
 import com.stripe.android.paymentsheet.PaymentSheetResult
 
@@ -17,11 +19,23 @@ import com.stripe.android.paymentsheet.PaymentSheetResult
 object StripePaymentSheets {
     private const val MERCHANT_DISPLAY_NAME = "Pantopus"
 
+    fun configurePublishableKey(
+        context: Context,
+        publishableKey: String?,
+    ) {
+        val key = publishableKey?.trim().orEmpty()
+        if (key.isBlank() || key.startsWith("pk_test_REPLACE") || key.startsWith("$(")) return
+        PaymentConfiguration.init(context.applicationContext, key)
+    }
+
     fun configuration(
+        context: Context,
         customerId: String,
         ephemeralKey: String,
-    ): PaymentSheet.Configuration =
-        PaymentSheet.Configuration(
+        publishableKey: String? = null,
+    ): PaymentSheet.Configuration {
+        configurePublishableKey(context, publishableKey)
+        return PaymentSheet.Configuration(
             merchantDisplayName = MERCHANT_DISPLAY_NAME,
             customer =
                 PaymentSheet.CustomerConfiguration(
@@ -29,6 +43,31 @@ object StripePaymentSheets {
                     ephemeralKeySecret = ephemeralKey,
                 ),
         )
+    }
+
+    /**
+     * Configuration for a one-off checkout (Block 3B). The customer +
+     * ephemeral key are best-effort: when the backend couldn't mint a key we
+     * still collect a card against the client secret rather than failing.
+     */
+    fun paymentConfiguration(
+        context: Context,
+        customerId: String?,
+        ephemeralKey: String?,
+        publishableKey: String? = null,
+    ): PaymentSheet.Configuration {
+        configurePublishableKey(context, publishableKey)
+        val customer =
+            if (!customerId.isNullOrBlank() && !ephemeralKey.isNullOrBlank()) {
+                PaymentSheet.CustomerConfiguration(id = customerId, ephemeralKeySecret = ephemeralKey)
+            } else {
+                null
+            }
+        return PaymentSheet.Configuration(
+            merchantDisplayName = MERCHANT_DISPLAY_NAME,
+            customer = customer,
+        )
+    }
 
     fun outcome(result: PaymentSheetResult): AddCardOutcome =
         when (result) {
@@ -36,4 +75,27 @@ object StripePaymentSheets {
             is PaymentSheetResult.Canceled -> AddCardOutcome.Canceled
             is PaymentSheetResult.Failed -> AddCardOutcome.Failed(result.error.message)
         }
+
+    /** Map Stripe's result into the SDK-free [CheckoutOutcome] the VM consumes. */
+    fun checkoutOutcome(result: PaymentSheetResult): CheckoutOutcome =
+        when (result) {
+            is PaymentSheetResult.Completed -> CheckoutOutcome.Paid
+            is PaymentSheetResult.Canceled -> CheckoutOutcome.Canceled
+            is PaymentSheetResult.Failed -> CheckoutOutcome.Declined(result.error.message)
+        }
+}
+
+/**
+ * Result of a checkout PaymentSheet, mapped from Stripe's `PaymentSheetResult`
+ * in the screen so the view-model stays SDK-free. Mirrors iOS `CheckoutOutcome`.
+ */
+sealed interface CheckoutOutcome {
+    /** PaymentSheet completed — re-read server state. */
+    data object Paid : CheckoutOutcome
+
+    /** Buyer dismissed the sheet without paying. */
+    data object Canceled : CheckoutOutcome
+
+    /** Card declined / SCA failed. */
+    data class Declined(val message: String?) : CheckoutOutcome
 }

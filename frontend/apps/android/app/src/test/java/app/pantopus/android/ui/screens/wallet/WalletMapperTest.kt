@@ -102,8 +102,8 @@ class WalletMapperTest {
                     tx("tx-2", "withdrawal", 50_000, createdAt = "2026-05-28T11:14:00Z"),
                 ),
                 WalletPendingReleaseResponse(totalPendingCents = 18_600L, inReviewCount = 2, releasingSoonCount = 1),
-                utc,
-                now,
+                zone = utc,
+                now = now,
             )
         assertEquals("847.50", content.available)
         assertEquals("\$186.00", content.pending)

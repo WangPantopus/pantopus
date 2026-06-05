@@ -19,6 +19,8 @@
 //  matches the doc's four-state rule: loading / populated / hold / error.
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 
@@ -32,11 +34,31 @@ public final class WalletViewModel {
         case error(message: String)
     }
 
+    /// Transient status for the Block 3C payout actions (withdraw / connect),
+    /// surfaced by the view as a toast. Distinct from `state` (which stays on
+    /// the loaded frame while an action runs).
+    public enum Action: Equatable, Sendable {
+        case idle
+        case withdrawing
+        case withdrawSucceeded(message: String)
+        case withdrawFailed(message: String)
+        /// Opening the Stripe-hosted onboarding / dashboard.
+        case connecting
+        case actionFailed(message: String)
+    }
+
     public private(set) var state: State = .loading
+    /// Drives the post-action toast (`wallet.*` result surfaces).
+    public private(set) var action: Action = .idle
 
     private let api: APIClient
+    private let connectPresenter: any ConnectWebPresenting
     private let calendar: Calendar
     private let now: @Sendable () -> Date
+    /// Cached from the last live fetch — the withdraw amount (full available
+    /// balance, in cents) + whether the connected account can receive payouts.
+    private var availableCents: Int = 0
+    private var payoutsEnabled: Bool = false
     /// Non-nil for the sample/preview path — `load()` resolves locally and
     /// never touches the network.
     private let sampleContent: WalletContent?
@@ -55,14 +77,16 @@ public final class WalletViewModel {
         self.init(api: .shared, calendar: calendar, now: now)
     }
 
-    /// Designated live initializer. `api` is injectable for tests; internal
-    /// because `APIClient` is internal.
+    /// Designated live initializer. `api` + `connectPresenter` are injectable
+    /// for tests; internal because `APIClient` is internal.
     init(
         api: APIClient,
+        connectPresenter: any ConnectWebPresenting = ConnectWebPresenter(),
         calendar: Calendar = .current,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.api = api
+        self.connectPresenter = connectPresenter
         self.calendar = calendar
         self.now = now
         sampleContent = nil
@@ -72,6 +96,7 @@ public final class WalletViewModel {
     /// Sample/preview path — resolve straight from deterministic content.
     public init(content: WalletContent) {
         api = .shared
+        connectPresenter = ConnectWebPresenter()
         calendar = .current
         now = { Date() }
         sampleContent = content
@@ -82,6 +107,7 @@ public final class WalletViewModel {
     /// loading + error chrome without a network layer.
     public init(state: State, content: WalletContent = WalletSampleData.populated) {
         api = .shared
+        connectPresenter = ConnectWebPresenter()
         calendar = .current
         now = { Date() }
         sampleContent = content
@@ -104,8 +130,11 @@ public final class WalletViewModel {
 
     // MARK: - Live fetch
 
-    private func fetchLive() async {
-        state = .loading
+    /// `showLoading == false` keeps the current frame visible while a post-action
+    /// refresh runs (e.g. after a withdraw) so the screen doesn't flash the
+    /// loading shell.
+    private func fetchLive(showLoading: Bool = true) async {
+        if showLoading { state = .loading }
         do {
             let balance: WalletBalanceResponse = try await api.request(WalletEndpoints.balance())
             let history: WalletTransactionsResponse = try await api.request(WalletEndpoints.transactions())
@@ -114,10 +143,19 @@ public final class WalletViewModel {
             let pending: WalletPendingReleaseResponse? = try? await api.request(
                 WalletEndpoints.pendingRelease()
             )
+            // Connect payout status gates the Withdraw CTA. A 404 (no account
+            // yet) or any error degrades to "not enabled" → "Set up payouts".
+            let connect: ConnectAccountStatusResponse? = try? await api.request(
+                ConnectEndpoints.accountStatus()
+            )
+            let enabled = connect?.account.payoutsEnabled ?? false
+            availableCents = balance.wallet.balance
+            payoutsEnabled = enabled
             let content = Self.makeContent(
                 balance: balance,
                 transactions: history.transactions,
                 pending: pending,
+                payoutsEnabled: enabled,
                 calendar: calendar,
                 now: now()
             )
@@ -127,6 +165,77 @@ public final class WalletViewModel {
                 message: (error as? APIError)?.errorDescription ?? "Couldn't load your wallet."
             )
         }
+    }
+
+    // MARK: - Payout actions (Block 3C)
+
+    /// Withdraw the full available balance to the seller's bank. Only reachable
+    /// when `payoutsEnabled` (the view gates the CTA), but re-checked here.
+    public func withdraw() async {
+        guard sampleContent == nil, !seeded else { return }
+        guard payoutsEnabled, availableCents >= 100 else {
+            action = .withdrawFailed(message: "Set up payouts before withdrawing.")
+            return
+        }
+        action = .withdrawing
+        do {
+            let response: WalletWithdrawResponse = try await api.request(
+                WalletEndpoints.withdraw(
+                    body: WalletWithdrawRequest(amount: availableCents, idempotencyKey: UUID().uuidString)
+                )
+            )
+            action = .withdrawSucceeded(message: response.message ?? "Withdrawal initiated.")
+            // Re-read balance + activity (server is the source of truth).
+            await fetchLive(showLoading: false)
+        } catch {
+            action = .withdrawFailed(
+                message: (error as? APIError)?.errorDescription ?? "Couldn't process the withdrawal."
+            )
+        }
+    }
+
+    /// "Set up payouts" / "Re-verify" — ensure a connected account exists, then
+    /// open the Stripe-hosted Account Link. On return, re-read status so the
+    /// gate flips to Withdraw if payouts are now enabled.
+    public func setupPayouts() async {
+        guard sampleContent == nil, !seeded else { return }
+        action = .connecting
+        // Ensure the account exists; a 400 "already exists" is fine — proceed.
+        _ = try? await api.request(ConnectEndpoints.createAccount(), as: ConnectCreateAccountResponse.self)
+        do {
+            let link: ConnectOnboardingResponse = try await api.request(ConnectEndpoints.onboarding())
+            guard let url = URL(string: link.onboardingUrl) else {
+                action = .actionFailed(message: "Couldn't open payout setup. Please try again.")
+                return
+            }
+            await connectPresenter.present(url: url)
+            action = .idle
+            await fetchLive(showLoading: false)
+        } catch {
+            action = .actionFailed(
+                message: (error as? APIError)?.errorDescription ?? "Couldn't start payout setup."
+            )
+        }
+    }
+
+    /// Open the Stripe Express dashboard for an onboarded seller (manage bank,
+    /// view payouts). Nothing to refresh on return.
+    public func openDashboard() async {
+        guard sampleContent == nil, !seeded else { return }
+        do {
+            let link: ConnectDashboardResponse = try await api.request(ConnectEndpoints.dashboard())
+            guard let url = URL(string: link.dashboardUrl) else { return }
+            await connectPresenter.present(url: url)
+        } catch {
+            action = .actionFailed(
+                message: (error as? APIError)?.errorDescription ?? "Couldn't open your payout dashboard."
+            )
+        }
+    }
+
+    /// Clear the action toast once the view has shown it.
+    public func clearAction() {
+        action = .idle
     }
 
     // MARK: - Mapping (pure — unit-test surface)
@@ -139,6 +248,7 @@ public final class WalletViewModel {
         balance: WalletBalanceResponse,
         transactions: [WalletTransactionDTO],
         pending: WalletPendingReleaseResponse?,
+        payoutsEnabled: Bool = true,
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> WalletContent {
@@ -155,7 +265,8 @@ public final class WalletViewModel {
             activity: activity,
             payoutMethod: placeholder.payoutMethod,
             taxDocs: placeholder.taxDocs,
-            holdState: nil
+            holdState: nil,
+            payoutsEnabled: payoutsEnabled
         )
     }
 

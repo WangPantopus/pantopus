@@ -134,7 +134,7 @@ public struct SettingsView: View {
         case .about:
             AboutView { popLast() }
         case .payments:
-            PaymentsView { popLast() }
+            PaymentsView(onBack: { popLast() }, onOpenWallet: onOpenWallet)
         default:
             EmptyView()
         }

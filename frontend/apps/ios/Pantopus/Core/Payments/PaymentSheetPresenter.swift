@@ -32,7 +32,8 @@ public protocol PaymentSheetPresenting: Sendable {
     func presentAddCard(
         setupIntentClientSecret: String,
         customer: String,
-        ephemeralKey: String
+        ephemeralKey: String,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome
 
     /// PaymentIntent (or SetupIntent) flow — collecting payment for a gig /
@@ -41,7 +42,8 @@ public protocol PaymentSheetPresenting: Sendable {
         clientSecret: String,
         customer: String,
         ephemeralKey: String,
-        isSetupIntent: Bool
+        isSetupIntent: Bool,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome
 }
 
@@ -56,8 +58,10 @@ public final class StripePaymentSheetPresenter: PaymentSheetPresenting {
     public func presentAddCard(
         setupIntentClientSecret: String,
         customer: String,
-        ephemeralKey: String
+        ephemeralKey: String,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome {
+        StripeBootstrap.configure(publishableKey: publishableKey ?? "")
         let configuration = makeConfiguration(customer: customer, ephemeralKey: ephemeralKey)
         let sheet = PaymentSheet(
             setupIntentClientSecret: setupIntentClientSecret,
@@ -70,8 +74,10 @@ public final class StripePaymentSheetPresenter: PaymentSheetPresenting {
         clientSecret: String,
         customer: String,
         ephemeralKey: String,
-        isSetupIntent: Bool
+        isSetupIntent: Bool,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome {
+        StripeBootstrap.configure(publishableKey: publishableKey ?? "")
         let configuration = makeConfiguration(customer: customer, ephemeralKey: ephemeralKey)
         let sheet = isSetupIntent
             ? PaymentSheet(setupIntentClientSecret: clientSecret, configuration: configuration)
@@ -84,7 +90,13 @@ public final class StripePaymentSheetPresenter: PaymentSheetPresenting {
     private func makeConfiguration(customer: String, ephemeralKey: String) -> PaymentSheet.Configuration {
         var configuration = PaymentSheet.Configuration()
         configuration.merchantDisplayName = merchantDisplayName
-        configuration.customer = .init(id: customer, ephemeralKeySecret: ephemeralKey)
+        // The customer + ephemeral key let PaymentSheet show saved cards and
+        // save new ones. They're best-effort for one-off checkouts (3B): when
+        // the backend couldn't mint a key we still collect a card against the
+        // client secret rather than failing the whole flow.
+        if !customer.isEmpty, !ephemeralKey.isEmpty {
+            configuration.customer = .init(id: customer, ephemeralKeySecret: ephemeralKey)
+        }
         // Apple Pay is intentionally left unconfigured until a merchant ID +
         // entitlement are provisioned; PaymentSheet still collects cards.
         // (Enabling it later is a one-liner here — see project.yml's

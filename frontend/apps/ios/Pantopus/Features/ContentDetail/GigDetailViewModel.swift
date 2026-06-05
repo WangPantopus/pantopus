@@ -8,6 +8,8 @@
 //  via `POST /api/gigs/:gigId/bids`.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 
@@ -30,20 +32,39 @@ public final class GigDetailViewModel {
     /// affordance + which sheet the host presents.
     public private(set) var canMarkDelivered: Bool = false
 
+    /// Block 3D — true when the signed-in viewer is the poster of a completed,
+    /// owner-confirmed gig with an assigned worker (the `/tip` preconditions).
+    /// Drives the "Send a tip" dock CTA.
+    public private(set) var canTip: Bool = false
+
+    /// Transient tip-flow status, surfaced by the view as a toast.
+    public enum TipStatus: Sendable, Equatable {
+        case idle
+        case sending
+        case succeeded
+        case canceled
+        case failed(message: String)
+    }
+
+    public private(set) var tipStatus: TipStatus = .idle
+
     private let gigId: String
     private let api: APIClient
     private let uploader: MultipartUploader
+    private let checkout: CheckoutCoordinator
     private let currentUserId: String?
 
     init(
         gigId: String,
         api: APIClient = .shared,
         uploader: MultipartUploader = .shared,
+        checkout: CheckoutCoordinator = CheckoutCoordinator(),
         currentUserId: String? = GigDetailViewModel.currentSignedInUserId()
     ) {
         self.gigId = gigId
         self.api = api
         self.uploader = uploader
+        self.checkout = checkout
         self.currentUserId = currentUserId
     }
 
@@ -63,13 +84,16 @@ public final class GigDetailViewModel {
             rawGig = detail.gig
             viewerIsOwner = currentUserId != nil && detail.gig.userId == currentUserId
             canMarkDelivered = Self.viewerCanMarkDelivered(gig: detail.gig, currentUserId: currentUserId)
+            canTip = Self.viewerCanTip(gig: detail.gig, viewerIsOwner: viewerIsOwner)
             var bids: [GigBidDTO] = []
             if viewerIsOwner {
                 if let bidsResponse: GigBidsResponse = try? await api.request(GigsEndpoints.bids(gigId: gigId)) {
                     bids = bidsResponse.bids
                 }
             }
-            state = .loaded(Self.project(gig: detail.gig, bids: bids, canMarkDelivered: canMarkDelivered))
+            state = .loaded(Self.project(
+                gig: detail.gig, bids: bids, canMarkDelivered: canMarkDelivered, canTip: canTip
+            ))
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gig."
             state = .error(message: message)
@@ -82,6 +106,54 @@ public final class GigDetailViewModel {
         guard let me = currentUserId, !me.isEmpty,
               let worker = gig.acceptedBy, worker == me else { return false }
         return (gig.status ?? "").lowercased() == "in_progress"
+    }
+
+    /// The tip gate (Block 3D): the poster, on a completed + owner-confirmed gig
+    /// with an assigned worker. Mirrors the `/tip` route's preconditions.
+    static func viewerCanTip(gig: GigDTO, viewerIsOwner: Bool) -> Bool {
+        guard viewerIsOwner else { return false }
+        guard let worker = gig.acceptedBy, !worker.isEmpty else { return false }
+        guard (gig.status ?? "").lowercased() == "completed" else { return false }
+        return (gig.ownerConfirmedAt ?? "").isEmpty == false
+    }
+
+    /// Send a tip of `amountCents` to the worker: create the tip payment,
+    /// present PaymentSheet via the shared `CheckoutCoordinator`, then
+    /// best-effort reconcile + refresh the gig. We never mark the tip paid
+    /// locally — the refresh-status + webhook reconcile server-side.
+    public func sendTip(amountCents: Int) async {
+        guard canTip else { return }
+        tipStatus = .sending
+        do {
+            let response: TipResponse = try await api.request(
+                PaymentsEndpoints.tip(body: TipRequest(gigId: gigId, amount: amountCents))
+            )
+            let outcome = await checkout.present(response.sheetParams)
+            switch outcome {
+            case .paid:
+                if let paymentId = response.paymentId {
+                    _ = try? await api.request(
+                        PaymentsEndpoints.tipRefreshStatus(paymentId: paymentId),
+                        as: TipRefreshStatusResponse.self
+                    )
+                }
+                tipStatus = .succeeded
+                await load()
+            case .canceled:
+                tipStatus = .canceled
+            case let .declined(message), let .failed(message):
+                tipStatus = .failed(message: message)
+            }
+        } catch {
+            tipStatus = .failed(
+                message: (error as? APIError)?.errorDescription ?? "Couldn't send the tip."
+            )
+        }
+    }
+
+    /// Clear the tip toast once the view has shown it.
+    public func clearTipStatus() {
+        tipStatus = .idle
     }
 
     /// Upload each proof photo via `POST /api/files/upload`, then mark the
@@ -150,10 +222,39 @@ extension GigDetailViewModel {
     /// capsules with ratings, per-bid tags — is rendered from
     /// `GigDetailSampleData` until the Magic Task JSONB is wired through
     /// the backend (out of scope per P8.2).
-    static func project(gig: GigDTO, bids: [GigBidDTO], canMarkDelivered: Bool = false) -> ContentDetailContent {
+    static func project(
+        gig: GigDTO,
+        bids: [GigBidDTO],
+        canMarkDelivered: Bool = false,
+        canTip: Bool = false
+    ) -> ContentDetailContent {
         (gig.isV2 == true)
-            ? projectTaskV2(gig: gig, bids: bids, canMarkDelivered: canMarkDelivered)
-            : projectGigV1(gig: gig, bids: bids)
+            ? projectTaskV2(gig: gig, bids: bids, canMarkDelivered: canMarkDelivered, canTip: canTip)
+            : projectGigV1(gig: gig, bids: bids, canTip: canTip)
+    }
+
+    /// The dock for the poster on a completed gig — primary becomes "Send a
+    /// tip" (Block 3D), keeping "Message" as the secondary.
+    static let tipDock = ContentDetailDock(
+        secondary: ContentDetailDockButton(label: "Message", icon: .send),
+        primary: ContentDetailDockButton(label: "Send a tip", icon: .handCoins)
+    )
+
+    /// V2 dock: tip (poster, completed) → mark-delivered (worker, in-progress)
+    /// → place-bid. Factored out to keep `projectTaskV2` under the body-length
+    /// limit.
+    private static func taskV2Dock(canMarkDelivered: Bool, canTip: Bool) -> ContentDetailDock {
+        if canTip { return tipDock }
+        if canMarkDelivered {
+            return ContentDetailDock(
+                secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                primary: ContentDetailDockButton(label: "Mark as delivered", icon: .checkCheck)
+            )
+        }
+        return ContentDetailDock(
+            secondary: ContentDetailDockButton(label: "Message", icon: .send),
+            primary: ContentDetailDockButton(label: "Place bid")
+        )
     }
 
     // MARK: V2 (Task) — Magic Task surface
@@ -161,7 +262,8 @@ extension GigDetailViewModel {
     private static func projectTaskV2(
         gig: GigDTO,
         bids: [GigBidDTO],
-        canMarkDelivered: Bool
+        canMarkDelivered: Bool,
+        canTip: Bool = false
     ) -> ContentDetailContent {
         let category = GigsCategory.from(backendKey: gig.category)
         let bidCount = gig.bidCount ?? bids.count
@@ -216,15 +318,7 @@ extension GigDetailViewModel {
         let statusPill = canMarkDelivered
             ? ContentDetailPill(label: "In progress", icon: .circle, tone: .warning)
             : ContentDetailPill(label: statusLabel, icon: .circle, tone: .warning)
-        let dock = canMarkDelivered
-            ? ContentDetailDock(
-                secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                primary: ContentDetailDockButton(label: "Mark as delivered", icon: .checkCheck)
-            )
-            : ContentDetailDock(
-                secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                primary: ContentDetailDockButton(label: "Place bid")
-            )
+        let dock = taskV2Dock(canMarkDelivered: canMarkDelivered, canTip: canTip)
         return ContentDetailContent(
             kind: .gig,
             statusPill: statusPill,
@@ -265,7 +359,7 @@ extension GigDetailViewModel {
 
     // MARK: V1 (legacy Gig) — sparse + awarded terminal state
 
-    private static func projectGigV1(gig: GigDTO, bids: [GigBidDTO]) -> ContentDetailContent {
+    private static func projectGigV1(gig: GigDTO, bids: [GigBidDTO], canTip: Bool = false) -> ContentDetailContent {
         let awarded = isAwarded(gig)
         let bidCount = gig.bidCount ?? bids.count
         let metaPieces: [String] = [
@@ -319,15 +413,17 @@ extension GigDetailViewModel {
             statStrip: [],
             modules: modules,
             trustCapsules: [],
-            dock: awarded
-                ? ContentDetailDock(
-                    secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                    primary: ContentDetailDockButton(label: "Bidding closed", icon: .lock, enabled: false)
-                )
-                : ContentDetailDock(
-                    secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                    primary: ContentDetailDockButton(label: "Place bid")
-                )
+            dock: canTip
+                ? tipDock
+                : (awarded
+                    ? ContentDetailDock(
+                        secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                        primary: ContentDetailDockButton(label: "Bidding closed", icon: .lock, enabled: false)
+                    )
+                    : ContentDetailDock(
+                        secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                        primary: ContentDetailDockButton(label: "Place bid")
+                    ))
         )
     }
 

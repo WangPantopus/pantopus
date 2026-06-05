@@ -2,6 +2,7 @@
 
 package app.pantopus.android.data.api.models.gigs
 
+import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
@@ -42,6 +43,8 @@ data class GigDto(
     @Json(name = "user_id") val userId: String? = null,
     @Json(name = "accepted_by") val acceptedBy: String? = null,
     @Json(name = "accepted_at") val acceptedAt: String? = null,
+    // Set when the poster confirms completion — gates the Block 3D tip affordance.
+    @Json(name = "owner_confirmed_at") val ownerConfirmedAt: String? = null,
     @Json(name = "scheduled_start") val scheduledStart: String? = null,
     @Json(name = "payment_status") val paymentStatus: String? = null,
     @Json(name = "engagement_mode") val engagementMode: String? = null,
@@ -130,6 +133,46 @@ data class PlaceBidResponse(
     val bid: GigBidDto? = null,
     val message: String? = null,
 )
+
+/**
+ * Response from `POST /api/gigs/:gigId/bids/:bidId/accept`.
+ * Paid gigs return PaymentSheet params and stay in `pending_payment`
+ * until `finalize-accept` succeeds; free gigs may already be accepted.
+ */
+@JsonClass(generateAdapter = true)
+data class GigBidAcceptResponse(
+    val bid: GigBidDto? = null,
+    val message: String? = null,
+    val requiresPaymentSetup: Boolean? = null,
+    val isSetupIntent: Boolean? = null,
+    val payment: PaymentPayload? = null,
+    val publishableKey: String? = null,
+    val clientSecret: String? = null,
+    val paymentId: String? = null,
+    val setupIntentId: String? = null,
+    val paymentIntentId: String? = null,
+    val ephemeralKey: String? = null,
+    val customer: String? = null,
+    val customerId: String? = null,
+) {
+    fun sheetParams(): PaymentIntentSheetParamsDto =
+        PaymentIntentSheetParamsDto(
+            clientSecret = clientSecret ?: payment?.clientSecret,
+            paymentIntentId = paymentIntentId ?: payment?.paymentIntentId,
+            customer = customer ?: customerId,
+            ephemeralKey = ephemeralKey,
+            publishableKey = publishableKey,
+            isSetupIntent = isSetupIntent,
+        )
+
+    @JsonClass(generateAdapter = true)
+    data class PaymentPayload(
+        val clientSecret: String? = null,
+        val paymentId: String? = null,
+        val setupIntentId: String? = null,
+        val paymentIntentId: String? = null,
+    )
+}
 
 /**
  * Body for `POST /api/gigs/:gigId/mark-completed`. The Delivery Proof

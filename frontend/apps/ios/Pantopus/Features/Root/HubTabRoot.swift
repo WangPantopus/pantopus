@@ -2081,12 +2081,12 @@ public struct HubTabRoot: View {
                 pop()
             }
         case .wallet:
+            // Withdraw + payout setup (Block 3C) are handled inside WalletView
+            // via the WalletViewModel (Stripe Connect onboarding / dashboard /
+            // withdraw); only the navigation affordances stay as callbacks.
             WalletView(
                 onBack: pop,
                 onOpenHistory: { Task { @MainActor in push(.placeholder(label: "Wallet history")) } },
-                onWithdraw: { Task { @MainActor in push(.placeholder(label: "Withdraw")) } },
-                onManagePayout: { Task { @MainActor in push(.placeholder(label: "Manage payout method")) } },
-                onReverifyPayout: { Task { @MainActor in push(.placeholder(label: "Re-verify bank")) } },
                 onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } },
                 onSeeAllActivity: { Task { @MainActor in push(.placeholder(label: "All activity")) } }
             )

@@ -24,6 +24,9 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     public let userId: String?
     public let acceptedBy: String?
     public let acceptedAt: String?
+    /// Set when the poster confirms completion — gates the Block 3D tip
+    /// affordance (the `/tip` route requires a completed + confirmed gig).
+    public let ownerConfirmedAt: String?
     public let scheduledStart: String?
     public let paymentStatus: String?
     public let engagementMode: String?
@@ -54,6 +57,7 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case userId = "user_id"
         case acceptedBy = "accepted_by"
         case acceptedAt = "accepted_at"
+        case ownerConfirmedAt = "owner_confirmed_at"
         case scheduledStart = "scheduled_start"
         case paymentStatus = "payment_status"
         case engagementMode = "engagement_mode"
@@ -175,6 +179,43 @@ public struct GigBidsResponse: Decodable, Sendable {
 public struct PlaceBidResponse: Decodable, Sendable {
     public let bid: GigBidDTO?
     public let message: String?
+}
+
+/// Response from `POST /api/gigs/:gigId/bids/:bidId/accept`.
+/// Paid gigs return PaymentSheet params and stay in `pending_payment` until
+/// `finalize-accept` succeeds; free gigs may return an already accepted bid.
+public struct GigBidAcceptResponse: Decodable, Sendable, Hashable {
+    public let bid: GigBidDTO?
+    public let message: String?
+    public let requiresPaymentSetup: Bool?
+    public let isSetupIntent: Bool?
+    public let payment: PaymentPayload?
+    public let publishableKey: String?
+    public let clientSecret: String?
+    public let paymentId: String?
+    public let setupIntentId: String?
+    public let paymentIntentId: String?
+    public let ephemeralKey: String?
+    public let customer: String?
+    public let customerId: String?
+
+    public var sheetParams: PaymentIntentSheetParams {
+        PaymentIntentSheetParams(
+            clientSecret: clientSecret ?? payment?.clientSecret,
+            paymentIntentId: paymentIntentId ?? payment?.paymentIntentId,
+            customer: customer ?? customerId,
+            ephemeralKey: ephemeralKey,
+            publishableKey: publishableKey,
+            isSetupIntent: isSetupIntent
+        )
+    }
+
+    public struct PaymentPayload: Decodable, Sendable, Hashable {
+        public let clientSecret: String?
+        public let paymentId: String?
+        public let setupIntentId: String?
+        public let paymentIntentId: String?
+    }
 }
 
 /// Body for `POST /api/gigs`. Mirrors the subset of `createGigSchema`

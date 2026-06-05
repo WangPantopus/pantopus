@@ -123,6 +123,13 @@ data class WalletContent(
     val taxDocs: WalletTaxDocs,
     /** Populated only in the [Hold] state. */
     val holdState: WalletHoldState? = null,
+    /**
+     * Block 3C — whether the seller's Stripe Connect account has payouts
+     * enabled. `false` gates the Withdraw CTA behind "Set up payouts". Defaults
+     * `true` so existing fixtures / snapshots render the Withdraw CTA unchanged;
+     * the live path sets it from `GET /connect/account`.
+     */
+    val payoutsEnabled: Boolean = true,
 ) {
     val isOnHold: Boolean get() = holdState != null
 }

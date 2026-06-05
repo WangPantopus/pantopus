@@ -13,9 +13,14 @@ public struct GigDetailView: View {
     @State private var viewModel: GigDetailViewModel
     @State private var bidSheetTarget: EditBidSheetTarget?
     @State private var deliveryTarget: DeliveryProofTarget?
+    @State private var showTipSheet = false
+    @State private var tipCustomAmountText = ""
     @State private var toast: ToastMessage?
     private let onBack: @MainActor () -> Void
     private let onMessage: (@MainActor (GigDTO) -> Void)?
+
+    /// Block 3D — preset tip amounts in cents.
+    private let tipPresets = [500, 1000, 2000]
 
     public init(
         viewModel: GigDetailViewModel,
@@ -64,7 +69,126 @@ public struct GigDetailView: View {
                 onDismiss: { deliveryTarget = nil }
             )
         }
+        .sheet(isPresented: $showTipSheet) { tipSheet }
         .overlay(alignment: .bottom) { toastOverlay }
+        .overlay(alignment: .top) { tipMarkers }
+        .onChange(of: viewModel.tipStatus) { _, status in handleTip(status) }
+    }
+
+    // MARK: - Tip (Block 3D)
+
+    private var tipSheet: some View {
+        VStack(spacing: Spacing.s4) {
+            Icon(.handCoins, size: 32, color: Theme.Color.primary600)
+            Text("Send a tip")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text("100% goes to your helper. Charged to your card via Stripe.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+            HStack(spacing: Spacing.s3) {
+                ForEach(tipPresets, id: \.self) { cents in
+                    Button { selectTip(cents) } label: {
+                        Text("$\(cents / 100)")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Theme.Color.primary600)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(Theme.Color.primary50)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("tip.amount.\(cents)")
+                }
+            }
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text("Custom amount")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                HStack(spacing: Spacing.s2) {
+                    Text("$")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    TextField("0.00", text: $tipCustomAmountText)
+                        .keyboardType(.decimalPad)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .accessibilityIdentifier("tip.amount.customInput")
+                }
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 48)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            Button {
+                if let cents = customTipCents {
+                    selectTip(cents)
+                }
+            } label: {
+                Text("Send custom tip")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(customTipCents == nil ? Theme.Color.appTextMuted : Theme.Color.appTextInverse)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(customTipCents == nil ? Theme.Color.appSurfaceSunken : Theme.Color.primary600)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            }
+            .disabled(customTipCents == nil)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tip.amount.customSubmit")
+            Button("Not now") { showTipSheet = false }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .buttonStyle(.plain)
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity)
+        .presentationDetents([.height(410)])
+        .accessibilityIdentifier("tip.amount")
+    }
+
+    private var customTipCents: Int? {
+        let cleaned = tipCustomAmountText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: ",", with: "")
+        guard let dollars = Double(cleaned), dollars >= 0.5 else { return nil }
+        return max(50, Int((dollars * 100).rounded()))
+    }
+
+    /// Zero-size anchors so UI tests can assert each tip stage.
+    @ViewBuilder private var tipMarkers: some View {
+        if viewModel.canTip {
+            Color.clear.frame(width: 0, height: 0).accessibilityIdentifier("tip.affordance")
+        }
+        if viewModel.tipStatus == .sending {
+            Color.clear.frame(width: 0, height: 0).accessibilityIdentifier("tip.paymentSheet")
+        }
+        if viewModel.tipStatus == .succeeded {
+            Color.clear.frame(width: 0, height: 0).accessibilityIdentifier("tip.success")
+        }
+    }
+
+    private func selectTip(_ cents: Int) {
+        showTipSheet = false
+        tipCustomAmountText = ""
+        Task { await viewModel.sendTip(amountCents: cents) }
+    }
+
+    private func handleTip(_ status: GigDetailViewModel.TipStatus) {
+        switch status {
+        case .idle, .sending:
+            break
+        case .succeeded:
+            // Keep the .succeeded marker live for tests; the toast fires once.
+            toast = ToastMessage(text: "Tip sent — thank you!", kind: .success)
+        case .canceled:
+            viewModel.clearTipStatus()
+        case let .failed(message):
+            toast = ToastMessage(text: message, kind: .error)
+            viewModel.clearTipStatus()
+        }
     }
 
     @ViewBuilder private var toastOverlay: some View {
@@ -80,10 +204,14 @@ public struct GigDetailView: View {
         }
     }
 
-    /// Dock primary routes to the Delivery Proof sheet when the viewer is
-    /// the assigned worker on an in-progress task, otherwise the bid sheet.
+    /// Dock primary routes to: the tip sheet when the poster can tip a
+    /// completed gig (Block 3D); the Delivery Proof sheet for the assigned
+    /// worker on an in-progress task; otherwise the bid sheet.
     private func presentPrimaryAction() {
-        if viewModel.canMarkDelivered {
+        if viewModel.canTip {
+            tipCustomAmountText = ""
+            showTipSheet = true
+        } else if viewModel.canMarkDelivered {
             presentDeliveryProof()
         } else {
             presentBidSheet()

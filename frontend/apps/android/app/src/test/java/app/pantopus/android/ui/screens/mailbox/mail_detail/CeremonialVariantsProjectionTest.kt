@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.mailbox.MailDetail
 import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -37,6 +38,7 @@ import org.junit.Test
 class CeremonialVariantsProjectionTest {
     private val repo: MailboxRepository = mockk()
     private val vaultRepo: MailboxVaultRepository = mockk(relaxed = true)
+    private val gigsRepo: GigsRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -52,6 +54,7 @@ class CeremonialVariantsProjectionTest {
         MailDetailViewModel(
             repo = repo,
             vaultRepo = vaultRepo,
+            gigsRepo = gigsRepo,
             savedStateHandle = SavedStateHandle(mapOf(MAIL_DETAIL_MAIL_ID_KEY to "m1")),
         )
 

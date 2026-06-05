@@ -17,14 +17,18 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferDto
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferUserDto
 import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.models.payments.CreatePaymentIntentRequest
+import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import app.pantopus.android.data.api.models.transaction_reviews.CreateTransactionReviewBody
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.listing_offers.ListingOffersRepository
 import app.pantopus.android.data.listings.ListingsRepository
+import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.data.transaction_reviews.TransactionReviewsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
@@ -53,8 +57,11 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -267,6 +274,11 @@ data class CounterSheetTarget(
     val suggestedAmount: Double?,
 )
 
+/** One-shot effects emitted by [ListingOffersViewModel]. */
+sealed interface ListingOffersEvent {
+    data class PresentCheckout(val params: PaymentIntentSheetParamsDto) : ListingOffersEvent
+}
+
 /**
  * T5.3.4 — Listing offers. Drives the screen against the shared
  * [ListOfRowsScreen]. See iOS counterpart for the mapping tables.
@@ -279,6 +291,7 @@ class ListingOffersViewModel
         private val listingsRepo: ListingsRepository,
         private val authRepo: AuthRepository,
         private val transactionReviewsRepo: TransactionReviewsRepository,
+        private val paymentsRepo: PaymentsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
@@ -597,6 +610,9 @@ class ListingOffersViewModel
         private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
 
+        private val _events = MutableSharedFlow<ListingOffersEvent>(extraBufferCapacity = 4)
+        val events: SharedFlow<ListingOffersEvent> = _events.asSharedFlow()
+
         private val _listingContext = MutableStateFlow<ListingContextConfig?>(null)
         val listingContext: StateFlow<ListingContextConfig?> = _listingContext.asStateFlow()
 
@@ -624,6 +640,7 @@ class ListingOffersViewModel
         private var offers: List<ListingOfferDto> = emptyList()
         private var loadedAtLeastOnce = false
         private var sort: ListingOffersSort = ListingOffersSort.HighestOffer
+        private var pendingCheckoutOfferId: String? = null
 
         private var nowProvider: () -> Instant = { Instant.now() }
         private var shareHandler: () -> Unit = {}
@@ -825,13 +842,58 @@ class ListingOffersViewModel
             applyOptimisticStatus(dto.id, "accepted")
             viewModelScope.launch {
                 when (val result = offersRepo.accept(listingId, dto.id)) {
-                    is NetworkResult.Success -> replaceOffer(result.data.offer)
+                    is NetworkResult.Success -> {
+                        val accepted = result.data.offer
+                        replaceOffer(accepted)
+                        checkoutAcceptedOfferIfNeeded(accepted, dto)
+                    }
                     is NetworkResult.Failure -> {
                         offers = previous
                         applyState()
                     }
                 }
             }
+        }
+
+        private suspend fun checkoutAcceptedOfferIfNeeded(
+            offer: ListingOfferDto,
+            fallback: ListingOfferDto,
+        ) {
+            if (!shouldCheckoutAcceptedOffer(offer, fallback)) return
+            val result =
+                paymentsRepo.createPaymentIntent(
+                    CreatePaymentIntentRequest(
+                        listingId = offer.listingId ?: fallback.listingId ?: listingId,
+                        offerId = offer.id,
+                        description = listing?.title ?: listingTitleHint,
+                    ),
+                )
+            when (result) {
+                is NetworkResult.Success -> {
+                    pendingCheckoutOfferId = offer.id
+                    _events.emit(ListingOffersEvent.PresentCheckout(result.data))
+                }
+                is NetworkResult.Failure -> Unit
+            }
+        }
+
+        fun onCheckoutOutcome(outcome: CheckoutOutcome) {
+            val offerId = pendingCheckoutOfferId ?: return
+            pendingCheckoutOfferId = null
+            if (outcome == CheckoutOutcome.Paid) {
+                refresh()
+            } else {
+                offers.find { it.id == offerId }?.let { replaceOffer(it) }
+            }
+        }
+
+        private fun shouldCheckoutAcceptedOffer(
+            offer: ListingOfferDto,
+            fallback: ListingOfferDto,
+        ): Boolean {
+            if (ListingOfferStatus.fromRaw(offer.status) != ListingOfferStatus.Accepted) return false
+            val buyerId = offer.buyerId ?: offer.buyer?.id ?: fallback.buyerId ?: fallback.buyer?.id ?: return false
+            return buyerId == currentUserId()
         }
 
         fun declineOffer(dto: ListingOfferDto) {
