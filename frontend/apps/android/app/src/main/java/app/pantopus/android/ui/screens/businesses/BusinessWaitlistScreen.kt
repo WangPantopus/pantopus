@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.pantopus.android.ui.components.OfflineBanner
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -52,7 +51,6 @@ fun BusinessWaitlistScreen(onBack: () -> Unit) {
                 .semantics { contentDescription = "businessWaitlist" },
     ) {
         BusinessWaitlistTopBar(onBack)
-        OfflineBanner(modifier = Modifier.fillMaxWidth())
 
         Column(
             modifier = Modifier.fillMaxSize().padding(Spacing.s5),

@@ -5,6 +5,7 @@
 //  App entry point. Boots the environment, auth, and root view.
 //
 
+import Foundation
 import SwiftUI
 
 @main
@@ -27,6 +28,19 @@ struct PantopusApp: App {
                 .task {
                     if !ProcessInfo.processInfo.isUITestSeededAuthSession {
                         await authManager.restoreSession()
+                    }
+                }
+                // Universal links (`https://pantopus.app/…`) and custom-scheme
+                // URLs (`pantopus://…`). Both funnel into the same router the
+                // notification-tap path uses; `RootTabView` observes
+                // `DeepLinkRouter.shared.pending` and dispatches to the right
+                // tab/stack, so cold-start links resolve once the root appears.
+                .onOpenURL { url in
+                    DeepLinkRouter.shared.handle(url: url)
+                }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    if let url = activity.webpageURL {
+                        DeepLinkRouter.shared.handle(url: url)
                     }
                 }
         }

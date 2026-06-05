@@ -217,6 +217,7 @@ private struct PlusOneStepper: View {
                 StepperButton(icon: .minus, primary: false) {
                     onAdjust(max(0, plusOneCount - 1))
                 }
+                .accessibilityLabel("Remove a plus-one")
                 Text("\(plusOneCount)")
                     .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(Theme.Color.appText)
@@ -224,6 +225,7 @@ private struct PlusOneStepper: View {
                 StepperButton(icon: .plus, primary: true) {
                     onAdjust(plusOneCount + 1)
                 }
+                .accessibilityLabel("Add a plus-one")
             }
             .padding(Spacing.s0 + 3)
             .background(Theme.Color.appSurfaceSunken)
