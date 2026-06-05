@@ -74,9 +74,17 @@ class BusinessProfileViewModel
             if (_saveState.value is BusinessProfileSaveState.Saved) return
             _saveState.value = BusinessProfileSaveState.InFlight
             viewModelScope.launch {
-                // Optimistic UX — the follow-a-business endpoint ships later.
-                _saveState.value = BusinessProfileSaveState.Saved
-                _toastMessage.value = "Saved"
+                when (val result = businesses.followBusiness(businessId)) {
+                    is NetworkResult.Success -> {
+                        _saveState.value = BusinessProfileSaveState.Saved
+                        _toastMessage.value = if (result.data.following) "Saved" else "Updated"
+                    }
+                    is NetworkResult.Failure -> {
+                        val message = friendlyMessage(result.error)
+                        _saveState.value = BusinessProfileSaveState.Failed(message)
+                        _toastMessage.value = message
+                    }
+                }
             }
         }
 

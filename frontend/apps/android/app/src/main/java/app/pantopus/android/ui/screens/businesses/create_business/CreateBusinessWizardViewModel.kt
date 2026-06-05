@@ -104,11 +104,12 @@ open class CreateBusinessWizardViewModel
                 CreateBusinessStep.LegalInfo -> transitionTo(CreateBusinessStep.Profile)
                 CreateBusinessStep.Profile -> transitionTo(CreateBusinessStep.Confirm)
                 CreateBusinessStep.Confirm -> {
-                    // Stub: confirm step has no real submit yet — pop
-                    // back so the design can be walked without a backend
-                    // round-trip. The follow-on prompt replaces this
-                    // with a real submit path.
-                    pendingEvent.value = CreateBusinessOutboundEvent.Dismiss
+                    _state.update {
+                        it.copy(
+                            submitError =
+                                "Business name, username, and email are required before this can be submitted.",
+                        )
+                    }
                 }
             }
         }
@@ -132,11 +133,8 @@ open class CreateBusinessWizardViewModel
         /**
          * Submit the typed search string as a custom category candidate.
          * Per audit open question #3 the backend doesn't yet accept the
-         * payload, so this routes through a stub: marks submitting,
-         * advances to the legal-info stub, and logs the payload so QA
-         * can see it fire. Replaced by a real
-         * `POST /api/businesses/custom-categories` call once backend
-         * ships it.
+         * payload. Keep the user on the search step with an explicit error
+         * until a real `POST /api/businesses/custom-categories` route ships.
          */
         fun submitCustomCategory() {
             val current = _state.value
@@ -148,17 +146,13 @@ open class CreateBusinessWizardViewModel
                     submitError = null,
                 )
             }
-            // TODO(audit-q3): wire to `POST /api/businesses/custom-categories`
-            // once backend accepts the payload.
-            Analytics.track(AnalyticsEvent.CtaCreateBusinessCustomCategorySubmit(label = trimmed))
             _state.update {
                 it.copy(
-                    selectedCategory = BusinessCategory.Other,
-                    searchText = "",
                     isSubmittingCustom = false,
+                    submitError = "Custom categories are not accepted by the backend yet.",
                 )
             }
-            transitionTo(CreateBusinessStep.LegalInfo)
+            Analytics.track(AnalyticsEvent.CtaCreateBusinessCustomCategorySubmit(label = trimmed))
         }
 
         fun acknowledgeEvent() {
@@ -224,8 +218,8 @@ open class CreateBusinessWizardViewModel
                     state.selectedCategory != null && !state.isSubmittingCustom
                 CreateBusinessStep.LegalInfo,
                 CreateBusinessStep.Profile,
-                CreateBusinessStep.Confirm,
                 -> true
+                CreateBusinessStep.Confirm -> false
             }
 
         private fun isDirty(state: CreateBusinessUiState): Boolean {

@@ -323,3 +323,9 @@ data class BusinessOwnerReviewsResponse(
 data class BusinessReviewRespondRequest(
     val response: String,
 )
+
+/** `POST /api/businesses/:businessId/follow` response. */
+@JsonClass(generateAdapter = true)
+data class BusinessFollowResponse(
+    val following: Boolean = true,
+)

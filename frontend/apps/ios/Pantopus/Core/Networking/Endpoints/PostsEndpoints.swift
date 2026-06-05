@@ -98,6 +98,16 @@ public enum PostsEndpoints {
     public static func deletePost(id: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/posts/\(id)")
     }
+
+    /// `POST /api/posts/:id/archive` — author-only archive.
+    public static func archive(id: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/posts/\(id)/archive")
+    }
+
+    /// `POST /api/posts/:id/unarchive` — author-only restore.
+    public static func unarchive(id: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/posts/\(id)/unarchive")
+    }
 }
 
 /// Endpoint builders for public profile fetch. Lives alongside posts

@@ -15,6 +15,7 @@ import javax.inject.Inject
 
 /** Nav-arg key for the business UUID. */
 const val EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY = "businessId"
+private const val EDITOR_BACKEND_UNAVAILABLE = "Business page editing is not connected to the backend yet."
 
 /**
  * P4.2 — A13.10 Edit Business Page. Owns per-field draft state + dirty
@@ -43,6 +44,7 @@ class EditBusinessPageViewModel
 
         private val _showsDiscardConfirm = MutableStateFlow(false)
         val showsDiscardConfirm: StateFlow<Boolean> = _showsDiscardConfirm.asStateFlow()
+        private var localPreviewPersistenceEnabled = false
 
         fun load() {
             if (_state.value is EditBusinessPageUiState.Loaded) return
@@ -59,22 +61,35 @@ class EditBusinessPageViewModel
 
         /** Test-only: seed the loaded state directly. */
         fun seedForPreview(content: EditBusinessPageContent) {
+            localPreviewPersistenceEnabled = true
             _state.value = EditBusinessPageUiState.Loaded(content)
         }
 
         fun save() {
             val current = _state.value as? EditBusinessPageUiState.Loaded ?: return
+            if (!localPreviewPersistenceEnabled) {
+                _toast.value = EDITOR_BACKEND_UNAVAILABLE
+                return
+            }
             _state.value = EditBusinessPageUiState.Loaded(promoteCurrentToOriginal(current.content))
             _toast.value = "Saved"
         }
 
         fun saveDraft() {
             val current = _state.value as? EditBusinessPageUiState.Loaded ?: return
+            if (!localPreviewPersistenceEnabled) {
+                _toast.value = EDITOR_BACKEND_UNAVAILABLE
+                return
+            }
             _state.value = EditBusinessPageUiState.Loaded(promoteCurrentToOriginal(current.content))
             _toast.value = "Draft saved"
         }
 
         fun publish() {
+            if (!localPreviewPersistenceEnabled) {
+                _toast.value = EDITOR_BACKEND_UNAVAILABLE
+                return
+            }
             _toast.value = "Published"
         }
 

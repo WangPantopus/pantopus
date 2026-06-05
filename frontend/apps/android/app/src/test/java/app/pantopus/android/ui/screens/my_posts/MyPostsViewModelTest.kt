@@ -9,6 +9,7 @@ package app.pantopus.android.ui.screens.my_posts
 
 import app.pantopus.android.data.api.models.posts.MyPostDto
 import app.pantopus.android.data.api.models.posts.MyPostsResponse
+import app.pantopus.android.data.api.models.posts.PostArchiveResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
@@ -109,6 +110,8 @@ class MyPostsViewModelTest {
         runTest {
             coEvery { postsRepo.userPosts(any(), any()) } returns
                 NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            coEvery { postsRepo.archivePost("p1") } returns
+                NetworkResult.Success(PostArchiveResponse(archived = true, archivedAt = fixedNow.toString()))
             val vm = makeVM()
             vm.load()
             val state = vm.state.value
@@ -219,6 +222,10 @@ class MyPostsViewModelTest {
         runTest {
             coEvery { postsRepo.userPosts(any(), any()) } returns
                 NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            coEvery { postsRepo.archivePost("p1") } returns
+                NetworkResult.Success(PostArchiveResponse(archived = true, archivedAt = fixedNow.toString()))
+            coEvery { postsRepo.unarchivePost("p1") } returns
+                NetworkResult.Success(PostArchiveResponse(archived = false, archivedAt = null))
             val vm = makeVM()
             vm.load()
             val state = vm.state.value as ListOfRowsUiState.Loaded
@@ -259,6 +266,8 @@ class MyPostsViewModelTest {
         runTest {
             coEvery { postsRepo.userPosts(any(), any()) } returns
                 NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            coEvery { postsRepo.archivePost("p1") } returns
+                NetworkResult.Success(PostArchiveResponse(archived = true, archivedAt = fixedNow.toString()))
             val vm = makeVM()
             vm.load()
             assertEquals(1, vm.tabs.value[0].count)
@@ -275,6 +284,10 @@ class MyPostsViewModelTest {
         runTest {
             coEvery { postsRepo.userPosts(any(), any()) } returns
                 NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            coEvery { postsRepo.archivePost("p1") } returns
+                NetworkResult.Success(PostArchiveResponse(archived = true, archivedAt = fixedNow.toString()))
+            coEvery { postsRepo.unarchivePost("p1") } returns
+                NetworkResult.Success(PostArchiveResponse(archived = false, archivedAt = null))
             val vm = makeVM()
             vm.load()
             vm.archive("p1")

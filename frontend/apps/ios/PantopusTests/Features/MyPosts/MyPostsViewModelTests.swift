@@ -14,8 +14,8 @@
 //    - row projection: intent chip in headerChips, time meta combines
 //      relative time + locality, body uses primary emphasis, archived
 //      highlight + ARCHIVED chip on archived rows
-//    - archive(_:) flips the row to Archived (optimistic, local only)
-//    - unarchive(_:) flips the row back to Active
+//    - archive(_:) flips the row to Archived and calls the backend
+//    - unarchive(_:) flips the row back to Active and calls the backend
 //    - confirmDelete() removes the row optimistically + rolls back on
 //      API failure
 //
@@ -273,7 +273,8 @@ final class MyPostsViewModelTests: XCTestCase {
             {"posts":[
               {"id":"p1","user_id":"u_me","content":"Active","post_type":"ask_local","created_at":"2026-05-15T10:00:00Z"}
             ]}
-            """)
+            """),
+            .status(200, body: #"{"archived":true,"archived_at":"2026-05-15T12:00:00Z"}"#)
         ]
         let vm = makeVM()
         await vm.load()
@@ -287,7 +288,7 @@ final class MyPostsViewModelTests: XCTestCase {
             postType: "ask_local",
             createdAt: "2026-05-15T10:00:00Z"
         )
-        vm.archive(dto)
+        await vm.archive(dto)
         XCTAssertEqual(vm.tabs[0].count, 0)
         XCTAssertEqual(vm.tabs[1].count, 1)
         XCTAssertTrue(vm.isArchived(dto))
@@ -299,7 +300,9 @@ final class MyPostsViewModelTests: XCTestCase {
             {"posts":[
               {"id":"p1","user_id":"u_me","content":"Active","post_type":"ask_local","created_at":"2026-05-15T10:00:00Z"}
             ]}
-            """)
+            """),
+            .status(200, body: #"{"archived":true,"archived_at":"2026-05-15T12:00:00Z"}"#),
+            .status(200, body: #"{"archived":false,"archived_at":null}"#)
         ]
         let vm = makeVM()
         await vm.load()
@@ -311,10 +314,10 @@ final class MyPostsViewModelTests: XCTestCase {
             postType: "ask_local",
             createdAt: "2026-05-15T10:00:00Z"
         )
-        vm.archive(dto)
+        await vm.archive(dto)
         XCTAssertEqual(vm.tabs[1].count, 1)
 
-        vm.unarchive(dto)
+        await vm.unarchive(dto)
         XCTAssertEqual(vm.tabs[0].count, 1)
         XCTAssertEqual(vm.tabs[1].count, 0)
     }

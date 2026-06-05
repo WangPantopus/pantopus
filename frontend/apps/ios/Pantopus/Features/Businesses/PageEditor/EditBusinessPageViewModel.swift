@@ -17,6 +17,7 @@ import Foundation
 public final class EditBusinessPageViewModel {
     public private(set) var state: EditBusinessPageState
     public var toastMessage: String?
+    private static let backendUnavailableMessage = "Business page editing is not connected to the backend yet."
 
     /// Surface flag — when true, the view stitches a "Discard"
     /// confirmation sheet over the screen. The view-model only flips
@@ -24,9 +25,11 @@ public final class EditBusinessPageViewModel {
     public var showsDiscardConfirm = false
 
     private let businessId: String
+    private let localPreviewPersistenceEnabled: Bool
 
     public init(businessId: String, preview: EditBusinessPageContent? = nil) {
         self.businessId = businessId
+        localPreviewPersistenceEnabled = preview != nil
         if let preview {
             state = .loaded(preview)
         } else {
@@ -52,6 +55,10 @@ public final class EditBusinessPageViewModel {
     /// promoted to `original`, then shows a toast.
     public func save() async {
         guard case let .loaded(content) = state else { return }
+        guard localPreviewPersistenceEnabled else {
+            toastMessage = Self.backendUnavailableMessage
+            return
+        }
         let cleaned = promoteCurrentToOriginal(content)
         state = .loaded(cleaned)
         toastMessage = "Saved"
@@ -61,6 +68,10 @@ public final class EditBusinessPageViewModel {
     /// as `save()` — both pin the current draft and clear dirtiness.
     public func saveDraft() async {
         guard case let .loaded(content) = state else { return }
+        guard localPreviewPersistenceEnabled else {
+            toastMessage = Self.backendUnavailableMessage
+            return
+        }
         let cleaned = promoteCurrentToOriginal(content)
         state = .loaded(cleaned)
         toastMessage = "Draft saved"
@@ -69,6 +80,10 @@ public final class EditBusinessPageViewModel {
     /// Sticky-save Publish button (setup mode, only enabled when all
     /// sections complete). Stub: pretend the page went live.
     public func publish() async {
+        guard localPreviewPersistenceEnabled else {
+            toastMessage = Self.backendUnavailableMessage
+            return
+        }
         toastMessage = "Published"
     }
 

@@ -43,6 +43,13 @@ class TransferOwnershipViewModelTest {
     }
 
     private fun makeViewModel(): TransferOwnershipViewModel =
+        TransferOwnershipViewModel(
+            SavedStateHandle(mapOf(TRANSFER_HOME_ID_KEY to "preview")),
+            ownersRepo,
+            recipientIsBackendBacked = true,
+        )
+
+    private fun makeProductionDefaultViewModel(): TransferOwnershipViewModel =
         TransferOwnershipViewModel(SavedStateHandle(mapOf(TRANSFER_HOME_ID_KEY to "preview")), ownersRepo)
 
     @Test
@@ -62,6 +69,21 @@ class TransferOwnershipViewModelTest {
         val state = vm.state.value
         assertTrue(state.confirmationMatches)
         assertTrue(state.isReadyToCommit)
+    }
+
+    @Test
+    fun production_default_blocks_sample_recipient_transfer() {
+        val vm = makeProductionDefaultViewModel()
+        vm.updateConfirmation("TRANSFER")
+
+        assertTrue(vm.state.value.confirmationMatches)
+        assertFalse(vm.state.value.isReadyToCommit)
+
+        vm.presentConfirmSheet()
+
+        assertEquals(ConfirmSheetPhase.Hidden, vm.state.value.sheetPhase)
+        assertNotNull(vm.state.value.toast)
+        assertTrue(vm.state.value.toast!!.isError)
     }
 
     @Test

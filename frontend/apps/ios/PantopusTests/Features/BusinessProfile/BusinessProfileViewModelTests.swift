@@ -198,7 +198,8 @@ final class BusinessProfileViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.detailJSON),
             .status(200, body: Self.publicJSON),
-            .status(200, body: Self.reviewsJSON)
+            .status(200, body: Self.reviewsJSON),
+            .status(200, body: #"{"following":true}"#)
         ]
         let vm = BusinessProfileViewModel(businessId: "biz-1", client: makeAPI())
         await vm.load()
@@ -391,7 +392,8 @@ final class BusinessProfileViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.detailJSON),
             .status(200, body: Self.publicJSON),
-            .status(200, body: Self.reviewsJSON)
+            .status(200, body: Self.reviewsJSON),
+            .status(200, body: #"{"following":true}"#)
         ]
         let vm = BusinessProfileViewModel(businessId: "biz-1", client: makeAPI())
         await vm.load()

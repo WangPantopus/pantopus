@@ -134,14 +134,19 @@ class CreateBusinessWizardViewModelTest {
     }
 
     @Test
-    fun custom_category_submit_advances_to_legal_with_other_selected() =
+    fun custom_category_submit_stays_on_pick_category_with_backend_error() =
         runTest {
             val vm = makeVm()
             vm.setSearchText("alpaca grooming")
             vm.submitCustomCategory()
-            assertEquals(BusinessCategory.Other, vm.state.value.selectedCategory)
-            assertEquals(CreateBusinessStep.LegalInfo, vm.state.value.currentStep)
-            assertEquals("", vm.state.value.searchText)
+            assertEquals(BusinessCategory.Home, vm.state.value.selectedCategory)
+            assertEquals(CreateBusinessStep.PickCategory, vm.state.value.currentStep)
+            assertEquals("alpaca grooming", vm.state.value.searchText)
+            assertEquals(
+                "Custom categories are not accepted by the backend yet.",
+                vm.state.value.submitError,
+            )
+            assertFalse(vm.state.value.isSubmittingCustom)
         }
 
     @Test

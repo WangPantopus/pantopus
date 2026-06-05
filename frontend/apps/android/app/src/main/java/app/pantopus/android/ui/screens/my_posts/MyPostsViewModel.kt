@@ -79,9 +79,9 @@ data class MyPostsDeleteTarget(
  *   - GET    /api/posts/user/:userId  (posts.js:3016, active set)
  *   - DELETE /api/posts/:id           (posts.js:2483)
  *
- * Stubbed (no backend route yet; local-only optimistic state):
- *   - archive / unarchive — TODO(backend): swap to POST /:id/archive
- *     and POST /:id/unarchive once the routes ship.
+ * Mutations:
+ *   - archive / unarchive — POST /:id/archive and /:id/unarchive with
+ *     optimistic rollback on failure.
  */
 @HiltViewModel
 class MyPostsViewModel
@@ -345,26 +345,40 @@ class MyPostsViewModel
         }
 
         /**
-         * Optimistically archive a post. Local-only today — see header.
-         * The skeleton matches the MyBids withdraw rollback so swapping in
-         * the future POST /:id/archive is a one-liner.
+         * Optimistically archive a post, then persist via the backend.
          */
         fun archive(postId: String) {
             _kebabTarget.value = null
+            val previous = localArchiveOverrides.toMap()
             localArchiveOverrides[postId] = nowProvider().toString()
             applyState()
-            // TODO(backend): wire POST /api/posts/:id/archive — on failure,
-            // restore the previous override and re-apply state.
+            viewModelScope.launch {
+                when (postsRepo.archivePost(postId)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure -> {
+                        localArchiveOverrides = previous.toMutableMap()
+                        applyState()
+                    }
+                }
+            }
         }
 
         fun unarchive(postId: String) {
             _kebabTarget.value = null
+            val previous = localArchiveOverrides.toMap()
             // Explicit `null` value (with containsKey == true) wins over the
             // wire `archived_at` in [isArchived].
             localArchiveOverrides[postId] = null
             applyState()
-            // TODO(backend): wire POST /api/posts/:id/unarchive — on failure,
-            // restore the previous override entry and re-apply state.
+            viewModelScope.launch {
+                when (postsRepo.unarchivePost(postId)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure -> {
+                        localArchiveOverrides = previous.toMutableMap()
+                        applyState()
+                    }
+                }
+            }
         }
 
         fun confirmDelete() {

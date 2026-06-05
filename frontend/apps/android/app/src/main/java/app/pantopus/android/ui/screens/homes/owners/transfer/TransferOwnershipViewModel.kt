@@ -46,6 +46,7 @@ data class TransferOwnershipUiState(
     val recipient: TransferOwnershipSampleData.RecipientSeed,
     val currentUser: TransferOwnershipSampleData.OwnerSeed,
     val coOwners: List<TransferOwnershipSampleData.OwnerSeed>,
+    val recipientIsBackendBacked: Boolean = false,
     val amount: Int = TransferOwnershipSampleData.DEFAULT_AMOUNT,
     val confirmationField: FormFieldState = FormFieldState(id = "confirmation"),
     val sheetPhase: ConfirmSheetPhase = ConfirmSheetPhase.Hidden,
@@ -63,7 +64,7 @@ data class TransferOwnershipUiState(
         get() = confirmationField.value == confirmationPhrase
 
     val isReadyToCommit: Boolean
-        get() = amount in 1..maxAmount && confirmationMatches
+        get() = amount in 1..maxAmount && confirmationMatches && recipientIsBackendBacked
 
     val isDirty: Boolean
         get() = amount != TransferOwnershipSampleData.DEFAULT_AMOUNT || confirmationField.value.isNotEmpty()
@@ -78,9 +79,18 @@ data class TransferOwnershipUiState(
 
     val ctaLabel: String
         get() {
+            if (!recipientIsBackendBacked) return "Transfer ownership unavailable"
             val firstName = recipient.name.split(" ").firstOrNull() ?: recipient.name
             return "Transfer $amount% to $firstName"
         }
+
+    val setupBlockMessage: String?
+        get() =
+            if (recipientIsBackendBacked) {
+                null
+            } else {
+                "Recipient selection is not connected to live owner data yet."
+            }
 
     val warningCopy: String
         get() {
@@ -206,6 +216,14 @@ class TransferOwnershipViewModel
             )
         val state: StateFlow<TransferOwnershipUiState> = _state.asStateFlow()
 
+        internal constructor(
+            savedStateHandle: SavedStateHandle,
+            ownersRepo: HomeOwnersRepository,
+            recipientIsBackendBacked: Boolean,
+        ) : this(savedStateHandle, ownersRepo) {
+            _state.update { it.copy(recipientIsBackendBacked = recipientIsBackendBacked) }
+        }
+
         fun updateAmount(raw: Int) {
             _state.update { current ->
                 val clamped = raw.coerceIn(current.sliderRange.first, current.maxAmount)
@@ -225,6 +243,15 @@ class TransferOwnershipViewModel
 
         fun presentConfirmSheet() {
             val current = _state.value
+            val setupBlockMessage = current.setupBlockMessage
+            if (setupBlockMessage != null) {
+                _state.update {
+                    it.copy(
+                        toast = TransferToast(text = setupBlockMessage, isError = true),
+                    )
+                }
+                return
+            }
             if (!current.isReadyToCommit) return
             _state.update { it.copy(sheetPhase = ConfirmSheetPhase.Visible, biometricErrorMessage = null) }
         }
@@ -265,6 +292,16 @@ class TransferOwnershipViewModel
             }
             viewModelScope.launch {
                 val current = _state.value
+                val setupBlockMessage = current.setupBlockMessage
+                if (setupBlockMessage != null) {
+                    _state.update {
+                        it.copy(
+                            sheetPhase = ConfirmSheetPhase.Visible,
+                            biometricErrorMessage = setupBlockMessage,
+                        )
+                    }
+                    return@launch
+                }
                 // Identify the buyer by their account id; effective_date
                 // is omitted so the transfer takes effect immediately.
                 val result =

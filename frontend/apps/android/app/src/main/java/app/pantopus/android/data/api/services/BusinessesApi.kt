@@ -2,6 +2,7 @@ package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.businesses.BusinessDashboardResponse
 import app.pantopus.android.data.api.models.businesses.BusinessDetailResponse
+import app.pantopus.android.data.api.models.businesses.BusinessFollowResponse
 import app.pantopus.android.data.api.models.businesses.BusinessInsightsResponse
 import app.pantopus.android.data.api.models.businesses.BusinessOwnerReviewsResponse
 import app.pantopus.android.data.api.models.businesses.BusinessPublicResponse
@@ -99,4 +100,13 @@ interface BusinessesApi {
         @Path("reviewId") reviewId: String,
         @Body body: BusinessReviewRespondRequest,
     )
+
+    /**
+     * `POST /api/businesses/:businessId/follow` — save/follow a public
+     * business. Route `backend/routes/businesses.js:3621`.
+     */
+    @POST("api/businesses/{businessId}/follow")
+    suspend fun follow(
+        @Path("businessId") businessId: String,
+    ): BusinessFollowResponse
 }

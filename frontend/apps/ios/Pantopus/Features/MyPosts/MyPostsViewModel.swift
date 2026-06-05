@@ -29,16 +29,11 @@
 //    - Active row tap → push pulse post detail
 //    - Empty states per tab.
 //
-//  Backend (existing — frontend-only PR per product call):
+//  Backend:
 //    - GET    /api/posts/user/:userId            (posts.js:3016, active set)
 //    - DELETE /api/posts/:id                     (posts.js:2483)
-//
-//  Stubbed (no backend route today — local-only optimistic mutation):
-//    - archive(id:)   — flips local `archivedAt` to now()
-//    - unarchive(id:) — clears local `archivedAt`
-//    TODO(backend): wire to POST /api/posts/:id/archive + /unarchive once
-//    the routes land. The optimistic-rollback skeleton is already in
-//    place — only the API call needs swapping in.
+//    - POST   /api/posts/:id/archive             author-only archive
+//    - POST   /api/posts/:id/unarchive           author-only restore
 //
 
 import Foundation
@@ -375,7 +370,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
             },
             onRestore: { [weak self] in
                 guard let self else { return }
-                Task { @MainActor in self.unarchive(dto) }
+                Task { @MainActor in await self.unarchive(dto) }
             }
         )
     }
@@ -439,34 +434,38 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
         deleteTarget = nil
     }
 
-    /// Optimistically archive the post. Today this is a local-only
-    /// mutation because the backend doesn't expose an archive endpoint;
-    /// the row immediately leaves the Active tab and surfaces in
-    /// Archived without a network round-trip.
-    public func archive(_ dto: MyPostDTO) {
+    /// Optimistically archive the post, then persist via the backend.
+    public func archive(_ dto: MyPostDTO) async {
         kebabTarget = nil
+        let previousOverrides = localArchiveOverrides
         localArchiveOverrides[dto.id] = .archived
         rebuild()
-        // TODO(backend): when POST /api/posts/:id/archive lands, kick the
-        // API call here and roll back `localArchiveOverrides[dto.id]` on
-        // failure. Skeleton:
-        //   Task {
-        //     do { _ = try await api.request(PostsEndpoints.archive(id: dto.id))
-        //     } catch {
-        //       localArchiveOverrides[dto.id] = oldValue
-        //       rebuild()
-        //     }
-        //   }
+        do {
+            _ = try await api.request(
+                PostsEndpoints.archive(id: dto.id),
+                as: PostArchiveResponse.self
+            )
+        } catch {
+            localArchiveOverrides = previousOverrides
+            rebuild()
+        }
     }
 
-    /// Optimistically unarchive (Restore). Mirror of [`archive`]; local-
-    /// only until backend ships an unarchive route.
-    public func unarchive(_ dto: MyPostDTO) {
+    /// Optimistically unarchive (Restore), then persist via the backend.
+    public func unarchive(_ dto: MyPostDTO) async {
         kebabTarget = nil
+        let previousOverrides = localArchiveOverrides
         localArchiveOverrides[dto.id] = .unarchived
         rebuild()
-        // TODO(backend): wire POST /api/posts/:id/unarchive — same shape
-        // as `archive` above.
+        do {
+            _ = try await api.request(
+                PostsEndpoints.unarchive(id: dto.id),
+                as: PostArchiveResponse.self
+            )
+        } catch {
+            localArchiveOverrides = previousOverrides
+            rebuild()
+        }
     }
 
     /// Optimistically delete the post. Hits the real DELETE endpoint;
