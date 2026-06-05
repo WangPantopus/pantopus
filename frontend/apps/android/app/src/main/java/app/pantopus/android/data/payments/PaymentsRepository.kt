@@ -28,17 +28,15 @@ class PaymentsRepository
         suspend fun addCardSheetParams(): NetworkResult<AddCardSheetParamsDto> = safeApiCall { api.addCardSheet() }
 
         /** `POST /api/payments/intent` — PaymentSheet params for a checkout (Block 3B). */
-        suspend fun createPaymentIntent(
-            request: CreatePaymentIntentRequest,
-        ): NetworkResult<PaymentIntentSheetParamsDto> = safeApiCall { api.createIntent(request) }
+        suspend fun createPaymentIntent(request: CreatePaymentIntentRequest): NetworkResult<PaymentIntentSheetParamsDto> =
+            safeApiCall { api.createIntent(request) }
 
         /** `POST /api/payments/tip` — tip the worker on a completed gig (Block 3D). */
         suspend fun tip(request: TipRequest): NetworkResult<TipResponse> = safeApiCall { api.tip(request) }
 
         /** `POST /api/payments/tip/{paymentId}/refresh-status` — reconcile a tip. */
-        suspend fun tipRefreshStatus(
-            paymentId: String,
-        ): NetworkResult<TipRefreshStatusResponse> = safeApiCall { api.tipRefreshStatus(paymentId) }
+        suspend fun tipRefreshStatus(paymentId: String): NetworkResult<TipRefreshStatusResponse> =
+            safeApiCall { api.tipRefreshStatus(paymentId) }
 
         /** `PUT /api/payments/methods/{id}/default`. */
         suspend fun setDefault(id: String): NetworkResult<PaymentMethodAckResponse> = safeApiCall { api.setDefault(id) }

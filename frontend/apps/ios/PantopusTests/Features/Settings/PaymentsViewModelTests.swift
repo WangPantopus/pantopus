@@ -245,6 +245,7 @@ final class PaymentsViewModelTests: XCTestCase {
         await vm.load()
         await vm.tapAddMethod()
         XCTAssertEqual(presenter.presentAddCardCallCount, 1)
+        XCTAssertEqual(presenter.lastAddCardPublishableKey, "pk_test_x")
         guard case let .loaded(loaded) = vm.state else {
             XCTFail("Expected .loaded, got \(vm.state)")
             return
@@ -337,13 +338,16 @@ final class PaymentsViewModelTests: XCTestCase {
 private final class StubPaymentSheetPresenter: PaymentSheetPresenting {
     var addCardOutcome: PaymentSheetOutcome = .completed
     private(set) var presentAddCardCallCount = 0
+    private(set) var lastAddCardPublishableKey: String?
 
     func presentAddCard(
         setupIntentClientSecret _: String,
         customer _: String,
-        ephemeralKey _: String
+        ephemeralKey _: String,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome {
         presentAddCardCallCount += 1
+        lastAddCardPublishableKey = publishableKey
         return addCardOutcome
     }
 
@@ -351,7 +355,8 @@ private final class StubPaymentSheetPresenter: PaymentSheetPresenting {
         clientSecret _: String,
         customer _: String,
         ephemeralKey _: String,
-        isSetupIntent _: Bool
+        isSetupIntent _: Bool,
+        publishableKey _: String?
     ) async -> PaymentSheetOutcome {
         .completed
     }

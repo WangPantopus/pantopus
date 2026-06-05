@@ -5,6 +5,7 @@ import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
+import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -79,6 +80,21 @@ class GigsRepository
             gigId: String,
             body: PlaceBidBody,
         ): NetworkResult<PlaceBidResponse> = safeApiCall { api.placeBid(gigId, body) }
+
+        suspend fun acceptBid(
+            gigId: String,
+            bidId: String,
+        ): NetworkResult<GigBidAcceptResponse> = safeApiCall { api.acceptBid(gigId, bidId) }
+
+        suspend fun finalizeAcceptBid(
+            gigId: String,
+            bidId: String,
+        ): NetworkResult<GigBidAcceptResponse> = safeApiCall { api.finalizeAcceptBid(gigId, bidId) }
+
+        suspend fun abortAcceptBid(
+            gigId: String,
+            bidId: String,
+        ): NetworkResult<GigBidAcceptResponse> = safeApiCall { api.abortAcceptBid(gigId, bidId) }
 
         suspend fun markCompleted(
             gigId: String,

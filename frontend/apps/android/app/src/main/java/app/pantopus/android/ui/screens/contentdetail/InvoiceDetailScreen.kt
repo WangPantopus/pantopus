@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,6 +36,7 @@ fun InvoiceDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val paymentStatus by viewModel.paymentStatus.collectAsStateWithLifecycle()
     val toastController = remember { ToastController() }
+    val context = LocalContext.current
 
     val paymentSheet =
         rememberPaymentSheet { result ->
@@ -50,8 +52,10 @@ fun InvoiceDetailScreen(
                         paymentIntentClientSecret = event.params.clientSecret.orEmpty(),
                         configuration =
                             StripePaymentSheets.paymentConfiguration(
+                                context = context,
                                 customerId = event.params.customer,
                                 ephemeralKey = event.params.ephemeralKey,
+                                publishableKey = event.params.publishableKey,
                             ),
                     )
             }

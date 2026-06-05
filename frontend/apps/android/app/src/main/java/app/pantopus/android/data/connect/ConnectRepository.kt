@@ -24,14 +24,11 @@ class ConnectRepository
             safeApiCall { api.createAccount(ConnectCreateAccountRequest()) }
 
         /** `POST /api/payments/connect/onboarding` — Stripe-hosted Account Link URL. */
-        suspend fun onboarding(): NetworkResult<ConnectOnboardingResponse> =
-            safeApiCall { api.onboarding(ConnectOnboardingRequest()) }
+        suspend fun onboarding(): NetworkResult<ConnectOnboardingResponse> = safeApiCall { api.onboarding(ConnectOnboardingRequest()) }
 
         /** `GET /api/payments/connect/account` — onboarding / payouts-enabled status. */
-        suspend fun accountStatus(): NetworkResult<ConnectAccountStatusResponse> =
-            safeApiCall { api.accountStatus() }
+        suspend fun accountStatus(): NetworkResult<ConnectAccountStatusResponse> = safeApiCall { api.accountStatus() }
 
         /** `POST /api/payments/connect/dashboard` — Express dashboard login link. */
-        suspend fun dashboard(): NetworkResult<ConnectDashboardResponse> =
-            safeApiCall { api.dashboard() }
+        suspend fun dashboard(): NetworkResult<ConnectDashboardResponse> = safeApiCall { api.dashboard() }
     }

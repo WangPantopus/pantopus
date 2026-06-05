@@ -54,13 +54,10 @@ data class PaymentMethodAckResponse(
 
 /**
  * Body for `POST /api/payments/intent` (Block 3B checkout). The server
- * computes/validates the amount and creates the PaymentIntent for the
- * referenced order. Keys are camelCase to match `createPaymentSchema`.
+ * computes the payee and amount from the referenced order.
  */
 @JsonClass(generateAdapter = true)
 data class CreatePaymentIntentRequest(
-    val payeeId: String,
-    val amount: Int,
     val gigId: String? = null,
     val listingId: String? = null,
     val offerId: String? = null,

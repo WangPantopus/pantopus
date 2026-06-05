@@ -26,7 +26,7 @@ public protocol ConnectWebPresenting: Sendable {
 public final class ConnectWebPresenter: NSObject, ConnectWebPresenting, SFSafariViewControllerDelegate {
     private var continuation: CheckedContinuation<Void, Never>?
 
-    public override init() {
+    override public init() {
         super.init()
     }
 

@@ -19,6 +19,7 @@ struct PaymentMethodRow: View {
     let trailing: PaymentsRowTrailing
     let rowIdentifier: String
     var labelColor: Color = Theme.Color.appText
+    var rowAccessibilityIdentifier: String?
     /// Accessibility id applied to the status chip (e.g. the "Default"
     /// badge on a saved method). `nil` leaves the chip untagged.
     var chipIdentifier: String?
@@ -55,7 +56,7 @@ struct PaymentMethodRow: View {
         .padding(.vertical, 14)
         .frame(minHeight: 48)
         .contentShape(Rectangle())
-        .accessibilityIdentifier("paymentsRow_\(rowIdentifier)")
+        .accessibilityIdentifier(rowAccessibilityIdentifier ?? "paymentsRow_\(rowIdentifier)")
     }
 
     @ViewBuilder

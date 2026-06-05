@@ -70,28 +70,19 @@ public struct AddCardSheetParams: Decodable, Sendable, Hashable {
 }
 
 /// Body for `POST /api/payments/intent` (Block 3B checkout). The server
-/// computes/validates the amount and creates the PaymentIntent for the
-/// referenced order. Keys are camelCase to match `createPaymentSchema`.
+/// computes the payee and amount from the referenced order.
 public struct CreatePaymentIntentBody: Encodable, Sendable, Hashable {
-    /// The party being paid (gig owner / listing seller / invoice issuer).
-    public let payeeId: String
-    /// Amount in the smallest currency unit (cents), min 50.
-    public let amount: Int
     public let gigId: String?
     public let listingId: String?
     public let offerId: String?
     public let description: String?
 
     public init(
-        payeeId: String,
-        amount: Int,
         gigId: String? = nil,
         listingId: String? = nil,
         offerId: String? = nil,
         description: String? = nil
     ) {
-        self.payeeId = payeeId
-        self.amount = amount
         self.gigId = gigId
         self.listingId = listingId
         self.offerId = offerId

@@ -52,7 +52,7 @@ fun PaymentMethodRow(
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .padding(horizontal = Spacing.s4, vertical = 14.dp)
-                .testTag("paymentsRow_${model.rowIdentifier}"),
+                .testTag(model.rowTestTag ?: "paymentsRow_${model.rowIdentifier}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {

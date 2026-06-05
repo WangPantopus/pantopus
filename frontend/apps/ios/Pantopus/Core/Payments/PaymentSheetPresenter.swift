@@ -32,7 +32,8 @@ public protocol PaymentSheetPresenting: Sendable {
     func presentAddCard(
         setupIntentClientSecret: String,
         customer: String,
-        ephemeralKey: String
+        ephemeralKey: String,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome
 
     /// PaymentIntent (or SetupIntent) flow — collecting payment for a gig /
@@ -41,7 +42,8 @@ public protocol PaymentSheetPresenting: Sendable {
         clientSecret: String,
         customer: String,
         ephemeralKey: String,
-        isSetupIntent: Bool
+        isSetupIntent: Bool,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome
 }
 
@@ -56,8 +58,10 @@ public final class StripePaymentSheetPresenter: PaymentSheetPresenting {
     public func presentAddCard(
         setupIntentClientSecret: String,
         customer: String,
-        ephemeralKey: String
+        ephemeralKey: String,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome {
+        StripeBootstrap.configure(publishableKey: publishableKey ?? "")
         let configuration = makeConfiguration(customer: customer, ephemeralKey: ephemeralKey)
         let sheet = PaymentSheet(
             setupIntentClientSecret: setupIntentClientSecret,
@@ -70,8 +74,10 @@ public final class StripePaymentSheetPresenter: PaymentSheetPresenting {
         clientSecret: String,
         customer: String,
         ephemeralKey: String,
-        isSetupIntent: Bool
+        isSetupIntent: Bool,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome {
+        StripeBootstrap.configure(publishableKey: publishableKey ?? "")
         let configuration = makeConfiguration(customer: customer, ephemeralKey: ephemeralKey)
         let sheet = isSetupIntent
             ? PaymentSheet(setupIntentClientSecret: clientSecret, configuration: configuration)

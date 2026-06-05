@@ -46,4 +46,3 @@ public enum WalletEndpoints {
         Endpoint(method: .post, path: "/api/wallet/withdraw", body: body)
     }
 }
-

@@ -31,7 +31,5 @@ class WalletRepository
         suspend fun pendingRelease(): NetworkResult<WalletPendingReleaseResponse> = safeApiCall { api.pendingRelease() }
 
         /** `POST /api/wallet/withdraw` — earned funds to bank (Block 3C). */
-        suspend fun withdraw(
-            request: WalletWithdrawRequest,
-        ): NetworkResult<WalletWithdrawResponse> = safeApiCall { api.withdraw(request) }
+        suspend fun withdraw(request: WalletWithdrawRequest): NetworkResult<WalletWithdrawResponse> = safeApiCall { api.withdraw(request) }
     }

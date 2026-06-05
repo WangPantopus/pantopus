@@ -38,11 +38,17 @@ class ListingOffersViewModelTestCase: XCTestCase {
             ?? Date(timeIntervalSince1970: 1_778_846_400)
     }()
 
-    func makeVM(api: APIClient? = nil) -> ListingOffersViewModel {
+    func makeVM(
+        api: APIClient? = nil,
+        checkout: CheckoutCoordinator = CheckoutCoordinator(),
+        currentUserId: @escaping @MainActor () -> String? = { nil }
+    ) -> ListingOffersViewModel {
         ListingOffersViewModel(
             listingId: "listing-1",
             listingTitleHint: "Mid-century walnut credenza",
-            api: api ?? makeAPI()
+            api: api ?? makeAPI(),
+            currentUserId: currentUserId,
+            checkout: checkout
         ) {
             Self.fixedNow
         }
@@ -97,6 +103,11 @@ class ListingOffersViewModelTestCase: XCTestCase {
     """
 
     static let emptyOffersJSON = "{\"offers\":[]}"
+
+    static let intentJSON = """
+    {"clientSecret":"pi_secret_1","paymentIntentId":"pi_1","customer":"cus_1",\
+    "ephemeralKey":"ek_1","publishableKey":"pk_test"}
+    """
 
     /// Three pending offers with amount and recency deliberately crossed
     /// so every sort yields a distinct order:

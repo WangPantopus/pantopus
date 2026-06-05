@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -68,16 +69,18 @@ import com.stripe.android.paymentsheet.rememberPaymentSheet
  * saved methods, add a card via Stripe PaymentSheet, set-default and
  * remove (optimistic). PaymentSheet presentation lives here (it needs the
  * Activity's `ActivityResultRegistry`); the view-model emits intents via
- * [PaymentsViewModel.events]. The Payouts / balance / Activity sections
- * render an honest scaffold until 3C wires Stripe Connect.
+ * [PaymentsViewModel.events]. Payout rows route to Wallet, which owns the
+ * live Stripe Connect onboarding/dashboard/withdraw flow.
  */
 @Composable
 fun PaymentsScreen(
     onBack: () -> Unit = {},
+    onOpenWallet: () -> Unit = {},
     viewModel: PaymentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toastController = remember { ToastController() }
+    val context = LocalContext.current
 
     // Stripe PaymentSheet must be created in composition (it registers an
     // ActivityResult launcher). We never build a card form — PaymentSheet
@@ -96,8 +99,10 @@ fun PaymentsScreen(
                         setupIntentClientSecret = event.params.setupIntent,
                         configuration =
                             StripePaymentSheets.configuration(
+                                context = context,
                                 customerId = event.params.customer,
                                 ephemeralKey = event.params.ephemeralKey,
+                                publishableKey = event.params.publishableKey,
                             ),
                     )
                 is PaymentsEvent.ShowMessage -> toastController.error(event.text)
@@ -114,7 +119,9 @@ fun PaymentsScreen(
                     onAddMethod = viewModel::tapAddMethod,
                     onSetDefault = viewModel::setDefault,
                     onRemove = viewModel::removeMethod,
-                    onTapRow = viewModel::tapRow,
+                    onTapRow = { id ->
+                        if (id.startsWith("payouts.")) onOpenWallet() else viewModel.tapRow(id)
+                    },
                     onCloseAccount = viewModel::tapCloseAccount,
                     onRetry = viewModel::refresh,
                 ),
@@ -150,7 +157,7 @@ internal fun PaymentsScreenContent(
             Modifier
                 .fillMaxSize()
                 .background(PantopusColors.appBg)
-                .testTag("payments"),
+                .testTag("payments.screen"),
     ) {
         TopBar(onBack = actions.onBack)
         when (val current = state) {
@@ -420,6 +427,7 @@ private fun MethodsCard(
                             subtext = method.subtext,
                             chip = method.chip,
                             trailing = PaymentsRowTrailing.Chevron,
+                            rowTestTag = "payments.method.${method.id}",
                             chipTestTag =
                                 if (method.chip != null) "paymentsRow_${method.id}_defaultBadge" else null,
                         ),
@@ -625,7 +633,7 @@ private fun AddMethodRow(onAddMethod: () -> Unit) {
                 .heightIn(min = 48.dp)
                 .clickable(onClick = onAddMethod)
                 .padding(horizontal = Spacing.s4, vertical = 13.dp)
-                .testTag("paymentsAddMethodRow"),
+                .testTag("payments.addMethodBtn"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
@@ -666,7 +674,7 @@ private fun InlineEmpty(
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s5)
                 .padding(top = 28.dp, bottom = 22.dp)
-                .testTag("paymentsMethodsInlineEmpty"),
+                .testTag("payments.empty"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {

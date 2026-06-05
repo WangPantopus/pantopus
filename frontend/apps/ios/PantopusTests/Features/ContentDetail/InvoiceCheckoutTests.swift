@@ -37,11 +37,14 @@ final class InvoiceCheckoutTests: XCTestCase {
             invoiceId: "inv-1",
             paid: false,
             checkout: CheckoutCoordinator(api: makeAPI(), presenter: presenter),
-            checkoutRequest: CheckoutRequest(payeeId: "payee-1", amountCents: 64285)
+            checkoutRequest: CheckoutRequest(
+                listingId: "listing-1",
+                offerId: "offer-1"
+            )
         )
     }
 
-    // checkout.paySuccess
+    /// checkout.paySuccess
     func testPayCompletesAndRefreshes() async {
         // Only the create-intent call hits the network; load() re-reads the
         // invoice from the fixture frame (no request).
@@ -54,13 +57,14 @@ final class InvoiceCheckoutTests: XCTestCase {
 
         XCTAssertEqual(presenter.presentPaymentCallCount, 1)
         XCTAssertEqual(presenter.lastClientSecret, "pi_secret_1")
+        XCTAssertEqual(presenter.lastPublishableKey, "pk_test")
         XCTAssertEqual(vm.paymentStatus, .paid)
         guard case .loaded = vm.state else {
             return XCTFail("Expected the invoice to re-load after payment, got \(vm.state)")
         }
     }
 
-    // checkout.payDeclined — card declined / SCA failed
+    /// checkout.payDeclined — card declined / SCA failed
     func testPayDeclinedSurfacesMessage() async {
         SequencedURLProtocol.sequence = [.status(201, body: Self.intentJSON)]
         let presenter = StubCheckoutPresenter()
@@ -70,7 +74,7 @@ final class InvoiceCheckoutTests: XCTestCase {
         XCTAssertEqual(vm.paymentStatus, .declined(message: "Your card was declined."))
     }
 
-    // checkout.cancel — buyer dismissed the sheet
+    /// checkout.cancel — buyer dismissed the sheet
     func testPayCanceledLeavesInvoiceUnpaid() async {
         SequencedURLProtocol.sequence = [.status(201, body: Self.intentJSON)]
         let presenter = StubCheckoutPresenter()
@@ -80,7 +84,7 @@ final class InvoiceCheckoutTests: XCTestCase {
         XCTAssertEqual(vm.paymentStatus, .canceled)
     }
 
-    // Intent creation fails → never presents the sheet, surfaces an error.
+    /// Intent creation fails → never presents the sheet, surfaces an error.
     func testIntentFailureDoesNotPresentSheet() async {
         SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
         let presenter = StubCheckoutPresenter()
@@ -92,7 +96,7 @@ final class InvoiceCheckoutTests: XCTestCase {
         }
     }
 
-    // The coordinator maps a missing client secret to .failed (no present).
+    /// The coordinator maps a missing client secret to .failed (no present).
     func testCoordinatorRejectsEmptyClientSecret() async {
         let presenter = StubCheckoutPresenter()
         let coordinator = CheckoutCoordinator(api: makeAPI(), presenter: presenter)
@@ -111,11 +115,13 @@ private final class StubCheckoutPresenter: PaymentSheetPresenting {
     var outcome: PaymentSheetOutcome = .completed
     private(set) var presentPaymentCallCount = 0
     private(set) var lastClientSecret: String?
+    private(set) var lastPublishableKey: String?
 
     func presentAddCard(
         setupIntentClientSecret _: String,
         customer _: String,
-        ephemeralKey _: String
+        ephemeralKey _: String,
+        publishableKey _: String?
     ) async -> PaymentSheetOutcome {
         .completed
     }
@@ -124,10 +130,12 @@ private final class StubCheckoutPresenter: PaymentSheetPresenting {
         clientSecret: String,
         customer _: String,
         ephemeralKey _: String,
-        isSetupIntent _: Bool
+        isSetupIntent _: Bool,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome {
         presentPaymentCallCount += 1
         lastClientSecret = clientSecret
+        lastPublishableKey = publishableKey
         return outcome
     }
 }

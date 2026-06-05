@@ -9,9 +9,8 @@
 //  the final item in the Payment methods card (iOS convention) and a
 //  destructive Close-account card on the populated frame only.
 //
-//  Stripe Connect onboarding deep-link and the card-add bottom sheet
-//  are out of scope — the rows surface the chrome so the design lands;
-//  follow-up work wires the actions through PaymentsViewModel.
+//  Saved cards use Stripe PaymentSheet. Payout rows can route into the
+//  Wallet surface, where Stripe Connect onboarding/dashboard live.
 //
 
 import SwiftUI
@@ -20,13 +19,16 @@ public struct PaymentsView: View {
     @State private var viewModel: PaymentsViewModel
     @State private var actionMethod: PaymentMethod?
     private let onBack: @MainActor () -> Void
+    private let onOpenWallet: @MainActor () -> Void
 
     public init(
         viewModel: PaymentsViewModel = PaymentsViewModel(),
-        onBack: @escaping @MainActor () -> Void
+        onBack: @escaping @MainActor () -> Void,
+        onOpenWallet: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
+        self.onOpenWallet = onOpenWallet
     }
 
     public var body: some View {
@@ -37,7 +39,7 @@ public struct PaymentsView: View {
         }
         .background(Theme.Color.appBg)
         .task { await viewModel.load() }
-        .accessibilityIdentifier("payments")
+        .accessibilityIdentifier("payments.screen")
         .confirmationDialog(
             actionMethod?.label ?? "Payment method",
             isPresented: Binding(
@@ -156,6 +158,7 @@ private extension PaymentsView {
                                 chip: method.chip,
                                 trailing: .chevron,
                                 rowIdentifier: method.id,
+                                rowAccessibilityIdentifier: "payments.method.\(method.id)",
                                 chipIdentifier: method.chip != nil
                                     ? "paymentsRow_\(method.id)_defaultBadge"
                                     : nil
@@ -251,7 +254,11 @@ private extension PaymentsView {
 
     private func payoutRow(_ row: PaymentsPayoutRow) -> some View {
         Button(action: {
-            Task { await viewModel.tapRow(row.id) }
+            if row.id.starts(with: "payouts.") {
+                onOpenWallet()
+            } else {
+                Task { await viewModel.tapRow(row.id) }
+            }
         }, label: {
             PaymentMethodRow(
                 brand: row.leadingBrand,
@@ -330,7 +337,7 @@ private extension PaymentsView {
             .contentShape(Rectangle())
         })
         .buttonStyle(.plain)
-        .accessibilityIdentifier("paymentsAddMethodRow")
+        .accessibilityIdentifier("payments.addMethodBtn")
     }
 
     private func inlineEmpty(icon: PantopusIcon, title: String, body: String) -> some View {
@@ -354,7 +361,7 @@ private extension PaymentsView {
         .padding(.horizontal, Spacing.s5)
         .padding(.top, 28)
         .padding(.bottom, 22)
-        .accessibilityIdentifier("paymentsMethodsInlineEmpty")
+        .accessibilityIdentifier("payments.empty")
     }
 
     // MARK: - Card chrome

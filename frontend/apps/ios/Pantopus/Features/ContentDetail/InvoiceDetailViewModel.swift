@@ -2,16 +2,11 @@
 //  InvoiceDetailViewModel.swift
 //  Pantopus
 //
-//  T2.6 ships the invoice frame with hardcoded fixture data; Block 3B wires
-//  the "Pay" CTA to the real Stripe PaymentSheet via the shared
-//  `CheckoutCoordinator`. The invoice itself still projects from a fixture
-//  (the invoice/order backend lands separately), but the pay step is real:
-//  it creates a PaymentIntent (`POST /api/payments/intent`), presents
-//  PaymentSheet, and on success re-reads server state — we never mark the
-//  invoice paid client-side (webhooks reconcile the `Payment`). The shell
-//  already supports the variable jsonb_modules[] surface so plumbing real
-//  invoice modules through later changes the VM only. Both designed A09.4
-//  states (due + paid) are projected here.
+//  T2.6 ships the invoice frame from fixture display data. Block 3B wires
+//  the "Pay" CTA to Stripe PaymentSheet only when a real backend order
+//  reference is injected; fixture invoices leave checkout disabled rather
+//  than sending placeholder payee/amount data. On success we re-read server
+//  state and never mark the invoice paid client-side.
 //
 
 import Foundation
@@ -37,9 +32,9 @@ public final class InvoiceDetailViewModel {
     private let invoiceId: String
     private let paid: Bool
     private let checkout: CheckoutCoordinator
-    /// The order this invoice bills for. Real invoices carry the payee +
-    /// amount; until the invoice backend lands we derive a request from the
-    /// fixture so the pay step is exercised end-to-end. `nil` disables pay.
+    /// The order this invoice bills for. Real invoices must carry a backend
+    /// order reference; fixture invoices leave this nil so pay is disabled
+    /// rather than charging against placeholder IDs.
     private let checkoutRequest: CheckoutRequest?
 
     public init(
@@ -51,7 +46,7 @@ public final class InvoiceDetailViewModel {
         self.invoiceId = invoiceId
         self.paid = paid
         self.checkout = checkout
-        self.checkoutRequest = checkoutRequest ?? Self.fixtureCheckoutRequest
+        self.checkoutRequest = checkoutRequest
     }
 
     public func load() async {
@@ -85,15 +80,6 @@ public final class InvoiceDetailViewModel {
     public func clearPaymentStatus() {
         paymentStatus = .idle
     }
-
-    /// Fixture order reference. The fixture total is $642.85 → 64 285 cents,
-    /// paid to the issuing business ("Brightside Outdoor"). The payee id is a
-    /// stand-in until the invoice backend supplies the real one.
-    private static let fixtureCheckoutRequest = CheckoutRequest(
-        payeeId: "00000000-0000-4000-8000-000000000b51",
-        amountCents: 64285,
-        description: "Holiday lighting · install + takedown"
-    )
 
     // MARK: - Fixtures
 

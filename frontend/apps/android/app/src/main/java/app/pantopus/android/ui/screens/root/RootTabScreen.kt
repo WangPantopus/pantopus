@@ -3170,7 +3170,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     AboutScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.SETTINGS_PAYMENTS) {
-                    PaymentsScreen(onBack = { navController.popBackStack() })
+                    PaymentsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenWallet = { navController.navigate(ChildRoutes.WALLET) },
+                    )
                 }
                 composable(
                     route = ChildRoutes.PRIVACY_HANDSHAKE,

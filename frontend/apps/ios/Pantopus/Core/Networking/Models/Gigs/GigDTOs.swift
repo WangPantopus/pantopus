@@ -181,6 +181,43 @@ public struct PlaceBidResponse: Decodable, Sendable {
     public let message: String?
 }
 
+/// Response from `POST /api/gigs/:gigId/bids/:bidId/accept`.
+/// Paid gigs return PaymentSheet params and stay in `pending_payment` until
+/// `finalize-accept` succeeds; free gigs may return an already accepted bid.
+public struct GigBidAcceptResponse: Decodable, Sendable, Hashable {
+    public let bid: GigBidDTO?
+    public let message: String?
+    public let requiresPaymentSetup: Bool?
+    public let isSetupIntent: Bool?
+    public let payment: PaymentPayload?
+    public let publishableKey: String?
+    public let clientSecret: String?
+    public let paymentId: String?
+    public let setupIntentId: String?
+    public let paymentIntentId: String?
+    public let ephemeralKey: String?
+    public let customer: String?
+    public let customerId: String?
+
+    public var sheetParams: PaymentIntentSheetParams {
+        PaymentIntentSheetParams(
+            clientSecret: clientSecret ?? payment?.clientSecret,
+            paymentIntentId: paymentIntentId ?? payment?.paymentIntentId,
+            customer: customer ?? customerId,
+            ephemeralKey: ephemeralKey,
+            publishableKey: publishableKey,
+            isSetupIntent: isSetupIntent
+        )
+    }
+
+    public struct PaymentPayload: Decodable, Sendable, Hashable {
+        public let clientSecret: String?
+        public let paymentId: String?
+        public let setupIntentId: String?
+        public let paymentIntentId: String?
+    }
+}
+
 /// Body for `POST /api/gigs`. Mirrors the subset of `createGigSchema`
 /// the Post-a-Task wizard surfaces (`backend/routes/gigs.js:425`). All
 /// optional fields are omitted from the encoded JSON when nil.

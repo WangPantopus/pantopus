@@ -84,7 +84,8 @@ public final class PaymentsViewModel {
             let outcome = await sheetPresenter.presentAddCard(
                 setupIntentClientSecret: params.setupIntent,
                 customer: params.customer,
-                ephemeralKey: params.ephemeralKey
+                ephemeralKey: params.ephemeralKey,
+                publishableKey: params.publishableKey
             )
             switch outcome {
             case .completed:
@@ -134,9 +135,8 @@ public final class PaymentsViewModel {
         actionError = nil
     }
 
-    /// Stripe Connect onboarding, payout routing and the destructive
-    /// close-account flow land with 3C; these stay no-ops so the view
-    /// remains typed.
+    /// Non-wallet rows can still be observed here; payout rows route through
+    /// `PaymentsView` into the Wallet surface where Connect is live.
     public func tapRow(_: String) async {}
     public func tapCloseAccount() async {}
 
@@ -174,9 +174,8 @@ public final class PaymentsViewModel {
         }
     }
 
-    /// Live frame: real saved methods + an honest "payouts not set up yet"
-    /// scaffold. The balance hero / Connect / Activity sections are wired
-    /// for real in 3C — until then we never fabricate balances.
+    /// Live frame: real saved methods + a payout entry point. Balance and
+    /// activity stay nil here because Wallet owns the earnings-in surface.
     static func liveFrame(methods: [PaymentMethod]) -> PaymentsLoaded {
         PaymentsLoaded(
             balance: nil,

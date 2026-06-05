@@ -45,9 +45,18 @@ class InvoiceDetailViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vm() =
+    private fun vm(withCheckout: Boolean = false) =
         InvoiceDetailViewModel(
-            savedStateHandle = SavedStateHandle(mapOf(InvoiceDetailViewModel.INVOICE_ID_KEY to "inv-1")),
+            savedStateHandle =
+                SavedStateHandle(
+                    buildMap {
+                        put(InvoiceDetailViewModel.INVOICE_ID_KEY, "inv-1")
+                        if (withCheckout) {
+                            put(InvoiceDetailViewModel.LISTING_ID_KEY, "listing-1")
+                            put(InvoiceDetailViewModel.OFFER_ID_KEY, "offer-1")
+                        }
+                    },
+                ),
             paymentsRepository = repository,
         )
 
@@ -75,7 +84,7 @@ class InvoiceDetailViewModelTest {
     fun pay_success_emits_present_checkout_event() =
         runTest {
             coEvery { repository.createPaymentIntent(any()) } returns NetworkResult.Success(sheetParams)
-            val vm = vm()
+            val vm = vm(withCheckout = true)
             vm.events.test {
                 vm.pay()
                 val event = awaitItem()
@@ -91,10 +100,22 @@ class InvoiceDetailViewModelTest {
         runTest {
             val slot = mutableListOf<CreatePaymentIntentRequest>()
             coEvery { repository.createPaymentIntent(capture(slot)) } returns NetworkResult.Success(sheetParams)
+            val vm = vm(withCheckout = true)
+            vm.pay()
+            assertEquals("listing-1", slot.first().listingId)
+            assertEquals("offer-1", slot.first().offerId)
+            assertEquals(null, slot.first().gigId)
+        }
+
+    @Test
+    fun pay_without_order_reference_declines_without_intent() =
+        runTest {
             val vm = vm()
             vm.pay()
-            assertEquals(64285, slot.first().amount)
-            assertTrue(slot.first().payeeId.isNotBlank())
+            assertEquals(
+                InvoicePaymentStatus.Declined("This invoice can't be paid yet."),
+                vm.paymentStatus.value,
+            )
         }
 
     // Intent creation fails → declined, no sheet.
@@ -103,7 +124,7 @@ class InvoiceDetailViewModelTest {
         runTest {
             coEvery { repository.createPaymentIntent(any()) } returns
                 NetworkResult.Failure(NetworkError.Server(500, "boom"))
-            val vm = vm()
+            val vm = vm(withCheckout = true)
             vm.pay()
             assertTrue(vm.paymentStatus.value is InvoicePaymentStatus.Declined)
         }

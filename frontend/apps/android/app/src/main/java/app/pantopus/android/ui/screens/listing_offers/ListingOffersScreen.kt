@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -44,12 +45,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferDto
 import app.pantopus.android.data.api.models.listing_offers.ListingOfferUserDto
+import app.pantopus.android.ui.screens.settings.payments.StripePaymentSheets
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.screens.transaction_reviews.TransactionReviewSheetContent
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import com.stripe.android.paymentsheet.rememberPaymentSheet
 
 /** Test tag on the listing-offers root container. */
 const val LISTING_OFFERS_TAG = "listing-offers"
@@ -76,6 +79,7 @@ fun ListingOffersScreen(
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val counterTarget by viewModel.counterTarget.collectAsStateWithLifecycle()
     val leaveReviewTarget by viewModel.leaveReviewTarget.collectAsStateWithLifecycle()
+    ListingOfferCheckoutEffect(viewModel)
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
@@ -128,6 +132,32 @@ fun ListingOffersScreen(
                     onSubmit = { draft -> viewModel.submitLeaveReview(draft) },
                     onClose = { viewModel.cancelLeaveReview() },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ListingOfferCheckoutEffect(viewModel: ListingOffersViewModel) {
+    val context = LocalContext.current
+    val paymentSheet =
+        rememberPaymentSheet { result ->
+            viewModel.onCheckoutOutcome(StripePaymentSheets.checkoutOutcome(result))
+        }
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ListingOffersEvent.PresentCheckout ->
+                    paymentSheet.presentWithPaymentIntent(
+                        paymentIntentClientSecret = event.params.clientSecret.orEmpty(),
+                        configuration =
+                            StripePaymentSheets.paymentConfiguration(
+                                context = context,
+                                customerId = event.params.customer,
+                                ephemeralKey = event.params.ephemeralKey,
+                                publishableKey = event.params.publishableKey,
+                            ),
+                    )
             }
         }
     }

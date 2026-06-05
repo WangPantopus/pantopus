@@ -2,6 +2,8 @@
 
 package app.pantopus.android.ui.screens.settings.payments
 
+import android.content.Context
+import com.stripe.android.PaymentConfiguration
 import com.stripe.android.paymentsheet.PaymentSheet
 import com.stripe.android.paymentsheet.PaymentSheetResult
 
@@ -17,11 +19,23 @@ import com.stripe.android.paymentsheet.PaymentSheetResult
 object StripePaymentSheets {
     private const val MERCHANT_DISPLAY_NAME = "Pantopus"
 
+    fun configurePublishableKey(
+        context: Context,
+        publishableKey: String?,
+    ) {
+        val key = publishableKey?.trim().orEmpty()
+        if (key.isBlank() || key.startsWith("pk_test_REPLACE") || key.startsWith("$(")) return
+        PaymentConfiguration.init(context.applicationContext, key)
+    }
+
     fun configuration(
+        context: Context,
         customerId: String,
         ephemeralKey: String,
-    ): PaymentSheet.Configuration =
-        PaymentSheet.Configuration(
+        publishableKey: String? = null,
+    ): PaymentSheet.Configuration {
+        configurePublishableKey(context, publishableKey)
+        return PaymentSheet.Configuration(
             merchantDisplayName = MERCHANT_DISPLAY_NAME,
             customer =
                 PaymentSheet.CustomerConfiguration(
@@ -29,6 +43,7 @@ object StripePaymentSheets {
                     ephemeralKeySecret = ephemeralKey,
                 ),
         )
+    }
 
     /**
      * Configuration for a one-off checkout (Block 3B). The customer +
@@ -36,9 +51,12 @@ object StripePaymentSheets {
      * still collect a card against the client secret rather than failing.
      */
     fun paymentConfiguration(
+        context: Context,
         customerId: String?,
         ephemeralKey: String?,
+        publishableKey: String? = null,
     ): PaymentSheet.Configuration {
+        configurePublishableKey(context, publishableKey)
         val customer =
             if (!customerId.isNullOrBlank() && !ephemeralKey.isNullOrBlank()) {
                 PaymentSheet.CustomerConfiguration(id = customerId, ephemeralKeySecret = ephemeralKey)

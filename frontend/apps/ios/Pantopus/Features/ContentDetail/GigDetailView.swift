@@ -14,6 +14,7 @@ public struct GigDetailView: View {
     @State private var bidSheetTarget: EditBidSheetTarget?
     @State private var deliveryTarget: DeliveryProofTarget?
     @State private var showTipSheet = false
+    @State private var tipCustomAmountText = ""
     @State private var toast: ToastMessage?
     private let onBack: @MainActor () -> Void
     private let onMessage: (@MainActor (GigDTO) -> Void)?
@@ -101,6 +102,41 @@ public struct GigDetailView: View {
                     .accessibilityIdentifier("tip.amount.\(cents)")
                 }
             }
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text("Custom amount")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                HStack(spacing: Spacing.s2) {
+                    Text("$")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    TextField("0.00", text: $tipCustomAmountText)
+                        .keyboardType(.decimalPad)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .accessibilityIdentifier("tip.amount.customInput")
+                }
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 48)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            Button {
+                if let cents = customTipCents {
+                    selectTip(cents)
+                }
+            } label: {
+                Text("Send custom tip")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(customTipCents == nil ? Theme.Color.appTextMuted : Theme.Color.appTextInverse)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(customTipCents == nil ? Theme.Color.appSurfaceSunken : Theme.Color.primary600)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            }
+            .disabled(customTipCents == nil)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tip.amount.customSubmit")
             Button("Not now") { showTipSheet = false }
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -108,8 +144,17 @@ public struct GigDetailView: View {
         }
         .padding(Spacing.s5)
         .frame(maxWidth: .infinity)
-        .presentationDetents([.height(240)])
+        .presentationDetents([.height(410)])
         .accessibilityIdentifier("tip.amount")
+    }
+
+    private var customTipCents: Int? {
+        let cleaned = tipCustomAmountText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: ",", with: "")
+        guard let dollars = Double(cleaned), dollars >= 0.5 else { return nil }
+        return max(50, Int((dollars * 100).rounded()))
     }
 
     /// Zero-size anchors so UI tests can assert each tip stage.
@@ -127,6 +172,7 @@ public struct GigDetailView: View {
 
     private func selectTip(_ cents: Int) {
         showTipSheet = false
+        tipCustomAmountText = ""
         Task { await viewModel.sendTip(amountCents: cents) }
     }
 
@@ -163,6 +209,7 @@ public struct GigDetailView: View {
     /// worker on an in-progress task; otherwise the bid sheet.
     private func presentPrimaryAction() {
         if viewModel.canTip {
+            tipCustomAmountText = ""
             showTipSheet = true
         } else if viewModel.canMarkDelivered {
             presentDeliveryProof()

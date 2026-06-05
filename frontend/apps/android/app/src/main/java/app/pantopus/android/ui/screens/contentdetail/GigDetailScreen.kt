@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -26,8 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +59,7 @@ fun GigDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tipStatus by viewModel.tipStatus.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var sheetTarget by remember { mutableStateOf<EditBidSheetTarget?>(null) }
     var deliveryTarget by remember { mutableStateOf<DeliveryProofTarget?>(null) }
     var showTipSheet by remember { mutableStateOf(false) }
@@ -78,8 +84,10 @@ fun GigDetailScreen(
                         paymentIntentClientSecret = event.params.clientSecret.orEmpty(),
                         configuration =
                             StripePaymentSheets.paymentConfiguration(
+                                context = context,
                                 customerId = event.params.customer,
                                 ephemeralKey = event.params.ephemeralKey,
+                                publishableKey = event.params.publishableKey,
                             ),
                     )
                 }
@@ -228,6 +236,15 @@ private fun TipAmountSheet(
     onSelect: (Int) -> Unit,
     onCancel: () -> Unit,
 ) {
+    var customAmount by remember { mutableStateOf("") }
+    val customCents =
+        customAmount
+            .trim()
+            .replace("$", "")
+            .replace(",", "")
+            .toDoubleOrNull()
+            ?.takeIf { it >= 0.5 }
+            ?.let { kotlin.math.round(it * 100).toInt().coerceAtLeast(50) }
     Column(
         modifier =
             Modifier
@@ -274,6 +291,95 @@ private fun TipAmountSheet(
                     )
                 }
             }
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Text(
+                text = "Custom amount",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .padding(horizontal = Spacing.s3),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Text(
+                    text = "$",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appTextSecondary,
+                )
+                BasicTextField(
+                    value = customAmount,
+                    onValueChange = { customAmount = it },
+                    enabled = !sending,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    textStyle =
+                        androidx.compose.ui.text.TextStyle(
+                            color = PantopusColors.appText,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                    cursorBrush = SolidColor(PantopusColors.primary600),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .testTag("tip.amount.customInput"),
+                    decorationBox = { inner ->
+                        if (customAmount.isEmpty()) {
+                            Text(
+                                text = "0.00",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PantopusColors.appTextMuted,
+                            )
+                        }
+                        inner()
+                    },
+                )
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 46.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(
+                        if (customCents == null || sending) {
+                            PantopusColors.appSurfaceSunken
+                        } else {
+                            PantopusColors.primary600
+                        },
+                    )
+                    .clickable(enabled = customCents != null && !sending) {
+                        customCents?.let(onSelect)
+                    }
+                    .testTag("tip.amount.customSubmit"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Send custom tip",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color =
+                    if (customCents == null || sending) {
+                        PantopusColors.appTextMuted
+                    } else {
+                        PantopusColors.appTextInverse
+                    },
+            )
         }
         Text(
             text = "Not now",

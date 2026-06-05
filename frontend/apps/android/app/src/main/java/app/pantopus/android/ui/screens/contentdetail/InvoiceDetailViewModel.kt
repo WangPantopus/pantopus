@@ -21,12 +21,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * T2.6 ships the invoice frame with hardcoded fixture data; Block 3B wires the
- * "Pay" CTA to the real Stripe PaymentSheet. The invoice itself still projects
- * from a fixture (the invoice/order backend lands separately), but the pay
- * step is real: it creates a PaymentIntent (`POST /api/payments/intent`),
- * presents PaymentSheet, and on success re-reads server state — it never marks
- * the invoice paid client-side (webhooks reconcile the `Payment`).
+ * T2.6 ships the invoice frame from fixture display data. Block 3B wires the
+ * "Pay" CTA to Stripe PaymentSheet only when a real backend order reference is
+ * provided through navigation args; fixture invoices leave checkout disabled
+ * rather than sending placeholder payee/amount data.
  */
 @HiltViewModel
 class InvoiceDetailViewModel
@@ -37,6 +35,30 @@ class InvoiceDetailViewModel
     ) : ViewModel() {
         companion object {
             const val INVOICE_ID_KEY = "invoiceId"
+            const val GIG_ID_KEY = "gigId"
+            const val LISTING_ID_KEY = "listingId"
+            const val OFFER_ID_KEY = "offerId"
+
+            fun checkoutRequestFrom(savedStateHandle: SavedStateHandle): CheckoutRequest? {
+                val gigId = savedStateHandle.get<String>(GIG_ID_KEY)?.takeIf { it.isNotBlank() }
+                if (gigId != null) {
+                    return CheckoutRequest(
+                        gigId = gigId,
+                        description = "Invoice ${savedStateHandle.get<String>(INVOICE_ID_KEY) ?: ""}".trim(),
+                    )
+                }
+                val listingId = savedStateHandle.get<String>(LISTING_ID_KEY)?.takeIf { it.isNotBlank() }
+                val offerId = savedStateHandle.get<String>(OFFER_ID_KEY)?.takeIf { it.isNotBlank() }
+                return if (listingId != null && offerId != null) {
+                    CheckoutRequest(
+                        listingId = listingId,
+                        offerId = offerId,
+                        description = "Invoice ${savedStateHandle.get<String>(INVOICE_ID_KEY) ?: ""}".trim(),
+                    )
+                } else {
+                    null
+                }
+            }
         }
 
         private val invoiceId: String = savedStateHandle.get<String>(INVOICE_ID_KEY) ?: "INV-00247"
@@ -51,16 +73,10 @@ class InvoiceDetailViewModel
         val events: SharedFlow<InvoiceDetailEvent> = _events.asSharedFlow()
 
         /**
-         * The order this invoice bills for. Real invoices carry the payee +
-         * amount; until the invoice backend lands we derive a request from the
-         * fixture so the pay step is exercised end-to-end.
+         * The order this invoice bills for. Real invoices must carry a backend
+         * order reference; fixture invoices leave this null so pay is disabled.
          */
-        private val checkoutRequest: CheckoutRequest =
-            CheckoutRequest(
-                payeeId = "00000000-0000-4000-8000-000000000b51",
-                amountCents = 64285,
-                description = "Holiday lighting · install + takedown",
-            )
+        private val checkoutRequest: CheckoutRequest? = checkoutRequestFrom(savedStateHandle)
 
         fun load() {
             _state.value = ContentDetailUiState.Loaded(Projection.fixture(invoiceId))
@@ -68,12 +84,15 @@ class InvoiceDetailViewModel
 
         /** Tapped "Pay" — create the PaymentIntent, then ask the screen to present the sheet. */
         fun pay() {
+            val checkoutRequest = checkoutRequest
+            if (checkoutRequest == null) {
+                _paymentStatus.value = InvoicePaymentStatus.Declined("This invoice can't be paid yet.")
+                return
+            }
             _paymentStatus.value = InvoicePaymentStatus.Paying
             viewModelScope.launch {
                 val req =
                     CreatePaymentIntentRequest(
-                        payeeId = checkoutRequest.payeeId,
-                        amount = checkoutRequest.amountCents,
                         gigId = checkoutRequest.gigId,
                         listingId = checkoutRequest.listingId,
                         offerId = checkoutRequest.offerId,

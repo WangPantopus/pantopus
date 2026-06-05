@@ -109,6 +109,25 @@ public enum GigsEndpoints {
         Endpoint(method: .put, path: "/api/gigs/\(gigId)/bids/\(bidId)", body: body)
     }
 
+    /// `POST /api/gigs/:gigId/bids/:bidId/accept` — poster accepts a bid.
+    /// Paid gigs return PaymentSheet params and require `finalizeAcceptBid`
+    /// after the sheet completes.
+    public static func acceptBid(gigId: String, bidId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids/\(bidId)/accept")
+    }
+
+    /// `POST /api/gigs/:gigId/bids/:bidId/finalize-accept` — completes a
+    /// paid bid acceptance after PaymentSheet authorizes the charge.
+    public static func finalizeAcceptBid(gigId: String, bidId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids/\(bidId)/finalize-accept")
+    }
+
+    /// `POST /api/gigs/:gigId/bids/:bidId/abort-accept` — restores a
+    /// pending-payment bid when the sheet is canceled or declined.
+    public static func abortAcceptBid(gigId: String, bidId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids/\(bidId)/abort-accept")
+    }
+
     /// `DELETE /api/gigs/:gigId/bids/:bidId` — withdraw a placed bid.
     /// Body carries a structured `WithdrawBidReason`. Backend records
     /// `withdrawal_reason` + `withdrawn_at` and returns a

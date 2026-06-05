@@ -345,6 +345,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     private let onOpenTransaction: @MainActor (ListingOfferDTO) -> Void
     private let onEditPrice: @MainActor () -> Void
     private let currentUserId: @MainActor () -> String?
+    private let checkout: CheckoutCoordinator
     private let now: @Sendable () -> Date
 
     // MARK: - Local data
@@ -382,6 +383,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         onOpenTransaction: @escaping @MainActor (ListingOfferDTO) -> Void = { _ in },
         onEditPrice: @escaping @MainActor () -> Void = {},
         currentUserId: @escaping @MainActor () -> String? = ListingOffersViewModel.currentSignedInUserId,
+        checkout: CheckoutCoordinator = CheckoutCoordinator(),
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.listingId = listingId
@@ -392,6 +394,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         self.onOpenTransaction = onOpenTransaction
         self.onEditPrice = onEditPrice
         self.currentUserId = currentUserId
+        self.checkout = checkout
         self.now = now
     }
 
@@ -592,11 +595,29 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             let response: ListingOfferResponse = try await api.request(
                 ListingOffersEndpoints.accept(listingId: listingId, offerId: dto.id)
             )
-            replace(offer: response.offer)
+            let accepted = response.offer
+            replace(offer: accepted)
+            if shouldCheckoutAcceptedOffer(accepted, fallback: dto) {
+                let outcome = await checkout.pay(CheckoutRequest(
+                    listingId: accepted.listingId ?? dto.listingId ?? listingId,
+                    offerId: accepted.id,
+                    description: listing?.title ?? listingTitleHint
+                ))
+                if outcome == .paid {
+                    await refresh()
+                }
+            }
         } catch {
             offers = previous
             rebuild()
         }
+    }
+
+    private func shouldCheckoutAcceptedOffer(_ offer: ListingOfferDTO, fallback: ListingOfferDTO? = nil) -> Bool {
+        guard ListingOfferStatus.fromRaw(offer.status) == .accepted,
+              let me = currentUserId(),
+              !me.isEmpty else { return false }
+        return me == (offer.buyerId ?? offer.buyer?.id ?? fallback?.buyerId ?? fallback?.buyer?.id)
     }
 
     public func declineOffer(_ dto: ListingOfferDTO) async {

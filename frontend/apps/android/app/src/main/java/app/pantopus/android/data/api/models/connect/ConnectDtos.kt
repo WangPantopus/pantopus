@@ -5,7 +5,7 @@ import com.squareup.moshi.JsonClass
 
 /**
  * DTOs for the Stripe Connect (Express) payout endpoints in
- * `backend/routes/pays.js` (`/connect/*`). Block 3C reads onboarding /
+ * `backend/routes/pays.js` (`/connect/...`). Block 3C reads onboarding /
  * payouts-enabled state to gate withdraw and opens Stripe-hosted Account Link
  * + Express dashboard URLs. Bank / identity / KYC fields are intentionally not
  * modelled — Stripe hosts that UI.

@@ -19,6 +19,8 @@
 //  matches the doc's four-state rule: loading / populated / hold / error.
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 

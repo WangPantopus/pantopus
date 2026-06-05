@@ -514,42 +514,49 @@ class GigDetailViewModel
                     }
                 return ContentDetailContent(
                     kind = ContentDetailKind.Gig,
-                    statusPill =
-                        if (awarded) {
-                            ContentDetailPill(
-                                id = "status",
-                                label = "Awarded",
-                                icon = PantopusIcon.Check,
-                                tone = ContentDetailPill.Tone.Success,
-                            )
-                        } else {
-                            ContentDetailPill(
-                                id = "status",
-                                label = "Open",
-                                icon = PantopusIcon.Circle,
-                                tone = ContentDetailPill.Tone.Warning,
-                            )
-                        },
+                    statusPill = gigV1StatusPill(awarded),
                     hero = hero,
                     statStrip = emptyList(),
                     modules = modules,
                     trustCapsules = emptyList(),
-                    dock =
-                        if (canTip) {
-                            tipDock
-                        } else if (awarded) {
-                            ContentDetailDock(
-                                secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
-                                primary = ContentDetailDockButton(label = "Bidding closed", icon = PantopusIcon.Lock, enabled = false),
-                            )
-                        } else {
-                            ContentDetailDock(
-                                secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
-                                primary = ContentDetailDockButton(label = "Place bid"),
-                            )
-                        },
+                    dock = gigV1Dock(canTip = canTip, awarded = awarded),
                 )
             }
+
+            private fun gigV1StatusPill(awarded: Boolean): ContentDetailPill =
+                if (awarded) {
+                    ContentDetailPill(
+                        id = "status",
+                        label = "Awarded",
+                        icon = PantopusIcon.Check,
+                        tone = ContentDetailPill.Tone.Success,
+                    )
+                } else {
+                    ContentDetailPill(
+                        id = "status",
+                        label = "Open",
+                        icon = PantopusIcon.Circle,
+                        tone = ContentDetailPill.Tone.Warning,
+                    )
+                }
+
+            private fun gigV1Dock(
+                canTip: Boolean,
+                awarded: Boolean,
+            ): ContentDetailDock =
+                when {
+                    canTip -> tipDock
+                    awarded ->
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                            primary = ContentDetailDockButton(label = "Bidding closed", icon = PantopusIcon.Lock, enabled = false),
+                        )
+                    else ->
+                        ContentDetailDock(
+                            secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                            primary = ContentDetailDockButton(label = "Place bid"),
+                        )
+                }
 
             private fun isAwarded(gig: GigDto): Boolean {
                 if (gig.acceptedBy.isNullOrEmpty()) return false

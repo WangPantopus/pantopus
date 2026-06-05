@@ -14,6 +14,8 @@
 //  re-verify CTA in the payout method card).
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 public struct WalletView: View {
@@ -86,10 +88,9 @@ public struct WalletView: View {
                 section(overline: "Payout method") {
                     PayoutMethodCard(
                         method: content.payoutMethod,
-                        onManage: { Task { await viewModel.openDashboard() } }
-                    ) {
-                        Task { await viewModel.setupPayouts() }
-                    }
+                        onManage: { Task { await viewModel.openDashboard() } },
+                        onReverify: { Task { await viewModel.setupPayouts() } }
+                    )
                 }
                 section(overline: "Taxes") {
                     TaxDocsRow(docs: content.taxDocs, onTap: onOpenTaxDocs)

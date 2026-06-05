@@ -13,6 +13,8 @@ import app.pantopus.android.data.api.models.common.JsonValue
  * the body falls back to the placeholder layout.
  */
 data class GigDetailDto(
+    val gigId: String? = null,
+    val bidId: String? = null,
     /**
      * True once the recipient has accepted this bid — swaps the three-way
      * action row for the next-steps timeline + an "Open thread" CTA.
@@ -89,10 +91,21 @@ data class GigDetailDto(
     companion object {
         fun decodeFromObjectPayload(payload: JsonValue?): GigDetailDto? {
             if (payload == null) return null
-            val bidder = decodeBidder(payload["bidder"] as? Map<*, *>) ?: return null
-            val bid = decodeBid(payload["bid"] as? Map<*, *>) ?: return null
-            val post = decodePost(payload["post"] as? Map<*, *>) ?: return null
+            val bidderMap = payload["bidder"] as? Map<*, *>
+            val bidMap = payload["bid"] as? Map<*, *>
+            val postMap = payload["post"] as? Map<*, *>
+            val bidder = decodeBidder(bidderMap) ?: return null
+            val bid = decodeBid(bidMap) ?: return null
+            val post = decodePost(postMap) ?: return null
+            val gigId =
+                stringCandidate(payload, "gig_id", "gigId", "gig")
+                    ?: stringCandidate(postMap.orEmpty(), "id", "gig_id", "gigId")
+            val bidId =
+                stringCandidate(payload, "bid_id", "bidId", "bid_offer_id")
+                    ?: stringCandidate(bidMap.orEmpty(), "id", "bid_id", "bidId")
             return GigDetailDto(
+                gigId = gigId,
+                bidId = bidId,
                 isAccepted = payload["is_accepted"] as? Boolean ?: false,
                 bidder = bidder,
                 bid = bid,
@@ -186,5 +199,13 @@ data class GigDetailDto(
                 .mapNotNull { it.firstOrNull()?.toString() }
                 .joinToString("")
                 .uppercase()
+
+        private fun stringCandidate(
+            payload: Map<*, *>,
+            vararg keys: String,
+        ): String? =
+            keys.firstNotNullOfOrNull { key ->
+                (payload[key] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+            }
     }
 }

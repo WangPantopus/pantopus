@@ -9,11 +9,14 @@ import app.pantopus.android.data.api.models.listing_offers.ListingOfferUserDto
 import app.pantopus.android.data.api.models.listing_offers.ListingOffersResponse
 import app.pantopus.android.data.api.models.listings.ListingDetailResponse
 import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
+import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.listing_offers.ListingOffersRepository
 import app.pantopus.android.data.listings.ListingsRepository
+import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.data.transaction_reviews.TransactionReviewsRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
@@ -21,10 +24,14 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -43,6 +50,7 @@ class ListingOffersViewModelTest {
     private val listingsRepo: ListingsRepository = mockk()
     private val authRepo: AuthRepository = mockk(relaxed = true)
     private val txnReviewsRepo: TransactionReviewsRepository = mockk(relaxed = true)
+    private val paymentsRepo: PaymentsRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -64,7 +72,7 @@ class ListingOffersViewModelTest {
                     ListingOffersViewModel.LISTING_TITLE_HINT_KEY to "Mid-century walnut credenza",
                 ),
             )
-        val vm = ListingOffersViewModel(offersRepo, listingsRepo, authRepo, txnReviewsRepo, handle)
+        val vm = ListingOffersViewModel(offersRepo, listingsRepo, authRepo, txnReviewsRepo, paymentsRepo, handle)
         vm.bindCallbacks(
             onShareListing = {},
             onOpenBuyer = {},
@@ -429,6 +437,55 @@ class ListingOffersViewModelTest {
             assertEquals("Accepted", row.chips!![0].text)
             assertEquals(1, row.footer?.actions?.size)
             assertEquals("View transaction", row.footer!!.actions.first().title)
+        }
+
+    @Test
+    fun accept_by_buyer_of_countered_offer_presents_checkout() =
+        runTest {
+            every { authRepo.state } returns
+                MutableStateFlow(
+                    AuthRepository.State.SignedIn(
+                        UserDto(
+                            id = "u_o-marcus",
+                            email = "marcus@example.com",
+                            displayName = "Marcus Tate",
+                            avatarUrl = null,
+                        ),
+                    ),
+                )
+            coEvery { listingsRepo.detail(any()) } returns
+                NetworkResult.Success(ListingDetailResponse(listing))
+            coEvery { offersRepo.listOffers(any()) } returns
+                NetworkResult.Success(ListingOffersResponse(threeOffers))
+            coEvery { offersRepo.accept(any(), any()) } returns
+                NetworkResult.Success(
+                    ListingOfferResponseEnvelope(
+                        ListingOfferDto(id = "o-marcus", status = "accepted"),
+                    ),
+                )
+            coEvery { paymentsRepo.createPaymentIntent(any()) } returns
+                NetworkResult.Success(
+                    PaymentIntentSheetParamsDto(
+                        clientSecret = "pi_secret_1",
+                        paymentIntentId = "pi_1",
+                        customer = "cus_1",
+                        ephemeralKey = "ek_1",
+                        publishableKey = "pk_test",
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+            val events = mutableListOf<ListingOffersEvent>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                vm.events.collect { events += it }
+            }
+
+            vm.acceptOffer(threeOffers.first { it.id == "o-marcus" })
+            advanceUntilIdle()
+
+            val event = events.single()
+            assertTrue(event is ListingOffersEvent.PresentCheckout)
+            assertEquals("pi_secret_1", (event as ListingOffersEvent.PresentCheckout).params.clientSecret)
         }
 
     @Test

@@ -37,7 +37,7 @@ final class WalletPayoutTests: XCTestCase {
             .status(200, body: balanceJSON),
             .status(200, body: txJSON),
             .status(200, body: pendingJSON),
-            payoutsEnabled ? .status(200, body: connectEnabledJSON) : .status(404, body: "{}"),
+            payoutsEnabled ? .status(200, body: connectEnabledJSON) : .status(404, body: "{}")
         ]
     }
 
@@ -117,9 +117,9 @@ final class WalletPayoutTests: XCTestCase {
         SequencedURLProtocol.sequence =
             [
                 .status(201, body: #"{"stripeAccountId":"acct_1"}"#), // create/ensure account
-                .status(200, body: #"{"onboardingUrl":"https://connect.stripe.com/setup/x","expiresAt":123}"#),
+                .status(200, body: #"{"onboardingUrl":"https://connect.stripe.com/setup/x","expiresAt":123}"#)
             ]
-                + Self.liveLoad(payoutsEnabled: true) // refresh after return
+            + Self.liveLoad(payoutsEnabled: true) // refresh after return
         let vm = makeVM(presenter: presenter)
         await vm.setupPayouts()
         XCTAssertEqual(presenter.presentedURLs.map(\.absoluteString), ["https://connect.stripe.com/setup/x"])
@@ -132,7 +132,7 @@ final class WalletPayoutTests: XCTestCase {
     func testOpenDashboardPresentsExpressLink() async {
         let presenter = StubConnectPresenter()
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"dashboardUrl":"https://connect.stripe.com/express/x"}"#),
+            .status(200, body: #"{"dashboardUrl":"https://connect.stripe.com/express/x"}"#)
         ]
         let vm = makeVM(presenter: presenter)
         await vm.openDashboard()

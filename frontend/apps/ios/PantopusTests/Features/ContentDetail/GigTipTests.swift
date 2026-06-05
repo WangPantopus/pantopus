@@ -84,13 +84,13 @@ final class GigTipTests: XCTestCase {
         )
     }
 
-    // tip.success
+    /// tip.success
     func testSendTipSucceedsAndReconciles() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON), // load
             .status(200, body: Self.tipJSON), // POST /tip
             .status(200, body: Self.refreshJSON), // refresh-status
-            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON), // reload
+            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON) // reload
         ]
         let presenter = StubTipPresenter()
         presenter.outcome = .completed
@@ -99,14 +99,15 @@ final class GigTipTests: XCTestCase {
         XCTAssertTrue(vm.canTip, "Poster on a completed + confirmed gig can tip")
         await vm.sendTip(amountCents: 1000)
         XCTAssertEqual(presenter.presentPaymentCallCount, 1)
+        XCTAssertEqual(presenter.lastPublishableKey, "pk")
         XCTAssertEqual(vm.tipStatus, .succeeded)
     }
 
-    // tip declined (card / SCA fail)
+    /// tip declined (card / SCA fail)
     func testSendTipDeclined() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON), // load
-            .status(200, body: Self.tipJSON), // POST /tip
+            .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()
         presenter.outcome = .failed(message: "Your card was declined.")
@@ -116,11 +117,11 @@ final class GigTipTests: XCTestCase {
         XCTAssertEqual(vm.tipStatus, .failed(message: "Your card was declined."))
     }
 
-    // tip canceled (buyer dismissed the sheet)
+    /// tip canceled (buyer dismissed the sheet)
     func testSendTipCanceled() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON), // load
-            .status(200, body: Self.tipJSON), // POST /tip
+            .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()
         presenter.outcome = .canceled
@@ -137,11 +138,13 @@ final class GigTipTests: XCTestCase {
 private final class StubTipPresenter: PaymentSheetPresenting {
     var outcome: PaymentSheetOutcome = .completed
     private(set) var presentPaymentCallCount = 0
+    private(set) var lastPublishableKey: String?
 
     func presentAddCard(
         setupIntentClientSecret _: String,
         customer _: String,
-        ephemeralKey _: String
+        ephemeralKey _: String,
+        publishableKey _: String?
     ) async -> PaymentSheetOutcome {
         .completed
     }
@@ -150,9 +153,11 @@ private final class StubTipPresenter: PaymentSheetPresenting {
         clientSecret _: String,
         customer _: String,
         ephemeralKey _: String,
-        isSetupIntent _: Bool
+        isSetupIntent _: Bool,
+        publishableKey: String?
     ) async -> PaymentSheetOutcome {
         presentPaymentCallCount += 1
+        lastPublishableKey = publishableKey
         return outcome
     }
 }

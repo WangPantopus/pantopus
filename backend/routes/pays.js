@@ -13,6 +13,7 @@ const { requireAdmin } = require('../middleware/verifyToken');
 const validate = require('../middleware/validate');
 const Joi = require('joi');
 const logger = require('../utils/logger');
+const { PAYMENT_STATES } = require('../stripe/paymentStateMachine');
 
 const paymentHistoryReadLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -126,18 +127,18 @@ const createConnectAccountSchema = Joi.object({
 });
 
 const createPaymentSchema = Joi.object({
-  payeeId: Joi.string().uuid().required(),
-  amount: Joi.number().integer().min(50).required(), // Min $0.50
   gigId: Joi.string().uuid().optional(),
-  // Marketplace checkout (Block 3B): the listing/offer being paid for. The
-  // listing-offer flow has no Payment row of its own yet, so we attribute the
-  // PaymentIntent via metadata until the marketplace-payments backend lands.
   listingId: Joi.string().uuid().optional(),
   offerId: Joi.string().uuid().optional(),
   description: Joi.string().max(500).optional(),
   paymentMethodId: Joi.string().optional(), // Stripe payment method ID
   metadata: Joi.object().optional()
-});
+})
+  // The server must derive payee + amount from one authoritative order
+  // reference. Listing checkouts are identified by the listing/offer pair.
+  .xor('gigId', 'offerId')
+  .with('listingId', 'offerId')
+  .with('offerId', 'listingId');
 
 const attachPaymentMethodSchema = Joi.object({
   paymentMethodId: Joi.string().required() // pm_xxx from Stripe.js
@@ -151,6 +152,304 @@ const createRefundSchema = Joi.object({
   ).required(),
   description: Joi.string().max(500).optional()
 });
+
+function paymentRouteError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function dollarsToCents(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.round(number * 100);
+}
+
+function assertPayableAmount(amount) {
+  if (!Number.isInteger(amount) || amount < 50) {
+    throw paymentRouteError(400, 'Order amount must be at least $0.50');
+  }
+}
+
+const PAYABLE_GIG_STATUSES = new Set(['assigned', 'in_progress', 'completed']);
+const ACCEPTED_BID_STATUSES = ['accepted', 'assigned', 'pending_payment'];
+const REUSABLE_CHECKOUT_PAYMENT_STATUSES = new Set([
+  PAYMENT_STATES.AUTHORIZE_PENDING,
+  PAYMENT_STATES.AUTHORIZED,
+  'pending',
+  'requires_payment_method',
+  'requires_confirmation',
+  'processing',
+]);
+const RETRYABLE_CHECKOUT_PAYMENT_STATUSES = new Set([
+  PAYMENT_STATES.AUTHORIZATION_FAILED,
+]);
+const IGNORED_CHECKOUT_PAYMENT_STATUSES = new Set([
+  PAYMENT_STATES.CANCELED,
+  'canceled',
+  'failed',
+]);
+const BLOCKING_CHECKOUT_PAYMENT_STATUSES = new Set([
+  PAYMENT_STATES.CAPTURE_PENDING,
+  PAYMENT_STATES.CAPTURED_HOLD,
+  PAYMENT_STATES.TRANSFER_SCHEDULED,
+  PAYMENT_STATES.TRANSFER_PENDING,
+  PAYMENT_STATES.TRANSFERRED,
+  PAYMENT_STATES.REFUND_PENDING,
+  PAYMENT_STATES.REFUNDED_PARTIAL,
+  PAYMENT_STATES.REFUNDED_FULL,
+  PAYMENT_STATES.DISPUTED,
+  'succeeded',
+  'refunded',
+  'partially_refunded',
+]);
+
+function paymentStatus(payment) {
+  return String(payment?.payment_status || '').toLowerCase();
+}
+
+function paymentHasSameTerms(payment, { payerId, checkout }) {
+  return (
+    String(payment?.payer_id) === String(payerId) &&
+    String(payment?.payee_id) === String(checkout.payeeId) &&
+    Number(payment?.amount_total) === Number(checkout.amount)
+  );
+}
+
+function metadataMatches(metadata = {}, expected = {}) {
+  return Object.entries(expected).every(([key, value]) => String(metadata?.[key] || '') === String(value));
+}
+
+function checkoutIdempotencyKey({ payerId, checkout }) {
+  if (checkout.gigId) {
+    return `payment-intent:gig:${checkout.gigId}:${payerId}:${checkout.amount}`;
+  }
+  return `payment-intent:listing-offer:${checkout.listingId}:${checkout.offerId}:${payerId}:${checkout.amount}`;
+}
+
+async function resolveAcceptedGigBid({ gigId, acceptedBy }) {
+  if (!acceptedBy) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from('GigBid')
+    .select('id, bid_amount, status')
+    .eq('gig_id', gigId)
+    .eq('user_id', acceptedBy)
+    .in('status', ACCEPTED_BID_STATUSES)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn('Payment intent: accepted bid lookup failed', { gigId, acceptedBy, error: error.message });
+  }
+  return data || null;
+}
+
+async function resolveGigCheckout({ payerId, gigId }) {
+  const { data: gig, error } = await supabaseAdmin
+    .from('Gig')
+    .select('id, user_id, accepted_by, title, status, price, origin_home_id, payment_id, payment_status')
+    .eq('id', gigId)
+    .single();
+
+  if (error || !gig) {
+    throw paymentRouteError(404, 'Gig not found');
+  }
+  if (gig.user_id !== payerId) {
+    throw paymentRouteError(403, 'Only the gig requester can pay for this gig');
+  }
+  if (!gig.accepted_by) {
+    throw paymentRouteError(409, 'Gig does not have an accepted worker');
+  }
+  if (!PAYABLE_GIG_STATUSES.has(gig.status)) {
+    throw paymentRouteError(400, 'Gig is not payable');
+  }
+
+  const acceptedBid = await resolveAcceptedGigBid({ gigId, acceptedBy: gig.accepted_by });
+  const amount = dollarsToCents(acceptedBid?.bid_amount ?? gig.price);
+  assertPayableAmount(amount);
+
+  const orderMetadata = {
+    type: 'gig_checkout',
+    gig_id: gigId,
+  };
+  if (acceptedBid?.id) orderMetadata.bid_id = acceptedBid.id;
+
+  return {
+    payeeId: gig.accepted_by,
+    amount,
+    gigId,
+    listingId: null,
+    offerId: null,
+    homeId: gig.origin_home_id || null,
+    description: `Pantopus gig: ${gig.title || gigId}`,
+    orderMetadata,
+    metadata: { ...orderMetadata },
+  };
+}
+
+async function resolveListingOfferCheckout({ payerId, listingId, offerId }) {
+  const { data: offer, error: offerError } = await supabaseAdmin
+    .from('ListingOffer')
+    .select('id, listing_id, buyer_id, seller_id, amount, status')
+    .eq('id', offerId)
+    .single();
+
+  if (offerError || !offer) {
+    throw paymentRouteError(404, 'Offer not found');
+  }
+  if (offer.listing_id !== listingId) {
+    throw paymentRouteError(400, 'Offer does not belong to this listing');
+  }
+  if (offer.buyer_id !== payerId) {
+    throw paymentRouteError(403, 'Only the buyer can pay for this offer');
+  }
+  if (offer.status !== 'accepted') {
+    throw paymentRouteError(409, 'Offer must be accepted before payment');
+  }
+
+  const { data: listing, error: listingError } = await supabaseAdmin
+    .from('Listing')
+    .select('id, user_id, title, status')
+    .eq('id', listingId)
+    .single();
+
+  if (listingError || !listing) {
+    throw paymentRouteError(404, 'Listing not found');
+  }
+  if (listing.user_id !== offer.seller_id) {
+    throw paymentRouteError(409, 'Offer seller does not match listing owner');
+  }
+  if (!['active', 'reserved'].includes(listing.status)) {
+    throw paymentRouteError(409, 'Listing is not payable');
+  }
+
+  const amount = dollarsToCents(offer.amount);
+  assertPayableAmount(amount);
+
+  const orderMetadata = {
+    type: 'listing_offer_checkout',
+    listing_id: listingId,
+    offer_id: offerId,
+  };
+
+  return {
+    payeeId: offer.seller_id,
+    amount,
+    gigId: null,
+    listingId,
+    offerId,
+    homeId: null,
+    description: `Pantopus listing: ${listing.title || listingId}`,
+    orderMetadata,
+    metadata: { ...orderMetadata },
+  };
+}
+
+async function resolveCheckoutPayment({ payerId, body }) {
+  if (body.gigId) {
+    return resolveGigCheckout({
+      payerId,
+      gigId: body.gigId,
+    });
+  }
+
+  return resolveListingOfferCheckout({
+    payerId,
+    listingId: body.listingId,
+    offerId: body.offerId,
+  });
+}
+
+async function findExistingCheckoutPayments(checkout) {
+  let query = supabaseAdmin
+    .from('Payment')
+    .select('*')
+    .eq('payment_type', 'gig_payment')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (checkout.gigId) {
+    query = query.eq('gig_id', checkout.gigId);
+  } else {
+    query = query
+      .is('gig_id', null)
+      .contains('metadata', checkout.orderMetadata);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw paymentRouteError(500, `Failed to check existing checkout payment: ${error.message}`);
+  }
+
+  return (data || []).filter((payment) => (
+    checkout.gigId || metadataMatches(payment.metadata, checkout.orderMetadata)
+  ));
+}
+
+async function resolveExistingCheckoutIntent({ payerId, checkout }) {
+  const existingPayments = await findExistingCheckoutPayments(checkout);
+  const activePayments = existingPayments.filter((payment) => (
+    !IGNORED_CHECKOUT_PAYMENT_STATUSES.has(paymentStatus(payment))
+  ));
+
+  const conflictingPayment = activePayments.find((payment) => !paymentHasSameTerms(payment, { payerId, checkout }));
+  if (conflictingPayment) {
+    throw paymentRouteError(409, 'An existing checkout payment no longer matches this order');
+  }
+
+  const payment = activePayments.find((candidate) => paymentHasSameTerms(candidate, { payerId, checkout }));
+  if (!payment) return null;
+
+  const status = paymentStatus(payment);
+  if (BLOCKING_CHECKOUT_PAYMENT_STATUSES.has(status)) {
+    throw paymentRouteError(409, `Checkout already has a payment in ${status} state`);
+  }
+
+  if (RETRYABLE_CHECKOUT_PAYMENT_STATUSES.has(status)) {
+    return { existingPaymentId: payment.id };
+  }
+
+  if (REUSABLE_CHECKOUT_PAYMENT_STATUSES.has(status) && payment.stripe_payment_intent_id) {
+    const clientSecret = await stripeService.getPaymentIntentClientSecret(payment.stripe_payment_intent_id);
+    return {
+      reused: true,
+      result: {
+        success: true,
+        clientSecret,
+        paymentIntentId: payment.stripe_payment_intent_id,
+        paymentId: payment.id,
+        payment,
+      },
+    };
+  }
+
+  throw paymentRouteError(409, `Checkout already has a payment in ${status || 'unknown'} state`);
+}
+
+async function linkGigCheckoutPayment({ checkout, result }) {
+  if (!checkout.gigId || !result?.paymentId) return;
+
+  const paymentStatus = result.payment?.payment_status || PAYMENT_STATES.AUTHORIZE_PENDING;
+  const { error } = await supabaseAdmin
+    .from('Gig')
+    .update({
+      payment_id: result.paymentId,
+      payment_status: paymentStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', checkout.gigId)
+    .is('payment_id', null);
+
+  if (error) {
+    logger.warn('Payment intent: failed to link gig payment', {
+      gigId: checkout.gigId,
+      paymentId: result.paymentId,
+      error: error.message,
+    });
+  }
+}
 
 // ============ CONNECT ACCOUNT ROUTES ============
 
@@ -280,52 +579,28 @@ router.post('/connect/dashboard', verifyToken, async (req, res) => {
 
 /**
  * POST /api/payments/intent
- * Create payment intent for gig payment
+ * Create mobile PaymentSheet params for a server-priced checkout.
  */
 router.post('/intent', verifyToken, validate(createPaymentSchema), async (req, res) => {
   try {
     const payerId = req.user.id;
-    const { payeeId, amount, gigId, listingId, offerId, description, metadata } = req.body;
+    const checkout = await resolveCheckoutPayment({ payerId, body: req.body });
+    const existingIntent = await resolveExistingCheckoutIntent({ payerId, checkout });
 
-    // Verify gig exists and payee is owner
-    if (gigId) {
-      const { data: gig, error: gigError } = await supabaseAdmin
-        .from('Gig')
-        .select('user_id, title, status')
-        .eq('id', gigId)
-        .single();
-
-      if (gigError || !gig) {
-        return res.status(404).json({ error: 'Gig not found' });
-      }
-
-      if (gig.user_id !== payeeId) {
-        return res.status(400).json({ error: 'Payee is not gig owner' });
-      }
-
-      if (gig.status !== 'active') {
-        return res.status(400).json({ error: 'Gig is not active' });
-      }
-    }
-
-    // Attribute marketplace/listing checkouts on the PaymentIntent so the
-    // Payment row + webhooks can reconcile them later (the ListingOffer has
-    // no Payment of its own today).
-    const intentMetadata = {
-      ...(metadata || {}),
-      ...(listingId ? { listing_id: listingId } : {}),
-      ...(offerId ? { offer_id: offerId } : {}),
-    };
-
-    // Create payment intent
-    const result = await stripeService.createPaymentIntent({
+    const result = existingIntent?.result || await stripeService.createPaymentIntentForGig({
       payerId,
-      payeeId,
-      amount,
-      gigId,
-      description,
-      metadata: intentMetadata
+      payeeId: checkout.payeeId,
+      amount: checkout.amount,
+      gigId: checkout.gigId,
+      homeId: checkout.homeId,
+      paymentMethodId: req.body.paymentMethodId,
+      existingPaymentId: existingIntent?.existingPaymentId,
+      metadata: checkout.metadata,
+      description: checkout.description,
+      idempotencyKey: existingIntent?.existingPaymentId ? undefined : checkoutIdempotencyKey({ payerId, checkout }),
     });
+
+    await linkGigCheckoutPayment({ checkout, result });
 
     // The mobile PaymentSheet needs the buyer's Stripe customer + a
     // short-lived ephemeral key to render saved cards (and save new ones).
@@ -342,19 +617,23 @@ router.post('/intent', verifyToken, validate(createPaymentSchema), async (req, r
       logger.warn('Payment intent: ephemeral key creation failed (non-fatal)', { error: ekErr.message });
     }
 
-    res.status(201).json({
+    res.status(existingIntent?.reused ? 200 : 201).json({
       clientSecret: result.clientSecret,
       paymentIntentId: result.paymentIntentId,
       payment: result.payment,
+      paymentId: result.paymentId,
       customer,
       ephemeralKey,
       publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+      amount: checkout.amount,
+      reused: !!existingIntent?.reused,
     });
 
   } catch (err) {
     logger.error('Payment intent creation error', { error: err.message });
-    res.status(500).json({
-      error: 'Failed to create payment intent',
+    const status = err.status || 500;
+    res.status(status).json({
+      error: status >= 500 ? 'Failed to create payment intent' : err.message,
       message: err.message
     });
   }

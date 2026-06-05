@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,12 +44,14 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.MemoryDetail
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PackageDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.PartyDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.RecordsDetailLayout
+import app.pantopus.android.ui.screens.settings.payments.StripePaymentSheets
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailTopBar
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarConfig
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import com.stripe.android.paymentsheet.rememberPaymentSheet
 
 /**
  * T6.5b (P20) — Android generic A17.1 mail item detail. Mirror of iOS
@@ -77,8 +80,30 @@ fun MailDetailScreen(
     val saveToVaultInFlight by viewModel.saveToVaultInFlight.collectAsStateWithLifecycle()
     val showsSaveToVault by viewModel.showsSaveToVaultPicker.collectAsStateWithLifecycle()
     val vaultFolders by viewModel.saveToVaultFolders.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val paymentSheet =
+        rememberPaymentSheet { result ->
+            viewModel.onGigBidCheckoutOutcome(StripePaymentSheets.checkoutOutcome(result))
+        }
 
     LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is MailDetailEvent.PresentGigBidCheckout ->
+                    paymentSheet.presentWithPaymentIntent(
+                        paymentIntentClientSecret = event.params.clientSecret.orEmpty(),
+                        configuration =
+                            StripePaymentSheets.paymentConfiguration(
+                                context = context,
+                                customerId = event.params.customer,
+                                ephemeralKey = event.params.ephemeralKey,
+                                publishableKey = event.params.publishableKey,
+                            ),
+                    )
+            }
+        }
+    }
     LaunchedEffect(toast) {
         if (toast != null) {
             kotlinx.coroutines.delay(1_800)

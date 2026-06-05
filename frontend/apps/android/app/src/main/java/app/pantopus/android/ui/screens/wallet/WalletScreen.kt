@@ -2,8 +2,10 @@
 
 package app.pantopus.android.ui.screens.wallet
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -108,13 +110,8 @@ fun WalletScreen(
             when (event) {
                 is WalletEvent.OpenUrl -> {
                     if (event.refreshOnReturn) awaitingConnectReturn = true
-                    runCatching {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(event.url)).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            },
-                        )
-                    }.onFailure { toastController.error("Couldn't open the payout page.") }
+                    runCatching { openStripeHostedUrl(context, event.url) }
+                        .onFailure { toastController.error("Couldn't open the payout page.") }
                 }
             }
         }
@@ -179,6 +176,25 @@ fun WalletScreen(
                 onCancel = { showWithdrawSheet = false },
             )
         }
+    }
+}
+
+private fun openStripeHostedUrl(
+    context: Context,
+    url: String,
+) {
+    val uri = Uri.parse(url)
+    runCatching {
+        CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+            .launchUrl(context, uri)
+    }.getOrElse {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
     }
 }
 

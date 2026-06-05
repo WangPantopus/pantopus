@@ -2,6 +2,7 @@
 
 package app.pantopus.android.data.api.models.gigs
 
+import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
@@ -132,6 +133,46 @@ data class PlaceBidResponse(
     val bid: GigBidDto? = null,
     val message: String? = null,
 )
+
+/**
+ * Response from `POST /api/gigs/:gigId/bids/:bidId/accept`.
+ * Paid gigs return PaymentSheet params and stay in `pending_payment`
+ * until `finalize-accept` succeeds; free gigs may already be accepted.
+ */
+@JsonClass(generateAdapter = true)
+data class GigBidAcceptResponse(
+    val bid: GigBidDto? = null,
+    val message: String? = null,
+    val requiresPaymentSetup: Boolean? = null,
+    val isSetupIntent: Boolean? = null,
+    val payment: PaymentPayload? = null,
+    val publishableKey: String? = null,
+    val clientSecret: String? = null,
+    val paymentId: String? = null,
+    val setupIntentId: String? = null,
+    val paymentIntentId: String? = null,
+    val ephemeralKey: String? = null,
+    val customer: String? = null,
+    val customerId: String? = null,
+) {
+    fun sheetParams(): PaymentIntentSheetParamsDto =
+        PaymentIntentSheetParamsDto(
+            clientSecret = clientSecret ?: payment?.clientSecret,
+            paymentIntentId = paymentIntentId ?: payment?.paymentIntentId,
+            customer = customer ?: customerId,
+            ephemeralKey = ephemeralKey,
+            publishableKey = publishableKey,
+            isSetupIntent = isSetupIntent,
+        )
+
+    @JsonClass(generateAdapter = true)
+    data class PaymentPayload(
+        val clientSecret: String? = null,
+        val paymentId: String? = null,
+        val setupIntentId: String? = null,
+        val paymentIntentId: String? = null,
+    )
+}
 
 /**
  * Body for `POST /api/gigs/:gigId/mark-completed`. The Delivery Proof

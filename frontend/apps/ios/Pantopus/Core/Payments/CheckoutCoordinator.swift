@@ -18,26 +18,20 @@
 
 import Foundation
 
-/// What the buyer is paying for. The server owns the real amount; we pass the
-/// agreed amount + the order reference so the PaymentIntent is attributable.
+/// What the buyer is paying for. The server owns the real amount and payee; the
+/// client passes only the order reference.
 public struct CheckoutRequest: Sendable, Equatable {
-    public let payeeId: String
-    public let amountCents: Int
     public let gigId: String?
     public let listingId: String?
     public let offerId: String?
     public let description: String?
 
     public init(
-        payeeId: String,
-        amountCents: Int,
         gigId: String? = nil,
         listingId: String? = nil,
         offerId: String? = nil,
         description: String? = nil
     ) {
-        self.payeeId = payeeId
-        self.amountCents = amountCents
         self.gigId = gigId
         self.listingId = listingId
         self.offerId = offerId
@@ -63,10 +57,11 @@ public final class CheckoutCoordinator {
     private let api: APIClient
     private let presenter: any PaymentSheetPresenting
 
-    public init(
-        api: APIClient = .shared,
-        presenter: any PaymentSheetPresenting = StripePaymentSheetPresenter()
-    ) {
+    public convenience init() {
+        self.init(api: .shared, presenter: StripePaymentSheetPresenter())
+    }
+
+    init(api: APIClient, presenter: any PaymentSheetPresenting) {
         self.api = api
         self.presenter = presenter
     }
@@ -78,8 +73,6 @@ public final class CheckoutCoordinator {
             params = try await api.request(
                 PaymentsEndpoints.intent(
                     body: CreatePaymentIntentBody(
-                        payeeId: request.payeeId,
-                        amount: request.amountCents,
                         gigId: request.gigId,
                         listingId: request.listingId,
                         offerId: request.offerId,
@@ -106,7 +99,8 @@ public final class CheckoutCoordinator {
             clientSecret: clientSecret,
             customer: params.customer ?? "",
             ephemeralKey: params.ephemeralKey ?? "",
-            isSetupIntent: params.isSetupIntent ?? false
+            isSetupIntent: params.isSetupIntent ?? false,
+            publishableKey: params.publishableKey
         )
         switch outcome {
         case .completed:

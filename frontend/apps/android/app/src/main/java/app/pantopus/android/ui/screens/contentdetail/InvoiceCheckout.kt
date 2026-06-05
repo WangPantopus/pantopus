@@ -14,12 +14,10 @@ import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
  */
 
 /**
- * What the buyer is paying for. The server owns the real amount; we pass the
- * agreed amount + the order reference so the PaymentIntent is attributable.
+ * What the buyer is paying for. The server owns the real amount and payee; the
+ * client passes only the order reference.
  */
 data class CheckoutRequest(
-    val payeeId: String,
-    val amountCents: Int,
     val gigId: String? = null,
     val listingId: String? = null,
     val offerId: String? = null,

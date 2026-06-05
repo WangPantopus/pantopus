@@ -8,6 +8,8 @@
 //  via `POST /api/gigs/:gigId/bids`.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 

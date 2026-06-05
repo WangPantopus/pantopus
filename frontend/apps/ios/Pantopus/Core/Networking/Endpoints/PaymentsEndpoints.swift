@@ -31,8 +31,8 @@ public enum PaymentsEndpoints {
     /// Block 3B checkout: creates a PaymentIntent for the gig / marketplace
     /// order and returns the full set of params the mobile PaymentSheet
     /// needs (`clientSecret` + `customer` + `ephemeralKey` +
-    /// `publishableKey`). The server owns the amount; the client passes the
-    /// order reference (gig / listing / offer id) + agreed amount. The
+    /// `publishableKey`). The server owns the payee and amount; the client
+    /// passes only the order reference (gig or listing/offer id pair). The
     /// charge is reconciled into the `Payment` table by Stripe webhooks, so
     /// the client refreshes the order from the backend on success — it never
     /// marks paid locally.

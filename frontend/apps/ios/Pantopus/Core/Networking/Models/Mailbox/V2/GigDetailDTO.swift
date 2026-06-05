@@ -15,6 +15,8 @@ import Foundation
 /// One incoming bid on a gig the recipient posted, plus the gig summary,
 /// the competing bids, and the post-acceptance next-steps timeline.
 public struct GigDetailDTO: Sendable, Hashable {
+    public let gigId: String?
+    public let bidId: String?
     /// True once the recipient has accepted this bid. Drives the secondary
     /// state: the three-way action row is swapped for the next-steps
     /// timeline + an "Open thread" CTA.
@@ -26,6 +28,8 @@ public struct GigDetailDTO: Sendable, Hashable {
     public let nextSteps: [NextStep]
 
     public init(
+        gigId: String? = nil,
+        bidId: String? = nil,
         isAccepted: Bool,
         bidder: Bidder,
         bid: Bid,
@@ -33,6 +37,8 @@ public struct GigDetailDTO: Sendable, Hashable {
         otherBids: [OtherBid],
         nextSteps: [NextStep]
     ) {
+        self.gigId = gigId
+        self.bidId = bidId
         self.isAccepted = isAccepted
         self.bidder = bidder
         self.bid = bid
@@ -46,6 +52,8 @@ public struct GigDetailDTO: Sendable, Hashable {
     /// taps Accept.
     public func accepted() -> GigDetailDTO {
         GigDetailDTO(
+            gigId: gigId,
+            bidId: bidId,
             isAccepted: true,
             bidder: bidder,
             bid: bid,
@@ -276,6 +284,10 @@ public struct GigDetailDTO: Sendable, Hashable {
         }
 
         return GigDetailDTO(
+            gigId: Self.stringCandidate(in: dict, keys: ["gig_id", "gigId", "gig"])
+                ?? Self.stringCandidate(in: postDict, keys: ["id", "gig_id", "gigId"]),
+            bidId: Self.stringCandidate(in: dict, keys: ["bid_id", "bidId", "bid_offer_id"])
+                ?? Self.stringCandidate(in: bidDict, keys: ["id", "bid_id", "bidId"]),
             isAccepted: dict["is_accepted"]?.boolValue ?? false,
             bidder: bidder,
             bid: bid,
@@ -288,5 +300,14 @@ public struct GigDetailDTO: Sendable, Hashable {
     private static func initials(from name: String) -> String {
         let parts = name.split(separator: " ").prefix(2)
         return parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+    }
+
+    private static func stringCandidate(in dict: [String: JSONValue], keys: [String]) -> String? {
+        for key in keys {
+            guard let value = dict[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !value.isEmpty else { continue }
+            return value
+        }
+        return nil
     }
 }
