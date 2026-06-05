@@ -24,7 +24,9 @@ object StripePaymentSheets {
         publishableKey: String?,
     ) {
         val key = publishableKey?.trim().orEmpty()
-        if (key.isBlank() || key.startsWith("pk_test_REPLACE") || key.startsWith("$(")) return
+        // Skip blanks and the committed pk_test_/pk_live_REPLACE_ME + $(…)
+        // placeholders so a fake key is never registered.
+        if (key.isBlank() || key.contains("REPLACE_ME") || key.startsWith("$(")) return
         PaymentConfiguration.init(context.applicationContext, key)
     }
 

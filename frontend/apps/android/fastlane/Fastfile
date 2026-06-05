@@ -24,6 +24,9 @@ platform :android do
       task: "bundleRelease",
       project_dir: "..",
       properties: {
+        # Fail the build if prod config (https URL + pk_live_ key) is missing,
+        # so a release artifact can never ship localhost/test values.
+        "pantopus.requireProdConfig" => "true",
         "android.injected.signing.store.file" => ENV["PANTOPUS_KEYSTORE_FILE"],
         "android.injected.signing.store.password" => ENV["PANTOPUS_KEYSTORE_PASSWORD"],
         "android.injected.signing.key.alias" => ENV["PANTOPUS_KEY_ALIAS"],

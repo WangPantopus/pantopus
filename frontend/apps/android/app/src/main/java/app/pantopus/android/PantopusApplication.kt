@@ -53,7 +53,9 @@ class PantopusApplication :
         // is already on the classpath (libs.stripe.android); we only init the
         // publishable key. PaymentSheet handles all card entry + SCA.
         val stripeKey = BuildConfig.STRIPE_PUBLISHABLE_KEY
-        if (stripeKey.isNotBlank() && !stripeKey.startsWith("pk_test_REPLACE")) {
+        // Skip the committed pk_test_/pk_live_REPLACE_ME placeholders so a
+        // misconfigured build never registers a fake key.
+        if (stripeKey.isNotBlank() && !stripeKey.contains("REPLACE_ME")) {
             PaymentConfiguration.init(this, stripeKey)
         }
     }

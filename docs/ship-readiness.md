@@ -334,8 +334,10 @@
     test` against Xcode 16.4 — the matrix completed `success` on PR #131
     with no warning-as-error escapes in the xcbeautify pipe.
   - **Caveat:** "Archive" specifically (Release configuration with
-    `Pantopus.xcconfig`) is built by `bundle exec fastlane beta` and
-    isn't exercised by CI today. Verify on the next TestFlight cut.
+    `Config/Pantopus.Release.xcconfig`) is built by `bundle exec fastlane
+    beta` (or the `build_release` dry-run lane) and isn't exercised by CI
+    today. Verify on the next TestFlight cut. See
+    `docs/release/prod-config-checklist.md`.
 - [x] **Android release APK + bundle build cleanly with no warnings.**
   - **Status:** CI workflow `Lint, test, assemble` runs `:app:assembleDebug`
     + `:app:lintDebug` to green. `ktlintCheck` + `detekt` both pass.

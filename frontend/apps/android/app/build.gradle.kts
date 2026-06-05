@@ -28,6 +28,17 @@ fun envOr(
     default: String,
 ): String = (localEnv.getProperty(key) ?: System.getenv(key) ?: default).trim()
 
+// Config values baked into BuildConfig. Resolved once so the release guard
+// below can validate the exact strings the release variant will ship.
+val apiBaseUrl = envOr("PANTOPUS_API_BASE_URL", "http://10.0.2.2:8000")
+val socketUrl = envOr("PANTOPUS_SOCKET_URL", "http://10.0.2.2:8000")
+val stripeKey = envOr("STRIPE_PUBLISHABLE_KEY", "pk_test_REPLACE_ME")
+val sentryDsn = envOr("SENTRY_DSN", "")
+// PANTOPUS_ENV tags Sentry + tunes trace sampling. Debug defaults to `local`,
+// release to `production`; an explicit value (e.g. `staging`) overrides both.
+val pantopusEnvDebug = envOr("PANTOPUS_ENV", "local")
+val pantopusEnvRelease = envOr("PANTOPUS_ENV", "production")
+
 android {
     namespace = "app.pantopus.android"
     // compileSdk bumped to 35 to satisfy transitive androidx.core 1.15 AAR
@@ -45,11 +56,13 @@ android {
         vectorDrawables.useSupportLibrary = true
 
         // Inject config into BuildConfig — read via BuildConfig.PANTOPUS_API_BASE_URL etc.
-        buildConfigField("String", "PANTOPUS_API_BASE_URL", "\"${envOr("PANTOPUS_API_BASE_URL", "http://10.0.2.2:8000")}\"")
-        buildConfigField("String", "PANTOPUS_SOCKET_URL", "\"${envOr("PANTOPUS_SOCKET_URL", "http://10.0.2.2:8000")}\"")
-        buildConfigField("String", "STRIPE_PUBLISHABLE_KEY", "\"${envOr("STRIPE_PUBLISHABLE_KEY", "pk_test_REPLACE_ME")}\"")
-        buildConfigField("String", "SENTRY_DSN", "\"${envOr("SENTRY_DSN", "")}\"")
-        buildConfigField("String", "PANTOPUS_ENV", "\"${envOr("PANTOPUS_ENV", "local")}\"")
+        // These are the defaultConfig values; the release buildType overrides
+        // PANTOPUS_ENV to production below.
+        buildConfigField("String", "PANTOPUS_API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "PANTOPUS_SOCKET_URL", "\"$socketUrl\"")
+        buildConfigField("String", "STRIPE_PUBLISHABLE_KEY", "\"$stripeKey\"")
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
+        buildConfigField("String", "PANTOPUS_ENV", "\"$pantopusEnvDebug\"")
 
         // PostHog product analytics — matches iOS. Empty key disables the
         // vendor (analytics no-ops in dev / CI); host defaults to EU Cloud.
@@ -89,6 +102,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Production environment tag: drives Sentry's environment + the
+            // 0.1 trace sample rate (vs 1.0 in dev). Overrides the local
+            // default from defaultConfig.
+            buildConfigField("String", "PANTOPUS_ENV", "\"$pantopusEnvRelease\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -138,6 +155,46 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// ── Release config guard ───────────────────────────────────────────────
+// A release build must point at a real https:// production backend and ship
+// a LIVE Stripe key. By default we only warn (so `./gradlew assembleRelease`
+// still works for local smoke tests against the debug keystore). When
+// `-Ppantopus.requireProdConfig=true` (or PANTOPUS_REQUIRE_PROD_CONFIG=true)
+// is set — as the fastlane release lane / CI do — a placeholder or localhost
+// value fails the build so test keys can never reach the Play Store.
+val requireProdProp = project.findProperty("pantopus.requireProdConfig") as String?
+val requireProdEnv = System.getenv("PANTOPUS_REQUIRE_PROD_CONFIG")
+val requireProdConfig = (requireProdProp ?: requireProdEnv)?.toBoolean() ?: false
+
+val buildingRelease =
+    gradle.startParameter.taskNames.any { name ->
+        val task = name.substringAfterLast(':')
+        task.endsWith("Release", ignoreCase = true) || task.startsWith("publish")
+    }
+
+if (buildingRelease) {
+    val apiIsLocal = apiBaseUrl.contains("localhost") || apiBaseUrl.contains("10.0.2.2")
+    val apiOk = apiBaseUrl.startsWith("https://") && !apiIsLocal
+    val problems = mutableListOf<String>()
+    if (!apiOk) {
+        problems += "PANTOPUS_API_BASE_URL must be an https:// production URL (got \"$apiBaseUrl\")"
+    }
+    if (!stripeKey.startsWith("pk_live_")) {
+        problems += "STRIPE_PUBLISHABLE_KEY must be a live key (pk_live_…) for release (got \"${stripeKey.take(8)}…\")"
+    }
+    if (problems.isNotEmpty()) {
+        val detail = problems.joinToString("\n  - ", prefix = "\n  - ")
+        val message =
+            "Release build is using non-production config:$detail" +
+                "\nSupply PANTOPUS_API_BASE_URL / STRIPE_PUBLISHABLE_KEY via .env or CI secrets."
+        if (requireProdConfig) {
+            throw GradleException(message)
+        } else {
+            logger.warn("⚠️  $message")
+        }
     }
 }
 

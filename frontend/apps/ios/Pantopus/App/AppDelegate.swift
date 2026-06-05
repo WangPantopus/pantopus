@@ -13,10 +13,28 @@ import UserNotifications
 final class AppDelegate: NSObject, UIApplicationDelegate {
     private let logger = Logger(label: "app.pantopus.ios.AppDelegate")
 
+    /// Configure SwiftLog. Called once from `didFinishLaunching` (which runs
+    /// once per process). Debug builds keep verbose `.debug` output;
+    /// Release/Staging raise the floor to `.notice` so `.info`/`.debug`
+    /// chatter (APNs tokens, deep-link paths, analytics breadcrumbs) never
+    /// reaches the device console of a shipped build.
+    private static func bootstrapLogging() {
+        LoggingSystem.bootstrap { label in
+            var handler = StreamLogHandler.standardError(label: label)
+            #if DEBUG
+            handler.logLevel = .debug
+            #else
+            handler.logLevel = .notice
+            #endif
+            return handler
+        }
+    }
+
     func application(
         _: UIApplication,
         didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        Self.bootstrapLogging()
         MainActor.assumeIsolated {
             Observability.shared.start(environment: AppEnvironment.current)
             // Product analytics (PostHog). No-ops until POSTHOG_API_KEY is set,

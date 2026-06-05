@@ -86,7 +86,7 @@ Then in Xcode:
 
 The app follows an MVVM structure with strict concurrency and the new `@Observable` macro (no more `ObservableObject` + `@Published`).
 
-- **`AppEnvironment`** — resolves the API/socket base URLs and Stripe key. Driven by the scheme env var `PANTOPUS_API_ENV` (one of `local`, `staging`, `production`).
+- **`AppEnvironment`** — resolves the API/socket base URLs and Stripe key. Honours the scheme env var `PANTOPUS_API_ENV` (`local` / `staging` / `production`) when set, otherwise falls back per build configuration: Debug → `.local`, the `Pantopus (Staging)` scheme → `.staging`, Release → `.production`. Per-config values come from `Config/Pantopus.{Debug,Staging,Release}.xcconfig` (overlaid by the gitignored `Secrets.xcconfig`); staging/prod URLs are `https://`-guarded so a stray localhost value can't reach a shipped build. See [`docs/release/prod-config-checklist.md`](../../../docs/release/prod-config-checklist.md).
 - **`APIClient`** — URLSession-based, async/await. Auto-attaches `Authorization: Bearer <token>` to authenticated endpoints, decodes JSON with snake_case → camelCase conversion, maps `401` → `AuthManager.handleUnauthorized()`.
 - **`AuthManager`** — `@Observable` `@MainActor`. Owns `State { unknown | signedOut | signedIn(user) }`, persists tokens to the Keychain via `KeychainStore`, restores the session on launch.
 - **`SocketClient`** — Socket.IO wrapper. Exposes events as `AsyncStream<T: Decodable>` for clean `for await` usage in view models.

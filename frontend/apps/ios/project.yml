@@ -33,13 +33,19 @@ settings:
       - "-enable-upcoming-feature"
       - "ExistentialAny"
 
+# Release is listed before Staging so the auto-generated "Pantopus" scheme
+# archives the Release configuration (XcodeGen picks the first release-type
+# config for the archive action). The dedicated "Pantopus (Staging)" scheme
+# below archives Staging.
 configs:
   Debug: debug
   Release: release
+  Staging: release
 
 configFiles:
-  Debug: Config/Pantopus.xcconfig
-  Release: Config/Pantopus.xcconfig
+  Debug: Config/Pantopus.Debug.xcconfig
+  Release: Config/Pantopus.Release.xcconfig
+  Staging: Config/Pantopus.Staging.xcconfig
 
 packages:
   # Stripe iOS SDK — payments (card, Apple Pay, PaymentSheet)
@@ -132,7 +138,11 @@ targets:
     entitlements:
       path: Pantopus/Resources/Pantopus.entitlements
       properties:
-        aps-environment: development
+        # Resolved per configuration from xcconfig: development for Debug,
+        # production for Staging/Release (App Store + TestFlight use the
+        # production APNs environment). Xcode substitutes the build setting
+        # into the entitlements plist at sign time.
+        aps-environment: $(APS_ENVIRONMENT)
         com.apple.developer.associated-domains:
           - applinks:pantopus.app
           - applinks:www.pantopus.app
@@ -148,6 +158,11 @@ targets:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
           GCC_PREPROCESSOR_DEFINITIONS: "DEBUG=1"
+        Staging:
+          # AppEnvironment resolves `.staging` from this flag (no DEBUG, so
+          # the runtime falls through to `#elseif STAGING`).
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: STAGING
+          SWIFT_COMPILATION_MODE: wholemodule
         Release:
           SWIFT_COMPILATION_MODE: wholemodule
     dependencies:
@@ -210,3 +225,25 @@ targets:
         TEST_TARGET_NAME: Pantopus
     dependencies:
       - target: Pantopus
+
+# The default "Pantopus" scheme is generated from the Pantopus target's
+# `scheme:` block above (Debug run/test, Release archive). This extra scheme
+# targets the Staging configuration for pre-prod TestFlight builds. Build it
+# with: `xcodebuild -scheme "Pantopus (Staging)" -configuration Staging`.
+schemes:
+  Pantopus (Staging):
+    build:
+      targets:
+        Pantopus: all
+    run:
+      config: Staging
+    test:
+      config: Staging
+      targets:
+        - PantopusTests
+    profile:
+      config: Staging
+    analyze:
+      config: Staging
+    archive:
+      config: Staging
