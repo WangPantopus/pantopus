@@ -57,7 +57,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.homes.HomeDocumentDto
-import app.pantopus.android.ui.components.OfflineBanner
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.theme.PantopusColors
@@ -107,7 +106,6 @@ fun DocumentDetailScreen(
                 .testTag("documentDetail"),
     ) {
         Column(Modifier.fillMaxSize()) {
-            OfflineBanner(modifier = Modifier.fillMaxWidth())
             when (val current = state) {
                 DocumentDetailUiState.Loading -> LoadingShell(onBack = onBack)
                 is DocumentDetailUiState.Loaded ->

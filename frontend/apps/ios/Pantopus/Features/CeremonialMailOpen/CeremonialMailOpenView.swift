@@ -112,6 +112,7 @@ public struct CeremonialMailOpenView: View {
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Back")
             .accessibilityIdentifier("ceremonialMailOpenBackButton")
             Spacer()
             Text("Letter")

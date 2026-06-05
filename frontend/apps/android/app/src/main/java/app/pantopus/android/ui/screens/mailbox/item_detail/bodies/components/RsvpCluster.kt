@@ -29,6 +29,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -367,6 +369,7 @@ private fun StepperButton(
     val bg = if (primary) PantopusColors.categoryParty else PantopusColors.appSurface
     val fg = if (primary) PantopusColors.appTextInverse else PantopusColors.appTextSecondary
     val border = if (primary) Color.Transparent else PantopusColors.appBorder
+    val label = if (primary) "Add a plus-one" else "Remove a plus-one"
     Box(
         modifier =
             Modifier
@@ -374,7 +377,8 @@ private fun StepperButton(
                 .clip(CircleShape)
                 .background(bg)
                 .border(1.dp, border, CircleShape)
-                .clickable(onClick = onClick),
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(icon = icon, contentDescription = null, size = 12.dp, tint = fg)

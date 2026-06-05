@@ -5,16 +5,36 @@
       {
         "appID": "6UYZBA546R.com.pantopus.app",
         "paths": [
-          "/gig/*",
-          "/gigs/*",
           "/post/*",
           "/posts/*",
+          "/gig/*",
+          "/gigs/*",
           "/listing/*",
           "/listings/*",
+          "/marketplace/*",
+          "/home",
+          "/homes/*",
+          "/user/*",
+          "/users/*",
+          "/business/*",
+          "/businesses/*",
           "/b/*",
           "/u/*",
-          "/marketplace/*",
-          "/invite/*"
+          "/mailbox/*",
+          "/chat/*",
+          "/messages/*",
+          "/conversation/*",
+          "/support-trains/*",
+          "/connections",
+          "/notifications",
+          "/wallet",
+          "/invite/*",
+          "/auth/*",
+          "/verify-email",
+          "/verify-email/*",
+          "/reset-password",
+          "/reset-password/*",
+          "/settings/payments"
         ]
       }
     ]
