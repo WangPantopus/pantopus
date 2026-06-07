@@ -194,9 +194,11 @@ public struct TasksTabRoot: View {
     }
 
     private func editListingDestination(listingId: String, jumpToStep: ListingComposeStep?) -> some View {
-        ListingComposeWizardView(mode: .edit(listingId: listingId, jumpToStep: jumpToStep)) { _ in
-            pop()
-        }
+        ListingComposeWizardView(
+            mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+            // swiftlint:disable:next trailing_closure
+            onListingUpdated: { _ in pop() }
+        )
     }
 
     @ViewBuilder

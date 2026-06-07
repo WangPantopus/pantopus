@@ -11,7 +11,7 @@ import CoreLocation
 import Foundation
 
 @MainActor
-public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocationManagerDelegate {
+public final class DeviceLocationProvider: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
     public static let shared = DeviceLocationProvider()
 
     private let manager = CLLocationManager()
@@ -91,7 +91,7 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
         }
     }
 
-    public nonisolated func locationManager(_: CLLocationManager, didFailWithError _: Error) {
+    public nonisolated func locationManager(_: CLLocationManager, didFailWithError _: any Error) {
         Task { @MainActor in
             pendingLocation?.resume(returning: cached)
             pendingLocation = nil
@@ -130,6 +130,9 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
         }
     }
 }
+
+@MainActor
+extension DeviceLocationProvider: @preconcurrency LocationProviding {}
 
 private extension UserCoordinate {
     init(_ location: CLLocation) {

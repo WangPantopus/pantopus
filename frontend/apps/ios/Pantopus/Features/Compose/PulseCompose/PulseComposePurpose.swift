@@ -87,11 +87,13 @@ public enum PulseComposePurpose: String, CaseIterable, Sendable, Hashable, Ident
     /// Post types allowed per posting target — mirrors mobile
     /// `PostComposerModal` filtering.
     public static func allowed(for target: PulsePostingTarget) -> [PulseComposePurpose] {
-        let placeTypes: Set = [
+        // swiftformat:disable:next redundantType
+        let placeTypes: Set<String> = [
             "ask_local", "recommendation", "event", "lost_found", "alert", "deal",
             "local_update", "neighborhood_win", "visitor_guide"
         ]
-        let businessTypes: Set = ["event", "deal", "local_update"]
+        // swiftformat:disable:next redundantType
+        let businessTypes: Set<String> = ["event", "deal", "local_update"]
 
         let allowedPostTypes: Set<String> = switch target {
         case .business: businessTypes

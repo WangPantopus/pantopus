@@ -126,9 +126,11 @@ public struct MarketplaceTabRoot: View {
                 path.append(.listingDetail(listingId: listingId))
             }
         case let .editListing(listingId, jumpToStep):
-            ListingComposeWizardView(mode: .edit(listingId: listingId, jumpToStep: jumpToStep)) { _ in
-                pop()
-            }
+            ListingComposeWizardView(
+                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+                // swiftlint:disable:next trailing_closure
+                onListingUpdated: { _ in pop() }
+            )
         case let .listingOffers(listingId, titleHint):
             ListingOffersView(
                 viewModel: ListingOffersViewModel(
