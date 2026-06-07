@@ -82,7 +82,14 @@ export default function PlaceHeader({
           <div className="mt-1">{addressLine}</div>
         )}
       </div>
-      {rightSlot ?? <PlaceAvatar initials={initials} status={status} size={40} />}
+      {rightSlot ?? (
+        <PlaceAvatar
+          initials={initials}
+          status={status}
+          size={40}
+          label={status === 'claimed' ? 'Claimed' : undefined}
+        />
+      )}
 
       {canSwitch ? (
         <PlaceSwitcher

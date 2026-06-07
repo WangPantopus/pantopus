@@ -148,6 +148,8 @@ export default function PlaceDashboard() {
         activeHomeId={homeId}
         onSwitchHome={setSelectedHomeId}
         onAddPlace={() => router.push('/app/homes/new')}
+        onVerify={() => router.push('/app/address-verify')}
+        onClaim={() => router.push('/app/homes')}
       />
     </Shell>
   );
