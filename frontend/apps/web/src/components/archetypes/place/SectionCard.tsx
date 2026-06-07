@@ -103,7 +103,7 @@ export default function SectionCard({
             </span>
           )}
         </div>
-        <Chevron />
+        {onClick ? <Chevron /> : null}
       </div>
     );
   }
@@ -191,7 +191,7 @@ export default function SectionCard({
             <span>{asOf}</span>
           </div>
         ) : null}
-        {!loading ? <Chevron /> : null}
+        {onClick && !loading ? <Chevron /> : null}
       </div>
       {body}
     </div>

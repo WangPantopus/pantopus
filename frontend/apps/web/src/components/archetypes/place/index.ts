@@ -29,6 +29,9 @@ export type { GroupProps } from './Group';
 export { default as PlaceHeader } from './PlaceHeader';
 export type { PlaceHeaderProps } from './PlaceHeader';
 
+export { default as HeroCard } from './HeroCard';
+export type { HeroCardProps, HeroVariant, HeroNudge } from './HeroCard';
+
 export {
   IconTile,
   Chevron,

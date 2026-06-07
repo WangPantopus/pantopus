@@ -64,6 +64,11 @@ export const queryKeys = {
   // ── Homes ─────────────────────────────────────────────────
   homeDetail: (id: string) => ['homes', 'detail', id] as const,
 
+  // ── Place (address-led home intelligence) ─────────────────
+  placePrimaryHome: () => ['place', 'primary-home'] as const,
+  placeIntelligence: (homeId: string) =>
+    ['place', 'intelligence', homeId] as const,
+
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>
     ['businesses', 'detail', id] as const,

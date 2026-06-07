@@ -34,6 +34,8 @@ export interface DensityCardProps {
   ctaLabel?: string;
   onCta?: () => void;
   onClick?: () => void;
+  /** Hide the conversion CTA (e.g. on an already-verified resident's dashboard). */
+  showCta?: boolean;
   className?: string;
 }
 
@@ -42,6 +44,7 @@ export default function DensityCard({
   ctaLabel = 'Be one of the first to verify on your block',
   onCta,
   onClick,
+  showCta = true,
   className = '',
 }: DensityCardProps) {
   const level = BUCKET_DOTS[bucket];
@@ -52,18 +55,18 @@ export default function DensityCard({
       className={`bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 ${onClick ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
     >
-      <div className="flex items-center gap-3 mb-2.5">
+      <div className={`flex items-center gap-3 ${showCta ? 'mb-2.5' : ''}`}>
         <IconTile icon={Users} tone={empty ? 'muted' : 'home'} />
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-semibold text-app-text -tracking-[0.01em]">Verified homes nearby</div>
         </div>
-        <Chevron />
+        {onClick ? <Chevron /> : null}
       </div>
-      <div className="flex items-center gap-2.5 mb-2.5">
+      <div className={`flex items-center gap-2.5 ${showCta ? 'mb-2.5' : 'mt-2.5'}`}>
         <DensityDots level={level} />
         <span className={`text-[15px] font-medium ${empty ? 'text-app-text-secondary' : 'text-app-text'}`}>{label}</span>
       </div>
-      <TextButton onClick={onCta}>{ctaLabel}</TextButton>
+      {showCta ? <TextButton onClick={onCta}>{ctaLabel}</TextButton> : null}
     </div>
   );
 }

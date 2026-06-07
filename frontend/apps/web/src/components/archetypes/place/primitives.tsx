@@ -12,7 +12,7 @@
 import { useId } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { ArrowRight, Check, ChevronRight, Home } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Home, User } from 'lucide-react';
 
 // ── Icon tone tile ──────────────────────────────────────────
 // Rounded square that carries the section's lucide glyph. `home` is
@@ -138,7 +138,7 @@ export function PlaceAvatar({ initials = 'RC', status = 'verified', size = 40, c
         className={`inline-flex items-center justify-center w-full h-full rounded-full font-bold ${disc}`}
         style={{ fontSize: Math.round(size * 0.34) }}
       >
-        {initials}
+        {initials ? initials : <User size={Math.round(size * 0.5)} strokeWidth={2} />}
       </span>
       {status === 'verified' ? (
         <span
