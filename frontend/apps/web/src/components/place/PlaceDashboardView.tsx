@@ -11,13 +11,21 @@
 
 import { Fragment } from 'react';
 import type { PlaceIntelligence } from '@pantopus/types';
-import { Group, HeroCard, PlaceHeader, VerifyBanner } from '@/components/archetypes/place';
+import { Group, HeroCard, PlaceHeader, VerifyBanner, type PlaceSwitcherHome } from '@/components/archetypes/place';
 import { derivePulse, renderSection, renderVerifyLocked } from './presentation';
 
 export interface PlaceDashboardViewProps {
   intelligence: PlaceIntelligence;
   /** Resident initials for the avatar; falls back to a neutral glyph. */
   userInitials?: string;
+  /** The resident's places — when 2+, the header opens the multi-home switcher. */
+  switchHomes?: PlaceSwitcherHome[];
+  /** The home currently shown (highlighted in the switcher). */
+  activeHomeId?: string | null;
+  /** Switch the active place — re-queries the contract for it. */
+  onSwitchHome?: (id: string) => void;
+  /** Claim or verify another address. */
+  onAddPlace?: () => void;
   /** Route to address verification (the T3 → T4 step). */
   onVerify?: () => void;
   /** Route to claim a place (a Band B/C locked card, if any). */
@@ -27,6 +35,10 @@ export interface PlaceDashboardViewProps {
 export default function PlaceDashboardView({
   intelligence,
   userInitials,
+  switchHomes,
+  activeHomeId,
+  onSwitchHome,
+  onAddPlace,
   onVerify,
   onClaim,
 }: PlaceDashboardViewProps) {
@@ -44,6 +56,10 @@ export default function PlaceDashboardView({
         address={intelligence.place.label}
         status={status}
         initials={userInitials ?? ''}
+        switchHomes={switchHomes}
+        activeHomeId={activeHomeId}
+        onSwitchHome={onSwitchHome}
+        onAddPlace={onAddPlace}
       />
 
       {showVerify && onVerify ? (
