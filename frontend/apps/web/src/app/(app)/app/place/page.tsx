@@ -7,7 +7,13 @@
 // ============================================================
 
 import PlaceDashboard from '@/components/place/PlaceDashboard';
+import PendingPlaceSaver from '@/components/place/PendingPlaceSaver';
 
 export default function PlacePage() {
-  return <PlaceDashboard />;
+  return (
+    <>
+      <PendingPlaceSaver />
+      <PlaceDashboard />
+    </>
+  );
 }

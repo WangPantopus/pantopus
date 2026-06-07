@@ -43,6 +43,7 @@ export * as mailboxV2P2 from './endpoints/mailboxV2Phase2';
 export * as mailboxV2P3 from './endpoints/mailboxV2Phase3';
 export * as payments from './endpoints/payments';
 export * as geo from './endpoints/geo';
+export type { GeoSuggestion } from './endpoints/geo';
 export * as bids from './endpoints/bids';
 export * as homeProfile from './endpoints/homeProfile';
 export * as notifications from './endpoints/notifications';
@@ -268,4 +269,11 @@ export type { BusinessSeat, SeatListItem, SeatDetail, MySeat, InviteDetails, Use
 // ============================================================
 export * as place from './endpoints/place';                        // Place — PlaceIntelligence dashboard + T0 preview
 export { getPlaceIntelligence, getPublicPlacePreview } from './endpoints/place';
-export type { PlacePreview } from './endpoints/place';
+export type {
+  PlacePreview,
+  PlacePreviewStatus,
+  PlacePreviewFlood,
+  PlacePreviewDensity,
+  PlacePreviewArea,
+  PlacePreviewLockedSection,
+} from './endpoints/place';
