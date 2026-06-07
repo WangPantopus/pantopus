@@ -133,8 +133,8 @@ export default function AddressAutocomplete({
   return (
     <div className="relative">
       <div
-        className={`flex items-center gap-2.5 h-[54px] px-3.5 bg-app-surface rounded-2xl border transition-shadow ${
-          active ? 'border-primary-600 shadow-[0_0_0_4px_rgba(2,132,199,0.12)]' : 'border-app-border shadow-sm'
+        className={`flex items-center gap-2.5 h-[54px] px-3.5 bg-app-surface rounded-2xl border transition ${
+          active ? 'border-primary-600 ring-4 ring-primary-600/10' : 'border-app-border shadow-sm'
         }`}
       >
         <MapPin size={19} strokeWidth={2} className={active ? 'text-primary-600 shrink-0' : 'text-app-text-muted shrink-0'} />

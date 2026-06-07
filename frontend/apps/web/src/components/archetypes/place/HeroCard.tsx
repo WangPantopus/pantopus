@@ -57,20 +57,27 @@ export default function HeroCard({ variant = 'allclear', title, chip, mainIcon: 
       </div>
 
       {nudge ? (
-        <button
-          type={nudgeInteractive ? 'button' : 'button'}
-          onClick={nudge.onClick}
-          disabled={!nudgeInteractive}
-          className={`w-full flex items-center gap-2.5 rounded-xl bg-app-surface-sunken px-3 py-2.5 text-left ${
-            nudgeInteractive ? 'cursor-pointer hover:bg-app-hover transition-colors' : 'cursor-default'
-          }`}
-        >
-          {NudgeIcon ? (
-            <NudgeIcon size={17} strokeWidth={2} className={alert ? 'text-app-warning shrink-0' : 'text-app-home shrink-0'} />
-          ) : null}
-          <span className="flex-1 text-[13.5px] text-app-text-strong leading-[19px]">{nudge.text}</span>
-          {nudgeInteractive ? <ChevronRight size={17} strokeWidth={2.25} className="shrink-0 text-app-text-muted" /> : null}
-        </button>
+        nudgeInteractive ? (
+          <button
+            type="button"
+            onClick={nudge.onClick}
+            className="w-full flex items-center gap-2.5 rounded-xl bg-app-surface-sunken px-3 py-2.5 text-left cursor-pointer hover:bg-app-hover transition-colors"
+          >
+            {NudgeIcon ? (
+              <NudgeIcon size={17} strokeWidth={2} className={alert ? 'text-app-warning shrink-0' : 'text-app-home shrink-0'} />
+            ) : null}
+            <span className="flex-1 text-[13.5px] text-app-text-strong leading-[19px]">{nudge.text}</span>
+            <ChevronRight size={17} strokeWidth={2.25} className="shrink-0 text-app-text-muted" />
+          </button>
+        ) : (
+          // Informational nudge (no action) — a div, not a disabled button.
+          <div className="w-full flex items-center gap-2.5 rounded-xl bg-app-surface-sunken px-3 py-2.5">
+            {NudgeIcon ? (
+              <NudgeIcon size={17} strokeWidth={2} className={alert ? 'text-app-warning shrink-0' : 'text-app-home shrink-0'} />
+            ) : null}
+            <span className="flex-1 text-[13.5px] text-app-text-strong leading-[19px]">{nudge.text}</span>
+          </div>
+        )
       ) : null}
     </div>
   );

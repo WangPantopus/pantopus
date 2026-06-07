@@ -115,7 +115,7 @@ function HeroStep({
             type="button"
             onClick={onSubmit}
             disabled={!canSubmit}
-            className="h-[54px] w-full flex items-center justify-center gap-1.5 rounded-2xl bg-primary-600 text-white text-base font-semibold -tracking-[0.01em] shadow-[0_6px_16px_rgba(2,132,199,0.2)] enabled:hover:bg-primary-700 disabled:opacity-50 transition-colors"
+            className="h-[54px] w-full flex items-center justify-center gap-1.5 rounded-2xl bg-primary-600 text-white text-base font-semibold -tracking-[0.01em] shadow-[var(--shadow-primary)] enabled:hover:bg-primary-700 disabled:opacity-50 transition-colors"
           >
             See your place
             <ArrowRight size={17} strokeWidth={2.5} />
@@ -276,7 +276,7 @@ function WallBar({ onWall }: { onWall: () => void }) {
         <button
           type="button"
           onClick={onWall}
-          className="shrink-0 rounded-xl bg-primary-600 text-white px-4 py-3 text-[15px] font-semibold -tracking-[0.01em] shadow-[0_6px_16px_rgba(2,132,199,0.18)] hover:bg-primary-700 transition-colors whitespace-nowrap"
+          className="shrink-0 rounded-xl bg-primary-600 text-white px-4 py-3 text-[15px] font-semibold -tracking-[0.01em] shadow-[var(--shadow-primary)] hover:bg-primary-700 transition-colors whitespace-nowrap"
         >
           Create account
         </button>
