@@ -15,7 +15,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
@@ -25,6 +25,7 @@ import {
   Lock as LockIcon,
   ArrowRight,
   ShieldCheck,
+  Smartphone,
   CloudSun,
   Home,
   FlaskConical,
@@ -37,6 +38,7 @@ import * as api from '@pantopus/api';
 import type { PlacePreview, PlacePreviewLockedSection } from '@pantopus/api';
 import { Group, SectionCard, LockedCard, DensityCard, PlaceHeader, TextButton } from '@/components/archetypes/place';
 import { ShimmerBlock } from '@/components/ui/Shimmer';
+import { getStoreDownloadCta } from '@/lib/publicShare';
 import { stashPendingPlace } from './pendingPlace';
 import AddressAutocomplete, { type SelectedAddress } from './AddressAutocomplete';
 
@@ -233,6 +235,33 @@ function PreviewBody({ preview, onWall }: { preview: PlacePreview; onWall: () =>
   );
 }
 
+// ── App-download link (platform-aware; the QR-scanner's other path) ──
+// The store URLs ship with real fallbacks, so this is never a dead link;
+// computed on the client from the user agent to point at the right store.
+function AppDownloadLink() {
+  const [cta, setCta] = useState<{ href: string; label: string } | null>(null);
+  useEffect(() => {
+    try {
+      setCta(getStoreDownloadCta(navigator.userAgent));
+    } catch {
+      setCta(null);
+    }
+  }, []);
+  if (!cta) return null;
+  return (
+    <a
+      href={cta.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary-600 hover:text-primary-700"
+    >
+      <Smartphone size={14} strokeWidth={2} />
+      Prefer the app? Get it
+      <ArrowRight size={13} strokeWidth={2.25} />
+    </a>
+  );
+}
+
 // ── Sticky wall bar ─────────────────────────────────────────
 function WallBar({ onWall }: { onWall: () => void }) {
   return (
@@ -251,6 +280,9 @@ function WallBar({ onWall }: { onWall: () => void }) {
         >
           Create account
         </button>
+      </div>
+      <div className="mt-2 flex justify-center">
+        <AppDownloadLink />
       </div>
     </div>
   );
