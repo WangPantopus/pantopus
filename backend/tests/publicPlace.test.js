@@ -1,22 +1,28 @@
 /**
  * Tests for GET /api/public/place — the anonymous T0 "Place" preview.
  *
- * Asserts the W0.3 contract + its hard constraints:
- *   • returns the density as a BUCKET enum, never a raw count;
+ * Asserts the W0.3 contract + its constraints:
+ *   • density is a BUCKET enum, never a raw count;
  *   • never calls ATTOM (no attomdata.com fetch, no propertyDataService);
- *   • never writes to the DB (NeighborhoodProfileCache stays empty, the
- *     seeded NeighborhoodPreview row is only read);
- *   • a non-US / ungeocodable address degrades to `unsupported_region`
- *     with HTTP 200 — never a 500.
+ *   • the PREVIEW persists no user state (no SavedPlace / Home / per-address
+ *     row); the only thing written is the shared, anonymous, tract-keyed
+ *     public-data cache (NeighborhoodProfileCache) — no address / PII / user id;
+ *   • a non-US / ungeocodable address degrades to `unsupported_region` with
+ *     HTTP 200 — never a 500;
+ *   • repeat requests are served from cache (geocode in-memory; flood + census
+ *     from the tract cache).
  *
- * The geocoder (services/geo) is mocked; the free-data fetchers run for real
- * against a URL-routed global.fetch mock so we can prove no ATTOM URL is hit.
- * supabaseAdmin is the project's in-memory mock (seedTable / getTable).
+ * The geocoder (services/geo) is mocked; the data fetchers run for real against
+ * a URL-routed global.fetch mock so we can prove no ATTOM URL is hit and that
+ * caching eliminates the second FEMA/Census round-trip. supabaseAdmin is the
+ * project's in-memory mock (seedTable / getTable); geoCache is the real
+ * in-memory LRU, cleared between tests.
  */
 
 const express = require('express');
 const request = require('supertest');
 const { resetTables, seedTable, getTable } = require('./__mocks__/supabaseAdmin');
+const { geoCache } = require('../utils/geoCache');
 
 // Geocoder — overridden per test. Default (US) set in beforeEach.
 jest.mock('../services/geo', () => ({ forwardGeocode: jest.fn() }));
@@ -64,8 +70,8 @@ function mockResp(data, ok = true) {
   };
 }
 
-// URL-routed fetch so the real Census/FEMA fetchers resolve. `femaOk` lets a
-// test simulate a FEMA outage (→ partial). An ATTOM URL would resolve too, so
+// URL-routed fetch so the real Census/FEMA fetchers resolve. `femaOk`/`censusOk`
+// let a test simulate an outage (→ partial). An ATTOM URL would resolve too, so
 // the "no ATTOM" assertion proves intent, not a mock-induced failure.
 function installFetch({ femaOk = true, censusOk = true, geocoderOk = true } = {}) {
   global.fetch = jest.fn((url) => {
@@ -78,9 +84,8 @@ function installFetch({ femaOk = true, censusOk = true, geocoderOk = true } = {}
   });
 }
 
-function attomWasCalled() {
-  return (global.fetch.mock?.calls || []).some(([url]) => String(url).includes('attomdata.com'));
-}
+const countFetch = (substr) => (global.fetch.mock?.calls || []).filter(([u]) => String(u).includes(substr)).length;
+const attomWasCalled = () => countFetch('attomdata.com') > 0;
 
 function buildApp() {
   const app = express();
@@ -93,10 +98,13 @@ function buildApp() {
 
 beforeEach(() => {
   resetTables();
+  geoCache.clear();
   jest.clearAllMocks();
+  // WalkScore/Census keys off → deterministic external calls (no walkscore fetch).
+  delete process.env.WALKSCORE_API_KEY;
+  delete process.env.CENSUS_API_KEY;
   geo.forwardGeocode.mockResolvedValue({ ...PORTLAND });
   installFetch();
-  // A warm block by default.
   seedTable('NeighborhoodPreview', [{ geohash: PORTLAND_GEOHASH, verified_users_count: 5 }]);
 });
 
@@ -182,26 +190,63 @@ describe('GET /api/public/place', () => {
     });
   });
 
-  describe('no ATTOM, no persistence', () => {
+  describe('no ATTOM, no preview persistence', () => {
     it('never calls ATTOM', async () => {
       await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
       expect(attomWasCalled()).toBe(false);
       expect(propertyDataService.verifyPropertyOwnership).not.toHaveBeenCalled();
     });
 
-    it('writes nothing to the database', async () => {
-      const app = buildApp();
-      await request(app).get('/api/public/place').query({ address: '1421 SE Oak St' });
+    it('persists no user/preview state — only an anonymous, tract-keyed cache', async () => {
+      await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
 
-      // The getProfile() cache write-path must be bypassed entirely.
-      expect(getTable('NeighborhoodProfileCache')).toHaveLength(0);
-      // The bucket source is only read, never mutated.
-      const previews = getTable('NeighborhoodPreview');
-      expect(previews).toHaveLength(1);
-      expect(previews[0].verified_users_count).toBe(5);
-      // No saved place / home record is created for an anonymous preview.
+      // The preview itself is never persisted: no saved place, no home record.
       expect(getTable('SavedPlace')).toHaveLength(0);
       expect(getTable('Home')).toHaveLength(0);
+
+      // The only write is the shared public-data cache, keyed by Census tract,
+      // holding anonymous area facts — no address, no PII, no user id.
+      const cache = getTable('NeighborhoodProfileCache');
+      expect(cache).toHaveLength(1);
+      const row = cache[0];
+      expect(row.tract_id).toBe('41051001902');
+      expect(row).not.toHaveProperty('user_id');
+      expect(row).not.toHaveProperty('address');
+      const serialized = JSON.stringify(row);
+      expect(serialized).not.toMatch(/Oak|1421/i); // no street address echoed into the cache
+    });
+  });
+
+  describe('caching', () => {
+    it('serves a repeat request from cache (no second Mapbox / FEMA / Census-ACS hit)', async () => {
+      const app = buildApp();
+
+      await request(app).get('/api/public/place').query({ address: '1421 SE Oak St' });
+      const geocodeCalls = geo.forwardGeocode.mock.calls.length;
+      const femaCalls = countFetch('hazards.fema.gov');
+      const acsCalls = countFetch('api.census.gov');
+      expect(geocodeCalls).toBe(1);
+      expect(femaCalls).toBe(1);
+      expect(acsCalls).toBe(1);
+
+      await request(app).get('/api/public/place').query({ address: '1421 SE Oak St' });
+
+      // Mapbox geocode (the billed call) is served from the in-memory cache.
+      expect(geo.forwardGeocode.mock.calls.length).toBe(1);
+      // Flood + Census are served from the tract cache — no new round-trips.
+      expect(countFetch('hazards.fema.gov')).toBe(1);
+      expect(countFetch('api.census.gov')).toBe(1);
+    });
+
+    it('still returns correct data on the cached (second) request', async () => {
+      const app = buildApp();
+      await request(app).get('/api/public/place').query({ address: '1421 SE Oak St' });
+      const res = await request(app).get('/api/public/place').query({ address: '1421 SE Oak St' });
+
+      expect(res.body.status).toBe('ready');
+      expect(res.body.free.flood).toMatchObject({ status: 'ready', zone: 'X' });
+      expect(res.body.free.area).toMatchObject({ status: 'ready', median_year_built: 1985 });
+      expect(res.body.free.density.bucket).toBe('few');
     });
   });
 
@@ -254,14 +299,20 @@ describe('GET /api/public/place', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('unsupported_region');
-      // A non-US lookup must not reach ATTOM (or any external data source).
+      // A non-US lookup must not reach any external data source.
       expect(attomWasCalled()).toBe(false);
+      expect(countFetch('hazards.fema.gov')).toBe(0);
+      expect(countFetch('api.census.gov')).toBe(0);
     });
 
-    it('does not 500 — and does not write — on the unsupported path', async () => {
+    it('does not 500 — and does not cache — a transient geocoder failure', async () => {
       geo.forwardGeocode.mockRejectedValue(new Error('boom'));
       await request(buildApp()).get('/api/public/place').query({ address: 'somewhere' });
-      expect(getTable('NeighborhoodProfileCache')).toHaveLength(0);
+      // Failures are never cached (a retry must be able to hit the geocoder again).
+      geo.forwardGeocode.mockResolvedValue({ ...PORTLAND });
+      const res = await request(buildApp()).get('/api/public/place').query({ address: 'somewhere' });
+      expect(res.body.status).not.toBe('unsupported_region');
+      expect(getTable('NeighborhoodProfileCache').length).toBeLessThanOrEqual(1);
     });
   });
 

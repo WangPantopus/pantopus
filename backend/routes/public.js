@@ -2,12 +2,9 @@ const express = require('express');
 const router = express.Router();
 const supabaseAdmin = require('../config/supabaseAdmin');
 const geo = require('../services/geo');
-const {
-  geocodeToTract,
-  fetchCensusACS,
-  fetchFloodZone,
-} = require('../services/ai/neighborhoodProfileService');
+const { getProfile } = require('../services/ai/neighborhoodProfileService');
 const { encodeGeohash6 } = require('../utils/geohash');
+const { geoCache } = require('../utils/geoCache');
 
 // ============================================================
 // Public Preview Endpoints
@@ -143,12 +140,19 @@ router.get('/posts/:id', async (req, res) => {
 // money, civic) is returned as a *locked descriptor* so the client can render
 // the locked cards and the soft-wall.
 //
-// Hard constraints (the §4 anti-leak rule):
-//   • No auth.            • No ATTOM (no propertyDataService).
-//   • No PII / no exact home record.   • Persists NOTHING — no DB writes.
-// The NeighborhoodProfileCache write path (getProfile) is deliberately
-// bypassed; we call the stateless fetchers directly so a preview never
-// stores anything. Rate-limiting is handled by previewLimiter at the mount.
+// Privacy (the §4 anti-leak rule):
+//   • No auth.   • No ATTOM (no propertyDataService).   • No PII / exact home record.
+//   • The PREVIEW persists nothing: no saved place, no per-user / per-address row,
+//     nothing that makes it returnable (close + reopen still hits the wall).
+//
+// Caching (shared, anonymous, area-level public reference data — never the
+// user's preview, so it honors "the preview persists nothing"):
+//   • flood + census → NeighborhoodProfileCache, keyed by Census TRACT
+//     (90-day TTL, shared with the authenticated pulse path) via getProfile().
+//   • geocode result → in-memory geoCache, keyed by the typed address (1h);
+//     Mapbox is the only billed dependency, so this is the highest-value cache.
+//   • density bucket → read live (its own job refreshes it every 15 min).
+// Every cached value is an anonymous area fact — no address, no user id.
 //
 // Statuses: ready | partial | unsupported_region | rate_limited
 //   • rate_limited is surfaced by previewLimiter as HTTP 429.
@@ -218,10 +222,21 @@ function clip(value, max = 120) {
   return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
 }
 
+// Mapbox is the only billed dependency, so successful geocodes are cached
+// in-memory keyed by the typed address (addresses don't move). Only positive
+// results are cached — a failure may be transient, and re-pinning "unsupported"
+// could outlast a brief geocoder blip.
+const GEO_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const geoCacheKey = (address) => `place:geo:${address.toLowerCase().replace(/\s+/g, ' ')}`;
+
 // Geocode an address to a US point via services/geo (country=us). Returns a
 // sanitized, area-level place identity, or { ok: false } for anything we can't
 // confidently place inside US coverage (→ unsupported_region, never a 500).
 async function geocodeUsAddress(address) {
+  const cacheKey = geoCacheKey(address);
+  const cached = geoCache.get(cacheKey);
+  if (cached) return cached;
+
   let result;
   try {
     result = await geo.forwardGeocode(address);
@@ -239,7 +254,7 @@ async function geocodeUsAddress(address) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false };
   if (!isLikelyUS(lat, lng)) return { ok: false };
 
-  return {
+  const place = {
     ok: true,
     lat,
     lng,
@@ -250,22 +265,8 @@ async function geocodeUsAddress(address) {
     state: clip(result.state, 24),
     zipcode: clip(result.zipcode, 12),
   };
-}
-
-// Census tract teaser — area-level medians only (NOT an exact home record,
-// NOT ATTOM). Reuses neighborhoodProfileService's stateless fetchers; writes
-// nothing. Returns null if the tract or ACS lookup is unavailable.
-async function fetchCensusTeaser(lat, lng) {
-  const tract = await geocodeToTract(lat, lng);
-  if (!tract) return null;
-  const { tractId, stateCode, countyCode } = tract;
-  const tractCode = tractId.slice(stateCode.length + countyCode.length);
-  const acs = await fetchCensusACS(stateCode, countyCode, tractCode);
-  if (!acs) return null;
-  return {
-    median_year_built: acs.median_year_built ?? null,
-    median_home_value: acs.median_home_value ?? null,
-  };
+  geoCache.set(cacheKey, place, GEO_CACHE_TTL_MS);
+  return place;
 }
 
 // Read the verified-homes count for the area and return ONLY its bucket.
@@ -311,32 +312,35 @@ router.get('/place', async (req, res) => {
 
     const geohash = encodeGeohash6(place.lat, place.lng);
 
-    // 2. The free demonstration subset only. Each source degrades on its own;
-    //    none persists anything, none touches ATTOM.
-    const [floodSettled, areaSettled, bucketSettled] = await Promise.allSettled([
-      fetchFloodZone(place.lat, place.lng),
-      fetchCensusTeaser(place.lat, place.lng),
+    // 2. The free demonstration subset only. Flood + the Census area teaser
+    //    come from the shared, tract-keyed NeighborhoodProfileCache (via
+    //    getProfile — it reads the cache and only writes anonymous area facts).
+    //    Density is read live. Each source degrades on its own; none persists
+    //    the preview, none touches ATTOM.
+    const [profileSettled, bucketSettled] = await Promise.allSettled([
+      getProfile({ latitude: place.lat, longitude: place.lng, address: place.line }),
       readDensityBucket(geohash),
     ]);
 
-    const flood = floodSettled.status === 'fulfilled' ? floodSettled.value : null;
-    const area = areaSettled.status === 'fulfilled' ? areaSettled.value : null;
+    const profile = profileSettled.status === 'fulfilled' && profileSettled.value
+      ? profileSettled.value.profile
+      : null;
     const bucket = bucketSettled.status === 'fulfilled' ? bucketSettled.value : 'none';
 
-    const floodSection = flood && flood.flood_zone
+    const floodSection = profile && profile.flood_zone
       ? {
           status: 'ready',
-          zone: flood.flood_zone,
-          description: flood.flood_zone_description || null,
+          zone: profile.flood_zone,
+          description: profile.flood_zone_description || null,
           source: 'FEMA National Flood Hazard Layer',
         }
       : { status: 'unavailable', source: 'FEMA National Flood Hazard Layer' };
 
-    const areaSection = area && (area.median_year_built != null || area.median_home_value != null)
+    const areaSection = profile && (profile.median_year_built != null || profile.median_home_value != null)
       ? {
           status: 'ready',
-          median_year_built: area.median_year_built,
-          median_home_value: area.median_home_value,
+          median_year_built: profile.median_year_built,
+          median_home_value: profile.median_home_value,
           note: 'Area-level, not your home',
           source: 'U.S. Census · American Community Survey',
         }
