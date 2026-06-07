@@ -221,7 +221,7 @@ private enum FieldLimits {
 }
 
 /// Maximum number of photos the picker accepts.
-public let pulseComposeMaxPhotos: Int = 4
+public let pulseComposeMaxPhotos: Int = 9
 
 /// Backs `PulseComposeView`. Holds intent + identity + visibility,
 /// per-field state, picked photos, and a submit pipeline that maps
@@ -246,6 +246,9 @@ public final class PulseComposeViewModel {
 
     /// Announce audience chip selection.
     public var announceAudience: PulseAnnounceAudience = .neighbors
+
+    /// Heads Up alert sub-type — required when `postType == alert`.
+    public var safetyAlertKind: PulseSafetyAlertKind = .theft
 
     /// Ask category chip selection.
     public var askCategory: PulseAskCategory = .handyman
@@ -287,21 +290,42 @@ public final class PulseComposeViewModel {
 
     private let api: APIClient
 
+    /// Step 1 target — set when entering via the three-step flow.
+    public let postingTarget: PulsePostingTarget?
+
+    /// Step 2 purpose — nil for connections-only posts.
+    public let composePurpose: PulseComposePurpose?
+
     init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
+        postingTarget: PulsePostingTarget? = nil,
+        composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
         api: APIClient = .shared
     ) {
-        activeIntent = intent
-        self.identity = identity
+        activeIntent = composePurpose?.legacyIntent ?? intent
+        self.postingTarget = postingTarget
+        self.composePurpose = composePurpose
+        if let postingTarget {
+            self.identity = PulseComposeIdentity(rawValue: postingTarget.postAs) ?? identity
+            visibility = postingTarget.isNetworkTarget ? .connections : .neighbors
+        } else {
+            self.identity = identity
+        }
         editingPostId = postId
         prefillState = postId == nil ? .ready : .loading
         self.api = api
         for field in PulseComposeField.allCases {
             fields[field] = FormFieldState(id: field.rawValue, originalValue: "")
         }
-        baselineIdentity = identity
+        baselineIdentity = self.identity
+        baselineVisibility = visibility
+    }
+
+    /// True when the draft screen was reached via target/purpose pickers.
+    public var isFlowMode: Bool {
+        postingTarget != nil
     }
 
     /// True iff this view-model is wired to edit an existing post.
@@ -536,6 +560,7 @@ public final class PulseComposeViewModel {
             state = .success(postId: postId)
             toast = ToastMessage(text: isEditing ? "Saved" : "Posted", kind: .success)
             shouldDismiss = true
+            PulsePostsRefresh.notifyPostsDidChange()
             Analytics.track(.formPulseComposeSubmit(intent: activeIntent.rawValue, result: .success))
             return true
         } catch {
@@ -690,61 +715,149 @@ public final class PulseComposeViewModel {
     func buildRequest() -> PostCreateRequest {
         let bodyValue = trimmedValue(.body)
         let titleValue = trimmedValue(.title)
+        let postType = effectivePostType
+        let purposeTag = effectivePurpose
+        let vis = effectiveVisibility
+        let audience = effectiveAudience
+        let postAs = postingTarget?.postAs ?? identity.postAs
+
+        let base: PostCreateRequest
         switch activeIntent {
         case .ask:
-            return PostCreateRequest(
+            base = PostCreateRequest(
                 content: bodyValue,
                 title: titleValue.isEmpty ? nil : titleValue,
-                postType: activeIntent.postType,
-                visibility: visibility.rawValue,
-                postAs: identity.postAs,
+                postType: postType,
+                visibility: vis,
+                postAs: postAs,
                 serviceCategory: askCategory.rawValue,
-                purpose: activeIntent.purpose
+                audience: audience,
+                purpose: purposeTag
             )
         case .recommend:
             let business = trimmedValue(.recommendBusiness)
-            return PostCreateRequest(
+            base = PostCreateRequest(
                 content: composeRecommendBody(stars: recommendRating, body: bodyValue),
-                postType: activeIntent.postType,
-                visibility: visibility.rawValue,
-                postAs: identity.postAs,
+                postType: postType,
+                visibility: vis,
+                postAs: postAs,
                 businessName: business.isEmpty ? nil : business,
-                purpose: activeIntent.purpose
+                audience: audience,
+                purpose: purposeTag
             )
         case .event:
             let venue = trimmedValue(.eventLocation)
             let dateRaw = trimmedValue(.eventDate)
-            return PostCreateRequest(
+            base = PostCreateRequest(
                 content: bodyValue,
                 title: titleValue.isEmpty ? nil : titleValue,
-                postType: activeIntent.postType,
-                visibility: visibility.rawValue,
-                postAs: identity.postAs,
+                postType: postType,
+                visibility: vis,
+                postAs: postAs,
                 eventDate: dateRaw.isEmpty ? nil : isoDateTime(from: dateRaw),
                 eventVenue: venue.isEmpty ? nil : venue,
-                purpose: activeIntent.purpose
+                audience: audience,
+                purpose: purposeTag
             )
         case .lost:
             let lastSeen = trimmedValue(.lostLastSeenLocation)
-            return PostCreateRequest(
+            base = PostCreateRequest(
                 content: prefixLastSeen(body: bodyValue, location: lastSeen),
-                postType: activeIntent.postType,
-                visibility: visibility.rawValue,
-                postAs: identity.postAs,
+                postType: postType,
+                visibility: vis,
+                postAs: postAs,
                 lostFoundType: lostFoundKind.rawValue,
-                purpose: activeIntent.purpose
+                audience: audience,
+                purpose: purposeTag
             )
         case .announce:
-            return PostCreateRequest(
+            let announceVis = postingTarget?.isNetworkTarget == true
+                ? vis
+                : announceAudience.backendVisibility
+            base = PostCreateRequest(
                 content: bodyValue,
                 title: titleValue.isEmpty ? nil : titleValue,
-                postType: activeIntent.postType,
-                visibility: announceAudience.backendVisibility,
-                postAs: identity.postAs,
-                audience: announceAudience.rawValue,
-                purpose: activeIntent.purpose
+                postType: postType,
+                visibility: announceVis,
+                postAs: postAs,
+                safetyAlertKind: postType == "alert" ? safetyAlertKind.rawValue : nil,
+                audience: audience,
+                purpose: purposeTag
             )
         }
+        return mergeTargetContext(into: base)
+    }
+
+    private var effectivePostType: String {
+        if let composePurpose { return composePurpose.postType }
+        if postingTarget?.isNetworkTarget == true { return "general" }
+        return activeIntent.postType
+    }
+
+    private var effectivePurpose: String? {
+        if let composePurpose { return composePurpose.apiPurpose }
+        if postingTarget?.isNetworkTarget == true { return nil }
+        return activeIntent.purpose
+    }
+
+    private var effectiveVisibility: String {
+        if postingTarget?.isNetworkTarget == true { return PulseComposeVisibility.connections.rawValue }
+        return visibility.rawValue
+    }
+
+    private var effectiveAudience: String {
+        postingTarget?.isNetworkTarget == true ? "connections" : "nearby"
+    }
+
+    private func mergeTargetContext(into base: PostCreateRequest) -> PostCreateRequest {
+        guard let target = postingTarget else { return base }
+        let gps = gpsFields(for: target)
+        return PostCreateRequest(
+            content: base.content,
+            title: base.title,
+            postType: base.postType,
+            visibility: base.visibility,
+            postAs: base.postAs,
+            mediaUrls: base.mediaUrls,
+            latitude: target.latitude,
+            longitude: target.longitude,
+            locationName: target.isPlaceTarget ? target.displayLabel : nil,
+            homeId: target.homeId,
+            businessId: target.businessId,
+            tags: base.tags,
+            gpsTimestamp: gps.timestamp,
+            gpsLatitude: gps.latitude,
+            gpsLongitude: gps.longitude,
+            crossPostToConnections: base.crossPostToConnections,
+            showOnProfile: base.showOnProfile,
+            profileVisibilityScope: base.profileVisibilityScope,
+            eventDate: base.eventDate,
+            eventEndDate: base.eventEndDate,
+            eventVenue: base.eventVenue,
+            safetyAlertKind: base.safetyAlertKind,
+            behaviorDescription: base.behaviorDescription,
+            dealExpiresAt: base.dealExpiresAt,
+            lostFoundType: base.lostFoundType,
+            contactPref: base.contactPref,
+            contactPhone: base.contactPhone,
+            businessName: base.businessName,
+            serviceCategory: base.serviceCategory,
+            audience: base.audience,
+            purpose: base.purpose
+        )
+    }
+
+    private func gpsFields(for target: PulsePostingTarget) -> (
+        timestamp: String?,
+        latitude: Double?,
+        longitude: Double?
+    ) {
+        guard case let .currentLocation(lat, lon, _) = target else {
+            return (nil, nil, nil)
+        }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return (formatter.string(from: Date()), lat, lon)
     }
 
     /// Build the `PATCH /api/posts/:id` body from the active intent's

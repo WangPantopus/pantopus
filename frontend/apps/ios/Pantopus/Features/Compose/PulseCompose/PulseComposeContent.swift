@@ -21,6 +21,7 @@ public struct PulseComposeContentState: Equatable {
     public var visibility: PulseComposeVisibility
     public var lostFoundKind: PulseLostFoundKind
     public var announceAudience: PulseAnnounceAudience
+    public var safetyAlertKind: PulseSafetyAlertKind
     public var askCategory: PulseAskCategory
     public var recommendRating: Int
     public var fields: [PulseComposeField: FormFieldState]
@@ -28,6 +29,10 @@ public struct PulseComposeContentState: Equatable {
     /// True when the intent picker should render as a non-interactive
     /// chip row (edit mode — `post_type` is fixed at create time).
     public var isIntentLocked: Bool
+    /// Three-step flow — hides inline intent/identity pickers.
+    public var isFlowMode: Bool
+    public var composePurpose: PulseComposePurpose?
+    public var postingTargetLabel: String?
 
     public init(
         activeIntent: PulseComposeIntent,
@@ -35,22 +40,30 @@ public struct PulseComposeContentState: Equatable {
         visibility: PulseComposeVisibility = .neighbors,
         lostFoundKind: PulseLostFoundKind = .lost,
         announceAudience: PulseAnnounceAudience = .neighbors,
+        safetyAlertKind: PulseSafetyAlertKind = .theft,
         askCategory: PulseAskCategory = .handyman,
         recommendRating: Int = 5,
         fields: [PulseComposeField: FormFieldState] = [:],
         photos: [PulseComposePhoto] = [],
-        isIntentLocked: Bool = false
+        isIntentLocked: Bool = false,
+        isFlowMode: Bool = false,
+        composePurpose: PulseComposePurpose? = nil,
+        postingTargetLabel: String? = nil
     ) {
         self.activeIntent = activeIntent
         self.identity = identity
         self.visibility = visibility
         self.lostFoundKind = lostFoundKind
         self.announceAudience = announceAudience
+        self.safetyAlertKind = safetyAlertKind
         self.askCategory = askCategory
         self.recommendRating = recommendRating
         self.fields = fields
         self.photos = photos
         self.isIntentLocked = isIntentLocked
+        self.isFlowMode = isFlowMode
+        self.composePurpose = composePurpose
+        self.postingTargetLabel = postingTargetLabel
     }
 }
 
@@ -61,6 +74,7 @@ public struct PulseComposeContentActions {
     public var onSelectVisibility: (PulseComposeVisibility) -> Void
     public var onSelectLostFoundKind: (PulseLostFoundKind) -> Void
     public var onSelectAnnounceAudience: (PulseAnnounceAudience) -> Void
+    public var onSelectSafetyAlertKind: (PulseSafetyAlertKind) -> Void
     public var onSelectAskCategory: (PulseAskCategory) -> Void
     public var onSelectRecommendRating: (Int) -> Void
     public var onUpdateField: (PulseComposeField, String) -> Void
@@ -73,6 +87,7 @@ public struct PulseComposeContentActions {
         onSelectVisibility: @escaping (PulseComposeVisibility) -> Void = { _ in },
         onSelectLostFoundKind: @escaping (PulseLostFoundKind) -> Void = { _ in },
         onSelectAnnounceAudience: @escaping (PulseAnnounceAudience) -> Void = { _ in },
+        onSelectSafetyAlertKind: @escaping (PulseSafetyAlertKind) -> Void = { _ in },
         onSelectAskCategory: @escaping (PulseAskCategory) -> Void = { _ in },
         onSelectRecommendRating: @escaping (Int) -> Void = { _ in },
         onUpdateField: @escaping (PulseComposeField, String) -> Void = { _, _ in },
@@ -84,6 +99,7 @@ public struct PulseComposeContentActions {
         self.onSelectVisibility = onSelectVisibility
         self.onSelectLostFoundKind = onSelectLostFoundKind
         self.onSelectAnnounceAudience = onSelectAnnounceAudience
+        self.onSelectSafetyAlertKind = onSelectSafetyAlertKind
         self.onSelectAskCategory = onSelectAskCategory
         self.onSelectRecommendRating = onSelectRecommendRating
         self.onUpdateField = onUpdateField
@@ -106,11 +122,55 @@ public struct PulseComposeContent: View {
     }
 
     public var body: some View {
-        intentPicker
-        identitySection
+        if state.isFlowMode {
+            flowContextHeader
+        } else {
+            intentPicker
+            identitySection
+        }
         intentSpecificSection
         photosSection
-        visibilitySection
+        if !state.isFlowMode || state.visibility != .connections {
+            visibilitySection
+        }
+    }
+
+    @ViewBuilder
+    private var flowContextHeader: some View {
+        if let purpose = state.composePurpose {
+            HStack(spacing: Spacing.s2) {
+                Icon(purposeFlowIcon(purpose), size: 16, strokeWidth: 2, color: Theme.Color.primary600)
+                Text(purpose.label)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("composePulsePurposeBadge")
+        }
+        if let label = state.postingTargetLabel {
+            HStack(spacing: Spacing.s2) {
+                Icon(.mapPin, size: 14, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                Text("Posting to \(label)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("composePulsePostingBanner")
+        }
+    }
+
+    private func purposeFlowIcon(_ purpose: PulseComposePurpose) -> PantopusIcon {
+        switch purpose {
+        case .ask: .helpCircle
+        case .headsUp: .megaphone
+        case .recommend: .star
+        case .lostFound: .search
+        case .localUpdate: .fileText
+        case .neighborhoodWin: .crown
+        case .visitorGuide: .compass
+        case .event: .calendar
+        case .deal: .tag
+        }
     }
 
     // MARK: - Intent picker
@@ -223,7 +283,12 @@ public struct PulseComposeContent: View {
         case .recommend: recommendSection
         case .event: eventSection
         case .lost: lostSection
-        case .announce: announceSection
+        case .announce:
+            if state.composePurpose == .headsUp {
+                headsUpSection
+            } else {
+                announceSection
+            }
         }
     }
 
@@ -407,6 +472,36 @@ public struct PulseComposeContent: View {
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
             .accessibilityIdentifier("composePulseField_lostLastSeenDate")
+        }
+    }
+
+    private var headsUpSection: some View {
+        FormFieldGroup("Heads Up") {
+            safetyKindChipRow
+            textField(.title, label: "Headline", placeholder: "What should people nearby know?")
+            audienceChipRow
+            bodyField(label: "Details", placeholder: "Describe what happened…", minHeight: 96)
+        }
+    }
+
+    private var safetyKindChipRow: some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text("Alert type")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Spacing.s2) {
+                    ForEach(PulseSafetyAlertKind.allCases, id: \.rawValue) { kind in
+                        chipPill(
+                            label: kind.label,
+                            isActive: state.safetyAlertKind == kind,
+                            identifier: "composePulseSafetyKind_\(kind.rawValue)"
+                        ) {
+                            actions.onSelectSafetyAlertKind(kind)
+                        }
+                    }
+                }
+            }
         }
     }
 

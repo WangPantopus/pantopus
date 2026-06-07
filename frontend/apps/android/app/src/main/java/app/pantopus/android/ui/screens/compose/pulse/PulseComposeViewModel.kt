@@ -14,6 +14,7 @@ import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
@@ -140,7 +141,7 @@ data class PulseComposePhoto(
 }
 
 /** Maximum number of photos the picker accepts. */
-const val PULSE_COMPOSE_MAX_PHOTOS: Int = 4
+const val PULSE_COMPOSE_MAX_PHOTOS: Int = 9
 
 /** Render state for the compose screen. */
 sealed interface PulseComposeUiState {
@@ -186,6 +187,7 @@ class PulseComposeViewModel
     constructor(
         private val repo: PostsRepository,
         private val networkMonitor: NetworkMonitor,
+        private val postsRefresh: PulsePostsRefreshNotifier,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PulseComposeUiState>(PulseComposeUiState.Idle)
@@ -217,6 +219,9 @@ class PulseComposeViewModel
 
         private val _announceAudience = MutableStateFlow(PulseAnnounceAudience.Neighbors)
         val announceAudience: StateFlow<PulseAnnounceAudience> = _announceAudience.asStateFlow()
+
+        private val _safetyAlertKind = MutableStateFlow(PulseSafetyAlertKind.Theft)
+        val safetyAlertKind: StateFlow<PulseSafetyAlertKind> = _safetyAlertKind.asStateFlow()
 
         private val _askCategory = MutableStateFlow(PulseAskCategory.Handyman)
         val askCategory: StateFlow<PulseAskCategory> = _askCategory.asStateFlow()
@@ -256,6 +261,32 @@ class PulseComposeViewModel
         private var baselineAskCategory: PulseAskCategory = PulseAskCategory.Handyman
         private var baselineRecommendRating: Int = DEFAULT_RECOMMEND_RATING
 
+        private var postingTarget: PulsePostingTarget? = null
+        private var composePurpose: PulseComposePurpose? = null
+        private var flowConfigured = false
+
+        /** True when the draft screen was reached via target/purpose pickers. */
+        val isFlowMode: Boolean get() = postingTarget != null
+
+        val flowPurpose: PulseComposePurpose? get() = composePurpose
+
+        val flowTargetLabel: String? get() = postingTarget?.displayLabel
+
+        fun applyFlowContext(target: PulsePostingTarget, purpose: PulseComposePurpose?) {
+            if (flowConfigured) return
+            flowConfigured = true
+            postingTarget = target
+            composePurpose = purpose
+            purpose?.legacyIntent?.let { _activeIntent.value = it }
+            _identity.value =
+                PulseComposeIdentity.entries.firstOrNull { it.key == target.postAs }
+                    ?: PulseComposeIdentity.Personal
+            _visibility.value =
+                if (target.isNetworkTarget) PulseComposeVisibility.Connections else PulseComposeVisibility.Neighbors
+            baselineIdentity = _identity.value
+            baselineVisibility = _visibility.value
+        }
+
         /** True iff this view-model is wired to edit an existing post. */
         val isEditing: Boolean get() = editingPostId != null
 
@@ -290,6 +321,10 @@ class PulseComposeViewModel
 
         fun selectAnnounceAudience(audience: PulseAnnounceAudience) {
             _announceAudience.value = audience
+        }
+
+        fun selectSafetyAlertKind(kind: PulseSafetyAlertKind) {
+            _safetyAlertKind.value = kind
         }
 
         fun selectAskCategory(category: PulseAskCategory) {
@@ -492,6 +527,7 @@ class PulseComposeViewModel
                     _state.value = PulseComposeUiState.Success(postId = result.data.postId)
                     _toast.value = PulseComposeToast("Posted", isError = false)
                     _shouldDismiss.value = true
+                    postsRefresh.notifyPostsDidChange()
                     Analytics.track(
                         AnalyticsEvent.FormPulseComposeSubmit(
                             intent = _activeIntent.value.key,
@@ -520,6 +556,7 @@ class PulseComposeViewModel
                         PulseComposeUiState.Success(postId = result.data.postId ?: postId)
                     _toast.value = PulseComposeToast("Saved", isError = false)
                     _shouldDismiss.value = true
+                    postsRefresh.notifyPostsDidChange()
                     Analytics.track(
                         AnalyticsEvent.FormPulseComposeSubmit(
                             intent = _activeIntent.value.key,
@@ -747,64 +784,133 @@ class PulseComposeViewModel
             val bodyValue = trimmedValue(PulseComposeField.Body)
             val titleValue = trimmedValue(PulseComposeField.Title)
             val intent = _activeIntent.value
-            return when (intent) {
-                PulseComposeIntent.Ask ->
-                    PostCreateRequest(
-                        content = bodyValue,
-                        title = titleValue.ifEmpty { null },
-                        postType = intent.postType,
-                        visibility = _visibility.value.key,
-                        postAs = _identity.value.postAs,
-                        serviceCategory = _askCategory.value.key,
-                        purpose = intent.purpose,
-                    )
-                PulseComposeIntent.Recommend -> {
-                    val business = trimmedValue(PulseComposeField.RecommendBusiness)
-                    PostCreateRequest(
-                        content = composeRecommendBody(_recommendRating.value, bodyValue),
-                        postType = intent.postType,
-                        visibility = _visibility.value.key,
-                        postAs = _identity.value.postAs,
-                        businessName = business.ifEmpty { null },
-                        purpose = intent.purpose,
-                    )
+            val postType = effectivePostType()
+            val purposeTag = effectivePurpose()
+            val vis = effectiveVisibility()
+            val audience = effectiveAudience()
+            val postAs = postingTarget?.postAs ?: _identity.value.postAs
+
+            val base =
+                when (intent) {
+                    PulseComposeIntent.Ask ->
+                        PostCreateRequest(
+                            content = bodyValue,
+                            title = titleValue.ifEmpty { null },
+                            postType = postType,
+                            visibility = vis,
+                            postAs = postAs,
+                            serviceCategory = _askCategory.value.key,
+                            audience = audience,
+                            purpose = purposeTag,
+                        )
+                    PulseComposeIntent.Recommend -> {
+                        val business = trimmedValue(PulseComposeField.RecommendBusiness)
+                        PostCreateRequest(
+                            content = composeRecommendBody(_recommendRating.value, bodyValue),
+                            postType = postType,
+                            visibility = vis,
+                            postAs = postAs,
+                            businessName = business.ifEmpty { null },
+                            audience = audience,
+                            purpose = purposeTag,
+                        )
+                    }
+                    PulseComposeIntent.Event -> {
+                        val venue = trimmedValue(PulseComposeField.EventLocation)
+                        val dateRaw = trimmedValue(PulseComposeField.EventDate)
+                        PostCreateRequest(
+                            content = bodyValue,
+                            title = titleValue.ifEmpty { null },
+                            postType = postType,
+                            visibility = vis,
+                            postAs = postAs,
+                            eventDate = dateRaw.ifEmpty { null }?.let { isoDateTime(it) },
+                            eventVenue = venue.ifEmpty { null },
+                            audience = audience,
+                            purpose = purposeTag,
+                        )
+                    }
+                    PulseComposeIntent.Lost -> {
+                        val lastSeen = trimmedValue(PulseComposeField.LostLastSeenLocation)
+                        PostCreateRequest(
+                            content = prefixLastSeen(bodyValue, lastSeen),
+                            postType = postType,
+                            visibility = vis,
+                            postAs = postAs,
+                            lostFoundType = _lostFoundKind.value.key,
+                            audience = audience,
+                            purpose = purposeTag,
+                        )
+                    }
+                    PulseComposeIntent.Announce -> {
+                        val announceVis =
+                            if (postingTarget?.isNetworkTarget == true) {
+                                vis
+                            } else {
+                                _announceAudience.value.backendVisibility
+                            }
+                        PostCreateRequest(
+                            content = bodyValue,
+                            title = titleValue.ifEmpty { null },
+                            postType = postType,
+                            visibility = announceVis,
+                            postAs = postAs,
+                            audience = audience,
+                            purpose = purposeTag,
+                            safetyAlertKind =
+                                if (postType == "alert") {
+                                    _safetyAlertKind.value.key
+                                } else {
+                                    null
+                                },
+                        )
+                    }
                 }
-                PulseComposeIntent.Event -> {
-                    val venue = trimmedValue(PulseComposeField.EventLocation)
-                    val dateRaw = trimmedValue(PulseComposeField.EventDate)
-                    PostCreateRequest(
-                        content = bodyValue,
-                        title = titleValue.ifEmpty { null },
-                        postType = intent.postType,
-                        visibility = _visibility.value.key,
-                        postAs = _identity.value.postAs,
-                        eventDate = dateRaw.ifEmpty { null }?.let { isoDateTime(it) },
-                        eventVenue = venue.ifEmpty { null },
-                        purpose = intent.purpose,
-                    )
+            return mergeTargetContext(base)
+        }
+
+        private fun effectivePostType(): String {
+            composePurpose?.postType?.let { return it }
+            if (postingTarget?.isNetworkTarget == true) return "general"
+            return _activeIntent.value.postType
+        }
+
+        private fun effectivePurpose(): String? {
+            composePurpose?.apiPurpose?.let { return it }
+            if (postingTarget?.isNetworkTarget == true) return null
+            return _activeIntent.value.purpose
+        }
+
+        private fun effectiveVisibility(): String {
+            if (postingTarget?.isNetworkTarget == true) return PulseComposeVisibility.Connections.key
+            return _visibility.value.key
+        }
+
+        private fun effectiveAudience(): String =
+            if (postingTarget?.isNetworkTarget == true) "connections" else "nearby"
+
+        private fun mergeTargetContext(base: PostCreateRequest): PostCreateRequest {
+            val target = postingTarget ?: return base
+            val gps =
+                when (target) {
+                    is PulsePostingTarget.CurrentLocation ->
+                        Triple(
+                            java.time.Instant.now().toString(),
+                            target.lat,
+                            target.lng,
+                        )
+                    else -> Triple(null, null, null)
                 }
-                PulseComposeIntent.Lost -> {
-                    val lastSeen = trimmedValue(PulseComposeField.LostLastSeenLocation)
-                    PostCreateRequest(
-                        content = prefixLastSeen(bodyValue, lastSeen),
-                        postType = intent.postType,
-                        visibility = _visibility.value.key,
-                        postAs = _identity.value.postAs,
-                        lostFoundType = _lostFoundKind.value.key,
-                        purpose = intent.purpose,
-                    )
-                }
-                PulseComposeIntent.Announce ->
-                    PostCreateRequest(
-                        content = bodyValue,
-                        title = titleValue.ifEmpty { null },
-                        postType = intent.postType,
-                        visibility = _announceAudience.value.backendVisibility,
-                        postAs = _identity.value.postAs,
-                        audience = _announceAudience.value.key,
-                        purpose = intent.purpose,
-                    )
-            }
+            return base.copy(
+                latitude = target.targetLatitude,
+                longitude = target.targetLongitude,
+                locationName = if (target.isPlaceTarget) target.displayLabel else null,
+                homeId = target.targetHomeId,
+                businessId = target.targetBusinessId,
+                gpsTimestamp = gps.first,
+                gpsLatitude = gps.second,
+                gpsLongitude = gps.third,
+            )
         }
 
         private fun trimmedValue(field: PulseComposeField): String = (_fields.value[field]?.value ?: "").trim()
