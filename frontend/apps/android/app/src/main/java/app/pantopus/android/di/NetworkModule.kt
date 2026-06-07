@@ -16,6 +16,7 @@ import app.pantopus.android.data.api.services.ChatApi
 import app.pantopus.android.data.api.services.ConnectApi
 import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.FollowingApi
+import app.pantopus.android.data.api.services.GeoApi
 import app.pantopus.android.data.api.services.GigsApi
 import app.pantopus.android.data.api.services.HomeGuestPassesApi
 import app.pantopus.android.data.api.services.HomeMembersApi
@@ -90,6 +91,7 @@ object NetworkModule {
             // UploadEvidenceRequest one omits optional fields when
             // null instead of writing JSON `null`.
             .add(UploadEvidenceRequestJsonAdapter())
+            .add(app.pantopus.android.data.api.models.businesses.BusinessServiceAreaJsonAdapter())
             .add(app.pantopus.android.data.api.models.homes.BillDecimalAdapter())
             .add(app.pantopus.android.data.api.models.homes.PollOptionAdapter())
             .add(Instant::class.java, Rfc3339DateJsonAdapter().nullSafe())
@@ -238,6 +240,10 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideChatApi(retrofit: Retrofit): ChatApi = retrofit.create(ChatApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGeoApi(retrofit: Retrofit): GeoApi = retrofit.create(GeoApi::class.java)
 
     @Provides
     @Singleton

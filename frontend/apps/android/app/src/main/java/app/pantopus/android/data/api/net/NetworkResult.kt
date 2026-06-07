@@ -37,7 +37,25 @@ sealed class NetworkError(
     class ClientError(
         code: Int,
         val body: String?,
-    ) : NetworkError(code, body ?: "Request failed ($code).")
+    ) : NetworkError(code, friendlyClientMessage(body) ?: body ?: "Request failed ($code).") {
+        companion object {
+            fun friendlyClientMessage(body: String?): String? {
+                if (body.isNullOrBlank()) return null
+                return runCatching {
+                    val json = org.json.JSONObject(body)
+                    val details = json.optJSONArray("details")
+                    if (details != null) {
+                        for (index in 0 until details.length()) {
+                            val message = details.optJSONObject(index)?.optString("message").orEmpty()
+                            if (message.isNotBlank()) return message
+                        }
+                    }
+                    json.optString("message").takeIf { it.isNotBlank() }
+                        ?: json.optString("error").takeIf { it.isNotBlank() }
+                }.getOrNull() ?: body
+            }
+        }
+    }
 
     /** 5xx after retries exhausted. */
     class Server(

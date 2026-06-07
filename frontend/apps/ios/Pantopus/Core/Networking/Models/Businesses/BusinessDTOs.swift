@@ -163,6 +163,82 @@ public struct BusinessLocationDTO: Decodable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// `BusinessProfile.service_area` — backend stores jsonb that may be a legacy
+/// display string or a structured object (city/state, radius, center coords).
+public struct BusinessServiceAreaDTO: Decodable, Sendable, Hashable {
+    public let city: String?
+    public let state: String?
+    public let radiusMiles: Double?
+    public let radiusKm: Double?
+    public let centerLat: Double?
+    public let centerLng: Double?
+    private let legacyDisplayText: String?
+
+    public var displayText: String? {
+        if let legacyDisplayText, !legacyDisplayText.isEmpty { return legacyDisplayText }
+        var segments: [String] = []
+        let locality = [city, state]
+            .compactMap { value -> String? in
+                guard let value, !value.isEmpty else { return nil }
+                return value
+            }
+            .joined(separator: ", ")
+        if !locality.isEmpty { segments.append(locality) }
+        if let radiusMiles {
+            let formatted = radiusMiles.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f mi", radiusMiles)
+                : String(format: "%.1f mi", radiusMiles)
+            segments.append("within \(formatted)")
+        } else if let radiusKm {
+            let formatted = radiusKm.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f km", radiusKm)
+                : String(format: "%.1f km", radiusKm)
+            segments.append("within \(formatted)")
+        }
+        guard !segments.isEmpty else { return nil }
+        return segments.joined(separator: " — ")
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case city, state
+        case radiusMiles = "radius_miles"
+        case radiusKm = "radius_km"
+        case centerLat = "center_lat"
+        case centerLng = "center_lng"
+    }
+
+    public init(from decoder: Decoder) throws {
+        if let single = try? decoder.singleValueContainer(),
+           let text = try? single.decode(String.self) {
+            legacyDisplayText = text.isEmpty ? nil : text
+            city = nil
+            state = nil
+            radiusMiles = nil
+            radiusKm = nil
+            centerLat = nil
+            centerLng = nil
+            return
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        city = try container.decodeIfPresent(String.self, forKey: .city)
+        state = try container.decodeIfPresent(String.self, forKey: .state)
+        radiusMiles = Self.decodeFlexibleDouble(from: container, forKey: .radiusMiles)
+        radiusKm = Self.decodeFlexibleDouble(from: container, forKey: .radiusKm)
+        centerLat = Self.decodeFlexibleDouble(from: container, forKey: .centerLat)
+        centerLng = Self.decodeFlexibleDouble(from: container, forKey: .centerLng)
+        legacyDisplayText = nil
+    }
+
+    private static func decodeFlexibleDouble(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) -> Double? {
+        if let value = try? container.decode(Double.self, forKey: key) { return value }
+        if let value = try? container.decode(Int.self, forKey: key) { return Double(value) }
+        return nil
+    }
+}
+
 /// Full `BusinessProfile` row returned by `GET /api/businesses/:businessId`.
 /// `select('*')` on the backend, but the iOS screen only decodes the
 /// fields it renders.
@@ -178,7 +254,7 @@ public struct BusinessProfileDetailDTO: Decodable, Sendable, Hashable {
     public let website: String?
     public let foundedYear: Int?
     public let employeeCount: String?
-    public let serviceArea: String?
+    public let serviceArea: BusinessServiceAreaDTO?
     public let foundingBadge: Bool?
     public let isPublished: Bool?
     public let verificationStatus: String?

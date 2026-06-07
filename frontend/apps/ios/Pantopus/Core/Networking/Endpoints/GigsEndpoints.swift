@@ -97,6 +97,35 @@ public enum GigsEndpoints {
         Endpoint(method: .get, path: "/api/gigs/\(gigId)/bids")
     }
 
+    /// `GET /api/gigs/:gigId/chat-room` — get-or-create the gig chat
+    /// room. Pre-bid users are added as participants (message-limited).
+    public static func chatRoom(gigId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/\(gigId)/chat-room")
+    }
+
+    /// `GET /api/gigs/:gigId/questions` — structured Q&A thread (public).
+    public static func questions(gigId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/\(gigId)/questions")
+    }
+
+    /// `POST /api/gigs/:gigId/questions` — ask a question (auth).
+    public static func askQuestion(gigId: String, body: AskGigQuestionBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/questions", body: body)
+    }
+
+    /// `POST /api/gigs/:gigId/questions/:questionId/answer` — poster answers.
+    public static func answerQuestion(
+        gigId: String,
+        questionId: String,
+        body: AnswerGigQuestionBody
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/gigs/\(gigId)/questions/\(questionId)/answer",
+            body: body
+        )
+    }
+
     /// `POST /api/gigs/:gigId/bids` — place a bid.
     public static func placeBid(gigId: String, body: PlaceBidBody) -> Endpoint {
         Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids", body: body)

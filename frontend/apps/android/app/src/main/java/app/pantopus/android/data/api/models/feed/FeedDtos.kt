@@ -11,7 +11,7 @@ import com.squareup.moshi.JsonClass
 @JsonClass(generateAdapter = true)
 data class FeedPost(
     val id: String,
-    @Json(name = "user_id") val userId: String,
+    @Json(name = "user_id") val userId: String? = null,
     val title: String? = null,
     val content: String? = null,
     @Json(name = "post_type") val postType: String? = null,
@@ -23,6 +23,9 @@ data class FeedPost(
     @Json(name = "event_date") val eventDate: String? = null,
     @Json(name = "event_venue") val eventVenue: String? = null,
     @Json(name = "lost_found_type") val lostFoundType: String? = null,
+    @Json(name = "media_urls") val mediaUrls: List<String> = emptyList(),
+    @Json(name = "media_thumbnails") val mediaThumbnails: List<String> = emptyList(),
+    @Json(name = "media_types") val mediaTypes: List<String> = emptyList(),
     val creator: FeedPostCreator? = null,
 )
 
@@ -32,22 +35,28 @@ data class FeedPost(
  */
 @JsonClass(generateAdapter = true)
 data class FeedPostCreator(
-    val id: String,
+    val id: String? = null,
     val username: String? = null,
     val name: String? = null,
     @Json(name = "first_name") val firstName: String? = null,
     @Json(name = "last_name") val lastName: String? = null,
     @Json(name = "profile_picture_url") val profilePictureUrl: String? = null,
+    @Json(name = "displayName") val authorDisplayName: String? = null,
+    val handle: String? = null,
+    @Json(name = "avatarUrl") val avatarUrl: String? = null,
+    val type: String? = null,
     val city: String? = null,
     val state: String? = null,
     @Json(name = "account_type") val accountType: String? = null,
 ) {
-    /** Best-effort display name across the populated fields. */
+    /** Best-effort display name across legacy and identity-projection fields. */
     fun displayName(): String {
+        if (!authorDisplayName.isNullOrEmpty()) return authorDisplayName
         if (!name.isNullOrEmpty()) return name
         val combined = listOfNotNull(firstName, lastName).filter { it.isNotEmpty() }.joinToString(" ")
         if (combined.isNotEmpty()) return combined
         if (!username.isNullOrEmpty()) return "@$username"
+        if (!handle.isNullOrEmpty()) return "@$handle"
         return "Pantopus user"
     }
 }
@@ -55,8 +64,16 @@ data class FeedPostCreator(
 /** Paging envelope returned by `GET /api/posts/feed`. */
 @JsonClass(generateAdapter = true)
 data class FeedPagination(
-    val nextCursor: String? = null,
+    val nextCursor: FeedCursor? = null,
     val hasMore: Boolean? = null,
+)
+
+/** Keyset cursor returned by the v1.1 feed API. */
+@JsonClass(generateAdapter = true)
+data class FeedCursor(
+    val createdAt: String,
+    val id: String,
+    val rankBucket: Int? = null,
 )
 
 /** `GET /api/posts/feed` response envelope. */

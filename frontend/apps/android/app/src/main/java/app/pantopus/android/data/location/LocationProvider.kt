@@ -52,11 +52,11 @@ class FallbackLocationProvider
         override suspend fun requestCurrent(timeoutMillis: Long): UserCoordinate? = fallback
     }
 
-/** Hilt binding for the fallback provider. */
+/** Hilt binding for the device location provider. */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class LocationProviderModule {
     @Binds
     @Singleton
-    abstract fun bindLocationProvider(impl: FallbackLocationProvider): LocationProvider
+    abstract fun bindLocationProvider(impl: DeviceLocationProvider): LocationProvider
 }

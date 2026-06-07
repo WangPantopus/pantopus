@@ -7,7 +7,12 @@ import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
+import app.pantopus.android.data.api.models.gigs.AnswerGigQuestionBody
+import app.pantopus.android.data.api.models.gigs.AskGigQuestionBody
+import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
+import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
+import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
@@ -81,6 +86,33 @@ interface GigsApi {
     suspend fun bids(
         @Path("gigId") gigId: String,
     ): GigBidsResponse
+
+    /** `GET /api/gigs/:gigId/chat-room` — get-or-create gig chat room. */
+    @GET("api/gigs/{gigId}/chat-room")
+    suspend fun chatRoom(
+        @Path("gigId") gigId: String,
+    ): GigChatRoomResponse
+
+    /** `GET /api/gigs/:gigId/questions` — structured Q&A (public). */
+    @GET("api/gigs/{gigId}/questions")
+    suspend fun questions(
+        @Path("gigId") gigId: String,
+    ): GigQuestionsResponse
+
+    /** `POST /api/gigs/:gigId/questions` — ask a question. */
+    @POST("api/gigs/{gigId}/questions")
+    suspend fun askQuestion(
+        @Path("gigId") gigId: String,
+        @Body body: AskGigQuestionBody,
+    ): GigQuestionMutationResponse
+
+    /** `POST /api/gigs/:gigId/questions/{questionId}/answer` — poster answers. */
+    @POST("api/gigs/{gigId}/questions/{questionId}/answer")
+    suspend fun answerQuestion(
+        @Path("gigId") gigId: String,
+        @Path("questionId") questionId: String,
+        @Body body: AnswerGigQuestionBody,
+    ): GigQuestionMutationResponse
 
     /** `POST /api/gigs/:gigId/bids` — place a bid. */
     @POST("api/gigs/{gigId}/bids")

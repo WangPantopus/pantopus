@@ -46,6 +46,12 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     public let latitude: Double?
     public let longitude: Double?
     public let approxLocation: GigApproxLocation?
+    /// True when the viewer may see exact coordinates (owner or assigned worker).
+    public let locationUnlocked: Bool?
+    /// Privacy-adjusted coordinates from `GET /api/gigs/:id`.
+    public let location: GigCoordinate?
+    public let exactCity: String?
+    public let exactState: String?
     public let creator: GigCreator?
 
     enum CodingKeys: String, CodingKey {
@@ -73,8 +79,130 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case latitude
         case longitude
         case approxLocation = "approx_location"
-        case creator = "User"
+        case locationUnlocked
+        case location
+        case exactCity = "exact_city"
+        case exactState = "exact_state"
+        case creator
+        case legacyCreator = "User"
     }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        price = try c.decodeIfPresent(Double.self, forKey: .price)
+        category = try c.decodeIfPresent(String.self, forKey: .category)
+        status = try c.decodeIfPresent(String.self, forKey: .status)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        deadline = try c.decodeIfPresent(String.self, forKey: .deadline)
+        isUrgent = try c.decodeIfPresent(Bool.self, forKey: .isUrgent)
+        tags = try c.decodeIfPresent([String].self, forKey: .tags)
+        userId = try c.decodeIfPresent(String.self, forKey: .userId)
+        acceptedBy = try c.decodeIfPresent(String.self, forKey: .acceptedBy)
+        acceptedAt = try c.decodeIfPresent(String.self, forKey: .acceptedAt)
+        ownerConfirmedAt = try c.decodeIfPresent(String.self, forKey: .ownerConfirmedAt)
+        scheduledStart = try c.decodeIfPresent(String.self, forKey: .scheduledStart)
+        paymentStatus = try c.decodeIfPresent(String.self, forKey: .paymentStatus)
+        engagementMode = try c.decodeIfPresent(String.self, forKey: .engagementMode)
+        scheduleType = try c.decodeIfPresent(String.self, forKey: .scheduleType)
+        payType = try c.decodeIfPresent(String.self, forKey: .payType)
+        taskArchetype = try c.decodeIfPresent(String.self, forKey: .taskArchetype)
+        isV2 = try c.decodeIfPresent(Bool.self, forKey: .isV2)
+        pickupAddress = try c.decodeIfPresent(String.self, forKey: .pickupAddress)
+        dropoffAddress = try c.decodeIfPresent(String.self, forKey: .dropoffAddress)
+        bidCount = try c.decodeIfPresent(Int.self, forKey: .bidCount)
+        savedByUser = try c.decodeIfPresent(Bool.self, forKey: .savedByUser)
+        distanceMiles = try c.decodeIfPresent(Double.self, forKey: .distanceMiles)
+        latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
+        approxLocation = try c.decodeIfPresent(GigApproxLocation.self, forKey: .approxLocation)
+        locationUnlocked = try c.decodeIfPresent(Bool.self, forKey: .locationUnlocked)
+        location = try c.decodeIfPresent(GigCoordinate.self, forKey: .location)
+        exactCity = try c.decodeIfPresent(String.self, forKey: .exactCity)
+        exactState = try c.decodeIfPresent(String.self, forKey: .exactState)
+        creator = try c.decodeIfPresent(GigCreator.self, forKey: .creator)
+            ?? c.decodeIfPresent(GigCreator.self, forKey: .legacyCreator)
+    }
+
+    public init(
+        id: String,
+        title: String,
+        description: String?,
+        price: Double?,
+        category: String?,
+        status: String?,
+        createdAt: String?,
+        deadline: String?,
+        isUrgent: Bool?,
+        tags: [String]?,
+        userId: String?,
+        acceptedBy: String?,
+        acceptedAt: String?,
+        ownerConfirmedAt: String?,
+        scheduledStart: String?,
+        paymentStatus: String?,
+        engagementMode: String?,
+        scheduleType: String?,
+        payType: String?,
+        taskArchetype: String?,
+        isV2: Bool?,
+        pickupAddress: String?,
+        dropoffAddress: String?,
+        bidCount: Int?,
+        savedByUser: Bool?,
+        distanceMiles: Double?,
+        latitude: Double?,
+        longitude: Double?,
+        approxLocation: GigApproxLocation?,
+        locationUnlocked: Bool?,
+        location: GigCoordinate?,
+        exactCity: String?,
+        exactState: String?,
+        creator: GigCreator?
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.price = price
+        self.category = category
+        self.status = status
+        self.createdAt = createdAt
+        self.deadline = deadline
+        self.isUrgent = isUrgent
+        self.tags = tags
+        self.userId = userId
+        self.acceptedBy = acceptedBy
+        self.acceptedAt = acceptedAt
+        self.ownerConfirmedAt = ownerConfirmedAt
+        self.scheduledStart = scheduledStart
+        self.paymentStatus = paymentStatus
+        self.engagementMode = engagementMode
+        self.scheduleType = scheduleType
+        self.payType = payType
+        self.taskArchetype = taskArchetype
+        self.isV2 = isV2
+        self.pickupAddress = pickupAddress
+        self.dropoffAddress = dropoffAddress
+        self.bidCount = bidCount
+        self.savedByUser = savedByUser
+        self.distanceMiles = distanceMiles
+        self.latitude = latitude
+        self.longitude = longitude
+        self.approxLocation = approxLocation
+        self.locationUnlocked = locationUnlocked
+        self.location = location
+        self.exactCity = exactCity
+        self.exactState = exactState
+        self.creator = creator
+    }
+}
+
+/// Nested `{ latitude, longitude }` on gig detail responses.
+public struct GigCoordinate: Decodable, Sendable, Hashable {
+    public let latitude: Double?
+    public let longitude: Double?
 }
 
 /// Privacy-safe coarse location surfaced on map / in-bounds responses.
@@ -84,20 +212,72 @@ public struct GigApproxLocation: Decodable, Sendable, Hashable {
     public let label: String?
 }
 
-/// Creator projection from the backend `User` join.
+/// Creator / poster identity on a gig. Detail responses use the identity
+/// serializer (`creator.displayName`, `creator.handle`); list joins may
+/// still nest the legacy `User` row (`name`, `username`).
 public struct GigCreator: Decodable, Sendable, Hashable {
     public let id: String?
     public let username: String?
     public let name: String?
+    public let displayName: String?
+    public let handle: String?
     public let profilePictureUrl: String?
+    public let avatarUrl: String?
     public let verified: Bool?
+    public let badges: [String]?
 
     enum CodingKeys: String, CodingKey {
-        case id
-        case username
-        case name
+        case id, username, name, displayName, handle, badges
         case profilePictureUrl = "profile_picture_url"
+        case avatarUrl
         case verified
+    }
+
+    public init(
+        id: String? = nil,
+        username: String? = nil,
+        name: String? = nil,
+        displayName: String? = nil,
+        handle: String? = nil,
+        profilePictureUrl: String? = nil,
+        avatarUrl: String? = nil,
+        verified: Bool? = nil,
+        badges: [String]? = nil
+    ) {
+        self.id = id
+        self.username = username
+        self.name = name
+        self.displayName = displayName
+        self.handle = handle
+        self.profilePictureUrl = profilePictureUrl
+        self.avatarUrl = avatarUrl
+        self.verified = verified
+        self.badges = badges
+    }
+
+    /// Best-effort public name across identity-serializer and legacy User shapes.
+    public var resolvedDisplayName: String {
+        if let displayName, !displayName.isEmpty { return displayName }
+        if let name, !name.isEmpty { return name }
+        if let handle, !handle.isEmpty { return handle }
+        if let username, !username.isEmpty { return username }
+        return "Neighbor"
+    }
+
+    public var resolvedHandle: String? {
+        let value = handle ?? username
+        guard let value, !value.isEmpty else { return nil }
+        return value
+    }
+
+    public var resolvedVerified: Bool {
+        verified ?? badges?.contains("verified_resident") ?? false
+    }
+
+    public var resolvedAvatarURL: URL? {
+        let raw = avatarUrl ?? profilePictureUrl
+        guard let raw, !raw.isEmpty else { return nil }
+        return URL(string: raw)
     }
 }
 
@@ -166,13 +346,140 @@ public struct GigBidDTO: Decodable, Sendable, Hashable, Identifiable {
         case status
         case message
         case createdAt = "created_at"
-        case bidder = "User"
+        case bidder
+        case legacyBidder = "User"
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        userId = try c.decodeIfPresent(String.self, forKey: .userId)
+        bidAmount = try c.decodeIfPresent(Double.self, forKey: .bidAmount)
+        amount = try c.decodeIfPresent(Double.self, forKey: .amount)
+        status = try c.decodeIfPresent(String.self, forKey: .status)
+        message = try c.decodeIfPresent(String.self, forKey: .message)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        bidder = try c.decodeIfPresent(GigCreator.self, forKey: .bidder)
+            ?? c.decodeIfPresent(GigCreator.self, forKey: .legacyBidder)
+    }
+
+    public init(
+        id: String,
+        userId: String?,
+        bidAmount: Double?,
+        amount: Double?,
+        status: String?,
+        message: String?,
+        createdAt: String?,
+        bidder: GigCreator?
+    ) {
+        self.id = id
+        self.userId = userId
+        self.bidAmount = bidAmount
+        self.amount = amount
+        self.status = status
+        self.message = message
+        self.createdAt = createdAt
+        self.bidder = bidder
     }
 }
 
 /// Envelope from `GET /api/gigs/:gigId/bids`.
 public struct GigBidsResponse: Decodable, Sendable {
     public let bids: [GigBidDTO]
+}
+
+/// Envelope from `GET /api/gigs/:gigId/chat-room` — get-or-create the
+/// gig-scoped chat room (pre-bid questions, owner/worker thread).
+public struct GigChatRoomResponse: Decodable, Sendable {
+    public let roomId: String
+    public let topicId: String?
+    public let gigOwnerId: String?
+}
+
+// MARK: - Structured Q&A
+
+/// User summary nested on a gig question row.
+public struct GigQuestionUser: Decodable, Sendable, Hashable {
+    public let id: String?
+    public let username: String?
+    public let firstName: String?
+    public let lastName: String?
+    public let name: String?
+    public let profilePictureUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, username, name
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case profilePictureUrl = "profile_picture_url"
+    }
+}
+
+/// One row from `GET /api/gigs/:gigId/questions`.
+public struct GigQuestionDTO: Decodable, Sendable, Identifiable, Hashable {
+    public let id: String
+    public let gigId: String
+    public let question: String
+    public let answer: String?
+    public let questionAttachments: [String]?
+    public let answerAttachments: [String]?
+    public let answeredAt: String?
+    public let isPinned: Bool?
+    public let upvoteCount: Int?
+    public let status: String
+    public let createdAt: String?
+    public let updatedAt: String?
+    public let asker: GigQuestionUser?
+    public let answerer: GigQuestionUser?
+    public let answererDisplayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, question, answer, status, asker, answerer
+        case gigId = "gig_id"
+        case questionAttachments = "question_attachments"
+        case answerAttachments = "answer_attachments"
+        case answeredAt = "answered_at"
+        case isPinned = "is_pinned"
+        case upvoteCount = "upvote_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case answererDisplayName = "answerer_display_name"
+    }
+
+    public var isAnswered: Bool { status == "answered" }
+}
+
+/// Envelope from `GET /api/gigs/:gigId/questions`.
+public struct GigQuestionsResponse: Decodable, Sendable {
+    public let questions: [GigQuestionDTO]
+}
+
+/// Envelope from ask/answer/pin mutations.
+public struct GigQuestionMutationResponse: Decodable, Sendable {
+    public let question: GigQuestionDTO
+}
+
+/// Body for `POST /api/gigs/:gigId/questions`.
+public struct AskGigQuestionBody: Encodable, Sendable {
+    public let question: String
+    public let attachments: [String]?
+
+    public init(question: String, attachments: [String]? = nil) {
+        self.question = question
+        self.attachments = attachments
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/questions/:questionId/answer`.
+public struct AnswerGigQuestionBody: Encodable, Sendable {
+    public let answer: String
+    public let attachments: [String]?
+
+    public init(answer: String, attachments: [String]? = nil) {
+        self.answer = answer
+        self.attachments = attachments
+    }
 }
 
 /// Envelope from `POST /api/gigs/:gigId/bids`.

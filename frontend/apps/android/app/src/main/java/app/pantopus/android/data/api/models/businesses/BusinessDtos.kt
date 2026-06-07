@@ -137,7 +137,7 @@ data class BusinessProfileDetailDto(
     val website: String? = null,
     @Json(name = "founded_year") val foundedYear: Int? = null,
     @Json(name = "employee_count") val employeeCount: String? = null,
-    @Json(name = "service_area") val serviceArea: String? = null,
+    @Json(name = "service_area") val serviceArea: BusinessServiceAreaDto? = null,
     @Json(name = "founding_badge") val foundingBadge: Boolean? = null,
     @Json(name = "is_published") val isPublished: Boolean? = null,
     @Json(name = "verification_status") val verificationStatus: String? = null,

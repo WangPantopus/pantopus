@@ -42,8 +42,8 @@ public enum APIError: Error, LocalizedError, Sendable {
         case .unauthorized: "Your session has expired. Please sign in again."
         case .forbidden: "You don't have permission to do that."
         case .notFound: "We couldn't find what you were looking for."
-        case let .clientError(status, message):
-            message ?? "Request failed (\(status))."
+        case let .clientError(_, message):
+            Self.friendlyClientMessage(message) ?? "Request failed."
         case let .server(status, _): "Server error \(status). Please try again."
         case .transport: "Can't reach Pantopus. Check your connection."
         case .decoding: "Received an unexpected response."
@@ -64,6 +64,22 @@ public enum APIError: Error, LocalizedError, Sendable {
         .timedOut, .cannotFindHost, .cannotConnectToHost,
         .networkConnectionLost, .dnsLookupFailed, .notConnectedToInternet
     ]
+
+    /// Turn a raw 4xx JSON body into a short user-facing string.
+    static func friendlyClientMessage(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        guard let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return raw
+        }
+        if let details = json["details"] as? [[String: Any]] {
+            let messages = details.compactMap { $0["message"] as? String }.filter { !$0.isEmpty }
+            if let first = messages.first { return first }
+        }
+        if let message = json["message"] as? String, !message.isEmpty { return message }
+        if let error = json["error"] as? String, !error.isEmpty { return error }
+        return raw
+    }
 }
 
 /// Successful / failed network result, for call sites that prefer a

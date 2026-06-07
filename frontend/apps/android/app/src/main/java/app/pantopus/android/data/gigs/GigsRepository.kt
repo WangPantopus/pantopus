@@ -7,7 +7,12 @@ import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
+import app.pantopus.android.data.api.models.gigs.AnswerGigQuestionBody
+import app.pantopus.android.data.api.models.gigs.AskGigQuestionBody
+import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
+import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
+import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
@@ -75,6 +80,25 @@ class GigsRepository
         suspend fun detail(id: String): NetworkResult<GigDetailResponse> = safeApiCall { api.detail(id) }
 
         suspend fun bids(gigId: String): NetworkResult<GigBidsResponse> = safeApiCall { api.bids(gigId) }
+
+        suspend fun chatRoom(gigId: String): NetworkResult<GigChatRoomResponse> = safeApiCall { api.chatRoom(gigId) }
+
+        suspend fun questions(gigId: String): NetworkResult<GigQuestionsResponse> = safeApiCall { api.questions(gigId) }
+
+        suspend fun askQuestion(
+            gigId: String,
+            question: String,
+        ): NetworkResult<GigQuestionMutationResponse> =
+            safeApiCall { api.askQuestion(gigId, AskGigQuestionBody(question = question)) }
+
+        suspend fun answerQuestion(
+            gigId: String,
+            questionId: String,
+            answer: String,
+        ): NetworkResult<GigQuestionMutationResponse> =
+            safeApiCall {
+                api.answerQuestion(gigId, questionId, AnswerGigQuestionBody(answer = answer))
+            }
 
         suspend fun placeBid(
             gigId: String,
