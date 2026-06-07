@@ -245,7 +245,9 @@ async function geocodeUsAddress(address) {
     lng,
     line: clip(result.address),
     city: clip(result.city),
-    state: result.state ? clip(String(result.state).toUpperCase(), 24) : null,
+    // The geo provider already uppercases the 2-letter US state code; don't
+    // re-case it (that would turn a rare full-name fallback into "OREGON").
+    state: clip(result.state, 24),
     zipcode: clip(result.zipcode, 12),
   };
 }
