@@ -334,7 +334,8 @@ async function composeYourHome(home, tier) {
   return [serializePlaceSection('your_home', {
     access,
     asOf: profile.cached_at || null,
-    status: result.source === 'cache' ? 'stale' : 'ready',
+    // getCachedProfile only returns within-TTL data, so a cache hit is fresh.
+    status: 'ready',
     data: {
       year_built: profile.year_built ?? null,
       sqft: profile.sqft ?? null,
@@ -390,8 +391,10 @@ async function composeBillBenchmark(home) {
       .select('amount, bill_type')
       .eq('home_id', home.id)
       .eq('bill_type', 'electric');
+    // HomeBill.amount is stored in cents (the benchmark job averages it
+    // straight into avg_amount_cents); convert to dollars to match the band.
     const vals = (bills || []).map((b) => Number(b.amount)).filter((n) => Number.isFinite(n));
-    if (vals.length) yourAmount = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    if (vals.length) yourAmount = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length / 100);
   } catch (err) {
     logger.warn('placeIntelligence: own bills read failed', { homeId: home.id, error: err.message });
   }

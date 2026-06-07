@@ -171,6 +171,28 @@ describe('GET /api/homes/:id/intelligence', () => {
     expect(s.sunrise_sunset.status).toBe('unavailable');
   });
 
+  test('bill benchmark compares the resident amount in the right unit (cents → $)', async () => {
+    seedHome();
+    seedTable('BillBenchmark', [
+      { geohash: GEOHASH, bill_type: 'electric', avg_amount_cents: 16500, household_count: 14 },
+      { geohash: GEOHASH, bill_type: 'electric', avg_amount_cents: 21000, household_count: 14 },
+    ]);
+    // HomeBill.amount is in cents → $142/mo average.
+    seedTable('HomeBill', [
+      { id: 'b1', home_id: HOME_ID, bill_type: 'electric', amount: 14200 },
+      { id: 'b2', home_id: HOME_ID, bill_type: 'electric', amount: 14200 },
+    ]);
+
+    const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+
+    expect(res.status).toBe(200);
+    const s = sectionsById(res.body);
+    // band 165–210 (mid 187.5); your $142 ⇒ ~24% below, not ~7500% above.
+    expect(s.bill_benchmark.data.your_amount).toBe(142);
+    expect(s.bill_benchmark.data.comparison).toBe('lower');
+    expect(s.bill_benchmark.data.comparison_pct).toBe(-24);
+  });
+
   test("a missing ATTOM key yields Your Home = 'unavailable' (not a 500)", async () => {
     seedHome();
     // ATTOM_API_KEY is deleted in beforeEach.
