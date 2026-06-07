@@ -5,17 +5,18 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Locks [PantopusRoute] down: four destinations, stable order, unique
+ * Locks [PantopusRoute] down: five destinations, stable order, unique
  * `path` strings, reverse lookup.
  */
 class PantopusRouteTest {
-    @Test fun four_entries_in_display_order() {
+    @Test fun five_entries_in_display_order() {
         val entries = PantopusRoute.entries
-        assertEquals(4, entries.size)
-        assertEquals(PantopusRoute.Hub, entries[0])
-        assertEquals(PantopusRoute.Nearby, entries[1])
-        assertEquals(PantopusRoute.Inbox, entries[2])
-        assertEquals(PantopusRoute.You, entries[3])
+        assertEquals(5, entries.size)
+        assertEquals(PantopusRoute.Home, entries[0])
+        assertEquals(PantopusRoute.Pulse, entries[1])
+        assertEquals(PantopusRoute.Tasks, entries[2])
+        assertEquals(PantopusRoute.Marketplace, entries[3])
+        assertEquals(PantopusRoute.Messages, entries[4])
     }
 
     @Test fun paths_are_unique() {

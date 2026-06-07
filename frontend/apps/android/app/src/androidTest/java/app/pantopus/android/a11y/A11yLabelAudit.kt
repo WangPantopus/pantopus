@@ -59,7 +59,7 @@ class A11yLabelAudit {
     @Test
     fun root_tab_bar_buttons_all_labelled() {
         compose.setContent {
-            var selected by remember { mutableStateOf<PantopusRoute>(PantopusRoute.Hub) }
+            var selected by remember { mutableStateOf<PantopusRoute>(PantopusRoute.Home) }
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 bottomBar = {
@@ -71,15 +71,15 @@ class A11yLabelAudit {
             ) { padding ->
                 Box(Modifier.padding(padding)) {
                     when (selected) {
-                        PantopusRoute.Hub -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
-                        PantopusRoute.Nearby -> Box(Modifier.fillMaxSize().testTag("nearbyTab.mapList"))
-                        PantopusRoute.Inbox ->
+                        PantopusRoute.Home -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
+                        PantopusRoute.Pulse -> Box(Modifier.fillMaxSize().testTag("pulseFeed"))
+                        PantopusRoute.Tasks -> Box(Modifier.fillMaxSize().testTag("gigsFeed"))
+                        PantopusRoute.Marketplace -> Box(Modifier.fillMaxSize().testTag("marketplace"))
+                        PantopusRoute.Messages ->
                             NotYetAvailableView(
-                                tabName = "Inbox",
-                                icon = PantopusIcon.Inbox,
+                                tabName = "Messages",
+                                icon = PantopusIcon.MessageCircle,
                             )
-                        PantopusRoute.You ->
-                            NotYetAvailableView(tabName = "You", icon = PantopusIcon.User)
                     }
                 }
             }

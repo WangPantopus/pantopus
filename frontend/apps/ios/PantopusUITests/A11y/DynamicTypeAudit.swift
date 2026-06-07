@@ -47,7 +47,7 @@ final class DynamicTypeAudit: XCTestCase {
 
     func testEditProfileRendersAtXXXLarge() throws {
         guard let app = launch() else { throw XCTSkip("UI test launch hooks not honoured.") }
-        app.buttons["tab.you"].firstMatch.tap()
+        app.buttons["hubAvatarButton"].firstMatch.tap()
         app.buttons["youEditProfileButton"].tap()
         let shell = app.descendants(matching: .any)
             .matching(identifier: "editProfileShell").firstMatch
@@ -60,7 +60,7 @@ final class DynamicTypeAudit: XCTestCase {
 
     func testYouTabRendersAtXXXLarge() throws {
         guard let app = launch() else { throw XCTSkip("UI test launch hooks not honoured.") }
-        app.buttons["tab.you"].firstMatch.tap()
+        app.buttons["hubAvatarButton"].firstMatch.tap()
         XCTAssertTrue(app.buttons["youSignOutButton"].waitForExistence(timeout: 3))
         XCTAssertTrue(
             app.buttons["youSignOutButton"].isHittable,

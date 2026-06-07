@@ -15,16 +15,19 @@ sealed class PantopusRoute(
     val icon: PantopusIcon,
 ) {
     /** Primary hub — the personalised landing surface (Prompt P7). */
-    data object Hub : PantopusRoute(path = "root/hub", label = "Hub", icon = PantopusIcon.Home)
+    data object Home : PantopusRoute(path = "root/home", label = "Home", icon = PantopusIcon.Home)
 
-    /** Nearby discovery — gigs / people / businesses in your radius. */
-    data object Nearby : PantopusRoute(path = "root/nearby", label = "Nearby", icon = PantopusIcon.Map)
+    /** Neighborhood feed — Pulse posts near you. */
+    data object Pulse : PantopusRoute(path = "root/pulse", label = "Pulse", icon = PantopusIcon.Rss)
 
-    /** Mailbox drawer list. */
-    data object Inbox : PantopusRoute(path = "root/inbox", label = "Inbox", icon = PantopusIcon.Inbox)
+    /** Neighbour gigs — browse, bid, and post tasks. */
+    data object Tasks : PantopusRoute(path = "root/tasks", label = "Tasks", icon = PantopusIcon.Briefcase)
 
-    /** Account & settings. */
-    data object You : PantopusRoute(path = "root/you", label = "You", icon = PantopusIcon.User)
+    /** Local marketplace — buy, sell, and rent nearby. */
+    data object Marketplace : PantopusRoute(path = "root/marketplace", label = "Marketplace", icon = PantopusIcon.ShoppingBag)
+
+    /** Direct messages and group chats. */
+    data object Messages : PantopusRoute(path = "root/messages", label = "Messages", icon = PantopusIcon.MessageCircle)
 
     companion object {
         /**
@@ -32,11 +35,11 @@ sealed class PantopusRoute(
          *
          * `by lazy` is intentional: when this list is built eagerly, the
          * companion's <clinit> runs while `PantopusRoute`'s own class init
-         * is still in flight, so `Hub.INSTANCE` etc. resolve to null and
+         * is still in flight, so `Home.INSTANCE` etc. resolve to null and
          * downstream callers crash with NPE. Deferring construction until
          * first access lets every `data object` finish initialising first.
          */
-        val entries: List<PantopusRoute> by lazy { listOf(Hub, Nearby, Inbox, You) }
+        val entries: List<PantopusRoute> by lazy { listOf(Home, Pulse, Tasks, Marketplace, Messages) }
 
         /** Lookup a route by its `path`. Returns null for unknown paths. */
         fun fromPath(path: String?): PantopusRoute? = entries.firstOrNull { it.path == path }

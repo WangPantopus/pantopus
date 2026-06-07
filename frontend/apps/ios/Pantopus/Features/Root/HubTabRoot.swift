@@ -131,6 +131,8 @@ public enum HubRoute: Hashable {
     case searchAccessCodes(homeId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
+    /// T5.3.3 — Author's own posts (My Pulse in the drawer).
+    case myPosts
     /// A03.2 — Beacon Updates feed (`surface=personas`). Reached from the
     /// AudienceProfile entry and the `pantopus://beacons` deep link.
     case beaconsFeed
@@ -316,6 +318,7 @@ public enum HubRoute: Hashable {
 /// NavigationStack wrapper for the Hub tab.
 public struct HubTabRoot: View {
     @Environment(AuthManager.self) private var auth
+    @Environment(RootTabModel.self) private var rootTabs
     @State private var path = RouteStack<HubRoute>()
     @State private var router = DeepLinkRouter.shared
     /// P6.6 — share / mail system sheet driven by "Share listing",
@@ -338,7 +341,11 @@ public struct HubTabRoot: View {
     @State private var debugSheet: HubRoute?
     #endif
 
-    public init() {}
+    private let onOpenProfile: @MainActor () -> Void
+
+    public init(onOpenProfile: @escaping @MainActor () -> Void = {}) {
+        self.onOpenProfile = onOpenProfile
+    }
 
     private var currentUserId: String {
         if case let .signedIn(user) = auth.state { return user.id }
@@ -491,7 +498,7 @@ public struct HubTabRoot: View {
         case .discoverNeighbors: return .discoverHub
         case .myBeacon: return .placeholder(label: "My Beacon")
         case .myListings: return .marketplace
-        case .myPulse: return .pulseFeed
+        case .myPulse: return .myPosts
         case .myTasks: return .placeholder(label: "My Tasks")
         case .myBids: return .myBids
         case .offersAndBids: return .placeholder(label: "Offers & Bids")
@@ -690,9 +697,10 @@ public struct HubTabRoot: View {
             case .action(.postTask): path.append(.quickPostGig(category: GigsCategory.all.rawValue))
             case .action(.snapAndSell): path.append(.composeListing)
             case .pillar(.mail): path.append(.mailboxRoot)
-            case .pillar(.pulse): path.append(.pulseFeed)
-            case .pillar(.gigs): path.append(.gigsFeed)
-            case .pillar(.marketplace): path.append(.marketplace)
+            case .pillar(.pulse): rootTabs.selected = .pulse
+            case .pillar(.gigs): rootTabs.selected = .tasks
+            case .pillar(.marketplace): rootTabs.selected = .marketplace
+            case .openProfile: onOpenProfile()
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case .openDiscoverHub: path.append(.discoverHub)
             case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
@@ -1472,6 +1480,20 @@ public struct HubTabRoot: View {
                 },
                 onBack: { Task { @MainActor in pop() } }
             )
+        case .myPosts:
+            MyPostsView(
+                viewModel: MyPostsViewModel(
+                    onOpenPost: { dto in
+                        Task { @MainActor in push(.pulsePost(postId: dto.id)) }
+                    },
+                    onCompose: {
+                        Task { @MainActor in push(.composePost(intent: PulseComposeIntent.ask.rawValue)) }
+                    },
+                    onEditPost: { dto in
+                        Task { @MainActor in push(.editPost(postId: dto.id)) }
+                    }
+                )
+            )
         case .beaconsFeed:
             BeaconsFeedView(
                 onOpenPost: { postId in
@@ -1484,13 +1506,17 @@ public struct HubTabRoot: View {
                 onBack: { Task { @MainActor in pop() } }
             )
         case let .composePost(intent):
-            PulseComposeView(intent: PulseComposeIntent.from(rawValue: intent)) { _ in
-                pop()
-            }
+            PulseComposeFlowView(
+                prefillFeedIntent: PulseIntent(rawValue: intent),
+                onCancel: { pop() },
+                onPosted: { _ in pop() }
+            )
         case let .editPost(postId):
-            PulseComposeView(postId: postId) { _ in
-                pop()
-            }
+            PulseComposeFlowView(
+                editingPostId: postId,
+                onCancel: { pop() },
+                onPosted: { _ in pop() }
+            )
         case .gigsFeed:
             GigsFeedView(
                 onOpenGig: { gigId in
@@ -1516,17 +1542,9 @@ public struct HubTabRoot: View {
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
                 onBack: { Task { @MainActor in pop() } },
-                onMessage: { gig in
+                onOpenChat: { destination in
                     Task { @MainActor in
-                        guard let posterId = gig.userId else { return }
-                        let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
-                        push(.chatConversation(InboxConversationDestination(
-                            mode: .person(otherUserId: posterId),
-                            displayName: name,
-                            initials: Self.initials(from: name),
-                            identityKind: nil,
-                            verified: gig.creator?.verified ?? false
-                        )))
+                        push(.chatConversation(destination))
                     }
                 }
             )
@@ -1558,17 +1576,15 @@ public struct HubTabRoot: View {
                 path.append(.gigDetail(gigId: gigId))
             }
         case let .nearbyMapForGigs(categoryKey):
-            NearbyMapView(
-                viewModel: NearbyMapViewModel(
+            TasksMapView(
+                viewModel: TasksMapViewModel(
                     initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
                 ),
-                onOpenEntity: { entity in
-                    Task { @MainActor in
-                        switch entity.kind {
-                        case .gig: push(.gigDetail(gigId: entity.id))
-                        case .listing: push(.listingDetail(listingId: entity.id))
-                        }
-                    }
+                onOpenTask: { taskId in
+                    Task { @MainActor in push(.gigDetail(gigId: taskId)) }
+                },
+                onCompose: { category in
+                    Task { @MainActor in push(.composeGig(category: category.rawValue)) }
                 },
                 onBack: { Task { @MainActor in pop() } }
             )

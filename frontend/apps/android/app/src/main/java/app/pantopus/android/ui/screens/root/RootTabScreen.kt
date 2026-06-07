@@ -63,7 +63,7 @@ import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenSc
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
 import app.pantopus.android.ui.screens.compose.listing.ListingComposeStep
 import app.pantopus.android.ui.screens.compose.listing.ListingComposeWizardScreen
-import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
+import app.pantopus.android.ui.screens.compose.pulse.PulseComposeFlowScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
@@ -239,7 +239,6 @@ import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
-import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsScreen
 import app.pantopus.android.ui.screens.offers.OffersScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
@@ -712,6 +711,9 @@ private object ChildRoutes {
      *  · payout routing). Distinct from `pantopus://wallet` (earnings-in). */
     const val SETTINGS_PAYMENTS = "settings/payments"
 
+    /** Profile / account hub — reached from the Hub avatar (no longer a bottom tab). */
+    const val PROFILE = "profile"
+
     /** Profiles & Privacy / Identity Center (T3.2). */
     const val IDENTITY_CENTER = "identity-center"
 
@@ -1034,9 +1036,8 @@ private object ChildRoutes {
     fun quickPostGig(category: String): String =
         "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
-    /** Build the Nearby-map-for-gigs path with the active category seed. */
-    fun nearbyMapForGigs(category: String): String =
-        "gigs/map?$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+    /** @deprecated Legacy path — resolves to [tasksMap]. */
+    fun nearbyMapForGigs(category: String): String = tasksMap(category)
 
     /** Build the Tasks-map path with the active category seed. */
     fun tasksMap(category: String): String = "tasks/map?$TASKS_MAP_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
@@ -1110,6 +1111,26 @@ private object ChildRoutes {
             "&$CHAT_VERIFIED_KEY=$verified" +
             "&$CHAT_IDENTITY_KEY=" +
             "&$CHAT_LOCALITY_KEY=${enc(locality ?: "")}" +
+            "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_TIER_NAME_KEY=" +
+            "&$CHAT_TIER_RANK_KEY=" +
+            "&$CHAT_SCROLL_TO_KEY="
+    }
+
+    /** Build the chat-conversation path for a gig-scoped room. */
+    fun chatConversationRoom(
+        roomId: String,
+        displayName: String,
+        initials: String,
+        verified: Boolean,
+    ): String {
+        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
+        return "chat/room/${enc(roomId)}?" +
+            "$CHAT_NAME_KEY=${enc(displayName)}" +
+            "&$CHAT_INITIALS_KEY=${enc(initials)}" +
+            "&$CHAT_VERIFIED_KEY=$verified" +
+            "&$CHAT_IDENTITY_KEY=" +
+            "&$CHAT_LOCALITY_KEY=" +
             "&$CHAT_ONLINE_KEY=false" +
             "&$CHAT_TIER_NAME_KEY=" +
             "&$CHAT_TIER_RANK_KEY=" +
@@ -1292,12 +1313,20 @@ private object ChildRoutes {
     fun waitingRoom(homeId: String): String = "homes/$homeId/waiting-room"
 }
 
+private fun NavHostController.navigateToRootTab(route: PantopusRoute) {
+    navigate(route.path) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
 /**
- * Signed-in root. Hosts [PantopusBottomBar] + a [NavHost] with the four
+ * Signed-in root. Hosts [PantopusBottomBar] + a [NavHost] with the five
  * top-level destinations from [PantopusRoute] plus drill-down destinations
  * wired from the Hub.
  *
- * @param inboxBadgeCount Unread count shown on the Inbox tab. Wired to
+ * @param inboxBadgeCount Unread count shown on the Messages tab. Wired to
  *     live data in Prompt P8.
  */
 @Composable
@@ -1318,9 +1347,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
     val navDrawerState = rememberDrawerState(DrawerValue.Closed)
     val navDrawerScope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = PantopusRoute.fromPath(backStackEntry?.destination?.route) ?: PantopusRoute.Hub
+    val currentRoute = PantopusRoute.fromPath(backStackEntry?.destination?.route) ?: PantopusRoute.Home
     val badges: Map<PantopusRoute, Int> =
-        if (inboxBadgeCount > 0) mapOf(PantopusRoute.Inbox to inboxBadgeCount) else emptyMap()
+        if (inboxBadgeCount > 0) mapOf(PantopusRoute.Messages to inboxBadgeCount) else emptyMap()
 
     // Consume pending deep links — when the host activity (or a
     // notification tap) routed a URL or path through DeepLinkRouter,
@@ -1339,11 +1368,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Feed -> {
-                navController.navigate(ChildRoutes.PULSE_FEED)
+                navController.navigateToRootTab(PantopusRoute.Pulse)
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Home -> {
-                navController.navigate(PantopusRoute.Hub.path)
+                navController.navigateToRootTab(PantopusRoute.Home)
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Connections -> {
@@ -1372,14 +1401,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Post -> {
+                navController.navigateToRootTab(PantopusRoute.Pulse)
                 navController.navigate(ChildRoutes.pulsePost(pending.id))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Conversation -> {
-                // Drop the user on the Inbox tab — the chat-conversation
-                // route needs counterparty metadata the deep link doesn't
-                // carry. Mirrors iOS, which selects the Inbox tab.
-                navController.navigate(PantopusRoute.Inbox.path)
+                navController.navigateToRootTab(PantopusRoute.Messages)
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.SupportTrain -> {
@@ -1407,10 +1434,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Gig -> {
+                navController.navigateToRootTab(PantopusRoute.Tasks)
                 navController.navigate(ChildRoutes.gigDetail(pending.id))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Listing -> {
+                navController.navigateToRootTab(PantopusRoute.Marketplace)
                 navController.navigate(ChildRoutes.listingDetail(pending.id))
                 DeepLinkRouter.consume()
             }
@@ -1559,10 +1588,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
         ) { padding: PaddingValues ->
             NavHost(
                 navController = navController,
-                startDestination = PantopusRoute.Hub.path,
+                startDestination = PantopusRoute.Home.path,
                 modifier = Modifier.padding(padding),
             ) {
-                composable(PantopusRoute.Hub.path) {
+                composable(PantopusRoute.Home.path) {
                     HubWithDebugFiveTap(navController = navController) {
                         HubScreen(onIntent = { intent ->
                             when (intent) {
@@ -1570,6 +1599,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     navController.navigate(ChildRoutes.NOTIFICATIONS)
                                 HubNavigationIntent.OpenMenu ->
                                     navDrawerScope.launch { navDrawerState.open() }
+                                HubNavigationIntent.OpenProfile ->
+                                    navController.navigate(ChildRoutes.PROFILE)
                                 HubNavigationIntent.StartVerification ->
                                     navController.navigate(ChildRoutes.ADD_HOME)
                                 is HubNavigationIntent.ActionTapped ->
@@ -1588,11 +1619,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                         PillarTile.Pillar.Mail ->
                                             navController.navigate(ChildRoutes.MAILBOX_ROOT)
                                         PillarTile.Pillar.Pulse ->
-                                            navController.navigate(ChildRoutes.PULSE_FEED)
+                                            navController.navigateToRootTab(PantopusRoute.Pulse)
                                         PillarTile.Pillar.Marketplace ->
-                                            navController.navigate(ChildRoutes.MARKETPLACE)
+                                            navController.navigateToRootTab(PantopusRoute.Marketplace)
                                         PillarTile.Pillar.Gigs ->
-                                            navController.navigate(ChildRoutes.GIGS_FEED)
+                                            navController.navigateToRootTab(PantopusRoute.Tasks)
                                     }
                                 is HubNavigationIntent.DiscoveryTapped ->
                                     routeForDiscovery(intent.item).also { navController.navigate(it) }
@@ -1608,17 +1639,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         })
                     }
                 }
-                composable(PantopusRoute.Nearby.path) {
-                    NearbyScreen(
-                        onOpenEntity = { entity: MapEntity ->
-                            when (entity.kind) {
-                                MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
-                                MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
-                            }
-                        },
+                composable(PantopusRoute.Pulse.path) {
+                    FeedScreen(
+                        onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
+                        onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
                     )
                 }
-                composable(PantopusRoute.Inbox.path) {
+                composable(PantopusRoute.Tasks.path) {
+                    GigsFeedScreen(
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                        onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
+                        onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
+                        onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
+                    )
+                }
+                composable(PantopusRoute.Marketplace.path) {
+                    MarketplaceScreen(
+                        onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
+                        onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
+                    )
+                }
+                composable(PantopusRoute.Messages.path) {
                     InboxScreen(
                         onOpenConversation = { row ->
                             navController.navigate(ChildRoutes.chatConversation(row))
@@ -1627,7 +1668,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenSearch = { navController.navigate(ChildRoutes.CHAT_SEARCH) },
                     )
                 }
-                composable(PantopusRoute.You.path) {
+                composable(ChildRoutes.PROFILE) {
                     YouScreen(
                         onOpenPublicProfile = { userId ->
                             navController.navigate(ChildRoutes.publicProfile(userId))
@@ -2810,19 +2851,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ) {
                     GigDetailScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenMessages = { gig ->
-                            gig.userId?.let { posterId ->
-                                val name = gig.creator?.name ?: gig.creator?.username ?: gig.title
-                                navController.navigate(
-                                    ChildRoutes.chatConversationFromPicker(
-                                        userId = posterId,
-                                        displayName = name,
-                                        initials = initialsFromName(name),
-                                        verified = gig.creator?.verified == true,
-                                        locality = null,
-                                    ),
-                                )
-                            }
+                        onOpenChat = { roomId, displayName, initials, verified ->
+                            navController.navigate(
+                                ChildRoutes.chatConversationRoom(
+                                    roomId = roomId,
+                                    displayName = displayName,
+                                    initials = initials,
+                                    verified = verified,
+                                ),
+                            )
                         },
                     )
                 }
@@ -2838,15 +2875,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ) { entry ->
                     val raw =
                         entry.arguments?.getString(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) ?: GigsCategory.All.key
-                    NearbyMapScreen(
-                        onOpenEntity = { entity ->
-                            when (entity.kind) {
-                                MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
-                                MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
-                            }
-                        },
+                    TasksMapScreen(
+                        onOpenTask = { taskId -> navController.navigate(ChildRoutes.gigDetail(taskId)) },
+                        onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
                         onBack = { navController.popBackStack() },
-                        initialCategory = GigsCategory.fromBackendKey(raw),
                     )
                 }
                 composable(
@@ -2898,8 +2930,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 defaultValue = PulseIntent.All.key
                             },
                         ),
-                ) {
-                    PulseComposeScreen(onBack = { navController.popBackStack() })
+                ) { entry ->
+                    val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_INTENT_KEY) ?: PulseIntent.All.key
+                    val feedIntent = PulseIntent.entries.firstOrNull { it.key == raw }
+                    PulseComposeFlowScreen(
+                        onBack = { navController.popBackStack() },
+                        prefillFeedIntent = feedIntent,
+                    )
                 }
                 composable(
                     route = ChildRoutes.EDIT_POST,
@@ -2909,8 +2946,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 type = NavType.StringType
                             },
                         ),
-                ) {
-                    PulseComposeScreen(onBack = { navController.popBackStack() })
+                ) { entry ->
+                    PulseComposeFlowScreen(
+                        onBack = { navController.popBackStack() },
+                        editingPostId = entry.arguments?.getString(ChildRoutes.EDIT_POST_POST_ID_KEY),
+                    )
                 }
                 composable(ChildRoutes.NOTIFICATIONS) {
                     NotificationsScreen(onBack = { navController.popBackStack() })

@@ -32,7 +32,7 @@ final class EditProfileUITests: XCTestCase {
     }
 
     private func openEditProfile(in app: XCUIApplication) -> XCUIElement {
-        app.buttons["tab.you"].firstMatch.tap()
+        app.buttons["hubAvatarButton"].firstMatch.tap()
         let editButton = app.buttons["youEditProfileButton"]
         XCTAssertTrue(editButton.waitForExistence(timeout: 3))
         editButton.tap()

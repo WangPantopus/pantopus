@@ -56,17 +56,17 @@ class NavigationSmokeTest {
     val composeRule = createComposeRule()
 
     /**
-     * Render the four bottom-bar tabs with stub destinations whose
+     * Render the five bottom-bar tabs with stub destinations whose
      * testTags match the real landing screens. Verifies:
-     *  - all four tab affordances render with `tab.hub` / `tab.nearby` /
-     *    `tab.inbox` / `tab.you`;
+     *  - all five tab affordances render with `tab.home` / `tab.pulse` /
+     *    `tab.tasks` / `tab.marketplace` / `tab.messages`;
      *  - selecting a tab swaps the visible destination's testTag;
-     *  - selecting Hub returns to the Hub destination.
+     *  - selecting Home returns to the Home destination.
      */
     @Test
     fun bottomBarTabs_swapDestinationsCorrectly() {
         composeRule.setContent {
-            var selected by remember { mutableStateOf<PantopusRoute>(PantopusRoute.Hub) }
+            var selected by remember { mutableStateOf<PantopusRoute>(PantopusRoute.Home) }
             Scaffold(
                 modifier = Modifier.testTag("rootScaffold"),
                 bottomBar = {
@@ -78,43 +78,50 @@ class NavigationSmokeTest {
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     when (selected) {
-                        PantopusRoute.Hub ->
-                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_HUB))
-                        PantopusRoute.Nearby ->
-                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_NEARBY))
-                        PantopusRoute.Inbox ->
-                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_INBOX))
-                        PantopusRoute.You ->
-                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_YOU))
+                        PantopusRoute.Home ->
+                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_HOME))
+                        PantopusRoute.Pulse ->
+                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_PULSE))
+                        PantopusRoute.Tasks ->
+                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_TASKS))
+                        PantopusRoute.Marketplace ->
+                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_MARKETPLACE))
+                        PantopusRoute.Messages ->
+                            Box(Modifier.fillMaxSize().testTag(LANDING_TAG_MESSAGES))
                     }
                 }
             }
         }
 
-        // 1. All four tabs render with the expected testTags.
-        composeRule.onNodeWithTag("tab.hub").assertIsDisplayed()
-        composeRule.onNodeWithTag("tab.nearby").assertIsDisplayed()
-        composeRule.onNodeWithTag("tab.inbox").assertIsDisplayed()
-        composeRule.onNodeWithTag("tab.you").assertIsDisplayed()
+        // 1. All five tabs render with the expected testTags.
+        composeRule.onNodeWithTag("tab.home").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab.pulse").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab.tasks").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab.marketplace").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab.messages").assertIsDisplayed()
 
-        // 2. Default landing is Hub.
-        composeRule.onNodeWithTag(LANDING_TAG_HUB).assertIsDisplayed()
+        // 2. Default landing is Home.
+        composeRule.onNodeWithTag(LANDING_TAG_HOME).assertIsDisplayed()
 
-        // 3. Tapping Nearby swaps in the nearby landing tag.
-        composeRule.onNodeWithTag("tab.nearby").performClick()
-        composeRule.onNodeWithTag(LANDING_TAG_NEARBY).assertIsDisplayed()
+        // 3. Tapping Pulse swaps in the feed landing tag.
+        composeRule.onNodeWithTag("tab.pulse").performClick()
+        composeRule.onNodeWithTag(LANDING_TAG_PULSE).assertIsDisplayed()
 
-        // 4. Tapping Inbox swaps in the chat list landing tag.
-        composeRule.onNodeWithTag("tab.inbox").performClick()
-        composeRule.onNodeWithTag(LANDING_TAG_INBOX).assertIsDisplayed()
+        // 4. Tapping Tasks swaps in the gigs feed landing tag.
+        composeRule.onNodeWithTag("tab.tasks").performClick()
+        composeRule.onNodeWithTag(LANDING_TAG_TASKS).assertIsDisplayed()
 
-        // 5. Tapping You swaps in the Me landing tag.
-        composeRule.onNodeWithTag("tab.you").performClick()
-        composeRule.onNodeWithTag(LANDING_TAG_YOU).assertIsDisplayed()
+        // 5. Tapping Marketplace swaps in the marketplace landing tag.
+        composeRule.onNodeWithTag("tab.marketplace").performClick()
+        composeRule.onNodeWithTag(LANDING_TAG_MARKETPLACE).assertIsDisplayed()
 
-        // 6. Re-selecting Hub returns to the Hub landing.
-        composeRule.onNodeWithTag("tab.hub").performClick()
-        composeRule.onNodeWithTag(LANDING_TAG_HUB).assertIsDisplayed()
+        // 6. Tapping Messages swaps in the chat list landing tag.
+        composeRule.onNodeWithTag("tab.messages").performClick()
+        composeRule.onNodeWithTag(LANDING_TAG_MESSAGES).assertIsDisplayed()
+
+        // 7. Re-selecting Home returns to the Home landing.
+        composeRule.onNodeWithTag("tab.home").performClick()
+        composeRule.onNodeWithTag(LANDING_TAG_HOME).assertIsDisplayed()
     }
 
     /**
@@ -147,17 +154,18 @@ class NavigationSmokeTest {
             PantopusRoute.entries.map { route ->
                 "tab.${route.path.substringAfterLast('/')}"
             }
-        // Hub / Nearby / Inbox / You.
-        check(expectedTags == listOf("tab.hub", "tab.nearby", "tab.inbox", "tab.you")) {
+        // Home / Pulse / Tasks / Marketplace / Messages.
+        check(expectedTags == listOf("tab.home", "tab.pulse", "tab.tasks", "tab.marketplace", "tab.messages")) {
             "PantopusRoute.entries derived testTags drifted: $expectedTags"
         }
     }
 
     private companion object {
-        const val LANDING_TAG_HUB = "smokeStub.hubScreen"
-        const val LANDING_TAG_NEARBY = "smokeStub.nearbyMap"
-        const val LANDING_TAG_INBOX = "smokeStub.chatList"
-        const val LANDING_TAG_YOU = "smokeStub.meScreen"
+        const val LANDING_TAG_HOME = "smokeStub.hubScreen"
+        const val LANDING_TAG_PULSE = "smokeStub.pulseFeed"
+        const val LANDING_TAG_TASKS = "smokeStub.gigsFeed"
+        const val LANDING_TAG_MARKETPLACE = "smokeStub.marketplace"
+        const val LANDING_TAG_MESSAGES = "smokeStub.chatList"
 
         // Note: matches the tag emitted by NotYetAvailableView via its
         // outermost `.testTag(NOT_YET_AVAILABLE_TAG)` constant, which is

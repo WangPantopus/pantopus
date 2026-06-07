@@ -2,8 +2,8 @@
 //  RootTabView.swift
 //  Pantopus
 //
-//  The 4-tab bottom bar — Hub · Nearby · Inbox · You — that sits above
-//  every signed-in screen. Hub is selected at launch.
+//  The 5-tab bottom bar — Home · Pulse · Tasks · Marketplace · Messages —
+//  that sits above every signed-in screen. Home is selected at launch.
 //
 
 import SwiftUI
@@ -11,38 +11,51 @@ import SwiftUI
 /// A tab in the primary bottom bar. Encoded as an enum so call sites never
 /// reach for stringly-typed paths.
 public enum RootTab: Hashable, CaseIterable {
-    case hub, nearby, inbox, you
+    case home, pulse, tasks, marketplace, messages
 
     /// Human-readable label rendered under each tab icon.
     public var label: String {
         switch self {
-        case .hub: "Hub"
-        case .nearby: "Nearby"
-        case .inbox: "Inbox"
-        case .you: "You"
+        case .home: "Home"
+        case .pulse: "Pulse"
+        case .tasks: "Tasks"
+        case .marketplace: "Marketplace"
+        case .messages: "Messages"
+        }
+    }
+
+    /// Stable accessibility / test identifier suffix (`tab.<id>`).
+    public var id: String {
+        switch self {
+        case .home: "home"
+        case .pulse: "pulse"
+        case .tasks: "tasks"
+        case .marketplace: "marketplace"
+        case .messages: "messages"
         }
     }
 
     /// Design-system icon token for the tab.
     public var icon: PantopusIcon {
         switch self {
-        case .hub: .home
-        case .nearby: .map
-        case .inbox: .inbox
-        case .you: .user
+        case .home: .home
+        case .pulse: .rss
+        case .tasks: .briefcase
+        case .marketplace: .shoppingBag
+        case .messages: .messageCircle
         }
     }
 }
 
 /// Observable state for the root tab view. Holds the selected tab and a
-/// cached count for the Inbox badge.
+/// cached count for the Messages badge.
 @Observable
 @MainActor
 public final class RootTabModel {
-    /// Currently selected tab. Starts at `.hub`.
-    public var selected: RootTab = .hub
-    /// Unread Inbox count rendered as the tab badge. Wired to live data in P8.
-    public var inboxBadge: Int = 0
+    /// Currently selected tab. Starts at `.home`.
+    public var selected: RootTab = .home
+    /// Unread Messages count rendered as the tab badge. Wired to live data in P8.
+    public var messagesBadge: Int = 0
     public init() {}
 }
 
@@ -52,27 +65,32 @@ public struct RootTabView: View {
     @State private var model = RootTabModel()
     @State private var router = DeepLinkRouter.shared
     @State private var pendingInviteToken: String?
+    @State private var showProfile = false
 
     public init() {}
 
     public var body: some View {
         TabView(selection: tabBinding) {
-            HubTabRoot()
-                .tabItem { tabLabel(.hub) }
-                .tag(RootTab.hub)
+            HubTabRoot(onOpenProfile: { showProfile = true })
+                .tabItem { tabLabel(.home) }
+                .tag(RootTab.home)
 
-            NearbyTabRoot()
-                .tabItem { tabLabel(.nearby) }
-                .tag(RootTab.nearby)
+            PulseTabRoot()
+                .tabItem { tabLabel(.pulse) }
+                .tag(RootTab.pulse)
+
+            TasksTabRoot()
+                .tabItem { tabLabel(.tasks) }
+                .tag(RootTab.tasks)
+
+            MarketplaceTabRoot()
+                .tabItem { tabLabel(.marketplace) }
+                .tag(RootTab.marketplace)
 
             InboxTabRoot()
-                .tabItem { tabLabel(.inbox) }
-                .tag(RootTab.inbox)
-                .badge(model.inboxBadge)
-
-            YouTabRoot()
-                .tabItem { tabLabel(.you) }
-                .tag(RootTab.you)
+                .tabItem { tabLabel(.messages) }
+                .tag(RootTab.messages)
+                .badge(model.messagesBadge)
         }
         .tint(Theme.Color.primary600)
         .environment(model)
@@ -81,6 +99,9 @@ public struct RootTabView: View {
         }
         .task {
             consumeInviteDeepLinkIfNeeded(pending: router.pending)
+        }
+        .fullScreenCover(isPresented: $showProfile) {
+            YouTabRoot()
         }
         .fullScreenCover(
             item: Binding<InviteSheetToken?>(
@@ -107,9 +128,15 @@ public struct RootTabView: View {
         case let .invite(token):
             pendingInviteToken = token
             _ = router.consume()
-        case .feed, .post, .supportTrain, .supportTrainManage, .user,
+        case .feed, .post:
+            model.selected = .pulse
+        case .gig:
+            model.selected = .tasks
+        case .listing:
+            model.selected = .marketplace
+        case .supportTrain, .supportTrainManage, .user,
              .connections, .beacons, .discoverHub,
-             .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests,
+             .homeDetail, .homeDashboard, .homeMemberRequests,
              .homeOwnersTransfer,
              .verifyLandlord, .postcardVerification,
              .notifications, .createBusiness, .businessProfile, .editBusinessPage,
@@ -118,11 +145,11 @@ public struct RootTabView: View {
              // Hub tab's stack (deep links open them on the placeholder).
              .stamps, .mailTask, .mailTranslation, .unboxing, .earn,
              .businessOwner, .viewAs, .waitingRoom:
-            model.selected = .hub
+            model.selected = .home
         case .conversation:
-            model.selected = .inbox
+            model.selected = .messages
         case .home:
-            model.selected = .hub
+            model.selected = .home
             _ = router.consume()
         case .resetPassword, .verifyEmail, .unknown:
             _ = router.consume()
@@ -144,7 +171,7 @@ public struct RootTabView: View {
                 .accessibilityHidden(true)
         }
         .accessibilityLabel(tab.label)
-        .accessibilityIdentifier("tab.\(tab)")
+        .accessibilityIdentifier("tab.\(tab.id)")
     }
 }
 
