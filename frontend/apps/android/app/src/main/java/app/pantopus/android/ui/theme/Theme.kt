@@ -92,7 +92,7 @@ private val PantopusLightColorScheme: ColorScheme =
         scrim = Color.Black,
     )
 
-// Dark scheme is light-parity for now; designers will layer real dark overrides later.
+// Dark shell neutrals mirror iOS `Neutral/*` asset-catalog dark appearances.
 private val PantopusDarkColorScheme: ColorScheme =
     darkColorScheme(
         primary = PantopusColors.primary600,
@@ -107,19 +107,19 @@ private val PantopusDarkColorScheme: ColorScheme =
         onTertiary = PantopusColors.appTextInverse,
         tertiaryContainer = PantopusColors.businessBg,
         onTertiaryContainer = PantopusColors.business,
-        background = PantopusColors.appBg,
-        onBackground = PantopusColors.appText,
-        surface = PantopusColors.appSurface,
-        onSurface = PantopusColors.appText,
-        surfaceVariant = PantopusColors.appSurfaceSunken,
-        onSurfaceVariant = PantopusColors.appTextSecondary,
+        background = PantopusColors.appBgDark,
+        onBackground = PantopusColors.appTextDark,
+        surface = PantopusColors.appSurfaceDark,
+        onSurface = PantopusColors.appTextStrongDark,
+        surfaceVariant = PantopusColors.appSurfaceSunkenDark,
+        onSurfaceVariant = PantopusColors.appTextSecondaryDark,
         surfaceTint = PantopusColors.primary600,
         error = PantopusColors.error,
         onError = PantopusColors.appTextInverse,
         errorContainer = PantopusColors.errorLight,
         onErrorContainer = PantopusColors.error,
-        outline = PantopusColors.appBorder,
-        outlineVariant = PantopusColors.appBorderSubtle,
+        outline = PantopusColors.appBorderDark,
+        outlineVariant = PantopusColors.appBorderStrongDark,
         scrim = Color.Black,
     )
 
@@ -130,8 +130,9 @@ private val PantopusDarkColorScheme: ColorScheme =
  * Feature composables MUST be nested inside this — reading
  * `PantopusTheme.tokens` or a token defined outside the theme scope throws.
  *
- * @param darkTheme Honour the system dark-mode setting. Currently renders
- *     the same palette as light; dark overrides ship later.
+ * @param darkTheme Honour the system dark-mode setting. Shell neutrals
+ *     (`background`, `surface`, text, borders) switch to the dark palette;
+ *     accent/category tokens stay shared with light for now.
  * @param content Composable content.
  */
 @Composable
