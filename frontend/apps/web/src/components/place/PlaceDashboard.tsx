@@ -108,7 +108,11 @@ export default function PlaceDashboard() {
 
   return (
     <Shell>
-      <PlaceDashboardView intelligence={intelQuery.data} />
+      <PlaceDashboardView
+        intelligence={intelQuery.data}
+        onVerify={() => router.push('/app/address-verify')}
+        onClaim={() => router.push('/app/homes')}
+      />
     </Shell>
   );
 }
