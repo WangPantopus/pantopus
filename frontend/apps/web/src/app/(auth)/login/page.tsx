@@ -48,7 +48,7 @@ export default function LoginPage() {
       }
 
       const params = new URLSearchParams(window.location.search);
-      router.push(safeRedirectPath(readAuthRedirectQuery(params)));
+      router.push(safeRedirectPath(readAuthRedirectQuery(params), '/app/place'));
     } catch (err: unknown) {
       setFieldErrors(extractFieldErrors(err));
       setError(extractApiError(err, 'Login failed. Please try again.'));

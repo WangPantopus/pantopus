@@ -39,7 +39,7 @@ function AuthCallbackPageContent() {
       (async () => {
         try {
           await api.auth.oauthTokenCallback(accessTokenFromHash, refreshTokenFromHash);
-          router.push('/app/hub');
+          router.push('/app/place');
         } catch (err: unknown) {
           console.error('OAuth token callback error:', err);
           setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.');
@@ -78,7 +78,7 @@ function AuthCallbackPageContent() {
     (async () => {
       try {
         await api.auth.oauthCallback(code);
-        router.push('/app/hub');
+        router.push('/app/place');
       } catch (err: unknown) {
         console.error('OAuth callback error:', err);
         setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.');

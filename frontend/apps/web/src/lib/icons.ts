@@ -64,6 +64,7 @@ import {
 
 // ── Navigation icons (sidebar, header, tabs) ─────────────────
 export const NavIcons = {
+  place: Home,
   hub: LayoutDashboard,
   feed: Newspaper,
   discover: Compass,
