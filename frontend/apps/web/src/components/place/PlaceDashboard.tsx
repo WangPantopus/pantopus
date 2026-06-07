@@ -108,7 +108,10 @@ export default function PlaceDashboard() {
 
   return (
     <Shell>
-      <PlaceDashboardView intelligence={intelQuery.data} />
+      <PlaceDashboardView
+        intelligence={intelQuery.data}
+        onOpenSection={(slug) => router.push(`/app/place/${slug}`)}
+      />
     </Shell>
   );
 }

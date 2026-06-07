@@ -300,7 +300,10 @@ function lockReason(env: PlaceSection): string {
 }
 
 // ── render one section envelope as the right card ───────────
-export function renderSection(env: PlaceSection): ReactNode {
+// `onOpen` taps through to the section's group-detail page (W2.3);
+// it's omitted for groups without a detail screen, so those cards
+// render no chevron (no dead control).
+export function renderSection(env: PlaceSection, onOpen?: () => void): ReactNode {
   const cfg = SECTION_CONFIG[env.id];
 
   if (env.id === 'block_density') {
@@ -309,7 +312,7 @@ export function renderSection(env: PlaceSection): ReactNode {
     }
     const hasData = env.data && (env.status === 'ready' || env.status === 'partial' || env.status === 'stale');
     if (hasData) {
-      return <DensityCard bucket={(env.data as PlaceBlockDensityData).bucket} showCta={false} />;
+      return <DensityCard bucket={(env.data as PlaceBlockDensityData).bucket} showCta={false} onClick={onOpen} />;
     }
     return (
       <SectionCard
@@ -317,6 +320,7 @@ export function renderSection(env: PlaceSection): ReactNode {
         title="Verified homes nearby"
         state={statusToState(env.status)}
         caption={env.unavailable_reason ?? undefined}
+        onClick={onOpen}
       />
     );
   }
@@ -340,6 +344,7 @@ export function renderSection(env: PlaceSection): ReactNode {
       chip={reading.chip}
       statusDot={reading.statusDot}
       caption={state === 'unavailable' ? env.unavailable_reason ?? undefined : reading.caption}
+      onClick={onOpen}
     />
   );
 }

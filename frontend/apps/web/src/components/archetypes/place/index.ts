@@ -32,6 +32,9 @@ export type { PlaceHeaderProps } from './PlaceHeader';
 export { default as HeroCard } from './HeroCard';
 export type { HeroCardProps, HeroVariant, HeroNudge } from './HeroCard';
 
+export { DetailHeader, DetailSectionLabel, SourceNote, ComingSoonRow, InfoNote } from './detail';
+export type { DetailHeaderProps, InfoNoteTone } from './detail';
+
 export {
   IconTile,
   Chevron,
