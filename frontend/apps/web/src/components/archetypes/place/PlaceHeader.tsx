@@ -39,7 +39,14 @@ export default function PlaceHeader({
           <span className="text-sm font-medium truncate">{address}</span>
         </div>
       </div>
-      {rightSlot ?? <PlaceAvatar initials={initials} status={status} size={40} />}
+      {rightSlot ?? (
+        <PlaceAvatar
+          initials={initials}
+          status={status}
+          size={40}
+          label={status === 'claimed' ? 'Claimed' : undefined}
+        />
+      )}
     </header>
   );
 }

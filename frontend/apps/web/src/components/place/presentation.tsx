@@ -31,6 +31,9 @@ import {
   TriangleAlert,
   TrendingUp,
   TrendingDown,
+  MessageCircle,
+  BadgeCheck,
+  Mailbox,
 } from 'lucide-react';
 import type {
   PlaceIntelligence,
@@ -299,13 +302,32 @@ function lockReason(env: PlaceSection): string {
   return 'Claim your place to see this.';
 }
 
+// ── navigation handlers, threaded into the locked cards ──────
+// Band D → verify (T3 → T4); Band B/C → claim (T1 → T3). Driven off
+// the contract's per-section band so a locked card never dead-ends.
+export interface PlaceSectionHandlers {
+  onVerify?: () => void;
+  onClaim?: () => void;
+}
+function lockHandler(env: PlaceSection, handlers?: PlaceSectionHandlers): (() => void) | undefined {
+  return env.band === 'D' ? handlers?.onVerify : handlers?.onClaim;
+}
+
 // ── render one section envelope as the right card ───────────
-export function renderSection(env: PlaceSection): ReactNode {
+export function renderSection(env: PlaceSection, handlers?: PlaceSectionHandlers): ReactNode {
   const cfg = SECTION_CONFIG[env.id];
 
   if (env.id === 'block_density') {
     if (env.access === 'locked') {
-      return <LockedCard icon={cfg.icon} title="Verified homes nearby" reason={lockReason(env)} cta={lockCta(env.band)} />;
+      return (
+        <LockedCard
+          icon={cfg.icon}
+          title="Verified homes nearby"
+          reason={lockReason(env)}
+          cta={lockCta(env.band)}
+          onCta={lockHandler(env, handlers)}
+        />
+      );
     }
     const hasData = env.data && (env.status === 'ready' || env.status === 'partial' || env.status === 'stale');
     if (hasData) {
@@ -322,7 +344,15 @@ export function renderSection(env: PlaceSection): ReactNode {
   }
 
   if (env.access === 'locked') {
-    return <LockedCard icon={cfg.icon} title={cfg.title} reason={lockReason(env)} cta={lockCta(env.band)} />;
+    return (
+      <LockedCard
+        icon={cfg.icon}
+        title={cfg.title}
+        reason={lockReason(env)}
+        cta={lockCta(env.band)}
+        onCta={lockHandler(env, handlers)}
+      />
+    );
   }
 
   const state = statusToState(env.status);
@@ -425,4 +455,42 @@ export function derivePulse(intel: PlaceIntelligence): DerivedPulse {
     title,
     nudge,
   };
+}
+
+// ════════════════════════════════════════════════════════════
+// Band-D "Locked until you verify" group (§9 — the T3 → T4 step)
+//
+// These trust / identity tools are NOT part of the launch-set contract;
+// at T3 (claimed, unverified) they render as locked cards that route to
+// address verification, per the claimed-dashboard design. At T4 they
+// unlock as their own pillars (Inbox / Identity), so this group shows
+// only while the resident is claimed-but-unverified.
+// ════════════════════════════════════════════════════════════
+export interface VerifyLockedItem {
+  icon: LucideIcon;
+  title: string;
+  reason: string;
+}
+
+export const VERIFY_LOCKED_SECTIONS: VerifyLockedItem[] = [
+  { icon: MessageCircle, title: 'Neighbor messaging', reason: 'Verify your address to message neighbors.' },
+  { icon: BadgeCheck, title: 'Verified badge', reason: 'Verify your address to get your verified badge.' },
+  {
+    icon: Mailbox,
+    title: 'Your mailbox',
+    reason: 'Verify your address for your mailbox — packages, civic notices, and permits.',
+  },
+];
+
+export function renderVerifyLocked(onVerify: () => void): ReactNode {
+  return VERIFY_LOCKED_SECTIONS.map((item) => (
+    <LockedCard
+      key={item.title}
+      icon={item.icon}
+      title={item.title}
+      reason={item.reason}
+      cta="Verify address"
+      onCta={onVerify}
+    />
+  ));
 }
