@@ -278,3 +278,16 @@ export type {
   PlacePreviewArea,
   PlacePreviewLockedSection,
 } from './endpoints/place';
+
+// Place — verified-only neighbor messaging (W2.6)
+export * as neighborMessages from './endpoints/neighborMessages';
+export type {
+  NeighborMessageTemplate,
+  NeighborReplyTemplate,
+  NeighborMessageTemplates,
+  NeighborMessageSender,
+  NeighborMessageReply,
+  ReceivedNeighborMessage,
+  SentNeighborMessage,
+  SendNeighborMessageInput,
+} from './endpoints/neighborMessages';
