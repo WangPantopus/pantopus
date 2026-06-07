@@ -48,6 +48,20 @@ public final class GigDetailViewModel {
 
     public private(set) var tipStatus: TipStatus = .idle
 
+    // MARK: - Structured Q&A
+
+    public private(set) var questions: [GigQuestionDTO] = []
+    public private(set) var questionsLoading = false
+    public var newQuestionText = ""
+    public var answeringQuestionId: String?
+    public var answerDraftText = ""
+    public private(set) var questionSubmitting = false
+    public private(set) var answerSubmitting = false
+
+    public var canAskQuestion: Bool {
+        Self.currentSignedInUserId() != nil && !viewerIsOwner
+    }
+
     private let gigId: String
     private let api: APIClient
     private let uploader: MultipartUploader
@@ -92,8 +106,13 @@ public final class GigDetailViewModel {
                 }
             }
             state = .loaded(Self.project(
-                gig: detail.gig, bids: bids, canMarkDelivered: canMarkDelivered, canTip: canTip
+                gig: detail.gig,
+                bids: bids,
+                canMarkDelivered: canMarkDelivered,
+                canTip: canTip,
+                viewerUserId: currentUserId
             ))
+            await loadQuestions()
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gig."
             state = .error(message: message)
@@ -210,27 +229,145 @@ public final class GigDetailViewModel {
             return false
         }
     }
+
+    // MARK: - Structured Q&A
+
+    func loadQuestions() async {
+        questionsLoading = true
+        defer { questionsLoading = false }
+        do {
+            let response: GigQuestionsResponse = try await api.request(GigsEndpoints.questions(gigId: gigId))
+            questions = response.questions
+        } catch {
+            questions = []
+        }
+    }
+
+    @discardableResult
+    func submitQuestion() async -> String? {
+        let trimmed = newQuestionText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 5 else { return "Question must be at least 5 characters." }
+        guard !questionSubmitting else { return nil }
+        questionSubmitting = true
+        defer { questionSubmitting = false }
+        do {
+            _ = try await api.request(
+                GigsEndpoints.askQuestion(gigId: gigId, body: AskGigQuestionBody(question: trimmed))
+            )
+            newQuestionText = ""
+            await loadQuestions()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't post question."
+        }
+    }
+
+    @discardableResult
+    func submitAnswer(questionId: String) async -> String? {
+        let trimmed = answerDraftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Answer can't be empty." }
+        guard !answerSubmitting else { return nil }
+        answerSubmitting = true
+        defer { answerSubmitting = false }
+        do {
+            _ = try await api.request(
+                GigsEndpoints.answerQuestion(
+                    gigId: gigId,
+                    questionId: questionId,
+                    body: AnswerGigQuestionBody(answer: trimmed)
+                )
+            )
+            answeringQuestionId = nil
+            answerDraftText = ""
+            await loadQuestions()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't post answer."
+        }
+    }
+
+    func beginAnswering(_ questionId: String) {
+        answeringQuestionId = questionId
+        answerDraftText = ""
+    }
+
+    func cancelAnswering() {
+        answeringQuestionId = nil
+        answerDraftText = ""
+    }
+
+    /// Opens (or creates) the gig chat room and returns a conversation
+    /// destination for the inbox stack. Mirrors web/RN `getGigChatRoom`.
+    public func resolveChatDestination() async -> InboxConversationDestination? {
+        guard let gig = rawGig else { return nil }
+        let name = gig.creator?.resolvedDisplayName ?? gig.title
+        let initials = Self.initialsFromName(name)
+        let verified = gig.creator?.resolvedVerified ?? false
+        do {
+            let response: GigChatRoomResponse = try await api.request(GigsEndpoints.chatRoom(gigId: gigId))
+            return InboxConversationDestination(
+                mode: .room(id: response.roomId),
+                displayName: name,
+                initials: initials,
+                identityKind: nil,
+                verified: verified
+            )
+        } catch {
+            return nil
+        }
+    }
 }
 
 // MARK: - Projection
 
 extension GigDetailViewModel {
-    /// Top-level projection. Splits on the explicit `is_v2` discriminator
-    /// (`GigDTO.isV2`): V2 ("Magic Task") gets the rich surface, legacy V1
-    /// gets the sparse layout (which also carries the awarded terminal
-    /// state). The full design-spec V2 frame — 3-photo strip, trust
-    /// capsules with ratings, per-bid tags — is rendered from
-    /// `GigDetailSampleData` until the Magic Task JSONB is wired through
-    /// the backend (out of scope per P8.2).
+    /// Top-level projection. V2 ("Magic Task") is the default surface for
+    /// open gigs; legacy V1 is kept only when `is_v2 == false` or when an
+    /// awarded terminal state has no explicit V2 flag (sparse awarded UI).
     static func project(
         gig: GigDTO,
         bids: [GigBidDTO],
         canMarkDelivered: Bool = false,
-        canTip: Bool = false
+        canTip: Bool = false,
+        viewerUserId: String? = nil
     ) -> ContentDetailContent {
-        (gig.isV2 == true)
-            ? projectTaskV2(gig: gig, bids: bids, canMarkDelivered: canMarkDelivered, canTip: canTip)
-            : projectGigV1(gig: gig, bids: bids, canTip: canTip)
+        shouldProjectTaskV2(gig: gig)
+            ? projectTaskV2(
+                gig: gig, bids: bids, canMarkDelivered: canMarkDelivered, canTip: canTip,
+                viewerUserId: viewerUserId
+            )
+            : projectGigV1(gig: gig, bids: bids, canTip: canTip, viewerUserId: viewerUserId)
+    }
+
+    /// Poster card for the "Posted By" section — avatar, name, @handle,
+    /// and a chat affordance (hidden when the viewer is the poster).
+    static func posterCounterparty(gig: GigDTO, viewerUserId: String?) -> ContentDetailCounterparty? {
+        guard let posterId = gig.userId, !posterId.isEmpty else { return nil }
+        let creator = gig.creator
+        let name = creator?.resolvedDisplayName ?? "Neighbor"
+        let handle = creator?.resolvedHandle.map { "@\($0)" }
+        let showsButton = viewerUserId.map { $0 != posterId } ?? true
+        return ContentDetailCounterparty(
+            displayName: name,
+            initials: initialsFromName(name),
+            avatarUrl: creator?.resolvedAvatarURL,
+            identityKind: nil,
+            verified: creator?.resolvedVerified ?? false,
+            rating: nil,
+            trailing: handle,
+            showsMessageButton: showsButton
+        )
+    }
+
+    static func initialsFromName(_ name: String) -> String {
+        name.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }.joined().uppercased()
+    }
+
+    /// `is_v2 == false` → V1; `true` → V2; `null` → V2 unless awarded.
+    private static func shouldProjectTaskV2(gig: GigDTO) -> Bool {
+        if gig.isV2 == false { return false }
+        if gig.isV2 == true { return true }
+        return !isAwarded(gig)
     }
 
     /// The dock for the poster on a completed gig — primary becomes "Send a
@@ -263,7 +400,8 @@ extension GigDetailViewModel {
         gig: GigDTO,
         bids: [GigBidDTO],
         canMarkDelivered: Bool,
-        canTip: Bool = false
+        canTip: Bool = false,
+        viewerUserId: String? = nil
     ) -> ContentDetailContent {
         let category = GigsCategory.from(backendKey: gig.category)
         let bidCount = gig.bidCount ?? bids.count
@@ -277,13 +415,16 @@ extension GigDetailViewModel {
             categoryChip: ContentDetailCategoryChip(label: category.label, category: category),
             meta: metaPieces.isEmpty ? nil : metaPieces.joined(separator: " · "),
             priceLine: priceLine,
-            priceCaption: gig.price != nil ? "budget" : nil
+            priceCaption: gig.price != nil ? "budget · cash or transfer" : nil
         )
         var modules: [ContentDetailModule] = []
         if let body = gig.description, !body.isEmpty {
             modules.append(.description(ContentDetailDescription(title: "What needs doing", icon: .clipboardList, body: body)))
         }
         modules.append(contentsOf: locationModules(gig))
+        if let mapModule = locationMapModule(for: gig) {
+            modules.append(mapModule)
+        }
         if let scheduledStart = gig.scheduledStart, !scheduledStart.isEmpty {
             modules.append(.captionedText(ContentDetailCaptionedText(
                 title: "When", icon: .calendar, label: formatScheduledStart(scheduledStart)
@@ -324,6 +465,7 @@ extension GigDetailViewModel {
             statusPill: statusPill,
             hero: hero,
             statStrip: statRows(gig),
+            counterparty: posterCounterparty(gig: gig, viewerUserId: viewerUserId),
             modules: modules,
             trustCapsules: [],
             dock: dock
@@ -357,9 +499,40 @@ extension GigDetailViewModel {
         return []
     }
 
+    /// Privacy-aware mini map when coordinates are available.
+    private static func locationMapModule(for gig: GigDTO) -> ContentDetailModule? {
+        guard let coordinate = resolveMapCoordinate(gig) else { return nil }
+        let approximate = !(gig.locationUnlocked ?? false)
+        let footnote = approximate
+            ? "Approximate area — the circle covers ~500m around the actual location. Tap to explore."
+            : "Tap to pan and zoom the map."
+        let category = GigsCategory.from(backendKey: gig.category)
+        return .locationMap(ContentDetailLocationMap(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            isApproximate: approximate,
+            footnote: footnote,
+            category: category
+        ))
+    }
+
+    private static func resolveMapCoordinate(_ gig: GigDTO) -> (latitude: Double, longitude: Double)? {
+        if let lat = gig.latitude, let lng = gig.longitude { return (lat, lng) }
+        if let lat = gig.location?.latitude, let lng = gig.location?.longitude { return (lat, lng) }
+        if let lat = gig.approxLocation?.latitude, let lng = gig.approxLocation?.longitude {
+            return (lat, lng)
+        }
+        return nil
+    }
+
     // MARK: V1 (legacy Gig) — sparse + awarded terminal state
 
-    private static func projectGigV1(gig: GigDTO, bids: [GigBidDTO], canTip: Bool = false) -> ContentDetailContent {
+    private static func projectGigV1(
+        gig: GigDTO,
+        bids: [GigBidDTO],
+        canTip: Bool = false,
+        viewerUserId: String? = nil
+    ) -> ContentDetailContent {
         let awarded = isAwarded(gig)
         let bidCount = gig.bidCount ?? bids.count
         let metaPieces: [String] = [
@@ -393,9 +566,8 @@ extension GigDetailViewModel {
         if let body = gig.description, !body.isEmpty {
             modules.append(.description(ContentDetailDescription(title: "Description", icon: nil, body: body)))
         }
-        if let poster = gig.creator?.name ?? gig.creator?.username {
-            let posted = relativeAge(gig.createdAt).map { " · \($0) ago" } ?? ""
-            modules.append(.captionedText(ContentDetailCaptionedText(title: "Posted by", icon: nil, label: "\(poster)\(posted)")))
+        if let mapModule = locationMapModule(for: gig) {
+            modules.append(mapModule)
         }
         if !bids.isEmpty {
             modules.append(.bids(ContentDetailBidsModule(
@@ -411,6 +583,7 @@ extension GigDetailViewModel {
                 : ContentDetailPill(label: "Open", icon: .circle, tone: .warning),
             hero: hero,
             statStrip: [],
+            counterparty: posterCounterparty(gig: gig, viewerUserId: viewerUserId),
             modules: modules,
             trustCapsules: [],
             dock: canTip
@@ -437,7 +610,7 @@ extension GigDetailViewModel {
 
     private static func awardWinnerName(gig: GigDTO, bids: [GigBidDTO]) -> String? {
         let winner = bids.first { $0.userId == gig.acceptedBy }
-        return winner?.bidder?.name ?? winner?.bidder?.username
+        return winner?.bidder?.resolvedDisplayName
     }
 
     private static func statRows(_ gig: GigDTO) -> [ContentDetailStat] {
@@ -457,7 +630,7 @@ extension GigDetailViewModel {
     }
 
     private static func projectBid(_ bid: GigBidDTO, acceptedBy: String? = nil) -> ContentDetailBidRow {
-        let name = bid.bidder?.name ?? bid.bidder?.username ?? "Bidder"
+        let name = bid.bidder?.resolvedDisplayName ?? "Bidder"
         let initials = name.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }.joined().uppercased()
         let amount = bid.bidAmount ?? bid.amount ?? 0
         let amountLabel = amount.truncatingRemainder(dividingBy: 1) == 0 ? "$\(Int(amount))" : String(format: "$%.2f", amount)
@@ -470,7 +643,7 @@ extension GigDetailViewModel {
             avatarColor: "primary",
             ratingLine: "verified neighbor",
             amount: amountLabel,
-            verified: bid.bidder?.verified ?? false,
+            verified: bid.bidder?.resolvedVerified ?? false,
             won: won,
             dimmed: dimmed
         )

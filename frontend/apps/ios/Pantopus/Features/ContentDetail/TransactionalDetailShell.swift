@@ -50,6 +50,7 @@ public struct TransactionalDetailShell: View {
     private let onRetry: @MainActor () -> Void
     private let onMessageCounterparty: (@MainActor () -> Void)?
     private let overflowItems: [ContentDetailOverflowItem]
+    private let scrollFooter: AnyView?
 
     public init(
         state: ContentDetailState,
@@ -58,7 +59,8 @@ public struct TransactionalDetailShell: View {
         onSecondaryAction: (@MainActor () -> Void)? = nil,
         onRetry: @escaping @MainActor () -> Void = {},
         onMessageCounterparty: (@MainActor () -> Void)? = nil,
-        overflowItems: [ContentDetailOverflowItem] = []
+        overflowItems: [ContentDetailOverflowItem] = [],
+        @ViewBuilder scrollFooter: () -> some View = { EmptyView() }
     ) {
         self.state = state
         self.onBack = onBack
@@ -67,6 +69,7 @@ public struct TransactionalDetailShell: View {
         self.onRetry = onRetry
         self.onMessageCounterparty = onMessageCounterparty
         self.overflowItems = overflowItems
+        self.scrollFooter = AnyView(scrollFooter())
     }
 
     public var body: some View {
@@ -149,6 +152,7 @@ public struct TransactionalDetailShell: View {
                         topNav(trailing: trailingOverflow(transparent: false), transparent: false)
                     }
                     contentBody(content)
+                    scrollFooter
                     Spacer(minLength: 110)
                 }
             }
@@ -204,9 +208,17 @@ public struct TransactionalDetailShell: View {
                     .padding(.top, 18)
             }
             if let counterparty = content.counterparty {
-                counterpartyCard(counterparty)
-                    .padding(.horizontal, Spacing.s5)
-                    .padding(.top, 18)
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    if content.kind == .gig {
+                        Text("Posted By")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.Color.appText)
+                            .accessibilityIdentifier("contentDetailPostedByHeader")
+                    }
+                    counterpartyCard(counterparty)
+                }
+                .padding(.horizontal, Spacing.s5)
+                .padding(.top, 18)
             }
             ForEach(content.modules) { module in
                 moduleView(module)
@@ -517,7 +529,7 @@ public struct TransactionalDetailShell: View {
 
     private func counterpartyCard(_ party: ContentDetailCounterparty) -> some View {
         HStack(spacing: Spacing.s3) {
-            AvatarView(initials: party.initials, verified: party.verified, size: 44)
+            AvatarView(initials: party.initials, verified: party.verified, size: 44, imageUrl: party.avatarUrl)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(party.displayName)
@@ -544,10 +556,9 @@ public struct TransactionalDetailShell: View {
             Spacer(minLength: Spacing.s0)
             if party.showsMessageButton, let onMessage = onMessageCounterparty {
                 Button(action: onMessage) {
-                    Icon(.send, size: 14, strokeWidth: 2.2, color: Theme.Color.appTextStrong)
-                        .frame(width: 34, height: 34)
-                        .background(Theme.Color.appSurface)
-                        .overlay(Circle().stroke(Theme.Color.appBorder, lineWidth: 1))
+                    Icon(.messageCircle, size: 16, strokeWidth: 2.2, color: Theme.Color.primary600)
+                        .frame(width: 36, height: 36)
+                        .background(Theme.Color.primary50)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -687,6 +698,8 @@ public struct TransactionalDetailShell: View {
             sectionCard(title: m.title, icon: nil, sub: m.sub) {
                 bidsTable(m.bids)
             }
+        case let .locationMap(m):
+            ContentDetailLocationMapView(map: m)
         case .fromTo, .lineItems, .summary:
             invoiceModuleView(module)
         }
@@ -1218,17 +1231,26 @@ private struct AvatarView: View {
     let initials: String
     let verified: Bool
     let size: CGFloat
+    var imageUrl: URL? = nil
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Circle()
-                .fill(Theme.Color.primary500)
-                .frame(width: size, height: size)
-                .overlay(
-                    Text(initials)
-                        .font(.system(size: size * 0.36, weight: .bold))
-                        .foregroundStyle(.white)
-                )
+            Group {
+                if let imageUrl {
+                    AsyncImage(url: imageUrl) { phase in
+                        switch phase {
+                        case let .success(image):
+                            image.resizable().scaledToFill()
+                        default:
+                            initialsCircle
+                        }
+                    }
+                } else {
+                    initialsCircle
+                }
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
             if verified {
                 ZStack {
                     Circle()
@@ -1240,6 +1262,16 @@ private struct AvatarView: View {
                 .offset(x: 2, y: 2)
             }
         }
+    }
+
+    private var initialsCircle: some View {
+        Circle()
+            .fill(Theme.Color.primary500)
+            .overlay(
+                Text(initials)
+                    .font(.system(size: size * 0.36, weight: .bold))
+                    .foregroundStyle(.white)
+            )
     }
 }
 

@@ -67,6 +67,7 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 
 /**
  * T2.6 Transactional Detail shell — single canvas shared by gig,
@@ -82,6 +83,8 @@ fun ContentDetailShell(
     onRetry: () -> Unit = {},
     onMessageCounterparty: (() -> Unit)? = null,
     overflowItems: List<ContentDetailOverflowItem> = emptyList(),
+    renderLocationMaps: Boolean = true,
+    scrollFooter: @Composable () -> Unit = {},
 ) {
     Box(
         modifier =
@@ -107,6 +110,8 @@ fun ContentDetailShell(
                     onSecondaryAction = onSecondaryAction,
                     onMessageCounterparty = onMessageCounterparty,
                     overflowItems = overflowItems,
+                    renderLocationMaps = renderLocationMaps,
+                    scrollFooter = scrollFooter,
                 )
         }
     }
@@ -195,6 +200,8 @@ private fun LoadedFrame(
     onSecondaryAction: (() -> Unit)?,
     onMessageCounterparty: (() -> Unit)?,
     overflowItems: List<ContentDetailOverflowItem>,
+    renderLocationMaps: Boolean,
+    scrollFooter: @Composable () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -214,16 +221,30 @@ private fun LoadedFrame(
             }
             content.counterparty?.let { party ->
                 Spacer(modifier = Modifier.height(18.dp))
+                if (content.kind == ContentDetailKind.Gig) {
+                    Text(
+                        text = "Posted By",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                        modifier =
+                            Modifier
+                                .padding(horizontal = Spacing.s5)
+                                .testTag("contentDetailPostedByHeader"),
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.s2))
+                }
                 CounterpartyCard(party = party, onMessage = onMessageCounterparty)
             }
             content.modules.forEach { module ->
                 Spacer(modifier = Modifier.height(22.dp))
-                ModuleView(module = module)
+                ModuleView(module = module, renderLocationMaps = renderLocationMaps)
             }
             if (content.trustCapsules.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(Spacing.s5))
                 TrustCapsuleWrap(content.trustCapsules)
             }
+            scrollFooter()
             Spacer(modifier = Modifier.height(120.dp))
         }
         if (content.cover != null) {
@@ -737,7 +758,7 @@ private fun CounterpartyCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        AvatarView(initials = party.initials, verified = party.verified, size = 44.dp)
+        AvatarView(initials = party.initials, verified = party.verified, size = 44.dp, imageUrl = party.avatarUrl)
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -768,20 +789,20 @@ private fun CounterpartyCard(
             Box(
                 modifier =
                     Modifier
-                        .size(34.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, CircleShape)
+                        .background(PantopusColors.primary50)
                         .clickable(onClick = onMessage)
-                        .semantics { contentDescription = "Message" },
+                        .semantics { contentDescription = "Message" }
+                        .testTag("contentDetailCounterpartyMessage"),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.Send,
+                    icon = PantopusIcon.MessageCircle,
                     contentDescription = null,
-                    size = 14.dp,
+                    size = 16.dp,
                     strokeWidth = 2.2f,
-                    tint = PantopusColors.appTextStrong,
+                    tint = PantopusColors.primary600,
                 )
             }
         }
@@ -812,7 +833,10 @@ private fun IdentityChip(kind: String) {
 // MARK: - Modules
 
 @Composable
-private fun ModuleView(module: ContentDetailModule) {
+private fun ModuleView(
+    module: ContentDetailModule,
+    renderLocationMaps: Boolean = true,
+) {
     when (module) {
         is ContentDetailModule.Description ->
             SectionCard(title = module.title, icon = module.icon) {
@@ -953,6 +977,11 @@ private fun ModuleView(module: ContentDetailModule) {
                     }
                 }
             }
+        is ContentDetailModule.LocationMap ->
+            ContentDetailLocationMapSection(
+                map = module,
+                renderGoogleMap = renderLocationMaps,
+            )
         is ContentDetailModule.FromTo ->
             Row(
                 modifier = Modifier.padding(horizontal = Spacing.s5).fillMaxWidth(),
@@ -1624,6 +1653,7 @@ private fun AvatarView(
     initials: String,
     verified: Boolean,
     size: androidx.compose.ui.unit.Dp,
+    imageUrl: String? = null,
 ) {
     Box(modifier = Modifier.size(size + 4.dp), contentAlignment = Alignment.BottomEnd) {
         Box(
@@ -1634,12 +1664,18 @@ private fun AvatarView(
                     .background(PantopusColors.primary500),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = initials,
-                fontSize = (size.value * 0.36f).sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextInverse,
-            )
+            if (!imageUrl.isNullOrBlank()) {
+                SubcomposeAsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    loading = { AvatarInitials(initials, size) },
+                    error = { AvatarInitials(initials, size) },
+                )
+            } else {
+                AvatarInitials(initials, size)
+            }
         }
         if (verified) {
             Box(
@@ -1661,4 +1697,17 @@ private fun AvatarView(
             }
         }
     }
+}
+
+@Composable
+private fun AvatarInitials(
+    initials: String,
+    size: androidx.compose.ui.unit.Dp,
+) {
+    Text(
+        text = initials,
+        fontSize = (size.value * 0.36f).sp,
+        fontWeight = FontWeight.Bold,
+        color = PantopusColors.appTextInverse,
+    )
 }

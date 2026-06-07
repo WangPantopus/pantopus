@@ -26,3 +26,11 @@ sealed interface TipStatus {
 sealed interface GigTipEvent {
     data class PresentTipSheet(val params: PaymentIntentSheetParamsDto) : GigTipEvent
 }
+
+/** One-shot effect: navigate to the gig chat room after `GET /chat-room`. */
+data class GigOpenChatEvent(
+    val roomId: String,
+    val displayName: String,
+    val initials: String,
+    val verified: Boolean,
+)

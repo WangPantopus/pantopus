@@ -75,6 +75,7 @@ data class ContentDetailStat(
 data class ContentDetailCounterparty(
     val displayName: String,
     val initials: String,
+    val avatarUrl: String? = null,
     val identityKind: String?,
     val verified: Boolean,
     val rating: Double?,
@@ -245,6 +246,17 @@ sealed interface ContentDetailModule {
     ) : ContentDetailModule {
         enum class TotalTone { Primary, Success }
     }
+
+    /** Interactive mini map — tap to open full-screen explorer. */
+    @Immutable
+    data class LocationMap(
+        override val id: String = "location_map",
+        val latitude: Double,
+        val longitude: Double,
+        val isApproximate: Boolean,
+        val footnote: String,
+        val category: GigsCategory,
+    ) : ContentDetailModule
 }
 
 @Immutable

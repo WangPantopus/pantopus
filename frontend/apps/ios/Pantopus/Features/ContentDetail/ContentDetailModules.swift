@@ -30,6 +30,7 @@ public enum ContentDetailModule: Sendable, Hashable, Identifiable {
     case fromTo(ContentDetailFromTo)
     case lineItems(ContentDetailLineItems)
     case summary(ContentDetailSummary)
+    case locationMap(ContentDetailLocationMap)
 
     public var id: String {
         switch self {
@@ -46,6 +47,7 @@ public enum ContentDetailModule: Sendable, Hashable, Identifiable {
         case let .fromTo(m): "fromto_\(m.from.name)"
         case let .lineItems(m): "lineitems_\(m.title)"
         case .summary: "summary"
+        case .locationMap: "location_map"
         }
     }
 }
@@ -124,6 +126,31 @@ public struct ContentDetailTwoStop: Sendable, Hashable {
         self.title = title
         self.icon = icon
         self.stops = stops
+    }
+}
+
+/// Interactive mini map for task location — tap to open a full-screen
+/// explorer with pan and zoom (mirrors the RN / web gig detail map).
+public struct ContentDetailLocationMap: Sendable, Hashable {
+    public let latitude: Double
+    public let longitude: Double
+    /// When true, render a ~500m privacy circle instead of an exact pin.
+    public let isApproximate: Bool
+    public let footnote: String
+    public let category: GigsCategory
+
+    public init(
+        latitude: Double,
+        longitude: Double,
+        isApproximate: Bool,
+        footnote: String,
+        category: GigsCategory
+    ) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.isApproximate = isApproximate
+        self.footnote = footnote
+        self.category = category
     }
 }
 
