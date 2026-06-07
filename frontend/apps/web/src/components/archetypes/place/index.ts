@@ -35,6 +35,12 @@ export type { HeroCardProps, HeroVariant, HeroNudge } from './HeroCard';
 export { DetailHeader, DetailSectionLabel, SourceNote, ComingSoonRow, InfoNote } from './detail';
 export type { DetailHeaderProps, InfoNoteTone } from './detail';
 
+export { default as PlaceSwitcher } from './PlaceSwitcher';
+export type { PlaceSwitcherProps, PlaceSwitcherHome, PlaceSwitcherStatus } from './PlaceSwitcher';
+
+export { default as VerifyBanner } from './VerifyBanner';
+export type { VerifyBannerProps } from './VerifyBanner';
+
 export {
   IconTile,
   Chevron,

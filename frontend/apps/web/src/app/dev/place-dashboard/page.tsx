@@ -70,7 +70,7 @@ function sec(id: PlaceSectionId, opts: Partial<PlaceSection> = {}): PlaceSection
   } as PlaceSection;
 }
 
-function build(alert: boolean): PlaceIntelligence {
+function build(alert: boolean, tier: PlaceIntelligence['tier'] = 'T4'): PlaceIntelligence {
   const sections: PlaceSection[] = [
     // Today
     sec('weather', {
@@ -186,7 +186,7 @@ function build(alert: boolean): PlaceIntelligence {
       state: 'OR',
       postal_code: '97214',
     },
-    tier: 'T4',
+    tier,
     region_supported: true,
     generated_at: '2026-06-07T16:41:00Z',
     groups,
@@ -212,19 +212,28 @@ export default function DevPlaceDashboardPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-app-home mb-1">
             Pantopus · Place · dashboard preview
           </p>
-          <h1 className="text-2xl font-bold -tracking-[0.02em]">Place dashboard (T4 verified)</h1>
+          <h1 className="text-2xl font-bold -tracking-[0.02em]">Place dashboard (T3 claimed · T4 verified)</h1>
           <p className="text-sm text-app-text-secondary mt-1 max-w-2xl">
-            Mock PlaceIntelligence mirroring a seeded verified home. Sections degrade independently —
-            ready, stale, unavailable, error — and the hero floats what matters now.
+            Mock PlaceIntelligence mirroring a seeded home. Sections degrade independently — ready,
+            stale, unavailable, error — and the hero floats what matters now. The claimed (T3) tier
+            adds the verify nudge and shows the Band-D items (messaging, badge, mailbox) as locked.
           </p>
         </header>
 
         <div className="flex flex-wrap gap-8 items-start">
-          <Column label="All clear">
+          <Column label="Verified (T4) · all clear">
             <PlaceDashboardView intelligence={build(false)} userInitials="RC" />
           </Column>
-          <Column label="Active alert">
+          <Column label="Verified (T4) · active alert">
             <PlaceDashboardView intelligence={build(true)} userInitials="RC" />
+          </Column>
+          <Column label="Claimed (T3) · verify nudge + Band-D locked">
+            <PlaceDashboardView
+              intelligence={build(false, 'T3')}
+              userInitials="RC"
+              onVerify={() => {}}
+              onClaim={() => {}}
+            />
           </Column>
           <Column label="Loading">
             <PlaceDashboardSkeleton />

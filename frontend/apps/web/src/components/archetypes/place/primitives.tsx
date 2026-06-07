@@ -121,10 +121,16 @@ export interface PlaceAvatarProps {
   initials?: string;
   status?: PlaceAvatarStatus;
   size?: number;
+  /**
+   * Optional status pill rendered under the disc (e.g. "Claimed"). Used
+   * to make the claimed-but-unverified state legible and motivate the
+   * verify step. Verified avatars carry the green check, not a pill.
+   */
+  label?: string;
   className?: string;
 }
 
-export function PlaceAvatar({ initials = 'RC', status = 'verified', size = 40, className = '' }: PlaceAvatarProps) {
+export function PlaceAvatar({ initials = 'RC', status = 'verified', size = 40, label, className = '' }: PlaceAvatarProps) {
   const disc =
     status === 'verified'
       ? 'text-white bg-gradient-to-br from-green-500 to-green-700'
@@ -132,8 +138,9 @@ export function PlaceAvatar({ initials = 'RC', status = 'verified', size = 40, c
         ? 'text-white bg-gradient-to-br from-slate-400 to-slate-500'
         : 'text-app-text-secondary bg-app-surface-sunken';
   const badge = Math.round(size * 0.42);
-  return (
-    <span className={`relative inline-flex shrink-0 ${className}`} style={{ width: size, height: size }}>
+
+  const inner = (
+    <>
       <span
         className={`inline-flex items-center justify-center w-full h-full rounded-full font-bold ${disc}`}
         style={{ fontSize: Math.round(size * 0.34) }}
@@ -156,6 +163,26 @@ export function PlaceAvatar({ initials = 'RC', status = 'verified', size = 40, c
           <Home size={Math.round(size * 0.22)} strokeWidth={2.75} className="text-white" />
         </span>
       ) : null}
+    </>
+  );
+
+  if (!label) {
+    return (
+      <span className={`relative inline-flex shrink-0 ${className}`} style={{ width: size, height: size }}>
+        {inner}
+      </span>
+    );
+  }
+
+  // With a label: the disc + a small amber pill, stacked and centered.
+  return (
+    <span className={`inline-flex flex-col items-center gap-1.5 shrink-0 ${className}`}>
+      <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+        {inner}
+      </span>
+      <span className="text-[10px] leading-[13px] font-bold uppercase tracking-[0.04em] text-app-warning bg-app-warning-bg border border-app-warning-light rounded-full px-1.5 py-0.5">
+        {label}
+      </span>
     </span>
   );
 }
