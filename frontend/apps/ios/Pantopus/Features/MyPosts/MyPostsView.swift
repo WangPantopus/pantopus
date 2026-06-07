@@ -25,6 +25,9 @@ public struct MyPostsView: View {
         @Bindable var bindable = viewModel
         return ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier("my-posts")
+            .onReceive(NotificationCenter.default.publisher(for: .pulsePostsDidChange)) { _ in
+                Task { await viewModel.refresh() }
+            }
             .confirmationDialog(
                 "Post options",
                 isPresented: Binding(

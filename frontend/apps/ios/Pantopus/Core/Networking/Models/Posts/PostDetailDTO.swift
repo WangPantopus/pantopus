@@ -11,7 +11,9 @@
 
 import Foundation
 
-/// Author / business-author projection on a post.
+/// Author / business-author projection on a post. Accepts both the legacy
+/// `{ username, name, first_name }` shape and the P0.4 identity projection
+/// `{ handle, displayName, avatarUrl }` returned by `attachIdentityAuthors`.
 public struct PostCreatorDTO: Decodable, Sendable, Hashable, Identifiable {
     public let id: String
     public let username: String?
@@ -22,12 +24,15 @@ public struct PostCreatorDTO: Decodable, Sendable, Hashable, Identifiable {
     public let city: String?
     public let state: String?
     public let accountType: String?
+    private let wireDisplayName: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, username, name
+        case id, username, name, handle
+        case displayName
         case firstName = "first_name"
         case lastName = "last_name"
         case profilePictureURL = "profile_picture_url"
+        case avatarUrl
         case city, state
         case accountType = "account_type"
     }
@@ -52,10 +57,31 @@ public struct PostCreatorDTO: Decodable, Sendable, Hashable, Identifiable {
         self.city = city
         self.state = state
         self.accountType = accountType
+        wireDisplayName = nil
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let rawId = try c.decodeIfPresent(String.self, forKey: .id)
+        let usernameValue = try c.decodeIfPresent(String.self, forKey: .username)
+        let handleValue = try c.decodeIfPresent(String.self, forKey: .handle)
+        id = rawId ?? usernameValue ?? handleValue ?? "pantopus"
+        username = usernameValue ?? handleValue
+        wireDisplayName = try c.decodeIfPresent(String.self, forKey: .displayName)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        firstName = try c.decodeIfPresent(String.self, forKey: .firstName)
+        lastName = try c.decodeIfPresent(String.self, forKey: .lastName)
+        profilePictureURL =
+            try c.decodeIfPresent(String.self, forKey: .profilePictureURL)
+                ?? c.decodeIfPresent(String.self, forKey: .avatarUrl)
+        city = try c.decodeIfPresent(String.self, forKey: .city)
+        state = try c.decodeIfPresent(String.self, forKey: .state)
+        accountType = try c.decodeIfPresent(String.self, forKey: .accountType)
     }
 
     /// Best-effort display name across the various populated fields.
     public var displayName: String {
+        if let wireDisplayName, !wireDisplayName.isEmpty { return wireDisplayName }
         if let name, !name.isEmpty { return name }
         let combined = [firstName, lastName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
         if !combined.isEmpty { return combined }

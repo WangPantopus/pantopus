@@ -357,7 +357,7 @@ object BusinessProfileMapper {
         location: BusinessLocationDto?,
         profile: BusinessProfileDetailDto?,
     ): BusinessServiceArea? {
-        val serviceAreaText = profile?.serviceArea?.takeIf { it.isNotEmpty() }
+        val serviceAreaText = profile?.serviceArea?.formattedLabel()
         if (location == null) {
             return serviceAreaText?.let {
                 BusinessServiceArea("Service area", null, it, null, null)

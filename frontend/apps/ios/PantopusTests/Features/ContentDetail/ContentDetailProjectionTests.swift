@@ -1,3 +1,4 @@
+// swiftlint:disable file_length type_body_length
 //
 //  ContentDetailProjectionTests.swift
 //  PantopusTests
@@ -15,6 +16,30 @@ import XCTest
 
 @MainActor
 final class ContentDetailProjectionTests: XCTestCase {
+    func testPosterCounterpartyDecodesIdentitySerializerCreator() throws {
+        let json = """
+        {
+          "id": "gig-1",
+          "title": "Fix faucet",
+          "user_id": "poster-user",
+          "creator": {
+            "type": "local",
+            "id": "poster-user",
+            "handle": "raw-poster",
+            "displayName": "Poster Name",
+            "avatarUrl": "https://cdn.example.com/avatars/poster.jpg",
+            "badges": ["verified_resident"]
+          }
+        }
+        """
+        let gig = try JSONDecoder().decode(GigDTO.self, from: Data(json.utf8))
+        let counterparty = GigDetailViewModel.posterCounterparty(gig: gig, viewerUserId: "viewer-user")
+        XCTAssertEqual(counterparty?.displayName, "Poster Name")
+        XCTAssertEqual(counterparty?.trailing, "@raw-poster")
+        XCTAssertTrue(counterparty?.verified ?? false)
+        XCTAssertEqual(counterparty?.avatarUrl?.absoluteString, "https://cdn.example.com/avatars/poster.jpg")
+    }
+
     // MARK: - Gig V2 (Task)
 
     func testTaskV2ProjectionFillsStatusHeroBidsAndTwoStop() {
@@ -67,6 +92,21 @@ final class ContentDetailProjectionTests: XCTestCase {
         XCTAssertEqual(callout?.title, "Be the first to bid")
     }
 
+    func testTaskV2IncludesPostedByCounterpartyWithHandle() {
+        let gig = makeGig(GigSpec(title: "Walk my dog", status: "open", isV2: true))
+        let content = GigDetailViewModel.project(gig: gig, bids: [], viewerUserId: "bidder")
+        XCTAssertNotNil(content.counterparty)
+        XCTAssertEqual(content.counterparty?.displayName, "Hana O.")
+        XCTAssertEqual(content.counterparty?.trailing, "@hana")
+        XCTAssertTrue(content.counterparty?.showsMessageButton ?? false)
+    }
+
+    func testPosterCounterpartyHidesMessageButtonForOwner() {
+        let gig = makeGig(GigSpec(title: "Walk my dog", status: "open", isV2: true))
+        let content = GigDetailViewModel.project(gig: gig, bids: [], viewerUserId: "owner")
+        XCTAssertFalse(content.counterparty?.showsMessageButton ?? true)
+    }
+
     // MARK: - Gig V2 worker delivery (Block F)
 
     func testTaskV2WorkerInProgressShowsDeliverDock() {
@@ -111,6 +151,90 @@ final class ContentDetailProjectionTests: XCTestCase {
         // Assigned-but-not-started and open tasks are not yet completable.
         let assigned = makeGig(GigSpec(status: "assigned", isV2: true, acceptedBy: "me"))
         XCTAssertFalse(GigDetailViewModel.viewerCanMarkDelivered(gig: assigned, currentUserId: "me"))
+    }
+
+    func testOpenGigWithoutIsV2FlagDefaultsToTaskV2() {
+        let gig = makeGig(GigSpec(
+            title: "Fix leaking kitchen faucet",
+            description: "The kitchen faucet leaks when the dishwasher is on.",
+            price: 100,
+            category: "handyman",
+            status: "open",
+            isV2: nil,
+            bidCount: 0,
+            scheduledStart: "2026-04-25T14:00:00.000Z"
+        ))
+        let content = GigDetailViewModel.project(gig: gig, bids: [])
+        XCTAssertEqual(content.statusPill?.label, "Open · No bids yet")
+        XCTAssertNotNil(content.hero.categoryChip)
+        XCTAssertEqual(content.hero.priceCaption, "budget · cash or transfer")
+        XCTAssertFalse(content.statStrip.isEmpty)
+        XCTAssertTrue(content.modules.contains {
+            if case let .description(m) = $0 { m.title == "What needs doing" } else { false }
+        })
+    }
+
+    func testAwardedGigWithoutIsV2FlagStaysOnV1() {
+        let gig = makeGig(GigSpec(
+            title: "Dog walk · 45 min",
+            price: 22,
+            category: "petcare",
+            status: "accepted",
+            isV2: nil,
+            acceptedBy: "u1",
+            bidCount: 3
+        ))
+        let content = GigDetailViewModel.project(gig: gig, bids: [
+            makeBid(id: "b1", userId: "u1", amount: 20, name: "Tomás G.")
+        ])
+        XCTAssertEqual(content.statusPill?.label, "Awarded")
+        XCTAssertNil(content.hero.categoryChip)
+    }
+
+    func testGigWithCoordinatesIncludesLocationMapModule() {
+        let gig = GigDTO(
+            id: "g1",
+            title: "Fix leaking kitchen faucet",
+            description: "Leaky faucet",
+            price: 100,
+            category: "handyman",
+            status: "open",
+            createdAt: nil,
+            deadline: nil,
+            isUrgent: false,
+            tags: nil,
+            userId: "owner",
+            acceptedBy: nil,
+            acceptedAt: nil,
+            ownerConfirmedAt: nil,
+            scheduledStart: nil,
+            paymentStatus: nil,
+            engagementMode: nil,
+            scheduleType: nil,
+            payType: nil,
+            taskArchetype: nil,
+            isV2: nil,
+            pickupAddress: nil,
+            dropoffAddress: nil,
+            bidCount: 0,
+            savedByUser: false,
+            distanceMiles: 0.6,
+            latitude: 45.587,
+            longitude: -122.399,
+            approxLocation: nil,
+            locationUnlocked: false,
+            location: GigCoordinate(latitude: 45.587, longitude: -122.399),
+            exactCity: "Camas",
+            exactState: "WA",
+            creator: nil
+        )
+        let content = GigDetailViewModel.project(gig: gig, bids: [])
+        let mapModule = content.modules.compactMap { mod -> ContentDetailLocationMap? in
+            if case let .locationMap(m) = mod { return m } else { return nil }
+        }.first
+        XCTAssertNotNil(mapModule)
+        XCTAssertTrue(mapModule?.isApproximate ?? false)
+        XCTAssertEqual(mapModule?.category, .handyman)
     }
 
     // MARK: - Gig V1 (legacy)
@@ -306,6 +430,7 @@ extension ContentDetailProjectionTests {
         var pickupAddress: String?
         var dropoffAddress: String?
         var bidCount: Int?
+        var scheduledStart: String?
         var distanceMiles: Double?
     }
 
@@ -325,7 +450,7 @@ extension ContentDetailProjectionTests {
             acceptedBy: spec.acceptedBy,
             acceptedAt: spec.acceptedBy == nil ? nil : "2025-11-14T17:30:00Z",
             ownerConfirmedAt: nil,
-            scheduledStart: nil,
+            scheduledStart: spec.scheduledStart,
             paymentStatus: nil,
             engagementMode: nil,
             scheduleType: nil,
@@ -340,6 +465,10 @@ extension ContentDetailProjectionTests {
             latitude: nil,
             longitude: nil,
             approxLocation: nil,
+            locationUnlocked: nil,
+            location: nil,
+            exactCity: nil,
+            exactState: nil,
             creator: GigCreator(id: "owner", username: "hana", name: "Hana O.", profilePictureUrl: nil, verified: true)
         )
     }

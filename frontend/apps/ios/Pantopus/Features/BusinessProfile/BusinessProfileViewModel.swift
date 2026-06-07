@@ -453,7 +453,7 @@ extension BusinessProfileViewModel {
         location: BusinessLocationDTO?,
         profile: BusinessProfileDetailDTO?
     ) -> BusinessServiceArea? {
-        let serviceAreaText = profile?.serviceArea?.isEmpty == false ? profile?.serviceArea : nil
+        let serviceAreaText = profile?.serviceArea?.displayText
         guard let location else {
             guard let serviceAreaText else { return nil }
             return BusinessServiceArea(

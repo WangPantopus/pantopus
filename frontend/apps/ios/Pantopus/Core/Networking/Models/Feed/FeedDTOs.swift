@@ -13,7 +13,8 @@ import Foundation
 /// actually reads.
 public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
     public let id: String
-    public let userId: String
+    /// Null for cold-start seeded neighborhood facts (`is_seeded`).
+    public let userId: String?
     public let title: String?
     public let content: String
     public let postType: String?
@@ -25,6 +26,9 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
     public let eventDate: String?
     public let eventVenue: String?
     public let lostFoundType: String?
+    public let mediaURLs: [String]
+    public let mediaThumbnails: [String]
+    public let mediaTypes: [String]
     public let creator: PostCreatorDTO?
 
     private enum CodingKeys: String, CodingKey {
@@ -40,13 +44,16 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
         case eventDate = "event_date"
         case eventVenue = "event_venue"
         case lostFoundType = "lost_found_type"
+        case mediaURLs = "media_urls"
+        case mediaThumbnails = "media_thumbnails"
+        case mediaTypes = "media_types"
         case creator
     }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
-        userId = try c.decode(String.self, forKey: .userId)
+        userId = try c.decodeIfPresent(String.self, forKey: .userId)
         title = try c.decodeIfPresent(String.self, forKey: .title)
         content = try c.decodeIfPresent(String.self, forKey: .content) ?? ""
         postType = try c.decodeIfPresent(String.self, forKey: .postType)
@@ -58,18 +65,40 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
         eventDate = try c.decodeIfPresent(String.self, forKey: .eventDate)
         eventVenue = try c.decodeIfPresent(String.self, forKey: .eventVenue)
         lostFoundType = try c.decodeIfPresent(String.self, forKey: .lostFoundType)
+        mediaURLs = try c.decodeIfPresent([String].self, forKey: .mediaURLs) ?? []
+        mediaThumbnails = try c.decodeIfPresent([String].self, forKey: .mediaThumbnails) ?? []
+        mediaTypes = try c.decodeIfPresent([String].self, forKey: .mediaTypes) ?? []
         creator = try c.decodeIfPresent(PostCreatorDTO.self, forKey: .creator)
     }
 }
 
 /// Paging envelope returned by `GET /api/posts/feed`.
 public struct FeedPagination: Decodable, Sendable, Hashable {
+    /// Opaque cursor id for the next page. The backend v1.1 feed returns an
+    /// object `{ createdAt, id, rankBucket? }`; older stubs used a string.
     public let nextCursor: String?
     public let hasMore: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case nextCursor
         case hasMore
+    }
+
+    private struct CursorObject: Decodable {
+        let createdAt: String
+        let id: String
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore)
+        if let cursorString = try? container.decode(String.self, forKey: .nextCursor) {
+            nextCursor = cursorString
+        } else if let cursorObject = try? container.decode(CursorObject.self, forKey: .nextCursor) {
+            nextCursor = cursorObject.id
+        } else {
+            nextCursor = nil
+        }
     }
 }
 

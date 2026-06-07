@@ -43,12 +43,14 @@ public struct MapListHybridShell<
     CategoryChips: View,
     MapControlsContent: View,
     SheetHeader: View,
-    SheetBody: View
+    SheetBody: View,
+    FloatingAction: View
 >: View {
     private let pins: [MapPin]
     private let anchor: MapAnchor?
     private let selectedPinId: String?
     private let recenterTrigger: Int
+    private let showSearchRadius: Bool
     private let onPinTap: (String) -> Void
     @Binding private var detent: MapListHybridDetent
 
@@ -57,17 +59,30 @@ public struct MapListHybridShell<
     private let mapControls: () -> MapControlsContent
     private let sheetHeader: () -> SheetHeader
     private let sheetBody: () -> SheetBody
+    private let floatingAction: () -> FloatingAction
 
     @State private var dragTranslation: CGFloat = 0
     @State private var cameraPosition: MapCameraPosition = .automatic
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Vertical room reserved below the safe-area top for the floating
-    /// map-control stack, so a near-full sheet can't push it off-screen
-    /// (≈ a 48pt FAB + two 38pt control buttons + gaps). Computed (not
-    /// stored) — generic types can't hold static stored properties.
-    private static var controlsTopReserve: CGFloat {
-        168
+    /// Vertical room below the safe-area top for the Post-task FAB when
+    /// the sheet is at the expanded (90%) stop.
+    private static var fabTopReserve: CGFloat {
+        56
+    }
+
+    /// Locate + layers stack height (two 38pt buttons + 8pt gap).
+    private static var mapControlsStackHeight: CGFloat {
+        84
+    }
+
+    /// A11.1 — gap above sheet, control stack, gap, then FAB (14+84+14).
+    private static var fabLiftAboveSheet: CGFloat {
+        112
+    }
+
+    private static var sheetToControlsGap: CGFloat {
+        14
     }
 
     public init(
@@ -75,11 +90,13 @@ public struct MapListHybridShell<
         anchor: MapAnchor? = nil,
         selectedPinId: String? = nil,
         recenterTrigger: Int = 0,
+        showSearchRadius: Bool = false,
         detent: Binding<MapListHybridDetent>,
         onPinTap: @escaping (String) -> Void = { _ in },
         @ViewBuilder topPill: @escaping () -> TopPill = { EmptyView() },
         @ViewBuilder categoryChips: @escaping () -> CategoryChips = { EmptyView() },
         @ViewBuilder mapControls: @escaping () -> MapControlsContent = { EmptyView() },
+        @ViewBuilder floatingAction: @escaping () -> FloatingAction = { EmptyView() },
         @ViewBuilder sheetHeader: @escaping () -> SheetHeader = { EmptyView() },
         @ViewBuilder sheetBody: @escaping () -> SheetBody
     ) {
@@ -87,11 +104,13 @@ public struct MapListHybridShell<
         self.anchor = anchor
         self.selectedPinId = selectedPinId
         self.recenterTrigger = recenterTrigger
+        self.showSearchRadius = showSearchRadius
         _detent = detent
         self.onPinTap = onPinTap
         self.topPill = topPill
         self.categoryChips = categoryChips
         self.mapControls = mapControls
+        self.floatingAction = floatingAction
         self.sheetHeader = sheetHeader
         self.sheetBody = sheetBody
     }
@@ -99,24 +118,25 @@ public struct MapListHybridShell<
     public var body: some View {
         GeometryReader { geo in
             let sheetHeight = max(120, detent.height(in: geo.size.height) + dragTranslation)
-            // Map controls follow the sheet edge, but clamp so a tall
-            // detent (the 90% expanded stop) can't push the stack off the
-            // top of the screen — the topmost control (e.g. a Post-task
-            // FAB) stays pinned in the visible map strip.
-            let controlsInset = min(
-                sheetHeight + 14,
-                max(14, geo.size.height - geo.safeAreaInsets.top - Self.controlsTopReserve)
+            let mapStripTop = geo.safeAreaInsets.top
+            let maxControlsBottom = max(
+                Self.sheetToControlsGap,
+                geo.size.height - mapStripTop - Self.mapControlsStackHeight - Self.sheetToControlsGap
             )
+            let maxFabBottom = max(
+                Self.fabLiftAboveSheet,
+                geo.size.height - mapStripTop - Self.fabTopReserve
+            )
+            let controlsInset = min(sheetHeight + Self.sheetToControlsGap, maxControlsBottom)
+            let fabInset = min(sheetHeight + Self.fabLiftAboveSheet, maxFabBottom)
             ZStack(alignment: .top) {
                 mapLayer
                 topPill()
-                    .padding(.top, geo.safeAreaInsets.top + 4)
-                    .padding(.horizontal, 14)
                     .accessibilityIdentifier("mapListHybridTopPill")
                 categoryChips()
-                    .padding(.top, geo.safeAreaInsets.top + 50)
                     .accessibilityIdentifier("mapListHybridChips")
                 mapControlsLayer(bottomInset: controlsInset)
+                floatingActionLayer(bottomInset: fabInset)
                 bottomSheet(height: sheetHeight, containerHeight: geo.size.height)
             }
             .ignoresSafeArea(edges: .bottom)
@@ -158,6 +178,15 @@ public struct MapListHybridShell<
                     MapListHybridAnchorDot()
                         .accessibilityLabel("You are here")
                 }
+                if showSearchRadius {
+                    // Dashed search-radius ring — A11.1 empty-map treatment.
+                    MapCircle(center: anchor.coordinate, radius: 800)
+                        .foregroundStyle(Theme.Color.primary600.opacity(0.05))
+                        .stroke(
+                            Theme.Color.primary600.opacity(0.45),
+                            style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+                        )
+                }
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
@@ -186,6 +215,14 @@ public struct MapListHybridShell<
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .padding(.bottom, bottomInset)
             .accessibilityIdentifier("mapListHybridMapControls")
+    }
+
+    private func floatingActionLayer(bottomInset: CGFloat) -> some View {
+        floatingAction()
+            .padding(.trailing, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .padding(.bottom, bottomInset)
+            .accessibilityIdentifier("mapListHybridFloatingAction")
     }
 
     // MARK: - Bottom sheet

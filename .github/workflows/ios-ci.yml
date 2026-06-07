@@ -161,6 +161,10 @@ jobs:
         # there made the XCUITest runner injection flaky ("Application …
         # xctrunner is unknown to FrontBoard"). Matching the runtime to the
         # SDK keeps the runner install deterministic across simulators.
+        #
+        # Tee raw xcodebuild output so compiler diagnostics survive xcbeautify
+        # formatting — SwiftEmitModule failures otherwise surface with no file
+        # or line context in GitHub Actions logs.
         run: |
           set -o pipefail
           xcodebuild \
@@ -179,7 +183,15 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
-            test | xcbeautify
+            test 2>&1 | tee "xcodebuild-${{ steps.sim.outputs.slug }}.log" | xcbeautify
+
+      - name: Upload xcodebuild log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log-${{ steps.sim.outputs.slug }}
+          path: frontend/apps/ios/xcodebuild-${{ steps.sim.outputs.slug }}.log
+          if-no-files-found: ignore
 
       - name: List available iOS simulators on failure
         if: failure()

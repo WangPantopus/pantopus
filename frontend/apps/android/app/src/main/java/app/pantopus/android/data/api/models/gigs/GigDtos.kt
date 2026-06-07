@@ -14,15 +14,36 @@ data class GigApproxLocation(
     val label: String? = null,
 )
 
-/** Creator projection from the backend `User` join. */
+/** Creator / poster identity on a gig. Detail responses use the identity
+ * serializer (`creator.displayName`, `creator.handle`); list joins may still
+ * nest the legacy `User` row (`name`, `username`). */
 @JsonClass(generateAdapter = true)
 data class GigCreator(
     val id: String? = null,
     val username: String? = null,
     val name: String? = null,
+    @Json(name = "displayName") val displayName: String? = null,
+    val handle: String? = null,
     @Json(name = "profile_picture_url") val profilePictureUrl: String? = null,
+    @Json(name = "avatarUrl") val avatarUrl: String? = null,
     val verified: Boolean? = null,
-)
+    val badges: List<String>? = null,
+) {
+    fun resolvedDisplayName(): String =
+        displayName?.takeIf { it.isNotEmpty() }
+            ?: name?.takeIf { it.isNotEmpty() }
+            ?: handle?.takeIf { it.isNotEmpty() }
+            ?: username?.takeIf { it.isNotEmpty() }
+            ?: "Neighbor"
+
+    fun resolvedHandle(): String? = handle?.takeIf { it.isNotEmpty() } ?: username?.takeIf { it.isNotEmpty() }
+
+    fun resolvedVerified(): Boolean = verified == true || badges.orEmpty().contains("verified_resident")
+
+    fun resolvedAvatarUrl(): String? =
+        avatarUrl?.takeIf { it.isNotEmpty() }
+            ?: profilePictureUrl?.takeIf { it.isNotEmpty() }
+}
 
 /**
  * One row from `GET /api/gigs` / `GET /api/gigs/nearby`. Mirrors the
@@ -51,8 +72,9 @@ data class GigDto(
     @Json(name = "schedule_type") val scheduleType: String? = null,
     @Json(name = "pay_type") val payType: String? = null,
     @Json(name = "task_archetype") val taskArchetype: String? = null,
-    // Explicit V2 ("Magic Task") discriminator. `true` → rich V2 surface;
-    // `null`/`false` → sparse V1 legacy layout. Backend may omit on legacy gigs.
+    // Explicit V2 ("Magic Task") discriminator. `false` → sparse V1 legacy
+    // layout; `null`/`true` → rich V2 surface (awarded legacy without the
+    // flag still falls back to V1 in projection).
     @Json(name = "is_v2") val isV2: Boolean? = null,
     @Json(name = "pickup_address") val pickupAddress: String? = null,
     @Json(name = "dropoff_address") val dropoffAddress: String? = null,
@@ -62,7 +84,23 @@ data class GigDto(
     val latitude: Double? = null,
     val longitude: Double? = null,
     @Json(name = "approx_location") val approxLocation: GigApproxLocation? = null,
-    @Json(name = "User") val creator: GigCreator? = null,
+    /** True when the viewer may see exact coordinates (owner or assigned worker). */
+    @Json(name = "locationUnlocked") val locationUnlocked: Boolean? = null,
+    /** Privacy-adjusted coordinates from `GET /api/gigs/:id`. */
+    val location: GigCoordinate? = null,
+    @Json(name = "exact_city") val exactCity: String? = null,
+    @Json(name = "exact_state") val exactState: String? = null,
+    @Json(name = "creator") val creator: GigCreator? = null,
+    @Json(name = "User") val legacyCreator: GigCreator? = null,
+) {
+    fun posterIdentity(): GigCreator? = creator ?: legacyCreator
+}
+
+/** Nested `{ latitude, longitude }` on gig detail responses. */
+@JsonClass(generateAdapter = true)
+data class GigCoordinate(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 /** Envelope from `/api/gigs`. */
@@ -110,13 +148,83 @@ data class GigBidDto(
     val status: String? = null,
     val message: String? = null,
     @Json(name = "created_at") val createdAt: String? = null,
-    @Json(name = "User") val bidder: GigCreator? = null,
-)
+    val bidder: GigCreator? = null,
+    @Json(name = "User") val legacyBidder: GigCreator? = null,
+) {
+    fun bidderIdentity(): GigCreator? = bidder ?: legacyBidder
+}
 
 /** Envelope from `GET /api/gigs/:gigId/bids`. */
 @JsonClass(generateAdapter = true)
 data class GigBidsResponse(
     val bids: List<GigBidDto>,
+)
+
+/** Envelope from `GET /api/gigs/:gigId/chat-room`. */
+@JsonClass(generateAdapter = true)
+data class GigChatRoomResponse(
+    val roomId: String,
+    val topicId: String? = null,
+    val gigOwnerId: String? = null,
+)
+
+/** User summary nested on a gig question row. */
+@JsonClass(generateAdapter = true)
+data class GigQuestionUser(
+    val id: String? = null,
+    val username: String? = null,
+    @Json(name = "first_name") val firstName: String? = null,
+    @Json(name = "last_name") val lastName: String? = null,
+    val name: String? = null,
+    @Json(name = "profile_picture_url") val profilePictureUrl: String? = null,
+)
+
+/** One row from `GET /api/gigs/:gigId/questions`. */
+@JsonClass(generateAdapter = true)
+data class GigQuestionDto(
+    val id: String,
+    @Json(name = "gig_id") val gigId: String,
+    val question: String,
+    val answer: String? = null,
+    @Json(name = "question_attachments") val questionAttachments: List<String>? = null,
+    @Json(name = "answer_attachments") val answerAttachments: List<String>? = null,
+    @Json(name = "answered_at") val answeredAt: String? = null,
+    @Json(name = "is_pinned") val isPinned: Boolean? = null,
+    @Json(name = "upvote_count") val upvoteCount: Int? = null,
+    val status: String,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null,
+    val asker: GigQuestionUser? = null,
+    val answerer: GigQuestionUser? = null,
+    @Json(name = "answerer_display_name") val answererDisplayName: String? = null,
+) {
+    val isAnswered: Boolean get() = status == "answered"
+}
+
+/** Envelope from `GET /api/gigs/:gigId/questions`. */
+@JsonClass(generateAdapter = true)
+data class GigQuestionsResponse(
+    val questions: List<GigQuestionDto>,
+)
+
+/** Envelope from ask/answer mutations. */
+@JsonClass(generateAdapter = true)
+data class GigQuestionMutationResponse(
+    val question: GigQuestionDto,
+)
+
+/** Body for `POST /api/gigs/:gigId/questions`. */
+@JsonClass(generateAdapter = true)
+data class AskGigQuestionBody(
+    val question: String,
+    val attachments: List<String>? = null,
+)
+
+/** Body for `POST /api/gigs/:gigId/questions/:questionId/answer`. */
+@JsonClass(generateAdapter = true)
+data class AnswerGigQuestionBody(
+    val answer: String,
+    val attachments: List<String>? = null,
 )
 
 /** `POST /api/gigs/:gigId/bids` body. */

@@ -2,7 +2,7 @@
 //  RootTabUITests.swift
 //  PantopusUITests
 //
-//  Covers the 4-tab bottom bar: Hub is selected at launch (once signed in),
+//  Covers the 5-tab bottom bar: Home is selected at launch (once signed in),
 //  each tab is tappable, and secondary tabs render their expected
 //  landing states.
 //
@@ -26,8 +26,8 @@ final class RootTabUITests: XCTestCase {
         app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         app.launch()
         // If the app doesn't honour the flag (older builds), skip rather than fail.
-        let hubTab = app.buttons["tab.hub"].firstMatch
-        guard hubTab.waitForExistence(timeout: 5) else {
+        let homeTab = app.buttons["tab.home"].firstMatch
+        guard homeTab.waitForExistence(timeout: 5) else {
             app.terminateAfterSkippedLaunch()
             return nil
         }
@@ -38,21 +38,21 @@ final class RootTabUITests: XCTestCase {
         app.buttons["tab.\(tab)"].firstMatch
     }
 
-    func testLaunchLandsOnHubTab() throws {
+    func testLaunchLandsOnHomeTab() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured; see RootTabUITests docs.")
         }
-        // Hub title is visible and the Hub tab bar item is selected.
-        let hubTab = tabButton("hub", in: app)
-        XCTAssertTrue(hubTab.waitForExistence(timeout: 2))
-        XCTAssertTrue(hubTab.isSelected || hubTab.value as? String == "1")
+        // Home title is visible and the Home tab bar item is selected.
+        let homeTab = tabButton("home", in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 2))
+        XCTAssertTrue(homeTab.isSelected || homeTab.value as? String == "1")
     }
 
-    func testAllFourTabsPresent() throws {
+    func testAllFiveTabsPresent() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        for tab in ["hub", "nearby", "inbox", "you"] {
+        for tab in ["home", "pulse", "tasks", "marketplace", "messages"] {
             let button = tabButton(tab, in: app)
             XCTAssertTrue(
                 button.waitForExistence(timeout: 2),
@@ -61,28 +61,43 @@ final class RootTabUITests: XCTestCase {
         }
     }
 
-    func testTapNearbyShowsMap() throws {
+    func testTapPulseShowsFeed() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        tabButton("nearby", in: app).tap()
-        XCTAssertTrue(app.buttons["nearbyCategoryChip_all"].waitForExistence(timeout: 5))
+        tabButton("pulse", in: app).tap()
+        XCTAssertTrue(app.otherElements["pulseFeed"].waitForExistence(timeout: 5))
     }
 
-    func testTapInboxShowsChatListEmptyState() throws {
+    func testTapTasksShowsGigsFeed() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        tabButton("inbox", in: app).tap()
+        tabButton("tasks", in: app).tap()
+        XCTAssertTrue(app.otherElements["gigsFeed"].waitForExistence(timeout: 5))
+    }
+
+    func testTapMarketplaceShowsGrid() throws {
+        guard let app = launchSignedIn() else {
+            throw XCTSkip("Signed-in launch env not honoured.")
+        }
+        tabButton("marketplace", in: app).tap()
+        XCTAssertTrue(app.otherElements["marketplace"].waitForExistence(timeout: 5))
+    }
+
+    func testTapMessagesShowsChatListEmptyState() throws {
+        guard let app = launchSignedIn() else {
+            throw XCTSkip("Signed-in launch env not honoured.")
+        }
+        tabButton("messages", in: app).tap()
         XCTAssertTrue(app.staticTexts["No conversations yet"].waitForExistence(timeout: 5))
     }
 
-    func testTapYouShowsAccountAndSignOut() throws {
+    func testTapHomeAvatarShowsProfile() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        tabButton("you", in: app).tap()
+        app.buttons["hubAvatarButton"].firstMatch.tap()
         XCTAssertTrue(app.scrollViews["meScreen"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["meDestructiveCard_personal"].waitForExistence(timeout: 2))
     }
 }

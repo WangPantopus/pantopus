@@ -56,6 +56,7 @@ class ContentDetailShellSnapshotTest {
                     onPrimaryAction = {},
                     onSecondaryAction = {},
                     onMessageCounterparty = {},
+                    renderLocationMaps = false,
                 )
             }
         }

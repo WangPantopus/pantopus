@@ -17,7 +17,7 @@ public struct GigDetailView: View {
     @State private var tipCustomAmountText = ""
     @State private var toast: ToastMessage?
     private let onBack: @MainActor () -> Void
-    private let onMessage: (@MainActor (GigDTO) -> Void)?
+    private let onOpenChat: (@MainActor (InboxConversationDestination) -> Void)?
 
     /// Block 3D — preset tip amounts in cents.
     private let tipPresets = [500, 1000, 2000]
@@ -25,11 +25,11 @@ public struct GigDetailView: View {
     public init(
         viewModel: GigDetailViewModel,
         onBack: @escaping @MainActor () -> Void = {},
-        onMessage: (@MainActor (GigDTO) -> Void)? = nil
+        onOpenChat: (@MainActor (InboxConversationDestination) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
-        self.onMessage = onMessage
+        self.onOpenChat = onOpenChat
     }
 
     public var body: some View {
@@ -37,9 +37,16 @@ public struct GigDetailView: View {
             state: viewModel.state,
             onBack: onBack,
             onPrimaryAction: { presentPrimaryAction() },
-            onSecondaryAction: { if let gig = viewModel.rawGig { onMessage?(gig) } },
+            onSecondaryAction: { openChat() },
             onRetry: { Task { await viewModel.load() } },
-            onMessageCounterparty: { if let gig = viewModel.rawGig { onMessage?(gig) } }
+            onMessageCounterparty: { openChat() },
+            scrollFooter: {
+                if case .loaded = viewModel.state {
+                    GigQuestionsSection(viewModel: viewModel) { message in
+                        toast = ToastMessage(text: message, kind: .error)
+                    }
+                }
+            }
         )
         .task { await viewModel.load() }
         .sheet(item: $bidSheetTarget) { target in
@@ -235,5 +242,12 @@ public struct GigDetailView: View {
             gigId: gig.id,
             gigTitle: gig.title
         )
+    }
+
+    private func openChat() {
+        Task {
+            guard let destination = await viewModel.resolveChatDestination() else { return }
+            onOpenChat?(destination)
+        }
     }
 }

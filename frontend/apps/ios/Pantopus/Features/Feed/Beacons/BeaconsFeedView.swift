@@ -28,13 +28,14 @@ public struct BeaconsFeedView: View {
     private let onBack: (@MainActor () -> Void)?
 
     init(
-        viewModel: PulseFeedViewModel = PulseFeedViewModel(surface: .beacons),
+        viewModel: PulseFeedViewModel? = nil,
         onOpenPost: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (PulseIntent) -> Void = { _ in },
         onDiscover: @escaping @MainActor () -> Void = {},
         onBack: (@MainActor () -> Void)? = nil
     ) {
-        _viewModel = State(initialValue: viewModel)
+        // Avoid default-arg `PulseFeedViewModel(surface: .beacons)` — crashes Swift 5.10 SIL gen.
+        _viewModel = State(initialValue: viewModel ?? PulseFeedViewModel(surface: .beacons))
         self.onOpenPost = onOpenPost
         self.onCompose = onCompose
         self.onDiscover = onDiscover

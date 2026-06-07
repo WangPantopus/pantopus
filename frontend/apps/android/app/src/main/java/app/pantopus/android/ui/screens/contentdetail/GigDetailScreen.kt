@@ -54,7 +54,7 @@ import kotlin.coroutines.resume
 @Composable
 fun GigDetailScreen(
     onBack: () -> Unit = {},
-    onOpenMessages: (app.pantopus.android.data.api.models.gigs.GigDto) -> Unit = {},
+    onOpenChat: (roomId: String, displayName: String, initials: String, verified: Boolean) -> Unit = { _, _, _, _ -> },
     viewModel: GigDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -94,14 +94,17 @@ fun GigDetailScreen(
             }
         }
     }
+    LaunchedEffect(Unit) {
+        viewModel.openChatEvents.collect { event ->
+            onOpenChat(event.roomId, event.displayName, event.initials, event.verified)
+        }
+    }
     // Tip success → toast (PaymentSheet itself surfaces decline / SCA errors).
     LaunchedEffect(tipStatus) {
         if (tipStatus is TipStatus.Succeeded) toastText = "Tip sent — thank you!"
     }
 
-    val openMessages: () -> Unit = {
-        viewModel.gigSnapshot()?.let { onOpenMessages(it) }
-    }
+    val openChat: () -> Unit = { viewModel.openGigChat() }
 
     LaunchedEffect(toastText) {
         if (toastText != null) {
@@ -136,9 +139,14 @@ fun GigDetailScreen(
                         )
             }
         },
-        onSecondaryAction = openMessages,
+        onSecondaryAction = openChat,
         onRetry = { viewModel.load() },
-        onMessageCounterparty = openMessages,
+        onMessageCounterparty = openChat,
+        scrollFooter = {
+            if (state is ContentDetailUiState.Loaded) {
+                GigQuestionsSection(viewModel) { message -> toastText = message }
+            }
+        },
     )
 
     val target = sheetTarget

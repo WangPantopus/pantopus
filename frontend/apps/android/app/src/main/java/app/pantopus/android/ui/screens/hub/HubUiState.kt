@@ -196,6 +196,8 @@ sealed interface HubNavigationIntent {
 
     data object OpenMenu : HubNavigationIntent
 
+    data object OpenProfile : HubNavigationIntent
+
     data object StartVerification : HubNavigationIntent
 
     data class ActionTapped(

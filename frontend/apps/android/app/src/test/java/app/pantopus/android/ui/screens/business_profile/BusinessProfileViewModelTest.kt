@@ -12,6 +12,7 @@ import app.pantopus.android.data.api.models.businesses.BusinessHoursDto
 import app.pantopus.android.data.api.models.businesses.BusinessLocationDto
 import app.pantopus.android.data.api.models.businesses.BusinessProfileDetailDto
 import app.pantopus.android.data.api.models.businesses.BusinessPublicResponse
+import app.pantopus.android.data.api.models.businesses.BusinessServiceAreaDto
 import app.pantopus.android.data.api.models.businesses.BusinessUserDetailDto
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
@@ -85,7 +86,10 @@ class BusinessProfileViewModelTest {
                     publicEmail = "hi@elmpark.test",
                     publicPhone = "+1-555-0101",
                     website = "elmparkcoffee.test",
-                    serviceArea = "Serves Cambridge & Somerville",
+                    serviceArea =
+                        BusinessServiceAreaDto(
+                            legacyDisplayText = "Serves Cambridge & Somerville",
+                        ),
                     isPublished = true,
                     verificationStatus = "address_verified",
                     primaryLocation =

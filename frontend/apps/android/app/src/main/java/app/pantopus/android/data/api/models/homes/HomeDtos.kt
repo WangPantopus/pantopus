@@ -63,7 +63,15 @@ data class MyHome(
     @Json(name = "verification_tier") val verificationTier: String?,
     @Json(name = "is_primary_owner") val isPrimaryOwner: Boolean?,
     @Json(name = "pending_claim_id") val pendingClaimId: String?,
+    val location: HomeLocation? = null,
 )
+
+/** Human-readable area label for the compose target picker. */
+fun MyHome.areaLabel(): String {
+    val parts = listOfNotNull(city, state).map { it.trim() }.filter { it.isNotEmpty() }
+    if (parts.isNotEmpty()) return parts.joinToString(", ")
+    return address ?: name ?: "Home"
+}
 
 /** `GET /api/homes/my-homes` envelope — route `backend/routes/home.js:1464`. */
 @JsonClass(generateAdapter = true)

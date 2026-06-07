@@ -7,6 +7,7 @@ import app.cash.turbine.test
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
 import app.pantopus.android.data.api.models.payments.TipResponse
 import app.pantopus.android.data.api.models.users.UserDto
@@ -75,6 +76,7 @@ class GigTipViewModelTest {
     private fun vmWithLoadedTip(): GigDetailViewModel {
         coEvery { repo.detail("g1") } returns NetworkResult.Success(GigDetailResponse(gig = completedConfirmedGig()))
         coEvery { repo.bids("g1") } returns NetworkResult.Success(GigBidsResponse(bids = emptyList()))
+        coEvery { repo.questions("g1") } returns NetworkResult.Success(GigQuestionsResponse(questions = emptyList()))
         return GigDetailViewModel(
             repo,
             authRepo,

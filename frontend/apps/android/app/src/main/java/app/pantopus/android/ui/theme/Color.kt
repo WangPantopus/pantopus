@@ -137,6 +137,18 @@ object PantopusColors {
     val appTextInverse = Color(0xFFFFFFFF)
     val appHover = Color(0xFFF3F4F6)
 
+    // Dark-mode shell neutrals — mirror iOS asset-catalog `luminosity: dark`
+    // appearances for `Neutral/*` colors.
+    val appBgDark = Color(0xFF0D1117)
+    val appSurfaceDark = Color(0xFF161B22)
+    val appSurfaceRaisedDark = Color(0xFF1C2230)
+    val appSurfaceSunkenDark = Color(0xFF0B0E13)
+    val appBorderDark = Color(0xFF2B313B)
+    val appBorderStrongDark = Color(0xFF3B424E)
+    val appTextDark = Color(0xFFE6EDF3)
+    val appTextStrongDark = Color(0xFFC9D1D9)
+    val appTextSecondaryDark = Color(0xFF9AA4B2)
+
     /**
      * Paper cream — `#FDF8EE`. Off-white warm stock used for postcard
      * and other physical-paper artefacts (verification cards, postcard

@@ -93,7 +93,7 @@ final class PropertyDetailsViewModelTests: XCTestCase {
     }
 
     func test_sampleData_monoFlagsOnExpectedRows() {
-        let monoIds: Set = ["year", "beds", "baths", "interior", "lot", "parcel", "zoning", "assessed"]
+        let monoIds: Set<String> = ["year", "beds", "baths", "interior", "lot", "parcel", "zoning", "assessed"]
         let rows = PropertyDetailsSampleData.clean.propertyFacts + PropertyDetailsSampleData.clean.records
         for row in rows where monoIds.contains(row.id) {
             XCTAssertTrue(row.mono, "Row \(row.id) should render monospaced")

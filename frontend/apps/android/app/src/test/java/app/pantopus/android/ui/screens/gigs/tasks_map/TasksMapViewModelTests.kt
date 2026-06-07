@@ -8,10 +8,13 @@ import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsSort
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapPinState
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -79,14 +82,24 @@ class TasksMapViewModelTests {
             gig("tutoring-1", "tutoring", 40.0, 40.753, -73.991, bidCount = 6, status = "in_progress"),
         )
 
+    private fun mockLocation(): LocationProvider {
+        val coord = UserCoordinate(latitude = 40.7484, longitude = -73.9857, accuracyMeters = 100.0)
+        return mockk {
+            every { cachedCoordinate() } returns coord
+            coEvery { requestCurrent(any()) } returns coord
+        }
+    }
+
     private fun vm(
         category: String? = null,
         gigs: List<GigDto> = sampleGigs,
         result: NetworkResult<GigsInBoundsResponse> = NetworkResult.Success(GigsInBoundsResponse(gigs)),
+        location: LocationProvider = mockLocation(),
     ): TasksMapViewModel {
         coEvery { repo.inBounds(any(), any(), any(), any(), any()) } returns result
         return TasksMapViewModel(
             repo,
+            location,
             SavedStateHandle(if (category != null) mapOf("category" to category) else emptyMap()),
         )
     }

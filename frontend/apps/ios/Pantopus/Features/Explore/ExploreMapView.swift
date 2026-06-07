@@ -395,7 +395,7 @@ public struct ExploreMapView: View {
     private func mapControls(bottomInset: CGFloat) -> some View {
         VStack(spacing: Spacing.s2) {
             mapControlButton(icon: .mapPin, label: "Locate me") {
-                recenter(on: viewModel.userCoordinate)
+                Task { await viewModel.locate() }
             }
             mapControlButton(icon: .map, label: "Fit all pins") {
                 fitAll()

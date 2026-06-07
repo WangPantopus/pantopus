@@ -64,9 +64,19 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
     public let verificationTier: String?
     public let isPrimaryOwner: Bool?
     public let pendingClaimId: String?
+    /// Parsed PostGIS point from `GET /api/homes/my-homes`.
+    public let location: HomeLocation?
 
     public var id: String {
         home.id
+    }
+
+    /// Human-readable area label for the target picker.
+    public var areaLabel: String {
+        let parts = [home.city, home.state].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !parts.isEmpty { return parts.joined(separator: ", ") }
+        return home.address ?? home.name ?? "Home"
     }
 
     /// Backend returns these as siblings on the home row, not a nested
@@ -80,6 +90,7 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
         verificationTier = try container.decodeIfPresent(String.self, forKey: .verificationTier)
         isPrimaryOwner = try container.decodeIfPresent(Bool.self, forKey: .isPrimaryOwner)
         pendingClaimId = try container.decodeIfPresent(String.self, forKey: .pendingClaimId)
+        location = try container.decodeIfPresent(HomeLocation.self, forKey: .location)
     }
 
     private enum FlatKeys: String, CodingKey {
@@ -88,6 +99,7 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
         case verificationTier = "verification_tier"
         case isPrimaryOwner = "is_primary_owner"
         case pendingClaimId = "pending_claim_id"
+        case location
     }
 }
 

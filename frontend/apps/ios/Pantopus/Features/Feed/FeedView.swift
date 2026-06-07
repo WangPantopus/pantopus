@@ -19,13 +19,14 @@ public struct FeedView: View {
     private let onBack: (@MainActor () -> Void)?
 
     init(
-        viewModel: PulseFeedViewModel = PulseFeedViewModel(),
+        viewModel: PulseFeedViewModel? = nil,
         onOpenPost: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (PulseIntent) -> Void = { _ in },
         onEmptyCTA: (@MainActor () -> Void)? = nil,
         onBack: (@MainActor () -> Void)? = nil
     ) {
-        _viewModel = State(initialValue: viewModel)
+        // Swift 5.10 crashes while lowering PulseFeedViewModel() in a default-argument thunk.
+        _viewModel = State(initialValue: viewModel ?? PulseFeedViewModel())
         self.onOpenPost = onOpenPost
         self.onCompose = onCompose
         self.onEmptyCTA = onEmptyCTA

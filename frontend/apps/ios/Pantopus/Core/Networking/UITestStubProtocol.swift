@@ -364,7 +364,11 @@ final class UITestStubProtocol: URLProtocol {
       "user_id":"u_demo",
       "bid_count":4,
       "distance_miles":0.2,
-      "pickup_address":"Rose Court, Unit 4B"
+      "pickup_address":"Rose Court, Unit 4B",
+      "latitude":45.587,
+      "longitude":-122.399,
+      "locationUnlocked":false,
+      "location":{"latitude":45.587,"longitude":-122.399}
     }}
     """
 

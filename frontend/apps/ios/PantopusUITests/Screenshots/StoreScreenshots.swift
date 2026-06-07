@@ -132,7 +132,7 @@ final class StoreScreenshots: XCTestCase {
         }
 
         // Back to Hub.
-        app.buttons["tab.hub"].firstMatch.tap()
+        app.buttons["tab.home"].firstMatch.tap()
 
         // Hub → Marketplace pillar → Marketplace grid.
         let marketplacePillar = app.descendants(matching: .any)
@@ -147,13 +147,13 @@ final class StoreScreenshots: XCTestCase {
         }
 
         // Nearby tab → Map+List Hybrid.
-        app.buttons["tab.nearby"].firstMatch.tap()
+        app.buttons["tab.pulse"].firstMatch.tap()
         if app.descendants(matching: .any)
             .matching(identifier: "nearbyMap").firstMatch
             .waitForExistence(timeout: 5) {
             snapshot("10_NearbyMap")
         }
-        app.buttons["tab.hub"].firstMatch.tap()
+        app.buttons["tab.home"].firstMatch.tap()
 
         // Hub → Gigs pillar → Gigs feed.
         let gigsPillar = app.descendants(matching: .any)
@@ -181,16 +181,16 @@ final class StoreScreenshots: XCTestCase {
         }
 
         // Inbox tab → Chat list.
-        app.buttons["tab.inbox"].firstMatch.tap()
+        app.buttons["tab.messages"].firstMatch.tap()
         if app.descendants(matching: .any)
             .matching(identifier: "chatList").firstMatch
             .waitForExistence(timeout: 5) {
             snapshot("03_ChatList")
         }
-        app.buttons["tab.hub"].firstMatch.tap()
+        app.buttons["tab.home"].firstMatch.tap()
 
         // You tab → Me view (Personal identity by default).
-        app.buttons["tab.you"].firstMatch.tap()
+        app.buttons["hubAvatarButton"].firstMatch.tap()
         _ = app.descendants(matching: .any)
             .matching(identifier: "meHeader_personal").firstMatch
             .waitForExistence(timeout: 5)
@@ -309,7 +309,7 @@ final class StoreScreenshots: XCTestCase {
         }
 
         // Hub bell → Notifications center (T5.1 Notifications V2).
-        app.buttons["tab.hub"].firstMatch.tap()
+        app.buttons["tab.home"].firstMatch.tap()
         let hubBell = app.descendants(matching: .any)
             .matching(identifier: "hubBellButton").firstMatch
         if hubBell.waitForExistence(timeout: 3) {
@@ -325,7 +325,7 @@ final class StoreScreenshots: XCTestCase {
         }
 
         // You tab → Edit Profile sheet.
-        app.buttons["tab.you"].firstMatch.tap()
+        app.buttons["hubAvatarButton"].firstMatch.tap()
         let editProfile = app.buttons["youEditProfileButton"]
         if editProfile.waitForExistence(timeout: 3) {
             editProfile.tap()

@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -85,6 +86,8 @@ fun PulseComposeScreen(
     onBack: () -> Unit,
     viewModel: PulseComposeViewModel = hiltViewModel(),
     onPosted: (String?) -> Unit = {},
+    flowTarget: PulsePostingTarget? = null,
+    flowPurpose: PulseComposePurpose? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIntent by viewModel.activeIntent.collectAsStateWithLifecycle()
@@ -92,6 +95,7 @@ fun PulseComposeScreen(
     val visibility by viewModel.visibility.collectAsStateWithLifecycle()
     val lostFoundKind by viewModel.lostFoundKind.collectAsStateWithLifecycle()
     val announceAudience by viewModel.announceAudience.collectAsStateWithLifecycle()
+    val safetyAlertKind by viewModel.safetyAlertKind.collectAsStateWithLifecycle()
     val askCategory by viewModel.askCategory.collectAsStateWithLifecycle()
     val recommendRating by viewModel.recommendRating.collectAsStateWithLifecycle()
     val fields by viewModel.fields.collectAsStateWithLifecycle()
@@ -99,6 +103,12 @@ fun PulseComposeScreen(
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val shouldDismiss by viewModel.shouldDismiss.collectAsStateWithLifecycle()
     val prefillState by viewModel.prefillState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(flowTarget, flowPurpose) {
+        if (flowTarget != null) {
+            viewModel.applyFlowContext(flowTarget, flowPurpose)
+        }
+    }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -178,11 +188,15 @@ fun PulseComposeScreen(
                                 visibility = visibility,
                                 lostFoundKind = lostFoundKind,
                                 announceAudience = announceAudience,
+                                safetyAlertKind = safetyAlertKind,
                                 askCategory = askCategory,
                                 recommendRating = recommendRating,
                                 fields = fields,
                                 photos = photos,
                                 isIntentLocked = viewModel.isIntentLocked,
+                                isFlowMode = viewModel.isFlowMode,
+                                composePurpose = viewModel.flowPurpose,
+                                postingTargetLabel = viewModel.flowTargetLabel,
                             ),
                         actions =
                             PulseComposeActions(
@@ -193,6 +207,7 @@ fun PulseComposeScreen(
                                         onSelectVisibility = viewModel::selectVisibility,
                                         onSelectLostFoundKind = viewModel::selectLostFoundKind,
                                         onSelectAnnounceAudience = viewModel::selectAnnounceAudience,
+                                        onSelectSafetyAlertKind = viewModel::selectSafetyAlertKind,
                                         onSelectAskCategory = viewModel::selectAskCategory,
                                         onSelectRecommendRating = viewModel::selectRecommendRating,
                                     ),
@@ -250,12 +265,16 @@ internal data class PulseComposeContentState(
     val visibility: PulseComposeVisibility = PulseComposeVisibility.Neighbors,
     val lostFoundKind: PulseLostFoundKind = PulseLostFoundKind.Lost,
     val announceAudience: PulseAnnounceAudience = PulseAnnounceAudience.Neighbors,
+    val safetyAlertKind: PulseSafetyAlertKind = PulseSafetyAlertKind.Theft,
     val askCategory: PulseAskCategory = PulseAskCategory.Handyman,
     val recommendRating: Int = 5,
     val fields: Map<PulseComposeField, FormFieldState> = emptyMap(),
     val photos: List<PulseComposePhoto> = emptyList(),
     /** True when the intent picker is non-interactive (edit mode). */
     val isIntentLocked: Boolean = false,
+    val isFlowMode: Boolean = false,
+    val composePurpose: PulseComposePurpose? = null,
+    val postingTargetLabel: String? = null,
 )
 
 internal data class PulseComposeSelectionActions(
@@ -264,6 +283,7 @@ internal data class PulseComposeSelectionActions(
     val onSelectVisibility: (PulseComposeVisibility) -> Unit,
     val onSelectLostFoundKind: (PulseLostFoundKind) -> Unit,
     val onSelectAnnounceAudience: (PulseAnnounceAudience) -> Unit,
+    val onSelectSafetyAlertKind: (PulseSafetyAlertKind) -> Unit,
     val onSelectAskCategory: (PulseAskCategory) -> Unit,
     val onSelectRecommendRating: (Int) -> Unit,
 )
@@ -280,23 +300,68 @@ internal fun PulseComposeBody(
     state: PulseComposeContentState,
     actions: PulseComposeActions,
 ) {
-    IntentPicker(
-        active = state.activeIntent,
-        isLocked = state.isIntentLocked,
-        onSelect = actions.selection.onSelectIntent,
-    )
-    IdentitySection(active = state.identity, onSelect = actions.selection.onSelectIdentity)
+    if (state.isFlowMode) {
+        FlowContextHeader(state.composePurpose, state.postingTargetLabel)
+    } else {
+        IntentPicker(
+            active = state.activeIntent,
+            isLocked = state.isIntentLocked,
+            onSelect = actions.selection.onSelectIntent,
+        )
+        IdentitySection(active = state.identity, onSelect = actions.selection.onSelectIdentity)
+    }
     IntentSpecificSection(
         state = state,
         onUpdateField = actions.onUpdateField,
         onSelectLostFoundKind = actions.selection.onSelectLostFoundKind,
         onSelectAnnounceAudience = actions.selection.onSelectAnnounceAudience,
+        onSelectSafetyAlertKind = actions.selection.onSelectSafetyAlertKind,
         onSelectAskCategory = actions.selection.onSelectAskCategory,
         onSelectRecommendRating = actions.selection.onSelectRecommendRating,
     )
     PhotosSection(photos = state.photos, onPick = actions.onPickPhotos, onRemove = actions.onRemovePhoto)
-    VisibilitySection(active = state.visibility, onSelect = actions.selection.onSelectVisibility)
+    if (!state.isFlowMode || state.visibility != PulseComposeVisibility.Connections) {
+        VisibilitySection(active = state.visibility, onSelect = actions.selection.onSelectVisibility)
+    }
 }
+
+@Composable
+private fun FlowContextHeader(
+    purpose: PulseComposePurpose?,
+    targetLabel: String?,
+) {
+    purpose?.let { p ->
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(icon = purposeIconFor(p), contentDescription = null, size = 16.dp, tint = PantopusColors.primary600)
+            Text(text = p.label, style = PantopusTextStyle.small.copy(fontWeight = FontWeight.SemiBold), color = PantopusColors.appText)
+        }
+    }
+    targetLabel?.let { label ->
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.MapPin, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextSecondary)
+            Text(text = "Posting to $label", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        }
+    }
+}
+
+private fun purposeIconFor(purpose: PulseComposePurpose): PantopusIcon =
+    when (purpose) {
+        PulseComposePurpose.Ask -> PantopusIcon.HelpCircle
+        PulseComposePurpose.HeadsUp -> PantopusIcon.Megaphone
+        PulseComposePurpose.Recommend -> PantopusIcon.Star
+        PulseComposePurpose.LostFound -> PantopusIcon.Search
+        PulseComposePurpose.LocalUpdate -> PantopusIcon.FileText
+        PulseComposePurpose.NeighborhoodWin -> PantopusIcon.Crown
+        PulseComposePurpose.VisitorGuide -> PantopusIcon.Compass
+        PulseComposePurpose.Event -> PantopusIcon.Calendar
+        PulseComposePurpose.Deal -> PantopusIcon.Tag
+    }
 
 @Composable
 private fun IntentPicker(
@@ -446,6 +511,7 @@ private fun IntentSpecificSection(
     onUpdateField: (PulseComposeField, String) -> Unit,
     onSelectLostFoundKind: (PulseLostFoundKind) -> Unit,
     onSelectAnnounceAudience: (PulseAnnounceAudience) -> Unit,
+    onSelectSafetyAlertKind: (PulseSafetyAlertKind) -> Unit,
     onSelectAskCategory: (PulseAskCategory) -> Unit,
     onSelectRecommendRating: (Int) -> Unit,
 ) {
@@ -474,12 +540,23 @@ private fun IntentSpecificSection(
                 onSelectKind = onSelectLostFoundKind,
             )
         PulseComposeIntent.Announce ->
-            AnnounceSection(
-                fields = state.fields,
-                audience = state.announceAudience,
-                onUpdateField = onUpdateField,
-                onSelectAudience = onSelectAnnounceAudience,
-            )
+            if (state.composePurpose == PulseComposePurpose.HeadsUp) {
+                HeadsUpSection(
+                    fields = state.fields,
+                    audience = state.announceAudience,
+                    safetyKind = state.safetyAlertKind,
+                    onUpdateField = onUpdateField,
+                    onSelectAudience = onSelectAnnounceAudience,
+                    onSelectSafetyKind = onSelectSafetyAlertKind,
+                )
+            } else {
+                AnnounceSection(
+                    fields = state.fields,
+                    audience = state.announceAudience,
+                    onUpdateField = onUpdateField,
+                    onSelectAudience = onSelectAnnounceAudience,
+                )
+            }
     }
 }
 
@@ -702,6 +779,48 @@ private fun LostFoundToggle(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HeadsUpSection(
+    fields: Map<PulseComposeField, FormFieldState>,
+    audience: PulseAnnounceAudience,
+    safetyKind: PulseSafetyAlertKind,
+    onUpdateField: (PulseComposeField, String) -> Unit,
+    onSelectAudience: (PulseAnnounceAudience) -> Unit,
+    onSelectSafetyKind: (PulseSafetyAlertKind) -> Unit,
+) {
+    FormFieldGroup("Heads Up") {
+        ChipRow(
+            label = "Alert type",
+            options = PulseSafetyAlertKind.entries.map { it.key to it.label },
+            activeKey = safetyKind.key,
+            identifierPrefix = "composePulseSafetyKind",
+            onSelect = { key ->
+                PulseSafetyAlertKind.fromKey(key)?.let(onSelectSafetyKind)
+            },
+        )
+        FieldRow(
+            field = PulseComposeField.Title,
+            label = "Headline",
+            placeholder = "What should people nearby know?",
+            fields = fields,
+            onUpdate = onUpdateField,
+        )
+        ChipRow(
+            label = "Audience",
+            options = PulseAnnounceAudience.entries.map { it.key to it.label },
+            activeKey = audience.key,
+            identifierPrefix = "composePulseAnnounceAudience",
+            onSelect = { key -> onSelectAudience(PulseAnnounceAudience.entries.first { it.key == key }) },
+        )
+        BodyEditor(
+            label = "Details",
+            placeholder = "Describe what happened…",
+            fields = fields,
+            onUpdate = onUpdateField,
+        )
     }
 }
 

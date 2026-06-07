@@ -14,6 +14,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -44,6 +45,7 @@ import org.junit.Test
 class PulseComposeViewModelTest {
     private val repo: PostsRepository = mockk()
     private val networkMonitor: NetworkMonitor = mockk()
+    private val postsRefresh = PulsePostsRefreshNotifier()
     private val isOnline = MutableStateFlow(true)
 
     @Before fun setUp() {
@@ -61,7 +63,7 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.INTENT_KEY, intent.key)
             }
-        return PulseComposeViewModel(repo, networkMonitor, savedState)
+        return PulseComposeViewModel(repo, networkMonitor, postsRefresh, savedState)
     }
 
     // MARK: - Defaults
@@ -186,7 +188,11 @@ class PulseComposeViewModelTest {
 
     @Test fun setPhotosTruncatesAtMax() {
         val vm = viewModel(PulseComposeIntent.Ask)
-        vm.setPhotos((0..7).map { PulseComposePhoto(id = "p$it", data = byteArrayOf(it.toByte())) })
+        vm.setPhotos(
+            (0 until PULSE_COMPOSE_MAX_PHOTOS + 3).map {
+                PulseComposePhoto(id = "p$it", data = byteArrayOf(it.toByte()))
+            },
+        )
         assertEquals(PULSE_COMPOSE_MAX_PHOTOS, vm.photos.value.size)
     }
 
@@ -259,8 +265,23 @@ class PulseComposeViewModelTest {
         vm.selectAnnounceAudience(PulseAnnounceAudience.Followers)
         val request = vm.buildRequest()
         assertEquals("local_update", request.postType)
-        assertEquals("followers", request.audience)
+        assertEquals("nearby", request.audience)
         assertEquals("followers", request.visibility)
+    }
+
+    @Test fun headsUpRequestCarriesSafetyAlertKind() {
+        val vm = viewModel(PulseComposeIntent.Announce)
+        vm.applyFlowContext(
+            target = PulsePostingTarget.CurrentLocation(45.5, -122.4, "Camas, WA"),
+            purpose = PulseComposePurpose.HeadsUp,
+        )
+        vm.update(PulseComposeField.Title, "Hello")
+        vm.update(PulseComposeField.Body, "What's up")
+        vm.selectSafetyAlertKind(PulseSafetyAlertKind.Suspicious)
+        val request = vm.buildRequest()
+        assertEquals("alert", request.postType)
+        assertEquals("heads_up", request.purpose)
+        assertEquals("suspicious", request.safetyAlertKind)
     }
 
     // MARK: - Submit pipeline
@@ -332,7 +353,7 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.POST_ID_KEY, postId)
             }
-        return PulseComposeViewModel(repo, networkMonitor, savedState)
+        return PulseComposeViewModel(repo, networkMonitor, postsRefresh, savedState)
     }
 
     private data class SamplePost(

@@ -26,4 +26,5 @@
 --exclude build,DerivedData,.build,Pantopus.xcodeproj,fastlane,SourcePackages
 
 --disable andOperator
+--disable redundantType
 --disable wrapMultilineStatementBraces

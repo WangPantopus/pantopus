@@ -253,6 +253,7 @@ dependencies {
     // Maps
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
+    implementation(libs.play.services.location)
 
     // Firebase Cloud Messaging — declared via BoM so the messaging
     // artifact picks up a compatible version automatically. Adding more

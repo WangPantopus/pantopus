@@ -40,11 +40,13 @@ public final class PulseFeedViewModel {
     public private(set) var scopeLabel: String?
 
     private let api: APIClient
-    /// Coordinates from the active location source. `nil` skips
-    /// `latitude`/`longitude` params — the backend will then default to
-    /// the user's last known location or return an empty list.
+    private let locationProvider: any LocationProviding
+    /// Optional fixed coordinates (tests / previews). When nil, fetch
+    /// resolves the device location before hitting the feed API.
     private let latitude: Double?
     private let longitude: Double?
+    private var resolvedLatitude: Double?
+    private var resolvedLongitude: Double?
     private var loadedItems: [FeedPostDTO] = []
     private var isLoading = false
 
@@ -52,15 +54,18 @@ public final class PulseFeedViewModel {
         api: APIClient = .shared,
         surface: FeedSurface = .pulse,
         latitude: Double? = nil,
-        longitude: Double? = nil
+        longitude: Double? = nil,
+        locationProvider: any LocationProviding = DeviceLocationProvider.shared
     ) {
         self.api = api
         self.surface = surface
         self.latitude = latitude
         self.longitude = longitude
+        self.locationProvider = locationProvider
     }
 
-    /// First-time load. No-op if we already have content.
+    /// First-time load. Refetches when still empty so a location fix can
+    /// populate the feed after permissions are granted.
     public func load() async {
         if case .loaded = state { return }
         await fetch()
@@ -114,11 +119,12 @@ public final class PulseFeedViewModel {
         defer { isLoading = false }
         if case .loaded = state {} else { state = .loading }
         do {
+            let coords = await resolvedCoordinates()
             let response: FeedResponse = try await api.request(
                 PostsEndpoints.feed(
                     surface: surface.backendSurface,
-                    latitude: latitude,
-                    longitude: longitude,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
                     postType: activeIntent.postType,
                     limit: 20
                 )
@@ -134,6 +140,26 @@ public final class PulseFeedViewModel {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load posts."
             state = .error(message: message)
         }
+    }
+
+    private func resolvedCoordinates() async -> (latitude: Double?, longitude: Double?) {
+        if let latitude, let longitude {
+            return (latitude, longitude)
+        }
+        if let resolvedLatitude, let resolvedLongitude {
+            return (resolvedLatitude, resolvedLongitude)
+        }
+        if let cached = locationProvider.cachedCoordinate() {
+            resolvedLatitude = cached.latitude
+            resolvedLongitude = cached.longitude
+            return (cached.latitude, cached.longitude)
+        }
+        if let fresh = await locationProvider.requestCurrent(timeoutSeconds: 4) {
+            resolvedLatitude = fresh.latitude
+            resolvedLongitude = fresh.longitude
+            return (fresh.latitude, fresh.longitude)
+        }
+        return (nil, nil)
     }
 
     // MARK: - Projection
@@ -166,7 +192,11 @@ public final class PulseFeedViewModel {
                 secondaryCount: post.commentCount
             ),
             attendees: attendees,
-            userHasReacted: post.userHasLiked
+            userHasReacted: post.userHasLiked,
+            mediaURLs: PulsePostCardContent.mediaDisplayURLs(
+                urls: post.mediaURLs,
+                thumbnails: post.mediaThumbnails
+            )
         )
     }
 
@@ -215,7 +245,8 @@ public final class PulseFeedViewModel {
             body: original.body,
             reactions: updatedReactions,
             attendees: original.attendees,
-            userHasReacted: hasReacted
+            userHasReacted: hasReacted,
+            mediaURLs: original.mediaURLs
         )
         state = .loaded(rows)
     }

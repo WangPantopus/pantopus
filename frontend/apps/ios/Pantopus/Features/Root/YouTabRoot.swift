@@ -1012,17 +1012,9 @@ public struct YouTabRoot: View {
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
                 onBack: { Task { @MainActor in pop() } },
-                onMessage: { gig in
+                onOpenChat: { destination in
                     Task { @MainActor in
-                        guard let posterId = gig.userId else { return }
-                        let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
-                        path.append(.chatConversation(InboxConversationDestination(
-                            mode: .person(otherUserId: posterId),
-                            displayName: name,
-                            initials: Self.initials(from: name),
-                            identityKind: nil,
-                            verified: gig.creator?.verified ?? false
-                        )))
+                        path.append(.chatConversation(destination))
                     }
                 }
             )
@@ -1117,13 +1109,25 @@ public struct YouTabRoot: View {
                 )
             )
         case let .composePost(intent):
-            PulseComposeView(intent: PulseComposeIntent.from(rawValue: intent)) { _ in
-                if !path.isEmpty { path.removeLast() }
-            }
+            PulseComposeFlowView(
+                prefillFeedIntent: PulseIntent(rawValue: intent),
+                onCancel: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onPosted: { _ in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
         case let .editPost(postId):
-            PulseComposeView(postId: postId) { _ in
-                if !path.isEmpty { path.removeLast() }
-            }
+            PulseComposeFlowView(
+                editingPostId: postId,
+                onCancel: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onPosted: { _ in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,
@@ -1190,17 +1194,15 @@ public struct YouTabRoot: View {
                 onBack: { Task { @MainActor in pop() } }
             )
         case let .tasksMap(categoryKey):
-            NearbyMapView(
-                viewModel: NearbyMapViewModel(
+            TasksMapView(
+                viewModel: TasksMapViewModel(
                     initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
                 ),
-                onOpenEntity: { entity in
-                    Task { @MainActor in
-                        switch entity.kind {
-                        case .gig: path.append(.gigDetail(gigId: entity.id))
-                        case .listing: path.append(.listingDetail(listingId: entity.id))
-                        }
-                    }
+                onOpenTask: { taskId in
+                    Task { @MainActor in path.append(.gigDetail(gigId: taskId)) }
+                },
+                onCompose: { _ in
+                    Task { @MainActor in path.append(.composeTask) }
                 },
                 onBack: { Task { @MainActor in pop() } }
             )

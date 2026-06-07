@@ -160,6 +160,7 @@ public struct ContentDetailStat: Sendable, Hashable, Identifiable {
 public struct ContentDetailCounterparty: Sendable, Hashable {
     public let displayName: String
     public let initials: String
+    public let avatarUrl: URL?
     public let identityKind: String? // "personal" | "business" | nil
     public let verified: Bool
     public let rating: Double?
@@ -169,6 +170,7 @@ public struct ContentDetailCounterparty: Sendable, Hashable {
     public init(
         displayName: String,
         initials: String,
+        avatarUrl: URL? = nil,
         identityKind: String?,
         verified: Bool,
         rating: Double?,
@@ -177,6 +179,7 @@ public struct ContentDetailCounterparty: Sendable, Hashable {
     ) {
         self.displayName = displayName
         self.initials = initials
+        self.avatarUrl = avatarUrl
         self.identityKind = identityKind
         self.verified = verified
         self.rating = rating

@@ -65,7 +65,7 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
         case "recommendation", "recommend": .recommend
         case "event": .event
         case "lost_found": .lost
-        case "local_update", "announcement", "heads_up", "neighborhood_win": .announce
+        case "local_update", "announcement", "heads_up", "neighborhood_win", "alert": .announce
         default: .announce
         }
     }

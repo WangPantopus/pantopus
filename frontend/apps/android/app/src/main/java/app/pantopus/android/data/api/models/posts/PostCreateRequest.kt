@@ -18,16 +18,36 @@ data class PostCreateRequest(
     val visibility: String,
     @Json(name = "postAs") val postAs: String,
     @Json(name = "mediaUrls") val mediaUrls: List<String>? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @Json(name = "locationName") val locationName: String? = null,
+    @Json(name = "homeId") val homeId: String? = null,
+    @Json(name = "businessId") val businessId: String? = null,
+    val tags: List<String>? = null,
+    @Json(name = "gpsTimestamp") val gpsTimestamp: String? = null,
+    @Json(name = "gpsLatitude") val gpsLatitude: Double? = null,
+    @Json(name = "gpsLongitude") val gpsLongitude: Double? = null,
+    @Json(name = "crossPostToConnections") val crossPostToConnections: Boolean? = null,
+    @Json(name = "showOnProfile") val showOnProfile: Boolean? = null,
+    @Json(name = "profileVisibilityScope") val profileVisibilityScope: String? = null,
     // Event-specific
     @Json(name = "eventDate") val eventDate: String? = null,
+    @Json(name = "eventEndDate") val eventEndDate: String? = null,
     @Json(name = "eventVenue") val eventVenue: String? = null,
+    // Safety alert
+    @Json(name = "safetyAlertKind") val safetyAlertKind: String? = null,
+    @Json(name = "behaviorDescription") val behaviorDescription: String? = null,
+    // Deal
+    @Json(name = "dealExpiresAt") val dealExpiresAt: String? = null,
     // Lost & Found
     @Json(name = "lostFoundType") val lostFoundType: String? = null,
-    // Recommend
+    @Json(name = "contactPref") val contactPref: String? = null,
+    @Json(name = "contactPhone") val contactPhone: String? = null,
+    // Recommend / deal business name alias
     @Json(name = "businessName") val businessName: String? = null,
     // Ask category
     @Json(name = "serviceCategory") val serviceCategory: String? = null,
-    // Announce audience
+    // Announce / persona audience
     val audience: String? = null,
     // v1.2 purpose tag
     val purpose: String? = null,

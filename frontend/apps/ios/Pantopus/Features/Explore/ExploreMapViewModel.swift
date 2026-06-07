@@ -60,7 +60,7 @@ public final class ExploreMapViewModel {
     /// tests; internal because `APIClient` is module-internal.
     init(
         api: APIClient,
-        location: any LocationProviding = FallbackLocationProvider.shared
+        location: any LocationProviding = DeviceLocationProvider.shared
     ) {
         self.api = api
         self.location = location
@@ -73,7 +73,7 @@ public final class ExploreMapViewModel {
     /// Sample/preview path — local sample entities, no network.
     public init(scenario: ExploreScenario) {
         api = .shared
-        location = FallbackLocationProvider.shared
+        location = DeviceLocationProvider.shared
         self.scenario = scenario
         allEntities = ExploreMapSampleData.entities(for: scenario)
         filters = ExploreMapSampleData.filters(for: scenario)
@@ -99,6 +99,12 @@ public final class ExploreMapViewModel {
 
     public func refresh() async {
         await load()
+    }
+
+    /// Re-resolve GPS and re-fetch the viewport around the updated anchor.
+    public func locate() async {
+        userCoordinate = await location.requestCurrent(timeoutSeconds: 4)
+        await fetchAroundUser()
     }
 
     // MARK: - Type toggle

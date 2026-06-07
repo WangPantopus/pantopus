@@ -42,8 +42,8 @@ final class NavigationSmokeTest: XCTestCase {
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
         app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         app.launch()
-        let hubTab = app.buttons["tab.hub"].firstMatch
-        guard hubTab.waitForExistence(timeout: 5) else {
+        let homeTab = app.buttons["tab.home"].firstMatch
+        guard homeTab.waitForExistence(timeout: 5) else {
             app.terminateAfterSkippedLaunch()
             return nil
         }

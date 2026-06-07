@@ -45,17 +45,23 @@ public struct TasksMapView: View {
             anchor: viewModel.anchor,
             selectedPinId: viewModel.selectedId,
             recenterTrigger: recenterToken,
+            showSearchRadius: {
+                if case .empty = viewModel.state { return true }
+                return false
+            }(),
             detent: $detent,
             onPinTap: { id in
                 viewModel.select(id)
                 snapTo(.standard)
             },
-            topPill: { floatingPill },
-            categoryChips: { categoryChips },
-            mapControls: { controlStack },
+            topPill: { topChrome },
+            categoryChips: { EmptyView() },
+            mapControls: { mapControls },
+            floatingAction: { postTaskFAB },
             sheetHeader: { sheetHeader },
             sheetBody: { sheetBody }
         )
+        .toolbar(.hidden, for: .navigationBar)
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .sheet(isPresented: $showFilterSheet) {
@@ -83,84 +89,102 @@ public struct TasksMapView: View {
         }
     }
 
-    // MARK: - Floating pill
+    // MARK: - Top chrome (back · category chips · filters — one row under status bar)
 
-    private var floatingPill: some View {
-        HStack(spacing: Spacing.s0) {
-            Button { onBack?() } label: {
-                Icon(.chevronLeft, size: 18, strokeWidth: 2.2, color: Theme.Color.appText)
-                    .frame(width: 32, height: 32)
+    private var topChrome: some View {
+        HStack(spacing: 8) {
+            if onBack != nil {
+                chromeButton(
+                    icon: .chevronLeft,
+                    iconSize: 18,
+                    label: "Back to list",
+                    identifier: "tasksMapBack"
+                ) {
+                    onBack?()
+                }
+            } else {
+                Color.clear.frame(width: 38, height: 38)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back to list")
-            .accessibilityIdentifier("tasksMapBack")
-            .opacity(onBack == nil ? 0 : 1)
-            .disabled(onBack == nil)
-            Spacer(minLength: Spacing.s1)
-            Text("Tasks map")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: Spacing.s1)
-            Button { showFilterSheet = true } label: {
-                Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)
-                    .frame(width: 32, height: 32)
+            categoryChipStrip
+            chromeButton(
+                icon: .slidersHorizontal,
+                iconSize: 16,
+                label: "Filters",
+                identifier: "tasksMapFilters"
+            ) {
+                showFilterSheet = true
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Filters")
-            .accessibilityIdentifier("tasksMapFilters")
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, Spacing.s2)
-        .background(.ultraThinMaterial)
-        .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
-        .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.10), radius: 8, x: 0, y: 4)
+        .padding(.horizontal, 14)
         .accessibilityIdentifier("tasksMapPill")
+        .accessibilityLabel("Tasks map")
+        .accessibilityAddTraits(.isHeader)
     }
 
-    // MARK: - Category chips
-
-    private var categoryChips: some View {
+    private var categoryChipStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(GigsCategory.allCases, id: \.self) { category in
-                    let active = category == viewModel.activeCategory
-                    Button {
-                        viewModel.selectCategory(category)
-                    } label: {
-                        HStack(spacing: 5) {
-                            if category != .all {
-                                Circle()
-                                    .fill(active ? Theme.Color.appTextInverse : category.color)
-                                    .frame(width: 7, height: 7)
-                            }
-                            Text(category.label)
-                                .font(.system(size: 11.5, weight: .semibold))
-                                .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
-                        }
-                        .padding(.horizontal, Spacing.s3)
-                        .frame(height: 28)
-                        .background(active ? category.color : Color.white.opacity(0.96))
-                        .overlay(Capsule().stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1))
-                        .clipShape(Capsule())
-                        .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("tasksMapCategoryChip_\(category.rawValue)")
+                    categoryChipButton(category)
                 }
             }
-            .padding(.horizontal, 14)
         }
+        .frame(maxWidth: .infinity)
         .accessibilityIdentifier("tasksMapCategoryChips")
     }
 
-    // MARK: - Control stack (Post-task FAB above locate / layers)
+    private func categoryChipButton(_ category: GigsCategory) -> some View {
+        let active = category == viewModel.activeCategory
+        return Button {
+            viewModel.selectCategory(category)
+        } label: {
+            HStack(spacing: 5) {
+                if category != .all {
+                    Circle()
+                        .fill(active ? Theme.Color.appTextInverse : category.color)
+                        .frame(width: 7, height: 7)
+                }
+                Text(category.label)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .frame(height: 28)
+            .background(active ? category.color : Theme.Color.appSurface.opacity(0.96))
+            .overlay(Capsule().stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1))
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("tasksMapCategoryChip_\(category.rawValue)")
+    }
 
-    private var controlStack: some View {
+    private func chromeButton(
+        icon: PantopusIcon,
+        iconSize: CGFloat,
+        label: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Icon(icon, size: iconSize, strokeWidth: 2.2, color: Theme.Color.appText)
+                .frame(width: 38, height: 38)
+                .background(.ultraThinMaterial)
+                .overlay(Circle().stroke(Theme.Color.appBorder, lineWidth: 1))
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+    }
+
+    // MARK: - Map controls (locate / layers — sit just above the sheet)
+
+    private var mapControls: some View {
         VStack(alignment: .trailing, spacing: Spacing.s2) {
-            postTaskFAB
             controlButton(icon: .mapPin, label: "Locate me", identifier: "tasksMapLocate") {
+                Task { await viewModel.locate() }
                 recenterToken += 1
             }
             controlButton(icon: .map, label: "Layers", identifier: "tasksMapLayers") {
@@ -168,6 +192,8 @@ public struct TasksMapView: View {
             }
         }
     }
+
+    // MARK: - Post-task FAB (A11.1 — stacked above map controls on the right)
 
     private var postTaskFAB: some View {
         Button { onCompose(viewModel.activeCategory) } label: {

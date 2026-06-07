@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsSort
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapAnchor
@@ -39,10 +41,16 @@ class TasksMapViewModel
     @Inject
     constructor(
         private val repo: GigsRepository,
+        private val location: LocationProvider,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
+        private val _anchor =
+            MutableStateFlow<MapAnchor?>(
+                location.cachedCoordinate()?.toMapAnchor(),
+            )
+
         /** "You are here" anchor handed to the shell. */
-        val anchor: MapAnchor? = TasksMapSampleData.anchor
+        val anchor: StateFlow<MapAnchor?> = _anchor.asStateFlow()
 
         /** The task set currently driving the map — fetched from in-bounds. */
         private var items: List<TaskMapItem> = emptyList()
@@ -68,10 +76,21 @@ class TasksMapViewModel
         val selectedId: StateFlow<String?> = _selectedId.asStateFlow()
 
         fun load() {
-            viewModelScope.launch { fetchInBounds() }
+            viewModelScope.launch {
+                resolveLocation(refresh = false)
+                fetchInBounds()
+            }
         }
 
         fun refresh() = load()
+
+        /** Re-resolve GPS and re-fetch the viewport around the updated anchor. */
+        fun locate() {
+            viewModelScope.launch {
+                resolveLocation(refresh = true)
+                fetchInBounds()
+            }
+        }
 
         fun selectCategory(category: GigsCategory) {
             if (category == _activeCategory.value) return
@@ -91,6 +110,16 @@ class TasksMapViewModel
             _selectedId.value = id
         }
 
+        private suspend fun resolveLocation(refresh: Boolean) {
+            val coordinate =
+                when {
+                    refresh -> location.requestCurrent()
+                    _anchor.value != null -> location.cachedCoordinate() ?: location.requestCurrent()
+                    else -> location.requestCurrent()
+                }
+            coordinate?.let { _anchor.value = it.toMapAnchor() }
+        }
+
         /**
          * Build a ~1.3 km square viewport around the anchor and hit
          * `GET /api/gigs/in-bounds` for *all* categories in view. The
@@ -100,7 +129,7 @@ class TasksMapViewModel
          */
         private suspend fun fetchInBounds() {
             _state.value = TasksMapUiState.Loading
-            val center = anchor ?: MapAnchor(FALLBACK_LAT, FALLBACK_LON)
+            val center = _anchor.value ?: MapAnchor(FALLBACK_LAT, FALLBACK_LON)
             val result =
                 repo.inBounds(
                     minLat = center.latitude - HALF_DEG_LAT,
@@ -218,3 +247,5 @@ class TasksMapViewModel
             private fun priceValue(price: String): Double = price.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0
         }
     }
+
+private fun UserCoordinate.toMapAnchor(): MapAnchor = MapAnchor(latitude = latitude, longitude = longitude)

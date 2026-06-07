@@ -62,7 +62,7 @@ enum class PulseIntent(
                 "recommendation", "recommend" -> Recommend
                 "event" -> Event
                 "lost_found" -> Lost
-                "local_update", "announcement", "heads_up", "neighborhood_win" -> Announce
+                "local_update", "announcement", "heads_up", "neighborhood_win", "alert" -> Announce
                 else -> Announce
             }
     }

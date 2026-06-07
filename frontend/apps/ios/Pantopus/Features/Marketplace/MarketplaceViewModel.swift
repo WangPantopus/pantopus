@@ -27,7 +27,7 @@ public final class MarketplaceViewModel {
 
     init(
         api: APIClient = .shared,
-        location: any LocationProviding = FallbackLocationProvider.shared,
+        location: any LocationProviding = DeviceLocationProvider.shared,
         radiusMiles: Double = 2
     ) {
         self.api = api

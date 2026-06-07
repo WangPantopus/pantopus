@@ -41,7 +41,7 @@ import app.pantopus.android.ui.theme.Spacing
  * Custom bottom bar matching the Pantopus design spec: 78dp tall, semi-
  * transparent white surface with a 12dp backdrop blur on API 31+, a 1dp
  * top border, 4 evenly-spaced tabs, active tint `primary600`, inactive
- * tint `appTextSecondary`. The [PantopusRoute.Inbox] tab accepts a badge count.
+ * tint `appTextSecondary`. The [PantopusRoute.Messages] tab accepts a badge count.
  *
  * @param selected Currently selected route.
  * @param onSelect Called when the user taps a different tab.
@@ -128,7 +128,7 @@ private fun TabItem(
                 size = 22.dp,
                 tint = tint,
             )
-            if (route is PantopusRoute.Inbox && badge > 0) {
+            if (route is PantopusRoute.Messages && badge > 0) {
                 InboxBadge(count = badge, modifier = Modifier.padding(start = Spacing.s3))
             }
         }

@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigQuestionDto
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.payments.TipRequest
 import app.pantopus.android.data.api.net.NetworkResult
@@ -27,6 +28,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
@@ -83,9 +86,34 @@ class GigDetailViewModel
         private val _events = MutableSharedFlow<GigTipEvent>(extraBufferCapacity = 4)
         val events: SharedFlow<GigTipEvent> = _events.asSharedFlow()
 
+        private val _openChatEvents = MutableSharedFlow<GigOpenChatEvent>(extraBufferCapacity = 1)
+        val openChatEvents: SharedFlow<GigOpenChatEvent> = _openChatEvents.asSharedFlow()
+
         private var rawGig: GigDto? = null
         private var canMarkDelivered = false
         private var canTip = false
+        private var viewerIsOwner = false
+
+        private val _questions = MutableStateFlow<List<GigQuestionDto>>(emptyList())
+        val questions: StateFlow<List<GigQuestionDto>> = _questions.asStateFlow()
+
+        private val _questionsLoading = MutableStateFlow(false)
+        val questionsLoading: StateFlow<Boolean> = _questionsLoading.asStateFlow()
+
+        private val _newQuestionText = MutableStateFlow("")
+        val newQuestionText: StateFlow<String> = _newQuestionText.asStateFlow()
+
+        private val _answeringQuestionId = MutableStateFlow<String?>(null)
+        val answeringQuestionId: StateFlow<String?> = _answeringQuestionId.asStateFlow()
+
+        private val _answerDraftText = MutableStateFlow("")
+        val answerDraftText: StateFlow<String> = _answerDraftText.asStateFlow()
+
+        private val _questionSubmitting = MutableStateFlow(false)
+        val questionSubmitting: StateFlow<Boolean> = _questionSubmitting.asStateFlow()
+
+        private val _answerSubmitting = MutableStateFlow(false)
+        val answerSubmitting: StateFlow<Boolean> = _answerSubmitting.asStateFlow()
 
         /** Payment id of the in-flight tip, used to reconcile after PaymentSheet. */
         private var pendingTipPaymentId: String? = null
@@ -99,6 +127,82 @@ class GigDetailViewModel
         /** True when the poster can tip the worker on this completed gig (3D). */
         fun canTip(): Boolean = canTip
 
+        /** True when the signed-in viewer owns this gig. */
+        fun viewerIsOwner(): Boolean = viewerIsOwner
+
+        fun canAskQuestion(): Boolean = currentUserId() != null && !viewerIsOwner
+
+        fun setNewQuestionText(value: String) {
+            _newQuestionText.value = value.take(1000)
+        }
+
+        fun setAnswerDraftText(value: String) {
+            _answerDraftText.value = value.take(2000)
+        }
+
+        fun beginAnswering(questionId: String) {
+            _answeringQuestionId.value = questionId
+            _answerDraftText.value = ""
+        }
+
+        fun cancelAnswering() {
+            _answeringQuestionId.value = null
+            _answerDraftText.value = ""
+        }
+
+        fun loadQuestions() {
+            viewModelScope.launch {
+                _questionsLoading.value = true
+                when (val result = repo.questions(gigId)) {
+                    is NetworkResult.Success -> _questions.value = result.data.questions
+                    is NetworkResult.Failure -> _questions.value = emptyList()
+                }
+                _questionsLoading.value = false
+            }
+        }
+
+        fun submitQuestion(onError: (String) -> Unit = {}) {
+            val trimmed = _newQuestionText.value.trim()
+            if (trimmed.length < 5) {
+                onError("Question must be at least 5 characters.")
+                return
+            }
+            viewModelScope.launch {
+                _questionSubmitting.value = true
+                when (val result = repo.askQuestion(gigId, trimmed)) {
+                    is NetworkResult.Success -> {
+                        _newQuestionText.value = ""
+                        loadQuestions()
+                    }
+                    is NetworkResult.Failure -> onError(result.error.message)
+                }
+                _questionSubmitting.value = false
+            }
+        }
+
+        fun submitAnswer(
+            questionId: String,
+            onError: (String) -> Unit = {},
+        ) {
+            val trimmed = _answerDraftText.value.trim()
+            if (trimmed.isEmpty()) {
+                onError("Answer can't be empty.")
+                return
+            }
+            viewModelScope.launch {
+                _answerSubmitting.value = true
+                when (val result = repo.answerQuestion(gigId, questionId, trimmed)) {
+                    is NetworkResult.Success -> {
+                        _answeringQuestionId.value = null
+                        _answerDraftText.value = ""
+                        loadQuestions()
+                    }
+                    is NetworkResult.Failure -> onError(result.error.message)
+                }
+                _answerSubmitting.value = false
+            }
+        }
+
         private fun currentUserId(): String? = (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
 
         fun load() {
@@ -107,6 +211,8 @@ class GigDetailViewModel
                 when (val result = repo.detail(gigId)) {
                     is NetworkResult.Success -> {
                         rawGig = result.data.gig
+                        viewerIsOwner =
+                            currentUserId()?.let { it == result.data.gig.userId } == true
                         canMarkDelivered = viewerCanMarkDelivered(result.data.gig, currentUserId())
                         canTip = viewerCanTip(result.data.gig, currentUserId())
                         var bids: List<GigBidDto> = emptyList()
@@ -116,8 +222,15 @@ class GigDetailViewModel
                         }
                         _state.value =
                             ContentDetailUiState.Loaded(
-                                Projection.project(result.data.gig, bids, canMarkDelivered, canTip),
+                                Projection.project(
+                                    result.data.gig,
+                                    bids,
+                                    canMarkDelivered,
+                                    canTip,
+                                    currentUserId(),
+                                ),
                             )
+                        loadQuestions()
                     }
                     is NetworkResult.Failure -> {
                         _state.value = ContentDetailUiState.Error(result.error.message)
@@ -242,25 +355,78 @@ class GigDetailViewModel
             _tipStatus.value = TipStatus.Idle
         }
 
+        /** Get-or-create the gig chat room, then emit navigation payload. */
+        fun openGigChat() {
+            val gig = rawGig ?: return
+            val poster = gig.posterIdentity()
+            val name = poster?.resolvedDisplayName() ?: gig.title
+            val initials = Projection.initialsFromName(name)
+            val verified = poster?.resolvedVerified() == true
+            viewModelScope.launch {
+                when (val result = repo.chatRoom(gigId)) {
+                    is NetworkResult.Success ->
+                        _openChatEvents.emit(
+                            GigOpenChatEvent(
+                                roomId = result.data.roomId,
+                                displayName = name,
+                                initials = initials,
+                                verified = verified,
+                            ),
+                        )
+                    is NetworkResult.Failure -> Unit
+                }
+            }
+        }
+
         object Projection {
             /**
-             * Splits on the explicit `is_v2` discriminator: V2 ("Magic Task")
-             * gets the rich surface, legacy V1 gets the sparse layout (which
-             * also carries the awarded terminal state). The full design-spec
-             * V2 frame is rendered from [GigDetailSampleData] until the Magic
-             * Task JSONB is wired through the backend (out of scope per P8.2).
+             * V2 ("Magic Task") is the default for open gigs. Legacy V1 is
+             * used only when `is_v2 == false` or when an awarded terminal
+             * state has no explicit V2 flag.
              */
             fun project(
                 gig: GigDto,
                 bids: List<GigBidDto>,
                 canMarkDelivered: Boolean = false,
                 canTip: Boolean = false,
+                viewerUserId: String? = null,
             ): ContentDetailContent {
-                return if (gig.isV2 == true) {
-                    projectTaskV2(gig, bids, canMarkDelivered, canTip)
+                return if (shouldProjectTaskV2(gig)) {
+                    projectTaskV2(gig, bids, canMarkDelivered, canTip, viewerUserId)
                 } else {
-                    projectGigV1(gig, bids, canTip)
+                    projectGigV1(gig, bids, canTip, viewerUserId)
                 }
+            }
+
+            fun posterCounterparty(
+                gig: GigDto,
+                viewerUserId: String?,
+            ): ContentDetailCounterparty? {
+                val posterId = gig.userId?.takeIf { it.isNotEmpty() } ?: return null
+                val creator = gig.posterIdentity()
+                val name = creator?.resolvedDisplayName() ?: "Neighbor"
+                val handle = creator?.resolvedHandle()?.let { "@$it" }
+                val showsButton = viewerUserId?.let { it != posterId } ?: true
+                return ContentDetailCounterparty(
+                    displayName = name,
+                    initials = initialsFromName(name),
+                    avatarUrl = creator?.resolvedAvatarUrl(),
+                    identityKind = null,
+                    verified = creator?.resolvedVerified() == true,
+                    rating = null,
+                    trailing = handle,
+                    showsMessageButton = showsButton,
+                )
+            }
+
+            fun initialsFromName(name: String): String =
+                name.split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
+
+            /** `is_v2 == false` → V1; `true` → V2; `null` → V2 unless awarded. */
+            private fun shouldProjectTaskV2(gig: GigDto): Boolean {
+                if (gig.isV2 == false) return false
+                if (gig.isV2 == true) return true
+                return !isAwarded(gig)
             }
 
             /** Poster dock on a completed gig — primary becomes "Send a tip" (3D). */
@@ -275,6 +441,7 @@ class GigDetailViewModel
                 bids: List<GigBidDto>,
                 canMarkDelivered: Boolean,
                 canTip: Boolean = false,
+                viewerUserId: String? = null,
             ): ContentDetailContent {
                 val category = GigsCategory.fromBackendKey(gig.category)
                 val bidCount = gig.bidCount ?: bids.size
@@ -290,20 +457,9 @@ class GigDetailViewModel
                         categoryChip = ContentDetailCategoryChip(category.label, category),
                         meta = metaPieces.takeIf { it.isNotEmpty() }?.joinToString(" · "),
                         priceLine = priceLine,
-                        priceCaption = if (priceLine != null) "budget" else null,
+                        priceCaption = if (priceLine != null) "budget · cash or transfer" else null,
                     )
-                val statStrip =
-                    listOfNotNull(
-                        gig.scheduleType?.takeIf { it.isNotEmpty() }?.let {
-                            ContentDetailStat(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, "schedule")
-                        },
-                        gig.taskArchetype?.takeIf { it.isNotEmpty() }?.let {
-                            ContentDetailStat(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, "type")
-                        },
-                        gig.engagementMode?.takeIf { it.isNotEmpty() }?.let {
-                            ContentDetailStat(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, "mode")
-                        },
-                    ).take(3)
+                val statStrip = statRows(gig)
                 val modules =
                     buildList {
                         gig.description?.takeIf { it.isNotEmpty() }?.let {
@@ -317,13 +473,23 @@ class GigDetailViewModel
                             )
                         }
                         addAll(locationModules(gig))
+                        locationMapModule(gig)?.let { add(it) }
                         gig.scheduledStart?.takeIf { it.isNotEmpty() }?.let { iso ->
                             add(
                                 ContentDetailModule.CaptionedText(
                                     id = "when",
                                     title = "When",
                                     icon = PantopusIcon.Calendar,
-                                    label = iso,
+                                    label = formatScheduledStart(iso),
+                                ),
+                            )
+                        } ?: gig.deadline?.takeIf { it.isNotEmpty() }?.let { iso ->
+                            add(
+                                ContentDetailModule.CaptionedText(
+                                    id = "by",
+                                    title = "By",
+                                    icon = PantopusIcon.Calendar,
+                                    label = formatScheduledStart(iso),
                                 ),
                             )
                         }
@@ -401,6 +567,7 @@ class GigDetailViewModel
                     statusPill = statusPill,
                     hero = hero,
                     statStrip = statStrip,
+                    counterparty = posterCounterparty(gig, viewerUserId),
                     modules = modules,
                     trustCapsules = emptyList(),
                     dock = dock,
@@ -449,10 +616,35 @@ class GigDetailViewModel
                 return emptyList()
             }
 
+            private fun locationMapModule(gig: GigDto): ContentDetailModule.LocationMap? {
+                val coordinate = resolveMapCoordinate(gig) ?: return null
+                val approximate = gig.locationUnlocked != true
+                val footnote =
+                    if (approximate) {
+                        "Approximate area — the circle covers ~500m around the actual location. Tap to explore."
+                    } else {
+                        "Tap to pan and zoom the map."
+                    }
+                return ContentDetailModule.LocationMap(
+                    latitude = coordinate.first,
+                    longitude = coordinate.second,
+                    isApproximate = approximate,
+                    footnote = footnote,
+                    category = GigsCategory.fromBackendKey(gig.category),
+                )
+            }
+
+            private fun resolveMapCoordinate(gig: GigDto): Pair<Double, Double>? {
+                val lat = gig.latitude ?: gig.location?.latitude ?: gig.approxLocation?.latitude
+                val lng = gig.longitude ?: gig.location?.longitude ?: gig.approxLocation?.longitude
+                return if (lat != null && lng != null) lat to lng else null
+            }
+
             private fun projectGigV1(
                 gig: GigDto,
                 bids: List<GigBidDto>,
                 canTip: Boolean = false,
+                viewerUserId: String? = null,
             ): ContentDetailContent {
                 val awarded = isAwarded(gig)
                 val bidCount = gig.bidCount ?: bids.size
@@ -490,17 +682,7 @@ class GigDetailViewModel
                         gig.description?.takeIf { it.isNotEmpty() }?.let {
                             add(ContentDetailModule.Description(id = "desc", title = "Description", icon = null, body = it))
                         }
-                        (gig.creator?.name ?: gig.creator?.username)?.let { poster ->
-                            val posted = relativeAge(gig.createdAt)?.let { " · $it ago" } ?: ""
-                            add(
-                                ContentDetailModule.CaptionedText(
-                                    id = "postedby",
-                                    title = "Posted by",
-                                    icon = null,
-                                    label = "$poster$posted",
-                                ),
-                            )
-                        }
+                        locationMapModule(gig)?.let { add(it) }
                         if (bids.isNotEmpty()) {
                             add(
                                 ContentDetailModule.Bids(
@@ -517,6 +699,7 @@ class GigDetailViewModel
                     statusPill = gigV1StatusPill(awarded),
                     hero = hero,
                     statStrip = emptyList(),
+                    counterparty = posterCounterparty(gig, viewerUserId),
                     modules = modules,
                     trustCapsules = emptyList(),
                     dock = gigV1Dock(canTip = canTip, awarded = awarded),
@@ -568,14 +751,14 @@ class GigDetailViewModel
                 bids: List<GigBidDto>,
             ): String? {
                 val winner = bids.firstOrNull { it.userId == gig.acceptedBy }
-                return winner?.bidder?.name ?: winner?.bidder?.username
+                return winner?.bidderIdentity()?.resolvedDisplayName()
             }
 
             private fun projectBid(
                 bid: GigBidDto,
                 acceptedBy: String? = null,
             ): ContentDetailBidRow {
-                val name = bid.bidder?.name ?: bid.bidder?.username ?: "Bidder"
+                val name = bid.bidderIdentity()?.resolvedDisplayName() ?: "Bidder"
                 val initials =
                     name.split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
                 val amount = bid.bidAmount ?: bid.amount ?: 0.0
@@ -589,7 +772,7 @@ class GigDetailViewModel
                     displayName = name,
                     ratingLine = "verified neighbor",
                     amount = amountLabel,
-                    verified = bid.bidder?.verified ?: false,
+                    verified = bid.bidderIdentity()?.resolvedVerified() == true,
                     won = won,
                     dimmed = dimmed,
                 )
@@ -632,6 +815,53 @@ class GigDetailViewModel
                     }
                 }.getOrNull()
             }
+
+            private fun statRows(gig: GigDto): List<ContentDetailStat> {
+                val out = mutableListOf<ContentDetailStat>()
+                gig.scheduledStart?.takeIf { it.isNotEmpty() }?.let { scheduled ->
+                    out.add(ContentDetailStat(formatScheduledDate(scheduled), "fixed date"))
+                } ?: gig.scheduleType?.takeIf { it.isNotEmpty() }?.let { schedule ->
+                    out.add(
+                        ContentDetailStat(
+                            schedule.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                            "schedule",
+                        ),
+                    )
+                }
+                gig.taskArchetype?.takeIf { it.isNotEmpty() }?.let { archetype ->
+                    out.add(
+                        ContentDetailStat(
+                            archetype.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                            "type",
+                        ),
+                    )
+                }
+                gig.engagementMode?.takeIf { it.isNotEmpty() }?.let { engagement ->
+                    out.add(
+                        ContentDetailStat(
+                            engagement.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                            "mode",
+                        ),
+                    )
+                }
+                return out.take(3)
+            }
+
+            private fun formatScheduledStart(iso: String): String =
+                parseInstant(iso)?.let { instant ->
+                    DateTimeFormatter.ofPattern("EEE MMM d · h:mm a")
+                        .withZone(ZoneId.systemDefault())
+                        .format(instant)
+                } ?: iso
+
+            private fun formatScheduledDate(iso: String): String =
+                parseInstant(iso)?.let { instant ->
+                    DateTimeFormatter.ofPattern("EEE MMM d")
+                        .withZone(ZoneId.systemDefault())
+                        .format(instant)
+                } ?: iso
+
+            private fun parseInstant(iso: String): Instant? = runCatching { Instant.parse(iso) }.getOrNull()
         }
     }
 

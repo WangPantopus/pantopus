@@ -23,25 +23,42 @@ public struct PulseComposeView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let onPosted: @MainActor (String?) -> Void
+    private let onCancel: @MainActor () -> Void
+    private let managesDismiss: Bool
 
     public init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
+        postingTarget: PulsePostingTarget? = nil,
+        composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
+        managesDismiss: Bool = true,
+        onCancel: @escaping @MainActor () -> Void = {},
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: PulseComposeViewModel(
             intent: intent,
             identity: identity,
+            postingTarget: postingTarget,
+            composePurpose: composePurpose,
             postId: postId
         ))
+        self.managesDismiss = managesDismiss
+        self.onCancel = onCancel
         self.onPosted = onPosted
     }
 
     /// Test seam — accept a pre-built view-model so tests can drive
     /// state without touching the network.
-    init(viewModel: PulseComposeViewModel, onPosted: @escaping @MainActor (String?) -> Void = { _ in }) {
+    init(
+        viewModel: PulseComposeViewModel,
+        managesDismiss: Bool = true,
+        onCancel: @escaping @MainActor () -> Void = {},
+        onPosted: @escaping @MainActor (String?) -> Void = { _ in }
+    ) {
         _viewModel = State(initialValue: viewModel)
+        self.managesDismiss = managesDismiss
+        self.onCancel = onCancel
         self.onPosted = onPosted
     }
 
@@ -52,7 +69,7 @@ public struct PulseComposeView: View {
             isValid: viewModel.isValid,
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSubmitting,
-            onClose: { dismiss() },
+            onClose: closeCompose,
             onCommit: {
                 Task { await viewModel.submit() }
             },
@@ -103,8 +120,16 @@ public struct PulseComposeView: View {
                 // Hold the success toast briefly so the user sees it.
                 try? await Task.sleep(nanoseconds: 700_000_000)
                 onPosted(postId)
-                dismiss()
+                closeCompose()
             }
+        }
+    }
+
+    private func closeCompose() {
+        if managesDismiss {
+            dismiss()
+        } else {
+            onCancel()
         }
     }
 
@@ -132,6 +157,7 @@ public struct PulseComposeView: View {
             onSelectVisibility: { viewModel.visibility = $0 },
             onSelectLostFoundKind: { viewModel.lostFoundKind = $0 },
             onSelectAnnounceAudience: { viewModel.announceAudience = $0 },
+            onSelectSafetyAlertKind: { viewModel.safetyAlertKind = $0 },
             onSelectAskCategory: { viewModel.askCategory = $0 },
             onSelectRecommendRating: { viewModel.recommendRating = $0 },
             onUpdateField: { viewModel.update($0, to: $1) },
@@ -168,11 +194,15 @@ public extension PulseComposeViewModel {
             visibility: visibility,
             lostFoundKind: lostFoundKind,
             announceAudience: announceAudience,
+            safetyAlertKind: safetyAlertKind,
             askCategory: askCategory,
             recommendRating: recommendRating,
             fields: fields,
             photos: photos,
-            isIntentLocked: isIntentLocked
+            isIntentLocked: isIntentLocked,
+            isFlowMode: isFlowMode,
+            composePurpose: composePurpose,
+            postingTargetLabel: postingTarget?.displayLabel
         )
     }
 }

@@ -61,9 +61,9 @@ final class SettingsViewModelTests: XCTestCase {
         let allRowIds = Set(groups.flatMap { $0.rows.map(\.id) })
         // Six sub-routes wired in P8; two stay placeholders (export +
         // paymentsPayouts).
-        let wired: Set = ["blocks", "password", "verification", "help", "legal", "about"]
+        let wired: Set<String> = ["blocks", "password", "verification", "help", "legal", "about"]
         XCTAssertTrue(wired.isSubset(of: allRowIds), "Missing wired row ids: \(wired.subtracting(allRowIds))")
-        let placeheld: Set = ["export", "paymentsPayouts"]
+        let placeheld: Set<String> = ["export", "paymentsPayouts"]
         XCTAssertTrue(placeheld.isSubset(of: allRowIds), "Placeholder routes must still surface in the index.")
     }
 }
