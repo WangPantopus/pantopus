@@ -193,28 +193,31 @@ class PulseFeedViewModel
             }
         }
 
-        private suspend fun resolvedCoordinates(): Pair<Double?, Double?> {
-            latitude?.let { lat ->
-                longitude?.let { lng ->
-                    return lat to lng
-                }
-            }
-            resolvedLatitude?.let { lat ->
-                resolvedLongitude?.let { lng ->
-                    return lat to lng
-                }
-            }
-            locationProvider.cachedCoordinate()?.let { cached ->
-                resolvedLatitude = cached.latitude
-                resolvedLongitude = cached.longitude
-                return cached.latitude to cached.longitude
-            }
-            locationProvider.requestCurrent(timeoutMillis = 4_000)?.let { fresh ->
-                resolvedLatitude = fresh.latitude
-                resolvedLongitude = fresh.longitude
-                return fresh.latitude to fresh.longitude
-            }
-            return null to null
+        private suspend fun resolvedCoordinates(): Pair<Double?, Double?> =
+            explicitCoordinates()
+                ?: storedCoordinates()
+                ?: awaitFreshCoordinates()
+                ?: (null to null)
+
+        private fun explicitCoordinates(): Pair<Double, Double>? {
+            val lat = latitude ?: return null
+            val lng = longitude ?: return null
+            return lat to lng
+        }
+
+        private fun storedCoordinates(): Pair<Double, Double>? {
+            val lat = resolvedLatitude ?: return null
+            val lng = resolvedLongitude ?: return null
+            return lat to lng
+        }
+
+        private suspend fun awaitFreshCoordinates(): Pair<Double, Double>? {
+            val cached = locationProvider.cachedCoordinate()
+            val fresh = cached ?: locationProvider.requestCurrent(timeoutMillis = 4_000)
+            val coordinate = fresh ?: return null
+            resolvedLatitude = coordinate.latitude
+            resolvedLongitude = coordinate.longitude
+            return coordinate.latitude to coordinate.longitude
         }
 
         private fun projectCard(post: FeedPost): PulsePostCardContent {

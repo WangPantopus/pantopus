@@ -28,6 +28,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /** Wraps the `/api/gigs` endpoints in the [NetworkResult] taxonomy. */
+@Suppress("TooManyFunctions")
 @Singleton
 class GigsRepository
     @Inject

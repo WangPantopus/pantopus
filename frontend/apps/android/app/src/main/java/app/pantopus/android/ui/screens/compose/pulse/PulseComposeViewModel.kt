@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "LargeClass")
 
 package app.pantopus.android.ui.screens.compose.pulse
 
@@ -783,6 +783,7 @@ class PulseComposeViewModel
         // MARK: - Request assembly
 
         /** Compose the `POST /api/posts` body from active-intent state. */
+        @Suppress("LongMethod")
         fun buildRequest(): PostCreateRequest {
             val bodyValue = trimmedValue(PulseComposeField.Body)
             val titleValue = trimmedValue(PulseComposeField.Title)

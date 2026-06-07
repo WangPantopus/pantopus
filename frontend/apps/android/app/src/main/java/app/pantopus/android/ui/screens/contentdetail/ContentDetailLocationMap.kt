@@ -106,44 +106,57 @@ fun ContentDetailLocationMapSection(
     }
 
     if (expanded) {
-        Dialog(
-            onDismissRequest = { expanded = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+        LocationMapExpandedDialog(
+            map = map,
+            renderGoogleMap = renderGoogleMap,
+            onDismiss = { expanded = false },
+        )
+    }
+}
+
+@Composable
+private fun LocationMapExpandedDialog(
+    map: ContentDetailModule.LocationMap,
+    renderGoogleMap: Boolean,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(PantopusColors.appSurface)
+                    .testTag("contentDetailLocationMapExpanded"),
         ) {
+            LocationMapCanvas(
+                map = map,
+                interactive = true,
+                renderGoogleMap = renderGoogleMap,
+                modifier = Modifier.fillMaxSize(),
+            )
             Box(
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .background(PantopusColors.appSurface)
-                        .testTag("contentDetailLocationMapExpanded"),
+                        .align(Alignment.TopStart)
+                        .padding(start = Spacing.s4, top = Spacing.s4)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.92f))
+                        .border(1.dp, PantopusColors.appBorder.copy(alpha = 0.7f), CircleShape)
+                        .clickable(onClick = onDismiss)
+                        .testTag("contentDetailLocationMapClose"),
+                contentAlignment = Alignment.Center,
             ) {
-                LocationMapCanvas(
-                    map = map,
-                    interactive = true,
-                    renderGoogleMap = renderGoogleMap,
-                    modifier = Modifier.fillMaxSize(),
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = "Close map",
+                    size = 16.dp,
+                    strokeWidth = 2.2f,
+                    tint = PantopusColors.appText,
                 )
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopStart)
-                            .padding(start = Spacing.s4, top = Spacing.s4)
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.92f))
-                            .border(1.dp, PantopusColors.appBorder.copy(alpha = 0.7f), CircleShape)
-                            .clickable { expanded = false }
-                            .testTag("contentDetailLocationMapClose"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.X,
-                        contentDescription = "Close map",
-                        size = 16.dp,
-                        strokeWidth = 2.2f,
-                        tint = PantopusColors.appText,
-                    )
-                }
             }
         }
     }

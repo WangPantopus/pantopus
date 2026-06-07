@@ -4,6 +4,7 @@ package app.pantopus.android.data.api.models.businesses
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
+import java.util.Locale
 
 /**
  * `BusinessProfile.service_area` — backend stores jsonb that may be a legacy
@@ -33,18 +34,18 @@ data class BusinessServiceAreaDto(
             radiusMiles != null -> {
                 val formatted =
                     if (radiusMiles % 1.0 == 0.0) {
-                        String.format("%.0f mi", radiusMiles)
+                        String.format(Locale.US, "%.0f mi", radiusMiles)
                     } else {
-                        String.format("%.1f mi", radiusMiles)
+                        String.format(Locale.US, "%.1f mi", radiusMiles)
                     }
                 segments += "within $formatted"
             }
             radiusKm != null -> {
                 val formatted =
                     if (radiusKm % 1.0 == 0.0) {
-                        String.format("%.0f km", radiusKm)
+                        String.format(Locale.US, "%.0f km", radiusKm)
                     } else {
-                        String.format("%.1f km", radiusKm)
+                        String.format(Locale.US, "%.1f km", radiusKm)
                     }
                 segments += "within $formatted"
             }

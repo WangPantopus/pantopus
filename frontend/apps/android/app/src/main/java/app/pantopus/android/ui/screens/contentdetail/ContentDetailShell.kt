@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "TooManyFunctions")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "TooManyFunctions", "LongParameterList")
 
 package app.pantopus.android.ui.screens.contentdetail
 

@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "LongParameterList")
 
 package app.pantopus.android.ui.screens.shared.map_list_hybrid
 

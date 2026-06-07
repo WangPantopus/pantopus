@@ -51,13 +51,13 @@ data class FeedPostCreator(
 ) {
     /** Best-effort display name across legacy and identity-projection fields. */
     fun displayName(): String {
-        if (!authorDisplayName.isNullOrEmpty()) return authorDisplayName
-        if (!name.isNullOrEmpty()) return name
         val combined = listOfNotNull(firstName, lastName).filter { it.isNotEmpty() }.joinToString(" ")
-        if (combined.isNotEmpty()) return combined
-        if (!username.isNullOrEmpty()) return "@$username"
-        if (!handle.isNullOrEmpty()) return "@$handle"
-        return "Pantopus user"
+        return authorDisplayName?.takeIf { it.isNotEmpty() }
+            ?: name?.takeIf { it.isNotEmpty() }
+            ?: combined.takeIf { it.isNotEmpty() }
+            ?: username?.takeIf { it.isNotEmpty() }?.let { "@$it" }
+            ?: handle?.takeIf { it.isNotEmpty() }?.let { "@$it" }
+            ?: "Pantopus user"
     }
 }
 

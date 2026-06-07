@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod")
+@file:Suppress("LongMethod", "LongParameterList", "MagicNumber")
 
 package app.pantopus.android.ui.screens.compose.pulse
 

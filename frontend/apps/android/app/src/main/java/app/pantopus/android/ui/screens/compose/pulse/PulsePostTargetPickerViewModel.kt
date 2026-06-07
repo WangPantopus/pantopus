@@ -2,6 +2,8 @@ package app.pantopus.android.ui.screens.compose.pulse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.businesses.BusinessMembership
+import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.models.homes.areaLabel
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.services.GeoApi
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 data class PulseHomeTargetOption(
@@ -68,16 +71,7 @@ class PulsePostTargetPickerViewModel
                         return@launch
                     }
                     is NetworkResult.Success -> {
-                        _homes.value =
-                            homesResult.data.homes.mapNotNull { row ->
-                                val loc = row.location ?: return@mapNotNull null
-                                PulseHomeTargetOption(
-                                    id = row.id,
-                                    label = row.areaLabel(),
-                                    latitude = loc.latitude,
-                                    longitude = loc.longitude,
-                                )
-                            }
+                        _homes.value = mapHomes(homesResult.data.homes)
                     }
                 }
 
@@ -87,40 +81,7 @@ class PulsePostTargetPickerViewModel
                         return@launch
                     }
                     is NetworkResult.Success -> {
-                        val mapped = mutableListOf<PulseBusinessTargetOption>()
-                        for (membership in bizResult.data.businesses) {
-                            val businessId = membership.business.id
-                            when (val detailResult = businessesRepository.business(businessId)) {
-                                is NetworkResult.Success -> {
-                                    val detail = detailResult.data
-                                    val primary =
-                                        detail.locations.firstOrNull { it.isPrimary == true }
-                                            ?: detail.locations.firstOrNull()
-                                    val point = primary?.location ?: continue
-                                    val labelParts =
-                                        listOfNotNull(primary?.city, primary?.state)
-                                            .filter { it.isNotBlank() }
-                                    val label =
-                                        if (labelParts.isEmpty()) {
-                                            membership.business.name
-                                                ?: membership.business.username
-                                                ?: "Business"
-                                        } else {
-                                            labelParts.joinToString(", ")
-                                        }
-                                    mapped +=
-                                        PulseBusinessTargetOption(
-                                            id = businessId,
-                                            name = membership.business.name ?: membership.business.username ?: "Business",
-                                            label = label,
-                                            latitude = point.lat,
-                                            longitude = point.lng,
-                                        )
-                                }
-                                is NetworkResult.Failure -> continue
-                            }
-                        }
-                        _businesses.value = mapped
+                        _businesses.value = mapBusinesses(bizResult.data.businesses)
                     }
                 }
                 _state.value = PulsePostTargetPickerState.Ready
@@ -131,7 +92,13 @@ class PulsePostTargetPickerViewModel
             _isLocating.value = true
             try {
                 val coordinate = locationProvider.requestCurrent() ?: return null
-                var label = String.format("%.2f, %.2f", coordinate.latitude, coordinate.longitude)
+                var label =
+                    String.format(
+                        Locale.US,
+                        "%.2f, %.2f",
+                        coordinate.latitude,
+                        coordinate.longitude,
+                    )
                 try {
                     val response = geoApi.reverse(coordinate.latitude, coordinate.longitude)
                     val locality = response.normalized.localityLabel
@@ -147,5 +114,50 @@ class PulsePostTargetPickerViewModel
             } finally {
                 _isLocating.value = false
             }
+        }
+
+        private fun mapHomes(rows: List<MyHome>) =
+            rows.mapNotNull { row ->
+                val loc = row.location ?: return@mapNotNull null
+                PulseHomeTargetOption(
+                    id = row.id,
+                    label = row.areaLabel(),
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                )
+            }
+
+        private suspend fun mapBusinesses(memberships: List<BusinessMembership>): List<PulseBusinessTargetOption> =
+            memberships.mapNotNull { membership ->
+                mapBusiness(membership)
+            }
+
+        private suspend fun mapBusiness(membership: BusinessMembership): PulseBusinessTargetOption? {
+            val businessId = membership.business.id
+            val detailResult = businessesRepository.business(businessId)
+            if (detailResult is NetworkResult.Failure) return null
+            val detail = (detailResult as NetworkResult.Success).data
+            val primary =
+                detail.locations.firstOrNull { it.isPrimary == true }
+                    ?: detail.locations.firstOrNull()
+            val point = primary?.location ?: return null
+            val labelParts =
+                listOfNotNull(primary?.city, primary?.state)
+                    .filter { it.isNotBlank() }
+            val label =
+                if (labelParts.isEmpty()) {
+                    membership.business.name
+                        ?: membership.business.username
+                        ?: "Business"
+                } else {
+                    labelParts.joinToString(", ")
+                }
+            return PulseBusinessTargetOption(
+                id = businessId,
+                name = membership.business.name ?: membership.business.username ?: "Business",
+                label = label,
+                latitude = point.lat,
+                longitude = point.lng,
+            )
         }
     }
