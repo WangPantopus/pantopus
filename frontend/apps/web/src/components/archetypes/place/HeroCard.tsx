@@ -31,14 +31,27 @@ export interface HeroCardProps {
   /** Large glyph beside the title. */
   mainIcon: LucideIcon;
   nudge?: HeroNudge;
+  /** Tap-through to the full Today's Pulse stream (W2.5). When set, the
+   *  title row becomes the expand affordance (chevron). */
+  onOpen?: () => void;
   className?: string;
 }
 
-export default function HeroCard({ variant = 'allclear', title, chip, mainIcon: MainIcon, nudge, className = '' }: HeroCardProps) {
+export default function HeroCard({ variant = 'allclear', title, chip, mainIcon: MainIcon, nudge, onOpen, className = '' }: HeroCardProps) {
   const alert = variant === 'alert';
   const tile = alert ? 'bg-app-warning-bg text-app-warning' : 'bg-app-home-bg text-app-home';
   const NudgeIcon = nudge?.icon;
   const nudgeInteractive = Boolean(nudge?.onClick);
+
+  const titleRow = (
+    <>
+      <span className={`inline-flex items-center justify-center shrink-0 w-[42px] h-[42px] rounded-xl ${tile}`}>
+        <MainIcon size={22} strokeWidth={2} />
+      </span>
+      <p className="flex-1 text-[17px] font-semibold text-app-text leading-[23px] -tracking-[0.012em]">{title}</p>
+      {onOpen ? <ChevronRight size={20} strokeWidth={2.25} className="shrink-0 mt-0.5 text-app-text-muted" /> : null}
+    </>
+  );
 
   return (
     <div className={`bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 ${className}`}>
@@ -49,12 +62,18 @@ export default function HeroCard({ variant = 'allclear', title, chip, mainIcon: 
         <Chip label={chip.label} variant={alert ? 'warning' : 'success'} icon={chip.icon} />
       </div>
 
-      <div className="flex items-start gap-3 mb-3.5">
-        <span className={`inline-flex items-center justify-center shrink-0 w-[42px] h-[42px] rounded-xl ${tile}`}>
-          <MainIcon size={22} strokeWidth={2} />
-        </span>
-        <p className="text-[17px] font-semibold text-app-text leading-[23px] -tracking-[0.012em]">{title}</p>
-      </div>
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label="See your full Today's Pulse"
+          className="w-full flex items-start gap-3 mb-3.5 text-left cursor-pointer"
+        >
+          {titleRow}
+        </button>
+      ) : (
+        <div className="flex items-start gap-3 mb-3.5">{titleRow}</div>
+      )}
 
       {nudge ? (
         nudgeInteractive ? (

@@ -32,6 +32,8 @@ export interface PlaceDashboardViewProps {
   /** Tap-through to a group-detail page (W2.3). Cards only show the
    *  chevron when their group has a detail screen. */
   onOpenSection?: (slug: string) => void;
+  /** Expand the hero into the full Today's Pulse stream (W2.5). */
+  onOpenPulse?: () => void;
   /** The resident's places — when 2+, the header opens the multi-home switcher. */
   switchHomes?: PlaceSwitcherHome[];
   /** The home currently shown (highlighted in the switcher). */
@@ -49,6 +51,7 @@ export default function PlaceDashboardView({
   homeId,
   userInitials,
   onOpenSection,
+  onOpenPulse,
   switchHomes,
   activeHomeId,
   onSwitchHome,
@@ -95,6 +98,7 @@ export default function PlaceDashboardView({
           chip={pulse.chip}
           mainIcon={pulse.mainIcon}
           nudge={pulse.nudge}
+          onOpen={onOpenPulse}
         />
       </div>
 
