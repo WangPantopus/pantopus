@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Mail, ShieldHalf, Hourglass, FileText, Clock,
   AlertCircle, KeyRound, Upload, ShieldCheck, LogOut, HelpCircle, ChevronRight,
@@ -45,16 +45,24 @@ function getStatusConfig(status: string, access: any): StatusConfig {
 function WaitingRoomContent() {
   const router = useRouter();
   const { id: homeId } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const { access, loading, needsVerification, reload } = useHomeAccess(homeId);
+
+  // The Place verify flow routes here with ?return=place; the param is
+  // preserved across the method pages so the verified resident lands back
+  // on /app/place (the B3 reveal).
+  const returnToPlace = searchParams.get('return') === 'place';
+  const returnQuery = returnToPlace ? '?return=place' : '';
+  const verifiedDest = returnToPlace ? '/app/place?verified=1' : `/app/homes/${homeId}/dashboard`;
 
   useEffect(() => { if (!getAuthToken()) router.push('/login'); }, [router]);
 
-  // Auto-redirect to dashboard once verified
+  // Auto-redirect once verified — back to /app/place if that's where we came from.
   useEffect(() => {
     if (!loading && access && !needsVerification) {
-      router.replace(`/app/homes/${homeId}/dashboard`);
+      router.replace(verifiedDest);
     }
-  }, [loading, access, needsVerification, homeId, router]);
+  }, [loading, access, needsVerification, router, verifiedDest]);
 
   const handleMoveOut = useCallback(async () => {
     const yes = await confirmStore.open({ title: "This isn't my home", description: 'This will remove you from this home. You can request to join again later.', confirmLabel: 'Remove me', variant: 'destructive' });
@@ -115,23 +123,23 @@ function WaitingRoomContent() {
         <div className="w-full space-y-2.5">
           {status === 'pending_postcard' && (
             <ActionCard icon={KeyRound} label="Enter verification code" desc="Enter the code from your postcard"
-              onClick={() => router.push(`/app/homes/${homeId}/verify-postcard`)} />
+              onClick={() => router.push(`/app/homes/${homeId}/verify-postcard${returnQuery}`)} />
           )}
 
           {(status === 'provisional_bootstrap' || status === 'pending_doc' || status === 'provisional') && (
             <ActionCard icon={Upload} label="Upload proof" desc="Speed up verification with a document"
-              onClick={() => router.push(`/app/homes/${homeId}/claim-owner`)} />
+              onClick={() => router.push(`/app/homes/${homeId}/claim-owner/evidence${returnQuery}`)} />
           )}
 
           {(status === 'pending_approval' || status === 'unverified' || status === 'provisional') && (
             <ActionCard icon={ShieldCheck} label="Landlord verification"
               desc={status === 'pending_approval' ? 'Check your approval status' : 'Request landlord approval'}
-              onClick={() => toast.info('Landlord verification flow coming soon')} />
+              onClick={() => router.push(`/app/homes/${homeId}/verify-landlord${returnQuery}`)} />
           )}
 
           {status !== 'pending_postcard' && status !== 'pending_approval' && (
             <ActionCard icon={Mail} label="Verify with mailed code" desc="Receive a code at this address"
-              onClick={() => router.push(`/app/homes/${homeId}/verify-postcard`)} />
+              onClick={() => router.push(`/app/homes/${homeId}/verify-postcard${returnQuery}`)} />
           )}
         </div>
 

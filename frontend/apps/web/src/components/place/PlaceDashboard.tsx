@@ -108,7 +108,7 @@ export default function PlaceDashboard() {
 
   return (
     <Shell>
-      <PlaceDashboardView intelligence={intelQuery.data} />
+      <PlaceDashboardView intelligence={intelQuery.data} homeId={homeId as string} />
     </Shell>
   );
 }

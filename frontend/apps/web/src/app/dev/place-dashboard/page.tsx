@@ -221,10 +221,10 @@ export default function DevPlaceDashboardPage() {
 
         <div className="flex flex-wrap gap-8 items-start">
           <Column label="All clear">
-            <PlaceDashboardView intelligence={build(false)} userInitials="RC" />
+            <PlaceDashboardView intelligence={build(false)} homeId="dev-home" userInitials="RC" />
           </Column>
           <Column label="Active alert">
-            <PlaceDashboardView intelligence={build(true)} userInitials="RC" />
+            <PlaceDashboardView intelligence={build(true)} homeId="dev-home" userInitials="RC" />
           </Column>
           <Column label="Loading">
             <PlaceDashboardSkeleton />
