@@ -370,7 +370,7 @@ private struct PulsePostMediaStrip: View {
             LazyVGrid(
                 columns: [
                     GridItem(.flexible(), spacing: Spacing.s2),
-                    GridItem(.flexible(), spacing: Spacing.s2),
+                    GridItem(.flexible(), spacing: Spacing.s2)
                 ],
                 spacing: Spacing.s2
             ) {

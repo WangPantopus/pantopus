@@ -37,20 +37,20 @@ public struct PulsePostPurposePickerView: View {
             onClose: onBack,
             onCommit: {},
             content: {
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                Text("What is this post for?")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Theme.Color.appText)
+                VStack(alignment: .leading, spacing: Spacing.s3) {
+                    Text("What is this post for?")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
 
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: Spacing.s2), GridItem(.flexible(), spacing: Spacing.s2)],
-                    spacing: Spacing.s2
-                ) {
-                    ForEach(purposes) { purpose in
-                        purposeChip(purpose)
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: Spacing.s2), GridItem(.flexible(), spacing: Spacing.s2)],
+                        spacing: Spacing.s2
+                    ) {
+                        ForEach(purposes) { purpose in
+                            purposeChip(purpose)
+                        }
                     }
                 }
-            }
             }
         )
         .accessibilityIdentifier("pulsePostPurposePicker")

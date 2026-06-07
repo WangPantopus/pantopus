@@ -1,10 +1,10 @@
 package app.pantopus.android.data.posts
 
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Broadcast when a Pulse post is created or edited so feed + My Posts

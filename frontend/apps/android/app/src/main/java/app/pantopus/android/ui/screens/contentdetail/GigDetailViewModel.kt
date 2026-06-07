@@ -861,8 +861,7 @@ class GigDetailViewModel
                         .format(instant)
                 } ?: iso
 
-            private fun parseInstant(iso: String): Instant? =
-                runCatching { Instant.parse(iso) }.getOrNull()
+            private fun parseInstant(iso: String): Instant? = runCatching { Instant.parse(iso) }.getOrNull()
         }
     }
 

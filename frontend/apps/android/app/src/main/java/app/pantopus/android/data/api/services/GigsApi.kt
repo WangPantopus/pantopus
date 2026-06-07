@@ -1,5 +1,7 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.gigs.AnswerGigQuestionBody
+import app.pantopus.android.data.api.models.gigs.AskGigQuestionBody
 import app.pantopus.android.data.api.models.gigs.BoostGigResponse
 import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
@@ -7,8 +9,6 @@ import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
-import app.pantopus.android.data.api.models.gigs.AnswerGigQuestionBody
-import app.pantopus.android.data.api.models.gigs.AskGigQuestionBody
 import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse

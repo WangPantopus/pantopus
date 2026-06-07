@@ -15,7 +15,7 @@ public enum GeoEndpoints {
             path: "/api/geo/reverse",
             query: [
                 "lat": String(latitude),
-                "lon": String(longitude),
+                "lon": String(longitude)
             ]
         )
     }

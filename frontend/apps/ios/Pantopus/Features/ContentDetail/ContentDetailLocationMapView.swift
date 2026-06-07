@@ -143,7 +143,7 @@ struct ContentDetailLocationMapView: View {
 
     private static func cameraPosition(for map: ContentDetailLocationMap) -> MapCameraPosition {
         let center = CLLocationCoordinate2D(latitude: map.latitude, longitude: map.longitude)
-        let spanMeters: CLLocationDistance = map.isApproximate ? 2_400 : 900
+        let spanMeters: CLLocationDistance = map.isApproximate ? 2400 : 900
         return .region(MKCoordinateRegion(
             center: center,
             latitudinalMeters: spanMeters,

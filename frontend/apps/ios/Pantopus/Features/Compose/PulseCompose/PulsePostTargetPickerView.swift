@@ -35,21 +35,21 @@ public struct PulsePostTargetPickerView: View {
             onClose: onCancel,
             onCommit: {},
             content: {
-            switch viewModel.state {
-            case .loading:
-                loadingBody
-            case .ready:
-                listBody
-            case let .error(message):
-                EmptyState(
-                    icon: .alertCircle,
-                    headline: "Couldn't load posting options",
-                    subcopy: message,
-                    cta: EmptyState.CTA(title: "Try again") {
-                        await viewModel.load()
-                    }
-                )
-            }
+                switch viewModel.state {
+                case .loading:
+                    loadingBody
+                case .ready:
+                    listBody
+                case let .error(message):
+                    EmptyState(
+                        icon: .alertCircle,
+                        headline: "Couldn't load posting options",
+                        subcopy: message,
+                        cta: EmptyState.CTA(title: "Try again") {
+                            await viewModel.load()
+                        }
+                    )
+                }
             }
         )
         .task { await viewModel.load() }

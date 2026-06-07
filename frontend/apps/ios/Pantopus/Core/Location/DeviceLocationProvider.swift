@@ -19,7 +19,7 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
     private var pendingLocation: CheckedContinuation<UserCoordinate?, Never>?
     private var pendingAuthorization: CheckedContinuation<Void, Never>?
 
-    private override init() {
+    override private init() {
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
@@ -53,9 +53,9 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
     private var isAuthorized: Bool {
         switch manager.authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 
@@ -73,7 +73,7 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
 
     // MARK: - CLLocationManagerDelegate
 
-    nonisolated public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    public nonisolated func locationManagerDidChangeAuthorization(_: CLLocationManager) {
         Task { @MainActor in
             syncFromLastKnown()
             pendingAuthorization?.resume()
@@ -81,7 +81,7 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
         }
     }
 
-    nonisolated public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    public nonisolated func locationManager(_: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         Task { @MainActor in
             guard let location = locations.last else { return }
             let coordinate = UserCoordinate(location)
@@ -91,7 +91,7 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
         }
     }
 
-    nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    public nonisolated func locationManager(_: CLLocationManager, didFailWithError _: Error) {
         Task { @MainActor in
             pendingLocation?.resume(returning: cached)
             pendingLocation = nil

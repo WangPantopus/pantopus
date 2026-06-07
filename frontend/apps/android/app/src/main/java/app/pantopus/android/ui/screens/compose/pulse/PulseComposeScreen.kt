@@ -326,7 +326,10 @@ internal fun PulseComposeBody(
 }
 
 @Composable
-private fun FlowContextHeader(purpose: PulseComposePurpose?, targetLabel: String?) {
+private fun FlowContextHeader(
+    purpose: PulseComposePurpose?,
+    targetLabel: String?,
+) {
     purpose?.let { p ->
         Row(
             modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s1),

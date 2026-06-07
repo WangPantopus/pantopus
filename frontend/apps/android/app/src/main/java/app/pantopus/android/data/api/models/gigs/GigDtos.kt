@@ -36,11 +36,9 @@ data class GigCreator(
             ?: username?.takeIf { it.isNotEmpty() }
             ?: "Neighbor"
 
-    fun resolvedHandle(): String? =
-        handle?.takeIf { it.isNotEmpty() } ?: username?.takeIf { it.isNotEmpty() }
+    fun resolvedHandle(): String? = handle?.takeIf { it.isNotEmpty() } ?: username?.takeIf { it.isNotEmpty() }
 
-    fun resolvedVerified(): Boolean =
-        verified == true || badges.orEmpty().contains("verified_resident")
+    fun resolvedVerified(): Boolean = verified == true || badges.orEmpty().contains("verified_resident")
 
     fun resolvedAvatarUrl(): String? =
         avatarUrl?.takeIf { it.isNotEmpty() }

@@ -57,7 +57,7 @@ public struct PostCreatorDTO: Decodable, Sendable, Hashable, Identifiable {
         self.city = city
         self.state = state
         self.accountType = accountType
-        self.wireDisplayName = nil
+        wireDisplayName = nil
     }
 
     public init(from decoder: any Decoder) throws {
@@ -73,7 +73,7 @@ public struct PostCreatorDTO: Decodable, Sendable, Hashable, Identifiable {
         lastName = try c.decodeIfPresent(String.self, forKey: .lastName)
         profilePictureURL =
             try c.decodeIfPresent(String.self, forKey: .profilePictureURL)
-            ?? c.decodeIfPresent(String.self, forKey: .avatarUrl)
+                ?? c.decodeIfPresent(String.self, forKey: .avatarUrl)
         city = try c.decodeIfPresent(String.self, forKey: .city)
         state = try c.decodeIfPresent(String.self, forKey: .state)
         accountType = try c.decodeIfPresent(String.self, forKey: .accountType)

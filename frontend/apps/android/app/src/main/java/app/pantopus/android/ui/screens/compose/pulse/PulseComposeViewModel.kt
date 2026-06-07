@@ -272,7 +272,10 @@ class PulseComposeViewModel
 
         val flowTargetLabel: String? get() = postingTarget?.displayLabel
 
-        fun applyFlowContext(target: PulsePostingTarget, purpose: PulseComposePurpose?) {
+        fun applyFlowContext(
+            target: PulsePostingTarget,
+            purpose: PulseComposePurpose?,
+        ) {
             if (flowConfigured) return
             flowConfigured = true
             postingTarget = target
@@ -886,8 +889,7 @@ class PulseComposeViewModel
             return _visibility.value.key
         }
 
-        private fun effectiveAudience(): String =
-            if (postingTarget?.isNetworkTarget == true) "connections" else "nearby"
+        private fun effectiveAudience(): String = if (postingTarget?.isNetworkTarget == true) "connections" else "nearby"
 
         private fun mergeTargetContext(base: PostCreateRequest): PostCreateRequest {
             val target = postingTarget ?: return base

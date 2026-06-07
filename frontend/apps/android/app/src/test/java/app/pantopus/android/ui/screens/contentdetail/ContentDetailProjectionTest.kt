@@ -2,8 +2,8 @@
 
 package app.pantopus.android.ui.screens.contentdetail
 
-import app.pantopus.android.data.api.models.gigs.GigCoordinate
 import app.pantopus.android.data.api.models.gigs.GigBidDto
+import app.pantopus.android.data.api.models.gigs.GigCoordinate
 import app.pantopus.android.data.api.models.gigs.GigCreator
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.listings.ListingDto

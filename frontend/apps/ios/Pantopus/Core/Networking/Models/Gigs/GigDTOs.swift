@@ -448,7 +448,9 @@ public struct GigQuestionDTO: Decodable, Sendable, Identifiable, Hashable {
         case answererDisplayName = "answerer_display_name"
     }
 
-    public var isAnswered: Bool { status == "answered" }
+    public var isAnswered: Bool {
+        status == "answered"
+    }
 }
 
 /// Envelope from `GET /api/gigs/:gigId/questions`.

@@ -48,6 +48,7 @@ class TasksMapViewModel
             MutableStateFlow<MapAnchor?>(
                 location.cachedCoordinate()?.toMapAnchor(),
             )
+
         /** "You are here" anchor handed to the shell. */
         val anchor: StateFlow<MapAnchor?> = _anchor.asStateFlow()
 

@@ -9,11 +9,11 @@ import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.location.LocationProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 data class PulseHomeTargetOption(
     val id: String,

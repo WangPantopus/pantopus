@@ -21,7 +21,9 @@ public enum PulseComposePurpose: String, CaseIterable, Sendable, Hashable, Ident
     case event
     case deal
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -67,7 +69,9 @@ public enum PulseComposePurpose: String, CaseIterable, Sendable, Hashable, Ident
     }
 
     /// Backend `purpose` enum (v1.2).
-    public var apiPurpose: String { rawValue }
+    public var apiPurpose: String {
+        rawValue
+    }
 
     /// Bridge into the legacy five-intent draft form where sections exist.
     public var legacyIntent: PulseComposeIntent {
@@ -83,11 +87,11 @@ public enum PulseComposePurpose: String, CaseIterable, Sendable, Hashable, Ident
     /// Post types allowed per posting target — mirrors mobile
     /// `PostComposerModal` filtering.
     public static func allowed(for target: PulsePostingTarget) -> [PulseComposePurpose] {
-        let placeTypes: Set<String> = [
+        let placeTypes: Set = [
             "ask_local", "recommendation", "event", "lost_found", "alert", "deal",
-            "local_update", "neighborhood_win", "visitor_guide",
+            "local_update", "neighborhood_win", "visitor_guide"
         ]
-        let businessTypes: Set<String> = ["event", "deal", "local_update"]
+        let businessTypes: Set = ["event", "deal", "local_update"]
 
         let allowedPostTypes: Set<String> = switch target {
         case .business: businessTypes

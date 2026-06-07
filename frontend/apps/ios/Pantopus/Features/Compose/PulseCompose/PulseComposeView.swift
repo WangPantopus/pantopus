@@ -50,7 +50,12 @@ public struct PulseComposeView: View {
 
     /// Test seam — accept a pre-built view-model so tests can drive
     /// state without touching the network.
-    init(viewModel: PulseComposeViewModel, managesDismiss: Bool = true, onCancel: @escaping @MainActor () -> Void = {}, onPosted: @escaping @MainActor (String?) -> Void = { _ in }) {
+    init(
+        viewModel: PulseComposeViewModel,
+        managesDismiss: Bool = true,
+        onCancel: @escaping @MainActor () -> Void = {},
+        onPosted: @escaping @MainActor (String?) -> Void = { _ in }
+    ) {
         _viewModel = State(initialValue: viewModel)
         self.managesDismiss = managesDismiss
         self.onCancel = onCancel

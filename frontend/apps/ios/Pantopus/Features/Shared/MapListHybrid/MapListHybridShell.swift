@@ -67,15 +67,23 @@ public struct MapListHybridShell<
 
     /// Vertical room below the safe-area top for the Post-task FAB when
     /// the sheet is at the expanded (90%) stop.
-    private static var fabTopReserve: CGFloat { 56 }
+    private static var fabTopReserve: CGFloat {
+        56
+    }
 
     /// Locate + layers stack height (two 38pt buttons + 8pt gap).
-    private static var mapControlsStackHeight: CGFloat { 84 }
+    private static var mapControlsStackHeight: CGFloat {
+        84
+    }
 
     /// A11.1 — gap above sheet, control stack, gap, then FAB (14+84+14).
-    private static var fabLiftAboveSheet: CGFloat { 112 }
+    private static var fabLiftAboveSheet: CGFloat {
+        112
+    }
 
-    private static var sheetToControlsGap: CGFloat { 14 }
+    private static var sheetToControlsGap: CGFloat {
+        14
+    }
 
     public init(
         pins: [MapPin],

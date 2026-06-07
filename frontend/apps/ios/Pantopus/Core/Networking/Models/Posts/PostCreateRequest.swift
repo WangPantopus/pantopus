@@ -39,7 +39,7 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
     // Safety alert
     public let safetyAlertKind: String?
     public let behaviorDescription: String?
-    // Deal
+    /// Deal
     public let dealExpiresAt: String?
     // Lost & Found
     public let lostFoundType: String?
