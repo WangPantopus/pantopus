@@ -47,6 +47,8 @@ const PLACE_SECTION_META = {
   air_quality: { group: 'today', band: 'A', source: 'AirNow · EPA', layer: 2 },
   alerts: { group: 'today', band: 'A', source: 'National Weather Service', layer: null },
   sunrise_sunset: { group: 'today', band: 'A', source: 'Open-Meteo', layer: null },
+  // Band B (W0.2) — exact property facts + valuation (ATTOM).
+  your_home: { group: 'your_home', band: 'B', source: 'County records · ATTOM', layer: null },
   flood: { group: 'risk_readiness', band: 'A', source: 'FEMA National Flood Hazard Layer', layer: 3 },
   lead_radon: { group: 'health_environment', band: 'A', source: 'EPA radon zones · HUD lead-paint rules', layer: 6 },
   drinking_water: { group: 'health_environment', band: 'A', source: 'EPA SDWIS', layer: 7 },

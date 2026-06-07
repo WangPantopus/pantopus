@@ -249,16 +249,20 @@ describe('placeIntelligenceSerializer — grouped response', () => {
 });
 
 describe('placeIntelligenceSerializer — contract integrity', () => {
-  test('every launch-set section has complete meta (group, band, source, layer)', () => {
-    Object.entries(PLACE_SECTION_META).forEach(([id, meta]) => {
+  test('every section has complete meta (group, band, source, layer)', () => {
+    Object.entries(PLACE_SECTION_META).forEach(([, meta]) => {
       expect(PLACE_GROUPS).toContain(meta.group);
       expect(['A', 'B', 'C', 'D']).toContain(meta.band);
       expect(typeof meta.source).toBe('string');
       expect(meta.source.length).toBeGreaterThan(0);
       expect(meta.layer === null || typeof meta.layer === 'number').toBe(true);
-      // Launch set is entirely Band A (§8.3 / §9.1).
-      expect(meta.band).toBe('A');
     });
+    // The 12 numbered launch layers are entirely Band A (§8.3 / §9.1).
+    Object.values(PLACE_SECTION_META)
+      .filter((m) => m.layer !== null)
+      .forEach((m) => expect(m.band).toBe('A'));
+    // your_home is the documented Band-B exception (exact property/valuation, W0.2).
+    expect(PLACE_SECTION_META.your_home.band).toBe('B');
     // The 12 numbered launch layers are all represented.
     const layers = Object.values(PLACE_SECTION_META).map((m) => m.layer).filter((n) => n !== null);
     expect(new Set(layers)).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]));

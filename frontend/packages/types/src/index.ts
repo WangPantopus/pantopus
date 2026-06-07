@@ -204,6 +204,7 @@ export type {
   PlaceBallotRace,
   PlacePollingPlace,
   PlaceCivicElectionData,
+  PlaceYourHomeData,
   PlaceSectionDataMap,
   PlaceSectionId,
   PlaceSectionMeta,

@@ -407,6 +407,27 @@ export interface PlaceCivicElectionData {
 }
 
 // ════════════════════════════════════════════════════════════
+// BAND-B SECTION DATA SHAPE (added in W0.2)
+// Exact property facts + valuation (ATTOM-paid record). Gated to
+// T3+ (claimed) and only populated when ATTOM_API_KEY is configured;
+// otherwise the section renders `unavailable` (area teaser at T0).
+// ════════════════════════════════════════════════════════════
+
+/** Your Home — property facts + value estimate + assessment (Band B). */
+export interface PlaceYourHomeData {
+  year_built: number | null;
+  sqft: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  lot_sqft: number | null;
+  home_type: string | null;
+  estimated_value: number | null;
+  value_low: number | null;
+  value_high: number | null;
+  assessed_value: number | null;
+}
+
+// ════════════════════════════════════════════════════════════
 // SECTION ENVELOPE + RESPONSE
 // ════════════════════════════════════════════════════════════
 
@@ -427,6 +448,8 @@ export interface PlaceSectionDataMap {
   rent_band: PlaceRentBandData;
   civic_districts: PlaceCivicDistrictsData;
   civic_election: PlaceCivicElectionData;
+  // Band B (W0.2) — exact property facts + valuation.
+  your_home: PlaceYourHomeData;
 }
 
 export type PlaceSectionId = keyof PlaceSectionDataMap;
@@ -436,6 +459,7 @@ export const PLACE_SECTION_IDS = [
   'air_quality',
   'alerts',
   'sunrise_sunset',
+  'your_home',
   'flood',
   'lead_radon',
   'drinking_water',
@@ -464,6 +488,7 @@ export const PLACE_SECTION_META: Record<PlaceSectionId, PlaceSectionMeta> = {
   air_quality: { group: 'today', band: 'A', source: 'AirNow · EPA', layer: 2 },
   alerts: { group: 'today', band: 'A', source: 'National Weather Service', layer: null },
   sunrise_sunset: { group: 'today', band: 'A', source: 'Open-Meteo', layer: null },
+  your_home: { group: 'your_home', band: 'B', source: 'County records · ATTOM', layer: null },
   flood: { group: 'risk_readiness', band: 'A', source: 'FEMA National Flood Hazard Layer', layer: 3 },
   lead_radon: { group: 'health_environment', band: 'A', source: 'EPA radon zones · HUD lead-paint rules', layer: 6 },
   drinking_water: { group: 'health_environment', band: 'A', source: 'EPA SDWIS', layer: 7 },
