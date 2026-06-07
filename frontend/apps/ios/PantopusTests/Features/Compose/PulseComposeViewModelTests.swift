@@ -163,7 +163,7 @@ final class PulseComposeViewModelTests: XCTestCase {
 
     func testSetPhotosTruncatesAtMax() {
         let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
-        let pool = (0..<8).map { PulseComposePhoto(data: Data([UInt8($0)])) }
+        let pool = (0..<(pulseComposeMaxPhotos + 3)).map { PulseComposePhoto(data: Data([UInt8($0)])) }
         vm.setPhotos(pool)
         XCTAssertEqual(vm.photos.count, pulseComposeMaxPhotos)
     }
@@ -237,7 +237,7 @@ final class PulseComposeViewModelTests: XCTestCase {
         vm.announceAudience = .followers
         let request = vm.buildRequest()
         XCTAssertEqual(request.postType, "local_update")
-        XCTAssertEqual(request.audience, "followers")
+        XCTAssertEqual(request.audience, "nearby")
         XCTAssertEqual(request.visibility, "followers")
     }
 

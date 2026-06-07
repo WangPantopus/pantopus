@@ -69,6 +69,7 @@ final class GigTipTests: XCTestCase {
         #"{"gig":{"id":"g1","title":"Patio cleanup","user_id":"owner-1","status":"completed","#
             + #""accepted_by":"worker-1","owner_confirmed_at":"2026-06-01T00:00:00Z"}}"#
     private static let bidsJSON = #"{"bids":[]}"#
+    private static let questionsJSON = #"{"questions":[]}"#
     private static let tipJSON =
         #"{"success":true,"clientSecret":"pi_tip","paymentId":"pay-tip-1","customer":"cus","ephemeralKey":"ek","publishableKey":"pk"}"#
     private static let refreshJSON =
@@ -87,10 +88,12 @@ final class GigTipTests: XCTestCase {
     /// tip.success
     func testSendTipSucceedsAndReconciles() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON), // load
+            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
+            .status(200, body: Self.questionsJSON), // load
             .status(200, body: Self.tipJSON), // POST /tip
             .status(200, body: Self.refreshJSON), // refresh-status
-            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON) // reload
+            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
+            .status(200, body: Self.questionsJSON) // reload
         ]
         let presenter = StubTipPresenter()
         presenter.outcome = .completed
@@ -106,7 +109,8 @@ final class GigTipTests: XCTestCase {
     /// tip declined (card / SCA fail)
     func testSendTipDeclined() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON), // load
+            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
+            .status(200, body: Self.questionsJSON), // load
             .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()
@@ -120,7 +124,8 @@ final class GigTipTests: XCTestCase {
     /// tip canceled (buyer dismissed the sheet)
     func testSendTipCanceled() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON), // load
+            .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
+            .status(200, body: Self.questionsJSON), // load
             .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()

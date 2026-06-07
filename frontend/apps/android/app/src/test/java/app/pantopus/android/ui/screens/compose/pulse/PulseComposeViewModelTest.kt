@@ -188,7 +188,11 @@ class PulseComposeViewModelTest {
 
     @Test fun setPhotosTruncatesAtMax() {
         val vm = viewModel(PulseComposeIntent.Ask)
-        vm.setPhotos((0..7).map { PulseComposePhoto(id = "p$it", data = byteArrayOf(it.toByte())) })
+        vm.setPhotos(
+            (0 until PULSE_COMPOSE_MAX_PHOTOS + 3).map {
+                PulseComposePhoto(id = "p$it", data = byteArrayOf(it.toByte()))
+            },
+        )
         assertEquals(PULSE_COMPOSE_MAX_PHOTOS, vm.photos.value.size)
     }
 
@@ -261,7 +265,7 @@ class PulseComposeViewModelTest {
         vm.selectAnnounceAudience(PulseAnnounceAudience.Followers)
         val request = vm.buildRequest()
         assertEquals("local_update", request.postType)
-        assertEquals("followers", request.audience)
+        assertEquals("nearby", request.audience)
         assertEquals("followers", request.visibility)
     }
 
