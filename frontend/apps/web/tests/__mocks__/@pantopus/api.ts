@@ -102,8 +102,16 @@ export const identityCenter = {
 };
 
 // P2.1 — ProfileToggle / ProBadge / ProModeCard
+// W2.4 — Place multi-home switcher reads getPrimaryHome + getMyHomes.
 export const homes = {
   getMyHomes: jest.fn(),
+  getPrimaryHome: jest.fn(),
+};
+
+// Place — address-led home intelligence (W1.x dashboard + W2.4 switcher).
+export const place = {
+  getPlaceIntelligence: jest.fn(),
+  getPublicPlacePreview: jest.fn(),
 };
 export const businesses = {
   getMyBusinesses: jest.fn(),

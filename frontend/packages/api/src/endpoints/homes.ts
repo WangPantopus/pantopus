@@ -218,12 +218,42 @@ export async function getHomeOccupants(homeId: string): Promise<{
 }
 
 /**
- * Get current user's homes
+ * Occupancy as returned by GET /api/homes/my-homes — the resident's
+ * relationship to one of their places. Distinct from the legacy
+ * HomeOccupancy shape: the list endpoint carries the verification status
+ * and display role rather than the raw move-in record.
  */
-export async function getMyHomes(): Promise<{ homes: (Home & { 
-  occupancy: HomeOccupancy 
-})[] }> {
-  return get<{ homes: (Home & { occupancy: HomeOccupancy })[] }>('/api/homes/my-homes');
+export interface MyHomeOccupancy {
+  id: string | null;
+  role?: string;
+  role_base?: string;
+  is_active?: boolean;
+  start_at?: string | null;
+  end_at?: string | null;
+  /** 'verified' lifts the place to the verified (T4) tier. */
+  verification_status?: 'pending' | 'verified' | 'rejected' | 'moved_out' | string | null;
+}
+
+/** One of the current user's places (GET /api/homes/my-homes). */
+export interface MyHome extends Omit<Home, 'location'> {
+  /** PostGIS point parsed by the endpoint; null when unset. */
+  location: Home['location'] | null;
+  /** Optional display name (Home column not in the base Home type). */
+  name?: string | null;
+  occupancy: MyHomeOccupancy;
+  /** HomeOwner status — distinguishes verified owners from pending. */
+  ownership_status?: 'verified' | 'pending' | 'rejected' | null;
+  verification_tier?: string | null;
+  /** Deep-link target for an in-progress ownership claim. */
+  pending_claim_id?: string | null;
+  can_delete_home?: boolean;
+}
+
+/**
+ * Get current user's homes (owned + occupied).
+ */
+export async function getMyHomes(): Promise<{ homes: MyHome[] }> {
+  return get<{ homes: MyHome[] }>('/api/homes/my-homes');
 }
 
 /**

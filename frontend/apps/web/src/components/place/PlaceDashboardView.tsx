@@ -1,40 +1,67 @@
 // ============================================================
 // PlaceDashboardView — the presentational dashboard.
 //
-// Renders the trust header, the Today's Pulse hero, and the launch-set
-// groups (data-driven from the PlaceIntelligence contract). Pure: it
-// takes the already-fetched intelligence so it's trivial to preview and
-// test. The container (PlaceDashboard) owns fetching + the page states.
+// Renders the trust header (+ multi-home switcher), the Today's Pulse
+// hero, and the launch-set groups (data-driven from the PlaceIntelligence
+// contract). For a claimed (T3) place it adds the verify nudge and the
+// Band-D "Locked until you verify" group — both opening the verification
+// prompt sheet (B1), which routes into the existing verification pages
+// and returns to the now-verified dashboard. For a verified (T4) place it
+// shows the Identity group (verified status + residency letter).
+//
+// Pure: it takes the already-fetched intelligence so it's trivial to
+// preview and test. The container (PlaceDashboard) owns fetching + states.
 // ============================================================
 
 'use client';
 
 import { Fragment, useState } from 'react';
 import type { PlaceIntelligence } from '@pantopus/types';
-import { Group, HeroCard, PlaceHeader } from '@/components/archetypes/place';
-import { derivePulse, renderSection } from './presentation';
-import { IdentityGroup, LockedIdentityGroup, VerifyBanner } from './PlaceIdentitySection';
+import { Group, HeroCard, PlaceHeader, VerifyBanner, type PlaceSwitcherHome } from '@/components/archetypes/place';
+import { derivePulse, renderSection, renderVerifyLocked } from './presentation';
+import { IdentityGroup } from './PlaceIdentitySection';
 import VerifyPromptSheet from './VerifyPromptSheet';
 
 export interface PlaceDashboardViewProps {
   intelligence: PlaceIntelligence;
-  /** The claimed home; needed to route the verification flow. */
+  /** The active home; needed to route the verification flow (B1 sheet). */
   homeId: string;
   /** Resident initials for the avatar; falls back to a neutral glyph. */
   userInitials?: string;
+  /** The resident's places — when 2+, the header opens the multi-home switcher. */
+  switchHomes?: PlaceSwitcherHome[];
+  /** The home currently shown (highlighted in the switcher). */
+  activeHomeId?: string | null;
+  /** Switch the active place — re-queries the contract for it. */
+  onSwitchHome?: (id: string) => void;
+  /** Claim or verify another address. */
+  onAddPlace?: () => void;
+  /** Route to claim a place (a Band B/C locked card, if any). */
+  onClaim?: () => void;
 }
 
-export default function PlaceDashboardView({ intelligence, homeId, userInitials }: PlaceDashboardViewProps) {
+export default function PlaceDashboardView({
+  intelligence,
+  homeId,
+  userInitials,
+  switchHomes,
+  activeHomeId,
+  onSwitchHome,
+  onAddPlace,
+  onClaim,
+}: PlaceDashboardViewProps) {
   const [verifyOpen, setVerifyOpen] = useState(false);
+  const openVerify = () => setVerifyOpen(true);
+
   const pulse = derivePulse(intelligence);
   const tier = intelligence.tier;
   const status = tier === 'T4' ? 'verified' : tier === 'T3' ? 'claimed' : 'none';
 
   // Identity / Band-D isn't in the contract yet (launch set is Band A), so
   // we derive the verify entry (T3) and the available identity rows (T4)
-  // from the resolved tier. Skip the client identity group if a later wave
-  // starts serving one.
-  const showVerifyEntry = tier === 'T3';
+  // from the resolved tier. The verify nudge + locked cards open the B1
+  // prompt sheet; skip the client identity group if a wave starts serving one.
+  const showVerify = tier === 'T3';
   const hasServerIdentity = intelligence.groups.some((g) => g.group === 'identity');
   const showIdentity = tier === 'T4' && !hasServerIdentity;
 
@@ -44,15 +71,19 @@ export default function PlaceDashboardView({ intelligence, homeId, userInitials 
         address={intelligence.place.label}
         status={status}
         initials={userInitials ?? ''}
+        switchHomes={switchHomes}
+        activeHomeId={activeHomeId}
+        onSwitchHome={onSwitchHome}
+        onAddPlace={onAddPlace}
       />
 
-      {showVerifyEntry ? (
+      {showVerify ? (
         <div className="mt-4">
-          <VerifyBanner onClick={() => setVerifyOpen(true)} />
+          <VerifyBanner onClick={openVerify} />
         </div>
       ) : null}
 
-      <div className="mt-4">
+      <div className={showVerify ? 'mt-3' : 'mt-4'}>
         <HeroCard
           variant={pulse.variant}
           title={pulse.title}
@@ -66,16 +97,18 @@ export default function PlaceDashboardView({ intelligence, homeId, userInitials 
         {intelligence.groups.map((group) => (
           <Group key={group.group} label={group.label}>
             {group.sections.map((section) => (
-              <Fragment key={section.id}>{renderSection(section)}</Fragment>
+              <Fragment key={section.id}>{renderSection(section, { onVerify: openVerify, onClaim })}</Fragment>
             ))}
           </Group>
         ))}
 
-        {showVerifyEntry ? <LockedIdentityGroup onVerify={() => setVerifyOpen(true)} /> : null}
+        {showVerify ? (
+          <Group label="Locked until you verify">{renderVerifyLocked(openVerify)}</Group>
+        ) : null}
         {showIdentity ? <IdentityGroup /> : null}
       </div>
 
-      {showVerifyEntry ? (
+      {showVerify ? (
         <VerifyPromptSheet
           open={verifyOpen}
           onClose={() => setVerifyOpen(false)}
