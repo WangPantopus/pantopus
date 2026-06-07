@@ -98,9 +98,10 @@ public struct TasksMapView: View {
                     icon: .chevronLeft,
                     iconSize: 18,
                     label: "Back to list",
-                    identifier: "tasksMapBack",
-                    action: { onBack?() }
-                )
+                    identifier: "tasksMapBack"
+                ) {
+                    onBack?()
+                }
             } else {
                 Color.clear.frame(width: 38, height: 38)
             }
@@ -109,9 +110,10 @@ public struct TasksMapView: View {
                 icon: .slidersHorizontal,
                 iconSize: 16,
                 label: "Filters",
-                identifier: "tasksMapFilters",
-                action: { showFilterSheet = true }
-            )
+                identifier: "tasksMapFilters"
+            ) {
+                showFilterSheet = true
+            }
         }
         .padding(.horizontal, 14)
         .accessibilityIdentifier("tasksMapPill")

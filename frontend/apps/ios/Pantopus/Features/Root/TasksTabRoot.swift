@@ -104,48 +104,13 @@ public struct TasksTabRoot: View {
         case let .gigDetail(gigId):
             gigDetailDestination(gigId: gigId)
         case let .composeGig(category):
-            GigComposeWizardView(preselectedCategoryKey: category) { gigId in
-                path.removeAll { item in
-                    if case .composeGig = item { return true }
-                    return false
-                }
-                path.append(.gigDetail(gigId: gigId))
-            }
+            composeGigDestination(category: category)
         case let .quickPostGig(category):
-            PostGigV1View(
-                viewModel: PostGigV1ViewModel(
-                    initialState: PostGigV1State(
-                        form: PostGigV1Form(category: GigsCategory(rawValue: category) ?? .all)
-                    )
-                ),
-                onClose: pop
-            ) { gigId in
-                path.removeAll { item in
-                    if case .quickPostGig = item { return true }
-                    return false
-                }
-                path.append(.gigDetail(gigId: gigId))
-            }
+            quickPostGigDestination(category: category)
         case let .tasksMap(categoryKey):
-            TasksMapView(
-                viewModel: TasksMapViewModel(
-                    initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
-                ),
-                onOpenTask: { taskId in
-                    Task { @MainActor in path.append(.gigDetail(gigId: taskId)) }
-                },
-                onCompose: { category in
-                    Task { @MainActor in path.append(.composeGig(category: category.rawValue)) }
-                },
-                onBack: pop
-            )
+            tasksMapDestination(categoryKey: categoryKey)
         case .gigSearch:
-            GigSearchView(
-                onOpenGig: { gigId in
-                    Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
-                },
-                onBack: pop
-            )
+            gigSearchDestination()
         case let .entityDetail(kind, id):
             entityDestination(kind: kind, id: id)
         case let .listingDetail(listingId):
@@ -153,30 +118,84 @@ public struct TasksTabRoot: View {
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         case let .publicProfile(userId):
-            PublicProfileView(
-                userId: userId,
-                onBack: pop,
-                onOpenMessages: { profile in
-                    Task { @MainActor in
-                        path.append(.chatConversation(InboxConversationDestination(
-                            mode: .person(otherUserId: profile.id),
-                            displayName: profile.displayName,
-                            initials: Self.initials(from: profile.displayName),
-                            identityKind: nil,
-                            verified: profile.verified ?? false
-                        )))
-                    }
-                }
-            )
+            publicProfileDestination(userId: userId)
         case let .chatConversation(dest):
             chatDestination(dest)
         case let .listingOffers(listingId, titleHint):
             listingOffersDestination(listingId: listingId, titleHint: titleHint)
         case let .editListing(listingId, jumpToStep):
-            ListingComposeWizardView(
-                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
-                onListingUpdated: { _ in pop() }
-            )
+            editListingDestination(listingId: listingId, jumpToStep: jumpToStep)
+        }
+    }
+
+    private func composeGigDestination(category: String) -> some View {
+        GigComposeWizardView(preselectedCategoryKey: category) { gigId in
+            path.removeAll { item in
+                if case .composeGig = item { return true }
+                return false
+            }
+            path.append(.gigDetail(gigId: gigId))
+        }
+    }
+
+    private func quickPostGigDestination(category: String) -> some View {
+        PostGigV1View(
+            viewModel: PostGigV1ViewModel(
+                initialState: PostGigV1State(
+                    form: PostGigV1Form(category: GigsCategory(rawValue: category) ?? .all)
+                )
+            ),
+            onClose: pop
+        ) { gigId in
+            path.removeAll { item in
+                if case .quickPostGig = item { return true }
+                return false
+            }
+            path.append(.gigDetail(gigId: gigId))
+        }
+    }
+
+    private func tasksMapDestination(categoryKey: String) -> some View {
+        TasksMapView(
+            viewModel: TasksMapViewModel(
+                initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
+            ),
+            onOpenTask: { taskId in
+                Task { @MainActor in path.append(.gigDetail(gigId: taskId)) }
+            },
+            onCompose: { category in
+                Task { @MainActor in path.append(.composeGig(category: category.rawValue)) }
+            },
+            onBack: pop
+        )
+    }
+
+    private func gigSearchDestination() -> some View {
+        GigSearchView(
+            onOpenGig: { gigId in
+                Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+            },
+            onBack: pop
+        )
+    }
+
+    private func publicProfileDestination(userId: String) -> some View {
+        PublicProfileView(userId: userId, onBack: pop) { profile in
+            Task { @MainActor in
+                path.append(.chatConversation(InboxConversationDestination(
+                    mode: .person(otherUserId: profile.id),
+                    displayName: profile.displayName,
+                    initials: Self.initials(from: profile.displayName),
+                    identityKind: nil,
+                    verified: profile.verified ?? false
+                )))
+            }
+        }
+    }
+
+    private func editListingDestination(listingId: String, jumpToStep: ListingComposeStep?) -> some View {
+        ListingComposeWizardView(mode: .edit(listingId: listingId, jumpToStep: jumpToStep)) { _ in
+            pop()
         }
     }
 
@@ -191,15 +210,11 @@ public struct TasksTabRoot: View {
     }
 
     private func gigDetailDestination(gigId: String) -> some View {
-        GigDetailView(
-            viewModel: GigDetailViewModel(gigId: gigId),
-            onBack: pop,
-            onOpenChat: { destination in
-                Task { @MainActor in
-                    path.append(.chatConversation(destination))
-                }
+        GigDetailView(viewModel: GigDetailViewModel(gigId: gigId), onBack: pop) { destination in
+            Task { @MainActor in
+                path.append(.chatConversation(destination))
             }
-        )
+        }
     }
 
     private func listingDetailDestination(listingId: String) -> some View {

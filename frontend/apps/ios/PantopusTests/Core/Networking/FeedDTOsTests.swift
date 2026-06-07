@@ -11,7 +11,7 @@ import XCTest
 
 final class FeedDTOsTests: XCTestCase {
     func testDecodesSeededFeedRowWithNullUserId() throws {
-        let json = """
+        let json = Data("""
         {
           "posts": [
             {
@@ -51,7 +51,7 @@ final class FeedDTOsTests: XCTestCase {
           ],
           "pagination": { "hasMore": false }
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let response = try JSONDecoder().decode(FeedResponse.self, from: json)
         XCTAssertEqual(response.posts.count, 2)
@@ -62,7 +62,7 @@ final class FeedDTOsTests: XCTestCase {
     }
 
     func testDecodesFeedWithObjectPaginationAndIdentityCreator() throws {
-        let json = """
+        let json = Data("""
         {
           "posts": [
             {
@@ -88,7 +88,7 @@ final class FeedDTOsTests: XCTestCase {
             "hasMore": false
           }
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let response = try JSONDecoder().decode(FeedResponse.self, from: json)
         XCTAssertEqual(response.posts.count, 1)
@@ -98,7 +98,7 @@ final class FeedDTOsTests: XCTestCase {
     }
 
     func testDecodesFeedPostMediaFields() throws {
-        let json = """
+        let json = Data("""
         {
           "posts": [
             {
@@ -116,7 +116,7 @@ final class FeedDTOsTests: XCTestCase {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let post = try JSONDecoder().decode(FeedResponse.self, from: json).posts[0]
         XCTAssertEqual(post.mediaURLs, ["https://cdn.example.com/full.jpg"])

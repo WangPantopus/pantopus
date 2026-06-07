@@ -33,8 +33,8 @@ public struct PulsePostTargetPickerView: View {
             isValid: false,
             isDirty: false,
             onClose: onCancel,
-            onCommit: {}
-        ) {
+            onCommit: {},
+            content: {
             switch viewModel.state {
             case .loading:
                 loadingBody
@@ -50,7 +50,8 @@ public struct PulsePostTargetPickerView: View {
                     }
                 )
             }
-        }
+            }
+        )
         .task { await viewModel.load() }
         .accessibilityIdentifier("pulsePostTargetPicker")
     }
@@ -79,9 +80,11 @@ public struct PulsePostTargetPickerView: View {
                 .padding(.bottom, Spacing.s2)
 
             targetRow(
-                icon: .compass,
-                iconBackground: Theme.Color.primary50,
-                iconColor: Theme.Color.primary600,
+                iconStyle: TargetRowIconStyle(
+                    icon: .compass,
+                    background: Theme.Color.primary50,
+                    color: Theme.Color.primary600
+                ),
                 title: "Current Location",
                 subtitle: "Post to the area where you are right now",
                 isLoading: viewModel.isLocating
@@ -109,9 +112,11 @@ public struct PulsePostTargetPickerView: View {
                 .padding(.vertical, Spacing.s2)
 
             targetRow(
-                icon: .link,
-                iconBackground: Theme.Color.warmAmberBg,
-                iconColor: Theme.Color.warmAmber,
+                iconStyle: TargetRowIconStyle(
+                    icon: .link,
+                    background: Theme.Color.warmAmberBg,
+                    color: Theme.Color.warmAmber
+                ),
                 title: "Connections",
                 subtitle: "Share with people you trust"
             ) {
@@ -124,18 +129,22 @@ public struct PulsePostTargetPickerView: View {
     private var homeSection: some View {
         if viewModel.homes.isEmpty {
             targetRow(
-                icon: .home,
-                iconBackground: Theme.Color.homeBg,
-                iconColor: Theme.Color.home,
+                iconStyle: TargetRowIconStyle(
+                    icon: .home,
+                    background: Theme.Color.homeBg,
+                    color: Theme.Color.home
+                ),
                 title: "Home Area",
                 subtitle: "Add a home to post here",
                 muted: true
             ) {}
         } else if viewModel.homes.count == 1, let home = viewModel.homes.first {
             targetRow(
-                icon: .home,
-                iconBackground: Theme.Color.homeBg,
-                iconColor: Theme.Color.home,
+                iconStyle: TargetRowIconStyle(
+                    icon: .home,
+                    background: Theme.Color.homeBg,
+                    color: Theme.Color.home
+                ),
                 title: "Home Area",
                 subtitle: home.label
             ) {
@@ -143,9 +152,11 @@ public struct PulsePostTargetPickerView: View {
             }
         } else {
             targetRow(
-                icon: .home,
-                iconBackground: Theme.Color.homeBg,
-                iconColor: Theme.Color.home,
+                iconStyle: TargetRowIconStyle(
+                    icon: .home,
+                    background: Theme.Color.homeBg,
+                    color: Theme.Color.home
+                ),
                 title: "Home Area",
                 subtitle: "\(viewModel.homes.count) homes",
                 trailing: expandedHomeList ? .chevronUp : .chevronDown
@@ -167,9 +178,11 @@ public struct PulsePostTargetPickerView: View {
         if !viewModel.businesses.isEmpty {
             if viewModel.businesses.count == 1, let biz = viewModel.businesses.first {
                 targetRow(
-                    icon: .building2,
-                    iconBackground: Theme.Color.businessBg,
-                    iconColor: Theme.Color.business,
+                    iconStyle: TargetRowIconStyle(
+                        icon: .building2,
+                        background: Theme.Color.businessBg,
+                        color: Theme.Color.business
+                    ),
                     title: "Business Area",
                     subtitle: biz.name
                 ) {
@@ -177,9 +190,11 @@ public struct PulsePostTargetPickerView: View {
                 }
             } else {
                 targetRow(
-                    icon: .building2,
-                    iconBackground: Theme.Color.businessBg,
-                    iconColor: Theme.Color.business,
+                    iconStyle: TargetRowIconStyle(
+                        icon: .building2,
+                        background: Theme.Color.businessBg,
+                        color: Theme.Color.business
+                    ),
                     title: "Business Area",
                     subtitle: "\(viewModel.businesses.count) businesses",
                     trailing: expandedBusinessList ? .chevronUp : .chevronDown
@@ -201,10 +216,14 @@ public struct PulsePostTargetPickerView: View {
         case chevronRight, chevronDown, chevronUp
     }
 
+    private struct TargetRowIconStyle {
+        let icon: PantopusIcon
+        let background: Color
+        let color: Color
+    }
+
     private func targetRow(
-        icon: PantopusIcon,
-        iconBackground: Color,
-        iconColor: Color,
+        iconStyle: TargetRowIconStyle,
         title: String,
         subtitle: String,
         muted: Bool = false,
@@ -215,10 +234,10 @@ public struct PulsePostTargetPickerView: View {
         Button(action: action) {
             HStack(spacing: Spacing.s3) {
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(iconBackground.opacity(muted ? 0.5 : 1))
+                    .fill(iconStyle.background.opacity(muted ? 0.5 : 1))
                     .frame(width: 40, height: 40)
                     .overlay {
-                        Icon(icon, size: 20, strokeWidth: 2, color: iconColor.opacity(muted ? 0.5 : 1))
+                        Icon(iconStyle.icon, size: 20, strokeWidth: 2, color: iconStyle.color.opacity(muted ? 0.5 : 1))
                     }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)

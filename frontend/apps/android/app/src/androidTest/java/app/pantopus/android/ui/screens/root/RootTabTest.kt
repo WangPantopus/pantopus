@@ -13,7 +13,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import app.pantopus.android.ui.screens.root.NotYetAvailableView
 import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Rule
 import org.junit.Test

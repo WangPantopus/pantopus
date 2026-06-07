@@ -595,6 +595,7 @@ public struct TransactionalDetailShell: View {
     // MARK: - Modules
 
     @ViewBuilder
+    // swiftlint:disable:next cyclomatic_complexity
     private func moduleView(_ module: ContentDetailModule) -> some View {
         switch module {
         case let .description(m):
@@ -1231,7 +1232,7 @@ private struct AvatarView: View {
     let initials: String
     let verified: Bool
     let size: CGFloat
-    var imageUrl: URL? = nil
+    var imageUrl: URL?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {

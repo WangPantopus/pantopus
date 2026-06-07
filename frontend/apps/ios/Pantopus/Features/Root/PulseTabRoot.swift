@@ -109,11 +109,7 @@ public struct PulseTabRoot: View {
                 onPosted: { _ in pop() }
             )
         case let .publicProfile(userId):
-            PublicProfileView(
-                userId: userId,
-                onBack: pop,
-                onOpenMessages: { _ in }
-            )
+            PublicProfileView(userId: userId, onBack: pop) { _ in }
         }
     }
 }

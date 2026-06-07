@@ -847,17 +847,19 @@ public final class PulseComposeViewModel {
         )
     }
 
-    private func gpsFields(for target: PulsePostingTarget) -> (
-        timestamp: String?,
-        latitude: Double?,
-        longitude: Double?
-    ) {
+    private struct GPSFields {
+        let timestamp: String?
+        let latitude: Double?
+        let longitude: Double?
+    }
+
+    private func gpsFields(for target: PulsePostingTarget) -> GPSFields {
         guard case let .currentLocation(lat, lon, _) = target else {
-            return (nil, nil, nil)
+            return GPSFields(timestamp: nil, latitude: nil, longitude: nil)
         }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        return (formatter.string(from: Date()), lat, lon)
+        return GPSFields(timestamp: formatter.string(from: Date()), latitude: lat, longitude: lon)
     }
 
     /// Build the `PATCH /api/posts/:id` body from the active intent's

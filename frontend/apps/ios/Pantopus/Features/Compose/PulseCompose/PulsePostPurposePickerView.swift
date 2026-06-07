@@ -35,8 +35,8 @@ public struct PulsePostPurposePickerView: View {
             isValid: false,
             isDirty: false,
             onClose: onBack,
-            onCommit: {}
-        ) {
+            onCommit: {},
+            content: {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 Text("What is this post for?")
                     .font(.system(size: 16, weight: .bold))
@@ -51,7 +51,8 @@ public struct PulsePostPurposePickerView: View {
                     }
                 }
             }
-        }
+            }
+        )
         .accessibilityIdentifier("pulsePostPurposePicker")
     }
 

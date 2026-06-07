@@ -73,7 +73,7 @@ public final class PulsePostTargetPickerViewModel {
                     let detail: BusinessDetailResponse = try await api.request(
                         BusinessesEndpoints.business(businessId: businessId)
                     )
-                    let primary = detail.locations.first(where: { $0.isPrimary == true })
+                    let primary = detail.locations.first { $0.isPrimary == true }
                         ?? detail.locations.first
                     guard let point = primary?.location else { continue }
                     let labelParts = [primary?.city, primary?.state].compactMap { $0 }.filter { !$0.isEmpty }

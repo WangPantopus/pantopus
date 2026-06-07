@@ -123,7 +123,10 @@ public final class DeviceLocationProvider: NSObject, LocationProviding, CLLocati
                 return nil
             }
             defer { group.cancelAll() }
-            return await group.next() ?? nil
+            for await value in group {
+                return value
+            }
+            return nil
         }
     }
 }

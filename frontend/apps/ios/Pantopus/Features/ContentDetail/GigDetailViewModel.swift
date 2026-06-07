@@ -333,7 +333,10 @@ extension GigDetailViewModel {
     ) -> ContentDetailContent {
         shouldProjectTaskV2(gig: gig)
             ? projectTaskV2(
-                gig: gig, bids: bids, canMarkDelivered: canMarkDelivered, canTip: canTip,
+                gig: gig,
+                bids: bids,
+                canMarkDelivered: canMarkDelivered,
+                canTip: canTip,
                 viewerUserId: viewerUserId
             )
             : projectGigV1(gig: gig, bids: bids, canTip: canTip, viewerUserId: viewerUserId)

@@ -71,7 +71,7 @@ public struct RootTabView: View {
 
     public var body: some View {
         TabView(selection: tabBinding) {
-            HubTabRoot(onOpenProfile: { showProfile = true })
+            HubTabRoot { showProfile = true }
                 .tabItem { tabLabel(.home) }
                 .tag(RootTab.home)
 

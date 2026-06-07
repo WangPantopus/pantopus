@@ -118,20 +118,17 @@ public struct MarketplaceTabRoot: View {
                 }
             )
         case .composeListing:
-            ListingComposeWizardView(
-                onOpenListingDetail: { listingId in
-                    path.removeAll { route in
-                        if case .composeListing = route { return true }
-                        return false
-                    }
-                    path.append(.listingDetail(listingId: listingId))
+            ListingComposeWizardView { listingId in
+                path.removeAll { route in
+                    if case .composeListing = route { return true }
+                    return false
                 }
-            )
+                path.append(.listingDetail(listingId: listingId))
+            }
         case let .editListing(listingId, jumpToStep):
-            ListingComposeWizardView(
-                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
-                onListingUpdated: { _ in pop() }
-            )
+            ListingComposeWizardView(mode: .edit(listingId: listingId, jumpToStep: jumpToStep)) { _ in
+                pop()
+            }
         case let .listingOffers(listingId, titleHint):
             ListingOffersView(
                 viewModel: ListingOffersViewModel(
@@ -155,7 +152,7 @@ public struct MarketplaceTabRoot: View {
                 )
             )
         case let .publicProfile(userId):
-            PublicProfileView(userId: userId, onBack: pop, onOpenMessages: { _ in })
+            PublicProfileView(userId: userId, onBack: pop) { _ in }
         case let .chatConversation(dest):
             ChatConversationView(
                 viewModel: ChatConversationViewModel(
