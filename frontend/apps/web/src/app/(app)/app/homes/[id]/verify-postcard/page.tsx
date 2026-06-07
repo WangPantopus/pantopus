@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Mail, Hash, Clock, ShieldCheck } from 'lucide-react';
 import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
@@ -12,6 +12,11 @@ const CODE_LENGTH = 6;
 function VerifyPostcardContent() {
   const router = useRouter();
   const { id: homeId } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  // The Place verify flow routes here with ?return=place; on success we
+  // send the now-verified resident back to /app/place (the B3 reveal).
+  const returnToPlace = searchParams.get('return') === 'place';
+  const verifiedDest = returnToPlace ? '/app/place?verified=1' : `/app/homes/${homeId}/dashboard`;
 
   const [step, setStep] = useState<'request' | 'enter'>('request');
   const [requesting, setRequesting] = useState(false);
@@ -49,7 +54,7 @@ function VerifyPostcardContent() {
     try {
       await api.homeOwnership.verifyPostcardCode(homeId, code);
       toast.success('Verified! You are now a verified member of this home.');
-      router.push(`/app/homes/${homeId}/dashboard`);
+      router.push(verifiedDest);
     } catch (err: any) {
       const msg = err?.message || 'Verification failed';
       if ((err as any)?.attempts_remaining != null) {
@@ -66,7 +71,7 @@ function VerifyPostcardContent() {
     } finally {
       setVerifying(false);
     }
-  }, [homeId, code, router]);
+  }, [homeId, code, router, verifiedDest]);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6">

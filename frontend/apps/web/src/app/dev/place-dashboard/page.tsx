@@ -222,16 +222,16 @@ export default function DevPlaceDashboardPage() {
 
         <div className="flex flex-wrap gap-8 items-start">
           <Column label="Verified (T4) · all clear">
-            <PlaceDashboardView intelligence={build(false)} userInitials="RC" />
+            <PlaceDashboardView intelligence={build(false)} homeId="dev-home" userInitials="RC" />
           </Column>
           <Column label="Verified (T4) · active alert">
-            <PlaceDashboardView intelligence={build(true)} userInitials="RC" />
+            <PlaceDashboardView intelligence={build(true)} homeId="dev-home" userInitials="RC" />
           </Column>
           <Column label="Claimed (T3) · verify nudge + Band-D locked">
             <PlaceDashboardView
               intelligence={build(false, 'T3')}
+              homeId="dev-home"
               userInitials="RC"
-              onVerify={() => {}}
               onClaim={() => {}}
             />
           </Column>

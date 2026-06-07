@@ -12,7 +12,7 @@
 
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -86,13 +86,14 @@ describe('W2.4 — Place multi-home switcher', () => {
 
     const sheet = await screen.findByRole('dialog', { name: /switch place/i });
     expect(sheet).toBeInTheDocument();
-    // Each place row carries its trust status.
-    expect(screen.getByText('Verified')).toBeInTheDocument();
-    expect(screen.getByText('Claimed')).toBeInTheDocument();
+    // Each place row carries its trust status. Scope to the sheet — the
+    // verified (T4) dashboard behind it also surfaces a "Verified" Identity chip.
+    expect(within(sheet).getByText('Verified')).toBeInTheDocument();
+    expect(within(sheet).getByText('Claimed')).toBeInTheDocument();
     // The active place is labelled, and the other place is offered.
-    expect(screen.getByText('Current place')).toBeInTheDocument();
-    expect(screen.getByText('88 Marine Dr')).toBeInTheDocument();
-    expect(screen.getByText('Add a place')).toBeInTheDocument();
+    expect(within(sheet).getByText('Current place')).toBeInTheDocument();
+    expect(within(sheet).getByText('88 Marine Dr')).toBeInTheDocument();
+    expect(within(sheet).getByText('Add a place')).toBeInTheDocument();
   });
 
   test('switching re-queries the contract for the selected home', async () => {

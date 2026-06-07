@@ -144,12 +144,12 @@ export default function PlaceDashboard() {
     <Shell>
       <PlaceDashboardView
         intelligence={intelQuery.data}
+        homeId={homeId as string}
         onOpenSection={(slug) => router.push(`/app/place/${slug}`)}
         switchHomes={switchHomes}
         activeHomeId={homeId}
         onSwitchHome={setSelectedHomeId}
         onAddPlace={() => router.push('/app/homes/new')}
-        onVerify={() => router.push('/app/address-verify')}
         onClaim={() => router.push('/app/homes')}
       />
     </Shell>
