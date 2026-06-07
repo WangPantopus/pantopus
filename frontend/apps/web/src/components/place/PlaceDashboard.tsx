@@ -145,6 +145,7 @@ export default function PlaceDashboard() {
       <PlaceDashboardView
         intelligence={intelQuery.data}
         homeId={homeId as string}
+        onOpenSection={(slug) => router.push(`/app/place/${slug}`)}
         switchHomes={switchHomes}
         activeHomeId={homeId}
         onSwitchHome={setSelectedHomeId}

@@ -314,8 +314,19 @@ function lockHandler(env: PlaceSection, handlers?: PlaceSectionHandlers): (() =>
 }
 
 // ── render one section envelope as the right card ───────────
-export function renderSection(env: PlaceSection, handlers?: PlaceSectionHandlers): ReactNode {
+// `onOpen` taps through to the section's group-detail page (W2.3) — it's
+// omitted for groups without a detail screen, so those cards render no
+// chevron (no dead control). `onVerify` / `onClaim` route the locked
+// cards (Band D / Band B-C), so a locked card never dead-ends.
+export interface PlaceSectionRenderOptions extends PlaceSectionHandlers {
+  /** Tap-through to the section's group-detail page (W2.3). */
+  onOpen?: () => void;
+}
+
+export function renderSection(env: PlaceSection, opts?: PlaceSectionRenderOptions): ReactNode {
   const cfg = SECTION_CONFIG[env.id];
+  const onOpen = opts?.onOpen;
+  const handlers = opts;
 
   if (env.id === 'block_density') {
     if (env.access === 'locked') {
@@ -331,7 +342,7 @@ export function renderSection(env: PlaceSection, handlers?: PlaceSectionHandlers
     }
     const hasData = env.data && (env.status === 'ready' || env.status === 'partial' || env.status === 'stale');
     if (hasData) {
-      return <DensityCard bucket={(env.data as PlaceBlockDensityData).bucket} showCta={false} />;
+      return <DensityCard bucket={(env.data as PlaceBlockDensityData).bucket} showCta={false} onClick={onOpen} />;
     }
     return (
       <SectionCard
@@ -339,6 +350,7 @@ export function renderSection(env: PlaceSection, handlers?: PlaceSectionHandlers
         title="Verified homes nearby"
         state={statusToState(env.status)}
         caption={env.unavailable_reason ?? undefined}
+        onClick={onOpen}
       />
     );
   }
@@ -370,6 +382,7 @@ export function renderSection(env: PlaceSection, handlers?: PlaceSectionHandlers
       chip={reading.chip}
       statusDot={reading.statusDot}
       caption={state === 'unavailable' ? env.unavailable_reason ?? undefined : reading.caption}
+      onClick={onOpen}
     />
   );
 }

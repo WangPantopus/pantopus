@@ -21,6 +21,7 @@ import { Group, HeroCard, PlaceHeader, VerifyBanner, type PlaceSwitcherHome } fr
 import { derivePulse, renderSection, renderVerifyLocked } from './presentation';
 import { IdentityGroup } from './PlaceIdentitySection';
 import VerifyPromptSheet from './VerifyPromptSheet';
+import { GROUP_TO_SLUG } from './detail/sections';
 
 export interface PlaceDashboardViewProps {
   intelligence: PlaceIntelligence;
@@ -28,6 +29,9 @@ export interface PlaceDashboardViewProps {
   homeId: string;
   /** Resident initials for the avatar; falls back to a neutral glyph. */
   userInitials?: string;
+  /** Tap-through to a group-detail page (W2.3). Cards only show the
+   *  chevron when their group has a detail screen. */
+  onOpenSection?: (slug: string) => void;
   /** The resident's places — when 2+, the header opens the multi-home switcher. */
   switchHomes?: PlaceSwitcherHome[];
   /** The home currently shown (highlighted in the switcher). */
@@ -44,6 +48,7 @@ export default function PlaceDashboardView({
   intelligence,
   homeId,
   userInitials,
+  onOpenSection,
   switchHomes,
   activeHomeId,
   onSwitchHome,
@@ -94,13 +99,17 @@ export default function PlaceDashboardView({
       </div>
 
       <div className="mt-6">
-        {intelligence.groups.map((group) => (
-          <Group key={group.group} label={group.label}>
-            {group.sections.map((section) => (
-              <Fragment key={section.id}>{renderSection(section, { onVerify: openVerify, onClaim })}</Fragment>
-            ))}
-          </Group>
-        ))}
+        {intelligence.groups.map((group) => {
+          const slug = GROUP_TO_SLUG[group.group];
+          const onOpen = slug && onOpenSection ? () => onOpenSection(slug) : undefined;
+          return (
+            <Group key={group.group} label={group.label}>
+              {group.sections.map((section) => (
+                <Fragment key={section.id}>{renderSection(section, { onOpen, onVerify: openVerify, onClaim })}</Fragment>
+              ))}
+            </Group>
+          );
+        })}
 
         {showVerify ? (
           <Group label="Locked until you verify">{renderVerifyLocked(openVerify)}</Group>
