@@ -262,3 +262,10 @@ export type { DimensionScore, HomeHealthScore, SeasonalChecklistItem, SeasonalCh
 
 // Types from identity (Identity Firewall)
 export type { BusinessSeat, SeatListItem, SeatDetail, MySeat, InviteDetails, UserPrivacySettings, UpdatePrivacySettingsPayload, UserProfileBlock, CreateBlockPayload, CreateSeatInvitePayload, AcceptInvitePayload, DeclineInvitePayload, UpdateSeatPayload, NotificationWithContext, SeatInviteStatus, SeatBindingMethod, SearchVisibilityLevel, ProfileVisibilityLevel, BlockScopeType, NotificationContextType, NotificationFirewallContext, BusinessRoleBase, PublicIdentityType, PersonaCategory, PersonaAudienceLabel, PersonaAudienceMode, PersonaFollowStatus, PersonaRelationshipType, PublicAuthorIdentity, LocalProfile, AudienceProfile, BroadcastChannel, BroadcastMessage, IdentityCenterPayload } from '@pantopus/types';
+
+// ============================================================
+// Place — address-led home intelligence (W1.1)
+// ============================================================
+export * as place from './endpoints/place';                        // Place — PlaceIntelligence dashboard + T0 preview
+export { getPlaceIntelligence, getPublicPlacePreview } from './endpoints/place';
+export type { PlacePreview } from './endpoints/place';
