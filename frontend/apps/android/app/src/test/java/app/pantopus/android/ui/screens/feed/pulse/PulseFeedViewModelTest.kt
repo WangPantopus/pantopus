@@ -9,7 +9,10 @@ import app.pantopus.android.data.api.models.feed.FeedResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +31,13 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PulseFeedViewModelTest {
     private val repo: PostsRepository = mockk()
+    private val locationProvider =
+        object : LocationProvider {
+            override fun cachedCoordinate(): UserCoordinate? = null
+
+            override suspend fun requestCurrent(timeoutMillis: Long): UserCoordinate? = null
+        }
+    private val postsRefresh = PulsePostsRefreshNotifier()
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -36,6 +46,28 @@ class PulseFeedViewModelTest {
     @After fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun load_projectsMediaUrlsPreferringThumbnails() =
+        runTest {
+            val vm = makeVm()
+            coEvery { repo.feed(any(), any(), any(), any()) } returns
+                NetworkResult.Success(
+                    FeedResponse(
+                        posts =
+                            listOf(
+                                askPost().copy(
+                                    mediaUrls = listOf("https://cdn.example.com/full.jpg"),
+                                    mediaThumbnails = listOf("https://cdn.example.com/thumb.jpg"),
+                                ),
+                            ),
+                        pagination = FeedPagination(hasMore = false),
+                    ),
+                )
+            vm.load()
+            val loaded = vm.state.value as PulseFeedUiState.Loaded
+            assertEquals(listOf("https://cdn.example.com/thumb.jpg"), loaded.rows.single().mediaUrls)
+        }
 
     private fun askPost(
         id: String = "p1",
@@ -67,7 +99,7 @@ class PulseFeedViewModelTest {
                 ),
         )
 
-    private fun makeVm(): PulseFeedViewModel = PulseFeedViewModel(repo)
+    private fun makeVm(): PulseFeedViewModel = PulseFeedViewModel(repo, locationProvider, postsRefresh)
 
     @Test fun load_with_posts_transitions_loaded() =
         runTest {

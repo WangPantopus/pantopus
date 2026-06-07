@@ -48,6 +48,14 @@ final class TasksMapViewModelTests: XCTestCase {
 
     // MARK: - Live in-bounds fetch
 
+    private func manhattanLocation() -> FixedLocationProvider {
+        FixedLocationProvider(UserCoordinate(latitude: 40.7484, longitude: -73.9857, accuracyMeters: 100))
+    }
+
+    private func makeLiveVM() -> TasksMapViewModel {
+        TasksMapViewModel(api: makeAPI(), location: manhattanLocation())
+    }
+
     func testLoadFetchesInBoundsAndProjectsPins() async {
         // Two gigs near the default anchor (40.7484, -73.9857); g1 sits
         // closer so closest-sort (the default) leads with it.
@@ -63,7 +71,7 @@ final class TasksMapViewModelTests: XCTestCase {
             ]}
             """)
         ]
-        let vm = TasksMapViewModel(api: makeAPI())
+        let vm = makeLiveVM()
         await vm.load()
         let visible = items(vm.state)
         XCTAssertEqual(visible?.count, 2)
@@ -87,14 +95,14 @@ final class TasksMapViewModelTests: XCTestCase {
             ]}
             """)
         ]
-        let vm = TasksMapViewModel(api: makeAPI())
+        let vm = makeLiveVM()
         await vm.load()
         XCTAssertEqual(items(vm.state)?.map(\.id), ["g1"])
     }
 
     func testLoadEmptyResultProducesEmpty() async {
         SequencedURLProtocol.sequence = [.status(200, body: "{\"gigs\":[]}")]
-        let vm = TasksMapViewModel(api: makeAPI())
+        let vm = makeLiveVM()
         await vm.load()
         XCTAssertTrue(isEmpty(vm.state))
         XCTAssertNil(vm.selectedId)
@@ -102,7 +110,7 @@ final class TasksMapViewModelTests: XCTestCase {
 
     func testLoadServerErrorProducesError() async {
         SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
-        let vm = TasksMapViewModel(api: makeAPI())
+        let vm = makeLiveVM()
         await vm.load()
         XCTAssertNotNil(errorMessage(vm.state))
     }

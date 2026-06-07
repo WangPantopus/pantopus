@@ -241,6 +241,22 @@ final class PulseComposeViewModelTests: XCTestCase {
         XCTAssertEqual(request.visibility, "followers")
     }
 
+    func testHeadsUpRequestCarriesSafetyAlertKind() {
+        let vm = PulseComposeViewModel(
+            intent: .announce,
+            postingTarget: .currentLocation(latitude: 45.5, longitude: -122.4, label: "Camas, WA"),
+            composePurpose: .headsUp,
+            api: makeAPI()
+        )
+        vm.update(.title, to: "Hello")
+        vm.update(.body, to: "What's up")
+        vm.safetyAlertKind = .suspicious
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.postType, "alert")
+        XCTAssertEqual(request.purpose, "heads_up")
+        XCTAssertEqual(request.safetyAlertKind, "suspicious")
+    }
+
     // MARK: - Submit pipeline
 
     func testSubmitHappyPathSucceedsAndDismisses() async {

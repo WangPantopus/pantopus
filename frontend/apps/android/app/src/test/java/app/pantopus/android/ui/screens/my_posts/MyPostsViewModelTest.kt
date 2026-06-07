@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowBodyEmphasis
@@ -42,6 +43,7 @@ import java.time.Instant
 class MyPostsViewModelTest {
     private val postsRepo: PostsRepository = mockk()
     private val authRepo: AuthRepository = mockk()
+    private val postsRefresh = PulsePostsRefreshNotifier()
 
     /** Fixed clock — Friday 2026-05-15 12:00 UTC. */
     private val fixedNow: Instant = Instant.parse("2026-05-15T12:00:00Z")
@@ -85,7 +87,7 @@ class MyPostsViewModelTest {
     )
 
     private fun makeVM(): MyPostsViewModel {
-        val vm = MyPostsViewModel(postsRepo, authRepo)
+        val vm = MyPostsViewModel(postsRepo, authRepo, postsRefresh)
         vm.overrideNow { fixedNow }
         return vm
     }

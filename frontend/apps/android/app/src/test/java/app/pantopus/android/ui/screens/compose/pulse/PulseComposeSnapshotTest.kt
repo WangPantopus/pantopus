@@ -119,6 +119,7 @@ class PulseComposeSnapshotTest {
                                 onSelectVisibility = {},
                                 onSelectLostFoundKind = {},
                                 onSelectAnnounceAudience = {},
+                                onSelectSafetyAlertKind = {},
                                 onSelectAskCategory = {},
                                 onSelectRecommendRating = {},
                             ),

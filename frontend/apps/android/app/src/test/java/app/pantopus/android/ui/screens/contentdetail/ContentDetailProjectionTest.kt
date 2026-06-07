@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.contentdetail
 
+import app.pantopus.android.data.api.models.gigs.GigCoordinate
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigCreator
 import app.pantopus.android.data.api.models.gigs.GigDto
@@ -22,6 +23,115 @@ import org.junit.Test
  * signature checks.
  */
 class ContentDetailProjectionTest {
+    @Test fun poster_counterparty_decodes_identity_serializer_creator() {
+        val json =
+            """
+            {
+              "gig": {
+                "id": "gig-1",
+                "title": "Fix faucet",
+                "user_id": "poster-user",
+                "creator": {
+                  "type": "local",
+                  "id": "poster-user",
+                  "handle": "raw-poster",
+                  "displayName": "Poster Name",
+                  "avatarUrl": "https://cdn.example.com/avatars/poster.jpg",
+                  "badges": ["verified_resident"]
+                }
+              }
+            }
+            """.trimIndent()
+        val moshi =
+            com.squareup.moshi.Moshi
+                .Builder()
+                .addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+                .build()
+        val response =
+            checkNotNull(
+                moshi.adapter(app.pantopus.android.data.api.models.gigs.GigDetailResponse::class.java)
+                    .fromJson(json),
+            )
+        val counterparty =
+            GigDetailViewModel.Projection.posterCounterparty(response.gig, viewerUserId = "viewer-user")
+        assertEquals("Poster Name", counterparty?.displayName)
+        assertEquals("@raw-poster", counterparty?.trailing)
+        assertTrue(counterparty?.verified == true)
+        assertEquals("https://cdn.example.com/avatars/poster.jpg", counterparty?.avatarUrl)
+    }
+
+    @Test fun open_gig_without_is_v2_flag_defaults_to_task_v2() {
+        val gig =
+            baseGig.copy(
+                title = "Fix leaking kitchen faucet",
+                description = "The kitchen faucet leaks when the dishwasher is on.",
+                price = 100.0,
+                category = "handyman",
+                status = "open",
+                isV2 = null,
+                scheduledStart = "2026-04-25T14:00:00.000Z",
+                bidCount = 0,
+            )
+        val content = GigDetailViewModel.Projection.project(gig, emptyList())
+        assertEquals("Open · No bids yet", content.statusPill?.label)
+        assertNotNull(content.hero.categoryChip)
+        assertEquals("budget · cash or transfer", content.hero.priceCaption)
+        assertTrue(content.statStrip.isNotEmpty())
+        assertTrue(content.modules.filterIsInstance<ContentDetailModule.Description>().any { it.title == "What needs doing" })
+    }
+
+    @Test fun task_v2_includes_posted_by_counterparty_with_handle() {
+        val gig = baseGig.copy(title = "Walk my dog", isV2 = true, status = "open")
+        val content = GigDetailViewModel.Projection.project(gig, emptyList(), viewerUserId = "bidder")
+        assertNotNull(content.counterparty)
+        assertEquals("Hana O.", content.counterparty?.displayName)
+        assertEquals("@hana", content.counterparty?.trailing)
+        assertTrue(content.counterparty?.showsMessageButton == true)
+    }
+
+    @Test fun poster_counterparty_hides_message_button_for_owner() {
+        val gig = baseGig.copy(title = "Walk my dog", isV2 = true, status = "open")
+        val content = GigDetailViewModel.Projection.project(gig, emptyList(), viewerUserId = "owner")
+        assertFalse(content.counterparty?.showsMessageButton == true)
+    }
+
+    @Test fun awarded_gig_without_is_v2_flag_stays_on_v1() {
+        val gig =
+            baseGig.copy(
+                title = "Dog walk · 45 min",
+                price = 22.0,
+                category = "petcare",
+                status = "accepted",
+                isV2 = null,
+                acceptedBy = "u1",
+                bidCount = 3,
+            )
+        val content =
+            GigDetailViewModel.Projection.project(
+                gig,
+                listOf(bid("b1", "u1", 20.0, "Tomás G.")),
+            )
+        assertEquals("Awarded", content.statusPill?.label)
+        assertNull(content.hero.categoryChip)
+    }
+
+    @Test fun gig_with_coordinates_includes_location_map_module() {
+        val gig =
+            baseGig.copy(
+                title = "Fix leaking kitchen faucet",
+                category = "handyman",
+                latitude = 45.587,
+                longitude = -122.399,
+                locationUnlocked = false,
+                location = GigCoordinate(latitude = 45.587, longitude = -122.399),
+            )
+        val content = GigDetailViewModel.Projection.project(gig, emptyList())
+        val map = content.modules.filterIsInstance<ContentDetailModule.LocationMap>().firstOrNull()
+        assertNotNull(map)
+        assertTrue(map!!.isApproximate)
+        assertEquals(GigsCategory.Handyman, map.category)
+    }
+
     @Test fun task_v2_projection_fills_status_hero_bids_and_two_stop() {
         val gig =
             baseGig.copy(
