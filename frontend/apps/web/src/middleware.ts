@@ -78,14 +78,15 @@ export function middleware(req: NextRequest) {
     return clearAuthCookies(NextResponse.next());
   }
 
-  // Returning users visiting the root should jump directly to hub.
+  // Returning users visiting the root land on their Place (the default
+  // landing for the authed app).
   if (pathname === '/' && isAuthenticated) {
-    return NextResponse.redirect(new URL('/app/hub', req.url));
+    return NextResponse.redirect(new URL('/app/place', req.url));
   }
 
   // Keep authenticated users out of login/register pages.
   if (AUTH_PAGES.has(pathname) && isAuthenticated) {
-    return NextResponse.redirect(new URL('/app/hub', req.url));
+    return NextResponse.redirect(new URL('/app/place', req.url));
   }
 
   // App routes require session.

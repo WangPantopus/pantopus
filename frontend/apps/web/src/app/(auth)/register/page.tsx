@@ -138,7 +138,7 @@ function RegisterContent() {
       const token = (respObj.accessToken || respObj.token) as string | undefined;
       if (token) {
         // Backend sets httpOnly cookies via same-origin proxy.
-        router.push(safeRedirectPath(redirectTo));
+        router.push(safeRedirectPath(redirectTo, '/app/place'));
       } else {
         const emailForNext = encodeURIComponent(normalizeEmail(formData.email));
         router.push(`/verify-email-sent?email=${emailForNext}`);

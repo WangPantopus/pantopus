@@ -649,6 +649,17 @@ export function PersonalSidebarContent({ currentPath, showLabels, chatUnread, of
     });
   }, [router, queryClient]);
 
+  // Place — warm the route bundle + the primary-home query (the
+  // intelligence query key needs the home id, not known on hover).
+  const prefetchPlace = useCallback(() => {
+    router.prefetch('/app/place');
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.placePrimaryHome(),
+      queryFn: () => api.homes.getPrimaryHome(),
+      staleTime: PREFETCH_STALE,
+    });
+  }, [router, queryClient]);
+
   // Feed / Gigs / Marketplace query keys include runtime state
   // (surface, filter, bounds, debounced search) that isn't known on hover.
   // For those, warm just the route bundle so navigation is still faster.
@@ -686,6 +697,7 @@ export function PersonalSidebarContent({ currentPath, showLabels, chatUnread, of
   return (
     <div className="space-y-0.5">
       {/* Primary */}
+      <SidebarItem icon={NavIcons.place} label="Place" active={startsWith('/app/place')} onClick={() => go('/app/place')} onPrefetch={prefetchPlace} showLabel={showLabels} accent="home" testId="sidebar-place" />
       <SidebarItem icon={NavIcons.hub} label="Hub" active={isActive('/app/hub')} onClick={() => go('/app/hub')} onPrefetch={prefetchHub} showLabel={showLabels} />
       <SidebarItem icon={NavIcons.feed} label="Pulse" active={startsWith('/app/feed')} onClick={() => go('/app/feed')} onPrefetch={prefetchFeed} showLabel={showLabels} />
       <SidebarItem icon={NavIcons.tasks} label="Tasks" active={startsWith('/app/gigs') && !isActive('/app/gigs/saved')} onClick={() => go('/app/gigs')} onPrefetch={prefetchGigs} showLabel={showLabels} count={offersPending} />
@@ -866,7 +878,7 @@ function SidebarItem({
   onClick: () => void;
   onPrefetch?: () => void;
   count?: number;
-  accent?: 'blue' | 'emerald' | 'violet' | 'teal';
+  accent?: 'blue' | 'emerald' | 'violet' | 'teal' | 'home';
   showLabel?: boolean;
   /** Optional trailing element (e.g. <ProBadge />) rendered before the count pill. */
   accessory?: React.ReactNode;
@@ -874,9 +886,12 @@ function SidebarItem({
   testId?: string;
 }) {
   const activeClasses =
-    accent === 'violet'
-      ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200 border-l-[3px] border-violet-600 dark:border-violet-400'
-      : accent === 'emerald'
+    accent === 'home'
+      ? // Place pillar accent = colors.identity.home (green-600 == #16A34A).
+        'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-200 border-l-[3px] border-green-600 dark:border-green-400'
+      : accent === 'violet'
+        ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200 border-l-[3px] border-violet-600 dark:border-violet-400'
+        : accent === 'emerald'
         ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-200 border-l-[3px] border-emerald-600 dark:border-emerald-400'
         : accent === 'teal'
           ? // Audience zone (unified-IA §3.2) — teal accent never appears on
