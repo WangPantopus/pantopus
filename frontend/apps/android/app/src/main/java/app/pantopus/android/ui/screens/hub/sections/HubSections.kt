@@ -66,6 +66,7 @@ import app.pantopus.android.ui.theme.pantopusShadow
 @Composable
 fun HubTopBar(
     content: TopBarContent,
+    onAvatarTap: () -> Unit,
     onBellTap: () -> Unit,
     onMenuTap: () -> Unit,
 ) {
@@ -79,11 +80,19 @@ fun HubTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            AvatarWithIdentityRing(
-                name = content.name,
-                identity = content.identity,
-                ringProgress = content.ringProgress,
-            )
+            Box(
+                modifier =
+                    Modifier
+                        .clickable(onClick = onAvatarTap)
+                        .testTag("hubAvatarButton")
+                        .semantics { contentDescription = "Profile" },
+            ) {
+                AvatarWithIdentityRing(
+                    name = content.name,
+                    identity = content.identity,
+                    ringProgress = content.ringProgress,
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     content.greeting,

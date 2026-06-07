@@ -53,6 +53,7 @@ data class PulsePostCardContent(
     val reactions: List<PulseReaction>,
     val attendees: PulseAttendeeStrip?,
     val userHasReacted: Boolean,
+    val mediaUrls: List<String> = emptyList(),
 )
 
 /** Event card attendee strip — stacked avatars + going count + RSVP CTA. */
@@ -108,6 +109,9 @@ fun PulsePostCard(
                 maxLines = if (!content.title.isNullOrEmpty()) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (content.mediaUrls.isNotEmpty()) {
+            PulsePostMediaPreview(urls = content.mediaUrls, postId = content.id)
         }
         content.attendees?.let { attendees ->
             AttendeeStrip(attendees = attendees, onRSVP = onRSVP, postId = content.id)
@@ -361,5 +365,8 @@ private fun buildA11yLabel(content: PulsePostCardContent): String {
     if (content.intent.cardChipLabel.isNotEmpty()) parts.add(content.intent.cardChipLabel)
     content.title?.takeIf { it.isNotEmpty() }?.let { parts.add(it) }
     if (content.body.isNotEmpty()) parts.add(content.body)
+    if (content.mediaUrls.isNotEmpty()) {
+        parts.add("${content.mediaUrls.size} attached ${if (content.mediaUrls.size == 1) "photo" else "photos"}")
+    }
     return parts.joinToString(". ")
 }

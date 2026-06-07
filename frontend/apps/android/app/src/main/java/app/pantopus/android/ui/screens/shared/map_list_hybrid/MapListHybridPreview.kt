@@ -60,6 +60,7 @@ fun MapListHybridShellStaticPreview(
     sheetHeader: @Composable () -> Unit,
     sheetBody: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    floatingAction: @Composable () -> Unit = {},
 ) {
     BoxWithConstraints(
         modifier =
@@ -71,8 +72,13 @@ fun MapListHybridShellStaticPreview(
         val sheetHeight = detent.height(maxHeight)
         val controlsBottom =
             minOf(
-                sheetHeight + 14.dp,
-                (maxHeight - CONTROLS_TOP_RESERVE).coerceAtLeast(14.dp),
+                sheetHeight + SHEET_TO_CONTROLS_GAP,
+                (maxHeight - MAP_CONTROLS_STACK_HEIGHT - SHEET_TO_CONTROLS_GAP).coerceAtLeast(SHEET_TO_CONTROLS_GAP),
+            )
+        val fabBottom =
+            minOf(
+                sheetHeight + FAB_LIFT_ABOVE_SHEET,
+                (maxHeight - FAB_TOP_RESERVE).coerceAtLeast(FAB_LIFT_ABOVE_SHEET),
             )
         // Flat pale-blue stand-in for the live map canvas. Holds a
         // testTag so snapshot tests can target it deterministically.
@@ -84,26 +90,20 @@ fun MapListHybridShellStaticPreview(
                     .testTag("mapListHybridStaticMap"),
         )
 
-        Box(
+        Column(
             modifier =
                 Modifier
-                    .padding(top = Spacing.s5, start = 14.dp, end = 14.dp)
+                    .padding(top = Spacing.s2, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .testTag("mapListHybridTopPill"),
+                    .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            topPill()
-        }
-
-        Box(
-            modifier =
-                Modifier
-                    .padding(top = Spacing.s16)
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .testTag("mapListHybridChips"),
-        ) {
-            categoryChips()
+            Box(modifier = Modifier.fillMaxWidth().testTag("mapListHybridTopPill")) {
+                topPill()
+            }
+            Box(modifier = Modifier.fillMaxWidth().testTag("mapListHybridChips")) {
+                categoryChips()
+            }
         }
 
         Box(
@@ -114,6 +114,16 @@ fun MapListHybridShellStaticPreview(
                     .testTag("mapListHybridMapControls"),
         ) {
             mapControls()
+        }
+
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 14.dp, bottom = fabBottom)
+                    .testTag("mapListHybridFloatingAction"),
+        ) {
+            floatingAction()
         }
 
         Column(

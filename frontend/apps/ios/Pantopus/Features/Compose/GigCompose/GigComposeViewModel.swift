@@ -61,7 +61,7 @@ final class GigComposeViewModel: WizardModel {
 
     init(
         api: APIClient = .shared,
-        location: any LocationProviding = FallbackLocationProvider.shared,
+        location: any LocationProviding = DeviceLocationProvider.shared,
         initialState: GigComposeFormState = .empty,
         // Defaults to the live NetworkMonitor in production. Tests inject
         // a closure returning a fixed value so the simulator's

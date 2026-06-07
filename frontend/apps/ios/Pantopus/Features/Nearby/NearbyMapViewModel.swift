@@ -56,7 +56,7 @@ public final class NearbyMapViewModel {
 
     init(
         api: APIClient = .shared,
-        location: any LocationProviding = FallbackLocationProvider.shared,
+        location: any LocationProviding = DeviceLocationProvider.shared,
         initialCategory: GigsCategory = .all
     ) {
         self.api = api
@@ -77,6 +77,12 @@ public final class NearbyMapViewModel {
 
     /// Pull-to-refresh / retry.
     public func refresh() async {
+        await fetchAroundUser()
+    }
+
+    /// Re-resolve GPS and re-fetch the viewport around the updated anchor.
+    public func locate() async {
+        userCoordinate = await location.requestCurrent(timeoutSeconds: 4)
         await fetchAroundUser()
     }
 

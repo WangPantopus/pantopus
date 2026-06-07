@@ -106,6 +106,7 @@ private fun PopulatedLayout(
         item(key = "topBar") {
             HubTopBar(
                 content = content.topBar,
+                onAvatarTap = { onIntent(HubNavigationIntent.OpenProfile) },
                 onBellTap = { onIntent(HubNavigationIntent.OpenNotifications) },
                 onMenuTap = { onIntent(HubNavigationIntent.OpenMenu) },
             )
@@ -176,6 +177,7 @@ private fun FirstRunLayout(
                         ringProgress = content.ringProgress,
                         unreadCount = 0,
                     ),
+                onAvatarTap = { onIntent(HubNavigationIntent.OpenProfile) },
                 onBellTap = {},
                 onMenuTap = {},
             )

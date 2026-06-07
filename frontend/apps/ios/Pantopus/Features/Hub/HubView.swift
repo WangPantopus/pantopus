@@ -47,6 +47,7 @@ struct HubView: View {
             LazyVStack(alignment: .leading, spacing: Spacing.s4, pinnedViews: [.sectionHeaders]) {
                 HubTopBar(
                     content: content.topBar,
+                    onAvatarTap: { onNavigate(.openProfile) },
                     onBellTap: { onNavigate(.openNotifications) },
                     onMenuTap: { onNavigate(.openMenu) }
                 )
@@ -95,6 +96,7 @@ struct HubView: View {
                             ringProgress: content.ringProgress,
                             unreadCount: 0
                         ),
+                        onAvatarTap: { onNavigate(.openProfile) },
                         onBellTap: { onNavigate(.openNotifications) },
                         onMenuTap: { onNavigate(.openMenu) }
                     )
@@ -126,6 +128,7 @@ struct HubView: View {
 enum HubNavigationIntent {
     case openNotifications
     case openMenu
+    case openProfile
     case action(ActionChipContent.Kind)
     case startVerification
     case pillar(PillarTile.Pillar)

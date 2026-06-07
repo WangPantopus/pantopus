@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.feed.FeedPost
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.screens.feed.FeedEmptyContent
 import app.pantopus.android.ui.screens.feed.FeedSurface
 import app.pantopus.android.ui.screens.shared.feed.FeedAvatarTint
@@ -42,6 +44,8 @@ class PulseFeedViewModel
     @Inject
     constructor(
         private val repo: PostsRepository,
+        private val locationProvider: LocationProvider,
+        private val postsRefresh: PulsePostsRefreshNotifier,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PulseFeedUiState>(PulseFeedUiState.Loading)
         val state: StateFlow<PulseFeedUiState> = _state.asStateFlow()
@@ -60,7 +64,17 @@ class PulseFeedViewModel
         private var scopeLabel: String? = null
         private var latitude: Double? = null
         private var longitude: Double? = null
+        private var resolvedLatitude: Double? = null
+        private var resolvedLongitude: Double? = null
         private var loading = false
+
+        init {
+            viewModelScope.launch {
+                postsRefresh.ticks.collect {
+                    refresh()
+                }
+            }
+        }
 
         /** Wire location coordinates from the host before the first load. */
         fun configureLocation(
@@ -146,12 +160,13 @@ class PulseFeedViewModel
             }
             viewModelScope.launch {
                 try {
+                    val (lat, lng) = resolvedCoordinates()
                     when (
                         val result =
                             repo.feed(
                                 surface = surface.backendSurface,
-                                latitude = latitude,
-                                longitude = longitude,
+                                latitude = lat,
+                                longitude = lng,
                                 postType = _activeIntent.value.postType,
                             )
                     ) {
@@ -176,6 +191,30 @@ class PulseFeedViewModel
                     _isRefreshing.value = false
                 }
             }
+        }
+
+        private suspend fun resolvedCoordinates(): Pair<Double?, Double?> {
+            latitude?.let { lat ->
+                longitude?.let { lng ->
+                    return lat to lng
+                }
+            }
+            resolvedLatitude?.let { lat ->
+                resolvedLongitude?.let { lng ->
+                    return lat to lng
+                }
+            }
+            locationProvider.cachedCoordinate()?.let { cached ->
+                resolvedLatitude = cached.latitude
+                resolvedLongitude = cached.longitude
+                return cached.latitude to cached.longitude
+            }
+            locationProvider.requestCurrent(timeoutMillis = 4_000)?.let { fresh ->
+                resolvedLatitude = fresh.latitude
+                resolvedLongitude = fresh.longitude
+                return fresh.latitude to fresh.longitude
+            }
+            return null to null
         }
 
         private fun projectCard(post: FeedPost): PulsePostCardContent {
@@ -210,6 +249,11 @@ class PulseFeedViewModel
                         null
                     },
                 userHasReacted = post.userHasLiked,
+                mediaUrls =
+                    resolvePulsePostMediaUrls(
+                        urls = post.mediaUrls,
+                        thumbnails = post.mediaThumbnails,
+                    ),
             )
         }
 

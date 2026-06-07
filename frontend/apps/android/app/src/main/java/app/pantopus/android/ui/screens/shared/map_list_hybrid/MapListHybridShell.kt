@@ -12,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -48,8 +49,11 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.Dash
+import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.CameraPositionState
+import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
@@ -57,13 +61,16 @@ import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 
-/**
- * Vertical room reserved below the status bar for the floating map-control
- * stack, so a near-full (90%) sheet can't push it off the top of the
- * screen (≈ a 48dp FAB + two 38dp control buttons + gaps). Mirrors the
- * iOS `controlsTopReserve`.
- */
-internal val CONTROLS_TOP_RESERVE = 168.dp
+/** Locate + layers stack (two 38dp buttons + 8dp gap). */
+internal val MAP_CONTROLS_STACK_HEIGHT = 84.dp
+
+/** A11.1 — sheet gap + controls + gap before the Post-task FAB. */
+internal val FAB_LIFT_ABOVE_SHEET = 112.dp
+
+/** Room below the status bar for the FAB when the sheet is expanded. */
+internal val FAB_TOP_RESERVE = 56.dp
+
+internal val SHEET_TO_CONTROLS_GAP = 14.dp
 
 /**
  * T6.6a (P24) — shared archetype for map+list hybrid surfaces.
@@ -99,11 +106,13 @@ fun MapListHybridShell(
     anchor: MapAnchor? = null,
     selectedPinId: String? = null,
     recenterTrigger: Int = 0,
+    showSearchRadius: Boolean = false,
     onPinTap: (String) -> Unit = {},
     reduceMotionOverride: Boolean? = null,
     topPill: @Composable () -> Unit = {},
     categoryChips: @Composable () -> Unit = {},
     mapControls: @Composable () -> Unit = {},
+    floatingAction: @Composable () -> Unit = {},
     sheetHeader: @Composable () -> Unit = {},
     sheetBody: @Composable () -> Unit = {},
 ) {
@@ -165,17 +174,20 @@ fun MapListHybridShell(
         // Map controls follow the sheet edge but clamp so the 90% detent
         // can't push the stack (e.g. a Post-task FAB) off the top.
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val controlsBottom =
-            minOf(
-                targetHeightDp + 14.dp,
-                (containerHeight - statusBarTop - CONTROLS_TOP_RESERVE).coerceAtLeast(14.dp),
-            )
+        val maxControlsBottom =
+            (containerHeight - statusBarTop - MAP_CONTROLS_STACK_HEIGHT - SHEET_TO_CONTROLS_GAP)
+                .coerceAtLeast(SHEET_TO_CONTROLS_GAP)
+        val maxFabBottom =
+            (containerHeight - statusBarTop - FAB_TOP_RESERVE).coerceAtLeast(FAB_LIFT_ABOVE_SHEET)
+        val controlsBottom = minOf(targetHeightDp + SHEET_TO_CONTROLS_GAP, maxControlsBottom)
+        val fabBottom = minOf(targetHeightDp + FAB_LIFT_ABOVE_SHEET, maxFabBottom)
 
         MapLayer(
             cameraState = cameraState,
             pins = pins,
             selectedPinId = selectedPinId,
             anchor = anchor,
+            showSearchRadius = showSearchRadius,
             reduceMotion = reduceMotion,
             onPinTap = onPinTap,
         )
@@ -184,7 +196,6 @@ fun MapListHybridShell(
             modifier =
                 Modifier
                     .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(top = Spacing.s2, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .testTag("mapListHybridTopPill"),
@@ -195,8 +206,6 @@ fun MapListHybridShell(
         Box(
             modifier =
                 Modifier
-                    .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(top = 56.dp)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .testTag("mapListHybridChips"),
@@ -212,6 +221,16 @@ fun MapListHybridShell(
                     .testTag("mapListHybridMapControls"),
         ) {
             mapControls()
+        }
+
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 14.dp, bottom = fabBottom)
+                    .testTag("mapListHybridFloatingAction"),
+        ) {
+            floatingAction()
         }
 
         BottomSheet(
@@ -246,6 +265,7 @@ private fun MapLayer(
     pins: List<MapPin>,
     selectedPinId: String?,
     anchor: MapAnchor?,
+    showSearchRadius: Boolean,
     reduceMotion: Boolean,
     onPinTap: (String) -> Unit,
 ) {
@@ -285,6 +305,16 @@ private fun MapLayer(
             }
         }
         if (anchor != null) {
+            if (showSearchRadius) {
+                Circle(
+                    center = LatLng(anchor.latitude, anchor.longitude),
+                    fillColor = PantopusColors.primary600.copy(alpha = 0.05f),
+                    radius = 800.0,
+                    strokeColor = PantopusColors.primary600.copy(alpha = 0.45f),
+                    strokePattern = listOf(Dash(12f), Gap(8f)),
+                    strokeWidth = 2f,
+                )
+            }
             val anchorState =
                 remember(anchor.latitude, anchor.longitude) {
                     MarkerState(position = LatLng(anchor.latitude, anchor.longitude))

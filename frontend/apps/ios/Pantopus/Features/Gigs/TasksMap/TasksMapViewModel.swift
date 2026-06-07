@@ -24,10 +24,14 @@ public final class TasksMapViewModel {
     /// Mirrors the pin↔card link — the active task pulses on the map and
     /// its rail card draws the selected ring.
     public private(set) var selectedId: String?
-    /// "You are here" anchor handed to the shell.
-    public let anchor: MapAnchor?
+    /// "You are here" anchor handed to the shell. Resolved from GPS in
+    /// production; tests / previews may inject a fixed anchor.
+    public private(set) var anchor: MapAnchor?
 
     private let api: APIClient
+    private let location: any LocationProviding
+    /// Fixed anchor override for previews / tests that should not hit GPS.
+    private let fixedAnchor: MapAnchor?
     /// Explicit offline fixture. When non-nil `load()` renders it directly
     /// instead of hitting the network (previews / sample / unit tests).
     private let seed: [TaskMapItem]?
@@ -40,12 +44,13 @@ public final class TasksMapViewModel {
     /// map without referencing it.
     public convenience init(
         initialCategory: GigsCategory = .all,
-        anchor: MapAnchor? = TasksMapSampleData.anchor,
+        anchor: MapAnchor? = nil,
         seed: [TaskMapItem]? = nil,
         failWith: String? = nil
     ) {
         self.init(
             api: .shared,
+            location: DeviceLocationProvider.shared,
             initialCategory: initialCategory,
             anchor: anchor,
             seed: seed,
@@ -57,14 +62,17 @@ public final class TasksMapViewModel {
     /// inject a stubbed client here.
     init(
         api: APIClient,
+        location: any LocationProviding = DeviceLocationProvider.shared,
         initialCategory: GigsCategory = .all,
-        anchor: MapAnchor? = TasksMapSampleData.anchor,
+        anchor: MapAnchor? = nil,
         seed: [TaskMapItem]? = nil,
         failWith: String? = nil
     ) {
         self.api = api
+        self.location = location
         activeCategory = initialCategory
-        self.anchor = anchor
+        fixedAnchor = anchor
+        self.anchor = fixedAnchor ?? location.cachedCoordinate()?.mapAnchor
         self.seed = seed
         self.failWith = failWith
     }
@@ -80,11 +88,19 @@ public final class TasksMapViewModel {
             recompute()
             return
         }
+        await resolveLocation(refresh: false)
         await fetchInBounds()
     }
 
     public func refresh() async {
         await load()
+    }
+
+    /// Re-resolve GPS and re-fetch the viewport around the updated anchor.
+    public func locate() async {
+        guard seed == nil, failWith == nil else { return }
+        await resolveLocation(refresh: true)
+        await fetchInBounds()
     }
 
     public func selectCategory(_ category: GigsCategory) {
@@ -103,6 +119,19 @@ public final class TasksMapViewModel {
     /// snaps the sheet to `.standard` so the matching card surfaces.
     public func select(_ id: String) {
         selectedId = id
+    }
+
+    // MARK: - Location
+
+    private func resolveLocation(refresh: Bool) async {
+        if fixedAnchor != nil {
+            anchor = fixedAnchor
+            return
+        }
+        if !refresh, anchor != nil { return }
+        if let coordinate = await location.requestCurrent(timeoutSeconds: 4) {
+            anchor = coordinate.mapAnchor
+        }
     }
 
     // MARK: - Fetch
@@ -218,5 +247,11 @@ public final class TasksMapViewModel {
 
     private static func priceValue(_ price: String) -> Double {
         Double(price.filter { $0.isNumber || $0 == "." }) ?? 0
+    }
+}
+
+private extension UserCoordinate {
+    var mapAnchor: MapAnchor {
+        MapAnchor(latitude: latitude, longitude: longitude)
     }
 }

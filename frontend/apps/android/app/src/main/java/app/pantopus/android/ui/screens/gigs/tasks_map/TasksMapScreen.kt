@@ -2,6 +2,11 @@
 
 package app.pantopus.android.ui.screens.gigs.tasks_map
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -46,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import app.pantopus.android.ui.screens.gigs.GigFilterCriteria
 import app.pantopus.android.ui.screens.gigs.GigFilterSheet
 import app.pantopus.android.ui.screens.gigs.GigsCategory
@@ -75,17 +83,53 @@ fun TasksMapScreen(
     onBack: () -> Unit = {},
     viewModel: TasksMapViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeCategory by viewModel.activeCategory.collectAsStateWithLifecycle()
     val activeSort by viewModel.activeSort.collectAsStateWithLifecycle()
     val selectedId by viewModel.selectedId.collectAsStateWithLifecycle()
+    val anchor by viewModel.anchor.collectAsStateWithLifecycle()
 
     var detent by remember { mutableStateOf(MapListHybridDetent.Standard) }
     var recenterToken by remember { mutableIntStateOf(0) }
     var showFilters by remember { mutableStateOf(false) }
     var filterCriteria by remember { mutableStateOf(GigFilterCriteria()) }
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { results ->
+            if (results.values.any { it }) {
+                viewModel.locate()
+                recenterToken++
+            }
+        }
+
+    fun requestLocate() {
+        if (hasLocationPermission(context)) {
+            viewModel.locate()
+            recenterToken++
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasLocationPermission(context)) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
+        viewModel.load()
+    }
 
     val items = (state as? TasksMapUiState.Populated)?.items.orEmpty()
 
@@ -93,23 +137,31 @@ fun TasksMapScreen(
         pins = items.map { it.toPin() },
         detent = detent,
         onDetentChange = { detent = it },
-        anchor = viewModel.anchor,
+        anchor = anchor,
         selectedPinId = selectedId,
         recenterTrigger = recenterToken,
+        showSearchRadius = state is TasksMapUiState.Empty,
         onPinTap = { id ->
             viewModel.select(id)
             detent = MapListHybridDetent.Standard
         },
-        topPill = { TasksMapTopPill(onBack = onBack, onFilters = { showFilters = true }) },
-        categoryChips = {
-            TasksMapCategoryChips(active = activeCategory, onSelect = viewModel::selectCategory)
+        topPill = {
+            TasksMapTopBar(
+                active = activeCategory,
+                onBack = onBack,
+                onFilters = { showFilters = true },
+                onSelectCategory = viewModel::selectCategory,
+            )
         },
+        categoryChips = {},
         mapControls = {
-            TasksMapControls(
-                onPostTask = { onCompose(activeCategory) },
-                onLocate = { recenterToken++ },
+            TasksMapMapControls(
+                onLocate = { requestLocate() },
                 onLayers = { showFilters = true },
             )
+        },
+        floatingAction = {
+            TasksMapPostFab(onClick = { onCompose(activeCategory) })
         },
         sheetHeader = {
             TasksMapSheetHeader(
@@ -146,66 +198,115 @@ fun TasksMapScreen(
 // MARK: - Chrome
 
 @Composable
+internal fun TasksMapTopBar(
+    active: GigsCategory,
+    onBack: () -> Unit,
+    onFilters: () -> Unit,
+    onSelectCategory: (GigsCategory) -> Unit,
+) {
+    val scrollState = rememberScrollState()
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp)
+                .testTag("tasksMapPill")
+                .semantics {
+                    contentDescription = "Tasks map"
+                    heading()
+                },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TasksMapControlButton(
+            icon = PantopusIcon.ChevronLeft,
+            iconSize = 18.dp,
+            label = "Back to list",
+            testTagId = "tasksMapBack",
+            onClick = onBack,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .horizontalScroll(scrollState)
+                    .testTag("tasksMapCategoryChips"),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GigsCategory.entries.forEach { category ->
+                TasksMapCategoryChip(
+                    category = category,
+                    active = category == active,
+                    onSelect = onSelectCategory,
+                )
+            }
+        }
+        TasksMapControlButton(
+            icon = PantopusIcon.SlidersHorizontal,
+            iconSize = Radii.xl,
+            label = "Filters",
+            testTagId = "tasksMapFilters",
+            onClick = onFilters,
+        )
+    }
+}
+
+@Composable
 internal fun TasksMapTopPill(
     onBack: () -> Unit,
     onFilters: () -> Unit,
 ) {
+    TasksMapTopBar(
+        active = GigsCategory.All,
+        onBack = onBack,
+        onFilters = onFilters,
+        onSelectCategory = {},
+    )
+}
+
+@Composable
+private fun TasksMapCategoryChip(
+    category: GigsCategory,
+    active: Boolean,
+    onSelect: (GigsCategory) -> Unit,
+) {
+    val chipSurface = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+    val chipBorder = MaterialTheme.colorScheme.outline
+    val chipText = MaterialTheme.colorScheme.onSurface
     Row(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
-                .background(Color.White.copy(alpha = 0.96f))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.pill))
-                .padding(start = 6.dp, end = Spacing.s2, top = Spacing.s2, bottom = Spacing.s2)
-                .fillMaxWidth()
-                .testTag("tasksMapPill"),
+                .background(if (active) category.color else chipSurface)
+                .border(
+                    width = if (active) 0.dp else 1.dp,
+                    color = if (active) Color.Transparent else chipBorder,
+                    shape = RoundedCornerShape(Radii.pill),
+                )
+                .shadow(elevation = 4.dp, shape = RoundedCornerShape(Radii.pill))
+                .clickable { onSelect(category) }
+                .padding(horizontal = Spacing.s3)
+                .height(28.dp)
+                .testTag("tasksMapCategoryChip_${category.key}"),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack)
-                    .testTag("tasksMapBack")
-                    .semantics { contentDescription = "Back to list" },
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.ChevronLeft,
-                contentDescription = null,
-                size = 18.dp,
-                strokeWidth = 2.2f,
-                tint = PantopusColors.appText,
+        if (category != GigsCategory.All) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (active) PantopusColors.appTextInverse else category.color),
             )
         }
         Text(
-            text = "Tasks map",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appText,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f).semantics { heading() },
+            text = category.label,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (active) PantopusColors.appTextInverse else chipText,
         )
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onFilters)
-                    .testTag("tasksMapFilters")
-                    .semantics { contentDescription = "Filters" },
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.SlidersHorizontal,
-                contentDescription = null,
-                size = Radii.xl,
-                strokeWidth = 2.2f,
-                tint = PantopusColors.appText,
-            )
-        }
     }
 }
 
@@ -226,48 +327,49 @@ internal fun TasksMapCategoryChips(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         GigsCategory.entries.forEach { category ->
-            val isActive = category == active
-            Row(
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.pill))
-                        .background(if (isActive) category.color else Color.White.copy(alpha = 0.96f))
-                        .border(
-                            width = if (isActive) 0.dp else 1.dp,
-                            color = if (isActive) Color.Transparent else PantopusColors.appBorder,
-                            shape = RoundedCornerShape(Radii.pill),
-                        )
-                        .shadow(elevation = 4.dp, shape = RoundedCornerShape(Radii.pill))
-                        .clickable { onSelect(category) }
-                        .padding(horizontal = Spacing.s3)
-                        .height(28.dp)
-                        .testTag("tasksMapCategoryChip_${category.key}"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                if (category != GigsCategory.All) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(if (isActive) Color.White else category.color),
-                    )
-                }
-                Text(
-                    text = category.label,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isActive) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
-                )
-            }
+            TasksMapCategoryChip(
+                category = category,
+                active = category == active,
+                onSelect = onSelect,
+            )
         }
     }
 }
 
 @Composable
-internal fun TasksMapControls(
-    onPostTask: () -> Unit,
+internal fun TasksMapPostFab(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .shadow(elevation = 12.dp, shape = RoundedCornerShape(Radii.pill))
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.primary600)
+                .clickable(onClick = onClick)
+                .padding(start = 14.dp, end = 18.dp)
+                .height(48.dp)
+                .testTag("tasksMapPostFab")
+                .semantics { contentDescription = "Post task" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Plus,
+            contentDescription = null,
+            size = 18.dp,
+            strokeWidth = 2.6f,
+            tint = PantopusColors.appTextInverse,
+        )
+        Text(
+            text = "Post task",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextInverse,
+        )
+    }
+}
+
+@Composable
+internal fun TasksMapMapControls(
     onLocate: () -> Unit,
     onLayers: () -> Unit,
 ) {
@@ -275,35 +377,6 @@ internal fun TasksMapControls(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        // Post-task FAB — extended pill, stacked above the controls.
-        Row(
-            modifier =
-                Modifier
-                    .shadow(elevation = 12.dp, shape = RoundedCornerShape(Radii.pill))
-                    .clip(RoundedCornerShape(Radii.pill))
-                    .background(PantopusColors.primary600)
-                    .clickable(onClick = onPostTask)
-                    .padding(start = 14.dp, end = 18.dp)
-                    .height(48.dp)
-                    .testTag("tasksMapPostFab")
-                    .semantics { contentDescription = "Post task" },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.Plus,
-                contentDescription = null,
-                size = 18.dp,
-                strokeWidth = 2.6f,
-                tint = PantopusColors.appTextInverse,
-            )
-            Text(
-                text = "Post task",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextInverse,
-            )
-        }
         TasksMapControlButton(
             icon = PantopusIcon.MapPin,
             label = "Locate me",
@@ -320,20 +393,24 @@ internal fun TasksMapControls(
 }
 
 @Composable
-private fun TasksMapControlButton(
+internal fun TasksMapControlButton(
     icon: PantopusIcon,
     label: String,
     testTagId: String,
     onClick: () -> Unit,
+    iconSize: androidx.compose.ui.unit.Dp = 16.dp,
 ) {
+    val controlSurface = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+    val controlBorder = MaterialTheme.colorScheme.outline
+    val controlTint = MaterialTheme.colorScheme.onBackground
     Box(
         modifier =
             Modifier
                 .size(38.dp)
                 .shadow(elevation = 4.dp, shape = CircleShape)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.96f))
-                .border(1.dp, PantopusColors.appBorder, CircleShape)
+                .background(controlSurface)
+                .border(1.dp, controlBorder, CircleShape)
                 .clickable(onClick = onClick)
                 .testTag(testTagId)
                 .semantics { contentDescription = label },
@@ -342,8 +419,8 @@ private fun TasksMapControlButton(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = Radii.xl,
-            tint = PantopusColors.appText,
+            size = iconSize,
+            tint = controlTint,
         )
     }
 }
@@ -780,6 +857,20 @@ private fun TasksMapErrorBody(
     }
 }
 
+private fun hasLocationPermission(context: Context): Boolean {
+    val fine =
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+    val coarse =
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+    return fine || coarse
+}
+
 /**
  * Static, render-only assembly of the Tasks-map chrome over the shell's
  * flat map stand-in. Used by Paparazzi (and `@Preview`) so the populated /
@@ -796,9 +887,17 @@ internal fun TasksMapStaticPreview(
     val count = (state as? TasksMapUiState.Populated)?.items?.size ?: 0
     MapListHybridShellStaticPreview(
         detent = MapListHybridDetent.Standard,
-        topPill = { TasksMapTopPill(onBack = {}, onFilters = {}) },
-        categoryChips = { TasksMapCategoryChips(active = activeCategory, onSelect = {}) },
-        mapControls = { TasksMapControls(onPostTask = {}, onLocate = {}, onLayers = {}) },
+        topPill = {
+            TasksMapTopBar(
+                active = activeCategory,
+                onBack = {},
+                onFilters = {},
+                onSelectCategory = {},
+            )
+        },
+        categoryChips = {},
+        mapControls = { TasksMapMapControls(onLocate = {}, onLayers = {}) },
+        floatingAction = { TasksMapPostFab(onClick = {}) },
         sheetHeader = { TasksMapSheetHeader(count = count, activeSort = activeSort, onSelectSort = {}) },
         sheetBody = {
             TasksMapSheetBody(

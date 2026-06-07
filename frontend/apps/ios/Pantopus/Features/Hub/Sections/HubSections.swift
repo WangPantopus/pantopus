@@ -16,16 +16,22 @@ import SwiftUI
 
 struct HubTopBar: View {
     let content: TopBarContent
+    let onAvatarTap: () -> Void
     let onBellTap: () -> Void
     let onMenuTap: () -> Void
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
-            AvatarWithIdentityRing(
-                name: content.name,
-                identity: content.identity,
-                ringProgress: content.ringProgress
-            )
+            Button(action: onAvatarTap) {
+                AvatarWithIdentityRing(
+                    name: content.name,
+                    identity: content.identity,
+                    ringProgress: content.ringProgress
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Profile")
+            .accessibilityIdentifier("hubAvatarButton")
             VStack(alignment: .leading, spacing: 1) {
                 Text(content.greeting)
                     .pantopusTextStyle(.caption)
