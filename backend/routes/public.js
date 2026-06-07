@@ -2,9 +2,13 @@ const express = require('express');
 const router = express.Router();
 const supabaseAdmin = require('../config/supabaseAdmin');
 const geo = require('../services/geo');
-const { getProfile } = require('../services/ai/neighborhoodProfileService');
-const { encodeGeohash6 } = require('../utils/geohash');
-const { geoCache } = require('../utils/geoCache');
+const {
+  geocodeToTract,
+  fetchCensusACS,
+  fetchFloodZone,
+} = require('../services/ai/neighborhoodProfileService');
+const { encodeGeohash, encodeGeohash6 } = require('../utils/geohash');
+const { GeoCache } = require('../utils/geoCache');
 
 // ============================================================
 // Public Preview Endpoints
@@ -142,17 +146,21 @@ router.get('/posts/:id', async (req, res) => {
 //
 // Privacy (the §4 anti-leak rule):
 //   • No auth.   • No ATTOM (no propertyDataService).   • No PII / exact home record.
-//   • The PREVIEW persists nothing: no saved place, no per-user / per-address row,
-//     nothing that makes it returnable (close + reopen still hits the wall).
+//   • The PREVIEW persists nothing: no saved place, no per-user / per-address
+//     row, NO DB writes at all — close + reopen still hits the wall.
 //
-// Caching (shared, anonymous, area-level public reference data — never the
-// user's preview, so it honors "the preview persists nothing"):
-//   • flood + census → NeighborhoodProfileCache, keyed by Census TRACT
-//     (90-day TTL, shared with the authenticated pulse path) via getProfile().
-//   • geocode result → in-memory geoCache, keyed by the typed address (1h);
-//     Mapbox is the only billed dependency, so this is the highest-value cache.
-//   • density bucket → read live (its own job refreshes it every 15 min).
-// Every cached value is an anonymous area fact — no address, no user id.
+// Caching (in-memory only, location-keyed, anonymous — never the user's
+// preview, never the database):
+//   • geocode → keyed by the typed address. Mapbox is the only billed
+//     dependency, so this is the highest-value cache; the TTL is kept short to
+//     respect Mapbox's "temporary result" terms.
+//   • flood → keyed by a fine (~38m) geohash, fetched independently so it never
+//     depends on the Census tract lookup.
+//   • census teaser → keyed by a coarse (~1.2km) geohash (area-level by nature).
+//   • density → read live (its own job refreshes it every 15 min).
+// Each source degrades on its own; only positive results are cached. We call
+// the stateless fetchers directly (not getProfile) so the preview neither
+// writes the shared profile cache nor triggers the Walk Score dependency.
 //
 // Statuses: ready | partial | unsupported_region | rate_limited
 //   • rate_limited is surfaced by previewLimiter as HTTP 429.
@@ -222,19 +230,28 @@ function clip(value, max = 120) {
   return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
 }
 
-// Mapbox is the only billed dependency, so successful geocodes are cached
-// in-memory keyed by the typed address (addresses don't move). Only positive
-// results are cached — a failure may be transient, and re-pinning "unsupported"
-// could outlast a brief geocoder blip.
-const GEO_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-const geoCacheKey = (address) => `place:geo:${address.toLowerCase().replace(/\s+/g, ' ')}`;
+// Dedicated in-memory cache for the preview's free facts. Isolated from the
+// shared mapbox-resolve cache (utils/geoCache singleton) so neither evicts the
+// other. Holds only anonymous, location-keyed public facts — nothing per-user,
+// nothing on disk or in the DB.
+const previewCache = new GeoCache(5000);
+
+// Geocode is kept short to respect Mapbox's "temporary result" terms; FEMA
+// flood zones and Census tract data change rarely, so they live a day. Flood is
+// keyed finely (zones can vary over ~100m near water); the Census teaser is
+// area-level by nature, so a coarse key is correct.
+const GEO_TTL_MS = 10 * 60 * 1000;       // 10 min — Mapbox temporary results
+const AREA_TTL_MS = 24 * 60 * 60 * 1000; // 24 h  — FEMA / Census are stable
+const FLOOD_GEOHASH_PRECISION = 8;       // ~38m
+
+const geoKey = (address) => `geo:${address.toLowerCase().replace(/\s+/g, ' ')}`;
 
 // Geocode an address to a US point via services/geo (country=us). Returns a
 // sanitized, area-level place identity, or { ok: false } for anything we can't
 // confidently place inside US coverage (→ unsupported_region, never a 500).
 async function geocodeUsAddress(address) {
-  const cacheKey = geoCacheKey(address);
-  const cached = geoCache.get(cacheKey);
+  const key = geoKey(address);
+  const cached = previewCache.get(key);
   if (cached) return cached;
 
   let result;
@@ -243,6 +260,7 @@ async function geocodeUsAddress(address) {
   } catch (err) {
     // No-result and infra failures both land here. For an anonymous preview we
     // degrade gracefully rather than 500 — the address simply isn't placeable.
+    // Failures are NOT cached: a retry must be able to reach the geocoder again.
     console.warn('[public/place] geocode failed:', err.message);
     return { ok: false };
   }
@@ -265,8 +283,46 @@ async function geocodeUsAddress(address) {
     state: clip(result.state, 24),
     zipcode: clip(result.zipcode, 12),
   };
-  geoCache.set(cacheKey, place, GEO_CACHE_TTL_MS);
+  previewCache.set(key, place, GEO_TTL_MS);
   return place;
+}
+
+// Flood — FEMA zone for a point, fetched independently (only needs lat/lng, so
+// it never depends on the Census tract lookup) and cached by a fine geohash.
+// Only positive results are cached; a null could be a transient error.
+async function fetchFloodCached(lat, lng) {
+  const key = `flood:${encodeGeohash(lat, lng, FLOOD_GEOHASH_PRECISION)}`;
+  const cached = previewCache.get(key);
+  if (cached) return cached;
+
+  const flood = await fetchFloodZone(lat, lng);
+  if (flood && flood.flood_zone) previewCache.set(key, flood, AREA_TTL_MS);
+  return flood;
+}
+
+// Census tract teaser — area-level medians only (NOT an exact home record,
+// NOT ATTOM). Resolves the tract, then the ACS medians; cached by a coarse
+// (area-level) geohash so the whole sub-pipeline is skipped on repeat.
+async function fetchCensusTeaserCached(lat, lng) {
+  const key = `census:${encodeGeohash6(lat, lng)}`;
+  const cached = previewCache.get(key);
+  if (cached) return cached;
+
+  const tract = await geocodeToTract(lat, lng);
+  if (!tract) return null;
+  const { tractId, stateCode, countyCode } = tract;
+  const tractCode = tractId.slice(stateCode.length + countyCode.length);
+  const acs = await fetchCensusACS(stateCode, countyCode, tractCode);
+  if (!acs) return null;
+
+  const teaser = {
+    median_year_built: acs.median_year_built ?? null,
+    median_home_value: acs.median_home_value ?? null,
+  };
+  if (teaser.median_year_built != null || teaser.median_home_value != null) {
+    previewCache.set(key, teaser, AREA_TTL_MS);
+  }
+  return teaser;
 }
 
 // Read the verified-homes count for the area and return ONLY its bucket.
@@ -312,35 +368,33 @@ router.get('/place', async (req, res) => {
 
     const geohash = encodeGeohash6(place.lat, place.lng);
 
-    // 2. The free demonstration subset only. Flood + the Census area teaser
-    //    come from the shared, tract-keyed NeighborhoodProfileCache (via
-    //    getProfile — it reads the cache and only writes anonymous area facts).
-    //    Density is read live. Each source degrades on its own; none persists
-    //    the preview, none touches ATTOM.
-    const [profileSettled, bucketSettled] = await Promise.allSettled([
-      getProfile({ latitude: place.lat, longitude: place.lng, address: place.line }),
+    // 2. The free demonstration subset only. Flood, the Census teaser, and the
+    //    density bucket are fetched independently and cached in-memory; each
+    //    degrades on its own, none persists the preview, none touches ATTOM.
+    const [floodSettled, areaSettled, bucketSettled] = await Promise.allSettled([
+      fetchFloodCached(place.lat, place.lng),
+      fetchCensusTeaserCached(place.lat, place.lng),
       readDensityBucket(geohash),
     ]);
 
-    const profile = profileSettled.status === 'fulfilled' && profileSettled.value
-      ? profileSettled.value.profile
-      : null;
+    const flood = floodSettled.status === 'fulfilled' ? floodSettled.value : null;
+    const area = areaSettled.status === 'fulfilled' ? areaSettled.value : null;
     const bucket = bucketSettled.status === 'fulfilled' ? bucketSettled.value : 'none';
 
-    const floodSection = profile && profile.flood_zone
+    const floodSection = flood && flood.flood_zone
       ? {
           status: 'ready',
-          zone: profile.flood_zone,
-          description: profile.flood_zone_description || null,
+          zone: flood.flood_zone,
+          description: flood.flood_zone_description || null,
           source: 'FEMA National Flood Hazard Layer',
         }
       : { status: 'unavailable', source: 'FEMA National Flood Hazard Layer' };
 
-    const areaSection = profile && (profile.median_year_built != null || profile.median_home_value != null)
+    const areaSection = area && (area.median_year_built != null || area.median_home_value != null)
       ? {
           status: 'ready',
-          median_year_built: profile.median_year_built,
-          median_home_value: profile.median_home_value,
+          median_year_built: area.median_year_built,
+          median_home_value: area.median_home_value,
           note: 'Area-level, not your home',
           source: 'U.S. Census · American Community Survey',
         }
@@ -385,3 +439,5 @@ router.get('/place', async (req, res) => {
 });
 
 module.exports = router;
+// Test-only hook: reset the in-memory preview caches between cases.
+module.exports.__clearPreviewCaches = () => previewCache.clear();
