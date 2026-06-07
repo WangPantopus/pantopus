@@ -390,6 +390,7 @@ app.use('/api', listingTradeRoutes);                    // Listing Trades (stand
 app.use('/api/marketplace', marketplaceRoutes);          // Marketplace (price intel, reputation)
 app.use('/api/link-preview', linkPreviewRoutes);         // Link preview (OG metadata extraction)
 app.use('/api/saved-places', require('./routes/savedPlaces')); // Saved Places
+app.use('/api/neighbor-messages', require('./routes/neighborMessages')); // Place — verified-only neighbor messaging (W2.6)
 app.use('/api/v1/address', require('./routes/addressValidation')); // Address validation pipeline
 app.use('/api/v1', require('./routes/landlordTenant'));            // Landlord portal + tenant flows
 app.use('/api/admin', require('./routes/admin'));             // Platform admin
