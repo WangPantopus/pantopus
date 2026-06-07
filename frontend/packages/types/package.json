@@ -13,7 +13,8 @@
     "./business": "./src/business.ts",
     "./identity": "./src/identity.ts",
     "./relationship": "./src/relationship.ts",
-    "./mailCompose": "./src/mailCompose.ts"
+    "./mailCompose": "./src/mailCompose.ts",
+    "./placeIntelligence": "./src/placeIntelligence.ts"
   },
   "scripts": {
     "lint": "eslint \"src/**/*.ts*\"",

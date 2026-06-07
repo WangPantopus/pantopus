@@ -160,6 +160,68 @@ export type {
   HomeTimelineItem,
 } from './homeIntelligence';
 
+// ─── Re-exports from Place Intelligence contract ────────────
+
+export type {
+  PlaceTier,
+  PlaceBand,
+  PlaceSectionAccess,
+  PlaceSectionStatus,
+  PlaceCoverage,
+  PlaceGroup,
+  WeatherConditionCode,
+  PlaceWeatherHour,
+  PlaceWeatherDay,
+  PlaceWeatherData,
+  AirQualityCategory,
+  PlaceAirQualityData,
+  WeatherAlertSeverity,
+  PlaceWeatherAlert,
+  PlaceAlertsData,
+  PlaceSunriseSunsetData,
+  FloodRiskLevel,
+  PlaceFloodData,
+  LeadPaintRisk,
+  PlaceLeadRadonData,
+  PlaceDrinkingWaterData,
+  PlaceEpaFacility,
+  PlaceEnvironmentalHazardsData,
+  PlaceDensityBucket,
+  PlaceBlockDensityData,
+  PlaceCensusContextData,
+  BillUtilityKind,
+  BenchmarkComparison,
+  PlaceBillBenchmarkData,
+  IncentiveLevel,
+  IncentiveType,
+  PlaceIncentive,
+  PlaceIncentivesData,
+  PlaceRentBandData,
+  CivicLevel,
+  PlaceCivicDistrict,
+  PlaceCivicRepresentative,
+  PlaceCivicDistrictsData,
+  PlaceBallotRace,
+  PlacePollingPlace,
+  PlaceCivicElectionData,
+  PlaceSectionDataMap,
+  PlaceSectionId,
+  PlaceSectionMeta,
+  PlaceSectionEnvelope,
+  PlaceSection,
+  PlaceAddressRef,
+  PlaceGroupBlock,
+  PlaceIntelligence,
+} from './placeIntelligence';
+
+export {
+  PLACE_GROUPS,
+  PLACE_GROUP_LABELS,
+  PLACE_DENSITY_LABELS,
+  PLACE_SECTION_IDS,
+  PLACE_SECTION_META,
+} from './placeIntelligence';
+
 // ─── Re-exports from home entity types ──────────────────────
 
 export type {
