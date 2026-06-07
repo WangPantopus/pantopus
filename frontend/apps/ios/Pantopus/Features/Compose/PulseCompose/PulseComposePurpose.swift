@@ -97,7 +97,7 @@ public enum PulseComposePurpose: String, CaseIterable, Sendable, Hashable, Ident
 
         let allowedPostTypes: Set<String> = switch target {
         case .business: businessTypes
-        case .connections: Set(["general"]) // connections skip purpose grid in practice
+        case .connections: Set<String>(["general"]) // connections skip purpose grid in practice
         default: placeTypes
         }
 
