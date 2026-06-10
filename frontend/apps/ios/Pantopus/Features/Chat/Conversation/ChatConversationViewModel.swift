@@ -210,8 +210,42 @@ public final class ChatConversationViewModel {
     /// Header counterparty data (drives the top-bar variant).
     public private(set) var counterparty: ChatCounterparty
 
-    /// Live composer text. Bound by the view's `TextField`.
-    public var composerText: String = ""
+    /// Live presence override for the person counterparty, driven by the
+    /// `user:online` / `user:offline` socket events. `nil` until the
+    /// first presence event arrives; the header falls back to the static
+    /// flag the route carried.
+    public private(set) var counterpartyOnline: Bool?
+
+    /// Counterparty the header should render — the static value with the
+    /// `online` flag replaced by the live presence override when one has
+    /// arrived.
+    public var headerCounterparty: ChatCounterparty {
+        guard case let .person(name, initials, locality, verified, online) = counterparty else {
+            return counterparty
+        }
+        return .person(
+            name: name,
+            initials: initials,
+            locality: locality,
+            verified: verified,
+            online: counterpartyOnline ?? online
+        )
+    }
+
+    /// A15 `.ctx-strip` — pinned gig context for gig-room threads.
+    /// Loaded from `GET /api/gigs/:id` when the route carried a gig id;
+    /// `nil` for non-gig threads or while the fetch is in flight.
+    public private(set) var gigContext: ChatGigContextStrip?
+
+    /// Live composer text. Bound by the view's `TextField`. Changes feed
+    /// the throttled `typing:start` emitter (A15 typing indicator).
+    public var composerText: String = "" {
+        didSet {
+            guard oldValue != composerText else { return }
+            guard !isProgrammaticComposerWrite else { return }
+            handleComposerTextChange()
+        }
+    }
 
     /// True while a send is in flight.
     public private(set) var isSending: Bool = false
@@ -231,8 +265,17 @@ public final class ChatConversationViewModel {
     /// True while the block-user call is in flight.
     public private(set) var isBlocking = false
 
-    /// Set when typing indicator should render above the composer.
+    /// True while `POST /api/users/:userId/report` is in flight.
+    public private(set) var isReporting = false
+
+    /// Set when typing indicator should render above the composer. Driven
+    /// by `typing:user` / `typing:stopped` socket events scoped to this
+    /// thread's rooms, with a 5s no-event auto-clear.
     public private(set) var isCounterpartyTyping: Bool = false
+
+    /// True while an AI reply stream is in flight. The composer swaps its
+    /// send disc for a stop button (A15.3) while this is set.
+    public private(set) var isAIStreaming: Bool = false
 
     /// Local pre-send queue. Backend upload/send wiring is out of scope
     /// for this phase, but the UI can still render and remove queued
@@ -291,6 +334,13 @@ public final class ChatConversationViewModel {
     private let mode: ChatThreadMode
     private let currentUserId: String
     private let initialTopic: ChatInitialTopic?
+    /// Gig backing a `.room` thread (from the unified-conversations
+    /// row's `gig_id`). Drives the pinned context strip. `nil` for
+    /// non-gig rooms, person threads, and AI.
+    private let gigId: String?
+    /// Registry consulted by `AppDelegate.willPresent` to suppress chat
+    /// push banners for the thread the user is already viewing.
+    private let activeThreadTracker: ActiveChatThreadTracker
     /// Message to scroll to on first load (Chat Search deep-link). `nil`
     /// for normal opens, which land on the latest message.
     private let scrollToMessageId: String?
@@ -306,6 +356,29 @@ public final class ChatConversationViewModel {
     private var oldestCursor: String?
     private var markReadTask: Task<Void, Never>?
     private var socketTasks: [Task<Void, Never>] = []
+    /// Socket-down fallback: polls `refresh()` every 30s while the
+    /// connection is not `.connected`, so the loaded thread keeps
+    /// receiving replies. Cancelled on reconnect and teardown. Never
+    /// runs for the AI thread (its messages are local-only).
+    private var fallbackPollTask: Task<Void, Never>?
+    /// Auto-clears `isCounterpartyTyping` ~5s after the last typing event.
+    private var typingClearTask: Task<Void, Never>?
+    /// Last `typing:start` emit — throttles outgoing typing signals to
+    /// one per ≥6s, bounding sustained typing at 10 emits/min (the
+    /// backend silently drops `typing:start` past 10/min,
+    /// `backend/socket/chatSocketio.js:23`). Agreed cross-platform
+    /// value: 6 000 ms on both clients.
+    private var lastTypingEmitAt: Date?
+    /// Whether we owe the room a `typing:stop` (a start was emitted).
+    private var didEmitTypingStart = false
+    /// True while `composerText` is being seeded programmatically
+    /// (edit seeding, edit-failure restore, capability-chip taps).
+    /// Suppresses the typing emitter so only real keystrokes broadcast
+    /// `typing:start` to the room.
+    private var isProgrammaticComposerWrite = false
+    /// In-flight AI reply stream, held so the composer's stop button can
+    /// cancel it mid-generation.
+    private var aiStreamTask: Task<Void, Never>?
     private var aiConversationId: String?
     private var aiDraftsByMessageId: [String: [ChatAIDraftCard]] = [:]
     /// Person-mode direct room — resolved once via `POST /api/chat/direct`
@@ -347,24 +420,28 @@ public final class ChatConversationViewModel {
         currentUserId: String,
         scrollToMessageId: String? = nil,
         initialTopic: ChatInitialTopic? = nil,
+        gigId: String? = nil,
         api: APIClient = .shared,
         socket: SocketClient = .shared,
         uploader: MultipartUploader = .shared,
         aiClient: any AIChatStreaming = AIChatStreamClient.shared,
         aiConversationStore: AIConversationStore = .shared,
-        locationProvider: any LocationProviding = DeviceLocationProvider.shared
+        locationProvider: any LocationProviding = DeviceLocationProvider.shared,
+        activeThreadTracker: ActiveChatThreadTracker = .shared
     ) {
         self.mode = mode
         self.counterparty = counterparty
         self.currentUserId = currentUserId
         self.initialTopic = initialTopic
         self.scrollToMessageId = scrollToMessageId
+        self.gigId = gigId
         self.api = api
         self.socket = socket
         self.uploader = uploader
         self.aiClient = aiClient
         self.aiConversationStore = aiConversationStore
         self.locationProvider = locationProvider
+        self.activeThreadTracker = activeThreadTracker
         aiPrompts = Self.defaultAICapabilities
         emptyChips = Self.defaultEmptyChips
         // Continue the user's existing AI conversation across thread
@@ -391,12 +468,14 @@ public final class ChatConversationViewModel {
         currentUserId = "preview_me"
         scrollToMessageId = nil
         initialTopic = nil
+        gigId = nil
         api = .shared
         socket = .shared
         uploader = .shared
         aiClient = AIChatStreamClient.shared
         aiConversationStore = .shared
         locationProvider = DeviceLocationProvider.shared
+        activeThreadTracker = .shared
         aiPrompts = Self.defaultAICapabilities
         emptyChips = Self.defaultEmptyChips
         self.fanEntitlement = fanEntitlement
@@ -416,10 +495,63 @@ public final class ChatConversationViewModel {
 
     public func load() async {
         if case .loaded = state { return }
+        await restoreAIConversationIfNeeded()
         await loadTopicsIfNeeded()
         await fetch(initial: true)
         subscribeToSockets()
         prefetchDirectRoomIfNeeded()
+        loadGigContextIfNeeded()
+    }
+
+    /// Restore the most recent Ask-Pantopus conversation across app
+    /// relaunches: `GET /api/ai/conversations` returns summaries ordered
+    /// newest-updated first, and `POST /api/ai/chat` resumes server-side
+    /// state when handed that conversation id. No-op when the session
+    /// store already holds an id (same-session reopen).
+    ///
+    /// TODO: render restored history — the backend exposes only the
+    /// conversation LIST (`backend/routes/ai.js:358`); there is no
+    /// per-conversation messages endpoint (no AI message rows exist —
+    /// history lives in the provider's `previous_response_id` state,
+    /// `backend/services/ai/agentService.js:68`). When a messages route
+    /// lands, seed `messages` here via `localMessage(...)` with user vs
+    /// assistant rows by role.
+    private func restoreAIConversationIfNeeded() async {
+        guard case .ai = mode, aiConversationId == nil else { return }
+        do {
+            let response: AIConversationsResponse = try await api.request(AIEndpoints.conversations())
+            guard let latest = response.conversations.first else { return }
+            aiConversationId = latest.id
+            aiConversationStore.setConversationId(latest.id, forUserId: currentUserId)
+        } catch {
+            // Non-fatal — the thread simply starts a fresh conversation.
+            logger.warning("AI conversation restore failed: \(error)")
+        }
+    }
+
+    /// Fetch the gig backing a `.room` thread and publish the pinned
+    /// context strip (A15 `.ctx-strip`). Fire-and-forget — the thread
+    /// renders fine without it.
+    private func loadGigContextIfNeeded() {
+        guard case .room = mode, let gigId, !gigId.isEmpty, gigContext == nil else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let response: GigDetailResponse = try await api.request(GigsEndpoints.detail(id: gigId))
+                let gig = response.gig
+                let price = gig.price.map { "$\(Int($0.rounded()))" }
+                let meta = [gig.category?.capitalized, gig.status?.capitalized]
+                    .compactMap { $0 }
+                    .joined(separator: " · ")
+                gigContext = ChatGigContextStrip(
+                    gigId: gigId,
+                    title: price.map { "\(gig.title) · \($0)" } ?? gig.title,
+                    meta: meta.isEmpty ? nil : meta
+                )
+            } catch {
+                logger.warning("gig context load failed: \(error)")
+            }
+        }
     }
 
     /// Resolve the person thread's direct room in the background so the
@@ -477,7 +609,7 @@ public final class ChatConversationViewModel {
                 applyUpdatedMessage(response.message)
                 cancelMessageAction()
             } catch {
-                composerText = trimmed
+                setComposerTextSilently(trimmed)
                 logger.warning("chat edit failed: \(error)")
             }
             return
@@ -650,33 +782,70 @@ public final class ChatConversationViewModel {
         queuedAttachments = []
         rebuild()
 
-        var streamedText = ""
-        do {
-            for try await event in aiClient.streamChat(
-                AIChatStreamRequest(
-                    message: text.isEmpty ? "What can you tell me about this image?" : text,
-                    conversationId: aiConversationId,
-                    images: imageURLs.isEmpty ? nil : imageURLs
-                )
-            ) {
-                switch event {
-                case let .conversation(id):
-                    aiConversationId = id
-                    aiConversationStore.setConversationId(id, forUserId: currentUserId)
-                case let .textDelta(delta):
-                    streamedText += delta
-                    replaceLocalMessage(id: assistantId, text: streamedText, type: "ai_reply", userId: "ai")
-                case let .draft(draft):
-                    aiDraftsByMessageId[assistantId, default: []].append(draft)
-                    rebuild()
-                case let .error(message):
-                    replaceLocalMessage(id: assistantId, text: message, type: "ai_reply", userId: "ai")
-                case .done:
-                    break
+        let request = AIChatStreamRequest(
+            message: text.isEmpty ? "What can you tell me about this image?" : text,
+            conversationId: aiConversationId,
+            images: imageURLs.isEmpty ? nil : imageURLs
+        )
+        // The stream is consumed in a stored Task so the composer's stop
+        // button (A15.3) can cancel it mid-generation via
+        // `cancelAIStream()`; partial text already rendered is kept.
+        isAIStreaming = true
+        let task = Task { [weak self] in
+            var streamedText = ""
+            guard let client = self?.aiClient else { return }
+            do {
+                for try await event in client.streamChat(request) {
+                    guard let self else { return }
+                    switch event {
+                    case let .conversation(id):
+                        self.aiConversationId = id
+                        self.aiConversationStore.setConversationId(id, forUserId: self.currentUserId)
+                    case let .textDelta(delta):
+                        streamedText += delta
+                        self.replaceLocalMessage(id: assistantId, text: streamedText, type: "ai_reply", userId: "ai")
+                    case let .draft(draft):
+                        self.aiDraftsByMessageId[assistantId, default: []].append(draft)
+                        self.rebuild()
+                    case let .error(message):
+                        self.replaceLocalMessage(id: assistantId, text: message, type: "ai_reply", userId: "ai")
+                    case .done:
+                        break
+                    }
+                }
+            } catch {
+                if !Task.isCancelled {
+                    self?.replaceLocalMessage(
+                        id: assistantId,
+                        text: "I lost the connection. Please try again.",
+                        type: "ai_reply",
+                        userId: "ai"
+                    )
                 }
             }
-        } catch {
-            replaceLocalMessage(id: assistantId, text: "I lost the connection. Please try again.", type: "ai_reply", userId: "ai")
+            if Task.isCancelled {
+                self?.finalizeCancelledAIStream(assistantId: assistantId, partialText: streamedText)
+            }
+        }
+        aiStreamTask = task
+        await task.value
+        aiStreamTask = nil
+        isAIStreaming = false
+    }
+
+    /// A15.3 stop button — cancel the in-flight AI reply stream. Text
+    /// that already streamed in stays as the final reply; an empty
+    /// placeholder bubble is dropped.
+    public func cancelAIStream() {
+        aiStreamTask?.cancel()
+    }
+
+    private func finalizeCancelledAIStream(assistantId: String, partialText: String) {
+        if partialText.isEmpty {
+            messages.removeAll { $0.id == assistantId }
+            rebuild()
+        } else {
+            replaceLocalMessage(id: assistantId, text: partialText, type: "ai_reply", userId: "ai")
         }
     }
 
@@ -711,7 +880,7 @@ public final class ChatConversationViewModel {
               let text = message.messageText else { return }
         editingMessageId = messageId
         replyingTo = nil
-        composerText = text
+        setComposerTextSilently(text)
     }
 
     public func cancelMessageAction() {
@@ -757,6 +926,28 @@ public final class ChatConversationViewModel {
         }
     }
 
+    /// Report the person counterparty — `POST /api/users/:userId/report`
+    /// (route `backend/routes/users.js:4153`, validator `:4137`).
+    /// `reason` must be one of the backend's six reason codes; `details`
+    /// is optional free text (≤ 1000 chars). Returns true on success so
+    /// the details sheet can show its confirmation. No-ops for room/AI
+    /// threads.
+    public func reportCounterparty(reason: String, details: String?) async -> Bool {
+        guard case let .person(otherUserId) = mode, !isReporting else { return false }
+        isReporting = true
+        defer { isReporting = false }
+        do {
+            _ = try await api.request(
+                UsersEndpoints.report(userId: otherUserId, reason: reason, details: details),
+                as: EmptyResponse.self
+            )
+            return true
+        } catch {
+            logger.warning("report user failed: \(error)")
+            return false
+        }
+    }
+
     /// Mark every message in the thread as read for the current user.
     /// Debounced — repeated calls within 600 ms collapse to one.
     public func scheduleMarkRead() {
@@ -768,16 +959,101 @@ public final class ChatConversationViewModel {
     }
 
     public func teardown() {
+        emitTypingStopIfNeeded()
         markReadTask?.cancel()
+        typingClearTask?.cancel()
+        aiStreamTask?.cancel()
+        fallbackPollTask?.cancel()
+        fallbackPollTask = nil
         socketTasks.forEach { $0.cancel() }
         socketTasks.removeAll()
+        activeThreadTracker.clear(owner: ObjectIdentifier(self))
+    }
+
+    // MARK: - Typing (A15)
+
+    /// Composer text changed — emit `typing:start` at most once per ≥6s
+    /// while non-empty, and `typing:stop` when cleared. Emits only when
+    /// a room id is already known (never creates rooms for typing).
+    private func handleComposerTextChange() {
+        if composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            emitTypingStopIfNeeded()
+            return
+        }
+        guard let roomId = typingRoomId() else { return }
+        let now = Date()
+        if let last = lastTypingEmitAt, now.timeIntervalSince(last) < 6 { return }
+        lastTypingEmitAt = now
+        didEmitTypingStart = true
+        socket.emit("typing:start", payload: ["roomId": roomId])
+    }
+
+    /// Write `composerText` without feeding the typing emitter — for
+    /// programmatic seeds (beginEdit, edit-failure restore, capability
+    /// chips), which must not broadcast "typing…" before the user has
+    /// touched the keyboard, nor burn the backend's 10/min typing budget.
+    private func setComposerTextSilently(_ text: String) {
+        isProgrammaticComposerWrite = true
+        composerText = text
+        isProgrammaticComposerWrite = false
+    }
+
+    private func emitTypingStopIfNeeded() {
+        guard didEmitTypingStart else { return }
+        didEmitTypingStart = false
+        lastTypingEmitAt = nil
+        guard let roomId = typingRoomId() else { return }
+        socket.emit("typing:stop", payload: ["roomId": roomId])
+    }
+
+    /// Room to scope typing signals to. `nil` when no room is resolved
+    /// yet — a person thread before its direct room exists must not
+    /// create one just to say "typing…".
+    private func typingRoomId() -> String? {
+        switch mode {
+        case let .room(id): id
+        case .person: directRoomId
+        case .ai: nil
+        }
+    }
+
+    /// Whether a typing event belongs to this thread's indicator. Room /
+    /// group threads accept any non-self member of an active room. A
+    /// person thread's `activeRoomIds` includes every shared room (gig /
+    /// group rooms with extra members too), so it must additionally
+    /// require the event to come from the counterparty — otherwise a
+    /// third member typing in a shared group room would render as the
+    /// counterparty typing in the 1:1 thread.
+    private func isTypingEventForThisThread(_ event: ChatRealtimeTyping) -> Bool {
+        guard activeRoomIds.contains(event.roomId), event.userId != currentUserId else { return false }
+        if case let .person(otherUserId) = mode {
+            return event.userId == otherUserId
+        }
+        return true
+    }
+
+    private func handleTypingStarted(_ event: ChatRealtimeTyping) {
+        guard isTypingEventForThisThread(event) else { return }
+        isCounterpartyTyping = true
+        typingClearTask?.cancel()
+        typingClearTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.isCounterpartyTyping = false
+        }
+    }
+
+    private func handleTypingStopped(_ event: ChatRealtimeTyping) {
+        guard isTypingEventForThisThread(event) else { return }
+        typingClearTask?.cancel()
+        isCounterpartyTyping = false
     }
 
     /// Tap a welcome-card capability chip — send its label as the
     /// thread's first message (transitions the AI thread out of the
     /// welcome/empty state).
     public func sendCapabilityPrompt(_ chip: ChatPromptChip) async {
-        composerText = chip.label
+        setComposerTextSilently(chip.label)
         await send()
     }
 
@@ -1034,6 +1310,17 @@ public final class ChatConversationViewModel {
     // MARK: - Fetch
 
     private func fetch(initial: Bool, before: String? = nil) async {
+        // AI thread messages are local-only — there is no persisted
+        // history to refetch, so refresh/pull-to-refresh must be a
+        // no-op BEFORE any clearing or the gesture would wipe the
+        // visible conversation (including mid-stream). A fresh thread
+        // still lands on `.empty` so the welcome card renders.
+        if case .ai = mode {
+            if messages.isEmpty {
+                state = .empty
+            }
+            return
+        }
         if initial {
             state = .loading
             messages = []
@@ -1047,9 +1334,7 @@ public final class ChatConversationViewModel {
         }
         switch mode {
         case .ai:
-            // No persisted history for AI threads yet — go straight to
-            // empty so the welcome card renders.
-            state = .empty
+            // Handled by the early return above.
             return
         case let .room(roomId):
             await fetchRoom(roomId: roomId, before: before, initial: initial)
@@ -1170,6 +1455,9 @@ public final class ChatConversationViewModel {
             ids.insert(directRoomId)
         }
         activeRoomIds = ids
+        // Keep the push layer's "currently viewing" registry in sync so
+        // foreground chat pushes for this thread don't show a banner.
+        activeThreadTracker.setActiveRooms(ids, owner: ObjectIdentifier(self))
     }
 
     // MARK: - Mark-read
@@ -1232,6 +1520,7 @@ public final class ChatConversationViewModel {
             // `message:new` for replies that land in it.
             if !activeRoomIds.contains(roomId) {
                 activeRoomIds.insert(roomId)
+                activeThreadTracker.setActiveRooms(activeRoomIds, owner: ObjectIdentifier(self))
                 joinActiveRoomsIfPossible()
             }
             return roomId
@@ -1253,9 +1542,12 @@ public final class ChatConversationViewModel {
     private func subscribeToSockets() {
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await state in socket.connectionStates() where state == .connected {
-                joinedRoomIds.removeAll()
-                joinActiveRoomsIfPossible()
+            for await state in socket.connectionStates() {
+                if state == .connected {
+                    joinedRoomIds.removeAll()
+                    joinActiveRoomsIfPossible()
+                }
+                updateFallbackPolling(isConnected: state == .connected)
             }
         })
         socketTasks.append(Task { [weak self] in
@@ -1282,7 +1574,61 @@ public final class ChatConversationViewModel {
                 handleReaction(event)
             }
         })
+        socketTasks.append(Task { [weak self] in
+            guard let self else { return }
+            for await event in socket.events(named: "typing:user", as: ChatRealtimeTyping.self) {
+                handleTypingStarted(event)
+            }
+        })
+        socketTasks.append(Task { [weak self] in
+            guard let self else { return }
+            for await event in socket.events(named: "typing:stopped", as: ChatRealtimeTyping.self) {
+                handleTypingStopped(event)
+            }
+        })
+        socketTasks.append(Task { [weak self] in
+            guard let self else { return }
+            for await event in socket.events(named: "user:online", as: ChatRealtimePresence.self) {
+                handlePresence(event, online: true)
+            }
+        })
+        socketTasks.append(Task { [weak self] in
+            guard let self else { return }
+            for await event in socket.events(named: "user:offline", as: ChatRealtimePresence.self) {
+                handlePresence(event, online: false)
+            }
+        })
         joinActiveRoomsIfPossible()
+    }
+
+    /// Live presence (A15 header dot / "Active now"). Only the person
+    /// thread's counterparty matters — room/group/AI threads have no
+    /// single presence subject.
+    private func handlePresence(_ event: ChatRealtimePresence, online: Bool) {
+        guard case let .person(otherUserId) = mode, event.userId == otherUserId else { return }
+        counterpartyOnline = online
+    }
+
+    /// Start/stop the socket-down fallback poll. While disconnected, a
+    /// loaded non-AI thread refetches every 30s so incoming replies
+    /// still land; reconnecting cancels the loop (the socket resumes
+    /// realtime delivery and `room:join` backfills the gap).
+    private func updateFallbackPolling(isConnected: Bool) {
+        if isConnected {
+            fallbackPollTask?.cancel()
+            fallbackPollTask = nil
+            return
+        }
+        guard fallbackPollTask == nil else { return }
+        if case .ai = mode { return }
+        fallbackPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                guard !Task.isCancelled else { return }
+                guard let self else { return }
+                await self.refresh()
+            }
+        }
     }
 
     private func joinActiveRoomsIfPossible() {
@@ -1305,9 +1651,28 @@ public final class ChatConversationViewModel {
     }
 
     private func mergeBackfill(_ backfill: [ChatMessageDTO]) {
+        // A backfill row carrying one of our client ids means that send
+        // landed server-side (lost POST response + missed `message:new`
+        // echo — exactly the reconnect case backfill exists for). Retire
+        // every trace of the optimistic copy, same contract as
+        // `apply(response:)`, so the delivered message can't render next
+        // to its own "Failed — Retry" twin.
+        var retiredPending = false
+        for clientId in backfill.compactMap(\.clientMessageId)
+        where pendingByClientId[clientId] != nil
+            || sendContextsByClientId[clientId] != nil
+            || failedClientIds.contains(clientId) {
+            pendingByClientId[clientId] = nil
+            sendContextsByClientId[clientId] = nil
+            failedClientIds.remove(clientId)
+            retiredPending = true
+        }
         let existingIds = Set(messages.map(\.id))
         let newMessages = backfill.filter { !existingIds.contains($0.id) }
-        guard !newMessages.isEmpty else { return }
+        guard !newMessages.isEmpty else {
+            if retiredPending { rebuild() }
+            return
+        }
         messages.append(contentsOf: newMessages)
         messages.sort { $0.createdAt < $1.createdAt }
         rebuild()
@@ -1419,15 +1784,6 @@ public final class ChatConversationViewModel {
                 combined[index + 1].userId == message.userId &&
                 Self.dayKey(for: combined[index + 1].createdAt) == dayKey
             let hasTail = !nextSameSide
-            let stamp: String? = hasTail ? Self.stampLabel(for: message, currentUserId: currentUserId) : nil
-            var body = Self.bodyForMessage(message)
-            if message.messageType == "ai_reply" {
-                body = .aiReply(text: message.messageText ?? "", estimate: nil, drafts: aiDraftsByMessageId[message.id] ?? [])
-            }
-            let replyPreview = Self.replyPreview(for: message, in: combined)
-            let reactions = message.reactions.map {
-                ChatBubbleReaction(id: $0.reaction, reaction: $0.reaction, count: $0.count, reactedByMe: $0.reactedByMe)
-            }
             let deliveryState: ChatDeliveryState? = {
                 guard side == .outgoing else { return nil }
                 if let clientId = message.clientMessageId, failedClientIds.contains(clientId) {
@@ -1437,6 +1793,21 @@ public final class ChatConversationViewModel {
                 if message.readAt != nil { return .read }
                 return .delivered
             }()
+            // Failed / in-flight rows keep their stamp row even when
+            // grouped (no tail) — the stamp is the only surface for the
+            // "Sending..." spinner and the "Failed to send" + Retry CTA,
+            // which must never be hidden by group rhythm. Tail visuals
+            // stay driven by `hasTail`.
+            let showStamp = hasTail || deliveryState == .failed || deliveryState == .sending
+            let stamp: String? = showStamp ? Self.stampLabel(for: message, currentUserId: currentUserId) : nil
+            var body = Self.bodyForMessage(message)
+            if message.messageType == "ai_reply" {
+                body = .aiReply(text: message.messageText ?? "", estimate: nil, drafts: aiDraftsByMessageId[message.id] ?? [])
+            }
+            let replyPreview = Self.replyPreview(for: message, in: combined)
+            let reactions = message.reactions.map {
+                ChatBubbleReaction(id: $0.reaction, reaction: $0.reaction, count: $0.count, reactedByMe: $0.reactedByMe)
+            }
             rows.append(.bubble(ChatBubbleContent(
                 id: message.id,
                 side: side,

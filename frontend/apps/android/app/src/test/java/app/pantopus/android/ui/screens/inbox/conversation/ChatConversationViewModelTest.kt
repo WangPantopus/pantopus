@@ -17,10 +17,16 @@ import app.pantopus.android.data.api.models.chats.SendChatMessageResponse
 import app.pantopus.android.data.ai.AIChatRepository
 import app.pantopus.android.data.ai.AIChatStreamEvent
 import app.pantopus.android.data.ai.AIConversationSession
+import app.pantopus.android.data.api.models.ai.AIConversationsResponse
+import app.pantopus.android.data.chats.ActiveChatThread
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.services.GeoApi
+import app.pantopus.android.data.api.models.profile.UserReportRequest
+import app.pantopus.android.data.api.models.profile.UserReportResponse
 import app.pantopus.android.data.blocks.BlocksRepository
+import app.pantopus.android.data.links.LinkPreviewRepository
+import app.pantopus.android.data.profile.UserReportsRepository
 import app.pantopus.android.data.chats.ChatRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.listings.ListingsRepository
@@ -68,10 +74,16 @@ class ChatConversationViewModelTest {
     private val geoApi: GeoApi = mockk(relaxed = true)
     private val locationProvider: LocationProvider = mockk(relaxed = true)
     private val blocksRepo: BlocksRepository = mockk()
+    private val reportsRepo: UserReportsRepository = mockk()
+    private val linkPreviewRepo: LinkPreviewRepository = mockk(relaxed = true)
 
     // Real instance — the singleton holder is what carries the AI
     // conversation id across VM instances within one app session.
     private val aiSession = AIConversationSession()
+
+    // Real instance — plain holder the VM publishes viewed room ids into
+    // for chat-push suppression.
+    private val activeChatThread = ActiveChatThread()
 
     private fun makeViewModel(): ChatConversationViewModel =
         ChatConversationViewModel(
@@ -84,7 +96,10 @@ class ChatConversationViewModelTest {
             geoApi,
             locationProvider,
             blocksRepo,
+            reportsRepo,
+            linkPreviewRepo,
             aiSession,
+            activeChatThread,
         )
 
     private val counterpartyPerson =
@@ -96,7 +111,7 @@ class ChatConversationViewModelTest {
             online = true,
         )
 
-    private val counterpartyAi = ChatCounterparty.Ai(displayName = "Ask Pantopus")
+    private val counterpartyAi = ChatCounterparty.Ai(displayName = "Pantopus AI")
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -113,6 +128,7 @@ class ChatConversationViewModelTest {
                 ),
             )
         every { aiRepo.streamChat(any(), any(), any()) } returns flowOf(AIChatStreamEvent.TextDelta("Hi"), AIChatStreamEvent.Done)
+        coEvery { aiRepo.conversations() } returns NetworkResult.Success(AIConversationsResponse(emptyList()))
         coEvery { repo.markRoomRead(any()) } returns NetworkResult.Success(Unit)
         coEvery { repo.markConversationRead(any()) } returns NetworkResult.Success(Unit)
         coEvery { repo.createDirectChat(any()) } returns
@@ -1152,6 +1168,32 @@ class ChatConversationViewModelTest {
             vm.blockUser { blocked = true }
             coVerify(exactly = 1) { blocksRepo.block("u_other") }
             assertTrue(blocked)
+        }
+
+    @Test fun report_user_calls_reports_repo_and_signals_success() =
+        runTest {
+            coEvery { repo.conversationMessages(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(ChatMessagesResponse(messages = emptyList(), hasMore = false))
+            val bodySlot = slot<UserReportRequest>()
+            coEvery { reportsRepo.report("u_other", capture(bodySlot)) } returns
+                NetworkResult.Success(UserReportResponse(message = "ok", alreadyReported = false))
+            val vm = makeViewModel()
+            vm.configure(
+                mode = ChatThreadMode.Person(otherUserId = "u_other"),
+                counterparty = counterpartyPerson,
+                currentUserId = "u_me",
+            )
+            vm.load()
+            var reported = false
+            vm.reportUser(reason = "harassment", details = "  keeps spamming my inbox  ") { reported = true }
+            coVerify(exactly = 1) { reportsRepo.report("u_other", any()) }
+            assertEquals("harassment", bodySlot.captured.reason)
+            assertEquals("keeps spamming my inbox", bodySlot.captured.details)
+            assertTrue(reported)
+            assertEquals(
+                "Report submitted — thanks for keeping the neighborhood safe",
+                vm.reportNotice.value,
+            )
         }
 
     /**

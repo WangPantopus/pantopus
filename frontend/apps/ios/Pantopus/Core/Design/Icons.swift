@@ -348,6 +348,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case filePlus2 = "file-plus-2"
     case fileWarning = "file-warning"
 
+    /// A15.3 AI Assistant header — the "New chat" trailing action uses
+    /// Lucide's `square-pen` (pen inside a square frame).
+    case squarePen = "square-pen"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -619,6 +623,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // falls back to the generic warning triangle.
         case .filePlus2: "doc.badge.plus"
         case .fileWarning: "exclamationmark.triangle"
+        case .squarePen: "square.and.pencil"
         }
     }
 }

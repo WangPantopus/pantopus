@@ -42,6 +42,9 @@ public struct InboxConversationDestination: Hashable, Sendable {
     /// with a body match). `nil` opens the conversation at the latest
     /// message.
     public let scrollToMessageId: String?
+    /// For gig-room rows: the backing gig id (unified-conversations
+    /// `gig_id`), so the thread can pin the gig context strip.
+    public let gigId: String?
 
     public init(
         mode: Mode,
@@ -51,7 +54,8 @@ public struct InboxConversationDestination: Hashable, Sendable {
         identityKind: String?,
         verified: Bool,
         scrollToMessageId: String? = nil,
-        initialTopic: ChatInitialTopic? = nil
+        initialTopic: ChatInitialTopic? = nil,
+        gigId: String? = nil
     ) {
         self.mode = mode
         self.kind = kind
@@ -61,6 +65,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
         self.verified = verified
         self.scrollToMessageId = scrollToMessageId
         self.initialTopic = initialTopic
+        self.gigId = gigId
     }
 }
 
@@ -127,7 +132,8 @@ public struct InboxTabRoot: View {
             displayName: row.displayName,
             initials: row.initials,
             identityKind: row.identityChip.map { $0 == .business ? "business" : "home" },
-            verified: row.verified
+            verified: row.verified,
+            gigId: row.gigId
         )
     }
 
@@ -174,7 +180,8 @@ public struct InboxTabRoot: View {
                     counterparty: Self.counterparty(for: dest),
                     currentUserId: currentUserId,
                     scrollToMessageId: dest.scrollToMessageId,
-                    initialTopic: dest.initialTopic
+                    initialTopic: dest.initialTopic,
+                    gigId: dest.gigId
                 ),
                 mode: dest.kind,
                 onUseAIDraft: { draft in

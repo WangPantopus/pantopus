@@ -12,6 +12,7 @@
 
 import PhotosUI
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// Chat conversation screen.
@@ -20,6 +21,7 @@ public struct ChatConversationView: View {
     @State private var attachmentsPresented = false
     @State private var photosPickerSelection: [PhotosPickerItem] = []
     @State private var photosPickerPresented = false
+    @State private var cameraPresented = false
     @State private var documentImporterPresented = false
     @State private var gigPickerPresented = false
     @State private var listingPickerPresented = false
@@ -29,6 +31,13 @@ public struct ChatConversationView: View {
     @State private var isSelecting = false
     @State private var selectedMessageIds: Set<String> = []
     @State private var bulkDeleteConfirmPresented = false
+    /// Gates the scroll-to-top pagination trigger: armed ~0.5s after the
+    /// populated frame first lays out, so the trigger's first `onAppear`
+    /// (which fires during initial paint, before the bottom anchor
+    /// settles) can't fetch an older page unprompted.
+    @State private var isLoadOlderArmed = false
+    /// Whether the pagination trigger row is currently composed/visible.
+    @State private var isLoadOlderTriggerVisible = false
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Presentation mode — drives the AI chrome (avatar, welcome card,
@@ -75,7 +84,7 @@ public struct ChatConversationView: View {
         VStack(spacing: Spacing.s0) {
             ChatConversationHeader(
                 mode: mode,
-                counterparty: viewModel.counterparty,
+                counterparty: viewModel.headerCounterparty,
                 creatorContext: resolvedCreatorContext,
                 onBack: onBack
             ) {
@@ -84,6 +93,7 @@ public struct ChatConversationView: View {
             if isSelecting {
                 ChatSelectionTopBar(count: selectedMessageIds.count, onCancel: exitSelection)
             }
+            gigContextStrip
             if mode == .creatorThread {
                 ChatCreatorAudienceStrip(
                     context: resolvedCreatorContext,
@@ -135,9 +145,11 @@ public struct ChatConversationView: View {
                     canSend: viewModel.canSend,
                     showsSendCost: mode == .fanThread && !isFanReplyLocked,
                     isLockedAction: isFanReplyLocked,
+                    isStreaming: viewModel.isAIStreaming,
                     onAttach: { attachmentsPresented = true },
                     onEmoji: { emojiPickerPresented = true },
-                    onSend: { sendOrPromptForUpgrade() }
+                    onSend: { sendOrPromptForUpgrade() },
+                    onStop: { viewModel.cancelAIStream() }
                 )
             }
         }
@@ -145,20 +157,29 @@ public struct ChatConversationView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .onDisappear { viewModel.teardown() }
-        // RN attach-grid parity: Photos / Document / Location / Task /
-        // Marketplace. Camera is intentionally omitted — capture needs
-        // AVCaptureDevice permission plumbing (Phase 4).
+        // RN attach-grid parity: Camera / Photos / Document / Location /
+        // Task / Marketplace. Camera hides itself where no capture device
+        // exists (simulator).
         .confirmationDialog(
             "Attach",
             isPresented: $attachmentsPresented,
             titleVisibility: .visible
         ) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Camera") { cameraPresented = true }
+            }
             Button("Photos") { photosPickerPresented = true }
             Button("Document") { documentImporterPresented = true }
             Button("Location") { Task { await viewModel.sendCurrentLocation() } }
             Button("Task") { gigPickerPresented = true }
             Button("Marketplace") { listingPickerPresented = true }
             Button("Cancel", role: .cancel) {}
+        }
+        .fullScreenCover(isPresented: $cameraPresented) {
+            SystemCameraPicker(isPresented: $cameraPresented) { image in
+                handleCapturedPhoto(image)
+            }
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $gigPickerPresented) {
             ChatShareGigPickerSheet(viewModel: viewModel) { gigPickerPresented = false }
@@ -223,6 +244,53 @@ public struct ChatConversationView: View {
     private func exitSelection() {
         isSelecting = false
         selectedMessageIds = []
+    }
+
+    /// A15 `.ctx-strip` — pinned gig context under the header of a
+    /// gig-room thread. Tapping opens the gig detail through the same
+    /// deep-link path the in-thread gig offer cards use.
+    @ViewBuilder private var gigContextStrip: some View {
+        if let context = viewModel.gigContext {
+            Button {
+                openGigDetail(gigId: context.gigId)
+            } label: {
+                HStack(spacing: 10) {
+                    Icon(.hammer, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                        .frame(width: 28, height: 28)
+                        .background(Theme.Color.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(context.title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appText)
+                            .lineLimit(1)
+                        if let meta = context.meta {
+                            Text(meta)
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: Spacing.s0)
+                    Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Theme.Color.primary50)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .stroke(Theme.Color.primary200, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.top, Spacing.s2)
+            .accessibilityLabel("Gig: \(context.title)")
+            .accessibilityIdentifier("chatGigContextStrip")
+        }
     }
 
     /// Dismissible banner shown when a send was rejected by the gig
@@ -315,6 +383,18 @@ public struct ChatConversationView: View {
 
     private func firstWord(_ raw: String) -> String {
         raw.split(separator: " ").first.map(String.init) ?? raw
+    }
+
+    /// Camera capture → JPEG (~0.8) → the same queued-attachment path the
+    /// photo picker feeds, so send/upload behavior is identical.
+    private func handleCapturedPhoto(_ image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.8) else { return }
+        viewModel.queueAttachment(
+            kind: .image,
+            filename: "camera-\(UUID().uuidString).jpg",
+            mimeType: "image/jpeg",
+            data: data
+        )
     }
 
     private func handlePickedPhotos(_ items: [PhotosPickerItem]) {
@@ -437,28 +517,35 @@ public struct ChatConversationView: View {
         }
     }
 
+    /// A15 / A15.2 `.empty` — 88pt avatar, "Say hi", trust pill, then
+    /// full-width suggestion cards that fill the composer when tapped.
+    /// The A15.2 person preview card (rating · jobs done · reply time ·
+    /// mutual neighbors) is design-only for now — it needs profile-stats
+    /// data the thread doesn't load today.
     private func personEmptyFrame(name: String, initials: String, locality: String?, verified: Bool) -> some View {
-        VStack(spacing: 18) {
+        VStack(spacing: Spacing.s0) {
             Spacer()
-            ChatPersonAvatar(initials: initials, verified: verified, online: false, size: 64)
-            VStack(spacing: 6) {
-                Text("Say hi to \(firstWord(name))")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Theme.Color.appText)
-                Text(
-                    locality.map { "You're both verified neighbors on \($0). New conversations stay private." }
-                        ?? "You're both verified neighbors. New conversations stay private."
-                )
-                .font(.system(size: 12.5))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 240)
-            }
-            quickChipsRow
-            verifiedEncryptionPill
+            ChatPersonAvatar(initials: initials, verified: verified, online: false, size: 88)
+            Text("Say hi")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(.top, 16)
+            Text(
+                locality.map { "This is the start of your conversation with \(firstWord(name)) from \($0)." }
+                    ?? "This is the start of your conversation with \(firstWord(name))."
+            )
+            .font(.system(size: 13))
+            .lineSpacing(5)
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.top, 6)
+            emptyTrustPill
+                .padding(.top, 10)
+            suggestionCards
+                .padding(.top, 18)
             Spacer()
         }
-        .padding(.horizontal, Spacing.s6)
+        .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("chatConversationEmpty")
     }
@@ -494,26 +581,32 @@ public struct ChatConversationView: View {
         .accessibilityIdentifier("chatConversationFanEmpty")
     }
 
-    private var quickChipsRow: some View {
-        HStack(spacing: Spacing.s2) {
+    /// A15 `.empty .sug` — full-width white suggestion cards. Tapping one
+    /// fills the composer (the prior quick-chip behavior, restyled).
+    private var suggestionCards: some View {
+        VStack(spacing: Spacing.s2) {
             ForEach(viewModel.emptyChips) { chip in
                 Button {
                     viewModel.composerText = chip.label
                 } label: {
-                    HStack(spacing: 6) {
-                        Icon(chip.icon, size: 13, strokeWidth: 2.2, color: Theme.Color.primary600)
+                    HStack(spacing: Spacing.s2) {
                         Text(chip.label)
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appTextStrong)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.Color.appText)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: Spacing.s2)
+                        Icon(.arrowUpRight, size: 14, color: Theme.Color.appTextMuted)
                     }
                     .padding(.horizontal, 14)
-                    .frame(height: 32)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .background(Theme.Color.appSurface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: .black.opacity(0.04), radius: 1.5, y: 1)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("chatQuickChip_\(chip.id)")
@@ -521,40 +614,130 @@ public struct ChatConversationView: View {
         }
     }
 
-    private var verifiedEncryptionPill: some View {
-        HStack(spacing: 7) {
-            Icon(.shieldCheck, size: 12, color: Theme.Color.primary600)
-            Text("DMs end-to-end encrypted between verified addresses")
-                .font(.system(size: 11, weight: .medium))
+    /// A15 `.empty .trust` — "Private between verified neighbors" pill.
+    private var emptyTrustPill: some View {
+        HStack(spacing: 5) {
+            Icon(.shieldCheck, size: 11, strokeWidth: 2.5, color: Theme.Color.success)
+            Text("Private between verified neighbors")
+                .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s2)
-        .background(Theme.Color.appSurfaceMuted)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Theme.Color.appSurface)
+        .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+        .clipShape(Capsule())
     }
 }
 
 // MARK: - AI welcome
 
 extension ChatConversationView {
+    /// A15.3 `.empty` — "Ask me anything" headline, trust pill, then the
+    /// 2×2 categorized prompt grid. Tapping a card sends its question.
     private var aiWelcomeFrame: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                aiWelcomeCard
+            VStack(spacing: Spacing.s0) {
+                ChatAIAvatar(size: 88)
+                Text("Ask me anything")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .padding(.top, 16)
+                Text("I use your verified neighbors, tasks, and mailbox to give answers that fit your block.")
+                    .font(.system(size: 13))
+                    .lineSpacing(5)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 6)
                 aiPrivacyRow
-                Spacer(minLength: Spacing.s0)
+                    .padding(.top, 10)
+                aiPromptGrid
+                    .padding(.top, 18)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
+            .padding(.horizontal, 28)
+            .padding(.top, Spacing.s10)
+            .padding(.bottom, Spacing.s4)
+            .frame(maxWidth: .infinity)
         }
         .accessibilityIdentifier("chatConversationAI")
     }
 
+    /// A15.3 `.prompt-grid` — 2×2 categorized prompt cards; tapping one
+    /// sends its question as the thread's first message.
+    private var aiPromptGrid: some View {
+        LazyVGrid(
+            columns: [GridItem(.flexible(), spacing: Spacing.s2), GridItem(.flexible(), spacing: Spacing.s2)],
+            spacing: Spacing.s2
+        ) {
+            ForEach(Self.aiPromptCards) { card in
+                Button {
+                    Task {
+                        await viewModel.sendCapabilityPrompt(
+                            ChatPromptChip(id: card.id, label: card.question, icon: card.icon)
+                        )
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Icon(card.icon, size: 14, color: Theme.Color.appTextInverse)
+                            .frame(width: 26, height: 26)
+                            .background(card.tint)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                        Text(card.category.uppercased())
+                            .font(.system(size: 9.5, weight: .bold))
+                            .tracking(0.6)
+                            .foregroundStyle(Theme.Color.appTextMuted)
+                        Text(card.question)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(Theme.Color.appText)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .background(Theme.Color.appSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: .black.opacity(0.04), radius: 1.5, y: 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(card.question)
+                .accessibilityIdentifier("chatAIPromptCard_\(card.id)")
+            }
+        }
+    }
+
+    /// A15.3 prompt-grid fixtures. Category tints approximate the design's
+    /// `--cat-handyman` / `--color-primary` / `--color-identity-home` /
+    /// `--cat-goods` swatches with the closest theme tokens.
+    private static let aiPromptCards: [AIPromptCard] = [
+        AIPromptCard(
+            id: "tasks", category: "Tasks", icon: .hammer,
+            tint: Theme.Color.warning,
+            question: "What's a fair price to mount a 55\" TV?"
+        ),
+        AIPromptCard(
+            id: "pulse", category: "Pulse", icon: .pencil,
+            tint: Theme.Color.primary600,
+            question: "Draft a post asking for a dog-sitter this weekend."
+        ),
+        AIPromptCard(
+            id: "mailbox", category: "Mailbox", icon: .mailbox,
+            tint: Theme.Color.home,
+            question: "Summarize today's mail and packages."
+        ),
+        AIPromptCard(
+            id: "marketplace", category: "Marketplace", icon: .shoppingBag,
+            tint: Theme.Color.success,
+            question: "Price my mid-century sofa for a quick sale."
+        )
+    ]
+
+    /// A15.3 `.ai-welcome` — capability card pinned at the top of a
+    /// populated AI thread. The design's info-bg→white gradient is
+    /// approximated with a flat `primary50` fill + `primary200` border.
     private var aiWelcomeCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
@@ -582,52 +765,86 @@ extension ChatConversationView {
             }
         }
         .padding(14)
-        .background(Theme.Color.magicBgSoft)
+        .background(Theme.Color.primary50)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                .stroke(Theme.Color.magicBorder, lineWidth: 1)
+                .stroke(Theme.Color.primary200, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         .accessibilityIdentifier("chatAIWelcomeCard")
     }
 
+    /// A15.3 `.ai-trust .row` — privacy pill under the empty headline.
     private var aiPrivacyRow: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Icon(.shieldCheck, size: 11, strokeWidth: 2.5, color: Theme.Color.success)
             Text("Private to your account · never shared with neighbors")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.top, 2)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Theme.Color.appSurface)
+        .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+        .clipShape(Capsule())
     }
 
     // MARK: - Populated + error
 
     private func populatedFrame(_ rows: [ChatTimelineRow]) -> some View {
+        // TODO(ctx-strip): A15's pinned gig context strip needs gig
+        // title/price/schedule, which neither room nor person mode loads
+        // today (room mode only knows its id). Implement once the thread
+        // fetch carries gig context — no new endpoint from the view.
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: Spacing.s0) {
                     if viewModel.canLoadOlder {
                         Color.clear
                             .frame(height: 1)
-                            .onAppear { Task { await viewModel.loadOlder() } }
+                            .onAppear {
+                                isLoadOlderTriggerVisible = true
+                                guard isLoadOlderArmed else { return }
+                                Task { await viewModel.loadOlder() }
+                            }
+                            .onDisappear { isLoadOlderTriggerVisible = false }
                     }
                     if mode == .fanThread {
                         FanAutoWelcomeCard()
                             .padding(.bottom, Spacing.s3)
+                    }
+                    if mode == .aiAssistant {
+                        // A15.3 — the welcome card stays pinned at the top
+                        // of the populated AI thread.
+                        aiWelcomeCard
+                            .padding(.bottom, 10)
                     }
                     ForEach(rows) { row in
                         timelineRowView(row)
                     }
                     Color.clear.frame(height: 4)
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .padding(.top, Spacing.s3)
             }
+            // Threads open at the latest message (rows project
+            // oldest-first), and the bottom stays anchored when new
+            // rows land while the user is already at the bottom.
+            .defaultScrollAnchor(.bottom)
             .refreshable { await viewModel.refresh() }
             .accessibilityIdentifier("chatConversationContent")
+            .task {
+                guard !isLoadOlderArmed else { return }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                isLoadOlderArmed = true
+                // A thread short enough to keep the trigger on screen
+                // never re-fires its `onAppear` — kick one fetch now so
+                // backward pagination still works there.
+                if isLoadOlderTriggerVisible, viewModel.canLoadOlder {
+                    await viewModel.loadOlder()
+                }
+            }
             .onChange(of: viewModel.pendingScrollTargetId) { _, target in
                 guard let target else { return }
                 if reduceMotion {
@@ -661,7 +878,10 @@ extension ChatConversationView {
     /// messages, with row taps toggling membership.
     @ViewBuilder
     private func bubbleRowView(_ bubble: ChatBubbleContent) -> some View {
-        let selectable = bubble.side == .outgoing && !bubble.id.hasPrefix("client_")
+        // Excludes in-flight (`client_`) rows and AI-thread local rows
+        // (`ai_user_` / `ai_assistant_`) — neither is persisted, so the
+        // bulk-delete loop could never delete them server-side.
+        let selectable = bubble.side == .outgoing && !bubble.id.hasPrefix("client_") && !bubble.id.hasPrefix("ai_")
         if isSelecting {
             let isSelected = selectedMessageIds.contains(bubble.id)
             HStack(alignment: .center, spacing: Spacing.s2) {
@@ -749,6 +969,16 @@ extension ChatConversationView {
         let parts = name.split(separator: " ").prefix(2)
         return parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
     }
+}
+
+/// One A15.3 prompt-grid card: a tinted icon square, an uppercase
+/// category label, and the question that gets sent on tap.
+private struct AIPromptCard: Identifiable {
+    let id: String
+    let category: String
+    let icon: PantopusIcon
+    let tint: Color
+    let question: String
 }
 
 // MARK: - Fan thread chrome
@@ -1090,11 +1320,12 @@ private struct ChatConversationHeader: View {
             avatar
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
+                    // A15 `.chat-id .name` — 14pt / 700.
                     Text(counterparty.displayName)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
-                    if mode == .aiAssistant { betaPill }
+                    if mode == .aiAssistant { aiBadge }
                     if mode == .fanThread { personaPill }
                     if mode == .creatorThread {
                         CreatorTierChip(
@@ -1108,8 +1339,9 @@ private struct ChatConversationHeader: View {
                         if presenceOnline {
                             Circle().fill(Theme.Color.success).frame(width: 6, height: 6)
                         }
+                        // A15 `.chat-id .sub` — 11pt regular.
                         Text(presence)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 11))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                             .lineLimit(1)
                     }
@@ -1182,20 +1414,39 @@ private struct ChatConversationHeader: View {
         } else {
             switch counterparty {
             case .person:
-                // RN replaces call/video chrome with a single info button
-                // that opens the conversation details drawer.
-                Button(action: onOpenDetails) {
-                    Icon(.info, size: 20, color: Theme.Color.appTextSecondary)
-                        .frame(width: 34, height: 34)
+                // A15 / A15.2 header actions: phone then info. Calling
+                // ships later — the phone button is a no-op affordance
+                // for now, per design.
+                HStack(spacing: 2) {
+                    Button {} label: {
+                        Icon(.phone, size: 20, color: Theme.Color.appTextStrong)
+                            .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Call")
+                    Button(action: onOpenDetails) {
+                        Icon(.info, size: 20, color: Theme.Color.appTextStrong)
+                            .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Conversation details")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Conversation details")
             case .ai:
-                HStack(spacing: Spacing.s0) {
-                    Icon(.history, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
-                    Icon(.moreVertical, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                // A15.3 header actions: square-pen "New chat" then
+                // more-horizontal. The VM has no AI-thread reset API yet
+                // (history is session-scoped in AIConversationStore) — the
+                // button is a no-op until reset lands.
+                HStack(spacing: 2) {
+                    Button {} label: {
+                        Icon(.squarePen, size: 18, color: Theme.Color.appTextStrong)
+                            .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New chat")
+                    Icon(.moreHorizontal, size: 18, color: Theme.Color.appTextStrong)
+                        .frame(width: 34, height: 34)
+                        .accessibilityHidden(true)
                 }
-                .accessibilityHidden(true)
             case .group:
                 Icon(.moreVertical, size: 18, color: Theme.Color.appText)
                     .frame(width: 34, height: 34)
@@ -1204,17 +1455,20 @@ private struct ChatConversationHeader: View {
         }
     }
 
-    private var betaPill: some View {
-        Text("BETA")
-            .font(.system(size: 9, weight: .bold))
-            .tracking(0.4)
-            .foregroundStyle(Theme.Color.appTextSecondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
+    /// A15.3 `.ai-badge` — "AI" mini-badge in the name row (sparkles
+    /// glyph, primary50 on primary700).
+    private var aiBadge: some View {
+        HStack(spacing: 3) {
+            Icon(.sparkles, size: 8, strokeWidth: 3, color: Theme.Color.primary700)
+            Text("AI")
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(Theme.Color.primary700)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 1)
+        .background(Theme.Color.primary50)
+        .clipShape(Capsule())
     }
 
     private var personaPill: some View {
@@ -1484,9 +1738,12 @@ private struct ChatPersonAvatar: View {
                 }
             }
             if verified {
-                Icon(.check, size: max(6, size * 0.22), strokeWidth: 3.5, color: Theme.Color.appTextInverse)
-                    .frame(width: max(12, size * 0.4), height: max(12, size * 0.4))
-                    .background(Theme.Color.primary600)
+                // A15 `.vb` — verified badge is SUCCESS green (#059669),
+                // 14pt on the 36 header avatar, capped at 24pt on the
+                // 88 empty-state avatar.
+                Icon(.check, size: min(12, max(6, size * 0.22)), strokeWidth: 3.5, color: Theme.Color.appTextInverse)
+                    .frame(width: min(24, max(12, size * 0.4)), height: min(24, max(12, size * 0.4)))
+                    .background(Theme.Color.success)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
                     .offset(x: 1, y: 1)
@@ -1509,12 +1766,14 @@ private struct ChatDayDividerRow: View {
     let label: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        // A15 `.day` — 10.5pt / 700 uppercase label flanked by 1px
+        // `appBorder` lines.
+        HStack(spacing: Spacing.s2) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
             Text(label.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.4)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.Color.appTextMuted)
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
         }
         .padding(.vertical, 6)
@@ -1659,19 +1918,85 @@ private struct ChatBroadcastReferenceCard: View {
     }
 }
 
+/// A15.2 `.link-bubble` preview card — white surface, 1px hairline,
+/// 12pt radius, optional image strip, host overline + title +
+/// description. Tap opens the URL in the system browser.
+private struct ChatLinkPreviewCard: View {
+    let metadata: LinkPreviewMetadata
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        Button { openURL(metadata.url) } label: {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
+                if let imageURL = metadata.imageURL {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case let .success(image):
+                            image.resizable().scaledToFill()
+                        default:
+                            Theme.Color.appSurfaceSunken
+                        }
+                    }
+                    .frame(height: 88)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(metadata.host)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .tracking(0.4)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                        .lineLimit(1)
+                    Text(metadata.title)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                    if let description = metadata.description {
+                        Text(description)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(Spacing.s3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Link preview: \(metadata.title)")
+        .accessibilityIdentifier("chatLinkPreview_\(metadata.url.absoluteString)")
+    }
+}
+
 // swiftlint:disable:next type_body_length
 private struct ChatBubbleRow: View {
-    // RN caps a bubble at 75% of the row width (fractional, not fixed) —
+    // A15 `.bubble { max-width: 78% }` (fractional, not fixed) —
     // `rowWidth` is read from the row's available width below. Until it
-    // resolves, fall back to a sensible fixed cap.
+    // resolves, fall back to a sensible fixed cap. AI replies stretch to
+    // 82% per `.bubble.ai`.
     private static let fallbackBubbleMaxWidth: CGFloat = 260
-    private static let bubbleHorizontalPadding: CGFloat = 14
+    private static let bubbleHorizontalPadding: CGFloat = 12
     @State private var rowWidth: CGFloat = 0
     private var bubbleMaxWidth: CGFloat {
-        rowWidth > 0 ? rowWidth * 0.75 : Self.fallbackBubbleMaxWidth
+        let fraction: CGFloat = isAIReplyBody ? 0.82 : 0.78
+        return rowWidth > 0 ? rowWidth * fraction : Self.fallbackBubbleMaxWidth
     }
     private var bubbleTextMaxWidth: CGFloat {
         bubbleMaxWidth - (Self.bubbleHorizontalPadding * 2)
+    }
+
+    private var isAIReplyBody: Bool {
+        if case .aiReply = content.body { return true }
+        return false
     }
 
     let content: ChatBubbleContent
@@ -1691,7 +2016,9 @@ private struct ChatBubbleRow: View {
     let onRetry: @MainActor () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: Spacing.s2) {
+        // A15 `.msg-row { align-items: flex-end }` — mini avatar and
+        // bubble align at the bottom edge.
+        HStack(alignment: .bottom, spacing: Spacing.s2) {
             if content.side == .outgoing {
                 Spacer(minLength: 44)
                 bubbleStack
@@ -1711,8 +2038,9 @@ private struct ChatBubbleRow: View {
                     .onChange(of: geo.size.width) { _, newValue in rowWidth = newValue }
             }
         )
-        .padding(.top, content.isContinuation ? 2 : 8)
-        .padding(.bottom, content.stamp == nil ? 3 : 0)
+        // A15 group rhythm — 2pt above a continuation bubble, 4pt above
+        // a new same/other-sender group (`.scroll gap: 4` + `.same -2`).
+        .padding(.top, content.isContinuation ? 2 : 4)
         .contextMenu {
             Button { onReply() } label: {
                 Text("Reply")
@@ -1727,7 +2055,10 @@ private struct ChatBubbleRow: View {
                     Text(reaction)
                 }
             }
-            if content.side == .outgoing && !content.id.hasPrefix("client_") {
+            // `client_` rows aren't persisted yet; `ai_`-prefixed rows
+            // (AI-thread local messages) are never persisted server-side,
+            // so Edit/Delete would PUT/DELETE an id that can't exist.
+            if content.side == .outgoing && !content.id.hasPrefix("client_") && !content.id.hasPrefix("ai_") {
                 Button { onBeginSelect() } label: {
                     Text("Select")
                 }
@@ -1760,43 +2091,28 @@ private struct ChatBubbleRow: View {
 
     private var bubbleStack: some View {
         VStack(alignment: alignment, spacing: Spacing.s0) {
-            switch content.body {
-            case let .text(text):
-                if Self.isEmojiOnly(text) {
-                    emojiBody(text)
-                } else {
-                    bubbleContainer { textBody(text) }
+            bubbleBody
+                // A15 `.reaction` — pills float over the bubble's bottom
+                // edge: leading corner for outgoing, trailing for
+                // incoming, hanging 10pt below.
+                .overlay(alignment: content.side == .outgoing ? .bottomLeading : .bottomTrailing) {
+                    if !content.reactions.isEmpty {
+                        reactionRow(content.reactions)
+                            .offset(x: content.side == .outgoing ? 8 : -8, y: 10)
+                    }
                 }
-            case let .textWithImages(text, imageURLs):
-                bubbleContainer { textWithImagesBody(text: text, imageURLs: imageURLs) }
-            case let .image(url):
-                photoBubble(url)
-            case let .attachment(filename, sizeLabel):
-                bubbleContainer { attachmentBody(filename: filename, sizeLabel: sizeLabel) }
-            case let .systemLink(label, sub, accent):
-                systemLinkPill(label: label, sub: sub, accent: accent)
-            case let .locationCard(card):
-                ChatLocationCardView(card: card, isOutgoing: content.side == .outgoing, onOpen: { onOpenLocation(card) })
-            case let .gigOfferCard(card):
-                ChatGigOfferCardView(
-                    card: card,
-                    isOutgoing: content.side == .outgoing,
-                    onOpen: { if !card.gigId.isEmpty { onOpenGig(card.gigId) } }
-                )
-            case let .listingOfferCard(card):
-                ChatListingOfferCardView(
-                    card: card,
-                    isOutgoing: content.side == .outgoing,
-                    onOpen: { if !card.listingId.isEmpty { onOpenListing(card.listingId) } }
-                )
-            case let .aiReply(text, estimate, drafts):
-                aiReplyBubble(text: text, estimate: estimate, drafts: drafts)
+                .padding(.bottom, content.reactions.isEmpty ? 0 : 10)
+            // A15.2 `.link-bubble` — preview card for the first http(s)
+            // URL in a plain text body, below the bubble in the same
+            // column. Rendered only once metadata resolved (no
+            // skeleton; nothing on failure — the inline link stays
+            // tappable either way).
+            if let url = linkPreviewURL, let metadata = LinkPreviewStore.shared.metadata(for: url) {
+                ChatLinkPreviewCard(metadata: metadata)
+                    .padding(.top, Spacing.s1)
             }
             if let tier = content.sentSupportTier, content.side == .outgoing {
                 paidSupportFooter(tier: tier)
-            }
-            if !content.reactions.isEmpty {
-                reactionRow(content.reactions)
             }
             if let stamp = content.stamp {
                 stampView(stamp)
@@ -1807,19 +2123,76 @@ private struct ChatBubbleRow: View {
         // Text onto one line, truncating long messages with "…" instead
         // of wrapping them.
         .frame(maxWidth: bubbleMaxWidth, alignment: alignmentToFrameAlignment)
+        .task(id: linkPreviewURL?.absoluteString) {
+            if let url = linkPreviewURL {
+                await LinkPreviewStore.shared.fetchIfNeeded(url)
+            }
+        }
+    }
+
+    /// First http(s) URL in a plain `.text` / `.textWithImages` body —
+    /// detection lives in the view layer (A15.2), never the projection.
+    /// AI replies and rich cards are excluded by the switch.
+    private var linkPreviewURL: URL? {
+        switch content.body {
+        case let .text(text):
+            return ChatLinkDetection.firstURL(in: text)
+        case let .textWithImages(text, _):
+            return ChatLinkDetection.firstURL(in: text)
+        default:
+            return nil
+        }
+    }
+
+    @ViewBuilder private var bubbleBody: some View {
+        switch content.body {
+        case let .text(text):
+            if Self.isEmojiOnly(text) {
+                emojiBody(text)
+            } else {
+                bubbleContainer { textBody(text) }
+            }
+        case let .textWithImages(text, imageURLs):
+            bubbleContainer { textWithImagesBody(text: text, imageURLs: imageURLs) }
+        case let .image(url):
+            photoBubble(url)
+        case let .attachment(filename, sizeLabel):
+            bubbleContainer { attachmentBody(filename: filename, sizeLabel: sizeLabel) }
+        case let .systemLink(label, sub, accent):
+            systemLinkPill(label: label, sub: sub, accent: accent)
+        case let .locationCard(card):
+            ChatLocationCardView(card: card, isOutgoing: content.side == .outgoing, onOpen: { onOpenLocation(card) })
+        case let .gigOfferCard(card):
+            ChatGigOfferCardView(
+                card: card,
+                isOutgoing: content.side == .outgoing,
+                onOpen: { if !card.gigId.isEmpty { onOpenGig(card.gigId) } }
+            )
+        case let .listingOfferCard(card):
+            ChatListingOfferCardView(
+                card: card,
+                isOutgoing: content.side == .outgoing,
+                onOpen: { if !card.listingId.isEmpty { onOpenListing(card.listingId) } }
+            )
+        case let .aiReply(text, estimate, drafts):
+            aiReplyBubble(text: text, estimate: estimate, drafts: drafts)
+        }
     }
 
     private func bubbleContainer(@ViewBuilder _ inner: () -> some View) -> some View {
         let isOut = content.side == .outgoing
+        // A15 `.bubble` — padding 8/12/9, radius 18 with 6pt sender
+        // corners, and the shared `--shadow-sm` lift.
         return inner()
             .padding(.horizontal, Self.bubbleHorizontalPadding)
-            .padding(.vertical, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 9)
             .foregroundStyle(isOut ? Theme.Color.appTextInverse : Theme.Color.appText)
             .background(
                 isOut ? Theme.Color.primary600 : Theme.Color.appSurface,
                 in: bubbleShape
             )
-            // Incoming bubbles are white with a 1px hairline border (RN);
+            // Incoming bubbles are white with a 1px hairline border;
             // outgoing are solid blue with no border.
             .overlay {
                 if !isOut {
@@ -1832,6 +2205,7 @@ private struct ChatBubbleRow: View {
                 }
             }
             .clipShape(bubbleShape)
+            .shadow(color: .black.opacity(0.04), radius: 1.5, y: 1)
     }
 
     @ViewBuilder private var replyPreview: some View {
@@ -1868,23 +2242,79 @@ private struct ChatBubbleRow: View {
         VStack(alignment: .leading, spacing: 0) {
             replyPreview
             // No explicit width frame — the Text wraps at the width the
-            // bubble column proposes (≤ 75% of the row) and hugs its
+            // bubble column proposes (≤ 78% of the row) and hugs its
             // wrapped size so short messages keep small bubbles.
-            Text(text)
-                .font(.system(size: 15))
+            // A15 `.bubble` type: 13.5pt / 18 line-height.
+            Text(linkStyled(text))
+                .font(.system(size: 13.5))
                 .multilineTextAlignment(.leading)
-                .lineSpacing(6)
+                .lineSpacing(4.5)
         }
     }
 
+    /// A15.2 — http(s) URLs in the body become tappable links (opening
+    /// in the system browser via the `.link` attribute), underlined and
+    /// tinted to stay readable on both bubble colours: inverse-ish on
+    /// the outgoing blue, `primary600` on the incoming white.
+    private func linkStyled(_ text: String) -> AttributedString {
+        let matches = ChatLinkDetection.linkMatches(in: text)
+        guard !matches.isEmpty else { return AttributedString(text) }
+        let linkColor = content.side == .outgoing ? Theme.Color.appTextInverse : Theme.Color.primary600
+        var result = AttributedString()
+        var cursor = text.startIndex
+        for match in matches where match.range.lowerBound >= cursor {
+            result += AttributedString(String(text[cursor..<match.range.lowerBound]))
+            var link = AttributedString(String(text[match.range]))
+            link.link = match.url
+            link.underlineStyle = .single
+            link.foregroundColor = linkColor
+            result += link
+            cursor = match.range.upperBound
+        }
+        result += AttributedString(String(text[cursor...]))
+        return result
+    }
+
+    /// Emoji-only detection via explicit code-point ranges (mirrors
+    /// Android's `isEmojiOnly`). `scalar.properties.isEmoji` is wrong
+    /// here — UTS #51 marks ASCII digits, `#`, `*`, `©`, `®`, `™` as
+    /// Emoji=Yes, so "123" / "#1" / "911" rendered as giant bare emoji.
+    /// At least one qualifying emoji scalar is required; variation
+    /// selectors, ZWJ, and skin tones count only as glue.
     private static func isEmojiOnly(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 30 else { return false }
-        return trimmed.unicodeScalars.allSatisfy { scalar in
-            scalar.properties.isEmojiPresentation
-                || scalar.value == 0xFE0F
-                || scalar.properties.isEmoji
+        var sawEmoji = false
+        for scalar in trimmed.unicodeScalars {
+            if isQualifyingEmojiScalar(scalar.value) {
+                sawEmoji = true
+            } else if !isEmojiGlueScalar(scalar.value) {
+                return false
+            }
         }
+        return sawEmoji
+    }
+
+    /// Scalars that qualify a message as emoji on their own.
+    private static func isQualifyingEmojiScalar(_ value: UInt32) -> Bool {
+        switch value {
+        case 0x1F300...0x1FAFF, // misc symbols & pictographs … symbols extended-A
+             0x1F1E6...0x1F1FF, // regional indicators (flags)
+             0x2600...0x27BF, // misc symbols + dingbats
+             0x2300...0x23FF, // misc technical (⌚ ⏰ …)
+             0x2B50, 0x2B55, // star, hollow circle
+             0x2190...0x21FF: // arrows
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Modifier scalars allowed between emoji (never qualifying alone).
+    private static func isEmojiGlueScalar(_ value: UInt32) -> Bool {
+        value == 0xFE0F // variation selector-16
+            || value == 0x200D // zero-width joiner
+            || (0x1F3FB...0x1F3FF).contains(value) // skin tones
     }
 
     private func textWithImagesBody(text: String, imageURLs: [URL]) -> some View {
@@ -1926,6 +2356,7 @@ private struct ChatBubbleRow: View {
                 lineWidth: content.side == .incoming ? 1 : 0
             )
         )
+        .shadow(color: .black.opacity(0.04), radius: 1.5, y: 1)
         .accessibilityLabel("Photo attachment")
         .accessibilityIdentifier("chatPhotoBubble_\(content.id)")
     }
@@ -2045,50 +2476,52 @@ private struct ChatBubbleRow: View {
         .accessibilityIdentifier("chatPaidSupportFooter_\(content.id)")
     }
 
+    /// A15 `.reaction` — white capsule pills with a 1px border that
+    /// anchor to the bubble's bottom corner (positioned by the caller's
+    /// overlay + offset). Tap toggles the reaction.
     private func reactionRow(_ reactions: [ChatBubbleReaction]) -> some View {
         HStack(spacing: 4) {
             ForEach(reactions) { reaction in
                 Button { onReact(reaction.reaction) } label: {
                     HStack(spacing: 3) {
                         Text(reaction.reaction)
-                            .font(.system(size: 14))
+                            .font(.system(size: 11))
                         Text("\(reaction.count)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(reaction.reactedByMe ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                            .font(.system(size: 9.5, weight: .bold))
+                            .foregroundStyle(
+                                reaction.reactedByMe ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                            )
                     }
-                    .padding(.horizontal, Spacing.s2)
-                    .padding(.vertical, 3)
-                    .background(
-                        reaction.reactedByMe ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken,
-                        in: RoundedRectangle(cornerRadius: Radii.lg)
-                    )
-                    // RN: only the reacted-by-me pill carries a border (blue).
-                    .overlay {
-                        if reaction.reactedByMe {
-                            RoundedRectangle(cornerRadius: Radii.lg)
-                                .stroke(Theme.Color.primary600, lineWidth: 1)
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Theme.Color.appSurface, in: Capsule())
+                    .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+                    .shadow(color: .black.opacity(0.04), radius: 1.5, y: 1)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.top, Spacing.s1)
         .accessibilityIdentifier("chatReactions_\(content.id)")
     }
 
     // MARK: - AI reply
 
+    /// A15.3 `.bubble.in.ai` — white bordered bubble at 82% max width
+    /// with the "Pantopus AI" tag pill. While the reply is streaming and
+    /// no text has arrived yet, renders the "Thinking…" row instead.
     private func aiReplyBubble(text: String, estimate: ChatEstimate?, drafts: [ChatAIDraftCard]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             aiTag
-            Text(text)
-                .pantopusTextStyle(.small)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: bubbleTextMaxWidth, alignment: .leading)
-                .pantopusLineHeight(.small)
-                .foregroundStyle(Theme.Color.appText)
+            if text.isEmpty, estimate == nil, drafts.isEmpty {
+                ChatAIThinkingRow()
+            } else {
+                Text(text)
+                    .font(.system(size: 13.5))
+                    .lineSpacing(4.5)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: bubbleTextMaxWidth, alignment: .leading)
+                    .foregroundStyle(Theme.Color.appText)
+            }
             if let estimate {
                 AIEstimateCard(estimate: estimate)
             }
@@ -2096,23 +2529,27 @@ private struct ChatBubbleRow: View {
                 AIDraftCard(draft: draft, onUse: onUseAIDraft)
             }
         }
-        .padding(.horizontal, 13)
+        .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: bubbleMaxWidth, alignment: .leading)
-        .background(Theme.Color.appSurfaceSunken, in: aiBubbleShape)
+        .background(Theme.Color.appSurface, in: aiBubbleShape)
+        .overlay(aiBubbleShape.stroke(Theme.Color.appBorder, lineWidth: 1))
+        .shadow(color: .black.opacity(0.04), radius: 1.5, y: 1)
     }
 
+    /// A15.3 `.ai-tag` — "Pantopus AI" pill: sparkles glyph + 9.5pt bold
+    /// uppercase, primary600 on primary50.
     private var aiTag: some View {
         HStack(spacing: Spacing.s1) {
-            Icon(.bot, size: 9, strokeWidth: 3, color: Theme.Color.magic)
+            Icon(.sparkles, size: 9, strokeWidth: 3, color: Theme.Color.primary600)
             Text("PANTOPUS AI")
                 .font(.system(size: 9.5, weight: .bold))
                 .tracking(0.5)
-                .foregroundStyle(Theme.Color.magic)
+                .foregroundStyle(Theme.Color.primary600)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
-        .background(Theme.Color.magicBg)
+        .background(Theme.Color.primary50)
         .clipShape(Capsule())
     }
 
@@ -2226,8 +2663,8 @@ private struct ChatBubbleRow: View {
 
     private var aiBubbleShape: some Shape {
         UnevenRoundedRectangle(
-            topLeadingRadius: 18,
-            bottomLeadingRadius: content.hasTail ? 4 : 18,
+            topLeadingRadius: content.isContinuation ? 6 : 18,
+            bottomLeadingRadius: content.hasTail ? 6 : 18,
             bottomTrailingRadius: 18,
             topTrailingRadius: 18
         )
@@ -2291,13 +2728,15 @@ private struct ChatBubbleRow: View {
     }
 
     private var bubbleShape: some Shape {
-        // RN bubble radius is 18 with a 4pt asymmetric tail on the
-        // sender's bottom corner of the last message in a run.
+        // A15 `.bubble` — radius 18 with a 6pt tail on the sender's
+        // bottom corner of the last message in a run, plus a 6pt top
+        // corner on the sender's side for continuation bubbles
+        // (`.bubble.in.cont` / `.bubble.out.cont`).
         UnevenRoundedRectangle(
-            topLeadingRadius: 18,
-            bottomLeadingRadius: content.side == .incoming && content.hasTail ? 4 : 18,
-            bottomTrailingRadius: content.side == .outgoing && content.hasTail ? 4 : 18,
-            topTrailingRadius: 18
+            topLeadingRadius: content.side == .incoming && content.isContinuation ? 6 : 18,
+            bottomLeadingRadius: content.side == .incoming && content.hasTail ? 6 : 18,
+            bottomTrailingRadius: content.side == .outgoing && content.hasTail ? 6 : 18,
+            topTrailingRadius: content.side == .outgoing && content.isContinuation ? 6 : 18
         )
     }
 
@@ -2335,13 +2774,15 @@ private struct ChatMiniAvatar: View {
     var hidden = false
 
     var body: some View {
+        // A15 `.mini-av` — 22pt circle, 9pt/700 initials. `hidden`
+        // keeps the layout slot for continuation bubbles.
         ZStack {
             Circle().fill(Theme.Color.primary500)
             Text(initials)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextInverse)
         }
-        .frame(width: 26, height: 26)
+        .frame(width: 22, height: 22)
         .opacity(hidden ? 0 : 1)
         .accessibilityHidden(true)
     }
@@ -2378,18 +2819,42 @@ private struct ChatReadReceipt: View {
     let timestamp: String
 
     var body: some View {
+        // A15 `.ts.out` — "Read <time>" with a 12pt primary500
+        // check-check (two overlapped checks emulate Lucide's glyph).
         HStack(spacing: Spacing.s1) {
             Text("Read \(timestamp)")
                 .font(.system(size: 10, weight: .regular))
                 .foregroundStyle(Theme.Color.appTextMuted)
-            HStack(spacing: -2) {
-                Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
-                Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
+            HStack(spacing: -7) {
+                Icon(.check, size: 12, strokeWidth: 2.5, color: Theme.Color.primary500)
+                Icon(.check, size: 12, strokeWidth: 2.5, color: Theme.Color.primary500)
             }
             .accessibilityHidden(true)
         }
         .accessibilityLabel("Read \(timestamp)")
         .accessibilityIdentifier("chatReadReceipt")
+    }
+}
+
+/// A15.3 "Thinking" state — shown inside the AI reply bubble while the
+/// stream is in flight and no text has arrived yet. A pulsing sparkles
+/// glyph plus muted copy (the design's shimmer gradient, simplified).
+private struct ChatAIThinkingRow: View {
+    @State private var pulsing = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Icon(.sparkles, size: 14, color: Theme.Color.primary600)
+                .opacity(pulsing ? 1 : 0.55)
+                .scaleEffect(pulsing ? 1.12 : 1)
+                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulsing)
+            Text("Thinking…")
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextMuted)
+        }
+        .onAppear { pulsing = true }
+        .accessibilityLabel("Pantopus AI is thinking")
+        .accessibilityIdentifier("chatAIThinking")
     }
 }
 
@@ -2438,7 +2903,7 @@ private struct ChatTypingIndicator: View {
             )
             Spacer()
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.top, Spacing.s2)
         .padding(.bottom, 6)
         .onAppear {
@@ -2536,80 +3001,126 @@ private struct ChatComposer: View {
     let canSend: Bool
     let showsSendCost: Bool
     let isLockedAction: Bool
+    /// A15.3 — while the AI reply stream is in flight the send disc
+    /// becomes a stop button wired to `onStop`.
+    var isStreaming = false
     let onAttach: @MainActor () -> Void
     let onEmoji: @MainActor () -> Void
     let onSend: @MainActor () -> Void
+    var onStop: @MainActor () -> Void = {}
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: Spacing.s1) {
+        // A15 `.composer` — [+ disc] → [input pill with trailing smile]
+        // → [send/stop disc].
+        HStack(alignment: .bottom, spacing: Spacing.s2) {
             Button(action: onAttach) {
-                Icon(.plus, size: 20, strokeWidth: 2.4, color: Theme.Color.primary600)
-                    .frame(width: 38, height: 38)
-                    .background(Theme.Color.primary50, in: Circle())
+                Icon(.plus, size: 19, strokeWidth: 2, color: Theme.Color.appTextStrong)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.Color.appSurfaceSunken, in: Circle())
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Attach")
             .accessibilityIdentifier("chatComposerAttach")
 
-            // RN order: [+] → emoji → rounded input → send.
-            Button(action: onEmoji) {
-                Icon(.smile, size: 18, color: Theme.Color.appTextMuted)
-                    .frame(width: 38, height: 38)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Emoji")
-            .accessibilityIdentifier("chatComposerEmoji")
-
-            TextField(placeholder, text: $text, axis: .vertical)
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.Color.appText)
-                .lineLimit(1...4)
-                .submitLabel(.send)
-                .onSubmit { if canSend { onSend() } }
-                .padding(.horizontal, Spacing.s4)
-                .padding(.vertical, Spacing.s2)
-                .frame(minHeight: 38)
-                .background(Theme.Color.appSurfaceSunken)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous))
-
-            Button(action: onSend) {
-                ZStack(alignment: .topTrailing) {
-                    Icon(
-                        isLockedAction ? .lock : .send,
-                        size: 18,
-                        strokeWidth: 2.5,
-                        color: canSend ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
-                    )
-                    .frame(width: 38, height: 38)
-                    .background(sendBackground, in: Circle())
-                    .frame(width: 44, height: 44)
-                    if showsSendCost && canSend {
-                        Text("-1")
-                            .font(.system(size: 9, weight: .heavy))
-                            .foregroundStyle(Theme.Color.primary700)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Theme.Color.appSurface)
-                            .overlay(Capsule().stroke(Theme.Color.primary600, lineWidth: 1))
-                            .clipShape(Capsule())
-                            .offset(x: 7, y: -6)
-                    }
+            // Input pill — smile lives INSIDE the pill on the right.
+            HStack(alignment: .bottom, spacing: Spacing.s2) {
+                TextField(placeholder, text: $text, axis: .vertical)
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1...4)
+                    .submitLabel(.send)
+                    .onSubmit { if canSend { onSend() } }
+                Button(action: onEmoji) {
+                    Icon(.smile, size: 17, color: Theme.Color.appTextMuted)
+                        .frame(width: 24, height: 20)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Emoji")
+                .accessibilityIdentifier("chatComposerEmoji")
             }
-            .buttonStyle(.plain)
-            .disabled(!canSend)
-            .accessibilityLabel("Send")
-            .accessibilityIdentifier("chatComposerSend")
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(minHeight: 36)
+            .background(Theme.Color.appSurfaceSunken)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            if isStreaming {
+                stopButton
+            } else {
+                sendButton
+            }
         }
-        .padding(.horizontal, Spacing.s2)
+        .padding(.horizontal, 10)
         .padding(.top, Spacing.s2)
-        .padding(.bottom, Spacing.s6)
+        .padding(.bottom, Spacing.s4)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
         }
+    }
+
+    private var sendButton: some View {
+        Button(action: onSend) {
+            ZStack(alignment: .topTrailing) {
+                Icon(
+                    isLockedAction ? .lock : .arrowUp,
+                    size: 18,
+                    strokeWidth: 2.5,
+                    color: canSend ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
+                )
+                .frame(width: 36, height: 36)
+                .background(sendBackground, in: Circle())
+                // A15 `--shadow-primary` on the active send disc.
+                .shadow(
+                    color: canSend && !isLockedAction ? Theme.Color.primary600.opacity(0.18) : .clear,
+                    radius: 8,
+                    y: 3
+                )
+                .frame(width: 44, height: 44)
+                if showsSendCost && canSend {
+                    Text("-1")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(Theme.Color.primary700)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Theme.Color.appSurface)
+                        .overlay(Capsule().stroke(Theme.Color.primary600, lineWidth: 1))
+                        .clipShape(Capsule())
+                        .offset(x: 7, y: -6)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!canSend)
+        .accessibilityLabel("Send")
+        .accessibilityIdentifier("chatComposerSend")
+    }
+
+    /// A15.3 `.composer .stop` — white disc, 1.5px error ring, filled
+    /// error square. Cancels the in-flight AI stream.
+    private var stopButton: some View {
+        Button(action: onStop) {
+            ZStack {
+                Circle()
+                    .fill(Theme.Color.appSurface)
+                    .frame(width: 36, height: 36)
+                Circle()
+                    .stroke(Theme.Color.error, lineWidth: 1.5)
+                    .frame(width: 36, height: 36)
+                RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                    .fill(Theme.Color.error)
+                    .frame(width: 11, height: 11)
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stop generating")
+        .accessibilityIdentifier("chatComposerStop")
     }
 
     private var sendBackground: Color {

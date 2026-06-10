@@ -114,8 +114,11 @@ final class ChatListViewModelTests: XCTestCase {
         XCTAssertTrue(marcus?.verified ?? false)
         XCTAssertNil(marcus?.identityChip)
         XCTAssertTrue(marcus?.topicKinds.contains("gig") ?? false)
+        XCTAssertEqual(marcus?.topics.first?.title, "Shelves", "row carries topic pills for the chips under the preview")
+        XCTAssertEqual(marcus?.topics.first?.topicType, "gig")
         let business = rows.first { $0.id == "b1" }
         XCTAssertEqual(business?.identityChip, .business)
+        XCTAssertEqual(business?.topics, [], "no pills when a conversation has no topics")
     }
 
     func testLoadEmptyTransitionsEmpty() async {

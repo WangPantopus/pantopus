@@ -97,12 +97,30 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 }
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
-    /// Show banner + play sound even when app is in foreground.
+    /// Show banner + play sound even when app is in foreground — except
+    /// chat pushes for the conversation the user is currently viewing.
+    /// The backend's chat push carries `type: "chat_message"` and
+    /// `room_id` at the top level of the APNs payload
+    /// (`backend/routes/chats.js:1837`, flattened by
+    /// `backend/services/push/apnsClient.js:buildPayload`); when that
+    /// room is registered as on-screen we suppress the banner entirely —
+    /// the socket already rendered the message in place.
     nonisolated func userNotificationCenter(
         _: UNUserNotificationCenter,
-        willPresent _: UNNotification
+        willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound, .badge]
+        // Extract only Sendable strings before hopping to the main actor —
+        // `UNNotification` must not cross.
+        let userInfo = notification.request.content.userInfo
+        let type = userInfo["type"] as? String
+        let roomId = userInfo["room_id"] as? String
+        if type == "chat_message", let roomId {
+            let isViewingThread = await MainActor.run {
+                ActiveChatThreadTracker.shared.isViewingRoom(roomId)
+            }
+            if isViewingThread { return [] }
+        }
+        return [.banner, .list, .sound, .badge]
     }
 
     /// Handle taps on notifications — route to the relevant deep link.

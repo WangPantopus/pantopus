@@ -188,7 +188,8 @@ private fun Middle(
                 text = content.displayName,
                 fontSize = 16.sp,
                 fontWeight = if (content.unread > 0 || isAiRow) FontWeight.Bold else FontWeight.Medium,
-                color = if (isAiRow) PantopusColors.business else PantopusColors.appText,
+                // A15.3 swaps the AI row's business purple for primary blues.
+                color = if (isAiRow) PantopusColors.primary700 else PantopusColors.appText,
                 maxLines = 1,
             )
             if (isAiRow) {
@@ -196,11 +197,11 @@ private fun Middle(
                     text = "AI",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appTextInverse,
+                    color = PantopusColors.primary700,
                     modifier =
                         Modifier
-                            .clip(RoundedCornerShape(Radii.sm))
-                            .background(PantopusColors.business)
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.primary50)
                             .padding(horizontal = 6.dp, vertical = 1.dp),
                 )
             }
@@ -212,14 +213,79 @@ private fun Middle(
             fontWeight = if (content.unread > 0) FontWeight.SemiBold else FontWeight.Normal,
             color =
                 when {
-                    isAiRow -> PantopusColors.business
+                    isAiRow -> PantopusColors.primary600
                     content.unread > 0 -> PantopusColors.appTextStrong
                     else -> PantopusColors.appTextSecondary
                 },
             maxLines = 1,
         )
+        if (content.topics.isNotEmpty()) {
+            TopicPillsRow(topics = content.topics)
+        }
     }
 }
+
+/**
+ * Up to two topic pills under the preview plus a "+N" overflow pill.
+ * The Column's spacedBy already contributes 4dp; the extra 2dp top
+ * padding lands the designed 6dp gap.
+ */
+@Composable
+private fun TopicPillsRow(topics: List<ConversationRowTopic>) {
+    Row(
+        modifier = Modifier.padding(top = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        topics.take(2).forEach { topic ->
+            TopicPill(title = topic.title, icon = rowTopicIcon(topic.topicType))
+        }
+        val overflow = topics.size - 2
+        if (overflow > 0) {
+            TopicPill(title = "+$overflow", icon = null)
+        }
+    }
+}
+
+@Composable
+private fun TopicPill(
+    title: String,
+    icon: PantopusIcon?,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        if (icon != null) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 10.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = title,
+            fontSize = 11.sp,
+            color = PantopusColors.appTextSecondary,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Icon per topic type — mirrors the conversation screen's topic strip. */
+private fun rowTopicIcon(type: String): PantopusIcon =
+    when (type) {
+        "task", "gig" -> PantopusIcon.Briefcase
+        "listing" -> PantopusIcon.Tag
+        "marketplace" -> PantopusIcon.ShoppingBag
+        else -> PantopusIcon.MessageCircle
+    }
 
 @Composable
 private fun Trailing(content: ConversationRowContent) {
@@ -228,7 +294,7 @@ private fun Trailing(content: ConversationRowContent) {
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
             size = 18.dp,
-            tint = PantopusColors.business,
+            tint = PantopusColors.primary600,
         )
         return
     }

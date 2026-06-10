@@ -66,6 +66,19 @@ data class ChatConversationRouteArgs(
     val currentUserId: String,
     val scrollToMessageId: String? = null,
     val initialTopic: ChatInitialTopic? = null,
+    /** Backing gig for gig rooms — drives the A15 pinned context strip. */
+    val gigId: String? = null,
+)
+
+/**
+ * A15 `.ctx-strip` — pinned gig context rendered under the header of a
+ * gig room. Built from the gig detail fetch keyed by the route's gigId.
+ */
+@Immutable
+data class ChatGigContextStrip(
+    val gigId: String,
+    val title: String,
+    val meta: String,
 )
 
 @Immutable

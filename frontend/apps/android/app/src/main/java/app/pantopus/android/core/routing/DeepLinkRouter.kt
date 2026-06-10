@@ -82,7 +82,12 @@ object DeepLinkRouter {
          */
         data class PostcardVerification(val id: String) : Destination
 
-        data class Conversation(val id: String) : Destination
+        /**
+         * `pantopus://chat/:roomId[?name=…]` — chat thread. `name` is an
+         * optional display name for the header; chat push taps carry the
+         * sender name there (appended by `NotificationDispatcher`).
+         */
+        data class Conversation(val id: String, val name: String? = null) : Destination
 
         data class User(val id: String) : Destination
 
@@ -337,7 +342,11 @@ object DeepLinkRouter {
             }
             "chat", "message", "messages", "conversation" -> {
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.Conversation(id)
+                val name =
+                    parseQueryParam(queryPart, "name")?.let { encoded ->
+                        runCatching { java.net.URLDecoder.decode(encoded, "UTF-8") }.getOrNull()
+                    }
+                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.Conversation(id, name)
             }
             "user", "users" -> {
                 val id = segments.getOrNull(1)

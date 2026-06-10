@@ -52,8 +52,8 @@ class ChatListViewModel
             ConversationRowContent(
                 id = "ai_assistant",
                 variant = ConversationRowVariant.AiAssistant,
-                displayName = "Ask Pantopus",
-                initials = "AP",
+                displayName = "Pantopus AI",
+                initials = "AI",
                 avatarUrl = null,
                 identityChip = null,
                 verified = false,
@@ -301,6 +301,12 @@ class ChatListViewModel
                 topicKinds = dto.topics?.mapNotNull { it.topicType }?.toSet() ?: emptySet(),
                 storageKey = storageKey,
                 isMuted = storageKey in mutedKeys,
+                topics =
+                    dto.topics.orEmpty().mapNotNull { topic ->
+                        val title = topic.title?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                        ConversationRowTopic(title = title, topicType = topic.topicType ?: "general")
+                    },
+                gigId = if (isRoom) dto.gigId else null,
             )
         }
 

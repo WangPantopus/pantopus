@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import app.pantopus.android.core.routing.DeepLinkRouter
+import app.pantopus.android.data.chats.ActiveChatThread
 import app.pantopus.android.push.PushTokenSyncer
 import app.pantopus.android.ui.components.ToastController
 import app.pantopus.android.ui.components.ToastHost
@@ -34,6 +35,9 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var pushTokenSyncer: PushTokenSyncer
+
+    /** Chat-push suppression: notifications skip rooms the user is viewing. */
+    @Inject lateinit var activeChatThread: ActiveChatThread
 
     /**
      * App-wide [ToastController]. Survives configuration changes via the
@@ -79,6 +83,18 @@ class MainActivity : ComponentActivity() {
         // on Android 13+ the OS requires an explicit runtime prompt.
         // On earlier versions notifications are granted by default.
         requestNotificationPermissionIfNeeded()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Foreground marker for chat-push suppression — a notification
+        // for the on-screen conversation is skipped only while visible.
+        activeChatThread.isForeground = true
+    }
+
+    override fun onStop() {
+        activeChatThread.isForeground = false
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

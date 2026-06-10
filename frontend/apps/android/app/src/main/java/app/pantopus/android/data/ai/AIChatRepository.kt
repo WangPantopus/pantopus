@@ -1,17 +1,25 @@
 package app.pantopus.android.data.ai
 
 import app.pantopus.android.BuildConfig
+import app.pantopus.android.data.api.models.ai.AIConversationsResponse
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.safeApiCall
+import app.pantopus.android.data.api.services.AIApi
 import app.pantopus.android.data.auth.TokenStorage
 import app.pantopus.android.ui.screens.inbox.conversation.ChatAIDraftCard
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.job
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,7 +37,15 @@ class AIChatRepository
     constructor(
         private val client: OkHttpClient,
         private val tokenStorage: TokenStorage,
+        private val api: AIApi,
     ) {
+        /**
+         * List the user's AI conversations (metadata only — newest-updated
+         * first). Route `backend/routes/ai.js:358`. Used to restore the
+         * latest conversation id across app relaunches.
+         */
+        suspend fun conversations(): NetworkResult<AIConversationsResponse> = safeApiCall { api.conversations() }
+
         fun streamChat(
             message: String,
             conversationId: String?,
@@ -54,26 +70,40 @@ class AIChatRepository
                         .header("Content-Type", "application/json")
                 tokenStorage.accessToken()?.let { builder.header("Authorization", "Bearer $it") }
                 val request = builder.build()
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        emit(AIChatStreamEvent.Error("Failed to connect to AI."))
-                        return@flow
-                    }
-                    val source = response.body?.source() ?: return@flow
-                    var eventName: String? = null
-                    var data: String? = null
-                    while (!source.exhausted()) {
-                        val line = source.readUtf8Line() ?: break
-                        when {
-                            line.startsWith("event: ") -> eventName = line.removePrefix("event: ").trim()
-                            line.startsWith("data: ") -> data = line.removePrefix("data: ")
-                            line.isEmpty() && eventName != null && data != null -> {
-                                parseEvent(eventName!!, data!!)?.let { emit(it) }
-                                eventName = null
-                                data = null
+                val call = client.newCall(request)
+                // The blocking execute/read below can't observe coroutine
+                // cancellation on its own — tear the HTTP call (and the
+                // server-side generation) down as soon as the collecting
+                // job is cancelled (Stop button, screen exit).
+                currentCoroutineContext().job.invokeOnCompletion { call.cancel() }
+                try {
+                    call.execute().use { response ->
+                        if (!response.isSuccessful) {
+                            emit(AIChatStreamEvent.Error("Failed to connect to AI."))
+                            return@flow
+                        }
+                        val source = response.body?.source() ?: return@flow
+                        var eventName: String? = null
+                        var data: String? = null
+                        while (!source.exhausted()) {
+                            val line = source.readUtf8Line() ?: break
+                            when {
+                                line.startsWith("event: ") -> eventName = line.removePrefix("event: ").trim()
+                                line.startsWith("data: ") -> data = line.removePrefix("data: ")
+                                line.isEmpty() && eventName != null && data != null -> {
+                                    parseEvent(eventName!!, data!!)?.let { emit(it) }
+                                    eventName = null
+                                    data = null
+                                }
                             }
                         }
                     }
+                } catch (error: IOException) {
+                    // call.cancel() surfaces as an IOException from the
+                    // blocking read — rethrow it as cancellation (not a
+                    // stream failure) when the job was cancelled.
+                    currentCoroutineContext().ensureActive()
+                    throw error
                 }
             }.flowOn(Dispatchers.IO)
 

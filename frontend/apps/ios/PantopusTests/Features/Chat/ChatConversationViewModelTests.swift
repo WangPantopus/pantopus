@@ -36,7 +36,7 @@ final class ChatConversationViewModelTests: XCTestCase {
         online: true
     )
 
-    private static let counterpartyAI: ChatCounterparty = .ai(name: "Ask Pantopus")
+    private static let counterpartyAI: ChatCounterparty = .ai(name: "Pantopus AI")
 
     private static func messagesJSON(_ rows: String..., hasMore: Bool = false) -> String {
         "{\"messages\":[\(rows.joined(separator: ","))],\"hasMore\":\(hasMore)}"
@@ -1035,6 +1035,21 @@ final class ChatConversationViewModelTests: XCTestCase {
         XCTAssertTrue(blocked)
         let request = URLProtocolStub.capturedRequests.first { $0.url?.path == "/api/users/u_other/block" }
         XCTAssertNotNil(request, "block must hit POST /api/users/:userId/block")
+        XCTAssertEqual(request?.httpMethod, "POST")
+    }
+
+    func testReportCounterpartyPostsToReportEndpoint() async {
+        URLProtocolStub.stub(path: "/api/users/u_other/report", response: .json("{\"success\":true}"))
+        let vm = ChatConversationViewModel(
+            mode: .person(otherUserId: "u_other"),
+            counterparty: Self.counterpartyPerson,
+            currentUserId: "u_me",
+            api: makeAPI()
+        )
+        let reported = await vm.reportCounterparty(reason: "spam", details: "Keeps posting ads")
+        XCTAssertTrue(reported)
+        let request = URLProtocolStub.capturedRequests.first { $0.url?.path == "/api/users/u_other/report" }
+        XCTAssertNotNil(request, "report must hit POST /api/users/:userId/report")
         XCTAssertEqual(request?.httpMethod, "POST")
     }
 

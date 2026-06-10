@@ -88,15 +88,16 @@ public struct ConversationRow: View {
             HStack(spacing: 6) {
                 Text(content.displayName)
                     .font(.system(size: 16, weight: content.unread > 0 || isAIRow ? .bold : .medium))
-                    .foregroundStyle(isAIRow ? Theme.Color.business : Theme.Color.appText)
+                    .foregroundStyle(isAIRow ? Theme.Color.primary700 : Theme.Color.appText)
                     .lineLimit(1)
                 if isAIRow {
+                    // A15.3 `.ai-badge` — primary identity, not business purple.
                     Text("AI")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .foregroundStyle(Theme.Color.primary700)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
-                        .background(Theme.Color.business, in: RoundedRectangle(cornerRadius: Radii.sm))
+                        .background(Theme.Color.primary50, in: Capsule())
                         .accessibilityHidden(true)
                 }
                 if let chip = content.identityChip {
@@ -112,16 +113,40 @@ public struct ConversationRow: View {
                 .font(.system(size: 14, weight: content.unread > 0 ? .semibold : .regular))
                 .foregroundStyle(
                     isAIRow
-                        ? Theme.Color.business
+                        ? Theme.Color.primary600
                         : (content.unread > 0 ? Theme.Color.appTextStrong : Theme.Color.appTextSecondary)
                 )
                 .lineLimit(1)
+            if !content.topics.isEmpty {
+                topicPills
+                    .padding(.top, 2)
+            }
         }
+    }
+
+    /// Topic pills under the preview — first two topics + a "+N"
+    /// overflow pill when the conversation has more.
+    private var topicPills: some View {
+        HStack(spacing: 4) {
+            ForEach(content.topics.prefix(2)) { topic in
+                ConversationTopicPill(topic: topic)
+            }
+            if content.topics.count > 2 {
+                Text("+\(content.topics.count - 2)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Theme.Color.appSurfaceSunken, in: Capsule())
+                    .accessibilityLabel("\(content.topics.count - 2) more topics")
+            }
+        }
+        .accessibilityIdentifier("conversationRow.topics_\(content.id)")
     }
 
     @ViewBuilder private var trailing: some View {
         if isAIRow {
-            Icon(.chevronRight, size: 18, color: Theme.Color.business)
+            Icon(.chevronRight, size: 18, color: Theme.Color.primary600)
                 .accessibilityHidden(true)
         } else {
             trailingDefault
@@ -223,6 +248,35 @@ private func initialsCircle(
             .foregroundStyle(fg)
     }
     .frame(width: size, height: size)
+}
+
+// MARK: - Topic pill
+
+/// One topic pill under the preview line. The icon follows the topic
+/// type: `task`/`gig` → briefcase, `listing`/`marketplace` → tag.
+private struct ConversationTopicPill: View {
+    let topic: ConversationRowTopic
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Icon(icon, size: 10, color: Theme.Color.appTextSecondary)
+            Text(topic.title)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Theme.Color.appSurfaceSunken, in: Capsule())
+    }
+
+    private var icon: PantopusIcon {
+        switch topic.topicType {
+        case "task", "gig": .briefcase
+        case "listing", "marketplace": .tag
+        default: .messageCircle
+        }
+    }
 }
 
 // MARK: - Identity disclosure chip

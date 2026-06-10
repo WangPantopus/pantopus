@@ -41,6 +41,21 @@ public enum ConversationIdentityChip: String, Sendable, Hashable {
     }
 }
 
+/// One topic pill rendered under a row's preview line. `topicType`
+/// drives the pill icon (`task`/`gig` → briefcase, `listing`/
+/// `marketplace` → tag).
+public struct ConversationRowTopic: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let title: String
+    public let topicType: String
+
+    public init(id: String, title: String, topicType: String) {
+        self.id = id
+        self.title = title
+        self.topicType = topicType
+    }
+}
+
 /// One row in the chat list. Pure render — no DTOs.
 public struct ConversationRowContent: Identifiable, Sendable, Hashable {
     public let id: String
@@ -57,6 +72,11 @@ public struct ConversationRowContent: Identifiable, Sendable, Hashable {
     public let pinned: Bool
     /// Topic kinds — drives filtering (gigs / market).
     public let topicKinds: Set<String>
+    /// Topic pills rendered under the preview (first 2 + "+N" overflow).
+    public let topics: [ConversationRowTopic]
+    /// For `.room` rows backed by a gig: the gig id, so the conversation
+    /// screen can render the pinned gig context strip. `nil` otherwise.
+    public let gigId: String?
     /// Stable key for mute/hide persistence — `person:<id>` or `room:<id>`.
     public let storageKey: String
     /// Whether the user muted notifications for this conversation.
@@ -75,6 +95,8 @@ public struct ConversationRowContent: Identifiable, Sendable, Hashable {
         unread: Int,
         pinned: Bool,
         topicKinds: Set<String>,
+        topics: [ConversationRowTopic] = [],
+        gigId: String? = nil,
         storageKey: String,
         isMuted: Bool = false
     ) {
@@ -90,6 +112,8 @@ public struct ConversationRowContent: Identifiable, Sendable, Hashable {
         self.unread = unread
         self.pinned = pinned
         self.topicKinds = topicKinds
+        self.topics = topics
+        self.gigId = gigId
         self.storageKey = storageKey
         self.isMuted = isMuted
     }

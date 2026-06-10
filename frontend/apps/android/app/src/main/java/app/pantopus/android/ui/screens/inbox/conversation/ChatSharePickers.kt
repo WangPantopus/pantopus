@@ -43,14 +43,15 @@ import coil.compose.AsyncImage
 /**
  * Attachment sheet mirroring the RN share grid
  * (`apps/mobile/src/components/chat/ChatAttachmentSheet.tsx`): centered
- * "Share" title over tinted icon tiles. The RN grid's Camera option is
- * intentionally omitted — capture needs CAMERA permission plumbing the
- * Android app doesn't carry yet (Phase 4); Photos covers the gallery path.
+ * "Share" title over tinted icon tiles. Camera capture rides
+ * `TakePicture()` against the app FileProvider with a runtime CAMERA
+ * permission request — wired by the conversation screen's [onCamera].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChatAttachSheet(
     onDismiss: () -> Unit,
+    onCamera: () -> Unit,
     onPhotos: () -> Unit,
     onDocument: () -> Unit,
     onLocation: () -> Unit,
@@ -65,6 +66,10 @@ internal fun ChatAttachSheet(
     ) {
         val options =
             listOf(
+                AttachGridItem("Camera", PantopusIcon.Camera, PantopusColors.warningBg, PantopusColors.warning) {
+                    onDismiss()
+                    onCamera()
+                },
                 AttachGridItem("Photos", PantopusIcon.Image, PantopusColors.successBg, PantopusColors.success) {
                     onDismiss()
                     onPhotos()

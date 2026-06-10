@@ -43,7 +43,7 @@ class ChatConversationSnapshotTest {
             online = true,
         )
 
-    private val aiCounterparty = ChatCounterparty.Ai(displayName = "Ask Pantopus")
+    private val aiCounterparty = ChatCounterparty.Ai(displayName = "Pantopus AI")
 
     private val creatorCounterparty =
         ChatCounterparty.Person(

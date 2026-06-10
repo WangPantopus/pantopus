@@ -150,6 +150,8 @@ class ChatListViewModelTest {
             assertTrue(marcus.verified)
             assertNull(marcus.identityChip)
             assertTrue(marcus.topicKinds.contains("gig"))
+            // Per-row topic pills plumb title + type from the DTO.
+            assertEquals(listOf(ConversationRowTopic(title = "Shelves", topicType = "gig")), marcus.topics)
             val biz = loaded.rows.first { it.id == "b1" }
             assertEquals(ConversationIdentityChip.Business, biz.identityChip)
         }

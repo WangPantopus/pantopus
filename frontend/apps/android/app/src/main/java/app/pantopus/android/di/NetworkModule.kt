@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapt
 import app.pantopus.android.data.api.net.RetryInterceptor
 import app.pantopus.android.data.api.services.AdminApi
 import app.pantopus.android.data.api.services.AudienceProfileApi
+import app.pantopus.android.data.api.services.AIApi
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.BlocksApi
 import app.pantopus.android.data.api.services.BusinessDiscoveryApi
@@ -244,6 +245,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideChatApi(retrofit: Retrofit): ChatApi = retrofit.create(ChatApi::class.java)
+
+    @Provides @Singleton
+    fun provideAIApi(retrofit: Retrofit): AIApi = retrofit.create(AIApi::class.java)
 
     @Provides
     @Singleton

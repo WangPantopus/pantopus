@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -38,9 +39,8 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**
- * The Pantopus AI mark: a flat `business`-purple circle with a white
- * `bot` glyph, matching the RN reference's circular AI icon. Flat fill,
- * no gradient — the app shell carries no gradients on the mobile side.
+ * The Pantopus AI mark — A15.3 `.ai-grad`: a primary-blue gradient circle
+ * with a white sparkles glyph.
  */
 @Composable
 internal fun ChatAiAvatar(size: Dp) {
@@ -49,14 +49,18 @@ internal fun ChatAiAvatar(size: Dp) {
             Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(PantopusColors.business)
+                .background(
+                    Brush.linearGradient(
+                        listOf(PantopusColors.primary600, PantopusColors.primary800),
+                    ),
+                )
                 .semantics { contentDescription = "Pantopus AI" },
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(
-            icon = PantopusIcon.Bot,
+            icon = PantopusIcon.Sparkles,
             contentDescription = null,
-            size = size * 0.55f,
+            size = size * 0.5f,
             tint = PantopusColors.appTextInverse,
         )
     }
@@ -76,20 +80,20 @@ internal fun AiCapabilityChip(
     Row(
         modifier =
             modifier
-                .clip(RoundedCornerShape(Radii.md))
+                .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.md))
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(10.dp))
                 .clickable { onTap(chip) }
                 .heightIn(min = 48.dp)
                 .padding(horizontal = 10.dp)
-                .testTag("chatAICapability_${chip.id}"),
+                .testTag("chatAIWelcomeCapability_${chip.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        PantopusIconImage(icon = chip.icon, contentDescription = null, size = 13.dp, tint = PantopusColors.magic)
+        PantopusIconImage(icon = chip.icon, contentDescription = null, size = 13.dp, tint = PantopusColors.primary600)
         Text(
             text = chip.label,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             color = PantopusColors.appTextStrong,
             maxLines = 1,

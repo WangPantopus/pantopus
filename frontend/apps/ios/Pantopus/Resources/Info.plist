@@ -39,29 +39,29 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>Pantopus uses the camera for profile photos, listing images, and mail capture.</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Pantopus uses Face ID to lock sensitive actions like payments.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pantopus uses your location to show gigs and neighbors near you, and for location-based notifications.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Pantopus uses your location to show gigs and neighbors near you.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Pantopus uses the camera for profile photos, listing images, mail capture, and taking photos to send in chat.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Pantopus uses Face ID to lock sensitive actions like payments.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Pantopus connects to the local development server on your Mac while testing.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Pantopus uses your location to show gigs and neighbors near you, and for location-based notifications.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Pantopus uses your location to show gigs and neighbors near you.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pantopus uses the microphone for voice messages in chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pantopus uses your photo library to upload profile photos, listing images, and mail.</string>
 	<key>PantopusAPIBaseURL</key>
 	<string>$(PANTOPUS_API_BASE_URL)</string>
 	<key>PantopusSocketURL</key>
 	<string>$(PANTOPUS_SOCKET_URL)</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Pantopus uses your photo library to upload profile photos, listing images, and mail.</string>
 	<key>PostHogAPIKey</key>
 	<string>$(POSTHOG_API_KEY)</string>
 	<key>PostHogHost</key>

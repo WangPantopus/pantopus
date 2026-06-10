@@ -92,6 +92,22 @@ public enum ChatCounterparty: Sendable, Hashable {
     }
 }
 
+/// A15 `.ctx-strip` — pinned gig context rendered under the header of
+/// a gig-room thread. Built by the VM from `GET /api/gigs/:id`.
+public struct ChatGigContextStrip: Sendable, Hashable {
+    public let gigId: String
+    /// "<gig title> · $<price>" (price omitted when the gig has none).
+    public let title: String
+    /// Secondary meta line, e.g. "Yard · Open".
+    public let meta: String?
+
+    public init(gigId: String, title: String, meta: String?) {
+        self.gigId = gigId
+        self.title = title
+        self.meta = meta
+    }
+}
+
 /// Sender side of a single message — speaker on the left ("in") or the
 /// signed-in user on the right ("out").
 public enum ChatMessageSide: String, Sendable, Hashable {

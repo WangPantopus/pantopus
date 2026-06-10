@@ -24,6 +24,19 @@ public enum UsersEndpoints {
         Endpoint(method: .get, path: "/api/users/\(userId)/stats")
     }
 
+    /// `POST /api/users/:userId/report` — report another user for a
+    /// trust & safety review. Route `backend/routes/users.js:4153`;
+    /// validator `backend/routes/users.js:4137` requires `reason` to be
+    /// one of `spam | harassment | inappropriate | misinformation |
+    /// safety | other` and caps optional `details` at 1000 characters.
+    public static func report(userId: String, reason: String, details: String? = nil) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/users/\(userId)/report",
+            body: ReportUserBody(reason: reason, details: details)
+        )
+    }
+
     /// `GET /api/users/search?q=…&type=…` — verified-user directory
     /// search. Route `backend/routes/users.js:2367`. Backend rejects
     /// `q` under 2 characters with a 400; the caller is expected to
@@ -39,6 +52,13 @@ public enum UsersEndpoints {
             ]
         )
     }
+}
+
+/// `POST /api/users/:userId/report` body — validator at
+/// `backend/routes/users.js:4137`. `details` is omitted when nil.
+private struct ReportUserBody: Encodable {
+    let reason: String
+    let details: String?
 }
 
 /// `GET /api/users/search` response envelope. Backend route at

@@ -74,8 +74,8 @@ class ChatListSnapshotTest {
             ConversationRowContent(
                 id = "ai_assistant",
                 variant = ConversationRowVariant.AiAssistant,
-                displayName = "Ask Pantopus",
-                initials = "AP",
+                displayName = "Pantopus AI",
+                initials = "AI",
                 avatarUrl = null,
                 identityChip = null,
                 verified = true,
@@ -100,6 +100,13 @@ class ChatListSnapshotTest {
                 pinned = false,
                 topicKinds = setOf("gig"),
                 storageKey = "person:u1",
+                // First two render as pills; the third collapses to "+1".
+                topics =
+                    listOf(
+                        ConversationRowTopic(title = "Mount shelves", topicType = "task"),
+                        ConversationRowTopic(title = "Bookcase", topicType = "listing"),
+                        ConversationRowTopic(title = "Garden help", topicType = "task"),
+                    ),
             ),
             ConversationRowContent(
                 id = "b1",

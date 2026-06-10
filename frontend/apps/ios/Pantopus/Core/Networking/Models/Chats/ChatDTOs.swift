@@ -589,6 +589,23 @@ public struct ChatRealtimeReaction: Decodable, Sendable, Hashable {
     public let counts: [String: Int]?
 }
 
+/// `typing:user` / `typing:stopped` socket payloads — broadcast to a
+/// room (excluding the sender) while a member types
+/// (`backend/socket/chatSocketio.js:345-397`). `username` is omitted
+/// here; the conversation header already knows the counterparty.
+public struct ChatRealtimeTyping: Decodable, Sendable, Hashable {
+    public let userId: String
+    public let roomId: String
+}
+
+/// `user:online` / `user:offline` socket payloads — broadcast to every
+/// connected client on a user's first connect / last disconnect
+/// (`backend/socket/chatSocketio.js:240` / `:646`). Payload is
+/// `{ userId }`.
+public struct ChatRealtimePresence: Decodable, Sendable, Hashable {
+    public let userId: String
+}
+
 /// `room:join` ack payload. Socket.IO returns recent messages as a
 /// reconnect/backfill safety net after the server verifies membership.
 public struct ChatRoomJoinAck: Decodable, Sendable, Hashable {

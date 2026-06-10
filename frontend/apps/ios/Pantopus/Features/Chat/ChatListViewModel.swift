@@ -5,7 +5,7 @@
 //  Loads `GET /api/chat/unified-conversations` + `/stats` and reacts to
 //  socket events (`badge:update`, `message:new`). Projects the
 //  hetero DTO into a homogeneous list of `ConversationRowContent` plus
-//  a synthetic, pinned "Ask Pantopus" AI assistant row.
+//  a synthetic, pinned "Pantopus AI" assistant row.
 //
 
 import Foundation
@@ -38,8 +38,8 @@ public final class ChatListViewModel {
     private let aiRow: ConversationRowContent = .init(
         id: "ai_assistant",
         variant: .aiAssistant,
-        displayName: "Ask Pantopus",
-        initials: "AP",
+        displayName: "Pantopus AI",
+        initials: "AI",
         avatarURL: nil,
         identityChip: nil,
         verified: false,
@@ -234,6 +234,8 @@ public final class ChatListViewModel {
                 unread: row.unread,
                 pinned: row.pinned,
                 topicKinds: row.topicKinds,
+                topics: row.topics,
+                gigId: row.gigId,
                 storageKey: row.storageKey,
                 isMuted: mutedKeys.contains(row.storageKey)
             )
@@ -293,6 +295,8 @@ public final class ChatListViewModel {
             unread: nextUnread,
             pinned: original.pinned,
             topicKinds: original.topicKinds,
+            topics: original.topics,
+            gigId: original.gigId,
             storageKey: original.storageKey,
             isMuted: original.isMuted
         )
@@ -333,6 +337,10 @@ public final class ChatListViewModel {
             unread: unread,
             pinned: false,
             topicKinds: Set(dto.topicKinds),
+            topics: dto.topics.map {
+                ConversationRowTopic(id: $0.id, title: $0.title, topicType: $0.topicType)
+            },
+            gigId: dto.gigId,
             storageKey: storageKey,
             isMuted: mutedKeys.contains(storageKey)
         )

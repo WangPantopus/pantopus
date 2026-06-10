@@ -18,23 +18,30 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.services.GeoApi
 import app.pantopus.android.data.blocks.BlocksRepository
+import app.pantopus.android.data.chats.ActiveChatThread
 import app.pantopus.android.data.chats.ChatRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.listings.ListingsRepository
+import app.pantopus.android.data.api.models.profile.UserReportRequest
+import app.pantopus.android.data.links.LinkPreview
+import app.pantopus.android.data.links.LinkPreviewRepository
 import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.profile.UserReportsRepository
 import app.pantopus.android.data.realtime.SocketManager
 import app.pantopus.android.data.upload.UploadFile
 import app.pantopus.android.data.upload.UploadRepository
 import app.pantopus.android.ui.theme.PantopusIcon
+import com.squareup.moshi.Moshi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,7 +66,10 @@ class ChatConversationViewModel
         private val geoApi: GeoApi,
         private val locationProvider: LocationProvider,
         private val blocksRepo: BlocksRepository,
+        private val reportsRepo: UserReportsRepository,
+        private val linkPreviewRepo: LinkPreviewRepository,
         private val aiSession: AIConversationSession,
+        private val activeChatThread: ActiveChatThread,
     ) : ViewModel() {
         private val _state = MutableStateFlow<ChatConversationUiState>(ChatConversationUiState.Loading)
         val state: StateFlow<ChatConversationUiState> = _state.asStateFlow()
@@ -128,6 +138,33 @@ class ChatConversationViewModel
         private val _isBlocking = MutableStateFlow(false)
         val isBlocking: StateFlow<Boolean> = _isBlocking.asStateFlow()
 
+        private val _isReporting = MutableStateFlow(false)
+        val isReporting: StateFlow<Boolean> = _isReporting.asStateFlow()
+
+        // One-shot toast/snackbar text after a report attempt (success or
+        // friendly failure). Cleared via [dismissReportNotice].
+        private val _reportNotice = MutableStateFlow<String?>(null)
+        val reportNotice: StateFlow<String?> = _reportNotice.asStateFlow()
+
+        // Resolved link-preview metadata keyed by URL (A15.2 `.link-bubble`).
+        // Held on the VM (not remember{}) so previews survive rotation. A
+        // key mapped to null means resolution finished with no usable
+        // metadata — the bubble renders nothing (no skeleton, no error).
+        private val _linkPreviews = MutableStateFlow<Map<String, LinkPreview?>>(emptyMap())
+        val linkPreviews: StateFlow<Map<String, LinkPreview?>> = _linkPreviews.asStateFlow()
+        private val linkPreviewsInFlight = mutableSetOf<String>()
+
+        // True while an AI reply stream is in flight — the composer swaps
+        // its send disc for a stop button (A15.3) bound to [cancelAiStream].
+        private val _isAiStreaming = MutableStateFlow(false)
+        val isAiStreaming: StateFlow<Boolean> = _isAiStreaming.asStateFlow()
+
+        // A15 `.ctx-strip` — pinned gig context for gig rooms. Populated
+        // once per VM from the gig detail fetch when the route carried a
+        // gigId; null hides the strip.
+        private val _gigContext = MutableStateFlow<ChatGigContextStrip?>(null)
+        val gigContext: StateFlow<ChatGigContextStrip?> = _gigContext.asStateFlow()
+
         // A15.3 capability chips for the AI welcome card (tap-to-send).
         val aiPrompts: List<ChatPromptChip> =
             listOf(
@@ -147,6 +184,7 @@ class ChatConversationViewModel
         private var mode: ChatThreadMode = ChatThreadMode.Ai
         private var initialTopic: ChatInitialTopic? = null
         private var currentUserId: String = ""
+        private var gigId: String? = null
         private var scrollToMessageId: String? = null
         private var didResolveScrollTarget = false
         private var messages: MutableList<ChatMessageDto> = mutableListOf()
@@ -202,18 +240,58 @@ class ChatConversationViewModel
         private var deleteJob: Job? = null
         private var reactJob: Job? = null
 
+        // Live presence (item: user:online / user:offline) — flips the
+        // person counterparty's `online` flag so the header dot reacts.
+        private var presenceOnlineJob: Job? = null
+        private var presenceOfflineJob: Job? = null
+
+        // Debounce for `message:reaction_updated` refetches — the event
+        // carries no viewer-relative reaction state, so we still refetch,
+        // but a reaction burst collapses into one fetch.
+        private var reactionRefetchJob: Job? = null
+
+        // 30s fallback refresh while the socket is down — started by the
+        // connectionState collector, cancelled on connect / teardown.
+        private var fallbackPollJob: Job? = null
+
+        // Decodes full socket payloads (`message:new` broadcasts the
+        // serializeChatMessageForViewer spread — the same snake_case shape
+        // the REST list returns) straight into [ChatMessageDto]. All chats
+        // DTOs are Moshi codegen, so a plain builder resolves them.
+        private val socketMessageAdapter = Moshi.Builder().build().adapter(ChatMessageDto::class.java)
+
+        // In-flight AI stream — kept so [cancelAiStream] can stop generation
+        // mid-reply. [streamingAssistantId] is the local assistant row the
+        // stream is filling; partial deltas land in [messages] as they
+        // arrive, so cancelling only needs to finalize an empty bubble.
+        private var aiStreamJob: Job? = null
+        private var streamingAssistantId: String? = null
+
+        // Typing indicator (item: typing realtime). Incoming: socket
+        // `typing:user` / `typing:stopped` flip [_isCounterpartyTyping] with
+        // a 5s auto-clear. Outgoing: `typing:start` is emitted at most every
+        // 6s while the composer changes (backend rate limit is 10/min,
+        // backend/socket/chatSocketio.js:345), `typing:stop` on send/clear.
+        private var typingUserJob: Job? = null
+        private var typingStoppedJob: Job? = null
+        private var typingClearJob: Job? = null
+        private var lastTypingEmitAtMs: Long = 0L
+        private var didEmitTypingStart = false
+
         fun configure(
             mode: ChatThreadMode,
             counterparty: ChatCounterparty,
             currentUserId: String,
             scrollToMessageId: String? = null,
             initialTopic: ChatInitialTopic? = null,
+            gigId: String? = null,
         ) {
             this.mode = mode
             this.currentUserId = currentUserId
             this._counterparty.value = counterparty
             this.scrollToMessageId = scrollToMessageId
             this.initialTopic = initialTopic
+            this.gigId = gigId
         }
 
         /** Clear the scroll target after the screen has scrolled to it. */
@@ -227,10 +305,77 @@ class ChatConversationViewModel
             // appending to the conversation the app session already opened.
             if (mode is ChatThreadMode.Ai && aiConversationId == null) {
                 aiConversationId = aiSession.conversationId
+                // Cold relaunch: the session holder is empty — restore the
+                // latest backend conversation id so the thread continues
+                // across app restarts.
+                if (aiConversationId == null) restoreLatestAiConversation()
             }
             loadTopicsIfNeeded()
+            loadGigContextIfNeeded()
             fetch(initial = true)
             subscribeToSockets()
+        }
+
+        /**
+         * Cross-relaunch AI continuity: `GET /api/ai/conversations` lists
+         * conversation metadata newest-updated first — adopt the latest id
+         * so the next send appends to it instead of forking a new thread.
+         *
+         * TODO(ai-history): the backend persists no AI message bodies
+         * (`AIConversation` carries only metadata + the OpenAI
+         * `response_id`; there is no per-conversation messages endpoint —
+         * see `backend/routes/ai.js:358` + `agentService.js:1003`), so the
+         * visible transcript can't be restored yet. When a messages
+         * endpoint lands, seed [messages] here via [localMessage]
+         * (role → user/assistant rows) before the first send.
+         */
+        private fun restoreLatestAiConversation() {
+            viewModelScope.launch {
+                when (val result = aiRepo.conversations()) {
+                    is NetworkResult.Success -> {
+                        val latest = result.data.conversations.firstOrNull() ?: return@launch
+                        // The SSE stream may have assigned an id while this
+                        // fetch was in flight — never clobber it.
+                        if (aiConversationId == null) {
+                            aiConversationId = latest.id
+                            aiSession.conversationId = latest.id
+                        }
+                    }
+                    is NetworkResult.Failure ->
+                        Timber.w("restore AI conversation failed: ${result.error.message}")
+                }
+            }
+        }
+
+        /**
+         * A15 `.ctx-strip` — resolve the pinned gig context for a gig room
+         * from the existing gig detail endpoint (`GET /api/gigs/:id`).
+         */
+        private fun loadGigContextIfNeeded() {
+            val id = gigId ?: return
+            if (mode !is ChatThreadMode.Room) return
+            if (_gigContext.value != null) return
+            viewModelScope.launch {
+                when (val result = gigsRepo.detail(id)) {
+                    is NetworkResult.Success -> {
+                        val gig = result.data.gig
+                        val meta =
+                            listOfNotNull(
+                                gig.category?.replaceFirstChar { it.uppercase() },
+                                gig.price?.let { "$${it.toInt()}" },
+                                gig.status?.replace('_', ' ')?.replaceFirstChar { it.uppercase() },
+                            ).joinToString(" · ")
+                        _gigContext.value =
+                            ChatGigContextStrip(
+                                gigId = gig.id,
+                                title = gig.title,
+                                meta = meta,
+                            )
+                    }
+                    is NetworkResult.Failure ->
+                        Timber.w("load gig context failed: ${result.error.message}")
+                }
+            }
         }
 
         fun refresh() {
@@ -240,6 +385,9 @@ class ChatConversationViewModel
 
         fun selectTopic(topicId: String?) {
             _selectedTopicId.value = if (_selectedTopicId.value == topicId) null else topicId
+            // A stale PRE_BID_LIMIT banner shouldn't survive a topic switch
+            // (mirrors iOS selectTopic).
+            _sendLimitNotice.value = null
             fetch(initial = true)
         }
 
@@ -251,6 +399,45 @@ class ChatConversationViewModel
 
         fun setComposerText(value: String) {
             _composerText.value = value
+            if (value.isBlank()) {
+                emitTypingStop()
+            } else {
+                emitTypingStartThrottled()
+            }
+        }
+
+        /**
+         * Room to address typing signals to. Only a room id that is already
+         * known qualifies — typing must never trigger room creation, so an
+         * unresolved person thread stays silent until the first send
+         * resolves the direct room.
+         */
+        private fun typingRoomIdOrNull(): String? =
+            when (val target = mode) {
+                is ChatThreadMode.Room -> target.id
+                is ChatThreadMode.Person -> directRoomId
+                ChatThreadMode.Ai -> null
+            }
+
+        private fun emitTypingStartThrottled() {
+            val roomId = typingRoomIdOrNull() ?: return
+            if (socket.connectionState.value != SocketManager.ConnectionState.Connected) return
+            val now = System.currentTimeMillis()
+            // ≥6s between emits keeps continuous typing at ≤10 emits/min —
+            // the backend's socket rate limit for `typing:start`.
+            if (now - lastTypingEmitAtMs < TYPING_EMIT_THROTTLE_MS) return
+            lastTypingEmitAtMs = now
+            didEmitTypingStart = true
+            socket.emit("typing:start", JSONObject().put("roomId", roomId))
+        }
+
+        private fun emitTypingStop() {
+            if (!didEmitTypingStart) return
+            didEmitTypingStart = false
+            lastTypingEmitAtMs = 0L
+            val roomId = typingRoomIdOrNull() ?: return
+            if (socket.connectionState.value != SocketManager.ConnectionState.Connected) return
+            socket.emit("typing:stop", JSONObject().put("roomId", roomId))
         }
 
         fun tapPrompt(chip: ChatPromptChip) {
@@ -527,7 +714,17 @@ class ChatConversationViewModel
             val trimmed = _composerText.value.trim()
             val hasQueuedFiles = _queuedAttachments.value.any { it.bytes != null }
             if ((trimmed.isEmpty() && !hasQueuedFiles) || _isSending.value) return
+            // AI sends stream on their own cancellable job so the composer's
+            // stop button can abort generation (A15.3) without blocking
+            // [isSending] for the whole stream.
+            if (_editingMessageId.value == null && mode is ChatThreadMode.Ai) {
+                if (_isAiStreaming.value) return
+                _composerText.value = ""
+                startAiStream(trimmed)
+                return
+            }
             _composerText.value = ""
+            emitTypingStop()
             _isSending.value = true
 
             viewModelScope.launch {
@@ -544,10 +741,6 @@ class ChatConversationViewModel
                                 Timber.w("chat edit failed: ${result.error.message}")
                             }
                         }
-                        return@launch
-                    }
-                    if (mode is ChatThreadMode.Ai) {
-                        streamAiMessage(trimmed)
                         return@launch
                     }
                     val clientId = newClientMessageId()
@@ -717,6 +910,41 @@ class ChatConversationViewModel
          */
         private fun newClientMessageId(): String = UUID.randomUUID().toString()
 
+        /** Launch the AI reply stream on its own cancellable job. */
+        private fun startAiStream(text: String) {
+            _isAiStreaming.value = true
+            aiStreamJob =
+                viewModelScope.launch {
+                    try {
+                        streamAiMessage(text)
+                    } finally {
+                        _isAiStreaming.value = false
+                    }
+                }
+        }
+
+        /**
+         * Stop button (A15.3): cancel the in-flight AI stream and finalize
+         * the assistant row. Partial deltas were committed to [messages] as
+         * they streamed, so a partially-written reply simply stays; an
+         * empty "thinking" bubble is dropped entirely (matches iOS).
+         */
+        fun cancelAiStream() {
+            val job = aiStreamJob ?: return
+            aiStreamJob = null
+            job.cancel()
+            _isAiStreaming.value = false
+            val assistantId = streamingAssistantId
+            streamingAssistantId = null
+            if (assistantId != null) {
+                val index = messages.indexOfFirst { it.id == assistantId }
+                if (index >= 0 && messages[index].resolvedText.isEmpty() && aiDraftsByMessageId[assistantId].isNullOrEmpty()) {
+                    messages.removeAt(index)
+                    rebuild()
+                }
+            }
+        }
+
         private suspend fun streamAiMessage(text: String) {
             val imageUrls = uploadQueuedAIImagesIfNeeded()
             val userMessage =
@@ -728,6 +956,7 @@ class ChatConversationViewModel
                     imageUrls = imageUrls,
                 )
             val assistantId = "ai_assistant_${UUID.randomUUID()}"
+            streamingAssistantId = assistantId
             messages.add(userMessage)
             messages.add(localMessage(id = assistantId, text = "", userId = "ai", type = "ai_reply"))
             _queuedAttachments.value = emptyList()
@@ -757,9 +986,13 @@ class ChatConversationViewModel
                         AIChatStreamEvent.Done -> Unit
                     }
                 }
-            }.onFailure {
+            }.onFailure { error ->
+                // A user-initiated stop is not a connection failure —
+                // [cancelAiStream] already finalized the row.
+                if (error is CancellationException) throw error
                 replaceLocalMessage(assistantId, "I lost the connection. Please try again.", "ai_reply", "ai")
             }
+            streamingAssistantId = null
         }
 
         fun react(
@@ -837,6 +1070,65 @@ class ChatConversationViewModel
             }
         }
 
+        /**
+         * Report the person counterparty via `POST /api/users/:userId/report`
+         * (route `backend/routes/users.js:4153`, Joi validator `:4137` —
+         * `reason` must be one of `spam · harassment · inappropriate ·
+         * misinformation · safety · other`, `details` optional, max 1000).
+         * Person threads only, mirroring [blockUser]. On success the
+         * caller dismisses the report sheet via [onReported] and the
+         * success toast is published through [reportNotice]; failures
+         * publish a friendly message there instead.
+         */
+        fun reportUser(
+            reason: String,
+            details: String?,
+            onReported: () -> Unit = {},
+        ) {
+            val target = mode as? ChatThreadMode.Person ?: return
+            if (_isReporting.value) return
+            viewModelScope.launch {
+                _isReporting.value = true
+                try {
+                    val body =
+                        UserReportRequest(
+                            reason = reason,
+                            details = details?.trim()?.takeIf { it.isNotEmpty() }?.take(MAX_REPORT_DETAILS),
+                        )
+                    when (val result = reportsRepo.report(target.otherUserId, body)) {
+                        is NetworkResult.Success -> {
+                            _reportNotice.value = "Report submitted — thanks for keeping the neighborhood safe"
+                            onReported()
+                        }
+                        is NetworkResult.Failure -> {
+                            Timber.w("report user failed: ${result.error.message}")
+                            _reportNotice.value = "Couldn't submit the report. Please try again."
+                        }
+                    }
+                } finally {
+                    _isReporting.value = false
+                }
+            }
+        }
+
+        fun dismissReportNotice() {
+            _reportNotice.value = null
+        }
+
+        /**
+         * Resolve link-preview metadata for [url] once (in-flight and
+         * resolved URLs are skipped) and publish it into [linkPreviews].
+         * Failures are recorded as null so the bubble renders no card.
+         */
+        fun resolveLinkPreview(url: String) {
+            if (_linkPreviews.value.containsKey(url) || !linkPreviewsInFlight.add(url)) return
+            viewModelScope.launch {
+                val preview = linkPreviewRepo.preview(url)
+                _linkPreviews.value = _linkPreviews.value + (url to preview)
+                linkPreviewsInFlight.remove(url)
+            }
+        }
+
         // MARK: - Selection mode (bulk delete)
 
         /** Only own persisted rows are selectable — optimistic `client_` rows have no server id yet. */
@@ -897,18 +1189,38 @@ class ChatConversationViewModel
         }
 
         fun teardown() {
+            // Don't leave the counterparty staring at a stale "typing…" row.
+            emitTypingStop()
+            // Leaving the screen — chat pushes for these rooms notify again.
+            activeChatThread.clear()
             markReadJob?.cancel()
             connectionJob?.cancel()
             messageJob?.cancel()
             updateJob?.cancel()
             deleteJob?.cancel()
             reactJob?.cancel()
+            presenceOnlineJob?.cancel()
+            presenceOfflineJob?.cancel()
+            reactionRefetchJob?.cancel()
+            fallbackPollJob?.cancel()
+            typingUserJob?.cancel()
+            typingStoppedJob?.cancel()
+            typingClearJob?.cancel()
+            aiStreamJob?.cancel()
             markReadJob = null
             connectionJob = null
             messageJob = null
             updateJob = null
             deleteJob = null
             reactJob = null
+            presenceOnlineJob = null
+            presenceOfflineJob = null
+            reactionRefetchJob = null
+            fallbackPollJob = null
+            typingUserJob = null
+            typingStoppedJob = null
+            typingClearJob = null
+            aiStreamJob = null
         }
 
         override fun onCleared() {
@@ -1023,6 +1335,7 @@ class ChatConversationViewModel
                 // `message:new` for replies that land in it.
                 if (!activeRoomIds.contains(roomId)) {
                     activeRoomIds = activeRoomIds + roomId
+                    publishViewedRooms()
                     joinActiveRoomsIfPossible()
                 }
             }
@@ -1099,6 +1412,16 @@ class ChatConversationViewModel
                     (mode as? ChatThreadMode.Room)?.id?.let(::add)
                     directRoomId?.let(::add)
                 }
+            publishViewedRooms()
+        }
+
+        /**
+         * Tell the push layer which rooms are on screen so an incoming
+         * `chat_message` FCM for one of them is suppressed while the user
+         * is reading it ([ActiveChatThread]).
+         */
+        private fun publishViewedRooms() {
+            activeChatThread.viewedRoomIds = activeRoomIds
         }
 
         // MARK: - Realtime
@@ -1107,12 +1430,15 @@ class ChatConversationViewModel
             if (connectionJob == null) {
                 connectionJob =
                     viewModelScope.launch {
-                        socket.connectionState
-                            .filter { it == SocketManager.ConnectionState.Connected }
-                            .collect {
+                        socket.connectionState.collect { state ->
+                            if (state == SocketManager.ConnectionState.Connected) {
+                                stopFallbackPolling()
                                 joinedRoomIds.clear()
                                 joinActiveRoomsIfPossible()
+                            } else {
+                                startFallbackPollingIfNeeded()
                             }
+                        }
                     }
             }
             if (messageJob == null) {
@@ -1139,7 +1465,123 @@ class ChatConversationViewModel
                         socket.eventsOf("message:reaction_updated").collect { handleReaction(it) }
                     }
             }
+            // Typing indicator — backend/socket/chatSocketio.js:345-397
+            // broadcasts `typing:user` / `typing:stopped` to joined rooms.
+            if (typingUserJob == null) {
+                typingUserJob =
+                    viewModelScope.launch {
+                        socket.eventsOf("typing:user").collect { handleTypingUser(it) }
+                    }
+            }
+            if (typingStoppedJob == null) {
+                typingStoppedJob =
+                    viewModelScope.launch {
+                        socket.eventsOf("typing:stopped").collect { handleTypingStopped(it) }
+                    }
+            }
+            // Live presence — backend/socket/chatSocketio.js:240 + :646
+            // broadcast `user:online` / `user:offline` with `{ userId }`.
+            if (presenceOnlineJob == null) {
+                presenceOnlineJob =
+                    viewModelScope.launch {
+                        socket.eventsOf("user:online").collect { handlePresence(it, online = true) }
+                    }
+            }
+            if (presenceOfflineJob == null) {
+                presenceOfflineJob =
+                    viewModelScope.launch {
+                        socket.eventsOf("user:offline").collect { handlePresence(it, online = false) }
+                    }
+            }
             joinActiveRoomsIfPossible()
+        }
+
+        /**
+         * Flip the person counterparty's online flag when the presence
+         * broadcast names the thread's other user — the header dot /
+         * "Active now" line reacts live. Person mode only; group rooms
+         * carry no single presence identity.
+         */
+        private fun handlePresence(
+            json: JSONObject,
+            online: Boolean,
+        ) {
+            val target = mode as? ChatThreadMode.Person ?: return
+            val userId = json.optStringValue("userId") ?: json.optStringValue("user_id") ?: return
+            if (userId != target.otherUserId) return
+            val person = _counterparty.value as? ChatCounterparty.Person ?: return
+            if (person.online == online) return
+            _counterparty.value = person.copy(online = online)
+        }
+
+        /**
+         * Socket-down fallback: while disconnected, refresh the loaded
+         * thread every 30s so the conversation doesn't silently freeze.
+         * AI threads stream over HTTP and need no polling.
+         *
+         * The timer runs on [Dispatchers.Default] deliberately: a
+         * self-re-arming `delay` loop on the Main test dispatcher would
+         * spin `runTest`'s virtual-clock advanceUntilIdle forever. The
+         * loop only reads thread-safe StateFlows and [refresh] launches
+         * its work on [viewModelScope] internally, so the hop is safe.
+         */
+        private fun startFallbackPollingIfNeeded() {
+            if (fallbackPollJob != null) return
+            if (mode is ChatThreadMode.Ai) return
+            fallbackPollJob =
+                viewModelScope.launch(Dispatchers.Default) {
+                    while (socket.connectionState.value != SocketManager.ConnectionState.Connected) {
+                        delay(SOCKET_FALLBACK_POLL_MS)
+                        if (socket.connectionState.value == SocketManager.ConnectionState.Connected) break
+                        if (_state.value is ChatConversationUiState.Loaded) refresh()
+                    }
+                }
+        }
+
+        private fun stopFallbackPolling() {
+            fallbackPollJob?.cancel()
+            fallbackPollJob = null
+        }
+
+        /**
+         * Person threads join EVERY shared room (the aggregated fetch's
+         * `roomIds` includes gig/group rooms with extra members), so a
+         * room match alone would let a third member's typing light the
+         * 1:1 indicator. Person mode additionally requires the event to
+         * come from the thread's counterparty; room mode keeps room-match.
+         */
+        private fun typingEventMatchesThread(
+            roomId: String,
+            userId: String,
+        ): Boolean {
+            if (!activeRoomIds.contains(roomId) || userId == currentUserId) return false
+            val person = mode as? ChatThreadMode.Person ?: return true
+            return userId == person.otherUserId
+        }
+
+        private fun handleTypingUser(json: JSONObject) {
+            val roomId = json.optStringValue("room_id") ?: json.optStringValue("roomId") ?: return
+            val userId = json.optStringValue("user_id") ?: json.optStringValue("userId") ?: return
+            if (!typingEventMatchesThread(roomId, userId)) return
+            _isCounterpartyTyping.value = true
+            // Auto-clear in case the counterparty's `typing:stop` is lost —
+            // the backend's ChatTyping rows expire after 10s; 5s keeps the
+            // indicator snappy.
+            typingClearJob?.cancel()
+            typingClearJob =
+                viewModelScope.launch {
+                    delay(TYPING_AUTO_CLEAR_MS)
+                    _isCounterpartyTyping.value = false
+                }
+        }
+
+        private fun handleTypingStopped(json: JSONObject) {
+            val roomId = json.optStringValue("room_id") ?: json.optStringValue("roomId") ?: return
+            val userId = json.optStringValue("user_id") ?: json.optStringValue("userId") ?: return
+            if (!typingEventMatchesThread(roomId, userId)) return
+            typingClearJob?.cancel()
+            typingClearJob = null
+            _isCounterpartyTyping.value = false
         }
 
         private fun joinActiveRoomsIfPossible() {
@@ -1157,9 +1599,32 @@ class ChatConversationViewModel
         }
 
         private fun mergeBackfill(backfill: List<ChatMessageDto>) {
+            // A backfill row carrying one of our client ids means that send
+            // landed server-side (lost POST response + missed `message:new`
+            // echo — exactly the gap room:join backfill covers). Retire the
+            // optimistic copy, same contract as the fetch success path, so
+            // the delivered message can't render alongside a duplicate
+            // "Failed — Retry" row.
+            var retiredPending = false
+            backfill.forEach { fetched ->
+                val confirmedId = fetched.clientMessageId ?: return@forEach
+                val held =
+                    pendingByClientId.containsKey(confirmedId) ||
+                        sendContextsByClientId.containsKey(confirmedId) ||
+                        failedClientIds.contains(confirmedId)
+                if (held) {
+                    pendingByClientId.remove(confirmedId)
+                    sendContextsByClientId.remove(confirmedId)
+                    failedClientIds.remove(confirmedId)
+                    retiredPending = true
+                }
+            }
             val existing = messages.map { it.id }.toSet()
             val fresh = backfill.filterNot { existing.contains(it.id) }
-            if (fresh.isEmpty()) return
+            if (fresh.isEmpty()) {
+                if (retiredPending) rebuild()
+                return
+            }
             messages.addAll(fresh)
             messages.sortBy { it.createdAt }
             rebuild()
@@ -1187,35 +1652,92 @@ class ChatConversationViewModel
         }
 
         /**
-         * Reactions don't change the message body — trigger a re-fetch
-         * so the server-canonical count lands in the projection.
+         * Reactions don't change the message body — trigger a re-fetch so
+         * the server-canonical, viewer-relative counts (`reacted_by_me`)
+         * land in the projection. The event's `reactions` array carries no
+         * viewer state, so the refetch stays — but debounced (300ms) so a
+         * reaction burst collapses into a single fetch.
          */
         private fun handleReaction(json: JSONObject) {
             val id =
                 json.optString("message_id").takeIf { it.isNotEmpty() }
                     ?: json.optString("messageId").takeIf { it.isNotEmpty() } ?: return
             if (messages.none { it.id == id }) return
-            fetch(initial = true)
+            reactionRefetchJob?.cancel()
+            reactionRefetchJob =
+                viewModelScope.launch {
+                    delay(REACTION_REFETCH_DEBOUNCE_MS)
+                    fetch(initial = true)
+                }
         }
 
+        /**
+         * `message:new` broadcasts the full serialized message
+         * (`backend/routes/chats.js:1771` — serializeChatMessageForViewer
+         * spread, the same snake_case shape the REST list returns), so the
+         * row merges incrementally instead of refetching the whole page —
+         * no Loading flicker. Decode failure falls back to the refetch.
+         */
         private fun handleIncoming(json: JSONObject) {
             val roomId = json.optStringValue("room_id") ?: json.optStringValue("roomId")
             if (roomId != null && !activeRoomIds.contains(roomId)) return
+            val decoded = decodeSocketMessage(json)
             val clientId = json.optString("client_message_id").takeIf { it.isNotEmpty() }
             if (clientId != null && pendingByClientId.containsKey(clientId)) {
+                // Echo of our own in-flight send (the broadcast can beat
+                // the POST response) — retire the optimistic copy and land
+                // the server row directly; no refetch needed.
                 pendingByClientId.remove(clientId)
                 sendContextsByClientId.remove(clientId)
                 failedClientIds.remove(clientId)
-                fetch(initial = true)
+                if (decoded != null) {
+                    if (matchesTopicFilter(decoded)) insertIncoming(decoded) else rebuild()
+                } else {
+                    fetch(initial = true)
+                }
                 return
             }
-            // Our own REST response usually lands first — skip the refetch
+            // Our own REST response usually lands first — skip the merge
             // when the broadcast echoes a message we already hold.
-            val id = json.optStringValue("id")
+            val id = decoded?.id ?: json.optStringValue("id")
             if (id != null && messages.any { it.id == id }) return
-            fetch(initial = true)
+            if (decoded != null) {
+                // A topic-filtered person view only shows that topic's
+                // messages — the old filtered refetch excluded the rest,
+                // so the incremental merge must too.
+                if (matchesTopicFilter(decoded)) insertIncoming(decoded)
+            } else {
+                fetch(initial = true)
+            }
         }
 
+        /**
+         * Whether [message] belongs in the current view: always true with
+         * no topic filter; under a filter, only the selected topic's rows.
+         */
+        private fun matchesTopicFilter(message: ChatMessageDto): Boolean {
+            val selected = _selectedTopicId.value ?: return true
+            return message.topicId == selected
+        }
+
+        /** Dedupe by id, insert sorted by createdAt, rebuild, mark read. */
+        private fun insertIncoming(message: ChatMessageDto) {
+            val index = messages.indexOfFirst { it.id == message.id }
+            if (index >= 0) {
+                messages[index] = message
+            } else {
+                messages.add(message)
+                messages.sortBy { it.createdAt }
+            }
+            rebuild()
+            scheduleMarkRead()
+        }
+
+        /**
+         * `message:edited` carries `{ messageId, message }` with the full
+         * serialized row (`backend/routes/chats.js:1900`) — apply it in
+         * place; refetch only if decoding fails.
+         */
         private fun handleUpdate(json: JSONObject) {
             val roomId = json.optStringValue("room_id") ?: json.optStringValue("roomId")
             if (roomId != null && !activeRoomIds.contains(roomId)) return
@@ -1226,8 +1748,24 @@ class ChatConversationViewModel
                     ?: json.optJSONObject("message")?.optStringValue("id")
                     ?: return
             if (messages.none { it.id == id }) return
-            fetch(initial = true)
+            val decoded = json.optJSONObject("message")?.let { decodeSocketMessage(it) }
+            if (decoded != null) {
+                applyUpdatedMessage(decoded)
+            } else {
+                fetch(initial = true)
+            }
         }
+
+        /**
+         * Decode one socket payload into a [ChatMessageDto] via the same
+         * Moshi codegen adapter the REST layer uses (CLAUDE.md: "pass
+         * through Moshi with the same @Json annotations"). Null on any
+         * decode failure — callers fall back to a full refetch.
+         */
+        private fun decodeSocketMessage(json: JSONObject): ChatMessageDto? =
+            runCatching { socketMessageAdapter.fromJson(json.toString()) }
+                .onFailure { Timber.w(it, "socket message decode failed") }
+                .getOrNull()
 
         private fun handleDelete(json: JSONObject) {
             val roomId = json.optStringValue("room_id") ?: json.optStringValue("roomId")
@@ -1323,7 +1861,6 @@ class ChatConversationViewModel
                         combined[index + 1].userId == message.userId &&
                         dayKey(combined[index + 1].createdAt) == dayKey
                 val hasTail = !nextSameSide
-                val stamp = if (hasTail) stampLabel(message) else null
                 val deliveryState =
                     if (side != ChatMessageSide.Outgoing) {
                         null
@@ -1336,6 +1873,15 @@ class ChatConversationViewModel
                     } else {
                         ChatDeliveryState.Delivered
                     }
+                // The stamp row is the ONLY surface for "Failed to send" +
+                // Retry and the "Sending..." spinner — force it for in-flight
+                // and failed sends even when a same-sender follow-up strips
+                // the group tail. Tail visuals stay driven by [hasTail].
+                val showStamp =
+                    hasTail ||
+                        deliveryState == ChatDeliveryState.Failed ||
+                        deliveryState == ChatDeliveryState.Sending
+                val stamp = if (showStamp) stampLabel(message) else null
                 val body = bodyOf(message)
                 val replyPreview = replyPreviewOf(message, combined)
                 val reactions =
@@ -1719,3 +2265,23 @@ private fun JSONObject.optStringValue(key: String): String? = optString(key).tak
 /** Banner copy for the pre-bid gig-room send limit (429 `PRE_BID_LIMIT`). */
 private const val PRE_BID_LIMIT_NOTICE =
     "Message limit reached — place a bid or wait for acceptance to keep chatting."
+
+/**
+ * Min gap between `typing:start` emits. The backend rate-limits the event
+ * to 10/min per socket and silently drops the excess
+ * (backend/socket/chatSocketio.js:23), so the throttle must be ≥6s to
+ * bound continuous typing at the cap.
+ */
+// Backend Joi cap for report `details` (`backend/routes/users.js:4140`).
+private const val MAX_REPORT_DETAILS = 1000
+
+private const val TYPING_EMIT_THROTTLE_MS = 6_000L
+
+/** Clear a stale counterparty typing indicator after this long. */
+private const val TYPING_AUTO_CLEAR_MS = 5_000L
+
+/** Collapse `message:reaction_updated` bursts into one refetch. */
+private const val REACTION_REFETCH_DEBOUNCE_MS = 300L
+
+/** Refresh cadence while the socket is disconnected (fallback polling). */
+private const val SOCKET_FALLBACK_POLL_MS = 30_000L

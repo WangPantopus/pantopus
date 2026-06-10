@@ -936,6 +936,9 @@ private object ChildRoutes {
     const val CHAT_TOPIC_REF_ID_KEY = "topicRefId"
     const val CHAT_TOPIC_TITLE_KEY = "topicTitle"
 
+    /** A15 `.ctx-strip` — backing gig id for gig rooms (empty otherwise). */
+    const val CHAT_GIG_ID_KEY = "gigId"
+
     /** P4.3 — message id to scroll to on open (Chat Search deep-link).
      *  Empty for normal opens, which land on the latest message. */
     const val CHAT_SCROLL_TO_KEY = "scrollTo"
@@ -952,7 +955,8 @@ private object ChildRoutes {
             "&$CHAT_SCROLL_TO_KEY={$CHAT_SCROLL_TO_KEY}" +
             "&$CHAT_TOPIC_TYPE_KEY={$CHAT_TOPIC_TYPE_KEY}" +
             "&$CHAT_TOPIC_REF_ID_KEY={$CHAT_TOPIC_REF_ID_KEY}" +
-            "&$CHAT_TOPIC_TITLE_KEY={$CHAT_TOPIC_TITLE_KEY}"
+            "&$CHAT_TOPIC_TITLE_KEY={$CHAT_TOPIC_TITLE_KEY}" +
+            "&$CHAT_GIG_ID_KEY={$CHAT_GIG_ID_KEY}"
 
     /** New message contact picker (T6.6b P25). Reached from Chat list
      *  compose button + empty-state CTA. */
@@ -1081,7 +1085,8 @@ private object ChildRoutes {
             "&$CHAT_SCROLL_TO_KEY=" +
             "&$CHAT_TOPIC_TYPE_KEY=" +
             "&$CHAT_TOPIC_REF_ID_KEY=" +
-            "&$CHAT_TOPIC_TITLE_KEY="
+            "&$CHAT_TOPIC_TITLE_KEY=" +
+            "&$CHAT_GIG_ID_KEY=${enc(row.gigId ?: "")}"
     }
 
     /** Build the creator-side fan thread path from a Creator Inbox row. */
@@ -1440,7 +1445,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Conversation -> {
+                // Chat push taps carry `/chat/<roomId>` (+ optional `name`
+                // appended by NotificationDispatcher from the push title).
+                // Land on the Messages tab first so Back pops to the chat
+                // list, then push the thread itself.
                 navController.navigateToRootTab(PantopusRoute.Messages)
+                if (pending.id.isNotBlank()) {
+                    val display = pending.name?.takeIf { it.isNotBlank() } ?: "Conversation"
+                    val initials =
+                        display
+                            .split(" ")
+                            .take(2)
+                            .mapNotNull { it.firstOrNull()?.toString() }
+                            .joinToString("")
+                            .uppercase()
+                            .ifEmpty { "?" }
+                    navController.navigate(
+                        ChildRoutes.chatConversationRoom(
+                            roomId = pending.id,
+                            displayName = display,
+                            initials = initials,
+                            verified = false,
+                        ),
+                    )
+                }
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.SupportTrain -> {
@@ -2649,6 +2677,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 type = NavType.StringType
                                 defaultValue = ""
                             },
+                            navArgument(ChildRoutes.CHAT_GIG_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
                         ),
                 ) { entry ->
                     val args = entry.arguments ?: return@composable
@@ -2665,6 +2697,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     val topicType = args.getString(ChildRoutes.CHAT_TOPIC_TYPE_KEY).orEmpty().takeIf { it.isNotEmpty() }
                     val topicRefId = args.getString(ChildRoutes.CHAT_TOPIC_REF_ID_KEY).orEmpty().takeIf { it.isNotEmpty() }
                     val topicTitle = args.getString(ChildRoutes.CHAT_TOPIC_TITLE_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                    val gigId = args.getString(ChildRoutes.CHAT_GIG_ID_KEY).orEmpty().takeIf { it.isNotEmpty() }
                     val initialTopic =
                         if (topicType != null && topicTitle != null) {
                             ChatInitialTopic(topicType = topicType, topicRefId = topicRefId, title = topicTitle)
@@ -2728,6 +2761,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onBack = { navController.popBackStack() },
                         scrollToMessageId = scrollTo,
                         initialTopic = initialTopic,
+                        gigId = gigId,
                         onUseAIDraft = { draft ->
                             navController.navigate(routeForAIDraft(draft))
                         },
