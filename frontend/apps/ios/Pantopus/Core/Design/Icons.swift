@@ -63,6 +63,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case heart
     case thumbsUp = "thumbs-up"
     case star
+    case starFill = "star-fill"
     case helpCircle = "help-circle"
     case calendar
     case calendarCheck = "calendar-check"
@@ -396,6 +397,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .heart: "heart"
         case .thumbsUp: "hand.thumbsup"
         case .star: "star"
+        case .starFill: "star.fill"
         case .helpCircle: "questionmark.circle"
         case .calendar: "calendar"
         case .calendarCheck: "calendar.badge.checkmark"

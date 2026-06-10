@@ -65,6 +65,14 @@ data class ChatConversationRouteArgs(
     val counterparty: ChatCounterparty,
     val currentUserId: String,
     val scrollToMessageId: String? = null,
+    val initialTopic: ChatInitialTopic? = null,
+)
+
+@Immutable
+data class ChatInitialTopic(
+    val topicType: String,
+    val topicRefId: String? = null,
+    val title: String,
 )
 
 /** Counterparty type — drives the header swap + empty-state copy. */
@@ -124,6 +132,8 @@ data class ChatQueuedAttachment(
     val id: String,
     val kind: ChatQueuedAttachmentKind,
     val filename: String,
+    val mimeType: String = "application/octet-stream",
+    val bytes: ByteArray? = null,
 )
 
 /**
@@ -137,9 +147,92 @@ data class ChatEstimate(
     val confidence: String,
 )
 
+@Immutable
+data class ChatAIDraftCard(
+    val id: String,
+    val type: String,
+    val title: String,
+    val summary: String? = null,
+    val priceLabel: String? = null,
+    val valid: Boolean = true,
+)
+
+@Immutable
+data class ChatReplyPreview(
+    val messageId: String,
+    val senderName: String,
+    val text: String,
+)
+
+@Immutable
+data class ChatBubbleReaction(
+    val reaction: String,
+    val count: Int,
+    val reactedByMe: Boolean,
+)
+
+@Immutable
+data class ChatConversationTopic(
+    val id: String,
+    val topicType: String,
+    val title: String,
+    val status: String? = null,
+)
+
+@Immutable
+data class ChatLocationCard(
+    val latitude: Double,
+    val longitude: Double,
+    val address: String,
+)
+
+@Immutable
+data class ChatGigOfferCard(
+    val gigId: String,
+    val title: String,
+    val category: String? = null,
+    val priceLabel: String? = null,
+    val status: String? = null,
+)
+
+@Immutable
+data class ChatListingOfferCard(
+    val listingId: String,
+    val title: String,
+    val category: String? = null,
+    val priceLabel: String,
+    val condition: String? = null,
+    val imageUrl: String? = null,
+)
+
+@Immutable
+data class ChatShareGigOption(
+    val id: String,
+    val title: String,
+    val category: String? = null,
+    val price: Double? = null,
+    val status: String? = null,
+)
+
+@Immutable
+data class ChatShareListingOption(
+    val id: String,
+    val title: String,
+    val category: String? = null,
+    val price: Double? = null,
+    val isFree: Boolean = false,
+    val condition: String? = null,
+    val imageUrl: String? = null,
+)
+
 /** Body of a single bubble. */
 sealed interface ChatBubbleBody {
     data class Text(val text: String) : ChatBubbleBody
+
+    data class TextWithImages(
+        val text: String,
+        val imageUrls: List<String>,
+    ) : ChatBubbleBody
 
     data class Image(val url: String?) : ChatBubbleBody
 
@@ -147,6 +240,12 @@ sealed interface ChatBubbleBody {
         val filename: String,
         val sizeLabel: String? = null,
     ) : ChatBubbleBody
+
+    data class LocationCard(val card: ChatLocationCard) : ChatBubbleBody
+
+    data class GigOfferCard(val card: ChatGigOfferCard) : ChatBubbleBody
+
+    data class ListingOfferCard(val card: ChatListingOfferCard) : ChatBubbleBody
 
     data class SystemLink(
         val label: String,
@@ -162,14 +261,24 @@ sealed interface ChatBubbleBody {
     data class AiReply(
         val text: String,
         val estimate: ChatEstimate?,
+        val drafts: List<ChatAIDraftCard> = emptyList(),
     ) : ChatBubbleBody
 }
+
+internal val ChatBubbleBody.isRichCard: Boolean
+    get() =
+        this is ChatBubbleBody.LocationCard ||
+            this is ChatBubbleBody.GigOfferCard ||
+            this is ChatBubbleBody.ListingOfferCard ||
+            this is ChatBubbleBody.SystemLink
 
 @Immutable
 data class ChatBubbleContent(
     val id: String,
     val side: ChatMessageSide,
     val body: ChatBubbleBody,
+    val replyPreview: ChatReplyPreview? = null,
+    val reactions: List<ChatBubbleReaction> = emptyList(),
     val hasTail: Boolean,
     val stamp: String?,
     val deliveryState: ChatDeliveryState?,
@@ -206,6 +315,15 @@ sealed interface ChatTimelineRow {
 
     data class Bubble(val content: ChatBubbleContent) : ChatTimelineRow {
         override val rowId: String = "bubble_${content.id}"
+    }
+
+    /**
+     * Topic-change marker on the unfiltered person thread — [id] is the id
+     * of the first message filed under the new topic, keeping LazyColumn
+     * keys unique. [label] is the topic title (fallback "General").
+     */
+    data class TopicDivider(val id: String, val label: String) : ChatTimelineRow {
+        override val rowId: String = "topic_$id"
     }
 }
 

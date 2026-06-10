@@ -289,6 +289,7 @@ public final class PulseComposeViewModel {
     private var baselineRecommendRating: Int = 5
 
     private let api: APIClient
+    private let multipartUploader: MultipartUploader
 
     /// Step 1 target — set when entering via the three-step flow.
     public let postingTarget: PulsePostingTarget?
@@ -302,7 +303,8 @@ public final class PulseComposeViewModel {
         postingTarget: PulsePostingTarget? = nil,
         composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
-        api: APIClient = .shared
+        api: APIClient = .shared,
+        multipartUploader: MultipartUploader = .shared
     ) {
         activeIntent = composePurpose?.legacyIntent ?? intent
         self.postingTarget = postingTarget
@@ -316,6 +318,7 @@ public final class PulseComposeViewModel {
         editingPostId = postId
         prefillState = postId == nil ? .ready : .loading
         self.api = api
+        self.multipartUploader = multipartUploader
         for field in PulseComposeField.allCases {
             fields[field] = FormFieldState(id: field.rawValue, originalValue: "")
         }
@@ -556,6 +559,26 @@ public final class PulseComposeViewModel {
                     PostsEndpoints.createPost(body: request)
                 )
                 postId = response.postId
+            }
+            if let postId, !photos.isEmpty {
+                let files = photos.enumerated().map { index, photo in
+                    photo.asMultipartFile(index: index)
+                }
+                do {
+                    _ = try await multipartUploader.uploadPostMedia(postId: postId, files: files)
+                } catch {
+                    toast = ToastMessage(
+                        text: isEditing
+                            ? "Saved, but photos couldn't attach."
+                            : "Posted, but photos couldn't attach.",
+                        kind: .neutral
+                    )
+                    state = .success(postId: postId)
+                    shouldDismiss = true
+                    PulsePostsRefresh.notifyPostsDidChange()
+                    Analytics.track(.formPulseComposeSubmit(intent: activeIntent.rawValue, result: .success))
+                    return true
+                }
             }
             state = .success(postId: postId)
             toast = ToastMessage(text: isEditing ? "Saved" : "Posted", kind: .success)
@@ -945,6 +968,27 @@ public final class PulseComposeViewModel {
             }
         }
         return raw
+    }
+}
+
+private extension PulseComposePhoto {
+    func asMultipartFile(index: Int) -> MultipartFile {
+        let (filename, mimeType) = Self.mimeInfo(for: data, index: index)
+        return MultipartFile(fieldName: "files", filename: filename, mimeType: mimeType, data: data)
+    }
+
+    static func mimeInfo(for data: Data, index: Int) -> (filename: String, mimeType: String) {
+        if data.count >= 3, data[0] == 0xFF, data[1] == 0xD8, data[2] == 0xFF {
+            return ("photo-\(index).jpg", "image/jpeg")
+        }
+        if data.count >= 8,
+           data[0] == 0x89, data[1] == 0x50, data[2] == 0x4E, data[3] == 0x47 {
+            return ("photo-\(index).png", "image/png")
+        }
+        if data.count >= 12, data[4] == 0x66, data[5] == 0x74, data[6] == 0x79, data[7] == 0x70 {
+            return ("photo-\(index).heic", "image/heic")
+        }
+        return ("photo-\(index).jpg", "image/jpeg")
     }
 }
 

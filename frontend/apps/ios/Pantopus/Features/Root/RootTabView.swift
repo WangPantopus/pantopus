@@ -6,6 +6,7 @@
 //  that sits above every signed-in screen. Home is selected at launch.
 //
 
+import Logging
 import SwiftUI
 
 /// A tab in the primary bottom bar. Encoded as an enum so call sites never
@@ -63,6 +64,7 @@ public final class RootTabModel {
 /// NavigationStack so deep navigation within a tab survives tab switches.
 public struct RootTabView: View {
     @State private var model = RootTabModel()
+    private let chatBadgeStore = ChatBadgeStore.shared
     @State private var router = DeepLinkRouter.shared
     @State private var pendingInviteToken: String?
     @State private var showProfile = false
@@ -94,6 +96,13 @@ public struct RootTabView: View {
         }
         .tint(Theme.Color.primary600)
         .environment(model)
+        .task {
+            await chatBadgeStore.start()
+            model.messagesBadge = chatBadgeStore.unreadMessages
+        }
+        .onChange(of: chatBadgeStore.unreadMessages) { _, unread in
+            model.messagesBadge = unread
+        }
         .onChange(of: router.pending) { _, pending in
             consumeInviteDeepLinkIfNeeded(pending: pending)
         }
@@ -181,6 +190,142 @@ private struct InviteSheetToken: Identifiable, Equatable {
     let token: String
     var id: String {
         token
+    }
+}
+
+/// Root-level unread badge source for the Messages tab. It mirrors the
+/// Expo mobile BadgeContext: seed from `/api/chat/stats`, then keep the
+/// count warm with `badge:update` socket events and reconnect refreshes.
+/// Muted conversation unread is excluded so the badge reflects "notify me"
+/// conversations only.
+@Observable
+@MainActor
+final class ChatBadgeStore {
+    static let shared = ChatBadgeStore()
+
+    private(set) var unreadMessages: Int = 0
+
+    private let api: APIClient
+    private let socket: SocketClient
+    private let preferences: ChatConversationPreferences
+    private let logger = Logger(label: "app.pantopus.ios.ChatBadge")
+    private var badgeTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var serverTotalUnread: Int = 0
+    private var cachedRows: [ConversationRowContent] = []
+
+    init(
+        api: APIClient = .shared,
+        socket: SocketClient = .shared,
+        preferences: ChatConversationPreferences = .shared
+    ) {
+        self.api = api
+        self.socket = socket
+        self.preferences = preferences
+    }
+
+    func start() async {
+        await refresh()
+        subscribeIfNeeded()
+    }
+
+    func refresh() async {
+        async let statsTask: ChatStatsResponse? = optional {
+            try await self.api.request(ChatEndpoints.stats())
+        }
+        async let conversationsTask: UnifiedConversationsResponse? = optional {
+            try await self.api.request(ChatEndpoints.unifiedConversations())
+        }
+        guard let stats = await statsTask else {
+            logger.warning("Chat badge refresh failed: stats unavailable")
+            return
+        }
+        serverTotalUnread = stats.stats.totalUnread
+        if let conversations = await conversationsTask {
+            let mutedKeys = preferences.mutedKeys()
+            cachedRows = conversations.conversations.map {
+                Self.snapshotRow(from: $0, mutedKeys: mutedKeys)
+            }
+        }
+        applyAdjustedUnread()
+    }
+
+    /// Called by the chat list whenever rows or server totals change.
+    func applyListSnapshot(totalUnread: Int, rows: [ConversationRowContent]) {
+        serverTotalUnread = totalUnread
+        cachedRows = rows
+        applyAdjustedUnread()
+    }
+
+    func stop() {
+        badgeTask?.cancel()
+        reconnectTask?.cancel()
+        badgeTask = nil
+        reconnectTask = nil
+    }
+
+    private func applyAdjustedUnread() {
+        unreadMessages = ChatUnreadBadgeMath.adjustedTotal(
+            serverTotal: serverTotalUnread,
+            rows: cachedRows,
+            mutedKeys: preferences.mutedKeys()
+        )
+    }
+
+    private func optional<T: Sendable>(_ operation: @Sendable () async throws -> T) async -> T? {
+        do {
+            return try await operation()
+        } catch {
+            logger.warning("Chat badge fetch failed: \(error)")
+            return nil
+        }
+    }
+
+    private static func snapshotRow(
+        from dto: UnifiedConversation,
+        mutedKeys: Set<String>
+    ) -> ConversationRowContent {
+        let storageKey =
+            switch dto.kind {
+            case .conversation: ChatConversationPreferences.personKey(dto.id)
+            case .room: ChatConversationPreferences.roomKey(dto.id)
+            }
+        return ConversationRowContent(
+            id: dto.id,
+            variant: .dm,
+            displayName: dto.name ?? dto.id,
+            initials: "?",
+            avatarURL: nil,
+            identityChip: nil,
+            verified: false,
+            preview: "",
+            timeLabel: "",
+            unread: dto.totalUnread,
+            pinned: false,
+            topicKinds: [],
+            storageKey: storageKey,
+            isMuted: mutedKeys.contains(storageKey)
+        )
+    }
+
+    private func subscribeIfNeeded() {
+        if badgeTask == nil {
+            badgeTask = Task { [weak self] in
+                guard let self else { return }
+                for await update in socket.events(named: "badge:update", as: ChatBadgeUpdate.self) {
+                    serverTotalUnread = update.totalUnread
+                    applyAdjustedUnread()
+                }
+            }
+        }
+        if reconnectTask == nil {
+            reconnectTask = Task { [weak self] in
+                guard let self else { return }
+                for await state in socket.connectionStates() where state == .connected {
+                    await refresh()
+                }
+            }
+        }
     }
 }
 

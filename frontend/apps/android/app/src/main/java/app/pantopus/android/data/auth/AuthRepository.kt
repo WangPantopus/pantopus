@@ -17,6 +17,7 @@ import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.observability.Observability
+import app.pantopus.android.data.realtime.SocketManager
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,6 +96,7 @@ class AuthRepository
         private val authApi: AuthApi,
         private val tokenStorage: TokenStorage,
         private val observability: Observability,
+        private val socketManager: SocketManager,
     ) {
         /** Session state for the current user. */
         sealed interface State {
@@ -127,9 +129,11 @@ class AuthRepository
                 val user = profile.toSessionUser()
                 observability.identify(userId = user.id, email = user.email)
                 Analytics.identify(userId = user.id)
+                socketManager.connect(token)
                 _state.value = State.SignedIn(user)
             } catch (t: Throwable) {
                 tokenStorage.clear()
+                socketManager.disconnect()
                 _state.value = State.SignedOut
             }
         }
@@ -150,6 +154,7 @@ class AuthRepository
                 observability.identify(userId = user.id, email = user.email)
                 Analytics.identify(userId = user.id)
                 observability.track("auth.signed_in")
+                response.accessToken?.takeIf { it.isNotBlank() }?.let(socketManager::connect)
                 _state.value = State.SignedIn(user)
                 user
             }.onFailure { t ->
@@ -281,6 +286,7 @@ class AuthRepository
                         accessToken = response.accessToken,
                         refreshToken = response.refreshToken,
                     )
+                    socketManager.connect(response.accessToken)
                 }
             } catch (t: Throwable) {
                 signOut()
@@ -291,6 +297,7 @@ class AuthRepository
         /** Clear local tokens and flip state to signed-out. */
         suspend fun signOut() {
             tokenStorage.clear()
+            socketManager.disconnect()
             observability.identify(userId = null)
             Analytics.identify(userId = null)
             observability.track("auth.signed_out")

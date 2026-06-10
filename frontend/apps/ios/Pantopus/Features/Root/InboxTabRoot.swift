@@ -14,6 +14,9 @@ public enum InboxRoute: Hashable {
     case conversation(InboxConversationDestination)
     case compose
     case search
+    case composeGig(category: String)
+    case composeListing
+    case composePost(intent: String)
 }
 
 /// Routing payload for a conversation push — captures the mode the
@@ -34,6 +37,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
     public let initials: String
     public let identityKind: String?
     public let verified: Bool
+    public let initialTopic: ChatInitialTopic?
     /// Message to scroll to on open (set when arriving from Chat Search
     /// with a body match). `nil` opens the conversation at the latest
     /// message.
@@ -46,7 +50,8 @@ public struct InboxConversationDestination: Hashable, Sendable {
         initials: String,
         identityKind: String?,
         verified: Bool,
-        scrollToMessageId: String? = nil
+        scrollToMessageId: String? = nil,
+        initialTopic: ChatInitialTopic? = nil
     ) {
         self.mode = mode
         self.kind = kind
@@ -55,6 +60,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
         self.identityKind = identityKind
         self.verified = verified
         self.scrollToMessageId = scrollToMessageId
+        self.initialTopic = initialTopic
     }
 }
 
@@ -167,9 +173,13 @@ public struct InboxTabRoot: View {
                     mode: Self.viewModelMode(for: dest.mode),
                     counterparty: Self.counterparty(for: dest),
                     currentUserId: currentUserId,
-                    scrollToMessageId: dest.scrollToMessageId
+                    scrollToMessageId: dest.scrollToMessageId,
+                    initialTopic: dest.initialTopic
                 ),
-                mode: dest.kind
+                mode: dest.kind,
+                onUseAIDraft: { draft in
+                    path.append(draftRoute(for: draft))
+                }
             ) { if !path.isEmpty { path.removeLast() } }
         case .compose:
             NewMessageView(
@@ -203,6 +213,33 @@ public struct InboxTabRoot: View {
                     }
                 )
             )
+        case let .composeGig(category):
+            GigComposeWizardView(preselectedCategoryKey: category) { _ in
+                if !path.isEmpty { path.removeLast() }
+            }
+        case .composeListing:
+            ListingComposeWizardView { _ in
+                if !path.isEmpty { path.removeLast() }
+            }
+        case let .composePost(intent):
+            PulseComposeFlowView(
+                prefillFeedIntent: PulseIntent(rawValue: intent),
+                onCancel: { if !path.isEmpty { path.removeLast() } },
+                onPosted: { _ in if !path.isEmpty { path.removeLast() } }
+            )
+        }
+    }
+
+    private func draftRoute(for draft: ChatAIDraftCard) -> InboxRoute {
+        switch draft.type {
+        case "gig":
+            .composeGig(category: "all")
+        case "listing":
+            .composeListing
+        case "post":
+            .composePost(intent: PulseIntent.ask.rawValue)
+        default:
+            .composePost(intent: PulseIntent.ask.rawValue)
         }
     }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,9 +38,9 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**
- * The Pantopus AI mark: a flat indigo-violet (`magic`) rounded square
- * (`Radii.lg`) with a white `bot` glyph. Flat fill, no gradient — the app
- * shell carries no gradients on the mobile side.
+ * The Pantopus AI mark: a flat `business`-purple circle with a white
+ * `bot` glyph, matching the RN reference's circular AI icon. Flat fill,
+ * no gradient — the app shell carries no gradients on the mobile side.
  */
 @Composable
 internal fun ChatAiAvatar(size: Dp) {
@@ -47,8 +48,8 @@ internal fun ChatAiAvatar(size: Dp) {
         modifier =
             Modifier
                 .size(size)
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.magic)
+                .clip(CircleShape)
+                .background(PantopusColors.business)
                 .semantics { contentDescription = "Pantopus AI" },
         contentAlignment = Alignment.Center,
     ) {

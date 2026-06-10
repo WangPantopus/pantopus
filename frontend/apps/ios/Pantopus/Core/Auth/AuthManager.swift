@@ -125,6 +125,7 @@ final class AuthManager {
                 state = .signedIn(user)
                 Observability.shared.identify(userId: user.id, email: user.email)
                 Analytics.identify(userId: user.id)
+                SocketClient.shared.connect(token: token)
                 logger.info("Session restored", metadata: ["userId": .string(user.id)])
             } catch {
                 logger.info("Session restore failed, signing out", metadata: ["error": .string("\(error)")])
@@ -156,6 +157,9 @@ final class AuthManager {
             Observability.shared.identify(userId: response.user.id, email: response.user.email)
             Analytics.identify(userId: response.user.id)
             Observability.shared.track("auth.signed_in")
+            if let access = accessToken {
+                SocketClient.shared.connect(token: access)
+            }
             logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
         } catch let apiError as APIError {
             throw Self.mapSignInError(apiError)
@@ -301,6 +305,7 @@ final class AuthManager {
             if let access = response.accessToken {
                 try store.set(access, for: SecureStoreKey.accessToken)
                 accessToken = access
+                SocketClient.shared.connect(token: access)
             }
             if let refresh = response.refreshToken {
                 try store.set(refresh, for: SecureStoreKey.refreshToken)

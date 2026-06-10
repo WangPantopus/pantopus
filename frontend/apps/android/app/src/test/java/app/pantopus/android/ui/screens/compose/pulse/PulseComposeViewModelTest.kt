@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.compose.pulse
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostCreateResponse
+import app.pantopus.android.data.api.models.posts.PostCreateResponsePost
 import app.pantopus.android.data.api.models.posts.PostDetailDto
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostUpdateRequest
@@ -15,6 +16,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
+import app.pantopus.android.data.upload.UploadRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -44,6 +46,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PulseComposeViewModelTest {
     private val repo: PostsRepository = mockk()
+    private val uploadRepo: UploadRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor = mockk()
     private val postsRefresh = PulsePostsRefreshNotifier()
     private val isOnline = MutableStateFlow(true)
@@ -63,7 +66,7 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.INTENT_KEY, intent.key)
             }
-        return PulseComposeViewModel(repo, networkMonitor, postsRefresh, savedState)
+        return PulseComposeViewModel(repo, uploadRepo, networkMonitor, postsRefresh, savedState)
     }
 
     // MARK: - Defaults
@@ -290,7 +293,9 @@ class PulseComposeViewModelTest {
         runTest {
             val body = slot<PostCreateRequest>()
             coEvery { repo.createPost(capture(body)) } returns
-                NetworkResult.Success(PostCreateResponse(message = "ok", postId = "p_42"))
+                NetworkResult.Success(
+                    PostCreateResponse(message = "ok", post = PostCreateResponsePost(id = "p_42")),
+                )
             val vm = viewModel(PulseComposeIntent.Ask)
             vm.update(PulseComposeField.Title, "Need a plumber")
             vm.update(PulseComposeField.Body, "Pipe is leaking.")
@@ -353,7 +358,7 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.POST_ID_KEY, postId)
             }
-        return PulseComposeViewModel(repo, networkMonitor, postsRefresh, savedState)
+        return PulseComposeViewModel(repo, uploadRepo, networkMonitor, postsRefresh, savedState)
     }
 
     private data class SamplePost(

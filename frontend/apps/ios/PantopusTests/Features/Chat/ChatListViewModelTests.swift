@@ -173,4 +173,89 @@ final class ChatListViewModelTests: XCTestCase {
         let nonAI = rows.filter { $0.id != "ai_assistant" }
         XCTAssertTrue(nonAI.allSatisfy { $0.unread > 0 })
     }
+
+    func testRootBadgeStoreSeedsUnreadMessagesFromStats() async {
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
+        URLProtocolStub.stub(path: "/api/chat/unified-conversations", response: .json(Self.listJSON()))
+        let store = ChatBadgeStore(api: makeAPI(), socket: .shared)
+        await store.start()
+        XCTAssertEqual(store.unreadMessages, 3)
+        store.stop()
+    }
+
+    func testHideConversationRemovesRowFromList() async {
+        URLProtocolStub.stub(
+            path: "/api/chat/unified-conversations",
+            response: .json(Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON))
+        )
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
+        let prefs = ChatConversationPreferences(defaults: makeDefaults())
+        let vm = ChatListViewModel(api: makeAPI(), socket: .shared, preferences: prefs)
+        await vm.load()
+        vm.hideConversation(storageKey: "person:u1")
+        guard case let .loaded(rows) = vm.state else {
+            XCTFail("Expected loaded after hide")
+            return
+        }
+        XCTAssertFalse(rows.contains { $0.id == "u1" })
+    }
+
+    func testMuteConversationExcludesUnreadFromFilterBadge() async {
+        URLProtocolStub.stub(
+            path: "/api/chat/unified-conversations",
+            response: .json(Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON))
+        )
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
+        let prefs = ChatConversationPreferences(defaults: makeDefaults())
+        let vm = ChatListViewModel(api: makeAPI(), socket: .shared, preferences: prefs)
+        await vm.load()
+        vm.toggleMute(storageKey: "person:u1")
+        XCTAssertEqual(vm.unreadByFilter[.unread], 1)
+    }
+
+    func testHiddenConversationAutoUnhidesWhenUnreadArrives() async {
+        let hiddenDirect = """
+        {
+          "_type": "conversation",
+          "other_participant_id": "u1",
+          "other_participant_name": "Marcus R.",
+          "other_participant_identity": {
+            "id": "u1",
+            "display_name": "Marcus R.",
+            "identity_kind": "personal",
+            "verified": true
+          },
+          "room_ids": ["r1"],
+          "total_unread": 4,
+          "last_message_at": "2026-04-20T10:00:00Z",
+          "last_message_preview": "New ping",
+          "topics": []
+        }
+        """
+        URLProtocolStub.stub(
+            path: "/api/chat/unified-conversations",
+            responses: [
+                .json(Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON)),
+                .json(Self.listJSON(hiddenDirect, Self.businessConversationJSON, Self.groupRoomJSON)),
+            ]
+        )
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
+        let prefs = ChatConversationPreferences(defaults: makeDefaults())
+        let vm = ChatListViewModel(api: makeAPI(), socket: .shared, preferences: prefs)
+        await vm.load()
+        vm.hideConversation(storageKey: "person:u1")
+        await vm.refresh()
+        guard case let .loaded(rows) = vm.state else {
+            XCTFail("Expected loaded after refresh")
+            return
+        }
+        XCTAssertTrue(rows.contains { $0.id == "u1" })
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        let suite = "ChatListViewModelTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
 }

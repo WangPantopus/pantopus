@@ -327,17 +327,31 @@ private struct CameraScannerPreview: UIViewControllerRepresentable {
 
 private final class CameraScannerController: UIViewController, AVCapturePhotoCaptureDelegate {
     private let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(
+        label: "app.pantopus.cameraScanner.session",
+        qos: .userInitiated
+    )
     private let photoOutput = AVCapturePhotoOutput()
     private lazy var previewLayer = AVCaptureVideoPreviewLayer(session: session)
     var onCapture: ((UIImage) -> Void)?
     private var lastToken = 0
+    private var isConfigured = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
-        configureSession()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        startSessionIfNeeded()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopSession()
     }
 
     override func viewDidLayoutSubviews() {
@@ -346,30 +360,50 @@ private final class CameraScannerController: UIViewController, AVCapturePhotoCap
     }
 
     deinit {
-        if session.isRunning { session.stopRunning() }
+        stopSession()
     }
 
     /// Capture a still when the SwiftUI shutter increments `token`. Token 0
     /// is the initial value, so it never fires a capture on first layout.
     func captureIfNeeded(token: Int) {
-        guard token != lastToken, token != 0, session.isRunning else { return }
+        guard token != lastToken, token != 0 else { return }
         lastToken = token
-        photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+        sessionQueue.async { [weak self] in
+            guard let self, self.session.isRunning else { return }
+            self.photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+        }
     }
 
-    private func configureSession() {
-        guard !session.isRunning else { return }
-        session.beginConfiguration()
-        session.sessionPreset = .photo
-        defer { session.commitConfiguration() }
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input),
-              session.canAddOutput(photoOutput)
-        else { return }
-        session.addInput(input)
-        session.addOutput(photoOutput)
-        session.startRunning()
+    private func startSessionIfNeeded() {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            if self.isConfigured {
+                if !self.session.isRunning {
+                    self.session.startRunning()
+                }
+                return
+            }
+            self.session.beginConfiguration()
+            self.session.sessionPreset = .photo
+            defer { self.session.commitConfiguration() }
+            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                  let input = try? AVCaptureDeviceInput(device: device),
+                  self.session.canAddInput(input),
+                  self.session.canAddOutput(self.photoOutput)
+            else { return }
+            self.session.addInput(input)
+            self.session.addOutput(self.photoOutput)
+            self.isConfigured = true
+            self.session.startRunning()
+        }
+    }
+
+    private func stopSession() {
+        sessionQueue.async { [session] in
+            if session.isRunning {
+                session.stopRunning()
+            }
+        }
     }
 
     func photoOutput(

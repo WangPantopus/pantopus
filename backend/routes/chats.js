@@ -409,8 +409,15 @@ function serializeChatMessageForViewer(message, options = {}) {
   if (!message) return null;
   const base = options.includeActorIdentity ? message : stripActorIdentity(message);
   const { sender, ...safe } = base;
+  const bodyText = safe.message_text ?? safe.message ?? null;
+  const bodyType = safe.message_type ?? safe.type ?? 'text';
   return {
     ...safe,
+    // Emit both canonical DB columns and legacy aliases so all clients decode reliably.
+    message: safe.message ?? bodyText,
+    message_text: bodyText,
+    type: safe.type ?? bodyType,
+    message_type: bodyType,
     sender: serializeUserIdentityForViewer(sender),
   };
 }
@@ -419,8 +426,19 @@ function serializeChatMessageForViewer(message, options = {}) {
  * Parse a pagination cursor: either "timestamp|uuid" composite or plain timestamp.
  * Returns { beforeTs, beforeId } where beforeId may be null (legacy format).
  */
+function normalizePaginationCursor(raw) {
+  if (!raw) return raw;
+  // Query strings decode '+' as space (application/x-www-form-urlencoded).
+  // Repair ISO timestamps like "2026-06-06T21:43:12.287311 00:00".
+  return String(raw).replace(
+    /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?) (\d{2}:\d{2}(?::\d{2})?)/,
+    '$1+$2'
+  );
+}
+
 function parseCursor(before) {
   if (!before) return { beforeTs: null, beforeId: null };
+  before = normalizePaginationCursor(before);
   const pipeIdx = before.indexOf('|');
   if (pipeIdx === -1) return { beforeTs: before, beforeId: null };
   return { beforeTs: before.slice(0, pipeIdx), beforeId: before.slice(pipeIdx + 1) };

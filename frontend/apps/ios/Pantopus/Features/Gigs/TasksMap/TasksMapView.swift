@@ -4,8 +4,8 @@
 //
 //  A11.1 Tasks map — the Gigs-only mode of the MapListHybrid archetype.
 //  Same canvas as the generic Nearby map (`NearbyMapView`), filtered to
-//  tasks, titled "Tasks map", and topped with a primary "Post task" FAB
-//  stacked above the locate / layers controls.
+//  tasks, titled "Tasks map", with a primary "Post task" button stacked
+//  below the locate / layers controls on the right.
 //
 //  Reached from the Gigs feed's list/map toggle. The floating-pill chevron
 //  returns to the list.
@@ -57,7 +57,7 @@ public struct TasksMapView: View {
             topPill: { topChrome },
             categoryChips: { EmptyView() },
             mapControls: { mapControls },
-            floatingAction: { postTaskFAB },
+            mapControlsStackHeight: Self.tasksMapControlsStackHeight,
             sheetHeader: { sheetHeader },
             sheetBody: { sheetBody }
         )
@@ -179,7 +179,12 @@ public struct TasksMapView: View {
         .accessibilityIdentifier(identifier)
     }
 
-    // MARK: - Map controls (locate / layers — sit just above the sheet)
+    /// Locate + layers + Post task (two 38pt buttons, 8pt gaps, 48pt FAB).
+    private static var tasksMapControlsStackHeight: CGFloat {
+        140
+    }
+
+    // MARK: - Map controls (locate / layers / post — sit just above the sheet)
 
     private var mapControls: some View {
         VStack(alignment: .trailing, spacing: Spacing.s2) {
@@ -190,10 +195,11 @@ public struct TasksMapView: View {
             controlButton(icon: .map, label: "Layers", identifier: "tasksMapLayers") {
                 showFilterSheet = true
             }
+            postTaskFAB
         }
     }
 
-    // MARK: - Post-task FAB (A11.1 — stacked above map controls on the right)
+    // MARK: - Post-task button (A11.1 — bottom of the right-hand control stack)
 
     private var postTaskFAB: some View {
         Button { onCompose(viewModel.activeCategory) } label: {

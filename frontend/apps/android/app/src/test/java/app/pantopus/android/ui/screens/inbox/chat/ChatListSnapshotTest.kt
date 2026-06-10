@@ -84,6 +84,7 @@ class ChatListSnapshotTest {
                 unread = 0,
                 pinned = true,
                 topicKinds = emptySet(),
+                storageKey = "ai_assistant",
             ),
             ConversationRowContent(
                 id = "u1",
@@ -98,6 +99,7 @@ class ChatListSnapshotTest {
                 unread = 2,
                 pinned = false,
                 topicKinds = setOf("gig"),
+                storageKey = "person:u1",
             ),
             ConversationRowContent(
                 id = "b1",
@@ -112,6 +114,7 @@ class ChatListSnapshotTest {
                 unread = 1,
                 pinned = false,
                 topicKinds = setOf("market"),
+                storageKey = "person:b1",
             ),
             ConversationRowContent(
                 id = "h1",
@@ -126,6 +129,7 @@ class ChatListSnapshotTest {
                 unread = 0,
                 pinned = false,
                 topicKinds = emptySet(),
+                storageKey = "person:h1",
             ),
             ConversationRowContent(
                 id = "g1",
@@ -140,6 +144,7 @@ class ChatListSnapshotTest {
                 unread = 0,
                 pinned = false,
                 topicKinds = emptySet(),
+                storageKey = "room:g1",
             ),
         )
 

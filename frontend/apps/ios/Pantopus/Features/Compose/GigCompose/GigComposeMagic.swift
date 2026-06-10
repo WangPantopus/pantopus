@@ -170,6 +170,7 @@ struct ComposeIdentityChip: View {
 
 struct MagicDescribeStep: View {
     @Bindable var viewModel: GigComposeViewModel
+    @FocusState private var isDescribeFocused: Bool
 
     var body: some View {
         ComposeIdentityChip()
@@ -180,23 +181,29 @@ struct MagicDescribeStep: View {
                 get: { viewModel.form.describeText },
                 set: { viewModel.setDescribeText($0) }
             ),
-            isParsed: viewModel.form.detectedArchetype != nil
+            isParsed: viewModel.form.detectedArchetype != nil,
+            isFocused: $isDescribeFocused
         )
         if let archetype = viewModel.form.detectedArchetype {
             DetectedArchetypePill(archetype: archetype) {
+                isDescribeFocused = false
                 viewModel.setComposeMode(.manual)
             }
             ModulePromptsCard(prompts: gigMagicModulePrompts(for: archetype))
         }
         EngagementModeControl(
             selected: viewModel.form.engagementMode
-        ) { viewModel.selectEngagementMode($0) }
+        ) { mode in
+            isDescribeFocused = false
+            viewModel.selectEngagementMode(mode)
+        }
     }
 }
 
 private struct MagicDescribeCard: View {
     @Binding var text: String
     let isParsed: Bool
+    @FocusState.Binding var isFocused: Bool
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
@@ -208,6 +215,7 @@ private struct MagicDescribeCard: View {
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, Spacing.s2)
                 .padding(.vertical, Spacing.s1)
+                .focused($isFocused)
                 .overlay(alignment: .topLeading) {
                     if text.isEmpty {
                         Text("e.g. Need someone to assemble an IKEA desk this Saturday morning…")
@@ -227,6 +235,14 @@ private struct MagicDescribeCard: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { isFocused = false }
+                    .font(.system(size: 16, weight: .semibold))
+                    .accessibilityIdentifier("composeGigDescribeKeyboardDone")
+            }
+        }
     }
 
     private var header: some View {

@@ -56,11 +56,12 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
         self.mediaURLs = mediaURLs
     }
 
-    /// Resolves feed-card image URLs, preferring thumbnails when present.
-    public static func mediaDisplayURLs(urls: [String], thumbnails: [String]) -> [URL] {
-        urls.enumerated().compactMap { index, url in
-            let candidate = thumbnails.indices.contains(index) ? thumbnails[index] : url
-            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Resolves feed-card image URLs from the original uploads. Thumbnails
+    /// are tiny (200×200) and look soft when scaled to a full-width card.
+    public static func mediaDisplayURLs(urls: [String], thumbnails: [String] = []) -> [URL] {
+        _ = thumbnails
+        return urls.compactMap { url in
+            let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
             return URL(string: trimmed)
         }

@@ -208,6 +208,8 @@ import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationMode
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadChrome
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadContext
+import app.pantopus.android.ui.screens.inbox.conversation.ChatAIDraftCard
+import app.pantopus.android.ui.screens.inbox.conversation.ChatInitialTopic
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.inbox.newmessage.NewMessageScreen
 import app.pantopus.android.ui.screens.inbox.search.ChatSearchResult
@@ -930,6 +932,9 @@ private object ChildRoutes {
     const val CHAT_ONLINE_KEY = "online"
     const val CHAT_TIER_NAME_KEY = "tierName"
     const val CHAT_TIER_RANK_KEY = "tierRank"
+    const val CHAT_TOPIC_TYPE_KEY = "topicType"
+    const val CHAT_TOPIC_REF_ID_KEY = "topicRefId"
+    const val CHAT_TOPIC_TITLE_KEY = "topicTitle"
 
     /** P4.3 — message id to scroll to on open (Chat Search deep-link).
      *  Empty for normal opens, which land on the latest message. */
@@ -944,7 +949,10 @@ private object ChildRoutes {
             "&$CHAT_ONLINE_KEY={$CHAT_ONLINE_KEY}" +
             "&$CHAT_TIER_NAME_KEY={$CHAT_TIER_NAME_KEY}" +
             "&$CHAT_TIER_RANK_KEY={$CHAT_TIER_RANK_KEY}" +
-            "&$CHAT_SCROLL_TO_KEY={$CHAT_SCROLL_TO_KEY}"
+            "&$CHAT_SCROLL_TO_KEY={$CHAT_SCROLL_TO_KEY}" +
+            "&$CHAT_TOPIC_TYPE_KEY={$CHAT_TOPIC_TYPE_KEY}" +
+            "&$CHAT_TOPIC_REF_ID_KEY={$CHAT_TOPIC_REF_ID_KEY}" +
+            "&$CHAT_TOPIC_TITLE_KEY={$CHAT_TOPIC_TITLE_KEY}"
 
     /** New message contact picker (T6.6b P25). Reached from Chat list
      *  compose button + empty-state CTA. */
@@ -1070,7 +1078,10 @@ private object ChildRoutes {
             "&$CHAT_ONLINE_KEY=false" +
             "&$CHAT_TIER_NAME_KEY=" +
             "&$CHAT_TIER_RANK_KEY=" +
-            "&$CHAT_SCROLL_TO_KEY="
+            "&$CHAT_SCROLL_TO_KEY=" +
+            "&$CHAT_TOPIC_TYPE_KEY=" +
+            "&$CHAT_TOPIC_REF_ID_KEY=" +
+            "&$CHAT_TOPIC_TITLE_KEY="
     }
 
     /** Build the creator-side fan thread path from a Creator Inbox row. */
@@ -1087,7 +1098,10 @@ private object ChildRoutes {
             "&$CHAT_ONLINE_KEY=false" +
             "&$CHAT_TIER_NAME_KEY=${enc(row.tierName ?: "Free")}" +
             "&$CHAT_TIER_RANK_KEY=${row.tierRank}" +
-            "&$CHAT_SCROLL_TO_KEY="
+            "&$CHAT_SCROLL_TO_KEY=" +
+            "&$CHAT_TOPIC_TYPE_KEY=" +
+            "&$CHAT_TOPIC_REF_ID_KEY=" +
+            "&$CHAT_TOPIC_TITLE_KEY="
     }
 
     /** Build the chat-conversation path for a New Message picker
@@ -1100,6 +1114,9 @@ private object ChildRoutes {
         initials: String,
         verified: Boolean,
         locality: String?,
+        topicType: String? = null,
+        topicRefId: String? = null,
+        topicTitle: String? = null,
     ): String {
         fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
         return "chat/person/${enc(userId)}?" +
@@ -1111,7 +1128,10 @@ private object ChildRoutes {
             "&$CHAT_ONLINE_KEY=false" +
             "&$CHAT_TIER_NAME_KEY=" +
             "&$CHAT_TIER_RANK_KEY=" +
-            "&$CHAT_SCROLL_TO_KEY="
+            "&$CHAT_SCROLL_TO_KEY=" +
+            "&$CHAT_TOPIC_TYPE_KEY=${enc(topicType ?: "")}" +
+            "&$CHAT_TOPIC_REF_ID_KEY=${enc(topicRefId ?: "")}" +
+            "&$CHAT_TOPIC_TITLE_KEY=${enc(topicTitle ?: "")}"
     }
 
     /** Build the chat-conversation path for a gig-scoped room. */
@@ -1131,7 +1151,10 @@ private object ChildRoutes {
             "&$CHAT_ONLINE_KEY=false" +
             "&$CHAT_TIER_NAME_KEY=" +
             "&$CHAT_TIER_RANK_KEY=" +
-            "&$CHAT_SCROLL_TO_KEY="
+            "&$CHAT_SCROLL_TO_KEY=" +
+            "&$CHAT_TOPIC_TYPE_KEY=" +
+            "&$CHAT_TOPIC_REF_ID_KEY=" +
+            "&$CHAT_TOPIC_TITLE_KEY="
     }
 
     /** Build the chat-conversation path for a Chat Search result. Carries
@@ -1160,7 +1183,10 @@ private object ChildRoutes {
             "&$CHAT_ONLINE_KEY=false" +
             "&$CHAT_TIER_NAME_KEY=" +
             "&$CHAT_TIER_RANK_KEY=" +
-            "&$CHAT_SCROLL_TO_KEY=${enc(result.matchedMessageId ?: "")}"
+            "&$CHAT_SCROLL_TO_KEY=${enc(result.matchedMessageId ?: "")}" +
+            "&$CHAT_TOPIC_TYPE_KEY=" +
+            "&$CHAT_TOPIC_REF_ID_KEY=" +
+            "&$CHAT_TOPIC_TITLE_KEY="
     }
 
     // ---- Wave A bootstrap placeholders ------------------------------------
@@ -1318,6 +1344,14 @@ private fun NavHostController.navigateToRootTab(route: PantopusRoute) {
     }
 }
 
+private fun routeForAIDraft(draft: ChatAIDraftCard): String =
+    when (draft.type) {
+        "gig" -> ChildRoutes.composeGig(GigsCategory.All.key)
+        "listing" -> ChildRoutes.COMPOSE_LISTING
+        "post" -> ChildRoutes.composePost(PulseIntent.Ask.key)
+        else -> ChildRoutes.composePost(PulseIntent.Ask.key)
+    }
+
 /**
  * Signed-in root. Hosts [PantopusBottomBar] + a [NavHost] with the five
  * top-level destinations from [PantopusRoute] plus drill-down destinations
@@ -1338,15 +1372,18 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             if (uri != null) appContext.shareText(InviteLinks.INVITE_MESSAGE, "Invite to Pantopus")
         }
     val sessionViewModel: RootSessionViewModel = hiltViewModel()
+    val chatBadgeViewModel: ChatBadgeViewModel = hiltViewModel()
     val currentHandle by sessionViewModel.currentHandle.collectAsStateWithLifecycle()
+    val liveInboxBadgeCount by chatBadgeViewModel.unreadMessages.collectAsStateWithLifecycle()
     // §1C-b — context-aware navigation drawer, opened from the Hub menu button
     // (repurposed from "open Settings"; Settings now lives as a drawer row).
     val navDrawerState = rememberDrawerState(DrawerValue.Closed)
     val navDrawerScope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = PantopusRoute.fromPath(backStackEntry?.destination?.route) ?: PantopusRoute.Home
+    val resolvedInboxBadgeCount = maxOf(inboxBadgeCount, liveInboxBadgeCount)
     val badges: Map<PantopusRoute, Int> =
-        if (inboxBadgeCount > 0) mapOf(PantopusRoute.Messages to inboxBadgeCount) else emptyMap()
+        if (resolvedInboxBadgeCount > 0) mapOf(PantopusRoute.Messages to resolvedInboxBadgeCount) else emptyMap()
 
     // Consume pending deep links — when the host activity (or a
     // notification tap) routed a URL or path through DeepLinkRouter,
@@ -2600,6 +2637,18 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 type = NavType.StringType
                                 defaultValue = ""
                             },
+                            navArgument(ChildRoutes.CHAT_TOPIC_TYPE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_TOPIC_REF_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ChildRoutes.CHAT_TOPIC_TITLE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
                         ),
                 ) { entry ->
                     val args = entry.arguments ?: return@composable
@@ -2613,6 +2662,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     val tierName = args.getString(ChildRoutes.CHAT_TIER_NAME_KEY).orEmpty().ifEmpty { "Free" }
                     val tierRank = args.getString(ChildRoutes.CHAT_TIER_RANK_KEY).orEmpty().toIntOrNull() ?: 1
                     val scrollTo = args.getString(ChildRoutes.CHAT_SCROLL_TO_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                    val topicType = args.getString(ChildRoutes.CHAT_TOPIC_TYPE_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                    val topicRefId = args.getString(ChildRoutes.CHAT_TOPIC_REF_ID_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                    val topicTitle = args.getString(ChildRoutes.CHAT_TOPIC_TITLE_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                    val initialTopic =
+                        if (topicType != null && topicTitle != null) {
+                            ChatInitialTopic(topicType = topicType, topicRefId = topicRefId, title = topicTitle)
+                        } else {
+                            null
+                        }
                     val mode: ChatThreadMode =
                         when (kind) {
                             "ai" -> ChatThreadMode.Ai
@@ -2669,6 +2727,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             ),
                         onBack = { navController.popBackStack() },
                         scrollToMessageId = scrollTo,
+                        initialTopic = initialTopic,
+                        onUseAIDraft = { draft ->
+                            navController.navigate(routeForAIDraft(draft))
+                        },
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                        onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
                     )
                 }
                 composable(ChildRoutes.CHAT_SEARCH) {
@@ -2745,6 +2809,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                         initials = initialsFromName(name),
                                         verified = false,
                                         locality = listing.locationName,
+                                        topicType = "listing",
+                                        topicRefId = listing.id,
+                                        topicTitle = name,
                                     ),
                                 )
                             }
@@ -2991,6 +3058,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     unread = 0,
                                     pinned = false,
                                     topicKinds = emptySet(),
+                                    storageKey = "person:${target.userId}",
                                 )
                             navController.navigate(ChildRoutes.chatConversation(row))
                         },

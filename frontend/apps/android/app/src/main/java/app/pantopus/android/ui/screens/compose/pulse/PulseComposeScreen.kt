@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,11 +43,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -621,6 +625,7 @@ private fun RatingPicker(
     rating: Int,
     onSelect: (Int) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         Text(
             text = "Rating",
@@ -637,7 +642,10 @@ private fun RatingPicker(
                     modifier =
                         Modifier
                             .size(44.dp)
-                            .clickable { onSelect(value) }
+                            .clickable {
+                                focusManager.clearFocus()
+                                onSelect(value)
+                            }
                             .testTag("composePulseRecommendStar_$value")
                             .semantics {
                                 contentDescription = if (value == 1) "1 star" else "$value stars"
@@ -648,8 +656,12 @@ private fun RatingPicker(
                         icon = PantopusIcon.Star,
                         contentDescription = null,
                         size = 28.dp,
-                        strokeWidth = 2f,
-                        tint = if (value <= rating) PantopusColors.warning else PantopusColors.appTextMuted,
+                        tint =
+                            if (value <= rating) {
+                                PantopusColors.warning
+                            } else {
+                                PantopusColors.appBorderStrong
+                            },
                     )
                 }
             }
@@ -1056,6 +1068,7 @@ private fun BodyEditor(
     fields: Map<PulseComposeField, FormFieldState>,
     onUpdate: (PulseComposeField, String) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
     val snapshot = fields[PulseComposeField.Body] ?: FormFieldState(id = PulseComposeField.Body.key)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         Text(
@@ -1086,6 +1099,8 @@ private fun BodyEditor(
                         fontSize = PantopusTextStyle.body.fontSize,
                     ),
                 cursorBrush = SolidColor(PantopusColors.primary600),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth(),
             )
             if (snapshot.value.isEmpty()) {

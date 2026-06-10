@@ -58,6 +58,7 @@ import app.pantopus.android.ui.screens.gigs.GigFilterCriteria
 import app.pantopus.android.ui.screens.gigs.GigFilterSheet
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsSort
+import app.pantopus.android.ui.screens.shared.map_list_hybrid.MAP_CONTROLS_STACK_HEIGHT
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapListHybridDetent
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapListHybridShell
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapListHybridShellStaticPreview
@@ -70,8 +71,8 @@ import app.pantopus.android.ui.theme.Spacing
 /**
  * A11.1 Tasks map — the Gigs-only mode of the MapListHybrid archetype.
  * Same canvas as the generic Nearby map, filtered to tasks, titled
- * "Tasks map", and topped with a primary "Post task" FAB stacked above the
- * locate / layers controls. Reached from the Gigs feed's list/map toggle;
+ * "Tasks map", with a primary "Post task" button stacked below the locate /
+ * layers controls. Reached from the Gigs feed's list/map toggle;
  * the floating-pill chevron returns to the list.
  *
  * Mirrors iOS `TasksMapView`.
@@ -154,14 +155,13 @@ fun TasksMapScreen(
             )
         },
         categoryChips = {},
+        mapControlsStackHeight = TASKS_MAP_CONTROLS_STACK_HEIGHT,
         mapControls = {
             TasksMapMapControls(
                 onLocate = { requestLocate() },
                 onLayers = { showFilters = true },
+                onPost = { onCompose(activeCategory) },
             )
-        },
-        floatingAction = {
-            TasksMapPostFab(onClick = { onCompose(activeCategory) })
         },
         sheetHeader = {
             TasksMapSheetHeader(
@@ -368,10 +368,14 @@ internal fun TasksMapPostFab(onClick: () -> Unit) {
     }
 }
 
+/** Locate + layers + Post task (two 38dp buttons, 8dp gaps, 48dp FAB). */
+internal val TASKS_MAP_CONTROLS_STACK_HEIGHT = MAP_CONTROLS_STACK_HEIGHT + Spacing.s2 + 48.dp
+
 @Composable
 internal fun TasksMapMapControls(
     onLocate: () -> Unit,
     onLayers: () -> Unit,
+    onPost: () -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.End,
@@ -389,6 +393,7 @@ internal fun TasksMapMapControls(
             testTagId = "tasksMapLayers",
             onClick = onLayers,
         )
+        TasksMapPostFab(onClick = onPost)
     }
 }
 
@@ -896,8 +901,8 @@ internal fun TasksMapStaticPreview(
             )
         },
         categoryChips = {},
-        mapControls = { TasksMapMapControls(onLocate = {}, onLayers = {}) },
-        floatingAction = { TasksMapPostFab(onClick = {}) },
+        mapControlsStackHeight = TASKS_MAP_CONTROLS_STACK_HEIGHT,
+        mapControls = { TasksMapMapControls(onLocate = {}, onLayers = {}, onPost = {}) },
         sheetHeader = { TasksMapSheetHeader(count = count, activeSort = activeSort, onSelectSort = {}) },
         sheetBody = {
             TasksMapSheetBody(

@@ -102,7 +102,8 @@ public struct MarketplaceTabRoot: View {
                             displayName: name,
                             initials: Self.initials(from: name),
                             identityKind: nil,
-                            verified: false
+                            verified: false,
+                            initialTopic: ChatInitialTopic(topicType: "listing", topicRefId: listing.id, title: name)
                         )))
                     }
                 },
@@ -160,9 +161,15 @@ public struct MarketplaceTabRoot: View {
                 viewModel: ChatConversationViewModel(
                     mode: Self.chatMode(for: dest.mode),
                     counterparty: Self.chatCounterparty(for: dest),
-                    currentUserId: currentUserId
+                    currentUserId: currentUserId,
+                    initialTopic: dest.initialTopic
                 ),
-                mode: dest.kind
+                mode: dest.kind,
+                onUseAIDraft: { draft in
+                    if draft.type == "listing" {
+                        path.append(.composeListing)
+                    }
+                }
             ) {
                 pop()
             }

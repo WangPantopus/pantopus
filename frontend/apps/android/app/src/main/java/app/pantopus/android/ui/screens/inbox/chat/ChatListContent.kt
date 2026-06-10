@@ -50,6 +50,10 @@ data class ConversationRowContent(
     val unread: Int,
     val pinned: Boolean,
     val topicKinds: Set<String>,
+    /** Stable key for mute/hide persistence — `person:<id>` or `room:<id>`. */
+    val storageKey: String,
+    /** Whether the user muted notifications for this conversation. */
+    val isMuted: Boolean = false,
 )
 
 /** Filter-tab entry the view renders. */

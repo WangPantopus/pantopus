@@ -60,6 +60,7 @@ public struct MapListHybridShell<
     private let sheetHeader: () -> SheetHeader
     private let sheetBody: () -> SheetBody
     private let floatingAction: () -> FloatingAction
+    private let mapControlsStackHeightOverride: CGFloat?
 
     @State private var dragTranslation: CGFloat = 0
     @State private var cameraPosition: MapCameraPosition = .automatic
@@ -96,6 +97,7 @@ public struct MapListHybridShell<
         @ViewBuilder topPill: @escaping () -> TopPill = { EmptyView() },
         @ViewBuilder categoryChips: @escaping () -> CategoryChips = { EmptyView() },
         @ViewBuilder mapControls: @escaping () -> MapControlsContent = { EmptyView() },
+        mapControlsStackHeight: CGFloat? = nil,
         @ViewBuilder floatingAction: @escaping () -> FloatingAction = { EmptyView() },
         @ViewBuilder sheetHeader: @escaping () -> SheetHeader = { EmptyView() },
         @ViewBuilder sheetBody: @escaping () -> SheetBody
@@ -110,6 +112,7 @@ public struct MapListHybridShell<
         self.topPill = topPill
         self.categoryChips = categoryChips
         self.mapControls = mapControls
+        self.mapControlsStackHeightOverride = mapControlsStackHeight
         self.floatingAction = floatingAction
         self.sheetHeader = sheetHeader
         self.sheetBody = sheetBody
@@ -119,9 +122,10 @@ public struct MapListHybridShell<
         GeometryReader { geo in
             let sheetHeight = max(120, detent.height(in: geo.size.height) + dragTranslation)
             let mapStripTop = geo.safeAreaInsets.top
+            let controlsStackHeight = mapControlsStackHeightOverride ?? Self.mapControlsStackHeight
             let maxControlsBottom = max(
                 Self.sheetToControlsGap,
-                geo.size.height - mapStripTop - Self.mapControlsStackHeight - Self.sheetToControlsGap
+                geo.size.height - mapStripTop - controlsStackHeight - Self.sheetToControlsGap
             )
             let maxFabBottom = max(
                 Self.fabLiftAboveSheet,

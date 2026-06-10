@@ -26,6 +26,175 @@ public enum ChatThreadMode: Sendable, Hashable {
     case ai
 }
 
+public struct ChatInitialTopic: Sendable, Hashable {
+    public let topicType: String
+    public let topicRefId: String?
+    public let title: String
+
+    public init(topicType: String, topicRefId: String? = nil, title: String) {
+        self.topicType = topicType
+        self.topicRefId = topicRefId
+        self.title = title
+    }
+}
+
+public struct AIChatStreamRequest: Encodable, Sendable {
+    public let message: String
+    public let conversationId: String?
+    public let images: [String]?
+
+    public init(message: String, conversationId: String? = nil, images: [String]? = nil) {
+        self.message = message
+        self.conversationId = conversationId
+        self.images = images
+    }
+}
+
+public enum AIChatStreamEvent: Sendable, Equatable {
+    case conversation(id: String)
+    case textDelta(String)
+    case draft(ChatAIDraftCard)
+    case done
+    case error(String)
+}
+
+protocol AIChatStreaming: Sendable {
+    func streamChat(_ request: AIChatStreamRequest) -> AsyncThrowingStream<AIChatStreamEvent, any Error>
+}
+
+final class AIChatStreamClient: AIChatStreaming, @unchecked Sendable {
+    static let shared = AIChatStreamClient()
+
+    private let environment: AppEnvironment
+    private let session: URLSession
+
+    init(environment: AppEnvironment = .current, session: URLSession = .shared) {
+        self.environment = environment
+        self.session = session
+    }
+
+    func streamChat(_ request: AIChatStreamRequest) -> AsyncThrowingStream<AIChatStreamEvent, any Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let token = await AuthManager.shared.accessToken
+                    let url = environment.apiBaseURL.appendingPathComponent("/api/ai/chat")
+                    var urlRequest = URLRequest(url: url)
+                    urlRequest.httpMethod = "POST"
+                    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    if let token {
+                        urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                    }
+                    urlRequest.httpBody = try JSONEncoder().encode(request)
+                    let (bytes, response) = try await session.bytes(for: urlRequest)
+                    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                        continuation.yield(.error("Failed to connect to AI."))
+                        continuation.finish()
+                        return
+                    }
+                    var eventName: String?
+                    var data: String?
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("event: ") {
+                            eventName = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+                        } else if line.hasPrefix("data: ") {
+                            data = String(line.dropFirst(6))
+                        } else if line.isEmpty, let name = eventName, let payload = data {
+                            Self.dispatch(eventName: name, data: payload, continuation: continuation)
+                            eventName = nil
+                            data = nil
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    if Task.isCancelled {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private static func dispatch(
+        eventName: String,
+        data: String,
+        continuation: AsyncThrowingStream<AIChatStreamEvent, any Error>.Continuation
+    ) {
+        guard let object = try? JSONSerialization.jsonObject(with: Data(data.utf8)) as? [String: Any] else { return }
+        switch eventName {
+        case "conversation":
+            if let id = object["conversationId"] as? String {
+                continuation.yield(.conversation(id: id))
+            }
+        case "text_delta":
+            if let delta = object["delta"] as? String {
+                continuation.yield(.textDelta(delta))
+            }
+        case "draft":
+            if let draft = Self.parseDraft(object) {
+                continuation.yield(.draft(draft))
+            }
+        case "done":
+            continuation.yield(.done)
+        case "error":
+            continuation.yield(.error((object["message"] as? String) ?? (object["error"] as? String) ?? "AI error."))
+        default:
+            break
+        }
+    }
+
+    private static func parseDraft(_ object: [String: Any]) -> ChatAIDraftCard? {
+        let type = (object["type"] as? String) ?? "draft"
+        let valid = (object["valid"] as? Bool) ?? true
+        let draft = object["draft"] as? [String: Any] ?? [:]
+        let title = (draft["title"] as? String)
+            ?? (draft["summary"] as? String)
+            ?? (draft["content"] as? String)
+            ?? "\(type.capitalized) draft"
+        let summary = (draft["description"] as? String)
+            ?? (draft["content"] as? String)
+            ?? (draft["summary"] as? String)
+        let price: String? = {
+            if let price = draft["price"] { return "$\(price)" }
+            if let amount = draft["amount"] { return "$\(amount)" }
+            return nil
+        }()
+        return ChatAIDraftCard(
+            id: "\(type)_\(UUID().uuidString)",
+            type: type,
+            title: title,
+            summary: summary,
+            priceLabel: price,
+            valid: valid
+        )
+    }
+}
+
+/// Session-scoped memory of the Ask-Pantopus conversation id, keyed by
+/// user, so closing and reopening the AI thread continues the same
+/// backend conversation (`POST /api/ai/chat` accepts `conversationId`).
+/// In-memory only — a fresh app launch starts a new conversation.
+@MainActor
+public final class AIConversationStore {
+    public static let shared = AIConversationStore()
+
+    private var conversationIdsByUserId: [String: String] = [:]
+
+    public init() {}
+
+    public func conversationId(forUserId userId: String) -> String? {
+        conversationIdsByUserId[userId]
+    }
+
+    public func setConversationId(_ id: String, forUserId userId: String) {
+        conversationIdsByUserId[userId] = id
+    }
+}
+
 @Observable
 @MainActor
 public final class ChatConversationViewModel {
@@ -47,6 +216,21 @@ public final class ChatConversationViewModel {
     /// True while a send is in flight.
     public private(set) var isSending: Bool = false
 
+    public private(set) var replyingTo: ChatReplyPreview?
+    public private(set) var editingMessageId: String?
+    public private(set) var topics: [ChatConversationTopic] = []
+    public private(set) var selectedTopicId: String?
+
+    /// User-facing notice set when the backend rejects a send with the
+    /// gig pre-bid message cap (429 `PRE_BID_LIMIT`,
+    /// `backend/routes/chats.js:1573`). Cleared on the next successful
+    /// send or topic switch; the view renders it as a dismissible
+    /// banner above the composer.
+    public private(set) var sendLimitNotice: String?
+
+    /// True while the block-user call is in flight.
+    public private(set) var isBlocking = false
+
     /// Set when typing indicator should render above the composer.
     public private(set) var isCounterpartyTyping: Bool = false
 
@@ -54,6 +238,12 @@ public final class ChatConversationViewModel {
     /// for this phase, but the UI can still render and remove queued
     /// attachments deterministically.
     public private(set) var queuedAttachments: [ChatQueuedAttachment] = []
+
+    public private(set) var shareableGigs: [ChatShareGigOption] = []
+    public private(set) var shareableListings: [ChatShareListingOption] = []
+    public private(set) var isLoadingShareOptions = false
+    public private(set) var shareOptionsError: String?
+    public private(set) var isSharingLocation = false
 
     /// Capability chips for the AI welcome card (tap-to-send).
     public let aiPrompts: [ChatPromptChip]
@@ -84,13 +274,23 @@ public final class ChatConversationViewModel {
     /// Whether the composer's send disc is enabled (text present + not
     /// in flight). Bound by the view.
     public var canSend: Bool {
-        !composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+        (!composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !queuedAttachments.isEmpty) && !isSending
+    }
+
+    /// True when another older page can be fetched.
+    public var canLoadOlder: Bool {
+        hasMore && oldestCursor != nil
     }
 
     private let api: APIClient
     private let socket: SocketClient
+    private let uploader: MultipartUploader
+    private let aiClient: any AIChatStreaming
+    private let aiConversationStore: AIConversationStore
+    private let locationProvider: any LocationProviding
     private let mode: ChatThreadMode
     private let currentUserId: String
+    private let initialTopic: ChatInitialTopic?
     /// Message to scroll to on first load (Chat Search deep-link). `nil`
     /// for normal opens, which land on the latest message.
     private let scrollToMessageId: String?
@@ -100,27 +300,78 @@ public final class ChatConversationViewModel {
     private var messages: [ChatMessageDTO] = []
     private var pendingByClientId: [String: ChatMessageDTO] = [:]
     private var failedClientIds: Set<String> = []
+    private var activeRoomIds: Set<String> = []
+    private var joinedRoomIds: Set<String> = []
     private var hasMore: Bool = false
     private var oldestCursor: String?
     private var markReadTask: Task<Void, Never>?
     private var socketTasks: [Task<Void, Never>] = []
+    private var aiConversationId: String?
+    private var aiDraftsByMessageId: [String: [ChatAIDraftCard]] = [:]
+    /// Person-mode direct room — resolved once via `POST /api/chat/direct`
+    /// (find-or-create, idempotent server-side) and cached for the VM's
+    /// lifetime. Person threads must always send here, never to a shared
+    /// gig/group room surfaced by the aggregated fetch.
+    private var directRoomId: String?
+    /// In-flight direct-room resolution, shared so concurrent sends make
+    /// a single `POST /api/chat/direct`.
+    private var directRoomTask: Task<String, any Error>?
+    /// Send inputs captured per optimistic row, keyed by its bare-UUID
+    /// `clientMessageId`. Survives refetches so retry resends the same
+    /// payload under the same idempotency key.
+    private var sendContextsByClientId: [String: PendingSendContext] = [:]
+
+    /// Inputs needed to (re)send one optimistic message. Captured at
+    /// send time so retry doesn't re-read mutated composer state.
+    private struct PendingSendContext {
+        let text: String
+        /// Uploaded attachment ids — set after the first successful
+        /// upload so a retry after a failed POST doesn't re-upload.
+        var fileIds: [String]?
+        let replyToId: String?
+        let topicId: String?
+        /// Explicit type for rich sends (`gig_offer`, `location`, …).
+        /// `nil` for composer sends, which infer `text` / `file` and are
+        /// the only sends that carry the queued composer attachments.
+        let messageType: String?
+        let metadata: [String: JSONValue]?
+    }
+
+    private enum ChatSendError: Error {
+        case noRoom
+    }
 
     init(
         mode: ChatThreadMode,
         counterparty: ChatCounterparty,
         currentUserId: String,
         scrollToMessageId: String? = nil,
+        initialTopic: ChatInitialTopic? = nil,
         api: APIClient = .shared,
-        socket: SocketClient = .shared
+        socket: SocketClient = .shared,
+        uploader: MultipartUploader = .shared,
+        aiClient: any AIChatStreaming = AIChatStreamClient.shared,
+        aiConversationStore: AIConversationStore = .shared,
+        locationProvider: any LocationProviding = DeviceLocationProvider.shared
     ) {
         self.mode = mode
         self.counterparty = counterparty
         self.currentUserId = currentUserId
+        self.initialTopic = initialTopic
         self.scrollToMessageId = scrollToMessageId
         self.api = api
         self.socket = socket
+        self.uploader = uploader
+        self.aiClient = aiClient
+        self.aiConversationStore = aiConversationStore
+        self.locationProvider = locationProvider
         aiPrompts = Self.defaultAICapabilities
         emptyChips = Self.defaultEmptyChips
+        // Continue the user's existing AI conversation across thread
+        // opens within this app session.
+        if case .ai = mode {
+            aiConversationId = aiConversationStore.conversationId(forUserId: currentUserId)
+        }
     }
 
     /// Preview/snapshot seam — seeds a fixed render state with no network
@@ -139,8 +390,13 @@ public final class ChatConversationViewModel {
         self.counterparty = counterparty
         currentUserId = "preview_me"
         scrollToMessageId = nil
+        initialTopic = nil
         api = .shared
         socket = .shared
+        uploader = .shared
+        aiClient = AIChatStreamClient.shared
+        aiConversationStore = .shared
+        locationProvider = DeviceLocationProvider.shared
         aiPrompts = Self.defaultAICapabilities
         emptyChips = Self.defaultEmptyChips
         self.fanEntitlement = fanEntitlement
@@ -160,12 +416,37 @@ public final class ChatConversationViewModel {
 
     public func load() async {
         if case .loaded = state { return }
+        await loadTopicsIfNeeded()
         await fetch(initial: true)
         subscribeToSockets()
+        prefetchDirectRoomIfNeeded()
+    }
+
+    /// Resolve the person thread's direct room in the background so the
+    /// first send doesn't pay the find-or-create round trip. Only runs
+    /// when history exists — opening an empty thread must not create
+    /// rooms for conversations that never start.
+    private func prefetchDirectRoomIfNeeded() {
+        guard case .person = mode, directRoomId == nil, !messages.isEmpty else { return }
+        Task { [weak self] in
+            _ = try? await self?.ensureRoomId()
+        }
     }
 
     public func refresh() async {
+        await loadTopicsIfNeeded()
         await fetch(initial: true)
+    }
+
+    public func selectTopic(_ topicId: String?) async {
+        selectedTopicId = selectedTopicId == topicId ? nil : topicId
+        sendLimitNotice = nil
+        await fetch(initial: true)
+    }
+
+    /// Dismiss the pre-bid send-limit banner.
+    public func dismissSendLimitNotice() {
+        sendLimitNotice = nil
     }
 
     /// Scroll-to-top trigger — fetch the next older page.
@@ -178,76 +459,301 @@ public final class ChatConversationViewModel {
     /// with a client-side id; on success swaps to the server id, on
     /// failure marks the row as failed for the view's retry CTA.
     public func send() async {
-        guard canSend else { return }
+        let hasQueuedFiles = queuedAttachments.contains { $0.data != nil }
+        guard canSend || hasQueuedFiles else { return }
         let trimmed = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
         composerText = ""
         isSending = true
         defer { isSending = false }
 
+        if let editingMessageId {
+            do {
+                let response: SendChatMessageResponse = try await api.request(
+                    ChatEndpoints.editMessage(
+                        id: editingMessageId,
+                        body: EditChatMessageBody(messageText: trimmed)
+                    )
+                )
+                applyUpdatedMessage(response.message)
+                cancelMessageAction()
+            } catch {
+                composerText = trimmed
+                logger.warning("chat edit failed: \(error)")
+            }
+            return
+        }
+
         // AI thread: no backend wired in T2.2; surface a placeholder
         // optimistic row so the design's "Ask anything…" composer
         // still feels alive.
         if case .ai = mode {
-            let pending = optimisticMessage(text: trimmed, roomId: "ai")
-            pendingByClientId[pending.clientMessageId ?? pending.id] = pending
-            rebuild()
+            await sendAIMessage(trimmed)
             return
         }
 
-        guard let roomId = await resolveRoomId() else {
-            logger.warning("send aborted — no resolvable room id for mode \(String(describing: mode))")
-            return
-        }
-
-        let pending = optimisticMessage(text: trimmed, roomId: roomId)
-        pendingByClientId[pending.clientMessageId ?? pending.id] = pending
+        let clientId = Self.newClientMessageId()
+        let pending = optimisticMessage(
+            text: trimmed.isEmpty ? "Attachment" : trimmed,
+            clientId: clientId,
+            roomId: knownRoomIdHint()
+        )
+        pendingByClientId[clientId] = pending
+        sendContextsByClientId[clientId] = PendingSendContext(
+            text: trimmed,
+            fileIds: nil,
+            replyToId: replyingTo?.messageId,
+            topicId: selectedTopicId,
+            messageType: nil,
+            metadata: nil
+        )
         rebuild()
+        await performSend(clientId: clientId)
+    }
 
+    /// Retry a failed optimistic send. Accepts the timeline row id
+    /// (`client_<uuid>`) or the bare client id, and resends with the
+    /// same `clientMessageId` — the backend dedups on it, so a retry
+    /// after a lost response can't double-post.
+    public func retry(clientId rawId: String) async {
+        guard !isSending else { return }
+        let clientId = Self.bareClientId(rawId)
+        guard pendingByClientId[clientId] != nil, sendContextsByClientId[clientId] != nil else { return }
+        failedClientIds.remove(clientId)
+        isSending = true
+        defer { isSending = false }
+        rebuild()
+        await performSend(clientId: clientId)
+    }
+
+    /// Shared send/retry tail. Resolves the destination room (creating
+    /// the direct room on a person thread's first message), uploads the
+    /// composer's queued attachments at most once, and POSTs under the
+    /// pending row's idempotency key.
+    @discardableResult
+    private func performSend(clientId: String) async -> Bool {
+        guard var context = sendContextsByClientId[clientId] else { return false }
         do {
+            let roomId = try await ensureRoomId()
+            if context.messageType == nil, context.fileIds == nil {
+                context.fileIds = try await uploadQueuedAttachmentsIfNeeded(roomId: roomId)
+                sendContextsByClientId[clientId] = context
+            }
+            let fileIds = context.fileIds ?? []
             let response: SendChatMessageResponse = try await api.request(
                 ChatEndpoints.sendMessage(
                     body: SendChatMessageBody(
                         roomId: roomId,
-                        messageText: trimmed,
-                        clientMessageId: pending.clientMessageId
+                        messageText: context.text.isEmpty ? nil : context.text,
+                        messageType: context.messageType ?? (fileIds.isEmpty ? "text" : "file"),
+                        fileIds: fileIds.isEmpty ? nil : fileIds,
+                        clientMessageId: clientId,
+                        replyToId: sanitizedReplyToId(context.replyToId, roomId: roomId),
+                        topicId: context.topicId,
+                        metadata: context.metadata
                     )
                 )
             )
-            // Swap optimistic → server message.
-            if let clientId = pending.clientMessageId {
-                pendingByClientId[clientId] = nil
+            // Swap optimistic → server message. The socket echo may have
+            // landed it via a refetch already, so replace-by-id.
+            pendingByClientId[clientId] = nil
+            sendContextsByClientId[clientId] = nil
+            failedClientIds.remove(clientId)
+            upsert(response.message)
+            replyingTo = nil
+            sendLimitNotice = nil
+            if context.messageType == nil {
+                queuedAttachments = []
             }
-            messages.append(response.message)
             rebuild()
             scheduleMarkRead(for: roomId)
+            return true
         } catch {
-            if let clientId = pending.clientMessageId {
-                failedClientIds.insert(clientId)
+            if Self.isPreBidLimit(error) {
+                sendLimitNotice = "Message limit reached — place a bid or wait for acceptance to keep chatting."
             }
+            // Don't resurrect a row that a concurrent socket echo already
+            // confirmed and retired (lost-response race — the server
+            // broadcasts `message:new` before the POST's HTTP response).
+            guard sendContextsByClientId[clientId] != nil else {
+                logger.warning("chat send failed but row already confirmed: \(error)")
+                return false
+            }
+            failedClientIds.insert(clientId)
             logger.warning("chat send failed: \(error)")
             rebuild()
+            return false
         }
     }
 
-    /// Retry a failed optimistic send.
-    public func retry(clientId: String) async {
-        guard let pending = pendingByClientId[clientId], let text = pending.messageText else { return }
-        failedClientIds.remove(clientId)
-        composerText = text
-        pendingByClientId[clientId] = nil
+    /// Whether an error is the gig room's pre-bid message cap — a 429
+    /// whose body carries `code: "PRE_BID_LIMIT"`
+    /// (`backend/routes/chats.js:1573`). The HTTP client surfaces 4xx
+    /// bodies as the raw string on `APIError.clientError`, so we match
+    /// the marker rather than re-decoding.
+    private static func isPreBidLimit(_ error: any Error) -> Bool {
+        guard case let APIError.clientError(status, message) = error else { return false }
+        return status == 429 && (message?.contains("PRE_BID_LIMIT") ?? false)
+    }
+
+    /// Insert a persisted message, replacing any copy that already
+    /// arrived through a socket-triggered refetch.
+    private func upsert(_ message: ChatMessageDTO) {
+        if let index = messages.firstIndex(where: { $0.id == message.id }) {
+            messages[index] = message
+        } else {
+            messages.append(message)
+        }
+    }
+
+    /// Bare lowercase UUID — the send validator is `Joi.string().uuid()`
+    /// (`backend/routes/chats.js:159`), so a prefixed id fails the whole
+    /// request with a 400. The `client_` prefix lives only on the local
+    /// optimistic row id.
+    private static func newClientMessageId() -> String {
+        UUID().uuidString.lowercased()
+    }
+
+    private static func bareClientId(_ rawId: String) -> String {
+        rawId.hasPrefix("client_") ? String(rawId.dropFirst("client_".count)) : rawId
+    }
+
+    /// The wire `replyToId` is accepted only when it points at a
+    /// persisted message that lives in the room we're actually sending
+    /// to. The backend rejects the whole send (400) if the reply target
+    /// is missing, soft-deleted, or in a different room
+    /// (`backend/routes/chats.js:1654`). Two cases this guards:
+    /// - person threads aggregate messages across every shared room
+    ///   (direct + gig + group), but we always send to the direct room —
+    ///   a reply to a gig/group bubble would 400;
+    /// - an optimistic (`client_`-prefixed) row isn't a UUID and isn't
+    ///   persisted yet.
+    /// In either case we drop the linkage and still deliver the text,
+    /// rather than failing the message permanently.
+    private func sanitizedReplyToId(_ replyToId: String?, roomId: String) -> String? {
+        guard let replyToId else { return nil }
+        return messages.first { $0.id == replyToId && $0.roomId == roomId }?.id
+    }
+
+    private func sendAIMessage(_ text: String) async {
+        let imageURLs = (try? await uploadQueuedAIImagesIfNeeded()) ?? []
+        let userMessage = localMessage(
+            id: "ai_user_\(UUID().uuidString)",
+            text: text,
+            userId: currentUserId,
+            type: "text",
+            imageURLs: imageURLs
+        )
+        let assistantId = "ai_assistant_\(UUID().uuidString)"
+        let assistantMessage = localMessage(id: assistantId, text: "", userId: "ai", type: "ai_reply")
+        messages.append(userMessage)
+        messages.append(assistantMessage)
+        queuedAttachments = []
         rebuild()
-        await send()
+
+        var streamedText = ""
+        do {
+            for try await event in aiClient.streamChat(
+                AIChatStreamRequest(
+                    message: text.isEmpty ? "What can you tell me about this image?" : text,
+                    conversationId: aiConversationId,
+                    images: imageURLs.isEmpty ? nil : imageURLs
+                )
+            ) {
+                switch event {
+                case let .conversation(id):
+                    aiConversationId = id
+                    aiConversationStore.setConversationId(id, forUserId: currentUserId)
+                case let .textDelta(delta):
+                    streamedText += delta
+                    replaceLocalMessage(id: assistantId, text: streamedText, type: "ai_reply", userId: "ai")
+                case let .draft(draft):
+                    aiDraftsByMessageId[assistantId, default: []].append(draft)
+                    rebuild()
+                case let .error(message):
+                    replaceLocalMessage(id: assistantId, text: message, type: "ai_reply", userId: "ai")
+                case .done:
+                    break
+                }
+            }
+        } catch {
+            replaceLocalMessage(id: assistantId, text: "I lost the connection. Please try again.", type: "ai_reply", userId: "ai")
+        }
     }
 
     /// Toggle a reaction on a message.
     public func react(messageId: String, reaction: String) async {
         do {
-            _ = try await api.request(
+            let response: ReactToChatMessageResponse = try await api.request(
                 ChatEndpoints.reactToMessage(id: messageId, reaction: reaction),
                 as: ReactToChatMessageResponse.self
             )
+            if let reactions = response.reactions {
+                applyReactions(reactions, to: messageId)
+            }
         } catch {
             logger.warning("chat react failed: \(error)")
+        }
+    }
+
+    public func beginReply(to messageId: String) {
+        guard let message = combinedMessages().first(where: { $0.id == messageId }) else { return }
+        replyingTo = ChatReplyPreview(
+            messageId: message.id,
+            senderName: message.sender?.name ?? (message.userId == currentUserId ? "You" : "Message"),
+            text: message.messageText ?? ""
+        )
+        editingMessageId = nil
+    }
+
+    public func beginEdit(messageId: String) {
+        guard let message = messages.first(where: { $0.id == messageId }),
+              message.userId == currentUserId,
+              let text = message.messageText else { return }
+        editingMessageId = messageId
+        replyingTo = nil
+        composerText = text
+    }
+
+    public func cancelMessageAction() {
+        replyingTo = nil
+        editingMessageId = nil
+    }
+
+    public func delete(messageId: String) async {
+        guard messages.contains(where: { $0.id == messageId && $0.userId == currentUserId }) else { return }
+        do {
+            _ = try await api.request(ChatEndpoints.deleteMessage(id: messageId), as: EmptyResponse.self)
+            messages.removeAll { $0.id == messageId }
+            rebuild()
+        } catch {
+            logger.warning("chat delete failed: \(error)")
+        }
+    }
+
+    /// Delete a batch of own messages by looping the single-message
+    /// endpoint (`DELETE /api/chat/messages/:messageId` — no bulk route
+    /// exists). Per-id failures are logged and skipped so one bad id
+    /// doesn't strand the rest of the selection.
+    public func bulkDelete(ids: [String]) async {
+        for id in ids {
+            await delete(messageId: id)
+        }
+    }
+
+    /// Block the person counterparty — `POST /api/users/:userId/block`
+    /// (route `backend/routes/blocks.js:13`, mounted at `/api/users`).
+    /// Returns true on success so the details sheet can dismiss and the
+    /// screen can pop back. No-ops for room/AI threads.
+    public func blockCounterparty() async -> Bool {
+        guard case let .person(otherUserId) = mode, !isBlocking else { return false }
+        isBlocking = true
+        defer { isBlocking = false }
+        do {
+            _ = try await api.request(BlocksEndpoints.block(userId: otherUserId), as: EmptyResponse.self)
+            return true
+        } catch {
+            logger.warning("block user failed: \(error)")
+            return false
         }
     }
 
@@ -276,11 +782,11 @@ public final class ChatConversationViewModel {
     }
 
     public func queueSamplePhotoAttachment() {
-        appendQueuedAttachment(ChatQueuedAttachment(id: "queued_photo", kind: .image, filename: "shelves.jpg"))
+        appendQueuedAttachment(ChatQueuedAttachment(id: "queued_photo", kind: .image, filename: "shelves.jpg", mimeType: "image/jpeg"))
     }
 
     public func queueSampleDocumentAttachment() {
-        appendQueuedAttachment(ChatQueuedAttachment(id: "queued_pdf", kind: .document, filename: "shelf.pdf"))
+        appendQueuedAttachment(ChatQueuedAttachment(id: "queued_pdf", kind: .document, filename: "shelf.pdf", mimeType: "application/pdf"))
     }
 
     public func queueSampleAttachments() {
@@ -292,9 +798,237 @@ public final class ChatConversationViewModel {
         queuedAttachments.removeAll { $0.id == id }
     }
 
+    public func queueAttachment(kind: ChatQueuedAttachmentKind, filename: String, mimeType: String, data: Data) {
+        appendQueuedAttachment(
+            ChatQueuedAttachment(
+                id: UUID().uuidString,
+                kind: kind,
+                filename: filename,
+                mimeType: mimeType,
+                data: data
+            )
+        )
+    }
+
+    public func loadShareableGigs() async {
+        isLoadingShareOptions = true
+        shareOptionsError = nil
+        defer { isLoadingShareOptions = false }
+        do {
+            let response: MyGigsResponse = try await api.request(GigsEndpoints.myGigs())
+            shareableGigs = response.gigs.map {
+                ChatShareGigOption(
+                    id: $0.id,
+                    title: $0.title,
+                    category: $0.category,
+                    price: $0.price,
+                    status: $0.status
+                )
+            }
+        } catch {
+            shareOptionsError = friendlyMessage(error)
+            shareableGigs = []
+        }
+    }
+
+    public func loadShareableListings() async {
+        isLoadingShareOptions = true
+        shareOptionsError = nil
+        defer { isLoadingShareOptions = false }
+        do {
+            let response: MyListingsResponse = try await api.request(ListingsEndpoints.myListings(limit: 100))
+            shareableListings = response.listings.compactMap { listing in
+                guard let title = listing.title, !title.isEmpty else { return nil }
+                let imageURL = listing.firstImage ?? listing.mediaUrls?.first
+                return ChatShareListingOption(
+                    id: listing.id,
+                    title: title,
+                    category: listing.category,
+                    price: listing.price,
+                    isFree: listing.isFree ?? false,
+                    condition: listing.condition,
+                    imageURL: imageURL
+                )
+            }
+        } catch {
+            shareOptionsError = friendlyMessage(error)
+            shareableListings = []
+        }
+    }
+
+    public func sendCurrentLocation() async {
+        guard !isSharingLocation, !isSending else { return }
+        isSharingLocation = true
+        defer { isSharingLocation = false }
+        guard let coordinate = await locationProvider.requestCurrent(timeoutSeconds: 4) else { return }
+        var address = String(format: "%.2f, %.2f", coordinate.latitude, coordinate.longitude)
+        do {
+            let response: GeoReverseResponse = try await api.request(
+                GeoEndpoints.reverse(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            )
+            let locality = response.normalized.localityLabel
+            if !locality.isEmpty { address = locality }
+        } catch {
+            // keep coordinate fallback
+        }
+        await sendRichMessage(
+            messageText: address,
+            messageType: "location",
+            metadata: [
+                "latitude": .number(coordinate.latitude),
+                "longitude": .number(coordinate.longitude),
+                "address": .string(address)
+            ]
+        )
+    }
+
+    public func sendGigOffer(_ gig: ChatShareGigOption) async {
+        var metadata: [String: JSONValue] = [
+            "gigId": .string(gig.id),
+            "title": .string(gig.title)
+        ]
+        if let category = gig.category { metadata["category"] = .string(category) }
+        if let price = gig.price { metadata["price"] = .number(price) }
+        if let status = gig.status { metadata["status"] = .string(status) }
+        await sendRichMessage(
+            messageText: gig.title,
+            messageType: "gig_offer",
+            metadata: metadata,
+            topicForPerson: ("task", gig.id, gig.title)
+        )
+    }
+
+    public func sendListingOffer(_ listing: ChatShareListingOption) async {
+        var metadata: [String: JSONValue] = [
+            "listingId": .string(listing.id),
+            "title": .string(listing.title),
+            "isFree": .bool(listing.isFree)
+        ]
+        if let category = listing.category { metadata["category"] = .string(category) }
+        if let price = listing.price { metadata["price"] = .number(price) }
+        if let condition = listing.condition { metadata["condition"] = .string(condition) }
+        if let imageURL = listing.imageURL { metadata["imageUrl"] = .string(imageURL) }
+        await sendRichMessage(
+            messageText: listing.title,
+            messageType: "listing_offer",
+            metadata: metadata,
+            topicForPerson: ("listing", listing.id, listing.title)
+        )
+    }
+
+    private func sendRichMessage(
+        messageText: String,
+        messageType: String,
+        metadata: [String: JSONValue],
+        topicForPerson: (type: String, refId: String, title: String)? = nil
+    ) async {
+        if case .ai = mode { return }
+        guard !isSending else { return }
+        isSending = true
+        defer { isSending = false }
+
+        let topicId = await resolveTopicIdForShare(topicForPerson)
+        let clientId = Self.newClientMessageId()
+        let pending = optimisticRichMessage(
+            text: messageText,
+            clientId: clientId,
+            roomId: knownRoomIdHint(),
+            messageType: messageType,
+            metadata: metadata
+        )
+        pendingByClientId[clientId] = pending
+        sendContextsByClientId[clientId] = PendingSendContext(
+            text: messageText,
+            fileIds: nil,
+            replyToId: replyingTo?.messageId,
+            topicId: topicId,
+            messageType: messageType,
+            metadata: metadata
+        )
+        rebuild()
+        let succeeded = await performSend(clientId: clientId)
+        if succeeded, topicForPerson != nil {
+            await loadTopicsIfNeeded()
+        }
+    }
+
+    private func resolveTopicIdForShare(
+        _ topic: (type: String, refId: String, title: String)?
+    ) async -> String? {
+        guard let topic else { return selectedTopicId }
+        guard case let .person(otherUserId) = mode else { return selectedTopicId }
+        do {
+            let response: FindOrCreateTopicResponse = try await api.request(
+                ChatEndpoints.findOrCreateTopic(
+                    otherUserId: otherUserId,
+                    body: FindOrCreateTopicBody(
+                        topicType: topic.type,
+                        topicRefId: topic.refId,
+                        title: topic.title
+                    )
+                )
+            )
+            selectedTopicId = response.topic.id
+            return response.topic.id
+        } catch {
+            logger.warning("find/create share topic failed: \(error)")
+            return selectedTopicId
+        }
+    }
+
+    private func optimisticRichMessage(
+        text: String,
+        clientId: String,
+        roomId: String,
+        messageType: String,
+        metadata: [String: JSONValue]
+    ) -> ChatMessageDTO {
+        ChatMessageDTO(
+            id: "client_\(clientId)",
+            roomId: roomId,
+            userId: currentUserId,
+            messageText: text,
+            messageType: messageType,
+            metadata: .object(metadata),
+            replyToId: nil,
+            clientMessageId: clientId,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            editedAt: nil,
+            deletedAt: nil,
+            deliveredAt: nil,
+            readAt: nil,
+            sender: nil
+        )
+    }
+
     private func appendQueuedAttachment(_ attachment: ChatQueuedAttachment) {
         guard !queuedAttachments.contains(where: { $0.id == attachment.id }) else { return }
-        queuedAttachments.append(attachment)
+        queuedAttachments = Array((queuedAttachments + [attachment]).prefix(5))
+    }
+
+    private func uploadQueuedAttachmentsIfNeeded(roomId: String) async throws -> [String] {
+        let files = queuedAttachments.compactMap { attachment -> MultipartFile? in
+            guard let data = attachment.data else { return nil }
+            return MultipartFile(
+                fieldName: "files",
+                filename: attachment.filename,
+                mimeType: attachment.mimeType,
+                data: data
+            )
+        }
+        guard !files.isEmpty else { return [] }
+        let response = try await uploader.uploadChatMedia(roomId: roomId, files: files)
+        return response.media.map(\.id)
+    }
+
+    private func uploadQueuedAIImagesIfNeeded() async throws -> [String] {
+        let files = queuedAttachments.compactMap { attachment -> MultipartFile? in
+            guard let data = attachment.data, attachment.mimeType.hasPrefix("image/") else { return nil }
+            return MultipartFile(fieldName: "files", filename: attachment.filename, mimeType: attachment.mimeType, data: data)
+        }
+        guard !files.isEmpty else { return [] }
+        let response = try await uploader.uploadAIMedia(files: files)
+        return response.images.map(\.url)
     }
 
     // MARK: - Fetch
@@ -303,8 +1037,11 @@ public final class ChatConversationViewModel {
         if initial {
             state = .loading
             messages = []
-            pendingByClientId = [:]
-            failedClientIds = []
+            // Pending / failed optimistic rows survive refetches —
+            // socket events trigger `fetch(initial: true)`, and eating
+            // an in-flight or failed send here would lose the message
+            // and its retry CTA. Confirmed rows are retired in
+            // `apply(response:)` by `client_message_id` match.
             oldestCursor = nil
             hasMore = false
         }
@@ -315,13 +1052,42 @@ public final class ChatConversationViewModel {
             state = .empty
             return
         case let .room(roomId):
-            await fetchRoom(roomId: roomId, before: before)
+            await fetchRoom(roomId: roomId, before: before, initial: initial)
         case let .person(otherUserId):
-            await fetchPerson(otherUserId: otherUserId, before: before)
+            await fetchPerson(otherUserId: otherUserId, before: before, initial: initial)
         }
     }
 
-    private func fetchRoom(roomId: String, before: String?) async {
+    private func loadTopicsIfNeeded() async {
+        guard case let .person(otherUserId) = mode else { return }
+        if let initialTopic, selectedTopicId == nil {
+            do {
+                let response: FindOrCreateTopicResponse = try await api.request(
+                    ChatEndpoints.findOrCreateTopic(
+                        otherUserId: otherUserId,
+                        body: FindOrCreateTopicBody(
+                            topicType: initialTopic.topicType,
+                            topicRefId: initialTopic.topicRefId,
+                            title: initialTopic.title
+                        )
+                    )
+                )
+                selectedTopicId = response.topic.id
+            } catch {
+                logger.warning("find/create topic failed: \(error)")
+            }
+        }
+        do {
+            let response: ConversationTopicsResponse = try await api.request(ChatEndpoints.conversationTopics(otherUserId: otherUserId))
+            topics = response.topics.map {
+                ChatConversationTopic(id: $0.id, topicType: $0.topicType, title: $0.title, status: $0.status)
+            }
+        } catch {
+            logger.warning("load topics failed: \(error)")
+        }
+    }
+
+    private func fetchRoom(roomId: String, before: String?, initial: Bool) async {
         do {
             let response: ChatMessagesResponse = try await api.request(
                 ChatEndpoints.roomMessages(roomId: roomId, before: before)
@@ -329,30 +1095,81 @@ public final class ChatConversationViewModel {
             apply(response: response)
             scheduleMarkRead(for: roomId)
         } catch {
-            state = .error(message: friendlyMessage(error))
+            handleFetchFailure(error, initial: initial)
         }
     }
 
-    private func fetchPerson(otherUserId: String, before: String?) async {
+    private func fetchPerson(otherUserId: String, before: String?, initial: Bool) async {
         do {
             let response: ChatMessagesResponse = try await api.request(
-                ChatEndpoints.conversationMessages(otherUserId: otherUserId, before: before)
+                ChatEndpoints.conversationMessages(otherUserId: otherUserId, before: before, topicId: selectedTopicId)
             )
             apply(response: response)
             scheduleMarkRead(for: otherUserId)
         } catch {
+            handleFetchFailure(error, initial: initial)
+        }
+    }
+
+    private func handleFetchFailure(_ error: any Error, initial: Bool) {
+        if initial {
             state = .error(message: friendlyMessage(error))
+        } else {
+            logger.warning("chat pagination failed: \(error)")
         }
     }
 
     private func apply(response: ChatMessagesResponse) {
         // Backend returns newest-first; we keep an oldest-first array
-        // for stable projection.
-        let ordered = response.messages.reversed()
+        // for stable projection. Drop ids we already hold — a send
+        // completing while this fetch was in flight may have upserted
+        // its message ahead of us.
+        let existingIds = Set(messages.map(\.id))
+        let ordered = response.messages.reversed().filter { !existingIds.contains($0.id) }
         messages.insert(contentsOf: ordered, at: 0)
+        // A fetched row carrying one of our client ids means that send
+        // landed server-side (e.g. the POST response was lost, then a
+        // socket refetch ran) — retire every trace of the optimistic
+        // copy so a delivered message can never linger as "failed".
+        for clientId in response.messages.compactMap(\.clientMessageId)
+        where pendingByClientId[clientId] != nil
+            || sendContextsByClientId[clientId] != nil
+            || failedClientIds.contains(clientId) {
+            pendingByClientId[clientId] = nil
+            sendContextsByClientId[clientId] = nil
+            failedClientIds.remove(clientId)
+        }
+        updateActiveRooms(response: response)
         hasMore = response.hasMore ?? false
-        oldestCursor = messages.first?.createdAt
+        oldestCursor = response.nextCursor ?? Self.paginationCursor(for: messages.first)
         rebuild()
+        joinActiveRoomsIfPossible()
+    }
+
+    /// Stable `(created_at|id)` cursor for keyset pagination. Avoids raw
+    /// ISO strings with `+` offsets — those become spaces in query strings.
+    private static func paginationCursor(for message: ChatMessageDTO?) -> String? {
+        guard let message else { return nil }
+        let timestamp = normalizeTimestampForPagination(message.createdAt)
+        return "\(timestamp)|\(message.id)"
+    }
+
+    private static func normalizeTimestampForPagination(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "+00:00", with: "Z")
+            .replacingOccurrences(of: "+0000", with: "Z")
+    }
+
+    private func updateActiveRooms(response: ChatMessagesResponse) {
+        var ids = Set(response.roomIds ?? [])
+        ids.formUnion(response.messages.map(\.roomId))
+        if case let .room(roomId) = mode {
+            ids.insert(roomId)
+        }
+        if let directRoomId {
+            ids.insert(directRoomId)
+        }
+        activeRoomIds = ids
     }
 
     // MARK: - Mark-read
@@ -385,17 +1202,49 @@ public final class ChatConversationViewModel {
         }
     }
 
-    private func resolveRoomId() async -> String? {
+    /// Resolve the room to send into. Room threads use their fixed id.
+    /// Person threads always send to the pair's direct room — found or
+    /// created via `POST /api/chat/direct` and cached — never to a
+    /// shared gig/group room surfaced by the aggregated fetch, which
+    /// would misfile plain DMs and trip gig pre-bid send limits.
+    private func ensureRoomId() async throws -> String {
+        switch mode {
+        case let .room(id):
+            return id
+        case .ai:
+            throw ChatSendError.noRoom
+        case let .person(otherUserId):
+            if let directRoomId { return directRoomId }
+            if let inFlight = directRoomTask {
+                return try await inFlight.value
+            }
+            let task = Task { [api] in
+                let response: CreateDirectChatResponse = try await api.request(
+                    ChatEndpoints.createDirectChat(otherUserId: otherUserId)
+                )
+                return response.roomId
+            }
+            directRoomTask = task
+            defer { directRoomTask = nil }
+            let roomId = try await task.value
+            directRoomId = roomId
+            // Join the freshly resolved room so the socket delivers
+            // `message:new` for replies that land in it.
+            if !activeRoomIds.contains(roomId) {
+                activeRoomIds.insert(roomId)
+                joinActiveRoomsIfPossible()
+            }
+            return roomId
+        }
+    }
+
+    /// Best-known room id for the optimistic row (cosmetic only — the
+    /// authoritative id is resolved by `ensureRoomId()` at send time).
+    private func knownRoomIdHint() -> String {
         switch mode {
         case let .room(id): return id
-        case let .person(otherUserId):
-            // Person mode requires a room id for `/messages`. Use the
-            // first room id surfaced by the most recent message, or
-            // fall back to the otherUserId stand-in if the thread is
-            // empty (server will create a direct room on first send).
-            if let firstRoom = messages.first?.roomId { return firstRoom }
-            return otherUserId
-        case .ai: return nil
+        case .person: return directRoomId ?? ""
+        case .ai: return ""
         }
     }
 
@@ -404,28 +1253,65 @@ public final class ChatConversationViewModel {
     private func subscribeToSockets() {
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
+            for await state in socket.connectionStates() where state == .connected {
+                joinedRoomIds.removeAll()
+                joinActiveRoomsIfPossible()
+            }
+        })
+        socketTasks.append(Task { [weak self] in
+            guard let self else { return }
             for await event in socket.events(named: "message:new", as: ChatRealtimeMessage.self) {
                 handleIncoming(event)
             }
         })
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await event in socket.events(named: "messageUpdated", as: ChatRealtimeMessageUpdate.self) {
+            for await event in socket.events(named: "message:edited", as: ChatRealtimeMessageUpdate.self) {
                 handleUpdate(event)
             }
         })
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await event in socket.events(named: "messageDeleted", as: ChatRealtimeMessageDelete.self) {
+            for await event in socket.events(named: "message:deleted", as: ChatRealtimeMessageDelete.self) {
                 handleDelete(event)
             }
         })
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await event in socket.events(named: "message:react", as: ChatRealtimeReaction.self) {
+            for await event in socket.events(named: "message:reaction_updated", as: ChatRealtimeReaction.self) {
                 handleReaction(event)
             }
         })
+        joinActiveRoomsIfPossible()
+    }
+
+    private func joinActiveRoomsIfPossible() {
+        guard socket.connectionState == .connected else { return }
+        let pendingRooms = activeRoomIds.subtracting(joinedRoomIds)
+        guard !pendingRooms.isEmpty else { return }
+        for roomId in pendingRooms {
+            joinedRoomIds.insert(roomId)
+            socketTasks.append(Task { [weak self] in
+                guard let self else { return }
+                let ack: ChatRoomJoinAck? = await socket.emitWithAck(
+                    "room:join",
+                    payload: ["roomId": roomId],
+                    as: ChatRoomJoinAck.self
+                )
+                guard ack?.success == true, let backfill = ack?.messages, !backfill.isEmpty else { return }
+                mergeBackfill(backfill)
+            })
+        }
+    }
+
+    private func mergeBackfill(_ backfill: [ChatMessageDTO]) {
+        let existingIds = Set(messages.map(\.id))
+        let newMessages = backfill.filter { !existingIds.contains($0.id) }
+        guard !newMessages.isEmpty else { return }
+        messages.append(contentsOf: newMessages)
+        messages.sort { $0.createdAt < $1.createdAt }
+        rebuild()
+        scheduleMarkRead()
     }
 
     /// Merge a reaction count update into the matching message. The
@@ -439,10 +1325,15 @@ public final class ChatConversationViewModel {
     }
 
     private func handleIncoming(_ event: ChatRealtimeMessage) {
-        // Server-side echo of our own optimistic message. Swap the
-        // matching pending row out.
+        guard activeRoomIds.contains(event.roomId) else { return }
+        // Server-side echo of our own optimistic message. Retire every
+        // trace of it — clearing the send context and any failed mark
+        // too, so a lost POST response resolving moments later can't
+        // re-flag the now-confirmed message as failed.
         if let clientId = event.clientMessageId, pendingByClientId[clientId] != nil {
             pendingByClientId[clientId] = nil
+            sendContextsByClientId[clientId] = nil
+            failedClientIds.remove(clientId)
             Task { await self.refresh() }
             return
         }
@@ -452,6 +1343,7 @@ public final class ChatConversationViewModel {
     }
 
     private func handleUpdate(_ event: ChatRealtimeMessageUpdate) {
+        if let roomId = event.roomId, !activeRoomIds.contains(roomId) { return }
         guard let index = messages.firstIndex(where: { $0.id == event.id }) else { return }
         let original = messages[index]
         // Construct an updated DTO by re-encoding/decoding the
@@ -461,7 +1353,23 @@ public final class ChatConversationViewModel {
     }
 
     private func handleDelete(_ event: ChatRealtimeMessageDelete) {
+        if let roomId = event.roomId, !activeRoomIds.contains(roomId) { return }
         messages.removeAll { $0.id == event.id }
+        rebuild()
+    }
+
+    private func applyUpdatedMessage(_ updated: ChatMessageDTO) {
+        if let index = messages.firstIndex(where: { $0.id == updated.id }) {
+            messages[index] = updated
+        } else {
+            messages.append(updated)
+        }
+        rebuild()
+    }
+
+    private func applyReactions(_ reactions: [ChatReactionSummary], to messageId: String) {
+        guard let index = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        messages[index] = messages[index].replacingReactions(reactions)
         rebuild()
     }
 
@@ -473,13 +1381,29 @@ public final class ChatConversationViewModel {
             state = .empty
             return
         }
+        // Topic dividers render only in a person thread's unfiltered
+        // ("All") view, and only when the pair has at least one topic —
+        // a topicId change between consecutive messages (nil → non-nil
+        // included) starts a new labeled segment.
+        let showsTopicDividers: Bool = {
+            guard case .person = mode else { return false }
+            return selectedTopicId == nil && !topics.isEmpty
+        }()
         var rows: [ChatTimelineRow] = []
         var lastDayKey: String?
+        var lastTopicId: String?
         for (index, message) in combined.enumerated() {
             let dayKey = Self.dayKey(for: message.createdAt)
             if dayKey != lastDayKey {
                 rows.append(.dayDivider(ChatDayDivider(id: dayKey, label: Self.dayLabel(for: message.createdAt))))
                 lastDayKey = dayKey
+            }
+            if showsTopicDividers {
+                if index > 0, message.topicId != lastTopicId {
+                    let label = topics.first { $0.id == message.topicId }?.title ?? "General"
+                    rows.append(.topicDivider(ChatTopicDivider(id: message.id, label: label)))
+                }
+                lastTopicId = message.topicId
             }
             if message.messageType == "broadcast_reference" {
                 rows.append(.broadcastReference(Self.broadcastReference(for: message)))
@@ -496,7 +1420,14 @@ public final class ChatConversationViewModel {
                 Self.dayKey(for: combined[index + 1].createdAt) == dayKey
             let hasTail = !nextSameSide
             let stamp: String? = hasTail ? Self.stampLabel(for: message, currentUserId: currentUserId) : nil
-            let body = Self.bodyForMessage(message)
+            var body = Self.bodyForMessage(message)
+            if message.messageType == "ai_reply" {
+                body = .aiReply(text: message.messageText ?? "", estimate: nil, drafts: aiDraftsByMessageId[message.id] ?? [])
+            }
+            let replyPreview = Self.replyPreview(for: message, in: combined)
+            let reactions = message.reactions.map {
+                ChatBubbleReaction(id: $0.reaction, reaction: $0.reaction, count: $0.count, reactedByMe: $0.reactedByMe)
+            }
             let deliveryState: ChatDeliveryState? = {
                 guard side == .outgoing else { return nil }
                 if let clientId = message.clientMessageId, failedClientIds.contains(clientId) {
@@ -510,6 +1441,8 @@ public final class ChatConversationViewModel {
                 id: message.id,
                 side: side,
                 body: body,
+                replyPreview: replyPreview,
+                reactions: reactions,
                 hasTail: hasTail,
                 isContinuation: previousSameSide,
                 stamp: stamp,
@@ -553,71 +1486,192 @@ public final class ChatConversationViewModel {
         return messages + pending
     }
 
-    private func optimisticMessage(text: String, roomId: String) -> ChatMessageDTO {
-        let clientId = "client_\(UUID().uuidString)"
-        let nowISO = ISO8601DateFormatter().string(from: Date())
-        let json = """
-        {
-          "id": "\(clientId)",
-          "room_id": "\(roomId)",
-          "user_id": "\(currentUserId)",
-          "message_text": \(Self.jsonString(text)),
-          "message_type": "text",
-          "client_message_id": "\(clientId)",
-          "created_at": "\(nowISO)"
-        }
-        """
-        let decoder = JSONDecoder()
-        return (try? decoder.decode(ChatMessageDTO.self, from: Data(json.utf8))) ?? Self.fallback(
-            clientId: clientId,
-            text: text,
+    /// Optimistic local row. Its `id` keeps the `client_` prefix — the
+    /// projection and views key "still sending" off that — while
+    /// `clientMessageId` stays a bare UUID for the wire.
+    private func optimisticMessage(text: String, clientId: String, roomId: String) -> ChatMessageDTO {
+        ChatMessageDTO(
+            id: "client_\(clientId)",
             roomId: roomId,
-            nowISO: nowISO,
-            userId: currentUserId
+            userId: currentUserId,
+            messageText: text,
+            messageType: "text",
+            metadata: nil,
+            replyToId: nil,
+            clientMessageId: clientId,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            editedAt: nil,
+            deletedAt: nil,
+            deliveredAt: nil,
+            readAt: nil,
+            sender: nil
         )
     }
 
-    private static func fallback(clientId: String, text _: String, roomId: String, nowISO: String, userId: String) -> ChatMessageDTO {
-        // Last-resort placeholder when JSON encoding the optimistic
-        // payload fails (should be unreachable — payload is constant).
-        let json = """
-        {
-          "id":"\(clientId)","room_id":"\(roomId)","user_id":"\(userId)",
-          "message_text":"send failed","message_type":"text",
-          "client_message_id":"\(clientId)","created_at":"\(nowISO)"
-        }
-        """
-        // swiftlint:disable:next force_try
-        return try! JSONDecoder().decode(ChatMessageDTO.self, from: Data(json.utf8))
+    private func localMessage(id: String, text: String, userId: String, type: String, imageURLs: [String] = []) -> ChatMessageDTO {
+        ChatMessageDTO(
+            id: id,
+            roomId: "ai",
+            userId: userId,
+            messageText: text,
+            messageType: type,
+            metadata: imageURLs.isEmpty ? nil : .object(["image_urls": .array(imageURLs.map(JSONValue.string))]),
+            replyToId: nil,
+            clientMessageId: nil,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            editedAt: nil,
+            deletedAt: nil,
+            deliveredAt: nil,
+            readAt: nil,
+            sender: nil
+        )
     }
 
-    private static func jsonString(_ raw: String) -> String {
-        let data = try? JSONEncoder().encode(raw)
-        return data.flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+    private func replaceLocalMessage(id: String, text: String, type: String, userId: String) {
+        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+        messages[index] = localMessage(id: id, text: text, userId: userId, type: type)
+        rebuild()
     }
 
     // MARK: - Body / stamp helpers
 
     private static func bodyForMessage(_ message: ChatMessageDTO) -> ChatBubbleContent.Body {
+        if let urls = message.metadata?.dictValue?["image_urls"]?.arrayValue?
+            .compactMap({ $0.stringValue })
+            .compactMap({ Self.resolvedMediaURL($0) }),
+           !urls.isEmpty {
+            return .textWithImages(text: message.messageText ?? "", imageURLs: urls)
+        }
+        if let firstAttachment = message.attachments.first {
+            let mime = firstAttachment.mimeType ?? ""
+            if mime.hasPrefix("image/"), let rawURL = firstAttachment.fileURL {
+                return .image(url: Self.resolvedMediaURL(rawURL))
+            }
+            return .attachment(
+                filename: firstAttachment.originalFilename ?? "Attachment",
+                sizeLabel: fileSizeLabel(firstAttachment.fileSize)
+            )
+        }
         switch message.messageType {
+        case "ai_reply":
+            return .aiReply(text: message.messageText ?? "", estimate: nil, drafts: [])
         case "image":
-            let url = (message.metadata?.dictValue?["image_url"]?.stringValue).flatMap(URL.init(string:))
+            let url = (message.metadata?.dictValue?["image_url"]?.stringValue).flatMap(Self.resolvedMediaURL)
             return .image(url: url)
         case "file", "audio":
             let name = message.metadata?.dictValue?["filename"]?.stringValue ?? "Attachment"
             return .attachment(filename: name, sizeLabel: nil)
         case "gig_offer":
-            let title = message.metadata?.dictValue?["title"]?.stringValue ?? "Shared gig"
-            return .systemLink(label: "Shared gig ·", sub: title, accent: .primary)
+            let meta = message.metadata?.dictValue
+            let gigId = Self.metaString(meta, keys: "gigId", "gig_id")
+                ?? Self.extractEntityId(from: message.messageText, collection: "gigs")
+            let title = Self.metaString(meta, keys: "title") ?? message.messageText ?? "Shared gig"
+            return .gigOfferCard(ChatGigOfferCard(
+                gigId: gigId ?? "",
+                title: title,
+                category: Self.metaString(meta, keys: "category"),
+                priceLabel: Self.metaPriceLabel(meta),
+                status: Self.metaString(meta, keys: "status")
+            ))
         case "listing_offer":
-            let title = message.metadata?.dictValue?["title"]?.stringValue ?? "Shared listing"
-            return .systemLink(label: "Shared listing ·", sub: title, accent: .success)
+            let meta = message.metadata?.dictValue
+            let listingId = Self.metaString(meta, keys: "listingId", "listing_id")
+                ?? Self.extractEntityId(from: message.messageText, collection: "listings")
+            let title = Self.metaString(meta, keys: "title") ?? message.messageText ?? "Shared listing"
+            let isFree = Self.metaBool(meta, keys: "isFree", "is_free") ?? false
+            let imageRaw = Self.metaString(meta, keys: "imageUrl", "image_url")
+            return .listingOfferCard(ChatListingOfferCard(
+                listingId: listingId ?? "",
+                title: title,
+                category: Self.metaString(meta, keys: "category"),
+                priceLabel: Self.metaListingPriceLabel(meta, isFree: isFree),
+                condition: Self.metaString(meta, keys: "condition"),
+                imageURL: imageRaw.flatMap(URL.init(string:))
+            ))
         case "location":
-            let where_ = message.metadata?.dictValue?["address"]?.stringValue ?? "Pinned location"
-            return .systemLink(label: "Location ·", sub: where_, accent: .warning)
+            let meta = message.metadata?.dictValue
+            let address = Self.metaString(meta, keys: "address") ?? message.messageText ?? "Pinned location"
+            let latitude = Self.metaDouble(meta, keys: "latitude", "lat") ?? 0
+            let longitude = Self.metaDouble(meta, keys: "longitude", "lng", "lon") ?? 0
+            return .locationCard(ChatLocationCard(
+                latitude: latitude,
+                longitude: longitude,
+                address: address
+            ))
         default:
             return .text(message.messageText ?? "")
         }
+    }
+
+    private static func resolvedMediaURL(_ raw: String?) -> URL? {
+        ChatMediaURL.resolve(raw: raw)
+    }
+
+    private static func metaString(_ meta: [String: JSONValue]?, keys: String...) -> String? {
+        guard let meta else { return nil }
+        for key in keys {
+            if let value = meta[key]?.stringValue, !value.isEmpty { return value }
+        }
+        return nil
+    }
+
+    private static func metaDouble(_ meta: [String: JSONValue]?, keys: String...) -> Double? {
+        guard let meta else { return nil }
+        for key in keys {
+            if let value = meta[key]?.numberValue { return value }
+            if let value = meta[key]?.stringValue, let parsed = Double(value) { return parsed }
+        }
+        return nil
+    }
+
+    private static func metaBool(_ meta: [String: JSONValue]?, keys: String...) -> Bool? {
+        guard let meta else { return nil }
+        for key in keys {
+            if let value = meta[key]?.boolValue { return value }
+        }
+        return nil
+    }
+
+    private static func metaPriceLabel(_ meta: [String: JSONValue]?) -> String? {
+        guard let raw = metaDouble(meta, keys: "price") else { return nil }
+        return "$\(Int(raw.rounded()))"
+    }
+
+    private static func metaListingPriceLabel(_ meta: [String: JSONValue]?, isFree: Bool) -> String {
+        if isFree { return "FREE" }
+        guard let raw = metaDouble(meta, keys: "price") else { return "Make Offer" }
+        return "$\(Int(raw.rounded()))"
+    }
+
+    private static func extractEntityId(from text: String?, collection: String) -> String? {
+        guard let text, !text.isEmpty else { return nil }
+        let pattern = #"/\#(collection)/([A-Za-z0-9-]+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, range: range),
+              let idRange = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[idRange])
+    }
+
+    private static func fileSizeLabel(_ bytes: Int?) -> String? {
+        guard let bytes else { return nil }
+        if bytes >= 1_000_000 {
+            return String(format: "%.1f MB", Double(bytes) / 1_000_000)
+        }
+        if bytes >= 1_000 {
+            return "\(bytes / 1_000) KB"
+        }
+        return "\(bytes) B"
+    }
+
+    private static func replyPreview(for message: ChatMessageDTO, in messages: [ChatMessageDTO]) -> ChatReplyPreview? {
+        guard let replyToId = message.replyToId,
+              let original = messages.first(where: { $0.id == replyToId }) else { return nil }
+        return ChatReplyPreview(
+            messageId: original.id,
+            senderName: original.sender?.name ?? "Message",
+            text: original.messageText ?? ""
+        )
     }
 
     private static func lockedTier(for message: ChatMessageDTO) -> String? {

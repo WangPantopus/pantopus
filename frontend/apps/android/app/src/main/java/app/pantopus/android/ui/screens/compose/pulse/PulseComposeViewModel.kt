@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
+import app.pantopus.android.data.upload.UploadRepository
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
@@ -186,6 +187,7 @@ class PulseComposeViewModel
     @Inject
     constructor(
         private val repo: PostsRepository,
+        private val uploadRepo: UploadRepository,
         private val networkMonitor: NetworkMonitor,
         private val postsRefresh: PulsePostsRefreshNotifier,
         savedStateHandle: SavedStateHandle,
@@ -488,6 +490,26 @@ class PulseComposeViewModel
 
         // MARK: - Submit
 
+        private suspend fun uploadPhotosIfNeeded(
+            postId: String?,
+            isEditing: Boolean,
+        ): Pair<String, Boolean> {
+            if (postId == null || _photos.value.isEmpty()) {
+                return (if (isEditing) "Saved" else "Posted") to false
+            }
+            return when (val upload = uploadRepo.uploadPostMedia(postId, _photos.value.map { it.data })) {
+                is NetworkResult.Success -> (if (isEditing) "Saved" else "Posted") to false
+                is NetworkResult.Failure ->
+                    (
+                        if (isEditing) {
+                            "Saved, but photos couldn't attach."
+                        } else {
+                            "Posted, but photos couldn't attach."
+                        }
+                    ) to true
+            }
+        }
+
         fun submit() {
             if (_state.value is PulseComposeUiState.Submitting) return
             val invalid = validateAll()
@@ -527,8 +549,10 @@ class PulseComposeViewModel
         private suspend fun handleCreate() {
             when (val result = repo.createPost(buildRequest())) {
                 is NetworkResult.Success -> {
-                    _state.value = PulseComposeUiState.Success(postId = result.data.postId)
-                    _toast.value = PulseComposeToast("Posted", isError = false)
+                    val postId = result.data.post?.id ?: result.data.postId
+                    val (toastText, toastError) = uploadPhotosIfNeeded(postId, isEditing = false)
+                    _state.value = PulseComposeUiState.Success(postId = postId)
+                    _toast.value = PulseComposeToast(toastText, isError = toastError)
                     _shouldDismiss.value = true
                     postsRefresh.notifyPostsDidChange()
                     Analytics.track(
@@ -555,9 +579,10 @@ class PulseComposeViewModel
         private suspend fun handleUpdate(postId: String) {
             when (val result = repo.updatePost(postId, buildUpdateRequest())) {
                 is NetworkResult.Success -> {
-                    _state.value =
-                        PulseComposeUiState.Success(postId = result.data.postId ?: postId)
-                    _toast.value = PulseComposeToast("Saved", isError = false)
+                    val resolvedId = result.data.postId ?: postId
+                    val (toastText, toastError) = uploadPhotosIfNeeded(resolvedId, isEditing = true)
+                    _state.value = PulseComposeUiState.Success(postId = resolvedId)
+                    _toast.value = PulseComposeToast(toastText, isError = toastError)
                     _shouldDismiss.value = true
                     postsRefresh.notifyPostsDidChange()
                     Analytics.track(

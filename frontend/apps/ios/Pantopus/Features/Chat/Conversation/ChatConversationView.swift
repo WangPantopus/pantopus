@@ -10,19 +10,33 @@
 
 // swiftlint:disable file_length
 
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Chat conversation screen.
 public struct ChatConversationView: View {
     @State private var viewModel: ChatConversationViewModel
     @State private var attachmentsPresented = false
+    @State private var photosPickerSelection: [PhotosPickerItem] = []
+    @State private var photosPickerPresented = false
+    @State private var documentImporterPresented = false
+    @State private var gigPickerPresented = false
+    @State private var listingPickerPresented = false
     @State private var upgradePromptPresented = false
+    @State private var detailsPresented = false
+    @State private var emojiPickerPresented = false
+    @State private var isSelecting = false
+    @State private var selectedMessageIds: Set<String> = []
+    @State private var bulkDeleteConfirmPresented = false
+    @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Presentation mode — drives the AI chrome (avatar, welcome card,
     /// reply bubbles). Default `.dm`.
     private let mode: ChatConversationMode
     private let creatorContext: ChatCreatorThreadContext?
     private let onOpenAudienceProfile: @MainActor () -> Void
+    private let onUseAIDraft: @MainActor (ChatAIDraftCard) -> Void
     private let onBack: @MainActor () -> Void
 
     public init(
@@ -30,12 +44,14 @@ public struct ChatConversationView: View {
         mode: ChatConversationMode = .dm,
         creatorContext: ChatCreatorThreadContext? = nil,
         onOpenAudienceProfile: @escaping @MainActor () -> Void = {},
+        onUseAIDraft: @escaping @MainActor (ChatAIDraftCard) -> Void = { _ in },
         onBack: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.mode = mode
         self.creatorContext = creatorContext
         self.onOpenAudienceProfile = onOpenAudienceProfile
+        self.onUseAIDraft = onUseAIDraft
         self.onBack = onBack
     }
 
@@ -50,6 +66,7 @@ public struct ChatConversationView: View {
             mode: mode,
             creatorContext: creatorContext,
             onOpenAudienceProfile: {},
+            onUseAIDraft: { _ in },
             onBack: onBack
         )
     }
@@ -61,7 +78,12 @@ public struct ChatConversationView: View {
                 counterparty: viewModel.counterparty,
                 creatorContext: resolvedCreatorContext,
                 onBack: onBack
-            )
+            ) {
+                detailsPresented = true
+            }
+            if isSelecting {
+                ChatSelectionTopBar(count: selectedMessageIds.count, onCancel: exitSelection)
+            }
             if mode == .creatorThread {
                 ChatCreatorAudienceStrip(
                     context: resolvedCreatorContext,
@@ -73,6 +95,15 @@ public struct ChatConversationView: View {
                 FanMembershipStripe(entitlement: activeFanEntitlement) {
                     upgradePromptPresented = true
                 }
+            }
+            if !viewModel.topics.isEmpty {
+                ChatTopicStrip(
+                    topics: viewModel.topics,
+                    selectedTopicId: viewModel.selectedTopicId,
+                    onSelect: { topicId in
+                        Task { await viewModel.selectTopic(topicId) }
+                    }
+                )
             }
             content
             if viewModel.isCounterpartyTyping {
@@ -88,41 +119,138 @@ public struct ChatConversationView: View {
                     upgradePromptPresented = true
                 }
             }
-            ChatComposer(
-                text: Binding(
-                    get: { viewModel.composerText },
-                    set: { viewModel.composerText = $0 }
-                ),
-                placeholder: composerPlaceholder,
-                canSend: viewModel.canSend,
-                showsSendCost: mode == .fanThread && !isFanReplyLocked,
-                isLockedAction: isFanReplyLocked,
-                onAttach: { attachmentsPresented = true },
-                onEmoji: {},
-                onSend: { sendOrPromptForUpgrade() }
-            )
+            if isSelecting {
+                ChatSelectionDeleteBar(selectedCount: selectedMessageIds.count) {
+                    bulkDeleteConfirmPresented = true
+                }
+            } else {
+                actionBanner
+                sendLimitBanner
+                ChatComposer(
+                    text: Binding(
+                        get: { viewModel.composerText },
+                        set: { viewModel.composerText = $0 }
+                    ),
+                    placeholder: composerPlaceholder,
+                    canSend: viewModel.canSend,
+                    showsSendCost: mode == .fanThread && !isFanReplyLocked,
+                    isLockedAction: isFanReplyLocked,
+                    onAttach: { attachmentsPresented = true },
+                    onEmoji: { emojiPickerPresented = true },
+                    onSend: { sendOrPromptForUpgrade() }
+                )
+            }
         }
         .background(Theme.Color.appSurface)
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .onDisappear { viewModel.teardown() }
+        // RN attach-grid parity: Photos / Document / Location / Task /
+        // Marketplace. Camera is intentionally omitted — capture needs
+        // AVCaptureDevice permission plumbing (Phase 4).
         .confirmationDialog(
             "Attach",
             isPresented: $attachmentsPresented,
             titleVisibility: .visible
         ) {
-            Button("Photo or video") { viewModel.queueSamplePhotoAttachment() }
-            Button("Document") { viewModel.queueSampleDocumentAttachment() }
-            Button("Listing") {}
-            Button("Gig") {}
-            Button("Location") {}
+            Button("Photos") { photosPickerPresented = true }
+            Button("Document") { documentImporterPresented = true }
+            Button("Location") { Task { await viewModel.sendCurrentLocation() } }
+            Button("Task") { gigPickerPresented = true }
+            Button("Marketplace") { listingPickerPresented = true }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $gigPickerPresented) {
+            ChatShareGigPickerSheet(viewModel: viewModel) { gigPickerPresented = false }
+        }
+        .sheet(isPresented: $listingPickerPresented) {
+            ChatShareListingPickerSheet(viewModel: viewModel) { listingPickerPresented = false }
+        }
+        .photosPicker(
+            isPresented: $photosPickerPresented,
+            selection: $photosPickerSelection,
+            maxSelectionCount: 5,
+            matching: .any(of: [.images, .videos])
+        )
+        .onChange(of: photosPickerSelection) { _, items in
+            handlePickedPhotos(items)
+        }
+        .fileImporter(
+            isPresented: $documentImporterPresented,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            handlePickedDocuments(result)
         }
         .sheet(isPresented: $upgradePromptPresented) {
             FanTierUpgradePromptSheet(entitlement: activeFanEntitlement)
                 .presentationDetents([.medium])
         }
+        .sheet(isPresented: $detailsPresented) {
+            ChatConversationDetailsSheet(viewModel: viewModel) {
+                // Blocked — close the drawer and pop the thread.
+                detailsPresented = false
+                onBack()
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $emojiPickerPresented) {
+            ChatEmojiPickerSheet { emoji in
+                viewModel.composerText += emoji
+            }
+            .presentationDetents([.height(340)])
+            .presentationDragIndicator(.visible)
+        }
+        .alert(
+            "Delete \(selectedMessageIds.count) message\(selectedMessageIds.count == 1 ? "" : "s")?",
+            isPresented: $bulkDeleteConfirmPresented
+        ) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                let ids = Array(selectedMessageIds)
+                Task {
+                    await viewModel.bulkDelete(ids: ids)
+                    exitSelection()
+                }
+            }
+        } message: {
+            Text("Deleted messages are removed for everyone in this conversation.")
+        }
         .accessibilityIdentifier("chatConversation")
+    }
+
+    private func exitSelection() {
+        isSelecting = false
+        selectedMessageIds = []
+    }
+
+    /// Dismissible banner shown when a send was rejected by the gig
+    /// room's pre-bid message cap (429 `PRE_BID_LIMIT`).
+    @ViewBuilder private var sendLimitBanner: some View {
+        if let notice = viewModel.sendLimitNotice {
+            HStack(spacing: Spacing.s2) {
+                Icon(.alertTriangle, size: 14, strokeWidth: 2.4, color: Theme.Color.warning)
+                Text(notice)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Spacing.s0)
+                Button { viewModel.dismissSendLimitNotice() } label: {
+                    Icon(.x, size: 13, strokeWidth: 2.5, color: Theme.Color.appTextSecondary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss message limit notice")
+            }
+            .padding(.leading, Spacing.s3)
+            .frame(minHeight: 44)
+            .background(Theme.Color.warningBg)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Theme.Color.warningLight).frame(height: 1)
+            }
+            .accessibilityIdentifier("chatSendLimitNotice")
+        }
     }
 
     private var resolvedCreatorContext: ChatCreatorThreadContext {
@@ -159,6 +287,24 @@ public struct ChatConversationView: View {
         mode == .fanThread && !activeFanEntitlement.canReply
     }
 
+    @ViewBuilder private var actionBanner: some View {
+        if let reply = viewModel.replyingTo {
+            ChatComposerContextBanner(
+                title: "Replying to \(reply.senderName)",
+                subtitle: reply.text,
+                style: .reply,
+                onCancel: { viewModel.cancelMessageAction() }
+            )
+        } else if viewModel.editingMessageId != nil {
+            ChatComposerContextBanner(
+                title: "Editing message",
+                subtitle: "Make your changes, then send.",
+                style: .edit,
+                onCancel: { viewModel.cancelMessageAction() }
+            )
+        }
+    }
+
     private func sendOrPromptForUpgrade() {
         if isFanReplyLocked {
             upgradePromptPresented = true
@@ -169,6 +315,65 @@ public struct ChatConversationView: View {
 
     private func firstWord(_ raw: String) -> String {
         raw.split(separator: " ").first.map(String.init) ?? raw
+    }
+
+    private func handlePickedPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            for item in items.prefix(5) {
+                guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+                let mimeType = item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
+                let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
+                await MainActor.run {
+                    viewModel.queueAttachment(
+                        kind: mimeType.hasPrefix("image/") ? .image : .document,
+                        filename: "chat-\(UUID().uuidString).\(ext)",
+                        mimeType: mimeType,
+                        data: data
+                    )
+                }
+            }
+            await MainActor.run { photosPickerSelection = [] }
+        }
+    }
+
+    private func handlePickedDocuments(_ result: Result<[URL], any Error>) {
+        guard case let .success(urls) = result else { return }
+        Task {
+            for url in urls.prefix(5) {
+                let didStart = url.startAccessingSecurityScopedResource()
+                defer {
+                    if didStart { url.stopAccessingSecurityScopedResource() }
+                }
+                guard let data = try? Data(contentsOf: url) else { continue }
+                let values = try? url.resourceValues(forKeys: [.contentTypeKey, .localizedNameKey])
+                let mimeType = values?.contentType?.preferredMIMEType ?? "application/octet-stream"
+                let filename = values?.localizedName ?? url.lastPathComponent
+                await MainActor.run {
+                    viewModel.queueAttachment(
+                        kind: mimeType.hasPrefix("image/") ? .image : .document,
+                        filename: filename,
+                        mimeType: mimeType,
+                        data: data
+                    )
+                }
+            }
+        }
+    }
+
+    private func openGigDetail(gigId: String) {
+        guard let url = URL(string: "pantopus://gigs/\(gigId)") else { return }
+        DeepLinkRouter.shared.handle(url: url)
+    }
+
+    private func openListingDetail(listingId: String) {
+        guard let url = URL(string: "pantopus://listings/\(listingId)") else { return }
+        DeepLinkRouter.shared.handle(url: url)
+    }
+
+    private func openLocationInMaps(_ card: ChatLocationCard) {
+        guard let url = URL(string: "http://maps.apple.com/?ll=\(card.latitude),\(card.longitude)") else { return }
+        openURL(url)
     }
 
     private var incomingInitials: String? {
@@ -442,21 +647,74 @@ extension ChatConversationView {
         switch row {
         case let .dayDivider(divider):
             ChatDayDividerRow(label: divider.label)
+        case let .topicDivider(divider):
+            ChatTopicDividerRow(label: divider.label)
         case let .broadcastReference(reference):
             ChatBroadcastReferenceCard(reference: reference)
         case let .bubble(bubble):
-            ChatBubbleRow(
-                content: bubble,
-                incomingInitials: incomingInitials,
-                onLockedAction: { upgradePromptPresented = true },
-                onRetry: {
-                    if let clientId = bubble.id.split(separator: "_").last.map(String.init),
-                       bubble.id.hasPrefix("client_") {
-                        Task { await viewModel.retry(clientId: "client_\(clientId)") }
-                    }
-                }
-            )
+            bubbleRowView(bubble)
         }
+    }
+
+    /// Wraps the bubble in selection chrome while bulk-select is
+    /// active: a leading check toggle on the user's own persisted
+    /// messages, with row taps toggling membership.
+    @ViewBuilder
+    private func bubbleRowView(_ bubble: ChatBubbleContent) -> some View {
+        let selectable = bubble.side == .outgoing && !bubble.id.hasPrefix("client_")
+        if isSelecting {
+            let isSelected = selectedMessageIds.contains(bubble.id)
+            HStack(alignment: .center, spacing: Spacing.s2) {
+                Icon(
+                    isSelected ? .checkCircle : .circle,
+                    size: 20,
+                    strokeWidth: 2,
+                    color: isSelected ? Theme.Color.primary600 : Theme.Color.appTextMuted
+                )
+                .frame(width: 28, height: 28)
+                .opacity(selectable ? 1 : 0)
+                chatBubbleRow(bubble)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard selectable else { return }
+                if isSelected {
+                    selectedMessageIds.remove(bubble.id)
+                } else {
+                    selectedMessageIds.insert(bubble.id)
+                }
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("chatSelectableRow_\(bubble.id)")
+        } else {
+            chatBubbleRow(bubble)
+        }
+    }
+
+    private func chatBubbleRow(_ bubble: ChatBubbleContent) -> some View {
+        ChatBubbleRow(
+            content: bubble,
+            incomingInitials: incomingInitials,
+            onLockedAction: { upgradePromptPresented = true },
+            onReply: { viewModel.beginReply(to: bubble.id) },
+            onEdit: { viewModel.beginEdit(messageId: bubble.id) },
+            onDelete: { Task { await viewModel.delete(messageId: bubble.id) } },
+            onBeginSelect: {
+                isSelecting = true
+                selectedMessageIds = [bubble.id]
+            },
+            onReact: { reaction in Task { await viewModel.react(messageId: bubble.id, reaction: reaction) } },
+            onUseAIDraft: onUseAIDraft,
+            onOpenGig: openGigDetail,
+            onOpenListing: openListingDetail,
+            onOpenLocation: openLocationInMaps,
+            onRetry: {
+                if bubble.id.hasPrefix("client_") {
+                    Task { await viewModel.retry(clientId: bubble.id) }
+                }
+            }
+        )
     }
 
     private func errorFrame(_ message: String) -> some View {
@@ -490,13 +748,6 @@ extension ChatConversationView {
     private func initials(of name: String) -> String {
         let parts = name.split(separator: " ").prefix(2)
         return parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
-    }
-}
-
-extension ChatConversationViewModel {
-    var canLoadOlder: Bool {
-        if case .loaded = state { return true }
-        return false
     }
 }
 
@@ -825,6 +1076,8 @@ private struct ChatConversationHeader: View {
     let counterparty: ChatCounterparty
     let creatorContext: ChatCreatorThreadContext
     let onBack: @MainActor () -> Void
+    /// Opens the conversation-details drawer (topics + safety actions).
+    var onOpenDetails: @MainActor () -> Void = {}
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -838,7 +1091,7 @@ private struct ChatConversationHeader: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(counterparty.displayName)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
                     if mode == .aiAssistant { betaPill }
@@ -856,7 +1109,7 @@ private struct ChatConversationHeader: View {
                             Circle().fill(Theme.Color.success).frame(width: 6, height: 6)
                         }
                         Text(presence)
-                            .font(.system(size: 10.5, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                             .lineLimit(1)
                     }
@@ -929,12 +1182,14 @@ private struct ChatConversationHeader: View {
         } else {
             switch counterparty {
             case .person:
-                HStack(spacing: Spacing.s0) {
-                    Icon(.phone, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
-                    Icon(.video, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
-                    Icon(.moreVertical, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                // RN replaces call/video chrome with a single info button
+                // that opens the conversation details drawer.
+                Button(action: onOpenDetails) {
+                    Icon(.info, size: 20, color: Theme.Color.appTextSecondary)
+                        .frame(width: 34, height: 34)
                 }
-                .accessibilityHidden(true)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Conversation details")
             case .ai:
                 HStack(spacing: Spacing.s0) {
                     Icon(.history, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
@@ -1266,6 +1521,102 @@ private struct ChatDayDividerRow: View {
     }
 }
 
+/// Topic-divider row — marks where the "All" view crosses into a
+/// different conversation topic (task / listing / general).
+private struct ChatTopicDividerRow: View {
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+            HStack(spacing: Spacing.s1) {
+                Icon(.tag, size: 10, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .background(Theme.Color.appSurfaceMuted)
+            .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+            .clipShape(Capsule())
+            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Topic \(label)")
+        .accessibilityIdentifier("chatTopicDivider")
+    }
+}
+
+// MARK: - Bulk-selection chrome
+
+private struct ChatSelectionTopBar: View {
+    let count: Int
+    let onCancel: @MainActor () -> Void
+
+    var body: some View {
+        HStack {
+            Text("\(count) selected")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+            Spacer(minLength: Spacing.s0)
+            Button(action: onCancel) {
+                Text("Cancel")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary600)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chatSelectionCancel")
+        }
+        .padding(.horizontal, Spacing.s4)
+        .frame(height: 44)
+        .background(Theme.Color.appSurfaceMuted)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        }
+        .accessibilityIdentifier("chatSelectionTopBar")
+    }
+}
+
+private struct ChatSelectionDeleteBar: View {
+    let selectedCount: Int
+    let onDelete: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: onDelete) {
+            HStack(spacing: Spacing.s2) {
+                Icon(
+                    .trash2,
+                    size: 15,
+                    strokeWidth: 2.4,
+                    color: selectedCount == 0 ? Theme.Color.appTextMuted : Theme.Color.appTextInverse
+                )
+                Text("Delete")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(selectedCount == 0 ? Theme.Color.appTextMuted : Theme.Color.appTextInverse)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(selectedCount == 0 ? Theme.Color.appSurfaceSunken : Theme.Color.error)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(selectedCount == 0)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s2)
+        .padding(.bottom, Spacing.s6)
+        .background(Theme.Color.appSurface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        }
+        .accessibilityLabel("Delete \(selectedCount) selected messages")
+        .accessibilityIdentifier("chatSelectionDelete")
+    }
+}
+
 private struct ChatBroadcastReferenceCard: View {
     let reference: ChatBroadcastReference
 
@@ -1310,9 +1661,33 @@ private struct ChatBroadcastReferenceCard: View {
 
 // swiftlint:disable:next type_body_length
 private struct ChatBubbleRow: View {
+    // RN caps a bubble at 75% of the row width (fractional, not fixed) —
+    // `rowWidth` is read from the row's available width below. Until it
+    // resolves, fall back to a sensible fixed cap.
+    private static let fallbackBubbleMaxWidth: CGFloat = 260
+    private static let bubbleHorizontalPadding: CGFloat = 14
+    @State private var rowWidth: CGFloat = 0
+    private var bubbleMaxWidth: CGFloat {
+        rowWidth > 0 ? rowWidth * 0.75 : Self.fallbackBubbleMaxWidth
+    }
+    private var bubbleTextMaxWidth: CGFloat {
+        bubbleMaxWidth - (Self.bubbleHorizontalPadding * 2)
+    }
+
     let content: ChatBubbleContent
     let incomingInitials: String?
     let onLockedAction: @MainActor () -> Void
+    let onReply: @MainActor () -> Void
+    let onEdit: @MainActor () -> Void
+    let onDelete: @MainActor () -> Void
+    /// Enters bulk-selection mode seeded with this message (own
+    /// persisted messages only).
+    let onBeginSelect: @MainActor () -> Void
+    let onReact: @MainActor (String) -> Void
+    let onUseAIDraft: @MainActor (ChatAIDraftCard) -> Void
+    let onOpenGig: @MainActor (String) -> Void
+    let onOpenListing: @MainActor (String) -> Void
+    let onOpenLocation: @MainActor (ChatLocationCard) -> Void
     let onRetry: @MainActor () -> Void
 
     var body: some View {
@@ -1329,58 +1704,210 @@ private struct ChatBubbleRow: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: alignmentToFrameAlignment)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { rowWidth = geo.size.width }
+                    .onChange(of: geo.size.width) { _, newValue in rowWidth = newValue }
+            }
+        )
         .padding(.top, content.isContinuation ? 2 : 8)
         .padding(.bottom, content.stamp == nil ? 3 : 0)
+        .contextMenu {
+            Button { onReply() } label: {
+                Text("Reply")
+            }
+            if let copyText {
+                Button { UIPasteboard.general.string = copyText } label: {
+                    Text("Copy")
+                }
+            }
+            ForEach(["👍", "❤️", "😂", "🔥"], id: \.self) { reaction in
+                Button { onReact(reaction) } label: {
+                    Text(reaction)
+                }
+            }
+            if content.side == .outgoing && !content.id.hasPrefix("client_") {
+                Button { onBeginSelect() } label: {
+                    Text("Select")
+                }
+                Button { onEdit() } label: {
+                    Text("Edit")
+                }
+                Button(role: .destructive) { onDelete() } label: {
+                    Text("Delete")
+                }
+            }
+        }
         .accessibilityElement(children: .combine)
+    }
+
+    /// Plain text carried by the bubble — the context menu's Copy
+    /// payload. `nil` for media-only bodies (photo / location / offer
+    /// cards), which hides the Copy item.
+    private var copyText: String? {
+        switch content.body {
+        case let .text(text):
+            return text.isEmpty ? nil : text
+        case let .textWithImages(text, _):
+            return text.isEmpty ? nil : text
+        case let .aiReply(text, _, _):
+            return text.isEmpty ? nil : text
+        case .attachment, .image, .systemLink, .locationCard, .gigOfferCard, .listingOfferCard:
+            return nil
+        }
     }
 
     private var bubbleStack: some View {
         VStack(alignment: alignment, spacing: Spacing.s0) {
             switch content.body {
             case let .text(text):
-                bubbleContainer { textBody(text) }
+                if Self.isEmojiOnly(text) {
+                    emojiBody(text)
+                } else {
+                    bubbleContainer { textBody(text) }
+                }
+            case let .textWithImages(text, imageURLs):
+                bubbleContainer { textWithImagesBody(text: text, imageURLs: imageURLs) }
             case let .image(url):
                 photoBubble(url)
             case let .attachment(filename, sizeLabel):
                 bubbleContainer { attachmentBody(filename: filename, sizeLabel: sizeLabel) }
             case let .systemLink(label, sub, accent):
                 systemLinkPill(label: label, sub: sub, accent: accent)
-            case let .aiReply(text, estimate):
-                aiReplyBubble(text: text, estimate: estimate)
+            case let .locationCard(card):
+                ChatLocationCardView(card: card, isOutgoing: content.side == .outgoing, onOpen: { onOpenLocation(card) })
+            case let .gigOfferCard(card):
+                ChatGigOfferCardView(
+                    card: card,
+                    isOutgoing: content.side == .outgoing,
+                    onOpen: { if !card.gigId.isEmpty { onOpenGig(card.gigId) } }
+                )
+            case let .listingOfferCard(card):
+                ChatListingOfferCardView(
+                    card: card,
+                    isOutgoing: content.side == .outgoing,
+                    onOpen: { if !card.listingId.isEmpty { onOpenListing(card.listingId) } }
+                )
+            case let .aiReply(text, estimate, drafts):
+                aiReplyBubble(text: text, estimate: estimate, drafts: drafts)
             }
             if let tier = content.sentSupportTier, content.side == .outgoing {
                 paidSupportFooter(tier: tier)
+            }
+            if !content.reactions.isEmpty {
+                reactionRow(content.reactions)
             }
             if let stamp = content.stamp {
                 stampView(stamp)
             }
         }
+        // Cap the column at the bubble max width instead of fixing it to
+        // its ideal width — `fixedSize(horizontal: true)` forced every
+        // Text onto one line, truncating long messages with "…" instead
+        // of wrapping them.
+        .frame(maxWidth: bubbleMaxWidth, alignment: alignmentToFrameAlignment)
     }
 
     private func bubbleContainer(@ViewBuilder _ inner: () -> some View) -> some View {
         let isOut = content.side == .outgoing
-        return ZStack(alignment: .bottom) {
-            inner()
-                .padding(.horizontal, 13)
-                .padding(.vertical, 9)
-                .frame(maxWidth: .infinity, alignment: alignmentToFrameAlignment)
-                .background(
-                    isOut ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken,
-                    in: bubbleShape
-                )
-                .foregroundStyle(isOut ? Theme.Color.appTextInverse : Theme.Color.appText)
-            if let tier = content.lockedTier, content.side == .incoming {
-                lockedPaywallOverlay(tier: tier)
+        return inner()
+            .padding(.horizontal, Self.bubbleHorizontalPadding)
+            .padding(.vertical, 10)
+            .foregroundStyle(isOut ? Theme.Color.appTextInverse : Theme.Color.appText)
+            .background(
+                isOut ? Theme.Color.primary600 : Theme.Color.appSurface,
+                in: bubbleShape
+            )
+            // Incoming bubbles are white with a 1px hairline border (RN);
+            // outgoing are solid blue with no border.
+            .overlay {
+                if !isOut {
+                    bubbleShape.stroke(Theme.Color.appBorder, lineWidth: 1)
+                }
             }
+            .overlay(alignment: .bottom) {
+                if let tier = content.lockedTier, content.side == .incoming {
+                    lockedPaywallOverlay(tier: tier)
+                }
+            }
+            .clipShape(bubbleShape)
+    }
+
+    @ViewBuilder private var replyPreview: some View {
+        if let reply = content.replyPreview {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(reply.senderName)
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(content.side == .outgoing ? Theme.Color.appTextInverse.opacity(0.9) : Theme.Color.primary600)
+                Text(reply.text)
+                    .font(.system(size: 11))
+                    .lineLimit(2)
+                    .foregroundStyle(content.side == .outgoing ? Theme.Color.appTextInverse.opacity(0.72) : Theme.Color.appTextSecondary)
+            }
+            .padding(.leading, 7)
+            .padding(.vertical, 4)
+            .overlay(alignment: .leading) {
+                RoundedRectangle(cornerRadius: Radii.xs)
+                    .fill(content.side == .outgoing ? Theme.Color.appTextInverse.opacity(0.45) : Theme.Color.primary600)
+                    .frame(width: 3)
+            }
+            .frame(maxWidth: bubbleTextMaxWidth, alignment: .leading)
+            .padding(.bottom, 5)
         }
-        .clipShape(bubbleShape)
+    }
+
+    private func emojiBody(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 48))
+            .lineSpacing(8)
+            .accessibilityLabel(text)
     }
 
     private func textBody(_ text: String) -> some View {
-        Text(text)
-            .pantopusTextStyle(.small)
-            .lineSpacing(5)
-            .frame(maxWidth: 260, alignment: .leading)
+        VStack(alignment: .leading, spacing: 0) {
+            replyPreview
+            // No explicit width frame — the Text wraps at the width the
+            // bubble column proposes (≤ 75% of the row) and hugs its
+            // wrapped size so short messages keep small bubbles.
+            Text(text)
+                .font(.system(size: 15))
+                .multilineTextAlignment(.leading)
+                .lineSpacing(6)
+        }
+    }
+
+    private static func isEmojiOnly(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 30 else { return false }
+        return trimmed.unicodeScalars.allSatisfy { scalar in
+            scalar.properties.isEmojiPresentation
+                || scalar.value == 0xFE0F
+                || scalar.properties.isEmoji
+        }
+    }
+
+    private func textWithImagesBody(text: String, imageURLs: [URL]) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            if !text.isEmpty {
+                textBody(text)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 6)], spacing: 6) {
+                ForEach(imageURLs, id: \.absoluteString) { url in
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case let .success(image): image.resizable().scaledToFill()
+                        case .failure: PhotoBubblePlaceholder()
+                        case .empty: PhotoBubblePlaceholder()
+                        @unknown default: PhotoBubblePlaceholder()
+                        }
+                    }
+                    .frame(width: 72, height: 72)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+            }
+            .frame(maxWidth: bubbleTextMaxWidth, alignment: .leading)
+        }
     }
 
     private func photoBubble(_ url: URL?) -> some View {
@@ -1409,7 +1936,9 @@ private struct ChatBubbleRow: View {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case let .success(image): image.resizable().scaledToFill()
-                default: PhotoBubblePlaceholder()
+                case .failure: PhotoBubblePlaceholder()
+                case .empty: PhotoBubblePlaceholder()
+                @unknown default: PhotoBubblePlaceholder()
                 }
             }
         } else {
@@ -1424,13 +1953,14 @@ private struct ChatBubbleRow: View {
                 Text(filename)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(content.side == .outgoing ? Theme.Color.appTextInverse : Theme.Color.appText)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 if let sizeLabel {
                     Text(sizeLabel)
                         .font(.system(size: 11))
                         .foregroundStyle(content.side == .outgoing ? Theme.Color.appTextInverse.opacity(0.7) : Theme.Color.appTextSecondary)
                 }
             }
+            .frame(maxWidth: bubbleTextMaxWidth, alignment: .leading)
         }
     }
 
@@ -1461,7 +1991,7 @@ private struct ChatBubbleRow: View {
                 .stroke(fg.opacity(0.2), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: bubbleMaxWidth)
     }
 
     private func lockedPaywallOverlay(tier: String) -> some View {
@@ -1486,7 +2016,7 @@ private struct ChatBubbleRow: View {
             .accessibilityLabel("Upgrade to \(tier) to read")
             .accessibilityIdentifier("chatLockedUpgrade_\(content.id)")
         }
-        .frame(maxWidth: 260)
+        .frame(maxWidth: bubbleMaxWidth)
         .background(
             LinearGradient(
                 colors: [
@@ -1515,23 +2045,60 @@ private struct ChatBubbleRow: View {
         .accessibilityIdentifier("chatPaidSupportFooter_\(content.id)")
     }
 
+    private func reactionRow(_ reactions: [ChatBubbleReaction]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(reactions) { reaction in
+                Button { onReact(reaction.reaction) } label: {
+                    HStack(spacing: 3) {
+                        Text(reaction.reaction)
+                            .font(.system(size: 14))
+                        Text("\(reaction.count)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(reaction.reactedByMe ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                    }
+                    .padding(.horizontal, Spacing.s2)
+                    .padding(.vertical, 3)
+                    .background(
+                        reaction.reactedByMe ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken,
+                        in: RoundedRectangle(cornerRadius: Radii.lg)
+                    )
+                    // RN: only the reacted-by-me pill carries a border (blue).
+                    .overlay {
+                        if reaction.reactedByMe {
+                            RoundedRectangle(cornerRadius: Radii.lg)
+                                .stroke(Theme.Color.primary600, lineWidth: 1)
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, Spacing.s1)
+        .accessibilityIdentifier("chatReactions_\(content.id)")
+    }
+
     // MARK: - AI reply
 
-    private func aiReplyBubble(text: String, estimate: ChatEstimate?) -> some View {
+    private func aiReplyBubble(text: String, estimate: ChatEstimate?, drafts: [ChatAIDraftCard]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             aiTag
             Text(text)
                 .pantopusTextStyle(.small)
-                .lineSpacing(5)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: bubbleTextMaxWidth, alignment: .leading)
+                .pantopusLineHeight(.small)
                 .foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity, alignment: .leading)
             if let estimate {
                 AIEstimateCard(estimate: estimate)
+            }
+            ForEach(drafts) { draft in
+                AIDraftCard(draft: draft, onUse: onUseAIDraft)
             }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 10)
-        .frame(maxWidth: 300, alignment: .leading)
+        .frame(maxWidth: bubbleMaxWidth, alignment: .leading)
         .background(Theme.Color.appSurfaceSunken, in: aiBubbleShape)
     }
 
@@ -1549,12 +2116,120 @@ private struct ChatBubbleRow: View {
         .clipShape(Capsule())
     }
 
+    private struct AIDraftCard: View {
+        let draft: ChatAIDraftCard
+        let onUse: @MainActor (ChatAIDraftCard) -> Void
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                HStack(spacing: Spacing.s2) {
+                    Icon(icon, size: 14, strokeWidth: 2.4, color: accent)
+                        .frame(width: 26, height: 26)
+                        .background(background)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    Text(label.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(accent)
+                    Spacer(minLength: Spacing.s0)
+                    if draft.valid {
+                        Text("Draft ready")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.Color.success)
+                    }
+                }
+                Text(draft.title)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(2)
+                if let summary = draft.summary, summary != draft.title {
+                    Text(summary)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(3)
+                }
+                if let price = draft.priceLabel {
+                    Text(price)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(accent)
+                }
+                if draft.type != "mail_summary" {
+                    Button { onUse(draft) } label: {
+                        HStack(spacing: 5) {
+                            Text(actionTitle)
+                            Icon(.arrowRight, size: 11, strokeWidth: 2.5, color: accent)
+                        }
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(accent)
+                        .frame(minHeight: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("chatAIDraftUse_\(draft.type)")
+                }
+            }
+            .padding(Spacing.s3)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(accent.opacity(0.22), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("chatAIDraft_\(draft.type)")
+        }
+
+        private var label: String {
+            switch draft.type {
+            case "gig": "Task Draft"
+            case "listing": "Listing Draft"
+            case "post": "Post Draft"
+            case "mail_summary": "Mail Summary"
+            default: "Draft"
+            }
+        }
+
+        private var actionTitle: String {
+            switch draft.type {
+            case "gig": "Use in task composer"
+            case "listing": "Use in listing composer"
+            case "post": "Use in Pulse composer"
+            default: "Use draft"
+            }
+        }
+
+        private var icon: PantopusIcon {
+            switch draft.type {
+            case "gig": .hammer
+            case "listing": .tag
+            case "post": .pencil
+            case "mail_summary": .mailbox
+            default: .sparkles
+            }
+        }
+
+        private var accent: Color {
+            switch draft.type {
+            case "listing": Theme.Color.success
+            case "mail_summary": Theme.Color.warning
+            default: Theme.Color.magic
+            }
+        }
+
+        private var background: Color {
+            switch draft.type {
+            case "listing": Theme.Color.successBg
+            case "mail_summary": Theme.Color.warningBg
+            default: Theme.Color.magicBg
+            }
+        }
+    }
+
     private var aiBubbleShape: some Shape {
         UnevenRoundedRectangle(
-            topLeadingRadius: Radii.xl,
-            bottomLeadingRadius: content.hasTail ? 4 : 16,
-            bottomTrailingRadius: Radii.xl,
-            topTrailingRadius: Radii.xl
+            topLeadingRadius: 18,
+            bottomLeadingRadius: content.hasTail ? 4 : 18,
+            bottomTrailingRadius: 18,
+            topTrailingRadius: 18
         )
     }
 
@@ -1564,22 +2239,23 @@ private struct ChatBubbleRow: View {
                 ChatReadReceipt(timestamp: raw)
             } else {
                 Text(stampString(raw))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(Theme.Color.appTextMuted)
                 if content.side == .outgoing {
                     switch content.deliveryState {
                     case .read:
                         EmptyView()
                     case .delivered:
-                        Icon(.check, size: 11, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
+                        Icon(.check, size: 10, strokeWidth: 2.0, color: Theme.Color.appTextMuted)
                     case .sending:
-                        ProgressView().scaleEffect(0.6).tint(Theme.Color.appTextSecondary)
+                        ProgressView().scaleEffect(0.6).tint(Theme.Color.appTextMuted)
                     case .failed:
                         Button(action: onRetry) {
                             HStack(spacing: 3) {
                                 Icon(.alertCircle, size: 11, color: Theme.Color.error)
                                 Text("Retry")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .underline()
                                     .foregroundStyle(Theme.Color.error)
                             }
                         }
@@ -1593,15 +2269,15 @@ private struct ChatBubbleRow: View {
         }
         .padding(.top, 2)
         .padding(.bottom, Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: alignmentToFrameAlignment)
     }
 
     private func stampString(_ raw: String) -> String {
         switch content.deliveryState {
         case .read: "Read \(raw)"
-        case .delivered: "\(raw) · Delivered"
-        case .sending: "Sending…"
-        case .failed: "Couldn't send"
+        // Delivered is conveyed by the small check icon, not a loud word (RN).
+        case .delivered: raw
+        case .sending: "Sending..."
+        case .failed: "Failed to send"
         case .none: raw
         }
     }
@@ -1615,18 +2291,24 @@ private struct ChatBubbleRow: View {
     }
 
     private var bubbleShape: some Shape {
+        // RN bubble radius is 18 with a 4pt asymmetric tail on the
+        // sender's bottom corner of the last message in a run.
         UnevenRoundedRectangle(
-            topLeadingRadius: Radii.xl,
-            bottomLeadingRadius: content.side == .incoming && content.hasTail ? 4 : 16,
-            bottomTrailingRadius: content.side == .outgoing && content.hasTail ? 4 : 16,
-            topTrailingRadius: Radii.xl
+            topLeadingRadius: 18,
+            bottomLeadingRadius: content.side == .incoming && content.hasTail ? 4 : 18,
+            bottomTrailingRadius: content.side == .outgoing && content.hasTail ? 4 : 18,
+            topTrailingRadius: 18
         )
     }
 
     private var showsIncomingAvatarSlot: Bool {
         guard content.side == .incoming else { return false }
-        if case .systemLink = content.body { return false }
-        return true
+        switch content.body {
+        case .systemLink, .locationCard, .gigOfferCard, .listingOfferCard:
+            return false
+        default:
+            return true
+        }
     }
 
     private func accentForeground(_ accent: ChatBubbleContent.SystemLinkAccent) -> Color {
@@ -1698,8 +2380,8 @@ private struct ChatReadReceipt: View {
     var body: some View {
         HStack(spacing: Spacing.s1) {
             Text("Read \(timestamp)")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .font(.system(size: 10, weight: .regular))
+                .foregroundStyle(Theme.Color.appTextMuted)
             HStack(spacing: -2) {
                 Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
                 Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
@@ -1859,54 +2541,49 @@ private struct ChatComposer: View {
     let onSend: @MainActor () -> Void
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: Spacing.s2) {
+        HStack(alignment: .bottom, spacing: Spacing.s1) {
             Button(action: onAttach) {
-                Icon(.plus, size: 18, strokeWidth: 2.4, color: Theme.Color.appTextStrong)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.Color.appSurfaceSunken, in: Circle())
+                Icon(.plus, size: 20, strokeWidth: 2.4, color: Theme.Color.primary600)
+                    .frame(width: 38, height: 38)
+                    .background(Theme.Color.primary50, in: Circle())
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Attach")
             .accessibilityIdentifier("chatComposerAttach")
 
-            HStack(alignment: .bottom, spacing: Spacing.s2) {
-                TextField(placeholder, text: $text, axis: .vertical)
-                    .font(Theme.Font.small)
-                    .foregroundStyle(Theme.Color.appText)
-                    .lineLimit(1...4)
-                    .submitLabel(.send)
-                    .onSubmit { if canSend { onSend() } }
-                Button(action: onEmoji) {
-                    Icon(.smile, size: 17, color: Theme.Color.appTextMuted)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Emoji")
-                .accessibilityIdentifier("chatComposerEmoji")
+            // RN order: [+] → emoji → rounded input → send.
+            Button(action: onEmoji) {
+                Icon(.smile, size: 18, color: Theme.Color.appTextMuted)
+                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
             }
-            .padding(.leading, Spacing.s3)
-            .padding(.trailing, Spacing.s1)
-            .padding(.vertical, 2)
-            .frame(minHeight: 36)
-            .background(Theme.Color.appSurfaceSunken)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+            .buttonStyle(.plain)
+            .accessibilityLabel("Emoji")
+            .accessibilityIdentifier("chatComposerEmoji")
+
+            TextField(placeholder, text: $text, axis: .vertical)
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.Color.appText)
+                .lineLimit(1...4)
+                .submitLabel(.send)
+                .onSubmit { if canSend { onSend() } }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s2)
+                .frame(minHeight: 38)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous))
 
             Button(action: onSend) {
                 ZStack(alignment: .topTrailing) {
                     Icon(
-                        isLockedAction ? .lock : .arrowUp,
+                        isLockedAction ? .lock : .send,
                         size: 18,
                         strokeWidth: 2.5,
                         color: canSend ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
                     )
-                    .frame(width: 36, height: 36)
+                    .frame(width: 38, height: 38)
                     .background(sendBackground, in: Circle())
-                    .shadow(color: canSend ? sendBackground.opacity(0.30) : .clear, radius: 10, x: 0, y: 4)
                     .frame(width: 44, height: 44)
                     if showsSendCost && canSend {
                         Text("-1")
@@ -1926,7 +2603,7 @@ private struct ChatComposer: View {
             .accessibilityLabel("Send")
             .accessibilityIdentifier("chatComposerSend")
         }
-        .padding(.horizontal, Spacing.s3)
+        .padding(.horizontal, Spacing.s2)
         .padding(.top, Spacing.s2)
         .padding(.bottom, Spacing.s6)
         .background(Theme.Color.appSurface)
@@ -1938,5 +2615,116 @@ private struct ChatComposer: View {
     private var sendBackground: Color {
         guard canSend else { return Theme.Color.appSurfaceSunken }
         return isLockedAction ? Theme.Color.warning : Theme.Color.primary600
+    }
+}
+
+private struct ChatComposerContextBanner: View {
+    enum Style {
+        case reply, edit
+    }
+
+    let title: String
+    let subtitle: String
+    let style: Style
+    let onCancel: @MainActor () -> Void
+
+    private var accent: Color {
+        style == .reply ? Theme.Color.primary600 : Theme.Color.success
+    }
+
+    private var barBackground: Color {
+        style == .reply ? Theme.Color.primary50 : Theme.Color.successBg
+    }
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            // RN reply/edit bars: tinted bar with a 3pt accent stripe.
+            RoundedRectangle(cornerRadius: 2)
+                .fill(accent)
+                .frame(width: 3, height: 32)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: Spacing.s0)
+            Button(action: onCancel) {
+                Icon(.x, size: 14, strokeWidth: 2.5, color: Theme.Color.appTextSecondary)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Cancel message action")
+        }
+        .padding(.leading, Spacing.s3)
+        .padding(.trailing, Spacing.s1)
+        .frame(height: 50)
+        .background(barBackground)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        }
+        .accessibilityIdentifier("chatComposerContext")
+    }
+}
+
+private struct ChatTopicStrip: View {
+    let topics: [ChatConversationTopic]
+    let selectedTopicId: String?
+    let onSelect: @MainActor (String?) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.s2) {
+                topicButton(id: nil, title: "All", icon: .messageCircle)
+                ForEach(topics) { topic in
+                    topicButton(id: topic.id, title: topic.title, icon: icon(for: topic.topicType))
+                }
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
+        }
+        .background(Theme.Color.appSurface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        }
+        .accessibilityIdentifier("chatTopicStrip")
+    }
+
+    private func topicButton(id: String?, title: String, icon: PantopusIcon) -> some View {
+        let selected = selectedTopicId == id || (id == nil && selectedTopicId == nil)
+        return Button { onSelect(id) } label: {
+            HStack(spacing: 4) {
+                Icon(icon, size: 12, strokeWidth: 2.4, color: selected ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                Text(title)
+                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(selected ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
+            // RN: only the active chip carries a border (primary200).
+            .overlay {
+                if selected {
+                    Capsule().stroke(Theme.Color.primary200, lineWidth: 1)
+                }
+            }
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func icon(for type: String) -> PantopusIcon {
+        switch type {
+        case "task": .briefcase
+        case "listing": .tag
+        case "home": .home
+        case "business": .building2
+        default: .messageCircle
+        }
     }
 }

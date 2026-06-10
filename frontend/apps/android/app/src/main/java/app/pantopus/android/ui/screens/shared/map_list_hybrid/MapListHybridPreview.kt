@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
@@ -60,6 +61,7 @@ fun MapListHybridShellStaticPreview(
     sheetHeader: @Composable () -> Unit,
     sheetBody: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    mapControlsStackHeight: Dp = MAP_CONTROLS_STACK_HEIGHT,
     floatingAction: @Composable () -> Unit = {},
 ) {
     BoxWithConstraints(
@@ -73,7 +75,7 @@ fun MapListHybridShellStaticPreview(
         val controlsBottom =
             minOf(
                 sheetHeight + SHEET_TO_CONTROLS_GAP,
-                (maxHeight - MAP_CONTROLS_STACK_HEIGHT - SHEET_TO_CONTROLS_GAP).coerceAtLeast(SHEET_TO_CONTROLS_GAP),
+                (maxHeight - mapControlsStackHeight - SHEET_TO_CONTROLS_GAP).coerceAtLeast(SHEET_TO_CONTROLS_GAP),
             )
         val fabBottom =
             minOf(

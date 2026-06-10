@@ -174,7 +174,8 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
 }
 
 /// `POST /api/posts` response envelope — the backend echoes a
-/// thin acknowledgement plus the created row's id.
+/// thin acknowledgement plus the created row. The id may appear as
+/// `post_id` (legacy stubs) or nested under `post.id` (live API).
 public struct PostCreateResponse: Decodable, Sendable, Hashable {
     public let message: String?
     public let postId: String?
@@ -182,6 +183,11 @@ public struct PostCreateResponse: Decodable, Sendable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case message
         case postId = "post_id"
+        case post
+    }
+
+    private struct NestedPostId: Decodable {
+        let id: String
     }
 
     public init(message: String? = nil, postId: String? = nil) {
@@ -192,8 +198,10 @@ public struct PostCreateResponse: Decodable, Sendable, Hashable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         message = try container.decodeIfPresent(String.self, forKey: .message)
-        if let snake = try? container.decodeIfPresent(String.self, forKey: .postId) {
-            postId = snake
+        if let topLevel = try container.decodeIfPresent(String.self, forKey: .postId) {
+            postId = topLevel
+        } else if let nested = try? container.decode(NestedPostId.self, forKey: .post) {
+            postId = nested.id
         } else {
             postId = nil
         }

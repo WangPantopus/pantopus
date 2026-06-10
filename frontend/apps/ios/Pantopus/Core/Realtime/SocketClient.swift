@@ -25,6 +25,8 @@ final class SocketClient {
 
     private var manager: SocketManager?
     private var socket: SocketIOClient?
+    private var authToken: String?
+    private var connectionContinuations: [UUID: AsyncStream<ConnectionState>.Continuation] = [:]
     private let logger = Logger(label: "app.pantopus.ios.SocketClient")
     private let environment: AppEnvironment
 
@@ -35,8 +37,18 @@ final class SocketClient {
     // MARK: - Lifecycle
 
     func connect(token: String) {
-        guard connectionState == .disconnected else { return }
-        connectionState = .connecting
+        if authToken == token, socket != nil {
+            if connectionState == .disconnected {
+                socket?.connect()
+                setConnectionState(.connecting)
+            }
+            return
+        }
+        if socket != nil {
+            disconnect()
+        }
+        authToken = token
+        setConnectionState(.connecting)
 
         let manager = SocketManager(
             socketURL: environment.socketURL,
@@ -56,13 +68,13 @@ final class SocketClient {
 
         socket.on(clientEvent: .connect) { [weak self] _, _ in
             Task { @MainActor in
-                self?.connectionState = .connected
+                self?.setConnectionState(.connected)
                 self?.logger.info("Socket connected")
             }
         }
         socket.on(clientEvent: .disconnect) { [weak self] _, _ in
             Task { @MainActor in
-                self?.connectionState = .disconnected
+                self?.setConnectionState(.disconnected)
                 self?.logger.info("Socket disconnected")
             }
         }
@@ -77,10 +89,24 @@ final class SocketClient {
         socket?.disconnect()
         socket = nil
         manager = nil
-        connectionState = .disconnected
+        authToken = nil
+        setConnectionState(.disconnected)
     }
 
     // MARK: - Events
+
+    func connectionStates() -> AsyncStream<ConnectionState> {
+        AsyncStream { continuation in
+            let id = UUID()
+            connectionContinuations[id] = continuation
+            continuation.yield(connectionState)
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor in
+                    self?.connectionContinuations[id] = nil
+                }
+            }
+        }
+    }
 
     /// Listen to an event as an AsyncStream of decoded payloads.
     ///
@@ -123,5 +149,38 @@ final class SocketClient {
 
     func emit(_ event: String, payload: [String: Any]) {
         socket?.emit(event, payload)
+    }
+
+    func emitWithAck<T: Decodable & Sendable>(
+        _ event: String,
+        payload: [String: Any],
+        as _: T.Type = T.self,
+        timeout: Double = 5
+    ) async -> T? {
+        guard let socket else { return nil }
+        return await withCheckedContinuation { continuation in
+            socket.emitWithAck(event, payload).timingOut(after: timeout) { data in
+                guard let first = data.first else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                do {
+                    let jsonData = try JSONSerialization.data(withJSONObject: first, options: [])
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    let decoded = try decoder.decode(T.self, from: jsonData)
+                    continuation.resume(returning: decoded)
+                } catch {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+
+    private func setConnectionState(_ state: ConnectionState) {
+        connectionState = state
+        for continuation in connectionContinuations.values {
+            continuation.yield(state)
+        }
     }
 }

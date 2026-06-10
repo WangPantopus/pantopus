@@ -27,7 +27,7 @@ public struct ConversationRow: View {
                 trailing
             }
             .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, 14)
+            .padding(.vertical, Spacing.s4)
             .background(rowBackground)
             .overlay(alignment: .leading) {
                 if content.pinned {
@@ -78,13 +78,27 @@ public struct ConversationRow: View {
         }
     }
 
+    private var isAIRow: Bool {
+        if case .aiAssistant = content.variant { return true }
+        return false
+    }
+
     private var middle: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
             HStack(spacing: 6) {
                 Text(content.displayName)
-                    .font(.system(size: 14.5, weight: content.unread > 0 ? .bold : .semibold))
-                    .foregroundStyle(Theme.Color.appText)
+                    .font(.system(size: 16, weight: content.unread > 0 || isAIRow ? .bold : .medium))
+                    .foregroundStyle(isAIRow ? Theme.Color.business : Theme.Color.appText)
                     .lineLimit(1)
+                if isAIRow {
+                    Text("AI")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Theme.Color.business, in: RoundedRectangle(cornerRadius: Radii.sm))
+                        .accessibilityHidden(true)
+                }
                 if let chip = content.identityChip {
                     IdentityDisclosureChip(chip: chip)
                 }
@@ -95,23 +109,42 @@ public struct ConversationRow: View {
                 Spacer(minLength: Spacing.s0)
             }
             Text(content.preview)
-                .font(.system(size: 12.5, weight: content.unread > 0 ? .medium : .regular))
-                .foregroundStyle(content.unread > 0 ? Theme.Color.appTextStrong : Theme.Color.appTextSecondary)
+                .font(.system(size: 14, weight: content.unread > 0 ? .semibold : .regular))
+                .foregroundStyle(
+                    isAIRow
+                        ? Theme.Color.business
+                        : (content.unread > 0 ? Theme.Color.appTextStrong : Theme.Color.appTextSecondary)
+                )
                 .lineLimit(1)
         }
     }
 
-    private var trailing: some View {
+    @ViewBuilder private var trailing: some View {
+        if isAIRow {
+            Icon(.chevronRight, size: 18, color: Theme.Color.business)
+                .accessibilityHidden(true)
+        } else {
+            trailingDefault
+        }
+    }
+
+    private var trailingDefault: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            Text(content.timeLabel)
-                .font(.system(size: 10.5, weight: content.unread > 0 ? .bold : .medium))
-                .foregroundStyle(content.unread > 0 ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+            HStack(spacing: 4) {
+                if content.isMuted {
+                    Icon(.bellOff, size: 14, color: Theme.Color.appTextMuted)
+                        .accessibilityLabel("Muted")
+                }
+                Text(content.timeLabel)
+                    .font(.system(size: 12, weight: content.unread > 0 ? .semibold : .regular))
+                    .foregroundStyle(content.unread > 0 ? Theme.Color.primary600 : Theme.Color.appTextMuted)
+            }
             if content.unread > 0 {
                 Text("\(content.unread)")
-                    .font(.system(size: 10.5, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
                     .padding(.horizontal, 6)
-                    .frame(minWidth: 18, minHeight: 18)
+                    .frame(minWidth: 20, minHeight: 20)
                     .background(Theme.Color.primary600)
                     .clipShape(Capsule())
                     .accessibilityLabel("\(content.unread) unread")
@@ -137,7 +170,7 @@ private struct DMAvatarView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            initialsCircle(size: 44, color: Theme.Color.appBorderStrong, initials: content.initials)
+            initialsCircle(size: 52, color: Theme.Color.personalBg, initials: content.initials, fg: Theme.Color.primary600)
             if content.verified {
                 Icon(.check, size: 9, strokeWidth: 3.5, color: Theme.Color.appTextInverse)
                     .frame(width: 16, height: 16)
@@ -148,7 +181,7 @@ private struct DMAvatarView: View {
                     .accessibilityLabel("Verified")
             }
         }
-        .frame(width: 46, height: 46)
+        .frame(width: 52, height: 52)
     }
 }
 
@@ -177,12 +210,17 @@ private struct GroupAvatarView: View {
     }
 }
 
-private func initialsCircle(size: CGFloat, color: Color, initials: String) -> some View {
+private func initialsCircle(
+    size: CGFloat,
+    color: Color,
+    initials: String,
+    fg: Color = Theme.Color.appTextInverse
+) -> some View {
     ZStack {
         Circle().fill(color)
         Text(initials)
             .font(.system(size: size * 0.34, weight: .bold))
-            .foregroundStyle(Theme.Color.appTextInverse)
+            .foregroundStyle(fg)
     }
     .frame(width: size, height: size)
 }
@@ -224,6 +262,115 @@ private struct IdentityDisclosureChip: View {
         switch chip {
         case .business: Theme.Color.businessBg
         case .home: Theme.Color.homeBg
+        }
+    }
+}
+
+// MARK: - Swipe actions
+
+/// Reveals mute + hide actions when the user swipes a conversation row left.
+public struct SwipeableConversationRow: View {
+    private let content: ConversationRowContent
+    private let onTap: @MainActor () -> Void
+    private let onMute: @MainActor () -> Void
+    private let onHide: @MainActor () -> Void
+
+    private let revealWidth: CGFloat = 140
+    @State private var offset: CGFloat = 0
+    @GestureState private var dragging: CGFloat = 0
+
+    public init(
+        content: ConversationRowContent,
+        onTap: @escaping @MainActor () -> Void,
+        onMute: @escaping @MainActor () -> Void,
+        onHide: @escaping @MainActor () -> Void
+    ) {
+        self.content = content
+        self.onTap = onTap
+        self.onMute = onMute
+        self.onHide = onHide
+    }
+
+    public var body: some View {
+        ZStack(alignment: .trailing) {
+            swipeActions
+            ConversationRow(content: content, onTap: onTap)
+                .offset(x: clampedOffset)
+                .highPriorityGesture(swipeGesture)
+        }
+        .accessibilityIdentifier("swipeableConversationRow_\(content.id)")
+    }
+
+    private var clampedOffset: CGFloat {
+        min(0, max(-revealWidth, offset + dragging))
+    }
+
+    private var swipeActions: some View {
+        HStack(spacing: 0) {
+            swipeButton(
+                icon: content.isMuted ? .bell : .bellOff,
+                label: content.isMuted ? "Unmute" : "Mute",
+                tint: Color(red: 0.42, green: 0.45, blue: 0.50),
+                id: "conversationRow.swipeMute_\(content.id)",
+                action: {
+                    reset()
+                    onMute()
+                }
+            )
+            swipeButton(
+                icon: .archive,
+                label: "Hide",
+                tint: Color(red: 0.22, green: 0.25, blue: 0.32),
+                id: "conversationRow.swipeHide_\(content.id)",
+                action: {
+                    reset()
+                    onHide()
+                }
+            )
+        }
+        .frame(width: revealWidth)
+        .opacity(clampedOffset < -2 ? 1 : 0)
+    }
+
+    private func swipeButton(
+        icon: PantopusIcon,
+        label: String,
+        tint: Color,
+        id: String,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Icon(icon, size: 17, color: Theme.Color.appTextInverse)
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(tint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
+    }
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 14)
+            .updating($dragging) { value, state, _ in
+                if abs(value.translation.width) > abs(value.translation.height) {
+                    state = value.translation.width
+                }
+            }
+            .onEnded { value in
+                let projected = offset + value.translation.width
+                withAnimation(.interpolatingSpring(stiffness: 320, damping: 30)) {
+                    offset = projected < -revealWidth / 2 ? -revealWidth : 0
+                }
+            }
+    }
+
+    private func reset() {
+        withAnimation(.interpolatingSpring(stiffness: 320, damping: 30)) {
+            offset = 0
         }
     }
 }

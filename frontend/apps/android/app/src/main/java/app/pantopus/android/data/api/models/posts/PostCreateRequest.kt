@@ -53,9 +53,20 @@ data class PostCreateRequest(
     val purpose: String? = null,
 )
 
-/** `POST /api/posts` response envelope — the backend echoes a thin ack. */
+/** Just enough of the wire `post` to surface the id for media upload. */
+@JsonClass(generateAdapter = true)
+data class PostCreateResponsePost(
+    val id: String,
+)
+
+/**
+ * `POST /api/posts` response envelope — the backend echoes a thin ack
+ * plus the created row. The id may appear as `post_id` (legacy stubs)
+ * or nested under `post.id` (live API).
+ */
 @JsonClass(generateAdapter = true)
 data class PostCreateResponse(
     val message: String? = null,
     @Json(name = "post_id") val postId: String? = null,
+    val post: PostCreateResponsePost? = null,
 )

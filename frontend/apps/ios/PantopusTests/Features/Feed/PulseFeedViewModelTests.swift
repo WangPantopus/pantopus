@@ -113,7 +113,7 @@ final class PulseFeedViewModelTests: XCTestCase {
         XCTAssertTrue(rows.first?.userHasReacted ?? false)
     }
 
-    func testLoadProjectsMediaURLsPreferringThumbnails() async {
+    func testLoadProjectsMediaURLsUsesFullResolution() async {
         let photoPostJSON = """
         {
           "id": "p_photo",
@@ -136,7 +136,33 @@ final class PulseFeedViewModelTests: XCTestCase {
             XCTFail("Expected .loaded, got \(vm.state)")
             return
         }
-        XCTAssertEqual(rows.first?.mediaURLs.map(\.absoluteString), ["https://cdn.example.com/thumb.jpg"])
+        XCTAssertEqual(rows.first?.mediaURLs.map(\.absoluteString), ["https://cdn.example.com/full.jpg"])
+    }
+
+    func testLoadFallsBackToFullMediaURLWhenThumbnailEmpty() async {
+        let photoPostJSON = """
+        {
+          "id": "p_photo",
+          "user_id": "u1",
+          "content": "Check out this sunset",
+          "created_at": "2026-06-07T00:00:00Z",
+          "post_type": "general",
+          "like_count": 0,
+          "comment_count": 0,
+          "userHasLiked": false,
+          "media_urls": ["https://cdn.example.com/full.jpg"],
+          "media_thumbnails": [""],
+          "media_types": ["image"]
+        }
+        """
+        SequencedURLProtocol.sequence = [.status(200, body: Self.feedJSON(photoPostJSON))]
+        let vm = PulseFeedViewModel(api: makeAPI())
+        await vm.load()
+        guard case let .loaded(rows) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(rows.first?.mediaURLs.map(\.absoluteString), ["https://cdn.example.com/full.jpg"])
     }
 
     func testTapReactionRollsBackOnFailure() async {

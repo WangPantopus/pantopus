@@ -122,7 +122,10 @@ public struct FormShell<Content: View>: View {
                 rightActionEnabled: isValid && isDirty && !isSaving,
                 isSaving: isSaving && bottomActionLabel == nil && stickyBottom == nil,
                 onClose: handleClose,
-                onCommit: onCommit
+                onCommit: {
+                    dismissKeyboard()
+                    onCommit()
+                }
             )
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s5) {
@@ -130,6 +133,7 @@ public struct FormShell<Content: View>: View {
                 }
                 .padding(.vertical, Spacing.s4)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Theme.Color.appBg)
             if let stickyBottom {
                 stickyBottom()
@@ -162,11 +166,21 @@ public struct FormShell<Content: View>: View {
     }
 
     private func handleClose() {
+        dismissKeyboard()
         if isDirty {
             showsDiscardConfirm = true
         } else {
             onClose()
         }
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 }
 

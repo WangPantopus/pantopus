@@ -2,6 +2,11 @@
 
 package app.pantopus.android.ui.screens.compose.listing
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -118,6 +123,9 @@ fun ListingComposeWizardScreen(
         onListingUpdated = onListingUpdated,
     )
     ListingComposeInitialLoadEffect(state = state, viewModel = viewModel)
+    ListingComposeCameraPermissionEffect(
+        isCameraCaptureStep = viewModel.isCameraCaptureStep,
+    )
 
     val screenTag = if (viewModel.isEditMode) LISTING_EDIT_SCREEN_TAG else LISTING_COMPOSE_SCREEN_TAG
     WizardShell(
@@ -165,6 +173,21 @@ private fun ListingComposeEventEffect(
             }
             null -> Unit
         }
+    }
+}
+
+@Composable
+private fun ListingComposeCameraPermissionEffect(isCameraCaptureStep: Boolean) {
+    val context = LocalContext.current
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+            onResult = { /* CameraPreviewSurface re-reads grant state on recomposition. */ },
+        )
+
+    LaunchedEffect(isCameraCaptureStep) {
+        if (!isCameraCaptureStep || listingComposeCameraGranted(context)) return@LaunchedEffect
+        permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 }
 
@@ -351,6 +374,10 @@ private fun CameraCaptureStep(
     }
 }
 
+private fun listingComposeCameraGranted(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED
+
 @Composable
 private fun CameraPreviewSurface() {
     val inspectionMode = LocalInspectionMode.current
@@ -359,6 +386,10 @@ private fun CameraPreviewSurface() {
         return
     }
     val context = LocalContext.current
+    if (!listingComposeCameraGranted(context)) {
+        CameraPermissionPlaceholder()
+        return
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
     AndroidView(
         modifier = Modifier.fillMaxWidth().fillMaxHeight(),
@@ -368,23 +399,62 @@ private fun CameraPreviewSurface() {
                 val providerFuture = ProcessCameraProvider.getInstance(ctx)
                 providerFuture.addListener(
                     {
-                        val provider = providerFuture.get()
-                        val preview =
-                            Preview.Builder().build().also {
-                                it.setSurfaceProvider(surfaceProvider)
-                            }
-                        provider.unbindAll()
-                        provider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                        )
+                        runCatching {
+                            val provider = providerFuture.get()
+                            val preview =
+                                Preview.Builder().build().also {
+                                    it.setSurfaceProvider(surfaceProvider)
+                                }
+                            provider.unbindAll()
+                            provider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                preview,
+                            )
+                        }
                     },
                     ContextCompat.getMainExecutor(context),
                 )
             }
         },
     )
+}
+
+@Composable
+private fun CameraPermissionPlaceholder() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .background(Color(0xFF0A0B0D)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.s5)
+                    .semantics {
+                        contentDescription =
+                            "Camera access is off — enable it in Settings to snap photos."
+                    },
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Camera,
+                contentDescription = null,
+                size = 28.dp,
+                strokeWidth = 2f,
+                tint = Color.White.copy(alpha = 0.5f),
+            )
+            Text(
+                text = "Camera access is off — enable it in Settings to snap photos.",
+                style = PantopusTextStyle.caption,
+                color = Color.White.copy(alpha = 0.6f),
+            )
+        }
+    }
 }
 
 @Composable

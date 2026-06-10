@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -31,6 +34,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
@@ -146,6 +150,7 @@ internal fun MagicDescribeStep(
     state: GigComposeUiState,
     vm: GigComposeViewModel,
 ) {
+    val focusManager = LocalFocusManager.current
     ComposeIdentityChip()
     HeadlineBlock("What do you need done?")
     SubcopyBlock("Describe it in your own words. Pantopus figures out the category, fills in the details, and posts it for bids.")
@@ -153,14 +158,24 @@ internal fun MagicDescribeStep(
         text = state.form.describeText,
         onTextChange = vm::setDescribeText,
         isParsed = state.form.detectedArchetype != null,
+        onDismissKeyboard = focusManager::clearFocus,
     )
     state.form.detectedArchetype?.let { archetype ->
-        DetectedArchetypePill(archetype = archetype, onChange = { vm.setComposeMode(ComposeMode.Manual) })
+        DetectedArchetypePill(
+            archetype = archetype,
+            onChange = {
+                focusManager.clearFocus()
+                vm.setComposeMode(ComposeMode.Manual)
+            },
+        )
         ModulePromptsCard(prompts = gigMagicModulePrompts(archetype))
     }
     EngagementModeControl(
         selected = state.form.engagementMode,
-        onSelect = vm::selectEngagementMode,
+        onSelect = { mode ->
+            focusManager.clearFocus()
+            vm.selectEngagementMode(mode)
+        },
     )
 }
 
@@ -186,6 +201,7 @@ private fun MagicDescribeCard(
     text: String,
     onTextChange: (String) -> Unit,
     isParsed: Boolean,
+    onDismissKeyboard: () -> Unit,
 ) {
     Column(
         modifier =
@@ -232,6 +248,8 @@ private fun MagicDescribeCard(
             onValueChange = onTextChange,
             textStyle = TextStyle(color = PantopusColors.appText, fontSize = 14.5.sp, lineHeight = 21.sp),
             cursorBrush = SolidColor(PantopusColors.primary600),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onDismissKeyboard() }),
             modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(Spacing.s3).testTag("composeGigDescribeField"),
             decorationBox = { inner ->
                 if (text.isEmpty()) {
