@@ -148,6 +148,13 @@ Decide: give health_environment its own detail page or fold into Risk — small 
 > up: enable "Google Civic Information API" on the existing project + set `GOOGLE_CIVIC_API_KEY`. Until then the
 > section renders the designed off-season state ("No upcoming election"). polling_place/ballot (voterInfoQuery)
 > land with the key. Verified live: Camas home → all 6 districts + graceful election state in CivicDetail.
+>
+> **Representatives added 2026-06-11 (keyless):** federal seats from the canonical
+> `unitedstates/congress-legislators` dataset (reduced per-state index, 7 d cache) and state legislators from
+> OpenStates' published current-people CSVs (`data.openstates.org/people/current/{state}.csv`, 7 d cache) —
+> matched on the geocoder's CD / SLDU / SLDL codes (leading-zero-tolerant). Verified live: Camas → Gluesenkamp
+> Perez + Cantwell + Murray (with phones) and LD-17's Stuebe / Waters / Harris (with emails). City/county
+> officials have no national source — the list is honestly partial at the local level.
 
 - **civic_districts**: Google Civic Information API — **verify current API status first** (representatives endpoint was
   deprecated; districts/divisions still live). Fallback: Cicero (paid) or OpenStates (state level). Cache 90 d.

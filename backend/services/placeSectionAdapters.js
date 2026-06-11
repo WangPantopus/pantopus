@@ -448,7 +448,8 @@ function ordinal(n) {
 
 // Geography-key prefixes vary by vintage ("119th Congressional
 // Districts", "2024 State Legislative Districts - Upper") — match by
-// suffix pattern, not exact key.
+// suffix pattern, not exact key. Returns the display list PLUS the raw
+// district codes the representative lookups key on.
 function districtsFromGeographies(geo) {
   const find = (re) => {
     const key = Object.keys(geo).find((k) => re.test(k));
@@ -457,6 +458,7 @@ function districtsFromGeographies(geo) {
   };
 
   const out = [];
+  const codes = { cd: null, sldu: null, sldl: null };
   const state = find(/^States$/);
   const stateName = (state && state.NAME) || null;
 
@@ -464,6 +466,7 @@ function districtsFromGeographies(geo) {
   if (cd && cd.NAME) {
     const num = Number(String(cd.BASENAME || '').replace(/\D/g, ''));
     const atLarge = !Number.isFinite(num) || num === 0 || num >= 98;
+    codes.cd = atLarge ? 0 : num;
     out.push({
       level: 'federal',
       office_label: 'U.S. House',
@@ -473,9 +476,15 @@ function districtsFromGeographies(geo) {
     });
   }
   const sldu = find(/State Legislative Districts - Upper/);
-  if (sldu && sldu.NAME) out.push({ level: 'state', office_label: 'State Senate', name: sldu.NAME });
+  if (sldu && sldu.NAME) {
+    codes.sldu = String(sldu.BASENAME || '').trim() || null;
+    out.push({ level: 'state', office_label: 'State Senate', name: sldu.NAME });
+  }
   const sldl = find(/State Legislative Districts - Lower/);
-  if (sldl && sldl.NAME) out.push({ level: 'state', office_label: 'State House', name: sldl.NAME });
+  if (sldl && sldl.NAME) {
+    codes.sldl = String(sldl.BASENAME || '').trim() || null;
+    out.push({ level: 'state', office_label: 'State House', name: sldl.NAME });
+  }
   const county = find(/^Counties$/);
   if (county && county.NAME) out.push({ level: 'county', office_label: 'County', name: county.NAME });
   const place = find(/^Incorporated Places$/);
@@ -485,7 +494,138 @@ function districtsFromGeographies(geo) {
   const school = find(/Unified School Districts$/);
   if (school && school.NAME) out.push({ level: 'school', office_label: 'School district', name: school.NAME });
 
-  return out;
+  return { districts: out, codes };
+}
+
+// ── Representative lookups (both keyless) ────────────────────
+// Federal: the canonical unitedstates/congress-legislators dataset —
+// reduced to a per-state index before caching (the raw file is 1.4 MB;
+// the index is a few hundred KB across all states). 7-day budget.
+async function fetchCongressIndex() {
+  const { payload } = await readThrough({
+    cacheKey: 'us:congress',
+    sectionId: '_congress_legislators',
+    ttlMs: 7 * DAY_MS,
+    fetch: async () => {
+      const members = await fetchJson(
+        'https://unitedstates.github.io/congress-legislators/legislators-current.json',
+      );
+      if (!Array.isArray(members) || !members.length) return null;
+      const byState = {};
+      for (const m of members) {
+        const t = m.terms && m.terms[m.terms.length - 1];
+        if (!t || !t.state) continue;
+        const entry = {
+          name: (m.name && (m.name.official_full || `${m.name.first} ${m.name.last}`)) || 'Member of Congress',
+          party: t.party || null,
+          phone: t.phone || null,
+          website: t.url || null,
+        };
+        const s = (byState[t.state] = byState[t.state] || { sens: [], reps: {} });
+        if (t.type === 'sen') s.sens.push(entry);
+        else if (t.type === 'rep') s.reps[String(t.district ?? 0)] = entry;
+      }
+      return byState;
+    },
+  });
+  return payload || null;
+}
+
+// State: OpenStates' published "current people" CSVs (keyless; the API
+// itself is key-gated). Minimal RFC-4180 parse — fields are quoted and
+// may contain commas/newlines.
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i += 1; }
+      else if (c === '"') inQuotes = false;
+      else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i += 1;
+      row.push(field); field = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function fetchStateLegislators(stateAbbr) {
+  const st = String(stateAbbr || '').toLowerCase();
+  if (!/^[a-z]{2}$/.test(st)) return null;
+  const { payload } = await readThrough({
+    cacheKey: `state:${st}`,
+    sectionId: '_state_legislators',
+    ttlMs: 7 * DAY_MS,
+    fetch: async () => {
+      const res = await fetch(`https://data.openstates.org/people/current/${st}.csv`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rows = parseCsv(await res.text());
+      if (rows.length < 2) return null;
+      const header = rows[0];
+      const col = (name) => header.indexOf(name);
+      const [iName, iParty, iDistrict, iChamber, iEmail, iVoice, iLinks] = [
+        col('name'), col('current_party'), col('current_district'), col('current_chamber'),
+        col('email'), col('capitol_voice'), col('links'),
+      ];
+      const people = rows.slice(1).map((r) => ({
+        name: r[iName] || '',
+        party: r[iParty] || null,
+        district: String(r[iDistrict] || '').trim(),
+        chamber: r[iChamber] || '',
+        email: r[iEmail] || null,
+        phone: r[iVoice] || null,
+        website: (r[iLinks] || '').split(';')[0] || null,
+      })).filter((p) => p.name && p.district);
+      return { people };
+    },
+  });
+  return (payload && payload.people) || null;
+}
+
+// Trim leading zeros so the geocoder's "017" matches OpenStates' "17".
+function districtEq(a, b) {
+  const norm = (v) => String(v || '').trim().replace(/^0+(?=\d)/, '').toLowerCase();
+  return norm(a) !== '' && norm(a) === norm(b);
+}
+
+async function lookupRepresentatives(stateAbbr, codes) {
+  const reps = [];
+  // Federal — never let one source's failure hide the other's results.
+  try {
+    const congress = await fetchCongressIndex();
+    const st = congress && congress[String(stateAbbr || '').toUpperCase()];
+    if (st) {
+      const house = codes.cd != null ? st.reps[String(codes.cd)] : null;
+      if (house) reps.push({ ...house, office: 'U.S. Representative', level: 'federal', email: null });
+      for (const sen of st.sens) reps.push({ ...sen, office: 'U.S. Senator', level: 'federal', email: null });
+    }
+  } catch (err) {
+    logger.warn('placeSections: congress lookup failed', { error: err.message });
+  }
+  try {
+    if (codes.sldu || codes.sldl) {
+      const people = await fetchStateLegislators(stateAbbr);
+      for (const p of people || []) {
+        if (p.chamber === 'upper' && districtEq(p.district, codes.sldu)) {
+          reps.push({ name: p.name, party: p.party, phone: p.phone, email: p.email, website: p.website, office: 'State Senator', level: 'state' });
+        } else if (p.chamber === 'lower' && districtEq(p.district, codes.sldl)) {
+          reps.push({ name: p.name, party: p.party, phone: p.phone, email: p.email, website: p.website, office: 'State Representative', level: 'state' });
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('placeSections: state legislators lookup failed', { stateAbbr, error: err.message });
+  }
+  return reps;
 }
 
 async function composeCivicDistricts(home) {
@@ -504,16 +644,21 @@ async function composeCivicDistricts(home) {
         );
         const geo = data && data.result && data.result.geographies;
         if (!geo) return null;
-        const districts = districtsFromGeographies(geo);
+        const { districts, codes } = districtsFromGeographies(geo);
         if (!districts.length) return null;
-        return { districts, representatives: [] };
+        // Names/contacts for the federal + state seats (both keyless
+        // sources, each individually cached 7 d). City/county officials
+        // have no national source — the list is honestly partial.
+        const representatives = await lookupRepresentatives(home.state, codes);
+        return { districts, representatives };
       },
     });
     if (!payload) return [serializePlaceSection('civic_districts', { status: 'unavailable' })];
     return [serializePlaceSection('civic_districts', {
       asOf: fetchedAt,
       status: stale ? 'stale' : 'ready',
-      source: 'U.S. Census Bureau geocoder',
+      source: 'U.S. Census Bureau · unitedstates/congress-legislators · OpenStates',
+      coverage: payload.representatives && payload.representatives.length ? 'full' : 'partial',
       data: payload,
     })];
   } catch (err) {
@@ -729,6 +874,8 @@ module.exports = {
   composeSeismic,
   composeWildfire,
   // Exported for testing.
+  parseCsv,
+  districtEq,
   leadRiskForYear,
   haversineMiles,
   stripCountySuffix,
