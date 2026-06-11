@@ -181,7 +181,25 @@ Decide: give health_environment its own detail page or fold into Risk — small 
 
 ---
 
-## Phase 5 — Money & valuation completion (#7, #2; ATTOM goes live)
+## Phase 5 — Money & valuation completion ✅ DONE (2026-06-11, on `feature/place-web`) — within key limits
+
+> **ATTOM is live** (key set; cache + on-open fetch already built) and a real matching bug is fixed: address1 sent
+> the full geocoder-formatted string ("…Court, Camas, Washington 98607, United States"), which can never match —
+> now the street segment only. ⚠️ The current key is a **trial** (sample coverage: the White House matches, most
+> addresses don't) — full property/valuation data needs the paid plan (your ATTOM budget decision).
+> **Sales trend**: ATTOM retired raw-ZIP geoids; /salestrend now needs their v4 hashed geoIdV4 (from property
+> responses / the v4 lookup) — wire when the paid plan lands; degrades gracefully meanwhile.
+> **Tax appeal (#2)**: AssessmentCard now carries the informational layer — assessment vs market estimate (±5%
+> in-line band, "above market is the usual basis for an appeal") + how-appeals-work education. No savings claims,
+> no advice (the legal gate). **Equity**: stays the implemented device-local private input — that privacy stance
+> ("only the resident can see") is deliberate in the codebase; server-side persistence reversed it for little gain.
+
+## Phase 7 status — funnel tests ✅ LEAN PASS DONE (2026-06-11)
+
+> `tests/startFunnel.test.tsx` (6 tests): hero CTA gating, T0 preview (free subset + locked teasers + wall +
+> register routing + sessionStorage stash), non-US region branch, lookup-error retry, AddressAutocomplete
+> (debounce → suggestions → keyboard selection; edit-after-select clears). Playwright e2e intentionally skipped
+> per the "don't over-invest in tests" guidance — the Jest layer covers the funnel logic.
 
 1. **ATTOM enablement** — set `ATTOM_API_KEY`, define budget policy: fetch only on dashboard/home-detail open,
    30-day property cache (already built: `AttomPropertyCache`), AVM tier decision (paid add-on; fall back to assessor

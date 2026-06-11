@@ -27,7 +27,13 @@ const FETCH_TIMEOUT_MS = 10000;
 // ── ATTOM API helpers ──────────────────────────────────────────────────────
 
 function buildAttomAddressLine1(home) {
-  const line1 = [home?.address, home?.address2]
+  // Home.address is often a fully-formatted geocoder string
+  // ("4080 NE Tacoma Ct, Camas, Washington 98607, United States");
+  // ATTOM's address1 must be the STREET LINE ONLY or matching fails
+  // with SuccessWithoutResult — take the segment before the first
+  // comma (a plain street line passes through unchanged).
+  const street = String(home?.address || '').split(',')[0].trim();
+  const line1 = [street, home?.address2]
     .filter((part) => typeof part === 'string' && part.trim())
     .join(' ')
     .trim();
