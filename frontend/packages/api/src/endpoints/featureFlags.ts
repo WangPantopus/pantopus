@@ -15,5 +15,8 @@ export interface FeatureFlagResponse {
 }
 
 export async function getFeatureFlag(flagName: string): Promise<FeatureFlagResponse> {
-  return get<FeatureFlagResponse>(`/feature-flags/${encodeURIComponent(flagName)}`);
+  // The backend mounts this under /api (app.js: app.use('/api', featureFlags)).
+  // The bare /feature-flags path 404'd against the Next proxy, so every web
+  // flag read silently fell back to its caller's default.
+  return get<FeatureFlagResponse>(`/api/feature-flags/${encodeURIComponent(flagName)}`);
 }
