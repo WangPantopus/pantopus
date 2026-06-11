@@ -23,8 +23,8 @@ public enum GigComposeOutboundEvent: Sendable, Equatable {
 /// One Basics-step photo riding the real upload pipeline
 /// (`POST /api/files/upload`). The raw bytes back the grid thumbnail;
 /// `status` drives the per-tile spinner / retry / uploaded chrome.
-struct GigComposeAttachment: Identifiable, Equatable, Sendable {
-    enum Status: Equatable, Sendable {
+struct GigComposeAttachment: Identifiable, Equatable {
+    enum Status: Equatable {
         case uploading
         case failed
         case uploaded(url: String)
@@ -86,6 +86,12 @@ final class GigComposeViewModel: WizardModel {
     /// are mirrored into `form.photoIds` so they survive restore.
     private(set) var attachments: [GigComposeAttachment] = []
 
+    /// Work item G — nearby price benchmark for the budget step
+    /// ("Similar handyman tasks nearby: $40–$120 · median $60"). Fetched
+    /// on entering the budget step with a category set; nil hides the
+    /// hint (no category, fetch failed, or `comparable_count == 0`).
+    private(set) var priceBenchmark: GigPriceBenchmarkDTO?
+
     // MARK: - Private dependencies
 
     private let api: APIClient
@@ -98,6 +104,10 @@ final class GigComposeViewModel: WizardModel {
 
     /// P15.5 — in-flight photo uploads keyed by attachment id.
     private var uploadTasks: [String: Task<Void, Never>] = [:]
+
+    /// G — the category the current `priceBenchmark` was fetched for, so
+    /// re-entering the budget step doesn't refetch the same category.
+    private var benchmarkCategory: GigComposeCategory?
 
     // MARK: - Init
 
@@ -644,6 +654,43 @@ extension GigComposeViewModel {
 }
 
 extension GigComposeViewModel {
+    // MARK: - G. Price benchmark
+
+    /// Fetch the low/median/high benchmark for the chosen category
+    /// (`GET /api/gigs/price-benchmark`), geo-scoped to the cached
+    /// device location when one exists. Failures are silent — the hint
+    /// simply doesn't render — and a benchmark with no comparables is
+    /// treated as absent.
+    func loadPriceBenchmark() async {
+        guard let category = form.category else {
+            priceBenchmark = nil
+            benchmarkCategory = nil
+            return
+        }
+        if category == benchmarkCategory, priceBenchmark != nil { return }
+        benchmarkCategory = category
+        do {
+            let coordinate = location.cachedCoordinate()
+            let response: GigPriceBenchmarkResponse = try await api.request(
+                GigsEndpoints.priceBenchmark(
+                    category: category.rawValue,
+                    lat: coordinate?.latitude,
+                    lng: coordinate?.longitude
+                )
+            )
+            guard form.category == category else { return }
+            if let benchmark = response.benchmark, (benchmark.comparableCount ?? 0) > 0 {
+                priceBenchmark = benchmark
+            } else {
+                priceBenchmark = nil
+            }
+        } catch {
+            guard form.category == category else { return }
+            priceBenchmark = nil
+            benchmarkCategory = nil
+        }
+    }
+
     // MARK: - API
 
     private func submit() async {

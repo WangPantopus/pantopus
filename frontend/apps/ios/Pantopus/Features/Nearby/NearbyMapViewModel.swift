@@ -283,7 +283,7 @@ public final class NearbyMapViewModel {
 
     private func sorted(_ source: [MapEntity]) -> [MapEntity] {
         switch activeSort {
-        case .newest, .fewestBids:
+        case .newest, .fewestBids, .urgency:
             source.sorted { a, b in a.bidCount < b.bidCount }
         case .closest:
             source.sorted { a, b in

@@ -230,8 +230,8 @@ public final class TasksMapViewModel {
     private func filteredSorted() -> [TaskMapItem] {
         let filtered = items.filter { activeCategory == .all || $0.category == activeCategory }
         switch activeSort {
-        case .newest:
-            return filtered // backend returns newest-first
+        case .newest, .urgency:
+            return filtered // backend returns newest-first (urgency has no local signal)
         case .closest:
             return filtered.sorted { Self.distanceMiles($0.distanceLabel) < Self.distanceMiles($1.distanceLabel) }
         case .highestPay:

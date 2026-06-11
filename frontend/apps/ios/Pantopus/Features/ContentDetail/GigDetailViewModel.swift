@@ -25,6 +25,14 @@ public final class GigDetailViewModel {
     /// Cached raw gig used by the place-bid + message flows.
     public private(set) var rawGig: GigDTO?
 
+    /// Bookmark state for the top-bar toggle. Seeded from
+    /// `saved_by_user` on load and flipped optimistically by
+    /// `toggleSave()`.
+    public private(set) var isSaved: Bool = false
+
+    /// True while a save/unsave request is in flight — debounces taps.
+    public private(set) var isSaveInFlight: Bool = false
+
     /// True when the signed-in viewer is the gig's assigned worker and the
     /// task is `in_progress` — the only state in which the worker can mark
     /// delivery (mirrors the backend `mark-completed` precondition and
@@ -96,6 +104,7 @@ public final class GigDetailViewModel {
         do {
             let detail: GigDetailResponse = try await api.request(GigsEndpoints.detail(id: gigId))
             rawGig = detail.gig
+            isSaved = detail.gig.savedByUser ?? false
             viewerIsOwner = currentUserId != nil && detail.gig.userId == currentUserId
             canMarkDelivered = Self.viewerCanMarkDelivered(gig: detail.gig, currentUserId: currentUserId)
             canTip = Self.viewerCanTip(gig: detail.gig, viewerIsOwner: viewerIsOwner)
@@ -116,6 +125,30 @@ public final class GigDetailViewModel {
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gig."
             state = .error(message: message)
+        }
+    }
+
+    /// Bookmark toggle (work item C). Optimistic: flip `isSaved`
+    /// immediately, then `POST /api/gigs/:id/save` (or `DELETE` to
+    /// unsave). On failure the flip reverts and the method returns
+    /// `false` so the view can toast. Taps are debounced while a
+    /// request is in flight.
+    @discardableResult
+    public func toggleSave() async -> Bool {
+        guard !isSaveInFlight, let gig = rawGig else { return true }
+        isSaveInFlight = true
+        defer { isSaveInFlight = false }
+        let target = !isSaved
+        isSaved = target
+        do {
+            let endpoint = target
+                ? GigsEndpoints.save(id: gig.id)
+                : GigsEndpoints.unsave(id: gig.id)
+            _ = try await api.request(endpoint, as: EmptyResponse.self)
+            return true
+        } catch {
+            isSaved = !target
+            return false
         }
     }
 

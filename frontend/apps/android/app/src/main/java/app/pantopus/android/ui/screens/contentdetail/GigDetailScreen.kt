@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -59,6 +60,7 @@ fun GigDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tipStatus by viewModel.tipStatus.collectAsStateWithLifecycle()
+    val saved by viewModel.saved.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var sheetTarget by remember { mutableStateOf<EditBidSheetTarget?>(null) }
     var deliveryTarget by remember { mutableStateOf<DeliveryProofTarget?>(null) }
@@ -142,6 +144,14 @@ fun GigDetailScreen(
         onSecondaryAction = openChat,
         onRetry = { viewModel.load() },
         onMessageCounterparty = openChat,
+        // P1.C — bookmark toggle in the top bar; optimistic flip with
+        // revert + toast on failure.
+        topBarAccessory = {
+            GigSaveToggle(
+                saved = saved,
+                onToggle = { viewModel.toggleSave { message -> toastText = message } },
+            )
+        },
         scrollFooter = {
             if (state is ContentDetailUiState.Loaded) {
                 GigQuestionsSection(viewModel) { message -> toastText = message }
@@ -234,6 +244,31 @@ fun GigDetailScreen(
                 )
             }
         }
+    }
+}
+
+/** P1.C — top-bar bookmark toggle; primary600 fill when saved. */
+@Composable
+private fun GigSaveToggle(
+    saved: Boolean,
+    onToggle: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onToggle)
+                .testTag("gigDetail.save"),
+        contentAlignment = Alignment.Center,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Bookmark,
+            contentDescription = if (saved) "Saved — tap to remove" else "Save this task",
+            size = 19.dp,
+            strokeWidth = 2f,
+            tint = if (saved) PantopusColors.primary600 else PantopusColors.appTextSecondary,
+        )
     }
 }
 

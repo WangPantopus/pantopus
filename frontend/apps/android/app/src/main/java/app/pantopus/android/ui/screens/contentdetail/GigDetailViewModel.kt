@@ -94,6 +94,13 @@ class GigDetailViewModel
         private var canTip = false
         private var viewerIsOwner = false
 
+        /** P1.C — bookmark state for the top-bar toggle (`saved_by_user`). */
+        private val _saved = MutableStateFlow(false)
+        val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+        /** P1.C — true while a save/unsave call is in flight (re-entrancy guard). */
+        private var saveInFlight = false
+
         private val _questions = MutableStateFlow<List<GigQuestionDto>>(emptyList())
         val questions: StateFlow<List<GigQuestionDto>> = _questions.asStateFlow()
 
@@ -211,6 +218,7 @@ class GigDetailViewModel
                 when (val result = repo.detail(gigId)) {
                     is NetworkResult.Success -> {
                         rawGig = result.data.gig
+                        _saved.value = result.data.gig.savedByUser == true
                         viewerIsOwner =
                             currentUserId()?.let { it == result.data.gig.userId } == true
                         canMarkDelivered = viewerCanMarkDelivered(result.data.gig, currentUserId())
@@ -312,6 +320,27 @@ class GigDetailViewModel
 
         /** Returns the gig id wired from `SavedStateHandle`. */
         fun currentGigId(): String = gigId
+
+        // MARK: - P1.C Save / bookmark
+
+        /**
+         * Toggle the bookmark optimistically: flip immediately, call the
+         * endpoint, revert + [onError] on failure.
+         */
+        fun toggleSave(onError: (String) -> Unit = {}) {
+            if (saveInFlight) return
+            saveInFlight = true
+            val target = !_saved.value
+            _saved.value = target
+            viewModelScope.launch {
+                val result = if (target) repo.save(gigId) else repo.unsave(gigId)
+                if (result is NetworkResult.Failure) {
+                    _saved.value = !target
+                    onError(if (target) "Couldn't save this task." else "Couldn't remove the save.")
+                }
+                saveInFlight = false
+            }
+        }
 
         // MARK: - Tip (Block 3D)
 

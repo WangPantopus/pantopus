@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
@@ -447,6 +448,9 @@ private fun BudgetStep(
     state: GigComposeUiState,
     vm: GigComposeViewModel,
 ) {
+    // P1.G — covers a restored wizard landing directly on this step;
+    // the VM dedupes per category so the step-advance fetch isn't repeated.
+    LaunchedEffect(Unit) { vm.fetchPriceBenchmark() }
     HeadlineBlock("Set your budget")
     SubcopyBlock("Pick a price model. Helpers see this on the gig card.")
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -482,6 +486,30 @@ private fun BudgetStep(
                     keyboardType = KeyboardType.Decimal,
                     fieldTestTag = "composeGig_budgetMax",
                     modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+    // P1.G — nearby price-benchmark hint; hidden when the fetch failed
+    // or there are no comparable tasks.
+    state.priceBenchmark?.let { benchmark ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("gigCompose.priceBenchmark"),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = benchmark.hintText,
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            benchmark.basis?.let { basis ->
+                Text(
+                    text = basis,
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextMuted,
                 )
             }
         }

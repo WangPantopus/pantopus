@@ -50,16 +50,20 @@ public struct TransactionalDetailShell: View {
     private let onRetry: @MainActor () -> Void
     private let onMessageCounterparty: (@MainActor () -> Void)?
     private let overflowItems: [ContentDetailOverflowItem]
+    /// Optional trailing top-bar control rendered before the overflow
+    /// menu (e.g. the gig-detail bookmark toggle).
+    private let topBarAccessory: AnyView?
     private let scrollFooter: AnyView?
 
     public init(
         state: ContentDetailState,
+        overflowItems: [ContentDetailOverflowItem] = [],
+        topBarAccessory: AnyView? = nil,
         onBack: @escaping @MainActor () -> Void,
         onPrimaryAction: @escaping @MainActor () -> Void = {},
         onSecondaryAction: (@MainActor () -> Void)? = nil,
         onRetry: @escaping @MainActor () -> Void = {},
         onMessageCounterparty: (@MainActor () -> Void)? = nil,
-        overflowItems: [ContentDetailOverflowItem] = [],
         @ViewBuilder scrollFooter: () -> some View = { EmptyView() }
     ) {
         self.state = state
@@ -69,6 +73,7 @@ public struct TransactionalDetailShell: View {
         self.onRetry = onRetry
         self.onMessageCounterparty = onMessageCounterparty
         self.overflowItems = overflowItems
+        self.topBarAccessory = topBarAccessory
         self.scrollFooter = AnyView(scrollFooter())
     }
 
@@ -165,15 +170,29 @@ public struct TransactionalDetailShell: View {
         }
     }
 
-    /// Build the trailing-nav overflow control. Returns `nil` when no
-    /// items are wired, which short-circuits to the bare back-only top
-    /// bar used by gigs / invoices today.
+    /// Build the trailing-nav chrome: optional accessory (bookmark, …)
+    /// followed by the overflow control. Returns `nil` when neither is
+    /// wired, which short-circuits to the bare back-only top bar.
     @MainActor
     private func trailingOverflow(transparent: Bool) -> AnyView? {
-        guard !overflowItems.isEmpty else { return nil }
-        return AnyView(
-            OverflowMenuButton(items: overflowItems, transparent: transparent)
-        )
+        let overflow: AnyView? = overflowItems.isEmpty
+            ? nil
+            : AnyView(OverflowMenuButton(items: overflowItems, transparent: transparent))
+        switch (topBarAccessory, overflow) {
+        case (nil, nil):
+            return nil
+        case let (accessory?, nil):
+            return accessory
+        case let (nil, overflow?):
+            return overflow
+        case let (accessory?, overflow?):
+            return AnyView(
+                HStack(spacing: 4) {
+                    accessory
+                    overflow
+                }
+            )
+        }
     }
 
     /// Trailing chrome for the cover-overlay (transparent) top bar:
@@ -185,6 +204,9 @@ public struct TransactionalDetailShell: View {
         guard !icons.isEmpty else { return trailingOverflow(transparent: true) }
         return AnyView(
             HStack(spacing: 4) {
+                if let topBarAccessory {
+                    topBarAccessory
+                }
                 ForEach(Array(icons.enumerated()), id: \.offset) { _, icon in
                     Icon(icon, size: 18, strokeWidth: 2, color: Theme.Color.appText)
                         .frame(width: 36, height: 36)

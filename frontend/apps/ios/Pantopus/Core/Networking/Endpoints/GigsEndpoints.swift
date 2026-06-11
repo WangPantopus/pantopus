@@ -51,6 +51,76 @@ public enum GigsEndpoints {
         return Endpoint(method: .get, path: "/api/gigs", query: query)
     }
 
+    /// `GET /api/gigs/browse` — sectioned browse feed (best matches /
+    /// urgent / clusters / high paying / new today / quick jobs) around
+    /// `lat`/`lng`. `radius` is **meters** to match the backend
+    /// signature. Route `backend/routes/gigs.js:3190`.
+    public static func browse(lat: Double, lng: Double, radiusMeters: Int) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/gigs/browse",
+            query: [
+                "lat": String(lat),
+                "lng": String(lng),
+                "radius": String(radiusMeters)
+            ]
+        )
+    }
+
+    /// `GET /api/gigs/price-benchmark` — low/median/high price benchmark
+    /// for a category, optionally geo-scoped. Route
+    /// `backend/routes/gigs.js:2985`.
+    public static func priceBenchmark(
+        category: String,
+        lat: Double? = nil,
+        lng: Double? = nil
+    ) -> Endpoint {
+        var query: [String: String] = ["category": category]
+        if let lat { query["lat"] = String(lat) }
+        if let lng { query["lng"] = String(lng) }
+        return Endpoint(method: .get, path: "/api/gigs/price-benchmark", query: query)
+    }
+
+    /// `POST /api/gigs/:gigId/dismiss` — "Not interested": hides the gig
+    /// from the caller's feed + records an affinity signal. Route
+    /// `backend/routes/gigs.js:8523`.
+    public static func dismissGig(gigId: String, reason: String? = nil) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/gigs/\(gigId)/dismiss",
+            body: DismissGigBody(reason: reason)
+        )
+    }
+
+    /// `DELETE /api/gigs/:gigId/dismiss` — undo a dismissal. Route
+    /// `backend/routes/gigs.js:8572`.
+    public static func undoDismissGig(gigId: String) -> Endpoint {
+        Endpoint(method: .delete, path: "/api/gigs/\(gigId)/dismiss")
+    }
+
+    /// `GET /api/gigs/hidden-categories` — the caller's hidden category
+    /// list. Route `backend/routes/gigs.js:3437`.
+    public static func hiddenCategories() -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/hidden-categories")
+    }
+
+    /// `POST /api/gigs/hidden-categories` — hide every gig in a category
+    /// from the caller's feed. Route `backend/routes/gigs.js:3461`.
+    public static func hideCategory(_ category: String) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/gigs/hidden-categories",
+            body: HideCategoryBody(category: category)
+        )
+    }
+
+    /// `DELETE /api/gigs/hidden-categories/:category` — unhide a
+    /// category. Route `backend/routes/gigs.js:3495`.
+    public static func unhideCategory(_ category: String) -> Endpoint {
+        let escaped = category.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? category
+        return Endpoint(method: .delete, path: "/api/gigs/hidden-categories/\(escaped)")
+    }
+
     /// `POST /api/gigs/magic-draft` — parse plain-English describe text
     /// into a structured draft (title / category / budget / schedule +
     /// per-field confidence and an optional clarifying question). Route
@@ -251,6 +321,25 @@ public enum GigsEndpoints {
     /// `task_format`).
     public static func create(_ body: CreateGigBody) -> Endpoint {
         Endpoint(method: .post, path: "/api/gigs", body: body)
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/dismiss`. Reason is optional
+/// free-text the backend truncates at 500 chars.
+public struct DismissGigBody: Encodable, Sendable {
+    public let reason: String?
+
+    public init(reason: String?) {
+        self.reason = reason
+    }
+}
+
+/// Body for `POST /api/gigs/hidden-categories`.
+public struct HideCategoryBody: Encodable, Sendable {
+    public let category: String
+
+    public init(category: String) {
+        self.category = category
     }
 }
 

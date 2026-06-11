@@ -81,6 +81,10 @@ data class GigDto(
     @Json(name = "bid_count") val bidCount: Int? = null,
     @Json(name = "saved_by_user") val savedByUser: Boolean? = null,
     @Json(name = "distance_miles") val distanceMiles: Double? = null,
+    /** Spatial-RPC rows (browse sections, spatial list path) carry meters. */
+    @Json(name = "distance_meters") val distanceMeters: Double? = null,
+    /** First attachment URL, enriched server-side for thumbnails. */
+    @Json(name = "first_image") val firstImage: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
     @Json(name = "approx_location") val approxLocation: GigApproxLocation? = null,

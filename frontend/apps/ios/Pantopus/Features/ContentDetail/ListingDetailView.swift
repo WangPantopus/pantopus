@@ -36,12 +36,12 @@ public struct ListingDetailView: View {
     public var body: some View {
         TransactionalDetailShell(
             state: viewModel.state,
+            overflowItems: overflowItems,
             onBack: onBack,
             onPrimaryAction: { handlePrimaryAction() },
             onSecondaryAction: { if let listing = viewModel.rawListing { onMessage?(listing) } },
             onRetry: { Task { await viewModel.load() } },
-            onMessageCounterparty: { if let listing = viewModel.rawListing { onMessage?(listing) } },
-            overflowItems: overflowItems
+            onMessageCounterparty: { if let listing = viewModel.rawListing { onMessage?(listing) } }
         )
         .task { await viewModel.load() }
         .sheet(isPresented: $offerSheetVisible) {

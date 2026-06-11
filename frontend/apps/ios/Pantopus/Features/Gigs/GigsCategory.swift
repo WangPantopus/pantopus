@@ -77,11 +77,14 @@ public enum GigsCategory: String, CaseIterable, Sendable, Hashable {
 }
 
 /// Sort options for the Gigs feed (matches backend `sort` enum).
+/// `urgency` (deadline-soonest) backs the browse "Urgent nearby"
+/// section's See-all jump.
 public enum GigsSort: String, CaseIterable, Sendable, Hashable, Identifiable {
     case newest
     case closest
     case highestPay = "highest_pay"
     case fewestBids = "fewest_bids"
+    case urgency
 
     public var id: String {
         rawValue
@@ -93,6 +96,7 @@ public enum GigsSort: String, CaseIterable, Sendable, Hashable, Identifiable {
         case .closest: "Closest"
         case .highestPay: "Highest pay"
         case .fewestBids: "Fewest bids"
+        case .urgency: "Urgent first"
         }
     }
 }

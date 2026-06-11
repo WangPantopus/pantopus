@@ -84,6 +84,8 @@ fun ContentDetailShell(
     onMessageCounterparty: (() -> Unit)? = null,
     overflowItems: List<ContentDetailOverflowItem> = emptyList(),
     renderLocationMaps: Boolean = true,
+    /** Optional trailing top-bar control (e.g. the gig save toggle, P1.C). */
+    topBarAccessory: (@Composable () -> Unit)? = null,
     scrollFooter: @Composable () -> Unit = {},
 ) {
     Box(
@@ -111,6 +113,7 @@ fun ContentDetailShell(
                     onMessageCounterparty = onMessageCounterparty,
                     overflowItems = overflowItems,
                     renderLocationMaps = renderLocationMaps,
+                    topBarAccessory = topBarAccessory,
                     scrollFooter = scrollFooter,
                 )
         }
@@ -201,6 +204,7 @@ private fun LoadedFrame(
     onMessageCounterparty: (() -> Unit)?,
     overflowItems: List<ContentDetailOverflowItem>,
     renderLocationMaps: Boolean,
+    topBarAccessory: (@Composable () -> Unit)?,
     scrollFooter: @Composable () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -212,7 +216,12 @@ private fun LoadedFrame(
         ) {
             content.cover?.let { CoverImage(it) }
             if (content.cover == null) {
-                TopNav(onBack = onBack, transparent = false, overflowItems = overflowItems)
+                TopNav(
+                    onBack = onBack,
+                    transparent = false,
+                    overflowItems = overflowItems,
+                    accessory = topBarAccessory,
+                )
             }
             HeroBlock(content = content)
             if (content.statStrip.isNotEmpty()) {
@@ -253,6 +262,7 @@ private fun LoadedFrame(
                 transparent = true,
                 overflowItems = overflowItems,
                 glassActions = content.cover.glassActions,
+                accessory = topBarAccessory,
             )
         }
         StickyDock(
@@ -272,6 +282,7 @@ private fun TopNav(
     transparent: Boolean,
     overflowItems: List<ContentDetailOverflowItem> = emptyList(),
     glassActions: List<PantopusIcon> = emptyList(),
+    accessory: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -300,6 +311,7 @@ private fun TopNav(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
+        accessory?.invoke()
         if (glassActions.isNotEmpty()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),

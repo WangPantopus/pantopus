@@ -2,11 +2,16 @@
 //  GigsFeedViewModel.swift
 //  Pantopus
 //
-//  Backs the Gigs feed (Hub → Gigs pillar). Fetches `GET /api/gigs`
-//  with the active category + sort, projects each gig to
-//  `GigCardContent`, and re-fetches when the chips or sort change.
-//  Saved-state is mirrored optimistically via `POST /api/gigs/:id/save`.
+//  Backs the Gigs feed (Hub → Gigs pillar). With no category / filters
+//  narrowing the feed it renders the sectioned browse surface
+//  (`GET /api/gigs/browse`); otherwise it fetches the flat list
+//  (`GET /api/gigs`) with the active category + sort, projects each gig
+//  to `GigCardContent`, and re-fetches when the chips or sort change.
+//  Also owns the radius-suggestion banner, "Not interested" dismissals
+//  with undo, and the realtime `gig:new` "new tasks" pill.
 //
+
+// swiftlint:disable file_length
 
 import Foundation
 import Observation
@@ -39,37 +44,91 @@ public final class GigsFeedViewModel {
     /// empty-state pill so the user knows their scope.
     public private(set) var radiusMiles: Double
 
+    /// "Only N tasks within X mi — Search Y mi" banner content. Set when
+    /// a load lands under 3 results with no filters; nil hides the banner.
+    public private(set) var radiusSuggestion: GigsRadiusSuggestion?
+
+    /// Transient undo affordance after a dismissal / category hide.
+    public private(set) var pendingUndo: GigsFeedUndo?
+
+    /// Count of `gig:new` events from other users since the last load /
+    /// banner refresh. Drives the floating "N new tasks" pill.
+    public private(set) var newTaskCount = 0
+
+    /// Error surfacing for dismiss / hide failures (same pattern as
+    /// MyBids). The view clears it after the toast expires.
+    public var toast: ToastMessage?
+
     private let api: APIClient
     private let latitude: Double?
     private let longitude: Double?
+    private let location: any LocationProviding
+    private let currentUserId: @MainActor () -> String?
+    private let gigEventsProvider: @MainActor () -> AsyncStream<GigNewEvent>
     private var loadedItems: [GigDTO] = []
+    private var undoSnapshot: [GigDTO] = []
     private var isLoading = false
+    /// X-dismissed for the session — suppresses the radius banner until
+    /// the VM is rebuilt.
+    private var radiusSuggestionDismissed = false
+    /// Set by browse "See all" so the flat list renders even with
+    /// category == All and no filters. Cleared by re-selecting "All".
+    private var flatListOverride = false
+    private var realtimeTask: Task<Void, Never>?
 
     init(
         api: APIClient = .shared,
         latitude: Double? = nil,
         longitude: Double? = nil,
-        radiusMiles: Double = 1
+        radiusMiles: Double = 1,
+        location: any LocationProviding = DeviceLocationProvider.shared,
+        currentUserId: @escaping @MainActor () -> String? = {
+            if case let .signedIn(user) = AuthManager.shared.state { return user.id }
+            return nil
+        },
+        gigEventsProvider: @escaping @MainActor () -> AsyncStream<GigNewEvent> = {
+            SocketClient.shared.events(named: "gig:new", as: GigNewEvent.self)
+        }
     ) {
         self.api = api
         self.latitude = latitude
         self.longitude = longitude
         self.radiusMiles = radiusMiles
+        self.location = location
+        self.currentUserId = currentUserId
+        self.gigEventsProvider = gigEventsProvider
+    }
+
+    /// True when the feed renders the sectioned browse surface: no
+    /// category chip, no structured filters, and no "See all" override.
+    /// (Search lives on its own screen, so "no search text" always holds
+    /// here.)
+    public var isBrowseMode: Bool {
+        activeCategory == .all && activeFilterCount == 0 && !flatListOverride
     }
 
     /// First-time load. No-op once we have content.
     public func load() async {
-        if case .loaded = state { return }
-        await fetch()
+        switch state {
+        case .loaded, .browse: return
+        default: await fetch()
+        }
     }
 
     public func refresh() async {
         await fetch()
     }
 
-    /// Chip-row tap. Tapping the active chip is a no-op.
+    /// Chip-row tap. Tapping the active chip is a no-op, except "All"
+    /// after a "See all" override — that returns to browse mode.
     public func selectCategory(_ category: GigsCategory) async {
-        guard category != activeCategory else { return }
+        if category == activeCategory {
+            guard category == .all, flatListOverride else { return }
+            flatListOverride = false
+            await fetch()
+            return
+        }
+        if category == .all { flatListOverride = false }
         activeCategory = category
         await fetch()
     }
@@ -92,13 +151,95 @@ public final class GigsFeedViewModel {
         await fetch()
     }
 
+    // MARK: - Radius suggestion (B)
+
+    /// Suggestion ladder: 1 → 3 → 5 → 10 mi, capped at 10.
+    static func nextRadius(after miles: Double) -> Double? {
+        if miles < 3 { return 3 }
+        if miles < 5 { return 5 }
+        if miles < 10 { return 10 }
+        return nil
+    }
+
+    /// "Search Y mi" tap — widen the radius and refetch. The banner
+    /// clears itself and only returns if the wider load is still thin.
+    public func expandRadius() async {
+        guard let suggestion = radiusSuggestion else { return }
+        radiusMiles = suggestion.suggestedMiles
+        radiusSuggestion = nil
+        await fetch()
+    }
+
+    /// X tap — hide the banner for the rest of the session.
+    public func dismissRadiusSuggestion() {
+        radiusSuggestionDismissed = true
+        radiusSuggestion = nil
+    }
+
+    private func updateRadiusSuggestion(resultCount: Int) {
+        guard !radiusSuggestionDismissed,
+              activeFilterCount == 0,
+              resultCount < 3,
+              let next = Self.nextRadius(after: radiusMiles)
+        else {
+            radiusSuggestion = nil
+            return
+        }
+        radiusSuggestion = GigsRadiusSuggestion(
+            resultCount: resultCount,
+            currentMiles: radiusMiles,
+            suggestedMiles: next
+        )
+    }
+
     // MARK: - Fetch
 
     private func fetch() async {
         if isLoading { return }
         isLoading = true
         defer { isLoading = false }
-        if case .loaded = state {} else { state = .loading }
+        switch state {
+        case .loaded, .browse: break
+        default: state = .loading
+        }
+        if isBrowseMode, let coordinate = resolvedCoordinate() {
+            await fetchBrowse(coordinate: coordinate)
+        } else {
+            await fetchFlat()
+        }
+    }
+
+    /// Injected fixed coordinate (tests / previews) or the device's
+    /// cached location. Browse requires one; without it the feed falls
+    /// back to the flat list.
+    private func resolvedCoordinate() -> UserCoordinate? {
+        if let latitude, let longitude {
+            return UserCoordinate(latitude: latitude, longitude: longitude, accuracyMeters: 0)
+        }
+        return location.cachedCoordinate()
+    }
+
+    private func fetchBrowse(coordinate: UserCoordinate) async {
+        do {
+            let response: GigsBrowseResponse = try await api.request(
+                GigsEndpoints.browse(
+                    lat: coordinate.latitude,
+                    lng: coordinate.longitude,
+                    radiusMeters: Int((radiusMiles * Self.metersPerMile).rounded())
+                )
+            )
+            let content = Self.projectBrowse(response)
+            state = content.isEmpty
+                ? .empty(GigsFeedEmpty(radiusMiles: radiusMiles))
+                : .browse(content)
+            updateRadiusSuggestion(resultCount: response.totalActive ?? 0)
+        } catch {
+            let message = (error as? APIError)?.errorDescription ?? "Couldn't load gigs."
+            state = .error(message: message)
+        }
+    }
+
+    private func fetchFlat() async {
         do {
             let response: GigsListResponse = try await api.request(
                 GigsEndpoints.list(
@@ -115,7 +256,8 @@ public final class GigsFeedViewModel {
                 )
             )
             loadedItems = response.gigs
-            rebuildState()
+            let visibleCount = rebuildState()
+            updateRadiusSuggestion(resultCount: visibleCount)
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gigs."
             state = .error(message: message)
@@ -124,11 +266,13 @@ public final class GigsFeedViewModel {
 
     /// Project `loadedItems` through the residual client-side filters
     /// into the render state. Budget / open-to-bids / single-schedule
-    /// were already applied server-side by `fetch()`; only the
+    /// were already applied server-side by `fetchFlat()`; only the
     /// dimensions the API can't express run here — posted-within stays
     /// client-side because the backend has no posted-within param.
-    /// An empty result falls to the designed empty state.
-    private func rebuildState() {
+    /// An empty result falls to the designed empty state. Returns the
+    /// visible row count for the radius-suggestion gate.
+    @discardableResult
+    private func rebuildState() -> Int {
         let now = Date()
         let visible = loadedItems.filter { filters.matchesClientSide($0, now: now) }
         if visible.isEmpty {
@@ -136,9 +280,137 @@ public final class GigsFeedViewModel {
         } else {
             state = .loaded(visible.map(Self.project))
         }
+        return visible.count
     }
 
-    // MARK: - Projection
+    // MARK: - Browse "See all" transitions (F)
+
+    /// Section "See all" — switch to the flat list with the section's
+    /// sort applied. Category stays "All"; re-tapping the "All" chip
+    /// returns to browse.
+    public func showAllFromBrowse(sort: GigsSort) async {
+        flatListOverride = true
+        activeSort = sort
+        await fetch()
+    }
+
+    /// Quick-jobs "See all" — flat list narrowed to the under-$100
+    /// budget band (mirrors the section's backend definition).
+    public func showAllQuickJobs() async {
+        flatListOverride = true
+        await applyFilters(GigFilterCriteria(budgetUpper: 100))
+    }
+
+    // MARK: - Dismiss / hide (D)
+
+    /// "Not interested": optimistic row removal + undo affordance, then
+    /// `POST /api/gigs/:gigId/dismiss`. Failure restores the row.
+    public func dismissGig(id: String) async {
+        guard loadedItems.contains(where: { $0.id == id }) else { return }
+        undoSnapshot = loadedItems
+        loadedItems.removeAll { $0.id == id }
+        rebuildState()
+        pendingUndo = GigsFeedUndo(message: "Task hidden", kind: .dismissedGig(gigId: id))
+        do {
+            _ = try await api.request(GigsEndpoints.dismissGig(gigId: id), as: EmptyResponse.self)
+        } catch {
+            restoreUndoSnapshot()
+            toast = ToastMessage(text: "Couldn't hide that task.", kind: .error)
+        }
+    }
+
+    /// "Hide all <Category>": optimistic removal of every row sharing the
+    /// source row's backend category string, then
+    /// `POST /api/gigs/hidden-categories`. Failure restores the rows.
+    public func hideCategory(ofGigId id: String) async {
+        guard let gig = loadedItems.first(where: { $0.id == id }),
+              let key = gig.category, !key.isEmpty else { return }
+        undoSnapshot = loadedItems
+        loadedItems.removeAll { $0.category == key }
+        rebuildState()
+        let label = GigsCategory.from(backendKey: key).label
+        pendingUndo = GigsFeedUndo(
+            message: "\(label) tasks hidden",
+            kind: .hiddenCategory(backendKey: key)
+        )
+        do {
+            _ = try await api.request(GigsEndpoints.hideCategory(key), as: EmptyResponse.self)
+        } catch {
+            restoreUndoSnapshot()
+            toast = ToastMessage(text: "Couldn't hide that category.", kind: .error)
+        }
+    }
+
+    /// Undo-toast tap — reinsert the removed rows and revert server-side.
+    public func undoPendingRemoval() async {
+        guard let undo = pendingUndo else { return }
+        restoreUndoSnapshot()
+        do {
+            switch undo.kind {
+            case let .dismissedGig(gigId):
+                _ = try await api.request(GigsEndpoints.undoDismissGig(gigId: gigId), as: EmptyResponse.self)
+            case let .hiddenCategory(backendKey):
+                _ = try await api.request(GigsEndpoints.unhideCategory(backendKey), as: EmptyResponse.self)
+            }
+        } catch {
+            toast = ToastMessage(text: "Couldn't undo.", kind: .error)
+        }
+    }
+
+    /// Auto-expiry (~5s) — drops the undo affordance without reverting.
+    public func expireUndo(_ id: UUID) {
+        guard pendingUndo?.id == id else { return }
+        pendingUndo = nil
+        undoSnapshot = []
+    }
+
+    private func restoreUndoSnapshot() {
+        pendingUndo = nil
+        loadedItems = undoSnapshot
+        undoSnapshot = []
+        rebuildState()
+    }
+
+    // MARK: - Realtime "new tasks" (E)
+
+    /// Subscribe to the global `gig:new` broadcast while the feed is
+    /// visible. The view calls this from `.task` and pairs it with
+    /// `stopRealtime()` in `.onDisappear`.
+    public func startRealtime() {
+        guard realtimeTask == nil else { return }
+        realtimeTask = Task { [weak self] in
+            guard let self else { return }
+            let stream = gigEventsProvider()
+            for await event in stream {
+                handleGigEvent(event)
+            }
+        }
+    }
+
+    public func stopRealtime() {
+        realtimeTask?.cancel()
+        realtimeTask = nil
+    }
+
+    /// Accumulate one banner tick per other-user gig. Own posts and
+    /// events landing mid-load are ignored.
+    func handleGigEvent(_ event: GigNewEvent) {
+        guard !isLoading else { return }
+        if let me = currentUserId(), let poster = event.userId, poster == me { return }
+        newTaskCount += 1
+    }
+
+    /// Banner tap — refresh the feed and clear the count.
+    public func refreshFromBanner() async {
+        newTaskCount = 0
+        await fetch()
+    }
+}
+
+// MARK: - Projection
+
+extension GigsFeedViewModel {
+    static let metersPerMile = 1609.34
 
     /// `GigDTO` → render-only `GigCardContent`. Exposed (internal) so the
     /// Gig Search surface projects identical rows without duplicating the
@@ -159,17 +431,77 @@ public final class GigsFeedViewModel {
             body: gig.description ?? "",
             price: price,
             bidCount: gig.bidCount ?? 0,
-            distanceLabel: Self.distanceLabel(miles: gig.distanceMiles)
+            distanceLabel: Self.distanceLabel(miles: gig.distanceMiles),
+            isUrgent: gig.isUrgent ?? false
         )
+    }
+
+    /// Browse response → sectioned render content. Vertical sections cap
+    /// at 3 rows; rails keep the backend's 5-item batches.
+    static func projectBrowse(_ response: GigsBrowseResponse) -> GigsBrowseContent {
+        GigsBrowseContent(
+            bestMatches: response.sections.bestMatches.prefix(3).map(projectBrowseRow),
+            urgentRail: response.sections.urgent.map(projectRail),
+            newToday: response.sections.newToday.prefix(3).map(projectBrowseRow),
+            highPayingRail: response.sections.highPaying.map(projectRail),
+            quickJobs: response.sections.quickJobs.prefix(3).map(projectBrowseRow),
+            clusters: response.sections.clusters.map(projectCluster),
+            totalActive: response.totalActive ?? 0
+        )
+    }
+
+    /// `BrowseGigDTO` → vertical row. Browse rows carry no bid count, so
+    /// `bidCount` is nil and the row hides both bid affordances.
+    static func projectBrowseRow(_ gig: BrowseGigDTO) -> GigCardContent {
+        let distance = distanceLabel(miles: gig.distanceMeters.map { $0 / metersPerMile })
+        let metaPieces: [String] = [
+            distance,
+            ageLabel(timestamp: gig.createdAt).map { "\($0) ago" }
+        ].compactMap { $0 }
+        return GigCardContent(
+            id: gig.id,
+            category: GigsCategory.from(backendKey: gig.category),
+            metaLine: metaPieces.joined(separator: " · "),
+            title: gig.title,
+            body: gig.description ?? "",
+            price: priceLabel(price: gig.price, payType: nil),
+            bidCount: nil,
+            distanceLabel: distance,
+            isUrgent: gig.isUrgent ?? false
+        )
+    }
+
+    /// `BrowseGigDTO` → compact rail card.
+    static func projectRail(_ gig: BrowseGigDTO) -> GigRailCardContent {
+        GigRailCardContent(
+            id: gig.id,
+            category: GigsCategory.from(backendKey: gig.category),
+            title: gig.title,
+            price: priceLabel(price: gig.price, payType: nil),
+            distanceLabel: distanceLabel(miles: gig.distanceMeters.map { $0 / metersPerMile })
+        )
+    }
+
+    /// Cluster → category chip. The id keeps the raw backend key so two
+    /// unknown categories collapsing onto the same chip enum stay unique.
+    static func projectCluster(_ cluster: GigClusterDTO) -> GigClusterChipContent {
+        GigClusterChipContent(
+            backendKey: cluster.category,
+            category: GigsCategory.from(backendKey: cluster.category),
+            count: cluster.count,
+            priceHint: cluster.priceMin.map { "From \(moneyLabel($0))" }
+        )
+    }
+
+    private static func moneyLabel(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0
+            ? "$\(Int(value))"
+            : String(format: "$%.2f", value)
     }
 
     private static func priceLabel(price: Double?, payType: String?) -> String {
         guard let price else { return "—" }
-        let formatted = if price.truncatingRemainder(dividingBy: 1) == 0 {
-            "$\(Int(price))"
-        } else {
-            String(format: "$%.2f", price)
-        }
+        let formatted = moneyLabel(price)
         switch payType {
         case "hourly": return "\(formatted) / hr"
         case "per_session": return "\(formatted) / session"

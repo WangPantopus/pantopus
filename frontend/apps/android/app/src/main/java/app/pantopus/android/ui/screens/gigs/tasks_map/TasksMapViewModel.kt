@@ -172,7 +172,9 @@ class TasksMapViewModel
             val filtered =
                 items.filter { _activeCategory.value == GigsCategory.All || it.category == _activeCategory.value }
             return when (_activeSort.value) {
-                GigsSort.Newest -> filtered // backend returns newest-first
+                // Urgency (P1.F) proxies to newest server-side; the map has
+                // no per-pin deadline, so it shares the newest-first order.
+                GigsSort.Newest, GigsSort.Urgency -> filtered // backend returns newest-first
                 GigsSort.Closest -> filtered.sortedBy { distanceMiles(it.distanceLabel) }
                 GigsSort.HighestPay -> filtered.sortedByDescending { priceValue(it.price) }
                 GigsSort.FewestBids -> filtered.sortedBy { it.bidCount }

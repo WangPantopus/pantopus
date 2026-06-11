@@ -195,6 +195,18 @@ data class GigComposePhotoUpload(
 )
 
 /**
+ * P1.G — projected price-benchmark hint shown under the budget fields.
+ * Built from `GET /api/gigs/price-benchmark`; absent (null on the UI
+ * state) when the fetch failed or there are no comparable tasks.
+ */
+data class GigComposePriceBenchmark(
+    /** "Similar handyman tasks nearby: $40–$120 · median $75" */
+    val hintText: String,
+    /** Humanised `basis` sub-caption, e.g. "completed tasks". */
+    val basis: String?,
+)
+
+/**
  * P0.2 — raw bytes of a picked attachment, held by the view-model for
  * upload + retry. Not a data class — [bytes] is an array, so structural
  * equality would be misleading.
