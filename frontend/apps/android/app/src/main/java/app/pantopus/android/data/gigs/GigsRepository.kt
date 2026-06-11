@@ -4,22 +4,26 @@ import app.pantopus.android.data.api.models.gigs.AnswerGigQuestionBody
 import app.pantopus.android.data.api.models.gigs.AskGigQuestionBody
 import app.pantopus.android.data.api.models.gigs.BoostGigResponse
 import app.pantopus.android.data.api.models.gigs.CancelGigBody
+import app.pantopus.android.data.api.models.gigs.CancellationPreviewResponse
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
+import app.pantopus.android.data.api.models.gigs.CounterBidBody
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.DismissGigBody
 import app.pantopus.android.data.api.models.gigs.GigActionSuccessResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
+import app.pantopus.android.data.api.models.gigs.GigBidMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
+import app.pantopus.android.data.api.models.gigs.GigInstantAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
+import app.pantopus.android.data.api.models.gigs.GigTemplatesResponse
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
-import app.pantopus.android.data.api.models.gigs.GigTemplatesResponse
 import app.pantopus.android.data.api.models.gigs.HiddenCategoryBody
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
@@ -29,9 +33,16 @@ import app.pantopus.android.data.api.models.gigs.MagicUndoResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.MyGigsResponse
+import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
+import app.pantopus.android.data.api.models.gigs.ReportGigBody
+import app.pantopus.android.data.api.models.gigs.ReportGigResponse
+import app.pantopus.android.data.api.models.gigs.ReportNoShowBody
+import app.pantopus.android.data.api.models.gigs.ReportNoShowResponse
+import app.pantopus.android.data.api.models.gigs.WorkerAckBody
+import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.GigsApi
@@ -106,8 +117,7 @@ class GigsRepository
             safeApiCall { api.hideCategory(HiddenCategoryBody(category = category)) }
 
         /** `DELETE /api/gigs/hidden-categories/:category` — unhide. */
-        suspend fun unhideCategory(category: String): NetworkResult<GigActionSuccessResponse> =
-            safeApiCall { api.unhideCategory(category) }
+        suspend fun unhideCategory(category: String): NetworkResult<GigActionSuccessResponse> = safeApiCall { api.unhideCategory(category) }
 
         /** `POST /api/gigs/magic-draft` — NLP-parse the describe text. */
         suspend fun magicDraft(body: MagicDraftRequest): NetworkResult<MagicDraftResponse> = safeApiCall { api.magicDraft(body) }
@@ -171,6 +181,68 @@ class GigsRepository
             gigId: String,
             bidId: String,
         ): NetworkResult<GigBidAcceptResponse> = safeApiCall { api.acceptBid(gigId, bidId) }
+
+        /** `POST /api/gigs/:gigId/bids/:bidId/reject` — poster rejects a bid. */
+        suspend fun rejectBid(
+            gigId: String,
+            bidId: String,
+        ): NetworkResult<GigBidMutationResponse> = safeApiCall { api.rejectBid(gigId, bidId) }
+
+        /** `POST /api/gigs/:gigId/bids/:bidId/counter` — poster counters a pending bid. */
+        suspend fun counterBid(
+            gigId: String,
+            bidId: String,
+            amount: Double,
+            message: String? = null,
+        ): NetworkResult<GigBidMutationResponse> =
+            safeApiCall { api.counterBid(gigId, bidId, CounterBidBody(amount = amount, message = message)) }
+
+        /** `POST .../counter/accept` — bidder takes the poster's counter amount. */
+        suspend fun acceptCounterOffer(
+            gigId: String,
+            bidId: String,
+        ): NetworkResult<GigBidMutationResponse> = safeApiCall { api.acceptCounterOffer(gigId, bidId) }
+
+        /** `POST .../counter/decline` — bidder declines; original bid stands. */
+        suspend fun declineCounterOffer(
+            gigId: String,
+            bidId: String,
+        ): NetworkResult<GigBidMutationResponse> = safeApiCall { api.declineCounterOffer(gigId, bidId) }
+
+        /** `POST /api/gigs/:gigId/instant-accept` — claim an instant-accept task. */
+        suspend fun instantAccept(gigId: String): NetworkResult<GigInstantAcceptResponse> = safeApiCall { api.instantAccept(gigId) }
+
+        /** `POST /api/gigs/:gigId/worker-ack` — assigned worker's "I'm on it". */
+        suspend fun workerAck(
+            gigId: String,
+            status: String = "starting_now",
+            etaMinutes: Int? = null,
+            note: String? = null,
+        ): NetworkResult<WorkerAckResponse> =
+            safeApiCall { api.workerAck(gigId, WorkerAckBody(status = status, etaMinutes = etaMinutes, note = note)) }
+
+        /** `POST /api/gigs/:gigId/start` — worker moves `assigned → in_progress`. */
+        suspend fun startGig(gigId: String): NetworkResult<GigDetailResponse> = safeApiCall { api.startGig(gigId) }
+
+        /** `GET /api/gigs/:gigId/no-show-check` — gate for the no-show affordance. */
+        suspend fun noShowCheck(gigId: String): NetworkResult<NoShowCheckResponse> = safeApiCall { api.noShowCheck(gigId) }
+
+        /** `POST /api/gigs/:gigId/report-no-show` — cancel with a no-show incident. */
+        suspend fun reportNoShow(
+            gigId: String,
+            description: String? = null,
+        ): NetworkResult<ReportNoShowResponse> = safeApiCall { api.reportNoShow(gigId, ReportNoShowBody(description = description)) }
+
+        /** `POST /api/gigs/:gigId/report` — flag a gig for moderation. */
+        suspend fun reportGig(
+            gigId: String,
+            reason: String,
+            details: String? = null,
+        ): NetworkResult<ReportGigResponse> = safeApiCall { api.reportGig(gigId, ReportGigBody(reason = reason, details = details)) }
+
+        /** `GET /api/gigs/:gigId/cancellation-preview` — zone + fee preview. */
+        suspend fun cancellationPreview(gigId: String): NetworkResult<CancellationPreviewResponse> =
+            safeApiCall { api.cancellationPreview(gigId) }
 
         suspend fun finalizeAcceptBid(
             gigId: String,

@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
 import app.pantopus.android.data.api.models.payments.TipResponse
+import app.pantopus.android.data.api.models.reviews.MyPendingReviewsResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
@@ -17,6 +18,8 @@ import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.payments.PaymentsRepository
+import app.pantopus.android.data.realtime.SocketManager
+import app.pantopus.android.data.reviews.ReviewsRepository
 import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -47,6 +50,8 @@ class GigTipViewModelTest {
     private val authRepo: AuthRepository = mockk()
     private val filesRepo: FilesRepository = mockk()
     private val paymentsRepo: PaymentsRepository = mockk()
+    private val reviewsRepo: ReviewsRepository = mockk()
+    private val socket: SocketManager = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -77,11 +82,14 @@ class GigTipViewModelTest {
         coEvery { repo.detail("g1") } returns NetworkResult.Success(GigDetailResponse(gig = completedConfirmedGig()))
         coEvery { repo.bids("g1") } returns NetworkResult.Success(GigBidsResponse(bids = emptyList()))
         coEvery { repo.questions("g1") } returns NetworkResult.Success(GigQuestionsResponse(questions = emptyList()))
+        coEvery { reviewsRepo.myPending() } returns NetworkResult.Success(MyPendingReviewsResponse(pending = emptyList()))
         return GigDetailViewModel(
             repo,
             authRepo,
             filesRepo,
             paymentsRepo,
+            reviewsRepo,
+            socket,
             SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
         )
     }

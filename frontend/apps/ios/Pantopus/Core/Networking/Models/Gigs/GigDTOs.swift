@@ -60,6 +60,11 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     /// Uploaded photo URLs riding the gig row. Owner edit mode rehydrates
     /// the photo grid from these.
     public let attachments: [String]?
+    /// Set when the assigned worker starts work (assigned → in_progress).
+    public let startedAt: String?
+    /// Pre-start acknowledgement from the worker — `starting_now` or
+    /// `running_late`. Drives the "I'm on it" affordance (hidden once set).
+    public let workerAckStatus: String?
     public let creator: GigCreator?
 
     enum CodingKeys: String, CodingKey {
@@ -93,6 +98,8 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case exactState = "exact_state"
         case exactAddress = "exact_address"
         case attachments
+        case startedAt = "started_at"
+        case workerAckStatus = "worker_ack_status"
         case creator
         case legacyCreator = "User"
     }
@@ -136,6 +143,8 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         // Lenient — legacy rows may carry non-string entries; drop rather
         // than fail the whole gig decode.
         attachments = try? c.decode([String].self, forKey: .attachments)
+        startedAt = try c.decodeIfPresent(String.self, forKey: .startedAt)
+        workerAckStatus = try c.decodeIfPresent(String.self, forKey: .workerAckStatus)
         creator = try c.decodeIfPresent(GigCreator.self, forKey: .creator)
             ?? c.decodeIfPresent(GigCreator.self, forKey: .legacyCreator)
     }
@@ -176,7 +185,9 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         exactState: String?,
         creator: GigCreator?,
         exactAddress: String? = nil,
-        attachments: [String]? = nil
+        attachments: [String]? = nil,
+        startedAt: String? = nil,
+        workerAckStatus: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -214,6 +225,8 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         self.creator = creator
         self.exactAddress = exactAddress
         self.attachments = attachments
+        self.startedAt = startedAt
+        self.workerAckStatus = workerAckStatus
     }
 }
 
@@ -354,6 +367,11 @@ public struct GigBidDTO: Decodable, Sendable, Hashable, Identifiable {
     public let status: String?
     public let message: String?
     public let createdAt: String?
+    /// Poster's counter-offer amount — set while `status == countered`
+    /// (and kept after the bidder responds; `counterStatus` tells which).
+    public let counterAmount: Double?
+    /// `pending` / `accepted` / `declined` for the counter round-trip.
+    public let counterStatus: String?
     public let bidder: GigCreator?
 
     enum CodingKeys: String, CodingKey {
@@ -364,6 +382,8 @@ public struct GigBidDTO: Decodable, Sendable, Hashable, Identifiable {
         case status
         case message
         case createdAt = "created_at"
+        case counterAmount = "counter_amount"
+        case counterStatus = "counter_status"
         case bidder
         case legacyBidder = "User"
     }
@@ -377,6 +397,8 @@ public struct GigBidDTO: Decodable, Sendable, Hashable, Identifiable {
         status = try c.decodeIfPresent(String.self, forKey: .status)
         message = try c.decodeIfPresent(String.self, forKey: .message)
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        counterAmount = try c.decodeIfPresent(Double.self, forKey: .counterAmount)
+        counterStatus = try c.decodeIfPresent(String.self, forKey: .counterStatus)
         bidder = try c.decodeIfPresent(GigCreator.self, forKey: .bidder)
             ?? c.decodeIfPresent(GigCreator.self, forKey: .legacyBidder)
     }
@@ -389,7 +411,9 @@ public struct GigBidDTO: Decodable, Sendable, Hashable, Identifiable {
         status: String?,
         message: String?,
         createdAt: String?,
-        bidder: GigCreator?
+        bidder: GigCreator?,
+        counterAmount: Double? = nil,
+        counterStatus: String? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -399,6 +423,8 @@ public struct GigBidDTO: Decodable, Sendable, Hashable, Identifiable {
         self.message = message
         self.createdAt = createdAt
         self.bidder = bidder
+        self.counterAmount = counterAmount
+        self.counterStatus = counterStatus
     }
 }
 
@@ -699,4 +725,94 @@ public struct CreateGigLocation: Encodable, Sendable, Equatable {
 public struct CreateGigResponse: Decodable, Sendable {
     public let gig: GigDTO
     public let message: String?
+}
+
+// MARK: - Phase 5 — lifecycle DTOs
+
+/// Response from `POST /api/gigs/:gigId/instant-accept`
+/// (`backend/routes/gigsV2.js:64`). On success the gig is already
+/// `assigned`; for paid gigs the *poster* still has to authorize
+/// payment, so the helper just refreshes the detail.
+public struct GigInstantAcceptResponse: Decodable, Sendable {
+    public let message: String?
+    public let gig: GigDTO?
+    public let paymentRequired: Bool?
+    public let requiresPaymentSetup: Bool?
+    public let isSetupIntent: Bool?
+    public let payment: GigBidAcceptResponse.PaymentPayload?
+}
+
+/// Response from `POST /api/gigs/:gigId/worker-ack`.
+public struct WorkerAckResponse: Decodable, Sendable {
+    public let success: Bool?
+    public let workerAckStatus: String?
+    public let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case success, message
+        case workerAckStatus = "worker_ack_status"
+    }
+}
+
+/// Response from `GET /api/gigs/:gigId/no-show-check`. Only
+/// `can_report` gates the UI; the rest is timing context.
+public struct NoShowCheckResponse: Decodable, Sendable {
+    public let canReport: Bool?
+    public let reason: String?
+    public let minutesOverdue: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case reason
+        case canReport = "can_report"
+        case minutesOverdue = "minutes_overdue"
+    }
+}
+
+/// Response from `GET /api/gigs/:gigId/cancellation-preview` — the
+/// `computeCancellationInfo` shape plus policy metadata
+/// (`backend/routes/gigs.js:6356`).
+public struct GigCancellationPreview: Decodable, Sendable {
+    public let zone: Int?
+    public let zoneLabel: String?
+    public let fee: Double?
+    public let feePct: Double?
+    public let inGrace: Bool?
+    public let policy: String?
+    public let policyLabel: String?
+    public let policyDescription: String?
+    public let canReschedule: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case zone, fee, policy
+        case zoneLabel = "zone_label"
+        case feePct = "fee_pct"
+        case inGrace = "in_grace"
+        case policyLabel = "policy_label"
+        case policyDescription = "policy_description"
+        case canReschedule = "can_reschedule"
+    }
+}
+
+/// Response from `POST /api/gigs/:gigId/report`.
+public struct GigReportResponse: Decodable, Sendable {
+    public let message: String?
+    public let alreadyReported: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case message
+        case alreadyReported = "already_reported"
+    }
+}
+
+/// Room event payload for `gig:<eventType>` socket frames emitted by
+/// `emitGigUpdate` (`backend/routes/gigs.js:413`). Socket DTOs omit
+/// explicit CodingKeys — `SocketClient` applies `convertFromSnakeCase`.
+public struct GigRoomEvent: Decodable, Sendable {
+    public let gigId: String?
+    public let eventType: String?
+
+    public init(gigId: String?, eventType: String?) {
+        self.gigId = gigId
+        self.eventType = eventType
+    }
 }

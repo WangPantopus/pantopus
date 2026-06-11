@@ -342,6 +342,8 @@ data class RowFooterAction(
     val variant: CompactButtonVariant = CompactButtonVariant.Primary,
     /** Flex weight inside the footer row. Default 1. */
     val flex: Int = 1,
+    /** Optional UI-test anchor applied to the button (Phase 5 counter rows). */
+    val testTag: String? = null,
     val onClick: () -> Unit,
 )
 

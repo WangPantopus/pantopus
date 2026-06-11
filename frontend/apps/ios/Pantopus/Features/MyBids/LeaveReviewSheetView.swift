@@ -135,6 +135,9 @@ public struct LeaveReviewSheetView: View {
                     .accessibilityIdentifier("leave-review-star-\(value)")
                 }
             }
+            // Canonical Android-parity anchor for the star row (the sheet
+            // is shared between My Bids and the gig-detail review CTA).
+            .accessibilityIdentifier("gigDetail.review.stars")
             Text(ratingHint)
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextMuted)

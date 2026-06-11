@@ -380,6 +380,9 @@ public struct RowFooterAction: Sendable {
     public let variant: CompactButtonVariant
     /// Flex weight inside the footer row. Default 1.
     public let flex: Int
+    /// Optional `accessibilityIdentifier` for the rendered button —
+    /// Android-parity test tags (e.g. `myBids.counter_<id>.accept`).
+    public let identifier: String?
     public let handler: @Sendable () -> Void
 
     public init(
@@ -387,12 +390,14 @@ public struct RowFooterAction: Sendable {
         icon: PantopusIcon? = nil,
         variant: CompactButtonVariant = .primary,
         flex: Int = 1,
+        identifier: String? = nil,
         handler: @escaping @Sendable () -> Void
     ) {
         self.title = title
         self.icon = icon
         self.variant = variant
         self.flex = flex
+        self.identifier = identifier
         self.handler = handler
     }
 }

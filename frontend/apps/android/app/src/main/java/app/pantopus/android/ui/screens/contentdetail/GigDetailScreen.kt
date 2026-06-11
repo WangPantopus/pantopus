@@ -21,6 +21,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,7 @@ import com.stripe.android.paymentsheet.rememberPaymentSheet
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun GigDetailScreen(
     onBack: () -> Unit = {},
@@ -61,14 +63,20 @@ fun GigDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tipStatus by viewModel.tipStatus.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
+    val cancelPreview by viewModel.cancelPreview.collectAsStateWithLifecycle()
+    val cancelPreviewLoading by viewModel.cancelPreviewLoading.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var sheetTarget by remember { mutableStateOf<EditBidSheetTarget?>(null) }
     var deliveryTarget by remember { mutableStateOf<DeliveryProofTarget?>(null) }
     var showTipSheet by remember { mutableStateOf(false) }
+    var showReportSheet by remember { mutableStateOf(false) }
+    var showCancelSheet by remember { mutableStateOf(false) }
     var toastText by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val deliverySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val tipSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val reportSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val cancelSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Block 3D — Stripe PaymentSheet for tipping (created in composition).
     val paymentSheet =
@@ -76,7 +84,18 @@ fun GigDetailScreen(
             viewModel.onTipOutcome(StripePaymentSheets.checkoutOutcome(result))
         }
 
+    // Phase 5 — second PaymentSheet for accept-bid / instant-accept checkouts.
+    val lifecyclePaymentSheet =
+        rememberPaymentSheet { result ->
+            viewModel.onLifecycleCheckoutOutcome(StripePaymentSheets.checkoutOutcome(result))
+        }
+
     LaunchedEffect(Unit) { viewModel.load() }
+    // Phase 5 — join the gig:<id> realtime room while the screen is visible.
+    DisposableEffect(Unit) {
+        viewModel.joinRealtime()
+        onDispose { viewModel.leaveRealtime() }
+    }
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -93,6 +112,24 @@ fun GigDetailScreen(
                             ),
                     )
                 }
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.lifecycleEvents.collect { event ->
+            when (event) {
+                is GigLifecycleEvent.Toast -> toastText = event.text
+                is GigLifecycleEvent.PresentPaymentSheet ->
+                    lifecyclePaymentSheet.presentWithPaymentIntent(
+                        paymentIntentClientSecret = event.params.clientSecret.orEmpty(),
+                        configuration =
+                            StripePaymentSheets.paymentConfiguration(
+                                context = context,
+                                customerId = event.params.customer,
+                                ephemeralKey = event.params.ephemeralKey,
+                                publishableKey = event.params.publishableKey,
+                            ),
+                    )
             }
         }
     }
@@ -115,6 +152,45 @@ fun GigDetailScreen(
         }
     }
 
+    // Phase 5 work item 6 — share via the system sheet with the web link.
+    val shareGig: () -> Unit = {
+        val url = GigDetailViewModel.shareUrl(viewModel.currentGigId())
+        val title = viewModel.gigSnapshot()?.title
+        val intent =
+            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(
+                    android.content.Intent.EXTRA_TEXT,
+                    if (title.isNullOrEmpty()) url else "$title — $url",
+                )
+            }
+        context.startActivity(android.content.Intent.createChooser(intent, "Share task"))
+    }
+
+    val overflowItems =
+        buildList {
+            add(ContentDetailOverflowItem(label = "Share", testTag = "gigDetail.share", onClick = shareGig))
+            add(
+                ContentDetailOverflowItem(
+                    label = "Report task",
+                    testTag = "gigDetail.report",
+                    onClick = { showReportSheet = true },
+                ),
+            )
+            if (viewModel.canCancelTask()) {
+                add(
+                    ContentDetailOverflowItem(
+                        label = "Cancel task",
+                        testTag = "gigDetail.cancel",
+                        onClick = {
+                            viewModel.requestCancelPreview()
+                            showCancelSheet = true
+                        },
+                    ),
+                )
+            }
+        }
+
     ContentDetailShell(
         state = state,
         onBack = onBack,
@@ -131,6 +207,8 @@ fun GigDetailScreen(
                             gigId = viewModel.currentGigId(),
                             gigTitle = gig?.title ?: "this task",
                         )
+                // Phase 5 work item 3 — instant accept claims the task directly.
+                viewModel.canInstantAccept() -> viewModel.instantAccept()
                 else ->
                     sheetTarget =
                         EditBidSheetTarget(
@@ -144,6 +222,7 @@ fun GigDetailScreen(
         onSecondaryAction = openChat,
         onRetry = { viewModel.load() },
         onMessageCounterparty = openChat,
+        overflowItems = overflowItems,
         // P1.C — bookmark toggle in the top bar; optimistic flip with
         // revert + toast on failure.
         topBarAccessory = {
@@ -154,10 +233,50 @@ fun GigDetailScreen(
         },
         scrollFooter = {
             if (state is ContentDetailUiState.Loaded) {
+                GigLifecycleSections(viewModel)
                 GigQuestionsSection(viewModel) { message -> toastText = message }
             }
         },
     )
+
+    // Phase 5 — invisible anchor for the instant-accept dock CTA.
+    if (viewModel.canInstantAccept()) {
+        Box(modifier = Modifier.size(0.dp).testTag("gigDetail.instantAccept"))
+    }
+
+    if (showReportSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showReportSheet = false },
+            sheetState = reportSheetState,
+        ) {
+            GigReportSheetContent(
+                onSubmit = { reason, details ->
+                    viewModel.submitReport(reason, details) { ok ->
+                        if (ok) showReportSheet = false
+                    }
+                },
+                onCancel = { showReportSheet = false },
+            )
+        }
+    }
+
+    if (showCancelSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showCancelSheet = false },
+            sheetState = cancelSheetState,
+        ) {
+            GigCancelSheetContent(
+                preview = cancelPreview,
+                previewLoading = cancelPreviewLoading,
+                onConfirm = { reason ->
+                    viewModel.confirmCancel(reason) { ok ->
+                        if (ok) showCancelSheet = false
+                    }
+                },
+                onCancel = { showCancelSheet = false },
+            )
+        }
+    }
 
     val target = sheetTarget
     if (target != null) {

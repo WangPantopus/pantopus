@@ -1879,7 +1879,10 @@ private fun FooterStack(footer: RowFooter) {
                     variant = action.variant,
                     size = CompactButtonSize.Footer,
                     onClick = action.onClick,
-                    modifier = Modifier.weight(action.flex.toFloat()),
+                    modifier =
+                        Modifier
+                            .weight(action.flex.toFloat())
+                            .then(action.testTag?.let { Modifier.testTag(it) } ?: Modifier),
                 )
             }
         }
