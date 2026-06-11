@@ -57,7 +57,7 @@ export default function PlaceHeader({
   const addressLine = (
     <span className="flex items-center gap-1.5 min-w-0 text-app-text-secondary">
       <MapPin size={14} strokeWidth={2} className="shrink-0 text-app-text-muted" />
-      <span className="text-sm font-medium truncate">{address}</span>
+      <span className="text-sm font-medium truncate" title={address}>{address}</span>
       {canSwitch ? (
         <ChevronsUpDown size={15} strokeWidth={2} className="shrink-0 text-app-text-muted" />
       ) : null}

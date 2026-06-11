@@ -21,6 +21,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShimmerBlock } from '@/components/ui/Shimmer';
 import { DetailHeader } from '@/components/archetypes/place';
+import PlaceShell from '../PlaceShell';
 import { PLACE_DETAIL_BY_SLUG } from './sections';
 import TodayDetail from './TodayDetail';
 import YourHomeDetail from './YourHomeDetail';
@@ -30,27 +31,30 @@ import MoneyDetail from './MoneyDetail';
 import CivicDetail from './CivicDetail';
 import IdentityDetail from './IdentityDetail';
 
-function DetailShell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto w-full max-w-[640px]">{children}</div>;
+function DetailShell({ section, children }: { section: string; children: React.ReactNode }) {
+  return <PlaceShell active={section}>{children}</PlaceShell>;
 }
 
 function DetailSkeleton() {
   return (
-    <div className="px-4 sm:px-5 pt-1 pb-16" aria-hidden="true">
-      <div className="h-3 w-24 mt-6 mb-2"><ShimmerBlock className="h-3 w-24" /></div>
-      <div className="flex flex-col gap-2.5">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px]">
-            <div className="flex items-center gap-3 mb-3">
-              <ShimmerBlock className="w-11 h-11 rounded-xl" />
-              <div className="flex-1 flex flex-col gap-2">
-                <ShimmerBlock className="h-4 w-1/3" />
-                <ShimmerBlock className="h-3 w-1/2" />
+    <div className="px-4 sm:px-5 pt-1 pb-16" role="status">
+      <span className="sr-only">Loading section details…</span>
+      <div aria-hidden="true">
+        <div className="h-3 w-24 mt-6 mb-2"><ShimmerBlock className="h-3 w-24" /></div>
+        <div className="flex flex-col gap-2.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px]">
+              <div className="flex items-center gap-3 mb-3">
+                <ShimmerBlock className="w-11 h-11 rounded-xl" />
+                <div className="flex-1 flex flex-col gap-2">
+                  <ShimmerBlock className="h-4 w-1/3" />
+                  <ShimmerBlock className="h-3 w-1/2" />
+                </div>
               </div>
+              <ShimmerBlock className="h-3 w-5/6" />
             </div>
-            <ShimmerBlock className="h-3 w-5/6" />
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -102,7 +106,7 @@ export default function PlaceSectionDetail({ section }: { section: string }) {
   // ── Unknown section ───────────────────────────────────────
   if (!valid) {
     return (
-      <DetailShell>
+      <DetailShell section={section}>
         <DetailHeader title="Not found" />
         <div className="px-4 sm:px-5">
           <EmptyState
@@ -119,7 +123,7 @@ export default function PlaceSectionDetail({ section }: { section: string }) {
 
   if (!mounted || !authed) {
     return (
-      <DetailShell>
+      <DetailShell section={section}>
         <DetailHeader title={meta.title} />
         <DetailSkeleton />
       </DetailShell>
@@ -128,7 +132,7 @@ export default function PlaceSectionDetail({ section }: { section: string }) {
 
   if (homeQuery.isError) {
     return (
-      <DetailShell>
+      <DetailShell section={section}>
         <DetailHeader title={meta.title} />
         <div className="px-4 sm:px-5">
           <ErrorState message="We couldn't load your place. Check your connection and try again." onRetry={() => homeQuery.refetch()} />
@@ -139,7 +143,7 @@ export default function PlaceSectionDetail({ section }: { section: string }) {
 
   if (homeQuery.isSuccess && !homeId) {
     return (
-      <DetailShell>
+      <DetailShell section={section}>
         <DetailHeader title={meta.title} />
         <div className="px-4 sm:px-5">
           <EmptyState
@@ -156,7 +160,7 @@ export default function PlaceSectionDetail({ section }: { section: string }) {
 
   if (homeQuery.isPending || intelQuery.isPending) {
     return (
-      <DetailShell>
+      <DetailShell section={section}>
         <DetailHeader title={meta.title} />
         <DetailSkeleton />
       </DetailShell>
@@ -165,7 +169,7 @@ export default function PlaceSectionDetail({ section }: { section: string }) {
 
   if (intelQuery.isError || !intelQuery.data) {
     return (
-      <DetailShell>
+      <DetailShell section={section}>
         <DetailHeader title={meta.title} />
         <div className="px-4 sm:px-5">
           <ErrorState message="We couldn't load your place. Check your connection and try again." onRetry={() => intelQuery.refetch()} />
@@ -178,7 +182,7 @@ export default function PlaceSectionDetail({ section }: { section: string }) {
   const residentName = userQuery.data?.name || userQuery.data?.firstName || '';
 
   return (
-    <DetailShell>
+    <DetailShell section={section}>
       {meta.group === 'today' && <TodayDetail intelligence={intelligence} />}
       {meta.group === 'your_home' && <YourHomeDetail intelligence={intelligence} homeId={homeId} />}
       {meta.group === 'risk_readiness' && <RiskDetail intelligence={intelligence} homeId={homeId} />}

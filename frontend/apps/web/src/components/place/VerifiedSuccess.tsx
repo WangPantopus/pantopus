@@ -59,8 +59,8 @@ export default function VerifiedSuccess({ onContinue }: VerifiedSuccessProps) {
 
   return (
     <div className="mx-auto w-full max-w-[640px] px-4 sm:px-5 py-10 flex flex-col">
-      {/* centerpiece */}
-      <div className="flex flex-col items-center text-center">
+      {/* centerpiece — staged reveal (decorative; static under reduced motion) */}
+      <div className="flex flex-col items-center text-center motion-safe:animate-[fadeInUp_0.4s_ease-out_both]">
         {/* verified seal — green disc + soft halo, calm not loud */}
         <div className="relative w-[108px] h-[108px] flex items-center justify-center">
           <span className="absolute w-[108px] h-[108px] rounded-full bg-app-home-bg opacity-50" />
@@ -79,7 +79,7 @@ export default function VerifiedSuccess({ onContinue }: VerifiedSuccessProps) {
       </div>
 
       {/* the reveal */}
-      <div className="mt-8">
+      <div className="mt-8 motion-safe:animate-[fadeInUp_0.4s_ease-out_both]" style={{ animationDelay: '180ms' }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-app-text-muted mb-2.5 px-0.5">
           Now available
         </div>
@@ -88,9 +88,10 @@ export default function VerifiedSuccess({ onContinue }: VerifiedSuccessProps) {
             <Link
               key={r.label}
               href={r.href}
-              className={`flex items-center gap-3 px-3.5 py-3 hover:bg-app-hover transition-colors ${
+              className={`flex items-center gap-3 px-3.5 py-3 hover:bg-app-hover transition-colors motion-safe:animate-[fadeInUp_0.35s_ease-out_both] ${
                 i > 0 ? 'border-t border-app-border-subtle' : ''
               }`}
+              style={{ animationDelay: `${260 + i * 110}ms` }}
             >
               <IconTile icon={r.icon} tone="home" size={36} />
               <div className="flex-1 min-w-0">
@@ -104,7 +105,7 @@ export default function VerifiedSuccess({ onContinue }: VerifiedSuccessProps) {
       </div>
 
       {/* forward */}
-      <div className="mt-8">
+      <div className="mt-8 motion-safe:animate-[fadeInUp_0.4s_ease-out_both]" style={{ animationDelay: '620ms' }}>
         <button
           type="button"
           onClick={onContinue}

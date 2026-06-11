@@ -189,7 +189,21 @@ Decide: give health_environment its own detail page or fold into Risk — small 
 
 ---
 
-## Phase 6 — Web design upgrade (explicit goal: better than a ported mobile column)
+## Phase 6 — Web design upgrade ✅ CORE DONE (2026-06-11, on `feature/place-web`)
+
+> Shipped: **desktop-grade Place surface** — new `PlaceShell` + `PlaceNavRail`: at lg+ a persistent left section
+> rail (Overview / Today / Your home / Risk / Block / Money / Civic / Identity / Pulse) beside a wider (760px)
+> content column, shared by the dashboard, all 7 detail pages, and the pulse stream — dashboard ⇄ detail is one
+> click, the back chevron hides at lg (in-page leaves keep it). Group cards pair up **2-across at lg** (lone/odd
+> cards span the row — pure CSS, mobile stack untouched). Motion: staggered dashboard group entrance, staged
+> VerifiedSuccess reveal (seal → heading → Band-D rows → CTA), all `motion-safe` so reduced-motion stays static.
+> /start: wider at sm+, larger hero type, preview fade-in, wall bar gets safe-area inset + rounded/shadow top,
+> and the preview inherits the 2-up grid. A11y: skeletons announce via role=status + sr-only, truncated addresses
+> get title tooltips. Drive-by: ECHO adapter now does the documented two-step (get_facilities count → get_qid
+> rows) and refuses to cache half-payloads (count>0 with no rows throws → stale/error).
+> Verified in the preview browser at 1440px (rail + grids + one-click section nav) and 375px (designed mobile
+> experience unchanged); the /start anonymous funnel re-verified end-to-end with live FEMA + density data.
+> Remaining polish (not blocking): contrast audit on muted tokens, /start designed-Preview hero-stat treatment.
 
 1. **Desktop-grade dashboard layout**: keep the single column ≤`md`; at `lg+` go two-column — left rail (header,
    Today hero, verify nudge/identity) + right sections grid; raise max width from 640px (~960–1100px).

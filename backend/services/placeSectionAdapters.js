@@ -353,16 +353,16 @@ function haversineMiles(lat1, lng1, lat2, lng2) {
   return 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function fetchEchoFacilities(lat, lng) {
-  const data = await fetchJson(
-    `${ECHO_URL}?output=JSON&p_lat=${lat}&p_long=${lng}&p_radius=1&responseset=20`,
-  );
+function echoResults(data) {
   const results = data && data.Results;
   if (!results || results.Error) {
     throw new Error((results && results.Error && results.Error.ErrorMessage) || 'ECHO error');
   }
-  const rows = results.Facilities || [];
-  const facilities = rows.slice(0, 5).map((f) => {
+  return results;
+}
+
+function mapEchoFacilities(rows, lat, lng) {
+  return (rows || []).slice(0, 5).map((f) => {
     const programs = ECHO_PROGRAM_FLAGS.filter(([flag]) => String(f[flag] || '') === 'Y').map(([, label]) => label);
     const fLat = Number(f.FacLat);
     const fLng = Number(f.FacLong);
@@ -374,7 +374,31 @@ async function fetchEchoFacilities(lat, lng) {
         : 1,
     };
   });
-  const count = Number(results.QueryRows) || rows.length;
+}
+
+// Two-step ECHO flow: get_facilities answers the COUNT + a QueryID;
+// the facility ROWS come from get_qid against that query. ECHO's edge
+// is flaky (some requests land on throttling nodes), so a count>0 with
+// no resolvable rows THROWS rather than caching a half-payload — the
+// envelope serves stale/error and a later request completes the pair.
+async function fetchEchoFacilities(lat, lng) {
+  const search = echoResults(await fetchJson(
+    `${ECHO_URL}?output=JSON&p_lat=${lat}&p_long=${lng}&p_radius=1&responseset=20`,
+  ));
+  const count = Number(search.QueryRows) || 0;
+
+  let rows = Array.isArray(search.Facilities) ? search.Facilities : [];
+  if (count > 0 && rows.length === 0 && search.QueryID) {
+    const page = echoResults(await fetchJson(
+      `https://echodata.epa.gov/echo/echo_rest_services.get_qid?output=JSON&qid=${encodeURIComponent(search.QueryID)}&pageno=1`,
+    ));
+    rows = Array.isArray(page.Facilities) ? page.Facilities : [];
+  }
+  if (count > 0 && rows.length === 0) {
+    throw new Error('ECHO returned a count but no facility rows');
+  }
+
+  const facilities = mapEchoFacilities(rows, lat, lng);
   return {
     facilities_within_mile: count,
     radius_mi: 1,

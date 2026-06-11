@@ -101,7 +101,7 @@ function HeroStep({
     <div className="flex flex-col min-h-screen pb-8">
       <TopBar />
       <div className="flex-1 flex flex-col justify-center">
-        <h1 className="text-[31px] leading-[37px] font-bold -tracking-[0.028em] text-app-text">
+        <h1 className="text-[31px] leading-[37px] sm:text-[36px] sm:leading-[43px] font-bold -tracking-[0.028em] text-app-text">
           See what&apos;s true about your address.
         </h1>
         <p className="mt-3.5 text-[15.5px] leading-[23px] text-app-text-secondary -tracking-[0.005em]">
@@ -265,7 +265,7 @@ function AppDownloadLink() {
 // ── Sticky wall bar ─────────────────────────────────────────
 function WallBar({ onWall }: { onWall: () => void }) {
   return (
-    <div className="sticky bottom-0 left-0 right-0 -mx-5 px-5 py-3.5 bg-app-surface/95 backdrop-blur border-t border-app-border">
+    <div className="sticky bottom-0 left-0 right-0 -mx-5 px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-app-surface/95 backdrop-blur border-t border-app-border sm:rounded-t-2xl sm:border-x sm:shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
       <div className="flex items-center gap-3.5">
         <div className="flex-1 min-w-0">
           <p className="text-[14.5px] font-semibold text-app-text leading-[19px] -tracking-[0.01em]">
@@ -375,7 +375,7 @@ export default function StartFunnel() {
   if (!submitted) {
     return (
       <div className="min-h-screen bg-app-bg">
-        <div className="mx-auto w-full max-w-[480px] px-5">
+        <div className="mx-auto w-full max-w-[480px] sm:max-w-[540px] px-5">
           <HeroStep
             onSelect={setSelected}
             onClear={() => setSelected(null)}
@@ -396,7 +396,7 @@ export default function StartFunnel() {
 
   return (
     <div className="min-h-screen bg-app-bg">
-      <div className="mx-auto w-full max-w-[480px] px-5 pt-3 flex flex-col min-h-screen">
+      <div className="mx-auto w-full max-w-[480px] sm:max-w-[540px] px-5 pt-3 flex flex-col min-h-screen">
         {previewQuery.isPending ? (
           <PreviewSkeleton />
         ) : previewQuery.isError ? (
@@ -410,7 +410,7 @@ export default function StartFunnel() {
           <UnsupportedRegion onBrowse={goBrowse} />
         ) : preview ? (
           <>
-            <div className="flex-1">
+            <div className="flex-1 motion-safe:animate-[fadeInUp_0.3s_ease-out_both]">
               <PlaceHeader
                 address={addressLabel}
                 status="none"
