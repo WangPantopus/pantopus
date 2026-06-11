@@ -34,6 +34,7 @@ const {
 const providerOrchestrator = require('./context/providerOrchestrator');
 const neighborhoodProfileService = require('./ai/neighborhoodProfileService');
 const propertyIntelligenceService = require('./ai/propertyIntelligenceService');
+const { getHomePrivacy } = require('./homePrivacyService');
 
 const HOME_SELECT =
   'id, owner_id, address, address2, city, state, zipcode, map_center_lat, map_center_lng, year_built, sq_ft, bedrooms, bathrooms, lot_sq_ft, home_type';
@@ -429,14 +430,54 @@ async function composeBillBenchmark(home) {
 // ════════════════════════════════════════════════════════════
 // composeHomeIntelligence — the full grouped response
 // ════════════════════════════════════════════════════════════
+
+// Which launch-set sections each wired composer produces, so a
+// `?sections=` subset request only runs (and only pays for) the
+// composers it actually needs.
+const COMPOSER_SECTIONS = [
+  { ids: ['weather', 'air_quality', 'alerts'], run: ({ userId }) => composeToday(userId) },
+  { ids: ['flood', 'census_context'], run: ({ home }) => composeNeighborhood(home) },
+  { ids: ['block_density'], run: ({ home }) => composeDensity(home) },
+  { ids: ['your_home'], run: ({ home, tier }) => composeYourHome(home, tier) },
+  { ids: ['bill_benchmark'], run: ({ home }) => composeBillBenchmark(home) },
+];
+
+// ── Per-home privacy → the place address ref (§ homePrivacy) ──
+// The endpoint is member-only, so most of the 9 Security toggles do not
+// apply here by design: guest_approval / notification_previews /
+// doc_lock / photo_blur / vault_auto_lock govern other surfaces, and
+// member_name_visibility / activity_visibility / map_opt_out govern what
+// OUTSIDERS see (this payload reaches members only). The one toggle that
+// shapes THIS payload is `address_precision` ("Street only · hide unit
+// number"): when ON, the unit (address2) is stripped from the ref.
+//
+// The Home.address column is often a fully-formatted geocoder string
+// ("4080 NE Tacoma Ct, Camas, Washington 98607, United States"); the ref
+// wants the street line, so everything after the first comma is dropped
+// (serializePlaceAddressRef re-appends the city for the display label).
+function buildPlaceRef(home, privacy) {
+  const full = String(home.address || '');
+  const street = (full.split(',')[0] || '').trim() || full;
+  const unit = String(home.address2 || '').trim();
+  const includeUnit = unit && !(privacy && privacy.address_precision);
+  return {
+    line1: includeUnit ? `${street} ${unit}` : street,
+    city: home.city,
+    state: home.state,
+    zipcode: home.zipcode,
+  };
+}
+
 /**
  * @param {object} params
  * @param {string} params.homeId
  * @param {string} params.userId
  * @param {object} params.access  Result of checkHomePermission (hasAccess, isOwner, occupancy).
+ * @param {string[]} [params.sectionIds]  Optional subset of PLACE_SECTION_IDS to compose
+ *                                        (already validated by the route); omitted ⇒ all.
  * @returns {Promise<object|null>} The PlaceIntelligence response, or null if the home is missing.
  */
-async function composeHomeIntelligence({ homeId, userId, access }) {
+async function composeHomeIntelligence({ homeId, userId, access, sectionIds }) {
   const { data: home, error } = await supabaseAdmin
     .from('Home')
     .select(HOME_SELECT)
@@ -449,30 +490,33 @@ async function composeHomeIntelligence({ homeId, userId, access }) {
   }
 
   const tier = resolveTier(access);
+  const requested = new Set(
+    Array.isArray(sectionIds) && sectionIds.length ? sectionIds : PLACE_SECTION_IDS,
+  );
 
-  // Compose every wired section in parallel; each composer is self-contained
+  // Compose only the composers that produce a requested section — plus the
+  // home's privacy toggles — in parallel; each composer is self-contained
   // and resolves (never rejects), so one failure can't sink the response.
-  const groups = await Promise.all([
-    composeToday(userId),
-    composeNeighborhood(home),
-    composeDensity(home),
-    composeYourHome(home, tier),
-    composeBillBenchmark(home),
+  const runs = COMPOSER_SECTIONS.filter(({ ids }) => ids.some((id) => requested.has(id)));
+  const [privacy, ...groups] = await Promise.all([
+    getHomePrivacy(homeId),
+    ...runs.map(({ run }) => run({ home, userId, tier })),
   ]);
 
   const composed = {};
   for (const env of groups.flat()) composed[env.id] = env;
 
-  // Fill every remaining launch-set section as `unavailable` so the full IA
-  // renders with section-by-section degradation (turned on in later waves).
-  const sections = PLACE_SECTION_IDS.map((id) => {
+  // Emit the requested sections in canonical order; anything not yet wired
+  // fills as `unavailable` so the full IA renders with section-by-section
+  // degradation (turned on in later waves).
+  const sections = PLACE_SECTION_IDS.filter((id) => requested.has(id)).map((id) => {
     if (composed[id]) return composed[id];
     const meta = PLACE_SECTION_META[id];
     return serializePlaceSection(id, { access: bandAccess(meta.band, tier), status: 'unavailable' });
   });
 
   return serializePlaceIntelligence({
-    place: home,
+    place: buildPlaceRef(home, privacy),
     tier,
     regionSupported: true,
     sections,
@@ -487,4 +531,5 @@ module.exports = {
   densityBucket,
   floodRiskLevel,
   mapAqiCategory,
+  buildPlaceRef,
 };

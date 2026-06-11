@@ -128,6 +128,13 @@ async function fetchCensusACS(stateCode, countyCode, tractCode) {
     logger.warn('Census ACS fetch failed', { stateCode, countyCode, tractCode, status: res?.status });
     return null;
   }
+  // api.census.gov now REQUIRES a key: keyless calls 302-redirect to an HTML
+  // "missing key" page instead of failing. Surface that clearly rather than
+  // letting it die downstream as a JSON parse error.
+  if (String(res.url || '').includes('missing_key')) {
+    logger.warn('Census ACS requires an API key — set CENSUS_API_KEY (free: api.census.gov/data/key_signup.html)');
+    return null;
+  }
 
   try {
     const data = await res.json();
@@ -225,7 +232,8 @@ async function fetchFloodZone(lat, lng) {
     returnGeometry: 'false',
     f: 'json',
   });
-  const url = `https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query?${params}`;
+  // FEMA retired the old /gis/nfhl/rest host path; /arcgis/rest is current.
+  const url = `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query?${params}`;
 
   const res = await timedFetch(url);
   if (!res || !res.ok) {

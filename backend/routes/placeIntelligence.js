@@ -15,13 +15,34 @@ const router = express.Router();
 const verifyToken = require('../middleware/verifyToken');
 const { checkHomePermission } = require('../utils/homePermissions');
 const placeIntelligenceService = require('../services/placeIntelligenceService');
+const { PLACE_SECTION_IDS } = require('../serializers/placeIntelligenceSerializer');
 const logger = require('../utils/logger');
 
-// GET /api/homes/:id/intelligence
+const VALID_SECTION_IDS = new Set(PLACE_SECTION_IDS);
+
+// `?sections=weather,flood` → validated id array (lazy section load),
+// null when the param is absent/empty (⇒ compose the full launch set).
+// Unknown ids are a 400 — a typo'd subset should fail loudly, not
+// silently return the wrong payload.
+function parseSectionsParam(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return { sectionIds: null };
+  const ids = [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))];
+  if (!ids.length) return { sectionIds: null };
+  const unknown = ids.filter((id) => !VALID_SECTION_IDS.has(id));
+  if (unknown.length) return { error: `Unknown section id(s): ${unknown.join(', ')}` };
+  return { sectionIds: ids };
+}
+
+// GET /api/homes/:id/intelligence[?sections=a,b,c]
 router.get('/:id/intelligence', verifyToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
   try {
+    const { sectionIds, error: sectionsError } = parseSectionsParam(req.query.sections);
+    if (sectionsError) {
+      return res.status(400).json({ error: sectionsError });
+    }
+
     const access = await checkHomePermission(id, userId);
     if (!access.hasAccess) {
       return res.status(403).json({ error: 'You do not have access to this place.' });
@@ -31,6 +52,7 @@ router.get('/:id/intelligence', verifyToken, async (req, res) => {
       homeId: id,
       userId,
       access,
+      sectionIds,
     });
     if (!intelligence) {
       return res.status(404).json({ error: 'Home not found' });

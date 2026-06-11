@@ -1,0 +1,217 @@
+# Place Intelligence — Implementation Plan (Web + Backend)
+
+> Written 2026-06-11 against the audit of the current codebase. Companion docs in this
+> directory: `pantopus-product-design-doc.md` (product model, trust ladder, gating matrix),
+> `place-intelligence-step1-inventory-and-contract.md` (data inventory + section contract),
+> `address anchored features/` (22 designed mobile screens the web mirrors).
+>
+> Scope: **web app (`frontend/apps/web`) + backend (`backend/`)**. Mobile is out of scope for now.
+> Workflow: one feature branch (`claude/<slug>`) + PR per phase. Targeted tests only.
+
+---
+
+## Where we are (audited 2026-06-11)
+
+**Done and wired end-to-end:**
+- Backend orchestrator `services/placeIntelligenceService.js` + `GET /api/homes/:id/intelligence`
+  (section envelope: `status / as_of / source / coverage / unavailable_reason / data`; band × tier gating;
+  T1/T3/T4 from occupancy verification).
+- Anonymous T0 preview `GET /api/public/place` (`routes/public.js`, `previewLimiter`).
+- Live sections: weather, air_quality, alerts (NOAA/AirNow), flood (FEMA), census_context,
+  block_density (k-anon buckets), bill_benchmark (≥10-household floor). `your_home` (ATTOM) wired but dark (no key).
+- Claim → postcard verify (Lob) → T4; neighbor messaging (T4-only, geohash-6 block, template-only, weekly cap).
+- Web: `/start` funnel (hero → autocomplete → T0 preview → soft wall → sessionStorage stash → post-signup save),
+  `/app/place` dashboard + 7 detail pages, verify prompt/success, message compose/received, switcher, pulse stream,
+  non-US "coming to your region". ~21/22 designed screens have counterparts.
+
+**The 17-section launch set** (`serializers/placeIntelligenceSerializer.js` → `PLACE_SECTION_META`); 8 return
+`BUILD_PENDING`: sunrise_sunset, lead_radon, drinking_water, environmental_hazards, incentives, rent_band,
+civic_districts, civic_election.
+
+**Key gaps:** residency letter is client-side `document.write` (not server-attested); no `?sections=` subset;
+homePrivacy toggles not consulted by intelligence; ATTOM dark; zero tests on the `/start` funnel; dashboard is a
+mobile column on desktop.
+
+---
+
+## Phase 0 — Contract completion ✅ DONE (2026-06-11, branch `claude/place-phase0-contract-completion`)
+
+> Shipped: `?sections=` subset (route validation + composer subsetting), homePrivacy integration
+> (`services/homePrivacyService.js` shared by route + intelligence; `address_precision` strips the unit from the
+> place ref; other 8 toggles documented as not applying to this member-only payload), `PlaceSectionCache`
+> (migration 156 + `services/placeSectionCache.js` read-through with stale-serve + missing-table passthrough),
+> optional `sections` param on the web api client. Drive-by fixes verified end-to-end: FEMA NFHL URL was stale
+> (`/gis/nfhl/rest` → `/arcgis/rest`) — flood section now returns real zones; Census ACS now REQUIRES a key
+> (set `CENSUS_API_KEY`, free signup) — clear log + graceful degradation without it.
+> Verified e2e on a local Supabase stack (auth → claim → T3/T4 → live NOAA/FEMA/ATTOM/density/benchmark data)
+> and against the hosted dev DB. ⚠️ Dev DB is missing migrations 153/154/155/156 — apply via SQL editor.
+
+**0.1 `?sections=` subset support** on `GET /homes/:id/intelligence`.
+Parse the param in `routes/placeIntelligence.js`, validate against `PLACE_SECTION_IDS`, compose only requested
+sections (others omitted, not `unavailable`). Lets detail pages and the pulse refresh cheaply.
+Tests: extend `tests/placeIntelligence.endpoint.test.js`.
+
+**0.2 homePrivacy integration.** `placeIntelligenceService` consults the 9 toggles (migration 153):
+at minimum `address_precision` (coarsen the address ref in the payload) and the Documents group
+(gates the identity/letters section). Document which toggles intentionally do NOT affect intelligence.
+Tests: unit tests on the composer with toggles set.
+
+**0.3 Generic per-section cache.** Today only ATTOM (30d) and neighborhood profile (90d) cache.
+Add `place_section_cache` migration (home_id/geo key, section_id, payload JSONB, fetched_at, expires_at) +
+a tiny read-through helper, so every Phase 2–4 adapter gets TTL caching for free. TTLs per the Step-1 doc
+(environment ~10–30 min, density 15 min, benchmark 6 h, property 30 d, census/flood 90 d).
+
+*Effort: small. No product decisions needed. Dependency for Phases 2–4.*
+
+---
+
+## Phase 1 — Server-attested residency letter (#11) — highest-credibility gap
+
+Today "Generate a residency letter" prints browser-built HTML (`IdentityDetail.tsx`) — not verifiable.
+
+**Backend:**
+- Migration `residency_letters`: id, home_id, user_id, purpose, letter_code (public verification code),
+  status (issued/revoked), issued_at, pdf_sha256, lob_letter_id (nullable).
+- `services/residencyLetterService.js`: T4 gate (verified occupancy via existing access check), renders a PDF
+  server-side (letterhead, verified address, resident name, issue date, letter_code + QR/URL), stores the record.
+- Routes: `POST /api/homes/:id/residency-letters` (create), `GET /api/homes/:id/residency-letters` (history),
+  `GET /api/homes/:id/residency-letters/:id/pdf` (download), and **public**
+  `GET /api/public/residency-letters/:code/verify` → {valid, issued_at, address line masked} — this is what makes
+  the letter mean something to a third party.
+- Optional v1.1: Lob-mailed physical letter (Lob is already integrated for postcards).
+- Respect the per-home Documents privacy group (ties into 0.2).
+
+**Web:** `IdentityDetail.tsx` calls the API: purpose field → issue → download PDF + history list; drop `document.write`.
+
+**Tests:** backend endpoint tests (T3 denied, T4 issued, code verifies, revoked code fails); frontend component test.
+
+*Effort: medium. Depends on 0.2 only loosely. Decisions: letterhead copy + whether v1 includes Lob mail (recommend: PDF-only v1).*
+
+---
+
+## Phase 2 — Fill the Band-A data sections (8 BUILD_PENDING → live)
+
+Each is an adapter implementing the existing `fetchSection(home) → envelope` pattern + cache (0.3) + targeted tests.
+The frontend detail pages already render these sections — they light up with zero client change. Order by effort:
+
+1. **sunrise_sunset** — Open-Meteo daily (already a provider: `context/providers/openMeteo.js`) or computed from lat/lng. Trivial.
+2. **rent_band** — HUD Fair Market Rents: annual static dataset by metro/county/ZIP. Import as a lookup table
+   (migration `hud_fmr`) + yearly refresh script. No API key, no runtime dependency.
+3. **lead_radon** — EPA radon zone by county (static dataset → lookup table) + lead-paint disclosure rule keyed on
+   `year_built` (from ATTOM when lit, else "unknown year" copy).
+4. **incentives** — DSIRE by state (+ federal staples like 25C/25D). Start with a curated state-level dataset; live
+   DSIRE API later. Coverage-honest copy.
+5. **drinking_water** — EPA SDWIS: nearest community water system by county → violations summary. API is clunky;
+   cache 90 d.
+6. **environmental_hazards** — EPA FRS/ECHO facilities within radius of lat/lng → count + nearest categories. Cache 90 d.
+
+Also reconcile one frontend mismatch: backend groups lead_radon/drinking_water/environmental_hazards under
+`health_environment`, which has **no detail slug** on web (cards don't tap through; RiskDetail renders some of them).
+Decide: give health_environment its own detail page or fold into Risk — small `sections.ts` change.
+
+*Effort: each adapter is small-to-medium; the phase is parallelizable. Ship one PR per 2–3 adapters.*
+
+---
+
+## Phase 3 — Civic (#5)
+
+- **civic_districts**: Google Civic Information API — **verify current API status first** (representatives endpoint was
+  deprecated; districts/divisions still live). Fallback: Cicero (paid) or OpenStates (state level). Cache 90 d.
+- **civic_election**: Google Civic elections endpoint / Democracy Works TurboVote for upcoming elections + polling info.
+  Ragged coverage → the envelope's `coverage: partial` + honest empty copy (already designed in CivicDetail).
+- Migration: reuse `place_section_cache`. Env keys: `GOOGLE_CIVIC_API_KEY`.
+
+*Effort: medium. Decision: paid fallback or state-level-only if Google coverage is insufficient.*
+
+---
+
+## Phase 4 — Risk completion (#3)
+
+- **seismic** — USGS NSHM hazard value at lat/lng → qualitative band (the current "Cascadia" copy is editorial; replace
+  with per-address data).
+- **wildfire** — USFS Wildfire Hazard Potential raster/tile lookup → band. (First Street is the paid upgrade; not v1.)
+- Extend the `risk_readiness` group data shape; RiskDetail already has the layout pattern.
+- **Emergency plan upgrade** (routes/shelters/go-bag): liability-sensitive → keep manual form, add source-cited
+  informational links only. Defer anything resembling auto-generated evacuation advice.
+
+*Effort: medium (raster lookups are the fiddly part).*
+
+---
+
+## Phase 5 — Money & valuation completion (#7, #2; ATTOM goes live)
+
+1. **ATTOM enablement** — set `ATTOM_API_KEY`, define budget policy: fetch only on dashboard/home-detail open,
+   30-day property cache (already built: `AttomPropertyCache`), AVM tier decision (paid add-on; fall back to assessor
+   totals — fallback already coded). Feature-flag so cost is controllable.
+2. **Equity** — needs a mortgage balance. Decision: keep the current device-only input (private, zero backend) or add
+   a server field (Home → Bills "mortgage" type) so equity appears in the valuation envelope and survives devices.
+   Recommend: server-side optional field, encrypted-at-rest semantics same as other bills.
+3. **Sales trend** — ATTOM `/salestrend/snapshot` by ZIP into `money_signals`/valuation data.
+4. **Tax appeal (informational only, #2)** — assessment vs ZIP comps + "how appeals work in your county" copy.
+   No savings claims (legal gate per the inventory doc). Ship as a subsection of YourHomeDetail/MoneyDetail.
+5. Insurance (#8)/energy (#9): stay deferred (regulated/partner-gated); BillBenchmark remains the peer-proxy angle.
+
+*Effort: small-medium code; the real items are the ATTOM contract/budget and the equity decision.*
+
+---
+
+## Phase 6 — Web design upgrade (explicit goal: better than a ported mobile column)
+
+1. **Desktop-grade dashboard layout**: keep the single column ≤`md`; at `lg+` go two-column — left rail (header,
+   Today hero, verify nudge/identity) + right sections grid; raise max width from 640px (~960–1100px).
+2. **Detail pages**: persistent left section nav at `lg+` (dashboard ⇄ detail without full-page jumps); mobile keeps
+   the current stacked pages.
+3. **/start preview**: bring the hierarchy of the designed `Place - Preview` screen (hero stat treatment, grouped
+   free sections, stronger locked-card teasers) instead of the flat list; sticky wall stays.
+4. **Motion**: verify-success reveal (staged Band-D rows), sheet enter/exit easing, subtle hero→pulse transition.
+5. **A11y pass**: contrast check on `app-text-secondary`/`muted` tokens, SR text for skeletons, `title` on truncated
+   addresses, safe-area inset on bottom sheets/wall bar, 320px viewport check.
+6. **Resilience**: fetch timeout (~6 s) → error card with retry; batch primaryHome+myHomes queries.
+
+*Effort: medium-large. Pure frontend; can run in parallel with Phases 2–5. Use `colors_and_type.css` + the HTML
+screens in `reference/address anchored features/` as the source of visual truth, adapted to web tokens.*
+
+---
+
+## Phase 7 — Test coverage & hardening (interleave with each phase; this closes the rest)
+
+- **Jest (web)**: StartFunnel (hero → preview → wall → region branch), AddressAutocomplete (debounce/keyboard/abort),
+  PlaceDashboard container (auth gate, tier rendering), VerifiedSuccess, PendingPlaceSaver (stash → create).
+- **Playwright e2e**: `/start` → preview → register → place saved → dashboard (the acquisition path has zero coverage today).
+- **Backend**: `GET /api/public/place` contract + rate-limit test; neighbor-message weekly-cap test; `?sections=`;
+  privacy-toggle composition; residency-letter lifecycle.
+
+---
+
+## Phase 8 — Deferred (tracked, not scheduled)
+
+| Item | Why deferred |
+|---|---|
+| T2 "Located" tier / global approximate-location discovery | Product decision (design doc §5 Option B) |
+| Commute times | Needs routing API (Google/Mapbox/OSRM) — paid |
+| Allergen / trash pickup / power outage | Paid or fragmented per-municipality sources |
+| Permits / development (#6) | Per-municipality; pilot metros later |
+| Notarized letter, portable verified-ID (#10) | Partner/regulatory gated |
+| Insurance (#8) / energy rates (#9) beyond benchmark | Carrier partners / compliance |
+
+## Open product decisions (block nothing in Phases 0–2; needed by 3/5/6)
+
+1. Dashboard naming ("Your Place" vs "Home") — affects web copy in Phase 6.
+2. ATTOM budget + AVM tier — Phase 5.
+3. Civic fallback provider if Google coverage disappoints — Phase 3.
+4. Equity: device-only vs server-side mortgage field — Phase 5 (recommend server-side).
+5. health_environment detail page vs fold into Risk — Phase 2 (recommend fold into Risk).
+
+## Suggested execution order
+
+```
+PR 1: Phase 0 (sections param + privacy toggles + section cache)
+PR 2: Phase 1 (residency letter, PDF-only v1)
+PR 3: Phase 2a (sunrise_sunset, rent_band, lead_radon) + slug reconciliation
+PR 4: Phase 2b (incentives, drinking_water, environmental_hazards)
+PR 5: Phase 6 (web design upgrade)            ← can start any time, parallel track
+PR 6: Phase 3 (civic)
+PR 7: Phase 4 (seismic, wildfire)
+PR 8: Phase 5 (ATTOM live, equity, sales trend, tax-appeal info)
+PR 9: Phase 7 leftovers (e2e funnel test if not landed earlier)
+```
