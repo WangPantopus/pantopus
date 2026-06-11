@@ -438,6 +438,26 @@ router.get('/place', async (req, res) => {
   }
 });
 
+// ============================================================
+// GET /api/public/residency-letters/:code — third-party letter check
+//
+// Anyone holding a residency letter can confirm it is genuine and not
+// revoked. Returns exactly what is printed on the paper — never more.
+// The mount-level previewLimiter (60/min/IP) plus the ~78-bit letter
+// code keep enumeration impractical. Unknown/malformed codes are a
+// uniform { valid: false } (no existence oracle).
+// ============================================================
+router.get('/residency-letters/:code', async (req, res) => {
+  try {
+    const residencyLetterService = require('../services/residencyLetterService');
+    const result = await residencyLetterService.verifyByCode(req.params.code);
+    return res.json(result);
+  } catch (err) {
+    console.error('[public/residency-letters] Error:', err.message);
+    return res.status(500).json({ error: 'Verification failed. Try again.' });
+  }
+});
+
 module.exports = router;
 // Test-only hook: reset the in-memory preview caches between cases.
 module.exports.__clearPreviewCaches = () => previewCache.clear();

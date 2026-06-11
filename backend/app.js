@@ -321,6 +321,7 @@ app.use('/api/homes', require('./routes/homeIam'));
 app.use('/api/homes', require('./routes/homeOwnership'));
 app.use('/api/homes', require('./routes/homePrivacy'));   // Per-home privacy/security toggles (/:id/privacy)
 app.use('/api/homes', require('./routes/placeIntelligence')); // Place dashboard contract (/:id/intelligence)
+app.use('/api/homes', require('./routes/residencyLetters')); // Server-attested residency letters (/:id/residency-letters)
 app.use('/api/homes', homeRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/sports', require('./routes/sports'));  // Sports topic lane (active events)

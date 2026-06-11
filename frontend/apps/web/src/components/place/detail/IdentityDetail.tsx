@@ -1,9 +1,10 @@
 // ============================================================
-// Place — Identity detail (C9). Verification status + a generator for
-// a verified residency letter: edit the purpose, see a live product-UI
-// preview, and deliver it by Download PDF (browser print) or Mail a
-// copy through your mailbox (reuses the compose/send endpoint, home
-// self-delivery). Portable ID sits below as "coming soon".
+// Place — Identity detail (C9). Verification status + SERVER-ATTESTED
+// residency letters (Phase 1, #11): set a purpose, preview, then issue.
+// The backend freezes the printed facts + the exact PDF and prints an
+// unguessable verification code on the letter — anyone holding it can
+// check it at /verify-residency/[code]. Letters can be downloaded
+// (the exact issued PDF), mailed to your mailbox, and revoked.
 //
 // Identity has no launch-set contract section, so this reads the
 // verified tier from the intelligence + the resident's name/home.
@@ -13,16 +14,23 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
+import type { ResidencyLetter } from '@pantopus/api';
 import type { PlaceIntelligence } from '@pantopus/types';
-import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard } from 'lucide-react';
+import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard, ShieldCheck, Ban, Loader2 } from 'lucide-react';
 import Chip from '@/components/archetypes/primitives/Chip';
 import { LockedCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote } from '@/components/archetypes/place';
 import { toast } from '@/components/ui/toast-store';
+import { queryKeys } from '@/lib/query-keys';
 import { detailAddress } from './sections';
 
 function issueDate(): string {
   return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 interface LetterFacts {
@@ -37,23 +45,41 @@ function letterPurpose(purpose: string): string {
   return p || 'General verification of residency';
 }
 
-function letterPlainText(f: LetterFacts): string {
-  const who = f.name ? f.name : 'the resident named on this account';
+// Plain-text body for "Mail a copy" — mirrors the issued letter,
+// including the verification code so the mailed copy is checkable too.
+function letterPlainText(letter: ResidencyLetter): string {
+  const cityZip = [[letter.address.city, letter.address.state].filter(Boolean).join(', '), letter.address.zipcode]
+    .filter(Boolean)
+    .join(' ');
   return [
-    issueDate(),
+    fmtDate(letter.issued_at),
     '',
     'To whom it may concern,',
     '',
-    `This letter confirms that ${who} is a verified resident at the address below, confirmed through Pantopus address verification.`,
+    `This letter certifies that ${letter.resident_name} is a verified resident of the address below, confirmed through the Pantopus address-verification process.`,
     '',
     'Verified address:',
-    f.line1,
-    f.cityStateZip,
+    letter.address.line1,
+    cityZip,
     '',
-    `Issued for: ${letterPurpose(f.purpose)}`,
+    `Issued for: ${letter.purpose}`,
     '',
-    'Address verified through Pantopus.',
+    `Verify this letter — code ${letter.letter_code}`,
+    letter.verify_url,
   ].join('\n');
+}
+
+// Browser-side download of the exact issued PDF.
+async function downloadLetterPdf(homeId: string, letter: ResidencyLetter): Promise<void> {
+  const blob = await api.residencyLetters.getResidencyLetterPdf(homeId, letter.id);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pantopus-residency-letter-${letter.id.slice(0, 8)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── Verification status — the green badge ───────────────────
@@ -96,7 +122,7 @@ function LetterPreview({ facts }: { facts: LetterFacts }) {
         <div className="text-[11px] text-app-text-muted">{issueDate()}</div>
         <div className="text-[15px] font-bold text-app-text mt-3 -tracking-[0.01em]">To whom it may concern,</div>
         <div className="text-[13.5px] text-app-text-strong leading-[21px] mt-2">
-          This letter confirms that <span className="font-bold text-app-text">{facts.name || 'the resident named on this account'}</span> is a verified resident at the address below, confirmed through Pantopus address verification.
+          This letter certifies that <span className="font-bold text-app-text">{facts.name || 'the resident named on this account'}</span> is a verified resident of the address below, confirmed through the Pantopus address-verification process.
         </div>
         <div className="mt-3.5 px-3.5 py-3 bg-app-surface-muted border border-app-border-subtle rounded-[11px]">
           <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted mb-1">Verified address</div>
@@ -105,6 +131,12 @@ function LetterPreview({ facts }: { facts: LetterFacts }) {
         <div className="mt-3 text-[13.5px] text-app-text-strong leading-[21px]">
           <span className="text-app-text-muted">Issued for: </span>
           <span className="font-semibold text-app-text">{letterPurpose(facts.purpose)}</span>
+        </div>
+        <div className="mt-3.5 px-3.5 py-3 bg-app-surface-muted border border-dashed border-app-border-strong rounded-[11px]">
+          <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted mb-1">Verify this letter</div>
+          <div className="text-[13px] text-app-text-secondary leading-[19px]">
+            A unique verification code is printed here when the letter is issued — anyone you hand it to can confirm it&apos;s genuine.
+          </div>
         </div>
         <div className="flex items-center gap-3 mt-[18px] pt-3.5 border-t border-dashed border-app-border-strong">
           <span className="w-[38px] h-[38px] rounded-[9px] bg-app-home-bg border border-app-success-light flex items-center justify-center shrink-0">
@@ -117,55 +149,35 @@ function LetterPreview({ facts }: { facts: LetterFacts }) {
   );
 }
 
-function printLetter(facts: LetterFacts): boolean {
-  if (typeof window === 'undefined') return false;
-  const win = window.open('', '_blank', 'width=720,height=900');
-  if (!win) return false;
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Verified residency letter</title>
-<style>
-  *{box-sizing:border-box} body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111827;margin:0;padding:48px;}
-  .sheet{max-width:640px;margin:0 auto;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden}
-  .head{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid #f1f3f5}
-  .brand{font-weight:700;font-size:16px} .tag{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;font-weight:600}
-  .body{padding:24px} .date{font-size:12px;color:#9ca3af} .greet{font-weight:700;margin-top:14px}
-  p{font-size:14px;line-height:22px;color:#374151} .addr{margin:16px 0;padding:14px 16px;background:#f8fafb;border:1px solid #eef0f2;border-radius:11px}
-  .addr .l{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#9ca3af;font-weight:600;margin-bottom:4px}
-  .addr .v{font-size:15px;font-weight:600;color:#111827} .foot{margin-top:20px;padding-top:16px;border-top:1px dashed #e2e5e9;font-size:13px;font-weight:700;color:#15803d}
-</style></head><body><div class="sheet">
-  <div class="head"><span class="brand">Pantopus</span><span class="tag">Verified residency</span></div>
-  <div class="body">
-    <div class="date">${esc(issueDate())}</div>
-    <div class="greet">To whom it may concern,</div>
-    <p>This letter confirms that <b>${esc(facts.name || 'the resident named on this account')}</b> is a verified resident at the address below, confirmed through Pantopus address verification.</p>
-    <div class="addr"><div class="l">Verified address</div><div class="v">${esc(facts.line1)}<br>${esc(facts.cityStateZip)}</div></div>
-    <p><span style="color:#9ca3af">Issued for:</span> <b>${esc(letterPurpose(facts.purpose))}</b></p>
-    <div class="foot">Address verified through Pantopus</div>
-  </div>
-</div>
-<script>window.onload=function(){setTimeout(function(){window.print();},250);};</script>
-</body></html>`);
-  win.document.close();
-  return true;
-}
+// ── One issued letter — code, status, actions ────────────────
+function IssuedLetterCard({ letter, homeId }: { letter: ResidencyLetter; homeId: string }) {
+  const queryClient = useQueryClient();
+  const [downloading, setDownloading] = useState(false);
+  const [mailing, setMailing] = useState(false);
+  const revoked = letter.status === 'revoked';
 
-function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<LetterFacts, 'purpose'>; homeId: string | null; address: string; onBack: () => void }) {
-  const [purpose, setPurpose] = useState('');
-  const [sending, setSending] = useState(false);
-  const fullFacts: LetterFacts = { ...facts, purpose };
+  const revokeMutation = useMutation({
+    mutationFn: () => api.residencyLetters.revokeResidencyLetter(homeId, letter.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.residencyLetters(homeId) });
+      toast.success('Letter revoked. Its verification code no longer checks out as active.');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not revoke the letter.'),
+  });
 
-  const onDownload = () => {
-    const ok = printLetter(fullFacts);
-    if (ok) toast.success('Opened your letter to print or save as PDF.');
-    else toast.error('Your browser blocked the print window. Allow pop-ups and try again.');
+  const onDownload = async () => {
+    setDownloading(true);
+    try {
+      await downloadLetterPdf(homeId, letter);
+    } catch {
+      toast.error('Could not download the letter. Try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const onMail = async () => {
-    if (!homeId) {
-      toast.error('We couldn’t find your mailbox for this place.');
-      return;
-    }
-    setSending(true);
+    setMailing(true);
     try {
       await api.mailCompose.sendComposedMail({
         destination: { deliveryTargetType: 'home', homeId, attnLabel: 'Current Resident', visibility: 'home_members' },
@@ -174,7 +186,7 @@ function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<L
           format: 'mailjson_v1',
           mimeType: 'application/json',
           title: 'Verified residency letter',
-          content: letterPlainText(fullFacts),
+          content: letterPlainText(letter),
           payload: { bodyFormat: 'plain_text' },
         },
         tracking: { source: 'place_identity_residency_letter_web' },
@@ -183,9 +195,85 @@ function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<L
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'We couldn’t mail your letter. Try again.');
     } finally {
-      setSending(false);
+      setMailing(false);
     }
   };
+
+  return (
+    <div className={`bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 ${revoked ? 'opacity-75' : ''}`}>
+      <div className="flex items-center gap-3">
+        <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${revoked ? 'bg-app-surface-sunken' : 'bg-primary-100'}`}>
+          <FileText size={20} strokeWidth={2} className={revoked ? 'text-app-text-muted' : 'text-primary-600'} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[14px] font-bold text-app-text font-mono tracking-[0.02em]">{letter.letter_code}</span>
+            <Chip label={revoked ? 'Revoked' : 'Active'} variant={revoked ? 'warning' : 'success'} />
+          </div>
+          <div className="text-[12.5px] text-app-text-muted mt-0.5 truncate">
+            {fmtDate(letter.issued_at)} · {letter.purpose}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-app-border-subtle">
+        <button
+          type="button"
+          onClick={onDownload}
+          disabled={downloading}
+          className="flex-1 h-10 rounded-[10px] bg-primary-600 text-white text-[13.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-primary-700 transition disabled:opacity-60"
+        >
+          {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} strokeWidth={2.25} />} PDF
+        </button>
+        <button
+          type="button"
+          onClick={onMail}
+          disabled={mailing || revoked}
+          className="flex-1 h-10 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-text text-[13.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-app-hover transition disabled:opacity-50"
+        >
+          <Mailbox size={15} strokeWidth={2} /> {mailing ? 'Sending…' : 'Mail'}
+        </button>
+        {!revoked && (
+          <button
+            type="button"
+            onClick={() => revokeMutation.mutate()}
+            disabled={revokeMutation.isPending}
+            className="h-10 px-3.5 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-error text-[13.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-app-error-light/40 transition disabled:opacity-50"
+          >
+            <Ban size={15} strokeWidth={2} /> Revoke
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<LetterFacts, 'purpose'>; homeId: string; address: string; onBack: () => void }) {
+  const [purpose, setPurpose] = useState('');
+  const queryClient = useQueryClient();
+  const fullFacts: LetterFacts = { ...facts, purpose };
+
+  const lettersQuery = useQuery({
+    queryKey: queryKeys.residencyLetters(homeId),
+    queryFn: () => api.residencyLetters.listResidencyLetters(homeId),
+  });
+
+  const issueMutation = useMutation({
+    mutationFn: () => api.residencyLetters.issueResidencyLetter(homeId, purpose),
+    onSuccess: async (letter) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.residencyLetters(homeId) });
+      setPurpose('');
+      toast.success(`Letter issued — verification code ${letter.letter_code}.`);
+      // Hand the PDF over immediately; the card below offers it again.
+      try {
+        await downloadLetterPdf(homeId, letter);
+      } catch {
+        /* the issued card's PDF button is the retry path */
+      }
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not issue the letter. Try again.'),
+  });
+
+  const letters = lettersQuery.data ?? [];
 
   return (
     <>
@@ -198,6 +286,7 @@ function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<L
             id="letter-purpose"
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
+            maxLength={140}
             placeholder="e.g. New library card application"
             className="w-full h-[46px] px-3.5 text-[15px] text-app-text bg-app-surface border-[1.5px] border-app-border rounded-[10px] outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-600/10 placeholder:text-app-text-muted"
           />
@@ -207,26 +296,34 @@ function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<L
         <DetailSectionLabel>Preview</DetailSectionLabel>
         <LetterPreview facts={fullFacts} />
 
-        <div className="flex gap-2.5 mt-3.5">
-          <button
-            type="button"
-            onClick={onMail}
-            disabled={sending}
-            className="flex-1 h-12 rounded-xl border-[1.5px] border-app-border bg-app-surface text-app-text text-[15px] font-semibold flex items-center justify-center gap-2 hover:bg-app-hover transition disabled:opacity-60"
-          >
-            <Mailbox size={18} strokeWidth={2} className="text-app-text-strong" /> {sending ? 'Sending…' : 'Mail a copy'}
-          </button>
-          <button
-            type="button"
-            onClick={onDownload}
-            className="flex-1 h-12 rounded-xl bg-primary-600 text-white text-[15px] font-semibold flex items-center justify-center gap-2 shadow-[0_6px_16px_rgba(2,132,199,0.22)] hover:bg-primary-700 transition"
-          >
-            <Download size={18} strokeWidth={2.25} /> Download PDF
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => issueMutation.mutate()}
+          disabled={issueMutation.isPending}
+          className="w-full h-12 mt-3.5 rounded-xl bg-primary-600 text-white text-[15px] font-semibold flex items-center justify-center gap-2 shadow-[0_6px_16px_rgba(2,132,199,0.22)] hover:bg-primary-700 transition disabled:opacity-60"
+        >
+          {issueMutation.isPending
+            ? (<><Loader2 size={18} className="animate-spin" /> Issuing…</>)
+            : (<><ShieldCheck size={18} strokeWidth={2.25} /> Issue verified letter</>)}
+        </button>
         <InfoNote>
-          The letter draws only on what you&apos;ve already verified. &ldquo;Download PDF&rdquo; opens a printable copy; &ldquo;Mail a copy&rdquo; delivers one to your mailbox.
+          Issuing creates the official PDF with a unique verification code and starts the download. The letter states only what you&apos;ve already verified; you can revoke it any time.
         </InfoNote>
+
+        {(letters.length > 0 || lettersQuery.isLoading) && (
+          <>
+            <DetailSectionLabel>Issued letters</DetailSectionLabel>
+            {lettersQuery.isLoading ? (
+              <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-[13.5px] text-app-text-muted">Loading your letters…</div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {letters.map((letter) => (
+                  <IssuedLetterCard key={letter.id} letter={letter} homeId={homeId} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </>
   );
@@ -240,7 +337,7 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
   const place = intelligence.place;
   const cityStateZip = [place.city, place.state].filter(Boolean).join(', ') + (place.postal_code ? ` ${place.postal_code}` : '');
 
-  if (letterOpen && verified) {
+  if (letterOpen && verified && homeId) {
     return (
       <ResidencyLetterLeaf
         facts={{ name: residentName, line1: place.line1 || place.label, cityStateZip }}
@@ -272,12 +369,12 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Generate a verified residency letter</div>
-                <div className="text-[12.5px] text-app-text-muted mt-0.5">Proof of address you can download or mail</div>
+                <div className="text-[12.5px] text-app-text-muted mt-0.5">An official PDF with a verification code anyone can check</div>
               </div>
               <ChevronRight size={18} strokeWidth={2.25} className="shrink-0 text-app-text-muted" />
             </button>
             <InfoNote>
-              A residency letter states your verified address for a purpose you choose — landlords, schools, libraries. It draws only on what you&apos;ve already verified.
+              A residency letter states your verified address for a purpose you choose — landlords, schools, libraries. Each letter carries a unique code a recipient can verify, and you can revoke it any time.
             </InfoNote>
           </>
         ) : (

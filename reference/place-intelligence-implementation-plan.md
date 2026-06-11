@@ -65,7 +65,18 @@ a tiny read-through helper, so every Phase 2–4 adapter gets TTL caching for fr
 
 ---
 
-## Phase 1 — Server-attested residency letter (#11) — highest-credibility gap
+## Phase 1 — Server-attested residency letter (#11) ✅ DONE (2026-06-11, on `feature/place-web`)
+
+> Shipped: migration 157 `ResidencyLetter` (frozen printed facts + exact PDF base64 + sha256 + unguessable
+> letter_code, issued/revoked lifecycle), `services/residencyLetterService.js` (pdfkit render, ~78-bit codes,
+> issuer-scoped privacy — household members never see each other's letters), routes
+> `POST/GET /api/homes/:id/residency-letters[, /:letterId/pdf, /:letterId/revoke]` (T4 gate: verified occupancy
+> required — unverified owners cannot issue) + public `GET /api/public/residency-letters/:code` (previewLimiter,
+> uniform {valid:false}), 10/day issue limiter. Web: IdentityDetail issues real letters (download exact PDF,
+> mail-a-copy includes the code, revoke, history list), new public `/verify-residency[/[code]]` checker page
+> (active=green / revoked=amber / unknown=neutral). Verified end-to-end through the real UI (login → issue →
+> list → verify page) and curl (hash-identical download, revoke kills verification, T3 blocked 403).
+> Deferred to later: Lob-mailed physical letter, QR code on the PDF, notarized variant (gated).
 
 Today "Generate a residency letter" prints browser-built HTML (`IdentityDetail.tsx`) — not verifiable.
 
