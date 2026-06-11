@@ -1592,6 +1592,7 @@ private struct FooterStack: View {
                         action: action.handler
                     )
                     .layoutPriority(Double(action.flex))
+                    .accessibilityIdentifier(action.identifier ?? "rowFooterAction_\(action.title)")
                 }
             }
         }

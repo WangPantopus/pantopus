@@ -2,6 +2,7 @@ package app.pantopus.android.data.reviews
 
 import app.pantopus.android.data.api.models.reviews.CreateReviewBody
 import app.pantopus.android.data.api.models.reviews.CreateReviewResponse
+import app.pantopus.android.data.api.models.reviews.MyPendingReviewsResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.ReviewsApi
@@ -19,4 +20,7 @@ class ReviewsRepository
         private val api: ReviewsApi,
     ) {
         suspend fun create(body: CreateReviewBody): NetworkResult<CreateReviewResponse> = safeApiCall { api.create(body) }
+
+        /** `GET /api/reviews/my-pending` — gigs awaiting the caller's review. */
+        suspend fun myPending(): NetworkResult<MyPendingReviewsResponse> = safeApiCall { api.myPending() }
     }

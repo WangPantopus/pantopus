@@ -4,24 +4,27 @@ import app.pantopus.android.data.api.models.gigs.AnswerGigQuestionBody
 import app.pantopus.android.data.api.models.gigs.AskGigQuestionBody
 import app.pantopus.android.data.api.models.gigs.BoostGigResponse
 import app.pantopus.android.data.api.models.gigs.CancelGigBody
+import app.pantopus.android.data.api.models.gigs.CancellationPreviewResponse
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
+import app.pantopus.android.data.api.models.gigs.CounterBidBody
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.DismissGigBody
 import app.pantopus.android.data.api.models.gigs.GigActionSuccessResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
+import app.pantopus.android.data.api.models.gigs.GigBidMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
+import app.pantopus.android.data.api.models.gigs.GigInstantAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
+import app.pantopus.android.data.api.models.gigs.GigTemplatesResponse
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
 import app.pantopus.android.data.api.models.gigs.HiddenCategoryBody
-import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
-import app.pantopus.android.data.api.models.gigs.GigTemplatesResponse
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
 import app.pantopus.android.data.api.models.gigs.MagicPostBody
@@ -30,8 +33,16 @@ import app.pantopus.android.data.api.models.gigs.MagicUndoResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.MyGigsResponse
+import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
+import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
+import app.pantopus.android.data.api.models.gigs.ReportGigBody
+import app.pantopus.android.data.api.models.gigs.ReportGigResponse
+import app.pantopus.android.data.api.models.gigs.ReportNoShowBody
+import app.pantopus.android.data.api.models.gigs.ReportNoShowResponse
+import app.pantopus.android.data.api.models.gigs.WorkerAckBody
+import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -231,6 +242,124 @@ interface GigsApi {
         @Path("gigId") gigId: String,
         @Body body: PlaceBidBody,
     ): PlaceBidResponse
+
+    /**
+     * `POST /api/gigs/:gigId/bids/:bidId/reject` — poster rejects a bid.
+     * Route `backend/routes/gigs.js:5026`. Returns `{ message }`.
+     */
+    @POST("api/gigs/{gigId}/bids/{bidId}/reject")
+    suspend fun rejectBid(
+        @Path("gigId") gigId: String,
+        @Path("bidId") bidId: String,
+    ): GigBidMutationResponse
+
+    /**
+     * `POST /api/gigs/:gigId/bids/:bidId/counter` — poster counters a
+     * pending bid (one outstanding counter per bid). Route
+     * `backend/routes/gigs.js:5097`. Returns `{ bid }` with
+     * `status == "countered"` + `counter_amount`.
+     */
+    @POST("api/gigs/{gigId}/bids/{bidId}/counter")
+    suspend fun counterBid(
+        @Path("gigId") gigId: String,
+        @Path("bidId") bidId: String,
+        @Body body: CounterBidBody,
+    ): GigBidMutationResponse
+
+    /**
+     * `POST /api/gigs/:gigId/bids/:bidId/counter/accept` — bidder accepts
+     * the poster's counter (bid amount becomes the counter amount). Route
+     * `backend/routes/gigs.js:5182`. Returns `{ bid }`.
+     */
+    @POST("api/gigs/{gigId}/bids/{bidId}/counter/accept")
+    suspend fun acceptCounterOffer(
+        @Path("gigId") gigId: String,
+        @Path("bidId") bidId: String,
+    ): GigBidMutationResponse
+
+    /**
+     * `POST /api/gigs/:gigId/bids/:bidId/counter/decline` — bidder
+     * declines the counter; the original bid stands. Route
+     * `backend/routes/gigs.js:5260`. Returns `{ bid }`.
+     */
+    @POST("api/gigs/{gigId}/bids/{bidId}/counter/decline")
+    suspend fun declineCounterOffer(
+        @Path("gigId") gigId: String,
+        @Path("bidId") bidId: String,
+    ): GigBidMutationResponse
+
+    /**
+     * `POST /api/gigs/:gigId/instant-accept` — helper claims an
+     * `engagement_mode == "instant_accept"` task while it is still open.
+     * Route `backend/routes/gigsV2.js:64` (mounted at `/api/gigs`,
+     * `backend/app.js:309`). Paid gigs return the poster-side payment
+     * payload alongside the now-`assigned` gig.
+     */
+    @POST("api/gigs/{gigId}/instant-accept")
+    suspend fun instantAccept(
+        @Path("gigId") gigId: String,
+    ): GigInstantAcceptResponse
+
+    /**
+     * `POST /api/gigs/:gigId/worker-ack` — assigned worker acknowledges
+     * ("I'm on it") before starting. Route `backend/routes/gigs.js:5838`.
+     */
+    @POST("api/gigs/{gigId}/worker-ack")
+    suspend fun workerAck(
+        @Path("gigId") gigId: String,
+        @Body body: WorkerAckBody,
+    ): WorkerAckResponse
+
+    /**
+     * `POST /api/gigs/:gigId/start` — assigned worker transitions
+     * `assigned → in_progress` (payment must be authorized for paid
+     * gigs). Route `backend/routes/gigs.js:5501`. Returns `{ gig }`.
+     */
+    @POST("api/gigs/{gigId}/start")
+    suspend fun startGig(
+        @Path("gigId") gigId: String,
+    ): GigDetailResponse
+
+    /**
+     * `GET /api/gigs/:gigId/no-show-check` — should the viewer see the
+     * "Report no-show" affordance? Route `backend/routes/gigs.js:7720`.
+     */
+    @GET("api/gigs/{gigId}/no-show-check")
+    suspend fun noShowCheck(
+        @Path("gigId") gigId: String,
+    ): NoShowCheckResponse
+
+    /**
+     * `POST /api/gigs/:gigId/report-no-show` — poster/worker reports the
+     * other side; cancels the gig with a no-show incident. Route
+     * `backend/routes/gigs.js:7572`.
+     */
+    @POST("api/gigs/{gigId}/report-no-show")
+    suspend fun reportNoShow(
+        @Path("gigId") gigId: String,
+        @Body body: ReportNoShowBody,
+    ): ReportNoShowResponse
+
+    /**
+     * `POST /api/gigs/:gigId/report` — flag a gig for moderation. Route
+     * `backend/routes/gigs.js:3110`; reasons per `reportGigSchema`
+     * (`backend/routes/gigs.js:690`).
+     */
+    @POST("api/gigs/{gigId}/report")
+    suspend fun reportGig(
+        @Path("gigId") gigId: String,
+        @Body body: ReportGigBody,
+    ): ReportGigResponse
+
+    /**
+     * `GET /api/gigs/:gigId/cancellation-preview` — zone + fee preview
+     * shown before the owner confirms a cancel. Route
+     * `backend/routes/gigs.js:6354`.
+     */
+    @GET("api/gigs/{gigId}/cancellation-preview")
+    suspend fun cancellationPreview(
+        @Path("gigId") gigId: String,
+    ): CancellationPreviewResponse
 
     /** `POST /api/gigs/:gigId/bids/:bidId/accept` — poster accepts a bid. */
     @POST("api/gigs/{gigId}/bids/{bidId}/accept")

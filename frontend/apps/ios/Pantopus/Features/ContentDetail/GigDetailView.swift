@@ -3,9 +3,13 @@
 //  Pantopus
 //
 //  T2.6 gig detail. Wraps `TransactionalDetailShell`. The primary dock
-//  action opens the shared `EditBidSheetView` in place-bid mode; the
-//  secondary opens a placeholder message thread.
+//  action opens the shared `EditBidSheetView` in place-bid mode (or tips /
+//  delivers / instant-accepts depending on the lifecycle); the Phase 5
+//  scroll footer carries the owner bids panel, active-task strip, and
+//  review CTA, with counter / report / cancel / no-show sheets attached.
 //
+
+// swiftlint:disable file_length type_body_length
 
 import SwiftUI
 
@@ -16,6 +20,14 @@ public struct GigDetailView: View {
     @State private var showTipSheet = false
     @State private var tipCustomAmountText = ""
     @State private var toast: ToastMessage?
+    // Phase 5 — lifecycle sheets
+    @State private var counterTarget: GigCounterSheetTarget?
+    @State private var rejectCandidate: GigBidDTO?
+    @State private var showReportSheet = false
+    @State private var showCancelSheet = false
+    @State private var cancelPreview: GigCancellationPreview?
+    @State private var showNoShowSheet = false
+    @State private var reviewTarget: LeaveReviewSheetTarget?
     private let onBack: @MainActor () -> Void
     private let onOpenChat: (@MainActor (InboxConversationDestination) -> Void)?
 
@@ -35,21 +47,20 @@ public struct GigDetailView: View {
     public var body: some View {
         TransactionalDetailShell(
             state: viewModel.state,
-            topBarAccessory: bookmarkAccessory,
+            overflowItems: overflowItems,
+            topBarAccessory: topBarAccessories,
             onBack: onBack,
             onPrimaryAction: { presentPrimaryAction() },
             onSecondaryAction: { openChat() },
             onRetry: { Task { await viewModel.load() } },
             onMessageCounterparty: { openChat() },
-            scrollFooter: {
-                if case .loaded = viewModel.state {
-                    GigQuestionsSection(viewModel: viewModel) { message in
-                        toast = ToastMessage(text: message, kind: .error)
-                    }
-                }
-            }
+            scrollFooter: { lifecycleFooter }
         )
-        .task { await viewModel.load() }
+        .task {
+            await viewModel.load()
+            viewModel.startRealtime()
+        }
+        .onDisappear { viewModel.stopRealtime() }
         .sheet(item: $bidSheetTarget) { target in
             EditBidSheetView(
                 target: target,
@@ -78,40 +89,180 @@ public struct GigDetailView: View {
             )
         }
         .sheet(isPresented: $showTipSheet) { tipSheet }
+        .modifier(GigLifecycleSheets(
+            viewModel: viewModel,
+            counterTarget: $counterTarget,
+            showReportSheet: $showReportSheet,
+            showCancelSheet: $showCancelSheet,
+            cancelPreview: $cancelPreview,
+            showNoShowSheet: $showNoShowSheet,
+            reviewTarget: $reviewTarget,
+            toast: $toast
+        ))
+        .confirmationDialog(
+            "Reject this bid?",
+            isPresented: Binding(
+                get: { rejectCandidate != nil },
+                set: { if !$0 { rejectCandidate = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Reject bid", role: .destructive) { confirmReject() }
+            Button("Keep bid", role: .cancel) { rejectCandidate = nil }
+        } message: {
+            Text("The bidder is notified and can't be selected afterwards.")
+        }
         .overlay(alignment: .bottom) { toastOverlay }
         .overlay(alignment: .top) { tipMarkers }
         .onChange(of: viewModel.tipStatus) { _, status in handleTip(status) }
     }
 
-    // MARK: - Save / bookmark (work item C)
+    // MARK: - Lifecycle footer (Phase 5)
 
-    /// Top-bar bookmark toggle. Hidden until the gig is loaded.
-    /// Optimistic — the VM flips immediately and reverts on failure,
-    /// at which point we surface an error toast.
-    private var bookmarkAccessory: AnyView? {
+    /// Owner bids panel → active-task panel → review CTA → Q&A.
+    @ViewBuilder private var lifecycleFooter: some View {
+        if case .loaded = viewModel.state {
+            if viewModel.showOwnerBidsPanel {
+                GigOwnerBidsPanel(
+                    bids: viewModel.ownerBids,
+                    inFlightBidId: viewModel.bidActionInFlight,
+                    onAccept: { bid in Task { await acceptBid(bid) } },
+                    onCounter: { bid in counterTarget = GigCounterSheetTarget(id: bid.id, bid: bid) },
+                    onReject: { bid in rejectCandidate = bid }
+                )
+            }
+            if let phase = viewModel.activePhase, viewModel.showActivePanel {
+                GigActiveTaskPanel(
+                    phase: phase,
+                    showWorkerAck: viewModel.showWorkerAck,
+                    canStartTask: viewModel.canStartTask,
+                    canConfirmCompletion: viewModel.canConfirmCompletion,
+                    noShowEligible: viewModel.noShowEligible,
+                    onWorkerAck: {
+                        Task { await runToasting(success: "Told the poster you're on it.") { await viewModel.sendWorkerAck() } }
+                    },
+                    onStartTask: {
+                        Task { await runToasting(success: "Task started.") { await viewModel.startTask() } }
+                    },
+                    onConfirmCompletion: {
+                        Task { await runToasting(success: "Completion confirmed.") { await viewModel.confirmCompletion() } }
+                    },
+                    onReportNoShow: { showNoShowSheet = true }
+                )
+            }
+            if viewModel.showReviewSection {
+                GigReviewSection(
+                    reviewSubmitted: viewModel.reviewSubmitted,
+                    revieweeName: viewModel.pendingReview?.revieweeName,
+                    onLeaveReview: presentReviewSheet
+                )
+            }
+            GigQuestionsSection(viewModel: viewModel) { message in
+                toast = ToastMessage(text: message, kind: .error)
+            }
+        }
+    }
+
+    /// Run a `String?`-error VM action, toasting either way.
+    private func runToasting(success: String, _ action: () async -> String?) async {
+        if let error = await action() {
+            toast = ToastMessage(text: error, kind: .error)
+        } else {
+            toast = ToastMessage(text: success, kind: .success)
+        }
+    }
+
+    private func acceptBid(_ bid: GigBidDTO) async {
+        switch await viewModel.acceptBid(bidId: bid.id) {
+        case .accepted:
+            toast = ToastMessage(text: "Bid accepted — task assigned.", kind: .success)
+        case .canceled:
+            toast = ToastMessage(text: "Payment canceled.", kind: .error)
+        case let .failed(message):
+            toast = ToastMessage(text: message, kind: .error)
+        }
+    }
+
+    private func confirmReject() {
+        guard let bid = rejectCandidate else { return }
+        rejectCandidate = nil
+        Task { await runToasting(success: "Bid rejected.") { await viewModel.rejectBid(bidId: bid.id) } }
+    }
+
+    private func presentReviewSheet() {
+        guard let gig = viewModel.rawGig else { return }
+        reviewTarget = LeaveReviewSheetTarget(
+            id: "review-\(gig.id)",
+            gigId: gig.id,
+            revieweeId: viewModel.pendingReview?.revieweeId ?? "",
+            gigTitle: gig.title,
+            revieweeName: viewModel.pendingReview?.revieweeName
+        )
+    }
+
+    // MARK: - Top bar (share + bookmark) & overflow
+
+    /// Share (universal link) + bookmark toggle. Hidden until loaded.
+    private var topBarAccessories: AnyView? {
         guard case .loaded = viewModel.state else { return nil }
         return AnyView(
-            Button {
-                Task {
-                    let ok = await viewModel.toggleSave()
-                    if !ok {
-                        toast = ToastMessage(text: "Couldn't update saved tasks.", kind: .error)
+            HStack(spacing: Spacing.s1) {
+                ShareLink(item: viewModel.shareURL) {
+                    Icon(.share, size: 18, strokeWidth: 2, color: Theme.Color.appText)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share task")
+                .accessibilityIdentifier("gigDetail.share")
+                Button {
+                    Task {
+                        let ok = await viewModel.toggleSave()
+                        if !ok {
+                            toast = ToastMessage(text: "Couldn't update saved tasks.", kind: .error)
+                        }
+                    }
+                } label: {
+                    Icon(
+                        .bookmark,
+                        size: 18,
+                        strokeWidth: 2,
+                        color: viewModel.isSaved ? Theme.Color.primary600 : Theme.Color.appText
+                    )
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(viewModel.isSaved ? "Saved — tap to unsave" : "Save task")
+                .accessibilityIdentifier("gigDetail.save")
+            }
+        )
+    }
+
+    /// Report (everyone) + Cancel task (owner of a live gig).
+    private var overflowItems: [ContentDetailOverflowItem] {
+        guard case .loaded = viewModel.state else { return [] }
+        var items = [
+            ContentDetailOverflowItem(label: "Report task", icon: .flag, identifier: "gigDetail.report") {
+                showReportSheet = true
+            }
+        ]
+        if viewModel.canCancelTask {
+            items.append(
+                ContentDetailOverflowItem(
+                    label: "Cancel task",
+                    icon: .ban,
+                    identifier: "gigDetail.cancel",
+                    role: .destructive
+                ) {
+                    Task {
+                        cancelPreview = await viewModel.loadCancellationPreview()
+                        showCancelSheet = true
                     }
                 }
-            } label: {
-                Icon(
-                    .bookmark,
-                    size: 18,
-                    strokeWidth: 2,
-                    color: viewModel.isSaved ? Theme.Color.primary600 : Theme.Color.appText
-                )
-                .frame(width: 36, height: 36)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(viewModel.isSaved ? "Saved — tap to unsave" : "Save task")
-            .accessibilityIdentifier("gigDetail.save")
-        )
+            )
+        }
+        return items
     }
 
     // MARK: - Tip (Block 3D)
@@ -196,8 +347,12 @@ public struct GigDetailView: View {
         return max(50, Int((dollars * 100).rounded()))
     }
 
-    /// Zero-size anchors so UI tests can assert each tip stage.
+    /// Zero-size anchors so UI tests can assert each tip stage (+ the
+    /// instant-accept affordance, whose button is the shared dock primary).
     @ViewBuilder private var tipMarkers: some View {
+        if viewModel.canInstantAccept {
+            Color.clear.frame(width: 0, height: 0).accessibilityIdentifier("gigDetail.instantAccept")
+        }
         if viewModel.canTip {
             Color.clear.frame(width: 0, height: 0).accessibilityIdentifier("tip.affordance")
         }
@@ -245,13 +400,16 @@ public struct GigDetailView: View {
 
     /// Dock primary routes to: the tip sheet when the poster can tip a
     /// completed gig (Block 3D); the Delivery Proof sheet for the assigned
-    /// worker on an in-progress task; otherwise the bid sheet.
+    /// worker on an in-progress task; instant accept on `instant_accept`
+    /// open gigs; otherwise the bid sheet.
     private func presentPrimaryAction() {
         if viewModel.canTip {
             tipCustomAmountText = ""
             showTipSheet = true
         } else if viewModel.canMarkDelivered {
             presentDeliveryProof()
+        } else if viewModel.canInstantAccept {
+            Task { await runToasting(success: "You're on the task — it's yours.") { await viewModel.instantAccept() } }
         } else {
             presentBidSheet()
         }
@@ -281,5 +439,95 @@ public struct GigDetailView: View {
             guard let destination = await viewModel.resolveChatDestination() else { return }
             onOpenChat?(destination)
         }
+    }
+}
+
+// MARK: - Phase 5 — lifecycle sheets
+
+/// Bundles the counter / report / cancel / no-show / review sheets so
+/// `GigDetailView.body` stays readable. All mutations route through the
+/// view-model; results surface via the shared toast binding.
+private struct GigLifecycleSheets: ViewModifier {
+    let viewModel: GigDetailViewModel
+    @Binding var counterTarget: GigCounterSheetTarget?
+    @Binding var showReportSheet: Bool
+    @Binding var showCancelSheet: Bool
+    @Binding var cancelPreview: GigCancellationPreview?
+    @Binding var showNoShowSheet: Bool
+    @Binding var reviewTarget: LeaveReviewSheetTarget?
+    @Binding var toast: ToastMessage?
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $counterTarget) { target in
+                GigCounterSheet(
+                    target: target,
+                    onSubmit: { amount, message in
+                        let error = await viewModel.counterBid(
+                            bidId: target.bid.id,
+                            amount: amount,
+                            message: message
+                        )
+                        if error == nil {
+                            toast = ToastMessage(text: "Counter-offer sent.", kind: .success)
+                        }
+                        return error
+                    },
+                    onDismiss: { counterTarget = nil }
+                )
+            }
+            .sheet(isPresented: $showReportSheet) {
+                GigReportSheet(
+                    onSubmit: { reason, details in
+                        let result = await viewModel.reportGig(reason: reason, details: details)
+                        toast = ToastMessage(text: result.message, kind: result.success ? .success : .error)
+                        showReportSheet = false
+                    },
+                    onDismiss: { showReportSheet = false }
+                )
+            }
+            .sheet(isPresented: $showCancelSheet) {
+                GigCancelSheet(
+                    preview: cancelPreview,
+                    onConfirm: { reason in
+                        if let error = await viewModel.cancelTask(reason: reason) {
+                            toast = ToastMessage(text: error, kind: .error)
+                        } else {
+                            toast = ToastMessage(text: "Task cancelled.", kind: .success)
+                        }
+                        showCancelSheet = false
+                    },
+                    onDismiss: { showCancelSheet = false }
+                )
+            }
+            .sheet(isPresented: $showNoShowSheet) {
+                GigNoShowSheet(
+                    onConfirm: { description in
+                        if let error = await viewModel.reportNoShow(description: description) {
+                            toast = ToastMessage(text: error, kind: .error)
+                        } else {
+                            toast = ToastMessage(text: "No-show reported. The task was cancelled.", kind: .success)
+                        }
+                        showNoShowSheet = false
+                    },
+                    onDismiss: { showNoShowSheet = false }
+                )
+            }
+            .sheet(item: $reviewTarget) { target in
+                LeaveReviewSheetView(
+                    target: target,
+                    onSubmit: { draft in
+                        if let error = await viewModel.submitReview(rating: draft.rating, comment: draft.comment) {
+                            toast = ToastMessage(text: error, kind: .error)
+                            return false
+                        }
+                        toast = ToastMessage(text: "Review submitted. Thanks!", kind: .success)
+                        reviewTarget = nil
+                        return true
+                    },
+                    onCancel: { reviewTarget = nil }
+                )
+                .presentationDetents([.medium, .large])
+            }
     }
 }

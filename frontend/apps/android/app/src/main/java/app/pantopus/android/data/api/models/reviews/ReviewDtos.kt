@@ -29,3 +29,24 @@ data class CreateReviewResponse(
     @Json(name = "gig_id") val gigId: String? = null,
     val rating: Int? = null,
 )
+
+/**
+ * One entry from `GET /api/reviews/my-pending` — a completed gig the
+ * caller participated in but hasn't reviewed yet. Route
+ * `backend/routes/reviews.js:333`.
+ */
+@JsonClass(generateAdapter = true)
+data class PendingReviewDto(
+    @Json(name = "gig_id") val gigId: String,
+    @Json(name = "gig_title") val gigTitle: String? = null,
+    @Json(name = "reviewee_id") val revieweeId: String? = null,
+    /** `owner` (reviewing the worker) or `worker` (reviewing the poster). */
+    val role: String? = null,
+    @Json(name = "reviewee_name") val revieweeName: String? = null,
+)
+
+/** Envelope from `GET /api/reviews/my-pending`. */
+@JsonClass(generateAdapter = true)
+data class MyPendingReviewsResponse(
+    val pending: List<PendingReviewDto> = emptyList(),
+)

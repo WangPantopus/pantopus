@@ -101,6 +101,13 @@ sealed class MyBidsStatus {
         override val chipVariant = StatusChipVariant.Warning
     }
 
+    /** Phase 5 — the poster countered; the bidder must respond. */
+    data class Countered(val amount: String) : MyBidsStatus() {
+        override val label = "Countered $amount"
+        override val icon = PantopusIcon.ArrowsRepeat
+        override val chipVariant = StatusChipVariant.Warning
+    }
+
     data class Expiring(val hoursLeft: Int) : MyBidsStatus() {
         override val label = "Closes in ${hoursLeft}h"
         override val icon = PantopusIcon.Timer
@@ -160,6 +167,9 @@ sealed class MyBidsFooter {
     data class Review(val firstName: String) : MyBidsFooter()
 
     data object Rebid : MyBidsFooter()
+
+    /** Phase 5 — pending counter from the poster: Accept / Decline. */
+    data object CounterRespond : MyBidsFooter()
 
     data object None : MyBidsFooter()
 }
@@ -604,6 +614,65 @@ class MyBidsViewModel
             }
         }
 
+        // MARK: - Phase 5 · counter responses (work item 2)
+
+        /**
+         * Bidder accepts the poster's counter — `POST
+         * /api/gigs/:gigId/bids/:bidId/counter/accept`
+         * (`backend/routes/gigs.js:5182`). Optimistic: the bid amount
+         * becomes the counter amount and the row returns to Pending.
+         */
+        fun acceptCounter(dto: BidDto) {
+            val gigId = dto.gigId ?: return
+            val previous = bids
+            val index = bids.indexOfFirst { it.id == dto.id }
+            if (index < 0) return
+            bids = bids.toMutableList().also { it[index] = counterAcceptedCopy(bids[index]) }
+            applyState()
+            viewModelScope.launch {
+                when (val result = gigsRepo.acceptCounterOffer(gigId, dto.id)) {
+                    is NetworkResult.Success -> _toast.value = MyBidsToast(text = "Counter accepted — new amount locked in.")
+                    is NetworkResult.Failure -> {
+                        bids = previous
+                        applyState()
+                        _toast.value =
+                            MyBidsToast(
+                                text = result.error.message.ifEmpty { "Couldn't accept the counter." },
+                                isError = true,
+                            )
+                    }
+                }
+            }
+        }
+
+        /**
+         * Bidder declines the poster's counter — `POST
+         * /api/gigs/:gigId/bids/:bidId/counter/decline`
+         * (`backend/routes/gigs.js:5260`). The original bid stands.
+         */
+        fun declineCounter(dto: BidDto) {
+            val gigId = dto.gigId ?: return
+            val previous = bids
+            val index = bids.indexOfFirst { it.id == dto.id }
+            if (index < 0) return
+            bids = bids.toMutableList().also { it[index] = counterDeclinedCopy(bids[index]) }
+            applyState()
+            viewModelScope.launch {
+                when (val result = gigsRepo.declineCounterOffer(gigId, dto.id)) {
+                    is NetworkResult.Success -> _toast.value = MyBidsToast(text = "Counter declined — your bid stands.")
+                    is NetworkResult.Failure -> {
+                        bids = previous
+                        applyState()
+                        _toast.value =
+                            MyBidsToast(
+                                text = result.error.message.ifEmpty { "Couldn't decline the counter." },
+                                isError = true,
+                            )
+                    }
+                }
+            }
+        }
+
         fun markComplete(dto: BidDto) {
             val gigId = dto.gigId ?: return
             val previous = bids
@@ -766,6 +835,26 @@ class MyBidsViewModel
                                 ),
                             ),
                     )
+                is MyBidsFooter.CounterRespond ->
+                    RowFooter(
+                        actions =
+                            listOf(
+                                RowFooterAction(
+                                    title = "Decline counter",
+                                    icon = PantopusIcon.X,
+                                    variant = CompactButtonVariant.Destructive,
+                                    testTag = "myBids.counter_${dto.id}.decline",
+                                    onClick = { declineCounter(dto) },
+                                ),
+                                RowFooterAction(
+                                    title = "Accept counter",
+                                    icon = PantopusIcon.Check,
+                                    variant = CompactButtonVariant.Primary,
+                                    testTag = "myBids.counter_${dto.id}.accept",
+                                    onClick = { acceptCounter(dto) },
+                                ),
+                            ),
+                    )
             }
 
         private fun bannerFor(
@@ -867,6 +956,11 @@ class MyBidsViewModel
                         }
                     }
                     "pending", "countered" -> {
+                        // Phase 5 — an outstanding counter beats every other
+                        // pending-tab verdict; the bidder must respond first.
+                        if (dto.counterStatus == "pending" && dto.counterAmount != null) {
+                            return MyBidsStatus.Countered(formatPrice(dto.counterAmount))
+                        }
                         val expires = parseInstant(dto.expiresAt)
                         if (expires != null) {
                             val timeLeft = ChronoUnit.SECONDS.between(now, expires)
@@ -891,7 +985,8 @@ class MyBidsViewModel
             ): MyBidsFooter {
                 val gigStatus = (dto.gig?.status ?: "").lowercase(Locale.ROOT)
                 return when (tab) {
-                    MyBidsTab.ACTIVE -> MyBidsFooter.Edit
+                    MyBidsTab.ACTIVE ->
+                        if (status is MyBidsStatus.Countered) MyBidsFooter.CounterRespond else MyBidsFooter.Edit
                     MyBidsTab.ACCEPTED ->
                         if (gigStatus == "in_progress") MyBidsFooter.Complete else MyBidsFooter.Message
                     MyBidsTab.DONE ->
@@ -911,7 +1006,7 @@ class MyBidsViewModel
             fun statusFilterId(status: MyBidsStatus): String =
                 when (status) {
                     is MyBidsStatus.TopBid, is MyBidsStatus.Shortlisted, is MyBidsStatus.Pending,
-                    is MyBidsStatus.Outbid, is MyBidsStatus.Expiring,
+                    is MyBidsStatus.Outbid, is MyBidsStatus.Expiring, is MyBidsStatus.Countered,
                     -> "pending"
                     is MyBidsStatus.Accepted, is MyBidsStatus.Scheduled -> "accepted"
                     is MyBidsStatus.NotSelected, is MyBidsStatus.TaskCancelled -> "declined"
@@ -1038,6 +1133,22 @@ class MyBidsViewModel
                     bidAmount = draft.amount,
                     message = draft.message,
                     proposedTime = draft.proposedTime,
+                    updatedAt = Instant.now().toString(),
+                )
+
+            /** Optimistic copy after accepting a counter: amount ⇒ counter amount. */
+            fun counterAcceptedCopy(dto: BidDto): BidDto =
+                dto.copy(
+                    bidAmount = dto.counterAmount ?: dto.bidAmount,
+                    status = "pending",
+                    counterStatus = "accepted",
+                    updatedAt = Instant.now().toString(),
+                )
+
+            /** Optimistic copy after declining a counter: original bid stands. */
+            fun counterDeclinedCopy(dto: BidDto): BidDto =
+                dto.copy(
+                    counterStatus = "declined",
                     updatedAt = Instant.now().toString(),
                 )
 

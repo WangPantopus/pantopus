@@ -3,8 +3,12 @@
 //  Pantopus
 //
 //  Endpoint builders for `backend/routes/gigs.js` — list (with category +
-//  sort + radius), nearby, in-bounds map mode, save/unsave, detail.
+//  sort + radius), nearby, in-bounds map mode, save/unsave, detail, and
+//  the Phase 5 lifecycle routes (counter / reject / start / no-show /
+//  report / cancellation preview).
 //
+
+// swiftlint:disable file_length
 
 import Foundation
 
@@ -356,6 +360,94 @@ public enum GigsEndpoints {
     public static func update(id: String, body: UpdateGigBody) -> Endpoint {
         Endpoint(method: .patch, path: "/api/gigs/\(id)", body: body)
     }
+
+    // MARK: - Phase 5 — lifecycle
+
+    /// `POST /api/gigs/:gigId/bids/:bidId/reject` — poster rejects a
+    /// bid; the bidder is notified and the bid flips to `rejected`.
+    /// Returns `{message}`. Route `backend/routes/gigs.js:5028`.
+    public static func rejectBid(gigId: String, bidId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids/\(bidId)/reject")
+    }
+
+    /// `POST /api/gigs/:gigId/bids/:bidId/counter` — poster counters a
+    /// pending bid with `{amount, message?}`. The bid becomes
+    /// `countered` and carries `counter_amount`; returns `{bid}`.
+    /// Route `backend/routes/gigs.js:5099`.
+    public static func counterBid(gigId: String, bidId: String, body: CounterBidBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids/\(bidId)/counter", body: body)
+    }
+
+    /// `POST /api/gigs/:gigId/bids/:bidId/counter/accept` — bidder
+    /// accepts the poster's counter: `bid_amount` becomes the counter
+    /// amount and the bid reverts to `pending`. Returns `{bid}`.
+    /// Route `backend/routes/gigs.js:5187`.
+    public static func acceptCounter(gigId: String, bidId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids/\(bidId)/counter/accept")
+    }
+
+    /// `POST /api/gigs/:gigId/bids/:bidId/counter/decline` — bidder
+    /// declines the counter; the original pending bid stands. Returns
+    /// `{bid}`. Route `backend/routes/gigs.js:5263`.
+    public static func declineCounter(gigId: String, bidId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids/\(bidId)/counter/decline")
+    }
+
+    /// `POST /api/gigs/:gigId/instant-accept` — helper claims an
+    /// `instant_accept` open gig (viewer ≠ owner). Atomic open→assigned
+    /// transition; paid gigs may ride PaymentSheet params for the
+    /// *poster* (`requiresPaymentSetup`). Route
+    /// `backend/routes/gigsV2.js:64`.
+    public static func instantAccept(gigId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/instant-accept")
+    }
+
+    /// `POST /api/gigs/:gigId/worker-ack` — assigned worker
+    /// acknowledges before start: `status` is `starting_now` or
+    /// `running_late` (+ optional `eta_minutes` 1–480, `note`). Only
+    /// while the gig is `assigned` and not yet started. Route
+    /// `backend/routes/gigs.js:5840`.
+    public static func workerAck(gigId: String, body: WorkerAckBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/worker-ack", body: body)
+    }
+
+    /// `POST /api/gigs/:gigId/start` — the **assigned worker** starts
+    /// work (assigned → in_progress). Paid gigs are payment-guarded
+    /// server-side. Route `backend/routes/gigs.js:5503`.
+    public static func startGig(gigId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/start")
+    }
+
+    /// `GET /api/gigs/:gigId/no-show-check` — should the viewer see a
+    /// "Report no-show" affordance? Returns `{can_report, reason, ...}`
+    /// timing info for poster or worker on assigned/in_progress gigs.
+    /// Route `backend/routes/gigs.js:7722`.
+    public static func noShowCheck(gigId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/\(gigId)/no-show-check")
+    }
+
+    /// `POST /api/gigs/:gigId/report-no-show` — report the other party
+    /// as a no-show. Body `{description?, evidence_urls?}`; cancels the
+    /// gig (zone 3) and penalizes the no-show party. Route
+    /// `backend/routes/gigs.js:7574`.
+    public static func reportNoShow(gigId: String, body: ReportNoShowBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/report-no-show", body: body)
+    }
+
+    /// `POST /api/gigs/:gigId/report` — flag a gig for moderation.
+    /// Body `{reason, details?≤1000}` with the backend reason enum;
+    /// repeat reports return `already_reported: true`. Route
+    /// `backend/routes/gigs.js:3112`.
+    public static func reportGig(gigId: String, body: ReportGigBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/report", body: body)
+    }
+
+    /// `GET /api/gigs/:gigId/cancellation-preview` — zone / fee / grace
+    /// info shown before cancelling (poster or worker). Route
+    /// `backend/routes/gigs.js:6356`.
+    public static func cancellationPreview(gigId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/\(gigId)/cancellation-preview")
+    }
 }
 
 /// Body for `POST /api/gigs/:gigId/dismiss`. Reason is optional
@@ -417,6 +509,87 @@ public struct MarkCompletedBody: Encodable, Sendable {
     public init(note: String? = nil, photos: [String]? = nil) {
         self.note = note
         self.photos = photos
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/bids/:bidId/counter`. The backend
+/// requires a positive `amount`; `message` is optional.
+public struct CounterBidBody: Encodable, Sendable {
+    public let amount: Double
+    public let message: String?
+
+    public init(amount: Double, message: String? = nil) {
+        self.amount = amount
+        self.message = message
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/worker-ack`.
+public struct WorkerAckBody: Encodable, Sendable {
+    public let status: String
+    public let etaMinutes: Int?
+    public let note: String?
+
+    public init(status: String = "starting_now", etaMinutes: Int? = nil, note: String? = nil) {
+        self.status = status
+        self.etaMinutes = etaMinutes
+        self.note = note
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status, note
+        case etaMinutes = "eta_minutes"
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/report-no-show`.
+public struct ReportNoShowBody: Encodable, Sendable {
+    public let description: String?
+    public let evidenceUrls: [String]?
+
+    public init(description: String? = nil, evidenceUrls: [String]? = nil) {
+        self.description = description
+        self.evidenceUrls = evidenceUrls
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case description
+        case evidenceUrls = "evidence_urls"
+    }
+}
+
+/// Reasons the backend's `reportGigSchema` whitelists for
+/// `POST /api/gigs/:gigId/report`.
+public enum GigReportReason: String, Sendable, CaseIterable {
+    case spam
+    case harassment
+    case inappropriate
+    case misinformation
+    case safety
+    case other
+
+    /// User-facing label rendered in the report sheet.
+    public var label: String {
+        switch self {
+        case .spam: "Spam or scam"
+        case .harassment: "Harassment"
+        case .inappropriate: "Inappropriate content"
+        case .misinformation: "Misinformation"
+        case .safety: "Safety concern"
+        case .other: "Something else"
+        }
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/report`. Details cap at 1000 chars
+/// server-side.
+public struct ReportGigBody: Encodable, Sendable {
+    public let reason: String
+    public let details: String?
+
+    public init(reason: GigReportReason, details: String? = nil) {
+        self.reason = reason.rawValue
+        self.details = details
     }
 }
 

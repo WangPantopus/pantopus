@@ -69,6 +69,9 @@ public enum MyBidsStatus: Sendable, Hashable {
     case shortlisted
     case pending
     case outbid
+    /// "Countered $X" — the poster sent a counter-offer that's still
+    /// awaiting the bidder's response (`counter_status == "pending"`).
+    case countered(amount: String)
     /// "Closes in Xh" — derived from `expires_at` when the bid is
     /// pending and within the warning window.
     case expiring(hoursLeft: Int)
@@ -96,6 +99,7 @@ public enum MyBidsStatus: Sendable, Hashable {
         case .shortlisted: "Shortlisted"
         case .pending: "Pending"
         case .outbid: "Outbid"
+        case let .countered(amount): "Countered \(amount)"
         case let .expiring(hours): "Closes in \(hours)h"
         case .accepted: "Accepted"
         case let .scheduled(weekday): "Starts \(weekday)"
@@ -112,6 +116,7 @@ public enum MyBidsStatus: Sendable, Hashable {
         case .shortlisted: .star
         case .pending: .hourglass
         case .outbid: .trendingDown
+        case .countered: .arrowsRepeat
         case .expiring: .timer
         case .accepted: .check
         case .scheduled: .calendar
@@ -128,7 +133,7 @@ public enum MyBidsStatus: Sendable, Hashable {
     public var chipVariant: StatusChipVariant {
         switch self {
         case .topBid, .accepted, .paid: .success
-        case .shortlisted, .scheduled, .leaveReview: .info
+        case .shortlisted, .scheduled, .leaveReview, .countered: .info
         case .pending, .notSelected, .taskCancelled: .neutral
         case .outbid: .warning
         case .expiring: .error
@@ -143,6 +148,9 @@ public enum MyBidsStatus: Sendable, Hashable {
 public enum MyBidsFooter: Sendable, Hashable {
     /// Active bid: ghost "Withdraw" (destructive) + primary "Edit bid".
     case edit
+    /// Countered bid awaiting the bidder's response: destructive
+    /// "Decline counter" + primary "Accept $X".
+    case counter(amount: String)
     /// Accepted, work not started: ghost "View details" + primary
     /// "Message client".
     case message
@@ -397,7 +405,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     /// Map a derived bid status onto one of the four filter chip ids.
     public static func statusFilterId(for status: MyBidsStatus) -> String {
         switch status {
-        case .topBid, .shortlisted, .pending, .outbid, .expiring: "pending"
+        case .topBid, .shortlisted, .pending, .outbid, .expiring, .countered: "pending"
         case .accepted, .scheduled: "accepted"
         case .notSelected, .taskCancelled: "declined"
         case .paid, .leaveReview: "completed"
@@ -449,6 +457,14 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             onRebid: { [weak self] in
                 guard let self else { return }
                 Task { @MainActor in self.onBrowseTasks() }
+            },
+            onAcceptCounter: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in await self.acceptCounter(dto) }
+            },
+            onDeclineCounter: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in await self.declineCounter(dto) }
             }
         )
     }
@@ -655,6 +671,62 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         }
     }
 
+    // MARK: - Counter response (Phase 5)
+
+    /// Bidder accepts the poster's counter-offer:
+    /// `POST /api/gigs/:gigId/bids/:bidId/counter/accept`
+    /// (`backend/routes/gigs.js:5187`). Optimistic — the bid amount
+    /// becomes the counter and the row settles back to Pending; rolls
+    /// back on failure.
+    public func acceptCounter(_ dto: BidDTO) async {
+        guard let gigId = dto.gigId, let counter = dto.counterAmount,
+              let index = bids.firstIndex(where: { $0.id == dto.id }) else { return }
+        let previous = bids
+        bids[index] = Self.counterRespondedCopy(of: bids[index], accepted: true)
+        rebuild()
+        do {
+            _ = try await api.request(
+                GigsEndpoints.acceptCounter(gigId: gigId, bidId: dto.id),
+                as: PlaceBidResponse.self
+            )
+            toast = ToastMessage(
+                text: "Counter accepted — your bid is now \(OffersViewModel.formatPrice(counter)).",
+                kind: .success
+            )
+        } catch {
+            bids = previous
+            rebuild()
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription ?? "Couldn't accept the counter-offer.",
+                kind: .error
+            )
+        }
+    }
+
+    /// Bidder declines the counter — the original pending bid stands.
+    /// `POST .../counter/decline` (`backend/routes/gigs.js:5263`).
+    public func declineCounter(_ dto: BidDTO) async {
+        guard let gigId = dto.gigId,
+              let index = bids.firstIndex(where: { $0.id == dto.id }) else { return }
+        let previous = bids
+        bids[index] = Self.counterRespondedCopy(of: bids[index], accepted: false)
+        rebuild()
+        do {
+            _ = try await api.request(
+                GigsEndpoints.declineCounter(gigId: gigId, bidId: dto.id),
+                as: PlaceBidResponse.self
+            )
+            toast = ToastMessage(text: "Counter declined — your original bid stands.", kind: .success)
+        } catch {
+            bids = previous
+            rebuild()
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription ?? "Couldn't decline the counter-offer.",
+                kind: .error
+            )
+        }
+    }
+
     /// Optimistically mark the assigned gig as complete. The row moves
     /// from Accepted → Done; on failure we restore the cached state.
     public func markComplete(_ dto: BidDTO) async {
@@ -752,11 +824,16 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         return .accepted
     }
 
-    /// `pending` / `countered` projection — expiring-soon takes visual
-    /// priority over Top bid / Shortlisted / Outbid (the P3 backend-prep
-    /// fields). Falls back to a neutral "Pending" chip when no signal
-    /// fires.
+    /// `pending` / `countered` projection — a live counter-offer wins
+    /// (the bidder has an action to take), then expiring-soon, then the
+    /// P3 backend-prep signals (Top bid / Shortlisted / Outbid). Falls
+    /// back to a neutral "Pending" chip when no signal fires.
     private static func pendingStatus(for dto: BidDTO, now: Date) -> MyBidsStatus {
+        if (dto.status ?? "").lowercased() == "countered",
+           dto.counterStatus == "pending",
+           let counter = dto.counterAmount {
+            return .countered(amount: OffersViewModel.formatPrice(counter))
+        }
         if let expires = parseDate(dto.expiresAt) {
             let timeLeft = expires.timeIntervalSince(now)
             if timeLeft > 0, timeLeft < MyBidsStatus.expiringWindow {
@@ -777,6 +854,9 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     public static func footerFor(dto: BidDTO, tab: String, status: MyBidsStatus) -> MyBidsFooter {
         switch tab {
         case MyBidsTab.active:
+            if case let .countered(amount) = status {
+                return .counter(amount: amount)
+            }
             return .edit
         case MyBidsTab.accepted:
             // "Mark complete" only when the gig is in progress; before
@@ -813,6 +893,8 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         public let onMarkComplete: @Sendable () -> Void
         public let onLeaveReview: @Sendable () -> Void
         public let onRebid: @Sendable () -> Void
+        public let onAcceptCounter: @Sendable () -> Void
+        public let onDeclineCounter: @Sendable () -> Void
 
         public init(
             onTap: @escaping @Sendable () -> Void = {},
@@ -821,7 +903,9 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             onMessage: @escaping @Sendable () -> Void = {},
             onMarkComplete: @escaping @Sendable () -> Void = {},
             onLeaveReview: @escaping @Sendable () -> Void = {},
-            onRebid: @escaping @Sendable () -> Void = {}
+            onRebid: @escaping @Sendable () -> Void = {},
+            onAcceptCounter: @escaping @Sendable () -> Void = {},
+            onDeclineCounter: @escaping @Sendable () -> Void = {}
         ) {
             self.onTap = onTap
             self.onWithdraw = onWithdraw
@@ -830,6 +914,8 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             self.onMarkComplete = onMarkComplete
             self.onLeaveReview = onLeaveReview
             self.onRebid = onRebid
+            self.onAcceptCounter = onAcceptCounter
+            self.onDeclineCounter = onDeclineCounter
         }
     }
 
@@ -862,7 +948,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             chips: [chip],
             metaTail: metaTail(for: dto, status: projection.status, now: now),
             highlight: highlight(for: projection),
-            footer: footer(for: projection.footer, callbacks: callbacks)
+            footer: footer(for: projection.footer, callbacks: callbacks, bidId: dto.id)
         )
     }
 
@@ -924,7 +1010,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
                 return "top now \(OffersViewModel.formatPrice(topPrice))"
             }
             return nil
-        case .expiring:
+        case .expiring, .countered:
             // Already in the chip; no tail needed.
             return nil
         case .topBid, .shortlisted, .pending:
@@ -947,9 +1033,11 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private static func footer(
         for variant: MyBidsFooter,
-        callbacks: RowCallbacks
+        callbacks: RowCallbacks,
+        bidId: String = ""
     ) -> RowFooter? {
         switch variant {
         case .none:
@@ -967,6 +1055,23 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
                     icon: .pencil,
                     variant: .primary,
                     handler: callbacks.onEditBid
+                )
+            ])
+        case let .counter(amount):
+            return RowFooter(actions: [
+                RowFooterAction(
+                    title: "Decline counter",
+                    icon: .x,
+                    variant: .destructive,
+                    identifier: "myBids.counter_\(bidId).decline",
+                    handler: callbacks.onDeclineCounter
+                ),
+                RowFooterAction(
+                    title: "Accept \(amount)",
+                    icon: .check,
+                    variant: .primary,
+                    identifier: "myBids.counter_\(bidId).accept",
+                    handler: callbacks.onAcceptCounter
                 )
             ])
         case .message:
@@ -1108,6 +1213,34 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         return (
             message.isEmpty ? nil : message,
             terms.isEmpty ? nil : terms
+        )
+    }
+
+    /// Build an optimistic copy of a bid whose counter the bidder just
+    /// answered. Mirrors the backend transition: accept moves
+    /// `bid_amount` to the counter; both arms settle back to `pending`.
+    public static func counterRespondedCopy(of dto: BidDTO, accepted: Bool) -> BidDTO {
+        BidDTO(
+            id: dto.id,
+            gigId: dto.gigId,
+            userId: dto.userId,
+            bidAmount: accepted ? (dto.counterAmount ?? dto.bidAmount) : dto.bidAmount,
+            message: dto.message,
+            proposedTime: dto.proposedTime,
+            status: "pending",
+            createdAt: dto.createdAt,
+            updatedAt: ISO8601DateFormatter().string(from: Date()),
+            expiresAt: dto.expiresAt,
+            counterAmount: dto.counterAmount,
+            counterStatus: accepted ? "accepted" : "declined",
+            counteredAt: dto.counteredAt,
+            withdrawnAt: dto.withdrawnAt,
+            withdrawalReason: dto.withdrawalReason,
+            gig: dto.gig,
+            bidder: dto.bidder,
+            shortlisted: dto.shortlisted,
+            yourRank: dto.yourRank,
+            topPrice: dto.topPrice
         )
     }
 
