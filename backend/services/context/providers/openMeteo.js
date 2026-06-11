@@ -10,7 +10,7 @@
 
 const ngeohash = require('ngeohash');
 const logger = require('../../../utils/logger');
-const { getContextCache, setContextCache } = require('../contextCacheService');
+const { getContextCache, getContextCacheStale, setContextCache } = require('../contextCacheService');
 
 const PROVIDER = 'OPEN_METEO';
 const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
@@ -21,6 +21,8 @@ const GEOHASH_PRECISION = 5;
 const TTL_CURRENT = 10;
 const TTL_HOURLY = 30;
 const TTL_DAILY = 240; // 4 hours
+// When the API is down, serve expired rows up to this old (database-first).
+const STALE_MAX_AGE_MIN = 360; // 6 hours
 
 // ── WMO weather code mapping ────────────────────────────────────────
 // https://www.nodc.noaa.gov/archive/arc0021/0002199/1.1/data/0-data/HTML/WMO-CODE/WMO4677.HTM
@@ -244,6 +246,8 @@ async function fetchWeather(latitude, longitude) {
 
     if (!res.ok) {
       logger.warn('Open-Meteo API error', { status: res.status, geohash });
+      const stale = await readStale(geohash);
+      if (stale) return stale;
       return { ...ERROR_RESULT, fetchedAt: new Date().toISOString(), source: 'error' };
     }
 
@@ -268,8 +272,30 @@ async function fetchWeather(latitude, longitude) {
     } else {
       logger.error('Open-Meteo fetch error', { provider: PROVIDER, geohash, lat: latitude, lng: longitude, error: err.message });
     }
+    const stale = await readStale(geohash);
+    if (stale) return stale;
     return { ...ERROR_RESULT, fetchedAt: new Date().toISOString(), source: 'error' };
   }
+}
+
+// Database-first fallback: a recent-but-expired snapshot (≤6 h) beats
+// an empty hub when the API is unreachable.
+async function readStale(geohash) {
+  const [current, hourly, daily] = await Promise.all([
+    getContextCacheStale(PROVIDER, 'weather_current', geohash, STALE_MAX_AGE_MIN),
+    getContextCacheStale(PROVIDER, 'weather_hourly', geohash, STALE_MAX_AGE_MIN),
+    getContextCacheStale(PROVIDER, 'weather_daily', geohash, STALE_MAX_AGE_MIN),
+  ]);
+  if (!current) return null;
+  logger.info('Open-Meteo serving stale cache (API unavailable)', { geohash });
+  return {
+    current: current.payload_json,
+    hourly: hourly ? hourly.payload_json : [],
+    daily: daily ? daily.payload_json : [],
+    provider: PROVIDER,
+    fetchedAt: current.fetched_at,
+    source: 'cache_stale',
+  };
 }
 
 module.exports = { fetchWeather, PROVIDER, WMO_CODE_MAP };

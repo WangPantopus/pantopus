@@ -265,6 +265,33 @@ screens in `reference/address anchored features/` as the source of visual truth,
 
 ---
 
+## Caching model ✅ AUDITED + HARDENED (2026-06-11) — database-first everywhere
+
+> Rule implemented across the stack: **fresh DB row → serve; expired → call API; API down → serve the expired
+> row (stale envelope); permanent data → effectively never refetched.** Decisions made:
+> - **Permanent**: claimed homes' lat/lng (Home row, since claim); tract/county assignment (changes only at the
+>   decennial census — `_tract` per ~150 m cell + `_county_fips` per home, 365 d safety valve); CountyRadonZone
+>   (1993 dataset, static seed); HudFmr (annual re-import).
+> - **Periodic + stale-fallback** (PlaceSectionCache `readThrough`): sunrise 6 h · election 1 d · drinking water,
+>   hazards, districts, flood, census teaser 90 d · seismic/wildfire 180 d · congress/state legislators 7 d.
+> - **ATTOM** (the paid one): fresh 30 d; on API failure/no-result an EXPIRED real-ATTOM row now serves as a
+>   `stale` envelope (database-first), and home-row fallback profiles cache only 1 DAY so an outage can't shadow
+>   real data for a month.
+> - **Neighborhood profile** (census+flood+walkscore): profiles missing census or flood now cache 1 day instead
+>   of 90 (a keyless-census profile no longer hides ACS data for a quarter once the key lands); total provider
+>   failure serves the expired profile; the tract geocode no longer re-runs on every call.
+> - **Weather** (Open-Meteo): on API failure a ≤6 h-old expired snapshot serves as `cache_stale`. **Alerts are
+>   the deliberate exception — never served stale** (an expired warning must not reappear).
+> - **Anonymous T0 preview**: flood + census teaser now persist in the shared geohash-keyed PlaceSectionCache
+>   (facts about land — survives restarts, shared across instances) with in-memory L1 on top. **The typed
+>   address and its geocode still never touch the database** — that's both the §4 anti-leak promise and Mapbox's
+>   temporary-result ToS (persisting geocodes requires their paid permanent endpoint). Searched-address geocodes
+>   are the ONE thing deliberately not stored.
+> No new tables needed — PlaceSectionCache (migration 156) carries all of it.
+> Verified end-to-end: preview survives restart with zero FEMA re-calls (fetched_at unchanged); ATTOM outage
+> simulation served the expired row as `your_home | stale | 585000` through the full HTTP stack; partial profile
+> wrote a 1-day TTL row. Targeted suites 27/27.
+
 ## Phase 8 — Deferred (tracked, not scheduled)
 
 | Item | Why deferred |

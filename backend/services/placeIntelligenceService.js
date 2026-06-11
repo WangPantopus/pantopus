@@ -336,8 +336,9 @@ async function composeYourHome(home, tier) {
   return [serializePlaceSection('your_home', {
     access,
     asOf: profile.cached_at || null,
-    // getCachedProfile only returns within-TTL data, so a cache hit is fresh.
-    status: 'ready',
+    // 'cache_stale' = ATTOM was unreachable and an expired row served
+    // instead (database-first resilience) — surfaced as a stale envelope.
+    status: result.source === 'cache_stale' ? 'stale' : 'ready',
     data: {
       year_built: profile.year_built ?? null,
       sqft: profile.sqft ?? null,

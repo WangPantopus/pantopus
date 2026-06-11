@@ -446,21 +446,27 @@ function buildFallbackProfile(home) {
  * Read a cached PropertyProfile for the given home.
  * Returns null on cache miss or expiry.
  */
-async function getCachedProfile(homeId) {
+async function getCachedProfile(homeId, { allowExpired = false } = {}) {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('PropertyIntelligenceCache')
-      .select('profile, fetched_at, source')
-      .eq('home_id', homeId)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
+      .select('profile, fetched_at, expires_at, source')
+      .eq('home_id', homeId);
+    if (!allowExpired) query = query.gt('expires_at', new Date().toISOString());
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       logger.warn('PropertyIntelligenceCache read error', { homeId, error: error.message });
       return null;
     }
 
-    return data ? { profile: data.profile, fetchedAt: data.fetched_at, source: data.source } : null;
+    if (!data) return null;
+    return {
+      profile: data.profile,
+      fetchedAt: data.fetched_at,
+      source: data.source,
+      expired: new Date(data.expires_at).getTime() <= Date.now(),
+    };
   } catch (err) {
     logger.error('PropertyIntelligenceCache read exception', { homeId, error: err.message });
     return null;
@@ -470,10 +476,10 @@ async function getCachedProfile(homeId) {
 /**
  * Write / upsert a cached PropertyProfile.
  */
-async function setCachedProfile(homeId, profile, source) {
+async function setCachedProfile(homeId, profile, source, ttlDays = CACHE_TTL_DAYS) {
   try {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + ttlDays * 24 * 60 * 60 * 1000);
 
     const { error } = await supabaseAdmin
       .from('PropertyIntelligenceCache')
@@ -665,6 +671,10 @@ async function getHomeAttomPropertyDetail(home) {
  * @param {string} homeId  UUID of the Home record
  * @returns {Promise<{ profile: object, source: 'cache'|'attom'|'fallback'|'error' }>}
  */
+// Fallback (home-row) profiles cache briefly so a transient ATTOM
+// outage can't shadow real data for the full 30-day budget.
+const FALLBACK_TTL_DAYS = 1;
+
 async function getProfile(homeId) {
   const cached = await getCachedProfile(homeId);
   if (cached) {
@@ -685,10 +695,21 @@ async function getProfile(homeId) {
 
   let profile = await fetchFromAttom(home);
   if (!profile) {
+    // ATTOM gave nothing (outage, rate limit, or no coverage). Database
+    // first: an EXPIRED row holding real ATTOM data beats a thin
+    // fallback — serve it stale and leave it in place so the next
+    // request retries the API.
+    const expired = await getCachedProfile(homeId, { allowExpired: true });
+    if (expired && expired.source === 'attom' && expired.profile) {
+      logger.info('PropertyIntelligence serving expired ATTOM cache (API unavailable)', { homeId });
+      return { profile: expired.profile, source: 'cache_stale' };
+    }
     if (!process.env.ATTOM_API_KEY) {
       logger.info('ATTOM_API_KEY not configured and no cached ATTOM payload, using fallback profile', { homeId });
     }
     profile = buildFallbackProfile(home);
+    await setCachedProfile(homeId, profile, profile.source, FALLBACK_TTL_DAYS);
+    return { profile, source: profile.source };
   }
 
   await setCachedProfile(homeId, profile, profile.source);

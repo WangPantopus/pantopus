@@ -61,7 +61,9 @@ async function homeCountyFips(home) {
     const { payload } = await readThrough({
       cacheKey: `home:${home.id}`,
       sectionId: '_county_fips',
-      ttlMs: 90 * DAY_MS,
+      // County assignment changes only at the decennial census —
+      // effectively permanent, refreshed yearly as a safety valve.
+      ttlMs: 365 * DAY_MS,
       fetch: async () => {
         const tract = await geocodeToTract(ll.lat, ll.lng);
         if (!tract || !tract.stateCode || !tract.countyCode) return null;
