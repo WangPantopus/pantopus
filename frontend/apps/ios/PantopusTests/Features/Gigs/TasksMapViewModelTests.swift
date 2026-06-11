@@ -4,9 +4,11 @@
 //
 //  A11.1 Tasks map view-model — the live `GET /api/gigs/in-bounds` fetch
 //  + projection, plus the client-side category filter, pin↔card
-//  selection, and sort that run on the fetched (or seeded) set. The
-//  filter/sort/selection tests drive an explicit `seed` (offline mode);
-//  the fetch tests drive a stubbed `APIClient`.
+//  selection sync, sort, the "Search this area" visibility state
+//  machine, the widen → jump-to-activity empty ladder, and the
+//  clustering / camera-request surface. The filter/sort/selection tests
+//  drive an explicit `seed` (offline mode); the fetch + state-machine
+//  tests drive a stubbed `APIClient` via `SequencedURLProtocol`.
 //
 
 import XCTest
@@ -64,7 +66,8 @@ final class TasksMapViewModelTests: XCTestCase {
             {"gigs":[
               {"id":"g1","title":"Fix a leaky sink","category":"handyman","price":60,
                "pay_type":"fixed","bid_count":4,"status":"open",
-               "latitude":40.749,"longitude":-73.988},
+               "latitude":40.749,"longitude":-73.988,
+               "creator":{"id":"u1","verified":true}},
               {"id":"g2","title":"Walk my dog","category":"pet","price":22,
                "pay_type":"per_walk","bid_count":1,"status":"open",
                "latitude":40.740,"longitude":-73.978}
@@ -81,8 +84,38 @@ final class TasksMapViewModelTests: XCTestCase {
         XCTAssertEqual(visible?.first?.price, "$60")
         XCTAssertEqual(visible?.first { $0.id == "g2" }?.price, "$22/walk")
         XCTAssertEqual(visible?.first { $0.id == "g2" }?.category, .petcare)
+        // Verified-poster semantic — g1's creator is verified (white
+        // ring), g2 has no creator payload (dashed pending outline).
+        XCTAssertEqual(visible?.first { $0.id == "g1" }?.state, .confirmed)
+        XCTAssertEqual(visible?.first { $0.id == "g2" }?.state, .pending)
         // Distance was computed client-side, not "—".
         XCTAssertNotEqual(visible?.first?.distanceLabel, "—")
+    }
+
+    func testFetchProjectsVerifiedPosterPinStyles() async {
+        // The "confirmed" pin treatment marks a verified poster:
+        // `creator.verified` or the `verified_resident` badge.
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"gigs":[
+              {"id":"flag","title":"Verified flag","category":"handyman","price":10,
+               "latitude":40.749,"longitude":-73.988,
+               "creator":{"id":"u1","verified":true}},
+              {"id":"badge","title":"Resident badge","category":"handyman","price":10,
+               "latitude":40.748,"longitude":-73.987,
+               "creator":{"id":"u2","badges":["verified_resident"]}},
+              {"id":"plain","title":"Plain creator","category":"handyman","price":10,
+               "latitude":40.747,"longitude":-73.986,
+               "creator":{"id":"u3","verified":false,"badges":["helper"]}}
+            ]}
+            """)
+        ]
+        let vm = makeLiveVM()
+        await vm.load()
+        let visible = items(vm.state)
+        XCTAssertEqual(visible?.first { $0.id == "flag" }?.state, .confirmed)
+        XCTAssertEqual(visible?.first { $0.id == "badge" }?.state, .confirmed)
+        XCTAssertEqual(visible?.first { $0.id == "plain" }?.state, .pending)
     }
 
     func testLoadDropsGigsWithoutCoordinates() async {
@@ -203,8 +236,229 @@ final class TasksMapViewModelTests: XCTestCase {
         await vm.load()
         let pins = items(vm.state)?.map(\.pin) ?? []
         XCTAssertEqual(pins.count, TasksMapSampleData.items.count)
-        // The moving + tutoring seeds are pending; the rest confirmed.
+        // The moving + tutoring seeds are pending (unverified posters);
+        // the rest confirmed.
         let pending = pins.filter { $0.state == .pending }.count
         XCTAssertEqual(pending, 2)
+    }
+
+    // MARK: - Search this area (visibility state machine)
+
+    private func region(
+        lat: Double,
+        lon: Double,
+        latSpan: Double = 0.024,
+        lonSpan: Double = 0.032
+    ) -> MapListHybridRegion {
+        MapListHybridRegion(
+            centerLatitude: lat,
+            centerLongitude: lon,
+            latitudeSpan: latSpan,
+            longitudeSpan: lonSpan
+        )
+    }
+
+    func testSearchThisAreaStateMachine() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"gigs":[{"id":"g1","title":"First","category":"handyman","price":60,
+              "latitude":40.749,"longitude":-73.988,"creator":{"id":"u1","verified":true}}]}
+            """),
+            .status(200, body: """
+            {"gigs":[{"id":"g9","title":"Refetched","category":"cleaning","price":80,
+              "latitude":40.760,"longitude":-73.985,"creator":{"id":"u2","verified":true}}]}
+            """)
+        ]
+        let vm = makeLiveVM()
+        await vm.load()
+        XCTAssertFalse(vm.showsSearchThisArea)
+
+        // First settle after the fetch adopts the camera region as the
+        // comparison baseline — never shows the pill.
+        let base = region(lat: 40.7484, lon: -73.9857)
+        vm.cameraSettled(on: base)
+        XCTAssertFalse(vm.showsSearchThisArea)
+
+        // Small pan (< 25% of the span) — still hidden.
+        vm.cameraSettled(on: region(lat: 40.7484 + 0.002, lon: -73.9857))
+        XCTAssertFalse(vm.showsSearchThisArea)
+
+        // Center moved by half the span — pill shows.
+        let far = region(lat: 40.7484 + 0.012, lon: -73.9857)
+        vm.cameraSettled(on: far)
+        XCTAssertTrue(vm.showsSearchThisArea)
+
+        // Tap → refetch the settled viewport, pill hides, data swaps.
+        await vm.searchThisArea()
+        XCTAssertFalse(vm.showsSearchThisArea)
+        XCTAssertEqual(items(vm.state)?.map(\.id), ["g9"])
+
+        // Camera settling on the refetched area re-baselines — hidden.
+        vm.cameraSettled(on: far)
+        XCTAssertFalse(vm.showsSearchThisArea)
+    }
+
+    func testSearchThisAreaShowsOnSignificantZoomChange() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"gigs":[{"id":"g1","title":"First","category":"handyman","price":60,
+              "latitude":40.749,"longitude":-73.988,"creator":{"id":"u1","verified":true}}]}
+            """)
+        ]
+        let vm = makeLiveVM()
+        await vm.load()
+        let base = region(lat: 40.7484, lon: -73.9857)
+        vm.cameraSettled(on: base)
+
+        // Mild zoom (×1.2) — hidden.
+        vm.cameraSettled(on: region(lat: 40.7484, lon: -73.9857, latSpan: 0.024 * 1.2, lonSpan: 0.032 * 1.2))
+        XCTAssertFalse(vm.showsSearchThisArea)
+
+        // Zoom out beyond +50% — shown.
+        vm.cameraSettled(on: region(lat: 40.7484, lon: -73.9857, latSpan: 0.024 * 2, lonSpan: 0.032 * 2))
+        XCTAssertTrue(vm.showsSearchThisArea)
+    }
+
+    // MARK: - Widen-search ladder + jump to activity
+
+    func testWidenSearchLadderEscalatesToJumpToActivity() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"gigs\":[]}"),
+            .status(200, body: """
+            {"gigs":[],"nearest_activity_center":{"latitude":40.6,"longitude":-73.9}}
+            """),
+            .status(200, body: """
+            {"gigs":[{"id":"a1","title":"Found one","category":"handyman","price":40,
+              "latitude":40.601,"longitude":-73.901,"creator":{"id":"u1","verified":true}}]}
+            """)
+        ]
+        let vm = makeLiveVM()
+        await vm.load()
+        XCTAssertTrue(isEmpty(vm.state))
+        XCTAssertEqual(vm.widenAttempts, 0)
+        XCTAssertEqual(vm.emptyAction, .widen)
+
+        // Widen: camera zooms out ×2.5 and the widened box refetches.
+        await vm.widenSearch()
+        XCTAssertEqual(vm.widenAttempts, 1)
+        let widened = vm.cameraTarget?.region
+        XCTAssertEqual(widened?.latitudeSpan ?? 0, 0.024 * 2.5, accuracy: 1e-9)
+        XCTAssertEqual(widened?.longitudeSpan ?? 0, 0.032 * 2.5, accuracy: 1e-9)
+        // Still empty, but the backend offered an activity center →
+        // the secondary CTA escalates.
+        XCTAssertTrue(isEmpty(vm.state))
+        XCTAssertEqual(vm.emptyAction, .jumpToActivity(latitude: 40.6, longitude: -73.9))
+
+        // Jump: camera recenters on the activity hint, refetch populates,
+        // ladder resets.
+        await vm.jumpToActivity()
+        XCTAssertEqual(items(vm.state)?.map(\.id), ["a1"])
+        XCTAssertEqual(vm.cameraTarget?.region.centerLatitude ?? 0, 40.6, accuracy: 1e-9)
+        XCTAssertEqual(vm.cameraTarget?.region.centerLongitude ?? 0, -73.9, accuracy: 1e-9)
+        XCTAssertEqual(vm.widenAttempts, 0)
+        XCTAssertEqual(vm.emptyAction, .widen)
+    }
+
+    func testEmptyLoadWithCenterStillOffersWidenFirst() async {
+        // The escalation requires at least one widen attempt — a first
+        // load that comes back empty with a hint still offers "Widen".
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"gigs":[],"nearest_activity_center":{"latitude":40.6,"longitude":-73.9}}
+            """)
+        ]
+        let vm = makeLiveVM()
+        await vm.load()
+        XCTAssertTrue(isEmpty(vm.state))
+        XCTAssertEqual(vm.emptyAction, .widen)
+    }
+
+    // MARK: - Pin↔card selection sync
+
+    func testSelectIndexSelectsItemAndPansCamera() async {
+        let vm = seeded()
+        await vm.load()
+        XCTAssertEqual(vm.selectedIndex, 0, "Default selection leads the rail")
+
+        vm.selectIndex(2)
+        let expected = vm.visibleItems[2]
+        XCTAssertEqual(vm.selectedId, expected.id)
+        XCTAssertEqual(vm.selectedIndex, 2)
+        // Camera pans to the selected pin, span preserved.
+        XCTAssertEqual(vm.cameraTarget?.region.centerLatitude ?? 0, expected.latitude, accuracy: 1e-9)
+        XCTAssertEqual(vm.cameraTarget?.region.centerLongitude ?? 0, expected.longitude, accuracy: 1e-9)
+        XCTAssertEqual(vm.cameraTarget?.region.latitudeSpan ?? 0, 0.024, accuracy: 1e-9)
+    }
+
+    func testPinSelectionUpdatesRailIndexWithoutCameraMove() async {
+        let vm = seeded()
+        await vm.load()
+        let target = vm.visibleItems[3]
+        vm.select(target.id)
+        XCTAssertEqual(vm.selectedIndex, 3)
+        XCTAssertNil(vm.cameraTarget, "Pin taps don't pan — the pin is already on screen")
+    }
+
+    func testSelectIndexOutOfRangeIsIgnored() async {
+        let vm = seeded()
+        await vm.load()
+        let before = vm.selectedId
+        vm.selectIndex(99)
+        XCTAssertEqual(vm.selectedId, before)
+        XCTAssertNil(vm.cameraTarget)
+    }
+
+    // MARK: - Clustering + cluster tap
+
+    func testWideSpanClustersPinsAndClusterTapZoomsOneStep() async {
+        let vm = TasksMapViewModel(anchor: TasksMapSampleData.anchor, seed: TasksMapSampleData.items)
+        await vm.load()
+
+        // City-wide span — every seed pin lands in one ~44pt bucket.
+        vm.cameraSettled(on: region(lat: 40.7484, lon: -73.9857, latSpan: 1.0, lonSpan: 1.0))
+        XCTAssertTrue(vm.mapPins.isEmpty)
+        XCTAssertEqual(vm.mapClusters.count, 1)
+        XCTAssertEqual(vm.mapClusters.first?.count, TasksMapSampleData.items.count)
+
+        // Tap → zoom one step (halve the span) centered on the cluster.
+        let cluster = vm.mapClusters[0]
+        vm.tapCluster(id: cluster.id)
+        XCTAssertEqual(vm.cameraTarget?.region.latitudeSpan ?? 0, 0.5, accuracy: 1e-9)
+        XCTAssertEqual(vm.cameraTarget?.region.longitudeSpan ?? 0, 0.5, accuracy: 1e-9)
+        XCTAssertEqual(vm.cameraTarget?.region.centerLatitude ?? 0, cluster.latitude, accuracy: 1e-9)
+        XCTAssertEqual(vm.cameraTarget?.region.centerLongitude ?? 0, cluster.longitude, accuracy: 1e-9)
+    }
+
+    func testTightZoomKeepsPinsIndividual() async {
+        let vm = TasksMapViewModel(anchor: TasksMapSampleData.anchor, seed: TasksMapSampleData.items)
+        await vm.load()
+        // Tight zoom — every pin pair sits further than the ~44pt
+        // bucket, so the nine seed pins render individually.
+        vm.cameraSettled(on: region(lat: 40.7484, lon: -73.9857, latSpan: 0.008, lonSpan: 0.008))
+        XCTAssertEqual(vm.mapPins.count, TasksMapSampleData.items.count)
+        XCTAssertTrue(vm.mapClusters.isEmpty)
+    }
+
+    // MARK: - Focus on pins
+
+    func testFocusOnPinsFitsCameraToAllPins() async {
+        let vm = seeded()
+        await vm.load()
+        vm.focusOnPins()
+        let regionTarget = vm.cameraTarget?.region
+        XCTAssertNotNil(regionTarget)
+        for item in vm.visibleItems {
+            XCTAssertGreaterThanOrEqual(item.latitude, regionTarget?.minLatitude ?? .infinity)
+            XCTAssertLessThanOrEqual(item.latitude, regionTarget?.maxLatitude ?? -.infinity)
+            XCTAssertGreaterThanOrEqual(item.longitude, regionTarget?.minLongitude ?? .infinity)
+            XCTAssertLessThanOrEqual(item.longitude, regionTarget?.maxLongitude ?? -.infinity)
+        }
+    }
+
+    func testFocusOnPinsIgnoredWhenEmpty() async {
+        let vm = TasksMapViewModel(seed: [])
+        await vm.load()
+        vm.focusOnPins()
+        XCTAssertNil(vm.cameraTarget)
     }
 }

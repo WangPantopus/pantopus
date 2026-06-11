@@ -5,8 +5,14 @@ package app.pantopus.android.ui.screens.shared.map_list_hybrid
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
@@ -26,6 +32,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,25 +41,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.Dash
-import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
-import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
@@ -107,11 +119,23 @@ fun MapListHybridShell(
     recenterTrigger: Int = 0,
     showSearchRadius: Boolean = false,
     onPinTap: (String) -> Unit = {},
+    // A11.1 — cluster markers from the consumer's clustering pass, the
+    // settled-camera report, and token-identified camera requests. All
+    // default to inert so existing callers keep compiling.
+    clusters: List<MapClusterPin> = emptyList(),
+    onClusterTap: (String) -> Unit = {},
+    onCameraChange: (MapListHybridRegion) -> Unit = {},
+    cameraRequest: MapListHybridCameraRequest? = null,
+    // Marker/sheet testTag namespace ("tasksMap" → "tasksMap.pin_<id>");
+    // null keeps the legacy mapListHybrid* ids.
+    markerTagPrefix: String? = null,
+    // Height of the consumer's control stack — the clamp that stops the
+    // 90% detent pushing the controls off the top of the screen.
+    controlsStackHeight: Dp = MAP_CONTROLS_STACK_HEIGHT,
     reduceMotionOverride: Boolean? = null,
     topPill: @Composable () -> Unit = {},
     categoryChips: @Composable () -> Unit = {},
     mapControls: @Composable () -> Unit = {},
-    mapControlsStackHeight: Dp = MAP_CONTROLS_STACK_HEIGHT,
     floatingAction: @Composable () -> Unit = {},
     sheetHeader: @Composable () -> Unit = {},
     sheetBody: @Composable () -> Unit = {},
@@ -151,6 +175,43 @@ fun MapListHybridShell(
         }
     }
 
+    // A11.1 — settled-camera report. Google Maps' isMoving → false edge
+    // stands in for the design's ~350 ms debounce; the projection's
+    // visible bounds become a maps-SDK-free region for the consumer's
+    // "Search this area" machine + clustering pass.
+    LaunchedEffect(cameraState) {
+        snapshotFlow { cameraState.isMoving }
+            .collect { moving ->
+                if (!moving) {
+                    val bounds = cameraState.projection?.visibleRegion?.latLngBounds ?: return@collect
+                    onCameraChange(
+                        MapListHybridRegion(
+                            centerLatitude = (bounds.southwest.latitude + bounds.northeast.latitude) / 2,
+                            centerLongitude = (bounds.southwest.longitude + bounds.northeast.longitude) / 2,
+                            latitudeSpan = bounds.northeast.latitude - bounds.southwest.latitude,
+                            longitudeSpan = bounds.northeast.longitude - bounds.southwest.longitude,
+                        ),
+                    )
+                }
+            }
+    }
+
+    // A11.1 — apply token-identified camera requests (cluster zoom, rail
+    // pan, widen, jump-to-activity, focus-on-pins), animated.
+    LaunchedEffect(cameraRequest?.token) {
+        val request = cameraRequest ?: return@LaunchedEffect
+        val region = request.region
+        cameraState.animate(
+            CameraUpdateFactory.newLatLngBounds(
+                LatLngBounds(
+                    LatLng(region.minLatitude, region.minLongitude),
+                    LatLng(region.maxLatitude, region.maxLongitude),
+                ),
+                0,
+            ),
+        )
+    }
+
     var dragDelta by remember { mutableStateOf(0f) }
 
     BoxWithConstraints(
@@ -175,7 +236,7 @@ fun MapListHybridShell(
         // can't push the stack (e.g. a Post-task FAB) off the top.
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val maxControlsBottom =
-            (containerHeight - statusBarTop - mapControlsStackHeight - SHEET_TO_CONTROLS_GAP)
+            (containerHeight - statusBarTop - controlsStackHeight - SHEET_TO_CONTROLS_GAP)
                 .coerceAtLeast(SHEET_TO_CONTROLS_GAP)
         val maxFabBottom =
             (containerHeight - statusBarTop - FAB_TOP_RESERVE).coerceAtLeast(FAB_LIFT_ABOVE_SHEET)
@@ -185,11 +246,14 @@ fun MapListHybridShell(
         MapLayer(
             cameraState = cameraState,
             pins = pins,
+            clusters = clusters,
             selectedPinId = selectedPinId,
             anchor = anchor,
             showSearchRadius = showSearchRadius,
             reduceMotion = reduceMotion,
             onPinTap = onPinTap,
+            onClusterTap = onClusterTap,
+            markerTagPrefix = markerTagPrefix,
         )
 
         Box(
@@ -255,6 +319,7 @@ fun MapListHybridShell(
             sheetHeader = sheetHeader,
             sheetBody = sheetBody,
             modifier = Modifier.align(Alignment.BottomCenter),
+            tag = markerTagPrefix?.let { "$it.sheet" } ?: "mapListHybridSheet",
         )
     }
 }
@@ -263,11 +328,14 @@ fun MapListHybridShell(
 private fun MapLayer(
     cameraState: CameraPositionState,
     pins: List<MapPin>,
+    clusters: List<MapClusterPin>,
     selectedPinId: String?,
     anchor: MapAnchor?,
     showSearchRadius: Boolean,
     reduceMotion: Boolean,
     onPinTap: (String) -> Unit,
+    onClusterTap: (String) -> Unit,
+    markerTagPrefix: String?,
 ) {
     val mapProperties = remember { MapProperties(isMyLocationEnabled = false) }
     val uiSettings =
@@ -301,19 +369,51 @@ private fun MapLayer(
                     true
                 },
             ) {
-                MapListHybridPinDot(pin = pin, isActive = isActive, reduceMotion = reduceMotion)
+                MapListHybridPinDot(
+                    pin = pin,
+                    isActive = isActive,
+                    reduceMotion = reduceMotion,
+                    tag = markerTagPrefix?.let { "$it.pin_${pin.id}" } ?: "mapListHybridPin_${pin.id}",
+                )
+            }
+        }
+        clusters.forEachIndexed { index, cluster ->
+            val clusterState =
+                remember(cluster.id, cluster.latitude, cluster.longitude) {
+                    MarkerState(position = LatLng(cluster.latitude, cluster.longitude))
+                }
+            MarkerComposable(
+                keys = arrayOf<Any>(cluster.id, cluster.count),
+                state = clusterState,
+                anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+                onClick = {
+                    onClusterTap(cluster.id)
+                    true
+                },
+            ) {
+                MapListHybridClusterDot(
+                    count = cluster.count,
+                    tag = markerTagPrefix?.let { "$it.cluster_$index" } ?: "mapListHybridCluster_$index",
+                )
             }
         }
         if (anchor != null) {
             if (showSearchRadius) {
-                Circle(
-                    center = LatLng(anchor.latitude, anchor.longitude),
-                    fillColor = PantopusColors.primary600.copy(alpha = 0.05f),
-                    radius = 800.0,
-                    strokeColor = PantopusColors.primary600.copy(alpha = 0.45f),
-                    strokePattern = listOf(Dash(12f), Gap(8f)),
-                    strokeWidth = 2f,
-                )
+                // A11.1 — dashed search-radius ring, screen-fixed at
+                // ~220 dp to match the design frame (not a geo circle).
+                val ringState =
+                    remember(anchor.latitude, anchor.longitude) {
+                        MarkerState(position = LatLng(anchor.latitude, anchor.longitude))
+                    }
+                MarkerComposable(
+                    keys = arrayOf<Any>("radiusRing"),
+                    state = ringState,
+                    anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+                ) {
+                    MapListHybridRadiusRing(
+                        tag = markerTagPrefix?.let { "$it.radiusRing" } ?: "mapListHybridRadiusRing",
+                    )
+                }
             }
             val anchorState =
                 remember(anchor.latitude, anchor.longitude) {
@@ -324,9 +424,66 @@ private fun MapLayer(
                 state = anchorState,
                 anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
             ) {
-                MapListHybridAnchorDot()
+                MapListHybridAnchorDot(
+                    tag = markerTagPrefix?.let { "$it.youAreHere" } ?: "mapListHybridAnchor",
+                )
             }
         }
+    }
+}
+
+/** A11.1 — 28dp cluster marker: primary disc, white ring + count. */
+@Composable
+internal fun MapListHybridClusterDot(
+    count: Int,
+    tag: String = "mapListHybridCluster",
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(34.dp)
+                .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.primary600)
+                    .border(2.dp, Color.White, CircleShape)
+                    .shadow(elevation = 2.dp, shape = CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = count.toString(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+        }
+    }
+}
+
+/** A11.1 — dashed search-radius ring (1.5dp dash primary@45%, 5% fill). */
+@Composable
+internal fun MapListHybridRadiusRing(tag: String = "mapListHybridRadiusRing") {
+    val ringColor = PantopusColors.primary600
+    Canvas(
+        modifier =
+            Modifier
+                .size(220.dp)
+                .testTag(tag),
+    ) {
+        drawCircle(color = ringColor.copy(alpha = 0.05f))
+        drawCircle(
+            color = ringColor.copy(alpha = 0.45f),
+            style =
+                Stroke(
+                    width = 1.5.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f)),
+                ),
+        )
     }
 }
 
@@ -338,6 +495,7 @@ private fun BottomSheet(
     sheetHeader: @Composable () -> Unit,
     sheetBody: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    tag: String = "mapListHybridSheet",
 ) {
     val draggable =
         rememberDraggableState { delta -> onDrag(delta) }
@@ -354,7 +512,7 @@ private fun BottomSheet(
                     orientation = Orientation.Vertical,
                     onDragStopped = { velocity -> onDragReleased(velocity) },
                 )
-                .testTag("mapListHybridSheet"),
+                .testTag(tag),
     ) {
         MapListHybridSheetGrabber()
         Box(modifier = Modifier.testTag("mapListHybridSheetHeader")) { sheetHeader() }
@@ -389,37 +547,31 @@ internal fun MapListHybridPinDot(
     pin: MapPin,
     isActive: Boolean,
     reduceMotion: Boolean,
+    tag: String = "mapListHybridPin_${pin.id}",
 ) {
     Box(
         modifier =
             Modifier
-                .size(50.dp)
-                .testTag("mapListHybridPin_${pin.id}"),
+                .size(56.dp)
+                .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
-        // Static double-halo on active selection. Under reduce-motion
-        // we swap the soft halo for a thin static ring so selection
-        // remains visible without animating an infinite pulse.
+        // A11.1 — two pulsing halos behind the selected pin (scale
+        // 0.6→1.6, alpha 0.6→0, 1.6 s ease-out, second layer +0.4 s).
+        // Under reduce-motion the pulse collapses to a thin static ring
+        // so selection remains visible without an infinite animation.
         if (isActive) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(pin.color.copy(alpha = if (reduceMotion) 0f else 0.25f))
-                        .border(
-                            width = if (reduceMotion) 2.dp else 0.dp,
-                            color = if (reduceMotion) pin.color.copy(alpha = 0.45f) else Color.Transparent,
-                            shape = CircleShape,
-                        ),
-            )
-            Box(
-                modifier =
-                    Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(pin.color.copy(alpha = if (reduceMotion) 0f else 0.35f)),
-            )
+            if (reduceMotion) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(46.dp)
+                            .border(2.dp, pin.color.copy(alpha = 0.45f), CircleShape),
+                )
+            } else {
+                MapListHybridPinPulseHalo(color = pin.color, delayMillis = 0)
+                MapListHybridPinPulseHalo(color = pin.color, delayMillis = 400)
+            }
         }
         Box(
             modifier =
@@ -435,20 +587,59 @@ internal fun MapListHybridPinDot(
                     .shadow(elevation = 2.dp, shape = CircleShape),
         )
         if (pin.state == MapPinState.Pending) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(28.dp)
-                        .border(2.dp, pin.color, CircleShape),
-            )
+            // Dashed "pending" outline 2dp outside the dot (A11.1).
+            val pendingColor = pin.color
+            Canvas(modifier = Modifier.size(30.dp)) {
+                drawCircle(
+                    color = pendingColor,
+                    style =
+                        Stroke(
+                            width = 2.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 7f)),
+                        ),
+                )
+            }
         }
     }
 }
 
+/** One animated pulse layer behind the active pin. */
 @Composable
-internal fun MapListHybridAnchorDot() {
+private fun MapListHybridPinPulseHalo(
+    color: Color,
+    delayMillis: Int,
+) {
+    val transition = rememberInfiniteTransition(label = "pinPulse")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1600, easing = androidx.compose.animation.core.EaseOut),
+                repeatMode = RepeatMode.Restart,
+                initialStartOffset = StartOffset(delayMillis),
+            ),
+        label = "pinPulseProgress",
+    )
+    val scale = 0.6f + progress
     Box(
-        modifier = Modifier.size(28.dp),
+        modifier =
+            Modifier
+                .size(34.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = (1f - progress) * 0.6f
+                }
+                .clip(CircleShape)
+                .background(color),
+    )
+}
+
+@Composable
+internal fun MapListHybridAnchorDot(tag: String = "mapListHybridAnchor") {
+    Box(
+        modifier = Modifier.size(28.dp).testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
         Box(

@@ -3,7 +3,9 @@
 package app.pantopus.android.ui.screens.gigs.tasks_map
 
 import androidx.compose.runtime.Immutable
+import app.pantopus.android.ui.screens.gigs.GigCardContent
 import app.pantopus.android.ui.screens.gigs.GigsCategory
+import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapListHybridDetent
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapPin
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapPinState
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -28,6 +30,8 @@ data class TaskMapItem(
     val price: String,
     val distanceLabel: String,
     val bidCount: Int,
+    /** Gig description — feeds the expanded-detent `GigRow` list. */
+    val body: String = "",
 ) {
     /** Projection into the shell's pin model — colour from the gig category
      * swatch, white-ring / dashed-outline treatment from [state]. */
@@ -39,6 +43,53 @@ data class TaskMapItem(
             color = category.color,
             state = state,
         )
+
+    /** Projection into the feed's card model for the expanded-detent
+     * vertical list — same `GigRow` as the Gigs feed. */
+    fun cardContent(): GigCardContent =
+        GigCardContent(
+            id = id,
+            category = category,
+            metaLine = distanceLabel,
+            title = title,
+            body = body,
+            price = price,
+            bidCount = bidCount,
+            distanceLabel = distanceLabel,
+        )
+}
+
+/**
+ * What the sheet body renders at each detent — the design's three-stop
+ * contract: header-only when collapsed, the card rail at the standard
+ * stop, the full vertical `GigRow` list when expanded.
+ */
+enum class TasksMapSheetMode {
+    HeaderOnly,
+    Rail,
+    FullList,
+    ;
+
+    companion object {
+        fun mode(detent: MapListHybridDetent): TasksMapSheetMode =
+            when (detent) {
+                MapListHybridDetent.Collapsed -> HeaderOnly
+                MapListHybridDetent.Standard -> Rail
+                MapListHybridDetent.Expanded -> FullList
+            }
+    }
+}
+
+/**
+ * Secondary CTA in the empty sheet. Ladder: "Widen search" zooms the
+ * camera out ×2.5 and refetches; once a widened refetch comes back
+ * empty AND the backend supplied a `nearest_activity_center`, the
+ * button becomes "Jump to activity".
+ */
+sealed interface TasksMapEmptyAction {
+    data object Widen : TasksMapEmptyAction
+
+    data class JumpToActivity(val latitude: Double, val longitude: Double) : TasksMapEmptyAction
 }
 
 /** Render state for the Tasks map — mirrors the four-state contract. */

@@ -352,6 +352,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     /// Lucide's `square-pen` (pen inside a square frame).
     case squarePen = "square-pen"
 
+    // A11.1 Tasks map — map-control glyphs (`locate-fixed`, `layers`,
+    // `maximize` for fit-all-pins) and the empty-state hero
+    // (`map-pin-off`).
+    case locateFixed = "locate-fixed"
+    case layers
+    case maximize
+    case mapPinOff = "map-pin-off"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -624,6 +632,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .filePlus2: "doc.badge.plus"
         case .fileWarning: "exclamationmark.triangle"
         case .squarePen: "square.and.pencil"
+        case .locateFixed: "scope"
+        case .layers: "square.3.layers.3d"
+        case .maximize: "arrow.up.left.and.arrow.down.right"
+        case .mapPinOff: "mappin.slash"
         }
     }
 }
