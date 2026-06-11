@@ -409,14 +409,185 @@ async function composeEnvironmentalHazards(home) {
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// civic_districts — Census geocoder, layers=all (keyless)
+// ════════════════════════════════════════════════════════════
+// The geocoder returns every elected geography for a point. The
+// contract's `representatives` arrives via a companion source later
+// (§11.4) and ships empty here — the client renders districts alone.
+
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
+// Geography-key prefixes vary by vintage ("119th Congressional
+// Districts", "2024 State Legislative Districts - Upper") — match by
+// suffix pattern, not exact key.
+function districtsFromGeographies(geo) {
+  const find = (re) => {
+    const key = Object.keys(geo).find((k) => re.test(k));
+    const rows = key && geo[key];
+    return rows && rows.length ? rows[0] : null;
+  };
+
+  const out = [];
+  const state = find(/^States$/);
+  const stateName = (state && state.NAME) || null;
+
+  const cd = find(/Congressional Districts$/);
+  if (cd && cd.NAME) {
+    const num = Number(String(cd.BASENAME || '').replace(/\D/g, ''));
+    const atLarge = !Number.isFinite(num) || num === 0 || num >= 98;
+    out.push({
+      level: 'federal',
+      office_label: 'U.S. House',
+      name: stateName
+        ? (atLarge ? `${stateName} At-Large District` : `${stateName}'s ${ordinal(num)} District`)
+        : cd.NAME,
+    });
+  }
+  const sldu = find(/State Legislative Districts - Upper/);
+  if (sldu && sldu.NAME) out.push({ level: 'state', office_label: 'State Senate', name: sldu.NAME });
+  const sldl = find(/State Legislative Districts - Lower/);
+  if (sldl && sldl.NAME) out.push({ level: 'state', office_label: 'State House', name: sldl.NAME });
+  const county = find(/^Counties$/);
+  if (county && county.NAME) out.push({ level: 'county', office_label: 'County', name: county.NAME });
+  const place = find(/^Incorporated Places$/);
+  if (place && place.NAME) {
+    out.push({ level: 'city', office_label: 'City', name: place.NAME.replace(/\s+(city|town|village|borough)$/i, '') });
+  }
+  const school = find(/Unified School Districts$/);
+  if (school && school.NAME) out.push({ level: 'school', office_label: 'School district', name: school.NAME });
+
+  return out;
+}
+
+async function composeCivicDistricts(home) {
+  const ll = homeLatLng(home);
+  if (!ll) return [serializePlaceSection('civic_districts', { status: 'unavailable' })];
+  try {
+    const gh6 = encodeGeohash(ll.lat, ll.lng, 6);
+    const { payload, fetchedAt, stale } = await readThrough({
+      cacheKey: `geo:${gh6}`,
+      sectionId: 'civic_districts',
+      ttlMs: 90 * DAY_MS,
+      fetch: async () => {
+        const data = await fetchJson(
+          'https://geocoding.geo.census.gov/geocoder/geographies/coordinates' +
+          `?x=${ll.lng}&y=${ll.lat}&benchmark=Public_AR_Current&vintage=Current_Current&layers=all&format=json`,
+        );
+        const geo = data && data.result && data.result.geographies;
+        if (!geo) return null;
+        const districts = districtsFromGeographies(geo);
+        if (!districts.length) return null;
+        return { districts, representatives: [] };
+      },
+    });
+    if (!payload) return [serializePlaceSection('civic_districts', { status: 'unavailable' })];
+    return [serializePlaceSection('civic_districts', {
+      asOf: fetchedAt,
+      status: stale ? 'stale' : 'ready',
+      source: 'U.S. Census Bureau geocoder',
+      data: payload,
+    })];
+  } catch (err) {
+    logger.warn('placeSections: civic_districts failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('civic_districts', { status: 'error' })];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// civic_election — Google Civic Information API (key-gated)
+// ════════════════════════════════════════════════════════════
+// Seasonal by design: off-season (or with no key / no upcoming election
+// for the home's state) the section is `unavailable` while districts
+// stay ready. Enable the "Google Civic Information API" on the existing
+// Google Cloud project and set GOOGLE_CIVIC_API_KEY to light this up.
+const STATE_NAMES = {
+  AL: 'alabama', AK: 'alaska', AZ: 'arizona', AR: 'arkansas', CA: 'california', CO: 'colorado',
+  CT: 'connecticut', DE: 'delaware', DC: 'district of columbia', FL: 'florida', GA: 'georgia',
+  HI: 'hawaii', ID: 'idaho', IL: 'illinois', IN: 'indiana', IA: 'iowa', KS: 'kansas', KY: 'kentucky',
+  LA: 'louisiana', ME: 'maine', MD: 'maryland', MA: 'massachusetts', MI: 'michigan', MN: 'minnesota',
+  MS: 'mississippi', MO: 'missouri', MT: 'montana', NE: 'nebraska', NV: 'nevada', NH: 'new hampshire',
+  NJ: 'new jersey', NM: 'new mexico', NY: 'new york', NC: 'north carolina', ND: 'north dakota',
+  OH: 'ohio', OK: 'oklahoma', OR: 'oregon', PA: 'pennsylvania', RI: 'rhode island', SC: 'south carolina',
+  SD: 'south dakota', TN: 'tennessee', TX: 'texas', UT: 'utah', VT: 'vermont', VA: 'virginia',
+  WA: 'washington', WV: 'west virginia', WI: 'wisconsin', WY: 'wyoming',
+};
+
+function electionMatchesState(election, stateAbbr) {
+  const ocd = String(election.ocdDivisionId || '');
+  if (ocd === 'ocd-division/country:us') return true; // national
+  const name = STATE_NAMES[String(stateAbbr || '').toUpperCase()];
+  return Boolean(name && ocd.includes(`state:${stateAbbr.toLowerCase()}`));
+}
+
+async function composeCivicElection(home) {
+  const apiKey = process.env.GOOGLE_CIVIC_API_KEY;
+  if (!apiKey) {
+    return [serializePlaceSection('civic_election', {
+      status: 'unavailable',
+      unavailableReason: 'Election data is not configured yet.',
+    })];
+  }
+  try {
+    const { payload, fetchedAt, stale } = await readThrough({
+      cacheKey: `state:${String(home.state || 'us').toLowerCase()}`,
+      sectionId: 'civic_election',
+      ttlMs: DAY_MS,
+      fetch: async () => {
+        const data = await fetchJson(
+          `https://civicinfo.googleapis.com/civicinfo/v2/elections?key=${apiKey}`,
+        );
+        const now = Date.now();
+        const upcoming = (data.elections || [])
+          .filter((e) => e.id !== '2000') // Google's VIP Test Election
+          .filter((e) => Date.parse(e.electionDay) >= now - DAY_MS)
+          .filter((e) => electionMatchesState(e, home.state))
+          .sort((a, b) => Date.parse(a.electionDay) - Date.parse(b.electionDay));
+        if (!upcoming.length) return null;
+        const next = upcoming[0];
+        return { name: next.name, date: next.electionDay };
+      },
+    });
+    if (!payload) {
+      return [serializePlaceSection('civic_election', {
+        status: 'unavailable',
+        unavailableReason: 'No upcoming election on the calendar for your area.',
+      })];
+    }
+    const daysUntil = Math.max(0, Math.ceil((Date.parse(payload.date) - Date.now()) / DAY_MS));
+    return [serializePlaceSection('civic_election', {
+      asOf: fetchedAt,
+      status: stale ? 'stale' : 'ready',
+      data: {
+        name: payload.name,
+        date: payload.date,
+        days_until: daysUntil,
+        polling_place: null, // voterInfoQuery lands with the ballot wave
+        ballot: [],
+      },
+    })];
+  } catch (err) {
+    logger.warn('placeSections: civic_election failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('civic_election', { status: 'error' })];
+  }
+}
+
 module.exports = {
   composeSunriseSunset,
   composeLeadRadon,
   composeRentBand,
   composeDrinkingWater,
   composeEnvironmentalHazards,
+  composeCivicDistricts,
+  composeCivicElection,
   // Exported for testing.
   leadRiskForYear,
   haversineMiles,
   stripCountySuffix,
+  districtsFromGeographies,
+  ordinal,
 };

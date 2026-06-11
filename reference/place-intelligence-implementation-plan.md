@@ -138,7 +138,16 @@ Decide: give health_environment its own detail page or fold into Risk — small 
 
 ---
 
-## Phase 3 — Civic (#5)
+## Phase 3 — Civic ✅ DONE (2026-06-11, on `feature/place-web`)
+
+> **civic_districts** is live and KEYLESS: the Census Bureau geocoder (`layers=all`) returns the full elected
+> ladder per point — U.S. House (rendered "Washington's 3rd District"), State Senate/House, county, city, school
+> district — cached 90 d per geohash-6; `representatives` ships empty per the contract (companion source later).
+> **civic_election** is wired to Google Civic (`/elections`, state-matched via ocdDivisionId, 1 d cache by state)
+> but key-gated: the Google Cloud project doesn't have the Civic Information API enabled (probed: 403). To light it
+> up: enable "Google Civic Information API" on the existing project + set `GOOGLE_CIVIC_API_KEY`. Until then the
+> section renders the designed off-season state ("No upcoming election"). polling_place/ballot (voterInfoQuery)
+> land with the key. Verified live: Camas home → all 6 districts + graceful election state in CivicDetail.
 
 - **civic_districts**: Google Civic Information API — **verify current API status first** (representatives endpoint was
   deprecated; districts/divisions still live). Fallback: Cicero (paid) or OpenStates (state level). Cache 90 d.

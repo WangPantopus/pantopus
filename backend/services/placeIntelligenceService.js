@@ -436,8 +436,8 @@ async function composeBillBenchmark(home) {
 // `?sections=` subset request only runs (and only pays for) the
 // composers it actually needs.
 //
-// Still BUILD_PENDING: `incentives` (DSIRE's API is license-gated;
-// curated federal copy would rot) and the civic pair (Phase 3).
+// Still BUILD_PENDING: `incentives` only (DSIRE's API is license-gated;
+// curated federal copy would rot).
 const COMPOSER_SECTIONS = [
   { ids: ['weather', 'air_quality', 'alerts'], run: ({ userId }) => composeToday(userId) },
   { ids: ['sunrise_sunset'], run: ({ home }) => placeSectionAdapters.composeSunriseSunset(home) },
@@ -449,6 +449,8 @@ const COMPOSER_SECTIONS = [
   { ids: ['your_home'], run: ({ home, tier }) => composeYourHome(home, tier) },
   { ids: ['bill_benchmark'], run: ({ home }) => composeBillBenchmark(home) },
   { ids: ['rent_band'], run: ({ home }) => placeSectionAdapters.composeRentBand(home) },
+  { ids: ['civic_districts'], run: ({ home }) => placeSectionAdapters.composeCivicDistricts(home) },
+  { ids: ['civic_election'], run: ({ home }) => placeSectionAdapters.composeCivicElection(home) },
 ];
 
 // ── Per-home privacy → the place address ref (§ homePrivacy) ──

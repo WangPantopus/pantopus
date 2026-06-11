@@ -165,16 +165,16 @@ describe('GET /api/homes/:id/intelligence', () => {
     expect(s.bill_benchmark.data.band_low).toBe(165);
     expect(s.bill_benchmark.data.band_high).toBe(210);
 
-    // Not-yet-wired launch sections degrade independently to unavailable
-    // (civic lands in Phase 3; incentives is license-gated).
-    expect(s.civic_election.status).toBe('unavailable');
-    expect(s.civic_districts.status).toBe('unavailable');
+    // Not-yet-wired launch sections degrade independently to unavailable:
+    // incentives is license-gated (DSIRE), and civic_election is key-gated
+    // (GOOGLE_CIVIC_API_KEY is unset in tests).
     expect(s.incentives.status).toBe('unavailable');
+    expect(s.civic_election.status).toBe('unavailable');
 
-    // Phase-2 sections are wired: whatever the mocked providers yield,
+    // Phase-2/3 sections are wired: whatever the mocked providers yield,
     // each is present with a valid envelope status and can never sink
     // the response (section-level degradation).
-    for (const id of ['lead_radon', 'sunrise_sunset', 'rent_band', 'drinking_water', 'environmental_hazards']) {
+    for (const id of ['lead_radon', 'sunrise_sunset', 'rent_band', 'drinking_water', 'environmental_hazards', 'civic_districts']) {
       expect(s[id]).toBeDefined();
       expect(['ready', 'partial', 'stale', 'unavailable', 'error']).toContain(s[id].status);
     }
