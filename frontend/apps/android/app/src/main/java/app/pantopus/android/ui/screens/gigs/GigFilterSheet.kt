@@ -34,6 +34,18 @@ enum class GigScheduleFilter(
     Flexible("flexible", "Flexible"),
     ;
 
+    /**
+     * P0.4 — wire value sent as the `schedule_type` query param when this
+     * bucket is the only one selected (the backend takes a single value).
+     */
+    val backendValue: String
+        get() =
+            when (this) {
+                OneTime -> "scheduled"
+                Recurring -> "recurring"
+                Flexible -> "flexible"
+            }
+
     companion object {
         fun fromKey(key: String?): GigScheduleFilter? = entries.firstOrNull { it.key == key }
 

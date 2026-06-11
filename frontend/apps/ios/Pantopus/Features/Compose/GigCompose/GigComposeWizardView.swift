@@ -11,6 +11,7 @@
 
 // swiftlint:disable file_length
 
+import PhotosUI
 import SwiftUI
 
 /// Pushed onto a tab stack from the Gigs FAB (Hub) and the You tab's
@@ -136,6 +137,8 @@ public struct GigComposeWizardView: View {
 
 private struct BasicsStep: View {
     @Bindable var viewModel: GigComposeViewModel
+    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var showsPhotosPicker = false
 
     var body: some View {
         HeadlineBlock("Describe the task")
@@ -154,15 +157,37 @@ private struct BasicsStep: View {
                 max: GigComposeLimits.descriptionMax
             )
         }
+        // P15.5 — real photo pipeline: PhotosPicker selection → immediate
+        // background upload per photo with per-tile state (spinner /
+        // tap-to-retry / uploaded). First photo is the cover.
         PhotoSlotsRow(
-            count: viewModel.form.photoIds.count,
+            attachments: viewModel.attachments,
             max: GigComposeLimits.maxPhotos,
-            // E.1 — the add tile opens the attachment-source sheet
-            // (camera / library / file). Each source mints a placeholder
-            // attachment until the real upload pipeline lands in P15.5.
-            onAddPlaceholder: { viewModel.presentPicker(.attachment) },
-            onRemove: viewModel.removePhoto(at:)
+            onAdd: { showsPhotosPicker = true },
+            onRetry: { viewModel.retryUpload(id: $0) },
+            onRemove: { viewModel.removeAttachment(id: $0) }
         )
+        .photosPicker(
+            isPresented: $showsPhotosPicker,
+            selection: $pickerItems,
+            maxSelectionCount: max(1, GigComposeLimits.maxPhotos - viewModel.attachments.count),
+            matching: .images
+        )
+        .onChange(of: pickerItems) { _, newItems in
+            handlePicked(newItems)
+        }
+    }
+
+    private func handlePicked(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self), !data.isEmpty {
+                    viewModel.addPhotoData(data)
+                }
+            }
+            pickerItems = []
+        }
     }
 
     private var titleBinding: Binding<String> {
@@ -221,38 +246,37 @@ private struct CharacterCounter: View {
 }
 
 private struct PhotoSlotsRow: View {
-    let count: Int
+    let attachments: [GigComposeAttachment]
     let max: Int
-    let onAddPlaceholder: () -> Void
-    let onRemove: (Int) -> Void
+    let onAdd: () -> Void
+    let onRetry: (String) -> Void
+    let onRemove: (String) -> Void
+
+    private var hasUploading: Bool {
+        attachments.contains { $0.status == .uploading }
+    }
+
+    private var hasFailed: Bool {
+        attachments.contains { $0.status == .failed }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text("Photos & files (optional, up to \(max))")
+            Text("Photos (optional, up to \(max))")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             HStack(spacing: Spacing.s2) {
-                ForEach(0..<count, id: \.self) { index in
-                    Button {
-                        onRemove(index)
-                    } label: {
-                        ZStack(alignment: .topTrailing) {
-                            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                                .fill(Theme.Color.primary50)
-                                .frame(width: 64, height: 64)
-                                .overlay(
-                                    Icon(.camera, size: 22, color: Theme.Color.primary600)
-                                )
-                            Icon(.x, size: 14, color: Theme.Color.appText)
-                                .padding(Spacing.s1)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("composeGig_photo_\(index)")
-                    .accessibilityLabel("Remove photo \(index + 1)")
+                ForEach(Array(attachments.enumerated()), id: \.element.id) { index, attachment in
+                    GigPhotoTile(
+                        attachment: attachment,
+                        isCover: index == 0,
+                        index: index,
+                        onRetry: { onRetry(attachment.id) },
+                        onRemove: { onRemove(attachment.id) }
+                    )
                 }
-                if count < max {
-                    Button(action: onAddPlaceholder) {
+                if attachments.count < max {
+                    Button(action: onAdd) {
                         RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                             .stroke(Theme.Color.appBorder, style: StrokeStyle(lineWidth: 1, dash: [4]))
                             .frame(width: 64, height: 64)
@@ -264,6 +288,102 @@ private struct PhotoSlotsRow: View {
                 }
                 Spacer(minLength: Spacing.s0)
             }
+            if hasUploading {
+                Text("Uploading photos… you can continue once they finish.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.warning)
+                    .accessibilityIdentifier("composeGig_uploadingHint")
+            } else if hasFailed {
+                Text("A photo failed to upload — tap it to retry, or remove it.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.error)
+                    .accessibilityIdentifier("composeGig_uploadFailedHint")
+            }
+        }
+    }
+}
+
+/// One 64×64 photo tile — uploading spinner / failed tap-to-retry /
+/// uploaded thumbnail (first tile carries the "Cover" badge).
+private struct GigPhotoTile: View {
+    let attachment: GigComposeAttachment
+    let isCover: Bool
+    let index: Int
+    let onRetry: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            tileBody
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            Button(action: onRemove) {
+                Icon(.x, size: 12, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
+                    .frame(width: 18, height: 18)
+                    .background(Circle().fill(Color.black.opacity(0.55)))
+            }
+            .buttonStyle(.plain)
+            .padding(2)
+            .accessibilityLabel("Remove photo \(index + 1)")
+        }
+        .overlay(alignment: .bottomLeading) {
+            if isCover, attachment.uploadedURL != nil {
+                Text("Cover")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .padding(.horizontal, Spacing.s1)
+                    .padding(.vertical, 1)
+                    .background(Color.black.opacity(0.55))
+                    .clipShape(Capsule())
+                    .padding(3)
+            }
+        }
+        .accessibilityIdentifier("composeGig_photo_\(index)")
+        .accessibilityLabel(accessibilityText)
+    }
+
+    @ViewBuilder private var tileBody: some View {
+        switch attachment.status {
+        case .uploading:
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .fill(Theme.Color.appSurfaceSunken)
+                .overlay(ProgressView().tint(Theme.Color.primary600))
+        case .failed:
+            Button(action: onRetry) {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(Theme.Color.errorBg)
+                    .overlay(
+                        VStack(spacing: 2) {
+                            Icon(.alertCircle, size: 16, strokeWidth: 2.4, color: Theme.Color.error)
+                            Text("Retry")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.Color.error)
+                        }
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("composeGig_retryPhoto_\(index)")
+        case .uploaded:
+            if let uiImage = UIImage(data: attachment.imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 64, height: 64)
+            } else {
+                // Restored-from-SceneStorage attachments carry no bytes —
+                // render the generic photo glyph over the primary tint.
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(Theme.Color.primary50)
+                    .overlay(Icon(.image, size: 22, color: Theme.Color.primary600))
+            }
+        }
+    }
+
+    private var accessibilityText: String {
+        switch attachment.status {
+        case .uploading: "Photo \(index + 1), uploading"
+        case .failed: "Photo \(index + 1), upload failed, tap to retry"
+        case .uploaded: "Photo \(index + 1)\(isCover ? ", cover" : ""), uploaded"
         }
     }
 }

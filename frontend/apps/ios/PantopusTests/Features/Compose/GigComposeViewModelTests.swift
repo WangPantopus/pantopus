@@ -28,10 +28,18 @@ final class GigComposeViewModelTests: XCTestCase {
         )
     }
 
+    private func makeUploader() -> MultipartUploader {
+        MultipartUploader(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession()
+        )
+    }
+
     /// Centralised constructor that injects an "always online" stub.
     private func makeVM(initialState: GigComposeFormState = .empty) -> GigComposeViewModel {
         GigComposeViewModel(
             api: makeAPI(),
+            uploader: makeUploader(),
             location: FixedLocationProvider(
                 UserCoordinate(latitude: 40.7484, longitude: -73.9857, accuracyMeters: 100)
             ),
@@ -133,12 +141,15 @@ final class GigComposeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.form.title.count, GigComposeLimits.titleMax)
     }
 
-    func testPhotoCapEnforcedOnAdd() {
+    func testPhotoCapEnforcedOnAdd() async {
         let vm = makeVM(initialState: GigComposeFormState(step: GigComposeStep.basics.rawValue, category: .handyman))
         for _ in 0..<GigComposeLimits.maxPhotos + 3 {
-            vm.addPhoto("placeholder://photo")
+            vm.addPhotoData(Data([0x1]))
         }
-        XCTAssertEqual(vm.form.photoIds.count, GigComposeLimits.maxPhotos)
+        XCTAssertEqual(vm.attachments.count, GigComposeLimits.maxPhotos)
+        // Let the kicked uploads settle (599 stub → .failed) so no task
+        // outlives the test.
+        await vm.awaitUploadsForTesting()
     }
 
     // MARK: - Step 3 — Budget validation

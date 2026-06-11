@@ -85,6 +85,8 @@ import java.util.Locale
 internal fun GigComposePickerSheetHost(
     state: GigComposeUiState,
     viewModel: GigComposeViewModel,
+    onPickPhoto: () -> Unit = {},
+    onPickFile: () -> Unit = {},
 ) {
     val sheet = state.activeSheet ?: return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -94,7 +96,8 @@ internal fun GigComposePickerSheetHost(
         containerColor = PantopusColors.appSurface,
     ) {
         when (sheet) {
-            GigPickerSheet.Attachment -> AttachmentSheetContent(viewModel)
+            GigPickerSheet.Attachment ->
+                AttachmentSheetContent(viewModel, onPickPhoto = onPickPhoto, onPickFile = onPickFile)
             GigPickerSheet.Category -> CategorySheetContent(state, viewModel)
             GigPickerSheet.Deadline -> DeadlineSheetContent(state, viewModel)
             GigPickerSheet.Policy -> PolicySheetContent(state, viewModel)
@@ -689,12 +692,22 @@ private fun SuggestionChipView(
 // ─── Sheet 5: Attachment source ───────────────────────────────────
 
 @Composable
-private fun AttachmentSheetContent(vm: GigComposeViewModel) {
-    // Real upload lands in P15.5 — each source mints a placeholder
-    // attachment so the cap + count behaviour stays exercisable.
-    fun add() {
-        vm.addPlaceholderPhoto()
+private fun AttachmentSheetContent(
+    vm: GigComposeViewModel,
+    onPickPhoto: () -> Unit,
+    onPickFile: () -> Unit,
+) {
+    // P0.2 — sources launch the host's system pickers; the picked bytes
+    // upload immediately via the VM. "Take a photo" routes through the
+    // visual-media picker too (dedicated camera capture is a follow-up).
+    fun pickPhoto() {
         vm.dismissPicker()
+        onPickPhoto()
+    }
+
+    fun pickFile() {
+        vm.dismissPicker()
+        onPickFile()
     }
     Column(
         modifier =
@@ -732,7 +745,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.primary600,
                 container = PantopusColors.primary50,
                 testTag = "gigPicker.attach.photos",
-            ) { add() }
+            ) { pickPhoto() }
             HorizontalDivider(color = PantopusColors.appBorderSubtle, modifier = Modifier.padding(start = 70.dp))
             AttachmentActionRow(
                 icon = PantopusIcon.Image,
@@ -741,7 +754,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.success,
                 container = PantopusColors.successBg,
                 testTag = "gigPicker.attach.library",
-            ) { add() }
+            ) { pickPhoto() }
             HorizontalDivider(color = PantopusColors.appBorderSubtle, modifier = Modifier.padding(start = 70.dp))
             AttachmentActionRow(
                 icon = PantopusIcon.FileText,
@@ -750,7 +763,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.magic,
                 container = PantopusColors.magicBg,
                 testTag = "gigPicker.attach.file",
-            ) { add() }
+            ) { pickFile() }
         }
         Box(
             modifier =

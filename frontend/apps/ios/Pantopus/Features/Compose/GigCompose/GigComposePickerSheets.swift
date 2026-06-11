@@ -9,9 +9,11 @@
 //  options, and an optional confirm affordance, presented from
 //  `GigComposeWizardView` via `.sheet(item:)`.
 //
-//  Six sheets: Attachment source · Category · Deadline · Cancellation
-//  policy · Urgency · Tags. Results bind straight back into
-//  `GigComposeViewModel` / `GigComposeFormState`.
+//  Five sheets: Category · Deadline · Cancellation policy · Urgency ·
+//  Tags. Results bind straight back into `GigComposeViewModel` /
+//  `GigComposeFormState`. (The former attachment-source sheet was
+//  retired in P15.5 — the Basics step now opens the system PhotosPicker
+//  directly and uploads for real via `POST /api/files/upload`.)
 //
 
 import SwiftUI
@@ -22,7 +24,6 @@ import SwiftUI
 
 /// The composer picker sheets, presented one-at-a-time over the wizard.
 public enum GigPickerSheet: String, Identifiable, CaseIterable, Sendable {
-    case attachment
     case category
     case deadline
     case policy
@@ -37,7 +38,7 @@ public enum GigPickerSheet: String, Identifiable, CaseIterable, Sendable {
     var detents: Set<PresentationDetent> {
         switch self {
         case .deadline: [.large]
-        case .attachment, .urgency: [.medium]
+        case .urgency: [.medium]
         case .category, .policy, .tags: [.medium, .large]
         }
     }
@@ -54,7 +55,6 @@ struct GigPickerSheetHost: View {
     var body: some View {
         Group {
             switch sheet {
-            case .attachment: GigAttachmentSheet(viewModel: viewModel)
             case .category: GigCategorySheet(viewModel: viewModel)
             case .deadline: GigDeadlineSheet(viewModel: viewModel)
             case .policy: GigPolicySheet(viewModel: viewModel)
@@ -792,144 +792,7 @@ private struct SuggestionChip: View {
     }
 }
 
-// MARK: - Sheet 5: Attachment source
-
-private struct GigAttachmentSheet: View {
-    let viewModel: GigComposeViewModel
-
-    var body: some View {
-        VStack(spacing: Spacing.s2) {
-            SheetGrabHandle()
-            VStack(spacing: Spacing.s0) {
-                header
-                AttachmentActionRow(
-                    icon: .camera,
-                    label: "Take a photo",
-                    subtitle: "Use the camera now",
-                    tint: Theme.Color.primary600,
-                    background: Theme.Color.primary50,
-                    identifier: "gigPicker.attach.photos"
-                ) { add(prefix: "photo") }
-                rowDivider
-                AttachmentActionRow(
-                    icon: .image,
-                    label: "Photo library",
-                    subtitle: "Choose existing photos",
-                    tint: Theme.Color.success,
-                    background: Theme.Color.successBg,
-                    identifier: "gigPicker.attach.library"
-                ) { add(prefix: "photo") }
-                rowDivider
-                AttachmentActionRow(
-                    icon: .fileText,
-                    label: "Choose a file",
-                    subtitle: "PDF, doc, or spreadsheet",
-                    tint: Theme.Color.magic,
-                    background: Theme.Color.magicBg,
-                    identifier: "gigPicker.attach.file"
-                ) { add(prefix: "file") }
-            }
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous)
-                    .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-            )
-            cancelButton
-        }
-        .padding(.horizontal, Spacing.s2)
-        .padding(.bottom, Spacing.s3)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Theme.Color.appSurface)
-        .accessibilityIdentifier("gigPicker.attachmentSheet")
-    }
-
-    private var header: some View {
-        VStack(spacing: 2) {
-            Text("Add a photo or file")
-                .font(.system(size: 13.5, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-            Text("Up to \(GigComposeLimits.maxPhotos) attachments · 10 MB each")
-                .font(.system(size: 11.5))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.s3)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-        }
-    }
-
-    private var rowDivider: some View {
-        Rectangle()
-            .fill(Theme.Color.appBorderSubtle)
-            .frame(height: 1)
-            .padding(.leading, 70)
-    }
-
-    private var cancelButton: some View {
-        Button(action: viewModel.dismissPicker) {
-            Text("Cancel")
-                .font(.system(size: 15.5, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Spacing.s3 + 3)
-                .background(Theme.Color.appSurface)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous)
-                        .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Real upload lands in P15.5 — minting a placeholder URL keeps the cap
-    /// + count behaviour exercisable and binds straight into `attachments`.
-    private func add(prefix: String) {
-        viewModel.addPhoto("placeholder://\(prefix)/\(UUID().uuidString)")
-        viewModel.dismissPicker()
-    }
-}
-
-private struct AttachmentActionRow: View {
-    let icon: PantopusIcon
-    let label: String
-    let subtitle: String
-    let tint: Color
-    let background: Color
-    let identifier: String
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Spacing.s4 - 2) {
-                Icon(icon, size: 20, color: tint)
-                    .frame(width: 40, height: 40)
-                    .background(background)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg - 1, style: .continuous))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(label)
-                        .font(.system(size: 15.5, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Spacer(minLength: Spacing.s0)
-                Icon(.chevronRight, size: 18, color: Theme.Color.appTextMuted)
-            }
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, Spacing.s4 - 1)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(identifier)
-        .accessibilityLabel("\(label). \(subtitle)")
-    }
-}
-
-// MARK: - Sheet 6: Category
+// MARK: - Sheet 5: Category
 
 private struct GigCategorySheet: View {
     let viewModel: GigComposeViewModel

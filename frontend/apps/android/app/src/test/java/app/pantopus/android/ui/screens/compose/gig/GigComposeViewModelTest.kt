@@ -6,8 +6,10 @@ import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
@@ -36,6 +38,7 @@ import java.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigComposeViewModelTest {
     private val repo: GigsRepository = mockk(relaxed = true)
+    private val filesRepo: FilesRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor =
         mockk<NetworkMonitor>(relaxed = true).also {
             every { it.isOnline } returns MutableStateFlow(true)
@@ -52,7 +55,16 @@ class GigComposeViewModelTest {
     }
 
     private fun makeVm(savedStateHandle: SavedStateHandle = SavedStateHandle()) =
-        GigComposeViewModel(repo, savedStateHandle, networkMonitor)
+        GigComposeViewModel(repo, savedStateHandle, networkMonitor, filesRepo)
+
+    private fun pickedPhoto(name: String = "photo.jpg") =
+        GigComposePickedPhoto(filename = name, mimeType = "image/jpeg", bytes = byteArrayOf(1, 2, 3))
+
+    private fun stubUploadSuccess(url: String = "https://cdn.pantopus.app/gig.jpg") {
+        coEvery {
+            filesRepo.uploadFile(any(), any(), any(), any(), any())
+        } returns NetworkResult.Success(FileUploadResponse(message = "ok", file = FileUploadResponse.FileRef("f1", url)))
+    }
 
     private val createGigResponse =
         CreateGigResponse(
@@ -97,7 +109,7 @@ class GigComposeViewModelTest {
                     "composeGig.locationMode" to "YourAddress",
                 ),
             )
-        return GigComposeViewModel(repo, handle, networkMonitor)
+        return GigComposeViewModel(repo, handle, networkMonitor, filesRepo)
     }
 
     // MARK: - Initial chrome
@@ -172,11 +184,98 @@ class GigComposeViewModelTest {
     }
 
     @Test
-    fun photo_cap_enforced_on_add() {
-        val vm = makeVm()
-        repeat(GigComposeLimits.MAX_PHOTOS + 3) { vm.addPlaceholderPhoto() }
-        assertEquals(GigComposeLimits.MAX_PHOTOS, vm.state.value.form.photoIds.size)
-    }
+    fun photo_cap_enforced_on_add() =
+        runTest {
+            stubUploadSuccess()
+            val vm = makeVm()
+            repeat(GigComposeLimits.MAX_PHOTOS + 3) { vm.addPickedPhoto(pickedPhoto()) }
+            advanceTimeBy(50)
+            assertEquals(GigComposeLimits.MAX_PHOTOS, vm.state.value.form.photoIds.size)
+            assertTrue(vm.state.value.photoUploads.isEmpty())
+        }
+
+    // MARK: - P0.2 Photo upload pipeline
+
+    @Test
+    fun picked_photo_uploads_and_lands_as_url() =
+        runTest {
+            stubUploadSuccess(url = "https://cdn.pantopus.app/abc.jpg")
+            val vm = makeVm()
+            vm.addPickedPhoto(pickedPhoto())
+            advanceTimeBy(50)
+            assertEquals(listOf("https://cdn.pantopus.app/abc.jpg"), vm.state.value.form.photoIds)
+            assertTrue("Tile graduates out of the upload list.", vm.state.value.photoUploads.isEmpty())
+        }
+
+    @Test
+    fun failed_upload_marks_tile_and_retry_succeeds() =
+        runTest {
+            coEvery {
+                filesRepo.uploadFile(any(), any(), any(), any(), any())
+            } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.addPickedPhoto(pickedPhoto())
+            advanceTimeBy(50)
+            val failedTile = vm.state.value.photoUploads.single()
+            assertTrue("Tile flips to failed on upload error.", failedTile.failed)
+            assertTrue(vm.state.value.form.photoIds.isEmpty())
+
+            stubUploadSuccess(url = "https://cdn.pantopus.app/retry.jpg")
+            vm.retryPhotoUpload(failedTile.id)
+            advanceTimeBy(50)
+            assertEquals(listOf("https://cdn.pantopus.app/retry.jpg"), vm.state.value.form.photoIds)
+            assertTrue(vm.state.value.photoUploads.isEmpty())
+        }
+
+    @Test
+    fun remove_failed_upload_drops_tile() =
+        runTest {
+            coEvery {
+                filesRepo.uploadFile(any(), any(), any(), any(), any())
+            } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.addPickedPhoto(pickedPhoto())
+            advanceTimeBy(50)
+            val tile = vm.state.value.photoUploads.single()
+            vm.removePhotoUpload(tile.id)
+            assertTrue(vm.state.value.photoUploads.isEmpty())
+        }
+
+    @Test
+    fun uploads_in_flight_disable_continue_on_basics() =
+        runTest {
+            coEvery { filesRepo.uploadFile(any(), any(), any(), any(), any()) } coAnswers {
+                kotlinx.coroutines.delay(1_000)
+                NetworkResult.Success(
+                    FileUploadResponse(message = "ok", file = FileUploadResponse.FileRef("f1", "https://cdn/x.jpg")),
+                )
+            }
+            val vm = makeVm()
+            vm.selectCategory(GigComposeCategory.Handyman)
+            vm.onPrimary()
+            advanceTimeBy(10)
+            vm.setTitle("Hang 3 shelves")
+            vm.setDescription("Need three IKEA Lack shelves mounted on drywall.")
+            assertTrue(vm.chrome.primaryCtaEnabled)
+            vm.addPickedPhoto(pickedPhoto())
+            assertFalse(
+                "Continue must be disabled while the upload is in flight.",
+                vm.chrome.primaryCtaEnabled,
+            )
+            advanceTimeBy(1_100)
+            assertTrue(vm.chrome.primaryCtaEnabled)
+        }
+
+    @Test
+    fun uploaded_urls_ride_create_body_attachments() =
+        runTest {
+            stubUploadSuccess(url = "https://cdn.pantopus.app/cover.jpg")
+            val vm = makeVm()
+            seedReviewReady(vm)
+            vm.addPickedPhoto(pickedPhoto())
+            advanceTimeBy(50)
+            assertEquals(listOf("https://cdn.pantopus.app/cover.jpg"), vm.buildCreateBody()?.attachments)
+        }
 
     // MARK: - Budget validation
 
@@ -379,7 +478,7 @@ class GigComposeViewModelTest {
                     "composeGig.budgetMin" to "180",
                 ),
             )
-        val vm = GigComposeViewModel(repo, handle, networkMonitor)
+        val vm = GigComposeViewModel(repo, handle, networkMonitor, filesRepo)
         assertEquals(GigComposeStep.Budget, vm.state.value.form.currentStep)
         assertEquals(GigComposeCategory.Cleaning, vm.state.value.form.category)
         assertEquals("Deep clean", vm.state.value.form.title)

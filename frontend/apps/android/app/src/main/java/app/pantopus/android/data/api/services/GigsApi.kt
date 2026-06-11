@@ -16,6 +16,8 @@ import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
+import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.MyGigsResponse
@@ -36,8 +38,11 @@ import retrofit2.http.Query
 interface GigsApi {
     /**
      * `GET /api/gigs` — paginated browse with category + sort filters.
-     * Excludes the caller's own gigs by default.
+     * Excludes the caller's own gigs by default. `schedule_type` takes a
+     * single value, `pay_type` takes `offers` for open-to-bids, and
+     * `deadline` accepts `today` / `tomorrow` / `this_week`.
      */
+    @Suppress("LongParameterList")
     @GET("api/gigs")
     suspend fun list(
         @Query("category") category: String? = null,
@@ -48,10 +53,23 @@ interface GigsApi {
         @Query("includeRemote") includeRemote: Boolean? = null,
         @Query("minPrice") minPrice: Double? = null,
         @Query("maxPrice") maxPrice: Double? = null,
+        @Query("schedule_type") scheduleType: String? = null,
+        @Query("pay_type") payType: String? = null,
+        @Query("deadline") deadline: String? = null,
         @Query("search") search: String? = null,
         @Query("limit") limit: Int = 20,
         @Query("offset") offset: Int = 0,
     ): GigsListResponse
+
+    /**
+     * `POST /api/gigs/magic-draft` — backend NLP parse of the Magic Task
+     * describe text into a structured gig draft. Replaces the on-device
+     * keyword matcher (which remains the offline fallback).
+     */
+    @POST("api/gigs/magic-draft")
+    suspend fun magicDraft(
+        @Body body: MagicDraftRequest,
+    ): MagicDraftResponse
 
     /** `GET /api/gigs/nearby` — radius search in meters. */
     @GET("api/gigs/nearby")

@@ -7,15 +7,18 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigLocation
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.UUID
 import javax.inject.Inject
 
 enum class PostGigV1PriceType(
@@ -29,9 +32,16 @@ enum class PostGigV1PriceType(
 
 enum class PostGigV1PhotoTone { Sofa, Stairs, Street, Neutral }
 
+/** P0.2 — per-tile upload lifecycle for the photo grid. */
+enum class PostGigV1PhotoStatus { Uploading, Failed, Uploaded }
+
 data class PostGigV1Photo(
     val id: String,
     val tone: PostGigV1PhotoTone,
+    /** P0.2 — upload state; sample/preview tiles default to uploaded. */
+    val status: PostGigV1PhotoStatus = PostGigV1PhotoStatus.Uploaded,
+    /** P0.2 — backend URL once the upload lands; rides `attachments`. */
+    val url: String? = null,
 )
 
 data class PostGigV1Form(
@@ -73,8 +83,10 @@ sealed interface PostGigV1UiState {
         val isSubmitting: Boolean = false,
         val postedGigId: String? = null,
     ) : PostGigV1UiState {
-        val canAttemptSubmit: Boolean = !isSubmitting
-        val isPostEnabled: Boolean = !isSubmitting && (form.hasAnyInput || validationErrors.isNotEmpty())
+        /** P0.2 — true while any photo upload is still in flight. */
+        val hasUploadsInFlight: Boolean = form.photos.any { it.status == PostGigV1PhotoStatus.Uploading }
+        val canAttemptSubmit: Boolean = !isSubmitting && !hasUploadsInFlight
+        val isPostEnabled: Boolean = canAttemptSubmit && (form.hasAnyInput || validationErrors.isNotEmpty())
     }
 
     data class FatalError(
@@ -93,6 +105,7 @@ class PostGigV1ViewModel
     @Inject
     constructor(
         private val repo: GigsRepository,
+        private val filesRepo: FilesRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PostGigV1UiState>(PostGigV1UiState.Content())
         val state: StateFlow<PostGigV1UiState> = _state.asStateFlow()
@@ -103,6 +116,10 @@ class PostGigV1ViewModel
         // Stashed so a post failure can flip to FatalError yet restore the
         // filled form on retry (mirrors iOS, where the form survives .error).
         private var lastForm: PostGigV1Form? = null
+
+        // P0.2 — picked-photo bytes (for retry) + per-tile upload jobs.
+        private val pendingPhotoBytes = mutableMapOf<String, PostGigV1PickedPhoto>()
+        private val uploadJobs = mutableMapOf<String, Job>()
 
         fun acknowledgeEvent() {
             _pendingEvent.value = null
@@ -161,34 +178,76 @@ class PostGigV1ViewModel
             updateForm { it.copy(location = location) }
         }
 
-        fun addPlaceholderPhoto() {
+        /**
+         * P0.2 — accept a picked photo and upload it immediately via
+         * `POST /api/files/upload` (`FilesRepository`). The tile tracks
+         * uploading / failed (tap-to-retry) / uploaded-URL states.
+         */
+        fun addPickedPhoto(picked: PostGigV1PickedPhoto) {
+            val content = _state.value as? PostGigV1UiState.Content ?: return
+            if (content.form.photos.size >= PostGigV1SampleData.MAX_PHOTOS) return
+            val id = "photo-${UUID.randomUUID()}"
+            pendingPhotoBytes[id] = picked
             updateForm { form ->
-                if (form.photos.size >= PostGigV1SampleData.MAX_PHOTOS) return@updateForm form
-                val tones =
-                    listOf(
-                        PostGigV1PhotoTone.Sofa,
-                        PostGigV1PhotoTone.Stairs,
-                        PostGigV1PhotoTone.Street,
-                        PostGigV1PhotoTone.Neutral,
-                    )
-                val index = form.photos.size
                 form.copy(
                     photos =
                         form.photos +
                             PostGigV1Photo(
-                                id = "photo-${index + 1}",
-                                tone = tones[index % tones.size],
+                                id = id,
+                                tone = PostGigV1PhotoTone.Neutral,
+                                status = PostGigV1PhotoStatus.Uploading,
                             ),
                 )
             }
+            startUpload(id)
+        }
+
+        /** P0.2 — retry a failed upload tile (bytes are still held). */
+        fun retryPhotoUpload(id: String) {
+            if (pendingPhotoBytes[id] == null) return
+            updatePhoto(id) { it.copy(status = PostGigV1PhotoStatus.Uploading) }
+            startUpload(id)
         }
 
         fun removePhoto(id: String) {
+            uploadJobs.remove(id)?.cancel()
+            pendingPhotoBytes.remove(id)
             updateForm { it.copy(photos = it.photos.filterNot { photo -> photo.id == id }) }
         }
 
-        fun pickNextSaturday() {
-            updateScheduledAt(PostGigV1SampleData.filledForm.scheduledAt)
+        private fun startUpload(id: String) {
+            val picked = pendingPhotoBytes[id] ?: return
+            uploadJobs[id] =
+                viewModelScope.launch {
+                    val result =
+                        filesRepo.uploadFile(
+                            filename = picked.filename,
+                            mimeType = picked.mimeType,
+                            bytes = picked.bytes,
+                            fileType = GIG_PHOTO_FILE_TYPE,
+                            visibility = "public",
+                        )
+                    when (result) {
+                        is NetworkResult.Success -> {
+                            pendingPhotoBytes.remove(id)
+                            uploadJobs.remove(id)
+                            updatePhoto(id) {
+                                it.copy(status = PostGigV1PhotoStatus.Uploaded, url = result.data.file.url)
+                            }
+                        }
+                        is NetworkResult.Failure ->
+                            updatePhoto(id) { it.copy(status = PostGigV1PhotoStatus.Failed) }
+                    }
+                }
+        }
+
+        private fun updatePhoto(
+            id: String,
+            transform: (PostGigV1Photo) -> PostGigV1Photo,
+        ) {
+            updateForm { form ->
+                form.copy(photos = form.photos.map { if (it.id == id) transform(it) else it })
+            }
         }
 
         /**
@@ -200,7 +259,9 @@ class PostGigV1ViewModel
          */
         fun submit(now: LocalDateTime = LocalDateTime.now()) {
             val current = _state.value as? PostGigV1UiState.Content ?: return
-            if (current.isSubmitting) return
+            // P0.2 — never race a half-done upload; the Post CTA is also
+            // disabled while uploads are in flight.
+            if (!current.canAttemptSubmit) return
             val errors = validate(current.form, now)
             if (errors.isNotEmpty()) {
                 _state.value = current.copy(validationErrors = errors)
@@ -256,7 +317,8 @@ class PostGigV1ViewModel
                 scheduleType = "scheduled",
                 scheduledStart = form.scheduledAt.atZone(ZoneId.systemDefault()).toInstant().toString(),
                 taskFormat = null,
-                attachments = null,
+                // P0.2 — uploaded photo URLs ride as attachments.
+                attachments = form.photos.mapNotNull { it.url }.ifEmpty { null },
                 location =
                     CreateGigLocation(
                         mode = "custom",
@@ -310,4 +372,20 @@ class PostGigV1ViewModel
             }
             return errors
         }
+
+        private companion object {
+            /** P0.2 — `file_type` form field on `POST /api/files/upload`. */
+            const val GIG_PHOTO_FILE_TYPE = "gig_photo"
+        }
     }
+
+/**
+ * P0.2 — raw bytes of a picked photo, held by the view-model for upload +
+ * retry. Not a data class — [bytes] is an array, so structural equality
+ * would be misleading.
+ */
+class PostGigV1PickedPhoto(
+    val filename: String,
+    val mimeType: String,
+    val bytes: ByteArray,
+)

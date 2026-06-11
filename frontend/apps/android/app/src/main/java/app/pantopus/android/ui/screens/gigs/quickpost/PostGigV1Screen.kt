@@ -2,6 +2,9 @@
 
 package app.pantopus.android.ui.screens.gigs.quickpost
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -29,11 +33,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -44,6 +51,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.gigs.GigsCategory
@@ -56,9 +64,12 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
 
 @Composable
 fun PostGigV1Screen(
@@ -70,6 +81,30 @@ fun PostGigV1Screen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
     val content = state as? PostGigV1UiState.Content
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // P0.3 — real Material3 date + time pickers behind the date field.
+    var showDateTimePicker by remember { mutableStateOf(false) }
+
+    // P0.2 — modern photo picker; picked URIs are copied to bytes and
+    // uploaded immediately by the VM.
+    val photoPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@launch
+                    val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                    viewModel.addPickedPhoto(
+                        PostGigV1PickedPhoto(
+                            filename = "gig-${UUID.randomUUID().toString().take(6)}.jpg",
+                            mimeType = mime,
+                            bytes = bytes,
+                        ),
+                    )
+                }
+            }
+        }
 
     LaunchedEffect(preselectedCategoryKey) {
         viewModel.preselectCategoryIfNeeded(GigsCategory.fromBackendKey(preselectedCategoryKey))
@@ -109,13 +144,29 @@ fun PostGigV1Screen(
                             onDescription = viewModel::updateDescription,
                             onPrice = viewModel::updatePrice,
                             onPriceType = viewModel::updatePriceType,
-                            onPickDate = viewModel::pickNextSaturday,
+                            onPickDate = { showDateTimePicker = true },
                             onLocation = viewModel::updateLocation,
-                            onAddPhoto = viewModel::addPlaceholderPhoto,
+                            onAddPhoto = {
+                                photoPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
                             onRemovePhoto = viewModel::removePhoto,
+                            onRetryPhoto = viewModel::retryPhotoUpload,
                         ),
                 )
         }
+    }
+
+    if (showDateTimePicker) {
+        FutureDateTimePickerDialogs(
+            initial = content?.form?.scheduledAt,
+            onPicked = { picked ->
+                showDateTimePicker = false
+                viewModel.updateScheduledAt(picked)
+            },
+            onDismiss = { showDateTimePicker = false },
+        )
     }
 }
 
@@ -129,6 +180,8 @@ data class PostGigV1Actions(
     val onLocation: (String) -> Unit = {},
     val onAddPhoto: () -> Unit = {},
     val onRemovePhoto: (String) -> Unit = {},
+    /** P0.2 — tap-to-retry on a failed upload tile. */
+    val onRetryPhoto: (String) -> Unit = {},
 )
 
 @Composable
@@ -195,6 +248,7 @@ fun PostGigV1Content(
             canAdd = form.photos.size < PostGigV1SampleData.MAX_PHOTOS,
             onAdd = actions.onAddPhoto,
             onRemove = actions.onRemovePhoto,
+            onRetry = actions.onRetryPhoto,
         )
     }
 
@@ -501,6 +555,7 @@ private fun PhotosGrid(
     canAdd: Boolean,
     onAdd: () -> Unit,
     onRemove: (String) -> Unit,
+    onRetry: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), verticalAlignment = Alignment.CenterVertically) {
@@ -530,6 +585,7 @@ private fun PhotosGrid(
                                 photo = item.photo,
                                 isCover = index == 0,
                                 onRemove = onRemove,
+                                onRetry = onRetry,
                                 modifier = Modifier.weight(1f),
                             )
                     }
@@ -602,6 +658,7 @@ private fun PhotoTile(
     photo: PostGigV1Photo,
     isCover: Boolean,
     onRemove: (String) -> Unit,
+    onRetry: (String) -> Unit,
     modifier: Modifier,
 ) {
     val fill =
@@ -617,15 +674,72 @@ private fun PhotoTile(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(fill)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+                .border(
+                    width = 1.dp,
+                    color =
+                        if (photo.status == PostGigV1PhotoStatus.Failed) {
+                            PantopusColors.error
+                        } else {
+                            PantopusColors.appBorder
+                        },
+                    shape = RoundedCornerShape(Radii.lg),
+                ),
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Image,
-            contentDescription = null,
-            size = Radii.xl2,
-            tint = PantopusColors.appTextSecondary,
-            modifier = Modifier.align(Alignment.Center),
-        )
+        if (photo.url != null) {
+            AsyncImage(
+                model = photo.url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            )
+        } else {
+            PantopusIconImage(
+                icon = PantopusIcon.Image,
+                contentDescription = null,
+                size = Radii.xl2,
+                tint = PantopusColors.appTextSecondary,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        // P0.2 — per-tile upload state overlays.
+        when (photo.status) {
+            PostGigV1PhotoStatus.Uploading ->
+                Box(
+                    modifier =
+                        Modifier
+                            .aspectRatio(1f)
+                            .fillMaxWidth()
+                            .background(PantopusColors.appText.copy(alpha = 0.35f))
+                            .testTag("postGigV1_uploadingPhoto_${photo.id}"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        color = PantopusColors.appTextInverse,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            PostGigV1PhotoStatus.Failed ->
+                Box(
+                    modifier =
+                        Modifier
+                            .aspectRatio(1f)
+                            .fillMaxWidth()
+                            .background(PantopusColors.errorBg.copy(alpha = 0.85f))
+                            .clickable { onRetry(photo.id) }
+                            .testTag("postGigV1_retryPhoto_${photo.id}")
+                            .semantics { contentDescription = "Upload failed, tap to retry" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.AlertCircle,
+                        contentDescription = null,
+                        size = 22.dp,
+                        tint = PantopusColors.error,
+                    )
+                }
+            PostGigV1PhotoStatus.Uploaded -> Unit
+        }
         if (isCover) {
             Text(
                 text = "Cover",
