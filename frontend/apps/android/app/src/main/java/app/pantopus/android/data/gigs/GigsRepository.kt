@@ -7,6 +7,8 @@ import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
+import app.pantopus.android.data.api.models.gigs.DismissGigBody
+import app.pantopus.android.data.api.models.gigs.GigActionSuccessResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
@@ -14,8 +16,10 @@ import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
+import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.HiddenCategoryBody
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
@@ -23,6 +27,7 @@ import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.MyGigsResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
+import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.GigsApi
@@ -68,6 +73,37 @@ class GigsRepository
                     offset = offset,
                 )
             }
+
+        /** `GET /api/gigs/browse` — pre-sectioned browse feed. `radiusMeters` null ⇒ server default (~100 mi). */
+        suspend fun browse(
+            lat: Double,
+            lng: Double,
+            radiusMeters: Int? = null,
+        ): NetworkResult<GigsBrowseResponse> = safeApiCall { api.browse(lat, lng, radiusMeters) }
+
+        /** `GET /api/gigs/price-benchmark` — category price percentiles for the composer hint. */
+        suspend fun priceBenchmark(
+            category: String,
+            lat: Double? = null,
+            lng: Double? = null,
+        ): NetworkResult<PriceBenchmarkResponse> = safeApiCall { api.priceBenchmark(category, lat, lng) }
+
+        /** `POST /api/gigs/:gigId/dismiss` — "Not interested". */
+        suspend fun dismissGig(
+            gigId: String,
+            reason: String? = null,
+        ): NetworkResult<GigActionSuccessResponse> = safeApiCall { api.dismissGig(gigId, DismissGigBody(reason = reason)) }
+
+        /** `DELETE /api/gigs/:gigId/dismiss` — undo a dismissal. */
+        suspend fun undoDismissGig(gigId: String): NetworkResult<GigActionSuccessResponse> = safeApiCall { api.undoDismissGig(gigId) }
+
+        /** `POST /api/gigs/hidden-categories` — hide every gig of a category. */
+        suspend fun hideCategory(category: String): NetworkResult<GigActionSuccessResponse> =
+            safeApiCall { api.hideCategory(HiddenCategoryBody(category = category)) }
+
+        /** `DELETE /api/gigs/hidden-categories/:category` — unhide. */
+        suspend fun unhideCategory(category: String): NetworkResult<GigActionSuccessResponse> =
+            safeApiCall { api.unhideCategory(category) }
 
         /** `POST /api/gigs/magic-draft` — NLP-parse the describe text. */
         suspend fun magicDraft(body: MagicDraftRequest): NetworkResult<MagicDraftResponse> = safeApiCall { api.magicDraft(body) }

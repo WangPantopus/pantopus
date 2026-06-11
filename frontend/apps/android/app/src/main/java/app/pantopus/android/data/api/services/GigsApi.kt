@@ -7,6 +7,8 @@ import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
+import app.pantopus.android.data.api.models.gigs.DismissGigBody
+import app.pantopus.android.data.api.models.gigs.GigActionSuccessResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
@@ -14,8 +16,11 @@ import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
+import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.HiddenCategoryBody
+import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
@@ -70,6 +75,63 @@ interface GigsApi {
     suspend fun magicDraft(
         @Body body: MagicDraftRequest,
     ): MagicDraftResponse
+
+    /**
+     * `GET /api/gigs/browse` — pre-sectioned browse feed (best matches,
+     * urgent, clusters, high paying, new today, quick jobs). Route
+     * `backend/routes/gigs.js:3190`. `radius` is meters; the server
+     * defaults to ~100 mi when omitted.
+     */
+    @GET("api/gigs/browse")
+    suspend fun browse(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("radius") radiusMeters: Int? = null,
+    ): GigsBrowseResponse
+
+    /**
+     * `GET /api/gigs/price-benchmark` — completed-gig price percentiles
+     * for a category. Route `backend/routes/gigs.js:2985`. `lat`/`lng`
+     * are accepted but unused server-side in the MVP.
+     */
+    @GET("api/gigs/price-benchmark")
+    suspend fun priceBenchmark(
+        @Query("category") category: String,
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null,
+    ): PriceBenchmarkResponse
+
+    /**
+     * `POST /api/gigs/:gigId/dismiss` — "Not interested". Records an
+     * affinity signal + stores the dismissal. Route
+     * `backend/routes/gigs.js:8523`.
+     */
+    @POST("api/gigs/{gigId}/dismiss")
+    suspend fun dismissGig(
+        @Path("gigId") gigId: String,
+        @Body body: DismissGigBody,
+    ): GigActionSuccessResponse
+
+    /** `DELETE /api/gigs/:gigId/dismiss` — undo. Route `backend/routes/gigs.js:8572`. */
+    @DELETE("api/gigs/{gigId}/dismiss")
+    suspend fun undoDismissGig(
+        @Path("gigId") gigId: String,
+    ): GigActionSuccessResponse
+
+    /**
+     * `POST /api/gigs/hidden-categories` — hide a whole category from
+     * the viewer's feeds. Route `backend/routes/gigs.js:3461`.
+     */
+    @POST("api/gigs/hidden-categories")
+    suspend fun hideCategory(
+        @Body body: HiddenCategoryBody,
+    ): GigActionSuccessResponse
+
+    /** `DELETE /api/gigs/hidden-categories/:category` — unhide. Route `backend/routes/gigs.js:3495`. */
+    @DELETE("api/gigs/hidden-categories/{category}")
+    suspend fun unhideCategory(
+        @Path("category") category: String,
+    ): GigActionSuccessResponse
 
     /** `GET /api/gigs/nearby` — radius search in meters. */
     @GET("api/gigs/nearby")

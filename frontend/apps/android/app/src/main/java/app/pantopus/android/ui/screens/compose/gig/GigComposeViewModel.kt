@@ -12,6 +12,7 @@ import app.pantopus.android.data.api.models.gigs.CreateGigLocation
 import app.pantopus.android.data.api.models.gigs.MagicDraftDto
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
+import app.pantopus.android.data.api.models.gigs.PriceBenchmarkDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
@@ -56,6 +57,8 @@ data class GigComposeUiState(
     val clarifyingQuestion: String? = null,
     /** P0.2 — in-flight / failed photo uploads (uploaded URLs live in [form.photoIds]). */
     val photoUploads: List<GigComposePhotoUpload> = emptyList(),
+    /** P1.G — price-benchmark hint for the budget step; null hides it. */
+    val priceBenchmark: GigComposePriceBenchmark? = null,
 )
 
 /**
@@ -594,6 +597,9 @@ open class GigComposeViewModel
                 it.copy(form = it.form.copy(step = step.ordinal0), errorMessage = null)
             }
             persist()
+            // P1.G — entering the budget step with a category fetches the
+            // nearby price benchmark for the hint under the fields.
+            if (step == GigComposeStep.Budget) fetchPriceBenchmark()
             step.stepNumber?.let { number ->
                 Analytics.track(
                     AnalyticsEvent.ScreenComposeGigWizardStepViewed(
@@ -601,6 +607,32 @@ open class GigComposeViewModel
                         stepName = step.name,
                     ),
                 )
+            }
+        }
+
+        // MARK: - P1.G Price benchmark
+
+        /** P1.G — category key of the last benchmark fetch (dedupe guard). */
+        private var benchmarkCategoryKey: String? = null
+
+        /**
+         * P1.G — fetch the completed-task price percentiles for the form's
+         * category. Failures are silent and `comparable_count == 0` hides
+         * the hint — the budget step renders fine without it. Re-invoked
+         * (idempotently) from the budget step so a restored wizard landing
+         * directly on Budget still gets the hint.
+         */
+        fun fetchPriceBenchmark() {
+            val category = _state.value.form.category ?: return
+            if (benchmarkCategoryKey == category.key) return
+            benchmarkCategoryKey = category.key
+            viewModelScope.launch {
+                val benchmark =
+                    when (val result = repository.priceBenchmark(category.key)) {
+                        is NetworkResult.Success -> projectBenchmark(category.label, result.data.benchmark)
+                        is NetworkResult.Failure -> null
+                    }
+                _state.update { it.copy(priceBenchmark = benchmark) }
             }
         }
 
@@ -1019,6 +1051,30 @@ open class GigComposeViewModel
             /** "60.0" reads as "60" in the budget fields; keep cents when present. */
             internal fun formatBudgetValue(value: Double?): String? =
                 value?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
+
+            /**
+             * P1.G — DTO → budget-step hint. Null (hidden) when the
+             * benchmark is missing, has no comparables, or lacks any of
+             * the three percentiles.
+             */
+            internal fun projectBenchmark(
+                categoryLabel: String,
+                dto: PriceBenchmarkDto?,
+            ): GigComposePriceBenchmark? {
+                if (dto == null || (dto.comparableCount ?: 0) <= 0) return null
+                val low = dto.low ?: return null
+                val high = dto.high ?: return null
+                val median = dto.median ?: return null
+                return GigComposePriceBenchmark(
+                    hintText =
+                        "Similar ${categoryLabel.lowercase()} tasks nearby: " +
+                            "${moneyLabel(low)}–${moneyLabel(high)} · median ${moneyLabel(median)}",
+                    basis = dto.basis?.replace('_', ' ')?.takeIf { it.isNotBlank() },
+                )
+            }
+
+            private fun moneyLabel(value: Double): String =
+                if (value % 1.0 == 0.0) "$${value.toInt()}" else String.format("$%.2f", value)
 
             /** P0.1 — draft budget → (min, max) field strings. */
             internal fun draftBudgetBounds(draft: MagicDraftDto): Pair<String?, String?> {

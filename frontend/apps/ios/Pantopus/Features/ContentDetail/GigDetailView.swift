@@ -35,6 +35,7 @@ public struct GigDetailView: View {
     public var body: some View {
         TransactionalDetailShell(
             state: viewModel.state,
+            topBarAccessory: bookmarkAccessory,
             onBack: onBack,
             onPrimaryAction: { presentPrimaryAction() },
             onSecondaryAction: { openChat() },
@@ -80,6 +81,37 @@ public struct GigDetailView: View {
         .overlay(alignment: .bottom) { toastOverlay }
         .overlay(alignment: .top) { tipMarkers }
         .onChange(of: viewModel.tipStatus) { _, status in handleTip(status) }
+    }
+
+    // MARK: - Save / bookmark (work item C)
+
+    /// Top-bar bookmark toggle. Hidden until the gig is loaded.
+    /// Optimistic — the VM flips immediately and reverts on failure,
+    /// at which point we surface an error toast.
+    private var bookmarkAccessory: AnyView? {
+        guard case .loaded = viewModel.state else { return nil }
+        return AnyView(
+            Button {
+                Task {
+                    let ok = await viewModel.toggleSave()
+                    if !ok {
+                        toast = ToastMessage(text: "Couldn't update saved tasks.", kind: .error)
+                    }
+                }
+            } label: {
+                Icon(
+                    .bookmark,
+                    size: 18,
+                    strokeWidth: 2,
+                    color: viewModel.isSaved ? Theme.Color.primary600 : Theme.Color.appText
+                )
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(viewModel.isSaved ? "Saved — tap to unsave" : "Save task")
+            .accessibilityIdentifier("gigDetail.save")
+        )
     }
 
     // MARK: - Tip (Block 3D)

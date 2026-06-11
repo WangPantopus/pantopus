@@ -408,8 +408,17 @@ private struct BudgetStep: View {
                 }
             }
         }
+        // G — entering the budget step fetches the nearby price
+        // benchmark for the chosen category (silent on failure).
+        .task { await viewModel.loadPriceBenchmark() }
         if let selected = viewModel.form.budgetType, selected != .offers {
             BudgetRangeFields(viewModel: viewModel, type: selected)
+        }
+        if let benchmark = viewModel.priceBenchmark {
+            PriceBenchmarkHint(
+                benchmark: benchmark,
+                categoryLabel: viewModel.form.category?.label.lowercased() ?? "similar"
+            )
         }
     }
 
@@ -419,6 +428,40 @@ private struct BudgetStep: View {
         case .hourly: "Pay by the hour worked."
         case .offers: "Helpers send their own price and you pick."
         }
+    }
+}
+
+/// Work item G — "Similar handyman tasks nearby: $40–$120 · median $60"
+/// hint under the budget fields, with the benchmark's basis line as a
+/// sub-caption. Renders only when a benchmark with comparables landed.
+private struct PriceBenchmarkHint: View {
+    let benchmark: GigPriceBenchmarkDTO
+    let categoryLabel: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(
+                "Similar \(categoryLabel) tasks nearby: "
+                    + "\(money(benchmark.low))–\(money(benchmark.high))"
+                    + " · median \(money(benchmark.median))"
+            )
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            if let basis = benchmark.basis, !basis.isEmpty {
+                Text(basis)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("gigCompose.priceBenchmark")
+    }
+
+    private func money(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0
+            ? "$\(Int(value))"
+            : String(format: "$%.2f", value)
     }
 }
 

@@ -11,7 +11,7 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 
 @MainActor
 final class GigComposeViewModelTests: XCTestCase {
@@ -435,5 +435,93 @@ final class GigComposeViewModelTests: XCTestCase {
         XCTAssertFalse(vm.chrome.dirty)
         vm.setUrgent(true)
         XCTAssertTrue(vm.chrome.dirty, "Setting urgent must trigger the discard confirm.")
+    }
+
+    // MARK: - G. Price benchmark (budget step)
+
+    private static let benchmarkJSON = """
+    {"benchmark":{
+      "low":40,"median":60,"high":120,
+      "basis":"Based on 18 completed handyman tasks",
+      "comparable_count":18,"category":"handyman"
+    }}
+    """
+
+    private func budgetStepState() -> GigComposeFormState {
+        GigComposeFormState(
+            step: GigComposeStep.budget.rawValue,
+            category: .handyman,
+            title: "Hang 3 shelves in the living room",
+            description: "Need three IKEA Lack shelves mounted on drywall.",
+            photoIds: []
+        )
+    }
+
+    func testBenchmarkFetchPopulatesHintWithGeoScope() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.benchmarkJSON)]
+        let vm = makeVM(initialState: budgetStepState())
+        await vm.loadPriceBenchmark()
+        XCTAssertEqual(vm.priceBenchmark?.low, 40)
+        XCTAssertEqual(vm.priceBenchmark?.median, 60)
+        XCTAssertEqual(vm.priceBenchmark?.high, 120)
+        XCTAssertEqual(vm.priceBenchmark?.basis, "Based on 18 completed handyman tasks")
+        let url = SequencedURLProtocol.capturedRequests.last?.url
+        XCTAssertEqual(url?.path, "/api/gigs/price-benchmark")
+        let components = url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
+        var query: [String: String] = [:]
+        for item in components?.queryItems ?? [] {
+            query[item.name] = item.value
+        }
+        XCTAssertEqual(query["category"], "handyman")
+        XCTAssertEqual(query["lat"], "40.7484", "Cached device location geo-scopes the benchmark.")
+        XCTAssertEqual(query["lng"], "-73.9857")
+    }
+
+    func testBenchmarkHiddenWhenNoComparables() async {
+        let zero = """
+        {"benchmark":{"low":20,"median":50,"high":90,"basis":"Estimated average","comparable_count":0,"category":"handyman"}}
+        """
+        SequencedURLProtocol.sequence = [.status(200, body: zero)]
+        let vm = makeVM(initialState: budgetStepState())
+        await vm.loadPriceBenchmark()
+        XCTAssertNil(vm.priceBenchmark, "comparable_count == 0 hides the hint.")
+    }
+
+    func testBenchmarkHiddenWhenBenchmarkNull() async {
+        SequencedURLProtocol.sequence = [.status(200, body: #"{"benchmark":null}"#)]
+        let vm = makeVM(initialState: budgetStepState())
+        await vm.loadPriceBenchmark()
+        XCTAssertNil(vm.priceBenchmark)
+    }
+
+    func testBenchmarkFailureIsSilent() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = makeVM(initialState: budgetStepState())
+        await vm.loadPriceBenchmark()
+        XCTAssertNil(vm.priceBenchmark)
+        XCTAssertNil(vm.errorMessage, "A failed benchmark fetch never surfaces an error.")
+    }
+
+    func testBenchmarkSkippedWithoutCategory() async {
+        let vm = makeVM()
+        await vm.loadPriceBenchmark()
+        XCTAssertNil(vm.priceBenchmark)
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.isEmpty,
+            "No category → no benchmark roundtrip."
+        )
+    }
+
+    func testBenchmarkCachedPerCategory() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.benchmarkJSON)]
+        let vm = makeVM(initialState: budgetStepState())
+        await vm.loadPriceBenchmark()
+        await vm.loadPriceBenchmark()
+        XCTAssertEqual(
+            SequencedURLProtocol.capturedRequests.count,
+            1,
+            "Re-entering the budget step with the same category doesn't refetch."
+        )
+        XCTAssertNotNil(vm.priceBenchmark)
     }
 }

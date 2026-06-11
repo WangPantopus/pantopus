@@ -4,11 +4,28 @@
 //
 //  Covers the Gigs feed VM (T2.3): load → loaded/empty/error, category
 //  chip + sort dropdown each drive a refetch, projection produces the
-//  expected category enum and bid count.
+//  expected category enum and bid count. Phase 1 additions: the
+//  radius-suggestion banner (B), dismiss / hide-category with undo (D),
+//  and the realtime "new tasks" pill (E). Browse-mode coverage (F)
+//  lives in `GigsBrowseTests`.
 //
 
 import XCTest
 @testable import Pantopus
+
+/// Location stub that never has a coordinate — keeps the feed VM on the
+/// flat-list path regardless of the simulator's location state.
+private final class NoLocationProvider: LocationProviding, @unchecked Sendable {
+    func cachedCoordinate() -> UserCoordinate? {
+        nil
+    }
+
+    func requestCurrent(timeoutSeconds _: TimeInterval) async -> UserCoordinate? {
+        nil
+    }
+}
+
+// swiftlint:disable type_body_length file_length
 
 @MainActor
 final class GigsFeedViewModelTests: XCTestCase {
@@ -22,6 +39,18 @@ final class GigsFeedViewModelTests: XCTestCase {
             environment: .current,
             session: SequencedURLProtocol.makeSession(),
             retryPolicy: .none
+        )
+    }
+
+    /// Centralised constructor — no device location (flat-list path) and
+    /// an injected current-user id for the realtime tests.
+    private func makeVM(radiusMiles: Double = 1, currentUserId: String? = nil) -> GigsFeedViewModel {
+        GigsFeedViewModel(
+            api: makeAPI(),
+            radiusMiles: radiusMiles,
+            location: NoLocationProvider(),
+            currentUserId: { currentUserId },
+            gigEventsProvider: { AsyncStream { $0.finish() } }
         )
     }
 
@@ -63,7 +92,7 @@ final class GigsFeedViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         guard case let .loaded(rows) = vm.state else {
             XCTFail("Expected .loaded, got \(vm.state)")
@@ -79,7 +108,7 @@ final class GigsFeedViewModelTests: XCTestCase {
 
     func testLoadEmptyTransitionsEmptyWithRadiusHint() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.gigsJSON())]
-        let vm = GigsFeedViewModel(api: makeAPI(), radiusMiles: 2)
+        let vm = makeVM(radiusMiles: 2)
         await vm.load()
         guard case let .empty(empty) = vm.state else {
             XCTFail("Expected .empty, got \(vm.state)")
@@ -90,7 +119,7 @@ final class GigsFeedViewModelTests: XCTestCase {
 
     func testLoadFailureTransitionsError() async {
         SequencedURLProtocol.sequence = [.status(500, body: "{}")]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         guard case .error = vm.state else {
             XCTFail("Expected .error, got \(vm.state)")
@@ -103,7 +132,7 @@ final class GigsFeedViewModelTests: XCTestCase {
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
             .status(200, body: Self.gigsJSON(Self.cleaningGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.selectCategory(.cleaning)
         XCTAssertEqual(vm.activeCategory, .cleaning)
@@ -120,7 +149,7 @@ final class GigsFeedViewModelTests: XCTestCase {
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
             .status(200, body: Self.gigsJSON(Self.cleaningGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.selectSort(.highestPay)
         XCTAssertEqual(vm.activeSort, .highestPay)
@@ -150,7 +179,7 @@ final class GigsFeedViewModelTests: XCTestCase {
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.applyFilters(GigFilterCriteria(
             budgetLower: 50,
@@ -175,7 +204,7 @@ final class GigsFeedViewModelTests: XCTestCase {
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.applyFilters(GigFilterCriteria())
         let query = lastQueryItems()
@@ -208,7 +237,7 @@ final class GigsFeedViewModelTests: XCTestCase {
             .status(200, body: Self.gigsJSON(scheduledGig, asapGig)),
             .status(200, body: Self.gigsJSON(scheduledGig, asapGig))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.applyFilters(GigFilterCriteria(schedules: [.oneTime, .flexible]))
         XCTAssertNil(lastQueryItems()["schedule_type"], "Multi-select can't ride the single-value param.")
@@ -223,7 +252,7 @@ final class GigsFeedViewModelTests: XCTestCase {
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.applyFilters(GigFilterCriteria(schedules: [.recurring]))
         XCTAssertNil(
@@ -254,7 +283,7 @@ final class GigsFeedViewModelTests: XCTestCase {
             .status(200, body: Self.gigsJSON(freshGig, staleGig)),
             .status(200, body: Self.gigsJSON(freshGig, staleGig))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.applyFilters(GigFilterCriteria(postedWithin: .today))
         XCTAssertNil(lastQueryItems()["deadline"], "posted-within is not the deadline param.")
@@ -262,5 +291,258 @@ final class GigsFeedViewModelTests: XCTestCase {
             return XCTFail("Expected .loaded, got \(vm.state)")
         }
         XCTAssertEqual(rows.map(\.id), ["g5"])
+    }
+
+    // MARK: - B. Radius suggestion
+
+    func testRadiusLadder() {
+        XCTAssertEqual(GigsFeedViewModel.nextRadius(after: 1), 3)
+        XCTAssertEqual(GigsFeedViewModel.nextRadius(after: 2), 3)
+        XCTAssertEqual(GigsFeedViewModel.nextRadius(after: 3), 5)
+        XCTAssertEqual(GigsFeedViewModel.nextRadius(after: 5), 10)
+        XCTAssertEqual(GigsFeedViewModel.nextRadius(after: 7), 10)
+        XCTAssertNil(GigsFeedViewModel.nextRadius(after: 10), "10 mi is the cap.")
+    }
+
+    func testThinLoadSurfacesRadiusSuggestion() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
+        ]
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertEqual(
+            vm.radiusSuggestion,
+            GigsRadiusSuggestion(resultCount: 2, currentMiles: 1, suggestedMiles: 3)
+        )
+    }
+
+    func testNoSuggestionWithThreeOrMoreResults() async {
+        let third = """
+        {
+          "id": "g7", "title": "Dog walk", "description": "30 min loop.",
+          "price": 20, "category": "petcare", "status": "open",
+          "created_at": "2026-06-09T08:00:00Z", "user_id": "u7"
+        }
+        """
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON, third))
+        ]
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertNil(vm.radiusSuggestion)
+    }
+
+    func testNoSuggestionWithActiveFilters() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.applyFilters(GigFilterCriteria(budgetUpper: 100))
+        XCTAssertNil(vm.radiusSuggestion, "Filtered loads never suggest widening the radius.")
+    }
+
+    func testNoSuggestionAtRadiusCap() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
+        ]
+        let vm = makeVM(radiusMiles: 10)
+        await vm.load()
+        XCTAssertNil(vm.radiusSuggestion, "No wider step exists past 10 mi.")
+    }
+
+    func testExpandRadiusRefetchesWiderAndResuggests() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.expandRadius()
+        XCTAssertEqual(vm.radiusMiles, 3)
+        XCTAssertEqual(lastQueryItems()["radiusMiles"], "3.0", "Refetch rides the widened radius.")
+        XCTAssertEqual(
+            vm.radiusSuggestion,
+            GigsRadiusSuggestion(resultCount: 1, currentMiles: 3, suggestedMiles: 5),
+            "A still-thin wider load suggests the next step."
+        )
+    }
+
+    func testDismissRadiusSuggestionSilencesForSession() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.dismissRadiusSuggestion()
+        XCTAssertNil(vm.radiusSuggestion)
+        await vm.refresh()
+        XCTAssertNil(vm.radiusSuggestion, "X-dismissal holds for the rest of the session.")
+    }
+
+    // MARK: - D. Not interested / hide category
+
+    func testDismissGigRemovesRowAndPostsDismiss() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
+            .status(200, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.dismissGig(id: "g1")
+        guard case let .loaded(rows) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.map(\.id), ["g2"])
+        XCTAssertEqual(vm.pendingUndo?.kind, .dismissedGig(gigId: "g1"))
+        let last = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(last?.httpMethod, "POST")
+        XCTAssertEqual(last?.url?.path, "/api/gigs/g1/dismiss")
+    }
+
+    func testDismissLastRowFallsToEmptyState() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
+            .status(200, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.dismissGig(id: "g1")
+        guard case .empty = vm.state else {
+            return XCTFail("Expected .empty after the only row was dismissed, got \(vm.state)")
+        }
+    }
+
+    func testDismissGigFailureRestoresRow() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
+            .status(500, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.dismissGig(id: "g1")
+        guard case let .loaded(rows) = vm.state else {
+            return XCTFail("Expected restored .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.map(\.id), ["g1", "g2"], "Failed dismiss restores the optimistic removal.")
+        XCTAssertNil(vm.pendingUndo)
+        XCTAssertNotNil(vm.toast, "Failure surfaces an error toast.")
+    }
+
+    func testUndoDismissReinsertsAndDeletes() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
+            .status(200, body: "{}"),
+            .status(200, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.dismissGig(id: "g1")
+        await vm.undoPendingRemoval()
+        guard case let .loaded(rows) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.map(\.id), ["g1", "g2"])
+        XCTAssertNil(vm.pendingUndo)
+        let last = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(last?.httpMethod, "DELETE")
+        XCTAssertEqual(last?.url?.path, "/api/gigs/g1/dismiss")
+    }
+
+    func testHideCategoryRemovesAllMatchingRows() async {
+        let secondHandyman = """
+        {
+          "id": "g8", "title": "Patch drywall", "description": "Two holes.",
+          "price": 45, "category": "handyman", "status": "open",
+          "created_at": "2026-06-09T08:00:00Z", "user_id": "u8"
+        }
+        """
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, secondHandyman, Self.cleaningGigJSON)),
+            .status(200, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.hideCategory(ofGigId: "g1")
+        guard case let .loaded(rows) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.map(\.id), ["g2"], "Every handyman row leaves the list.")
+        XCTAssertEqual(vm.pendingUndo?.kind, .hiddenCategory(backendKey: "handyman"))
+        let last = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(last?.httpMethod, "POST")
+        XCTAssertEqual(last?.url?.path, "/api/gigs/hidden-categories")
+    }
+
+    func testUndoHideCategoryReinsertsAndDeletes() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
+            .status(200, body: "{}"),
+            .status(200, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.hideCategory(ofGigId: "g1")
+        await vm.undoPendingRemoval()
+        guard case let .loaded(rows) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.map(\.id), ["g1", "g2"])
+        let last = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(last?.httpMethod, "DELETE")
+        XCTAssertEqual(last?.url?.path, "/api/gigs/hidden-categories/handyman")
+    }
+
+    func testExpireUndoDropsAffordanceWithoutReverting() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
+            .status(200, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.dismissGig(id: "g1")
+        guard let undo = vm.pendingUndo else { return XCTFail("Expected a pending undo") }
+        vm.expireUndo(undo.id)
+        XCTAssertNil(vm.pendingUndo)
+        guard case let .loaded(rows) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.map(\.id), ["g2"], "Expiry keeps the removal in place.")
+    }
+
+    // MARK: - E. Realtime "new tasks" banner
+
+    func testGigEventsAccumulateAndIgnoreOwnPosts() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON, Self.handymanGigJSON))
+        ]
+        let vm = makeVM(currentUserId: "me")
+        await vm.load()
+        vm.handleGigEvent(GigNewEvent(id: "n1", userId: "neighbor-1"))
+        vm.handleGigEvent(GigNewEvent(id: "n2", userId: "neighbor-2"))
+        XCTAssertEqual(vm.newTaskCount, 2)
+        vm.handleGigEvent(GigNewEvent(id: "n3", userId: "me"))
+        XCTAssertEqual(vm.newTaskCount, 2, "Own posts never tick the banner.")
+        vm.handleGigEvent(GigNewEvent(id: "n4", userId: nil))
+        XCTAssertEqual(vm.newTaskCount, 3, "Events without a poster id still count.")
+    }
+
+    func testRefreshFromBannerClearsCountAndRefetches() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON)),
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
+        ]
+        let vm = makeVM(currentUserId: "me")
+        await vm.load()
+        vm.handleGigEvent(GigNewEvent(id: "n1", userId: "neighbor-1"))
+        XCTAssertEqual(vm.newTaskCount, 1)
+        await vm.refreshFromBanner()
+        XCTAssertEqual(vm.newTaskCount, 0)
+        guard case let .loaded(rows) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.count, 2, "Banner tap refetched the feed.")
     }
 }

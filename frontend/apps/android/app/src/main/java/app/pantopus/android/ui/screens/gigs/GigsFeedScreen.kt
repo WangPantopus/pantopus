@@ -1,10 +1,12 @@
 @file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod")
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package app.pantopus.android.ui.screens.gigs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +27,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,8 +56,10 @@ import app.pantopus.android.ui.screens.shared.feed.FeedSkeletonCard
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.delay
 
 /**
  * Gigs feed (T2.3). Reached from Hub → Gigs pillar. Three frames:
@@ -73,9 +80,20 @@ fun GigsFeedScreen(
     val activeSort by viewModel.activeSort.collectAsStateWithLifecycle()
     val activeFilterCount by viewModel.activeFilterCount.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
+    val radiusSuggestion by viewModel.radiusSuggestion.collectAsStateWithLifecycle()
+    val newTaskCount by viewModel.newTaskCount.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
     var showFilters by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
+
+    // P1.D — undo window: the toast auto-dismisses after ~5s.
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            delay(TOAST_DISMISS_DELAY_MS)
+            viewModel.dismissToast()
+        }
+    }
 
     Box(
         modifier =
@@ -97,13 +115,48 @@ fun GigsFeedScreen(
                 onSelectSort = viewModel::selectSort,
                 onOpenFilters = { showFilters = true },
             )
-            when (val s = state) {
-                is GigsFeedUiState.Loading -> LoadingFrame()
-                is GigsFeedUiState.Empty -> EmptyFrame(radiusMiles = s.radiusMiles) { onCompose(activeCategory) }
-                is GigsFeedUiState.Loaded ->
-                    PopulatedFrame(rows = s.rows, onOpenGig = onOpenGig)
-                is GigsFeedUiState.Error ->
-                    ErrorFrame(message = s.message, onRetry = viewModel::refresh)
+            // P1.B — slim radius-suggestion banner above the list.
+            radiusSuggestion?.let { suggestion ->
+                if (state is GigsFeedUiState.Loaded || state is GigsFeedUiState.Empty) {
+                    RadiusSuggestionBanner(
+                        suggestion = suggestion,
+                        onAccept = viewModel::acceptRadiusSuggestion,
+                        onDismiss = viewModel::dismissRadiusSuggestion,
+                    )
+                }
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when (val s = state) {
+                    is GigsFeedUiState.Loading -> LoadingFrame()
+                    is GigsFeedUiState.BrowseLoading -> BrowseLoadingFrame()
+                    is GigsFeedUiState.Empty -> EmptyFrame(radiusMiles = s.radiusMiles) { onCompose(activeCategory) }
+                    is GigsFeedUiState.Loaded ->
+                        PopulatedFrame(
+                            rows = s.rows,
+                            onOpenGig = onOpenGig,
+                            onDismissGig = viewModel::dismissGig,
+                            onHideCategory = viewModel::hideCategory,
+                        )
+                    is GigsFeedUiState.BrowseLoaded ->
+                        BrowseFrame(
+                            content = s.browse,
+                            onOpenGig = onOpenGig,
+                            onSeeAll = viewModel::exitBrowse,
+                            onSelectCategory = viewModel::selectCategory,
+                            onSeeAllTasks = { viewModel.exitBrowse(GigsSort.Newest) },
+                        )
+                    is GigsFeedUiState.Error ->
+                        ErrorFrame(message = s.message, onRetry = viewModel::refresh)
+                }
+                // P1.E — floating "new tasks" pill; hidden while loading.
+                val loadingNow = state is GigsFeedUiState.Loading || state is GigsFeedUiState.BrowseLoading
+                if (newTaskCount > 0 && !loadingNow) {
+                    NewTasksBanner(
+                        count = newTaskCount,
+                        onTap = viewModel::refreshFromNewTasksBanner,
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = Spacing.s2),
+                    )
+                }
             }
         }
         FeedComposeFAB(
@@ -115,6 +168,9 @@ fun GigsFeedScreen(
                     .padding(end = Spacing.s4, bottom = Spacing.s10)
                     .testTag("gigsComposeFab"),
         )
+        toast?.let { payload ->
+            GigsFeedToastOverlay(payload = payload, onUndo = viewModel::undo)
+        }
     }
 
     if (showFilters) {
@@ -125,6 +181,9 @@ fun GigsFeedScreen(
         )
     }
 }
+
+/** P1.D — undo window before the toast auto-dismisses. */
+private const val TOAST_DISMISS_DELAY_MS = 5_000L
 
 // MARK: - Chrome
 
@@ -542,6 +601,8 @@ private fun RadiusHintPill(radiusMiles: Double) {
 internal fun PopulatedFrame(
     rows: List<GigCardContent>,
     onOpenGig: (String) -> Unit,
+    onDismissGig: (String) -> Unit = {},
+    onHideCategory: (GigsCategory) -> Unit = {},
 ) {
     LazyColumn(
         modifier =
@@ -552,8 +613,93 @@ internal fun PopulatedFrame(
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         items(items = rows, key = { it.id }) { row ->
-            GigRow(content = row, onTap = { onOpenGig(row.id) })
+            DismissableGigRow(
+                content = row,
+                onTap = { onOpenGig(row.id) },
+                onDismiss = { onDismissGig(row.id) },
+                onHideCategory = { onHideCategory(row.category) },
+            )
         }
+    }
+}
+
+/**
+ * P1.D — feed row wrapped in a swipe-to-dismiss ("Not interested") with a
+ * long-press menu carrying the same action plus "Hide all <Category>".
+ */
+@Composable
+private fun DismissableGigRow(
+    content: GigCardContent,
+    onTap: () -> Unit,
+    onDismiss: () -> Unit,
+    onHideCategory: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val dismissState =
+        rememberSwipeToDismissBoxState(
+            confirmValueChange = { value ->
+                if (value == SwipeToDismissBoxValue.EndToStart) onDismiss()
+                // Never settle — the VM removes the row optimistically and
+                // an undo re-inserts it in place.
+                false
+            },
+        )
+    Box {
+        SwipeToDismissBox(
+            state = dismissState,
+            enableDismissFromStartToEnd = false,
+            backgroundContent = { NotInterestedSwipeBackground() },
+            modifier = Modifier.testTag("gigsRowSwipe_${content.id}"),
+        ) {
+            GigRow(content = content, onTap = onTap, onLongPress = { menuOpen = true })
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text("Not interested") },
+                onClick = {
+                    menuOpen = false
+                    onDismiss()
+                },
+                modifier = Modifier.testTag("gigsRowMenu_notInterested"),
+            )
+            DropdownMenuItem(
+                text = { Text("Hide all ${content.category.label}") },
+                onClick = {
+                    menuOpen = false
+                    onHideCategory()
+                },
+                modifier = Modifier.testTag("gigsRowMenu_hideCategory"),
+            )
+        }
+    }
+}
+
+/** P1.D — revealed behind the row while swiping toward "Not interested". */
+@Composable
+private fun NotInterestedSwipeBackground() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.errorBg)
+                .padding(horizontal = Spacing.s4),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+        PantopusIconImage(
+            icon = PantopusIcon.EyeOff,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.error,
+        )
+        Text(
+            text = "Not interested",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.error,
+        )
     }
 }
 
@@ -561,6 +707,7 @@ internal fun PopulatedFrame(
 internal fun GigRow(
     content: GigCardContent,
     onTap: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -569,7 +716,7 @@ internal fun GigRow(
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                .clickable(onClick = onTap)
+                .combinedClickable(onClick = onTap, onLongClick = onLongPress)
                 .padding(Spacing.s4)
                 .testTag("gigsRow_${content.id}"),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -579,6 +726,9 @@ internal fun GigRow(
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             CategoryChip(category = content.category)
+            if (content.isUrgent) {
+                UrgentPill()
+            }
             if (content.metaLine.isNotEmpty()) {
                 Text(
                     text = content.metaLine,
@@ -668,6 +818,28 @@ private fun CategoryChip(category: GigsCategory) {
     }
 }
 
+/** P1.A — amber "URGENT" pill beside the category badge. */
+@Composable
+private fun UrgentPill() {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.warningBg)
+                .padding(horizontal = Spacing.s2, vertical = 2.dp)
+                .testTag("gigRow.urgent"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "URGENT",
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.warning,
+            letterSpacing = 0.5.sp,
+        )
+    }
+}
+
 @Composable
 private fun BidPill(count: Int) {
     Row(
@@ -710,6 +882,166 @@ private fun BeTheFirstPill() {
             fontWeight = FontWeight.Bold,
             color = PantopusColors.primary700,
         )
+    }
+}
+
+// MARK: - P1.B / P1.D / P1.E banners + toast
+
+/**
+ * P1.B — slim suggestion banner above the list: "Only N tasks within
+ * X mi" + a "Search Y mi" action bumping the radius ladder, dismissible
+ * for the session.
+ */
+@Composable
+internal fun RadiusSuggestionBanner(
+    suggestion: GigsRadiusSuggestion,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val taskWord = if (suggestion.visibleCount == 1) "task" else "tasks"
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.primary50)
+                .padding(start = Spacing.s3, end = Spacing.s1)
+                .heightIn(min = 40.dp)
+                .testTag("gigsFeed.radiusSuggestion"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.MapPin,
+            contentDescription = null,
+            size = 13.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "Only ${suggestion.visibleCount} $taskWord within ${milesLabel(suggestion.currentRadiusMiles)} mi",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.primary600,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "Search ${milesLabel(suggestion.suggestedRadiusMiles)} mi",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.primary700,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .clickable(onClick = onAccept)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s2)
+                    .testTag("gigsFeed.radiusSuggestion.accept"),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onDismiss)
+                    .testTag("gigsFeed.radiusSuggestion.dismiss"),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.X,
+                contentDescription = "Dismiss",
+                size = 12.dp,
+                strokeWidth = 2.4f,
+                tint = PantopusColors.primary600,
+            )
+        }
+    }
+}
+
+private fun milesLabel(miles: Double): String =
+    if (miles % 1.0 == 0.0) "${miles.toInt()}" else String.format("%.1f", miles)
+
+/** P1.E — floating "N new tasks — tap to refresh" pill over the feed. */
+@Composable
+internal fun NewTasksBanner(
+    count: Int,
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val taskWord = if (count == 1) "new task" else "new tasks"
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.primary600)
+                .clickable(onClick = onTap)
+                .padding(horizontal = Spacing.s4)
+                .heightIn(min = 36.dp)
+                .testTag("gigsFeed.newTasksBanner"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ArrowUp,
+            contentDescription = null,
+            size = 13.dp,
+            strokeWidth = 2.4f,
+            tint = PantopusColors.appTextInverse,
+        )
+        Text(
+            text = "$count $taskWord — tap to refresh",
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextInverse,
+        )
+    }
+}
+
+/**
+ * P1.D — transient bottom toast (mirrors `MyBidsToastOverlay`) with an
+ * optional Undo action for dismissals / category hides.
+ */
+@Composable
+internal fun GigsFeedToastOverlay(
+    payload: GigsFeedToast,
+    onUndo: (GigsFeedUndo) -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .padding(bottom = Spacing.s10, start = Spacing.s4, end = Spacing.s4)
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(if (payload.isError) PantopusColors.error else PantopusColors.success)
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                    .testTag("gigsFeed.toast"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Text(
+                text = payload.text,
+                style = PantopusTextStyle.small,
+                color = PantopusColors.appTextInverse,
+            )
+            payload.undo?.let { undo ->
+                Text(
+                    text = "Undo",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextInverse,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .clickable { onUndo(undo) }
+                            .padding(horizontal = Spacing.s1)
+                            .testTag("gigsFeed.undoButton"),
+                )
+            }
+        }
     }
 }
 
