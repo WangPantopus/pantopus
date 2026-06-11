@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.Shimmer
@@ -38,6 +39,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.AsyncImage
 
 /**
  * P1.F — sectioned browse feed rendered when the Gigs feed has no
@@ -53,6 +55,7 @@ internal fun BrowseFrame(
     onSeeAll: (GigsSort) -> Unit,
     onSelectCategory: (GigsCategory) -> Unit,
     onSeeAllTasks: () -> Unit,
+    onSeeAllQuickJobs: (() -> Unit)? = null,
 ) {
     LazyColumn(
         modifier =
@@ -113,7 +116,9 @@ internal fun BrowseFrame(
                     testTag = "gigsBrowse.quickJobs",
                     rows = content.quickJobs,
                     onOpenGig = onOpenGig,
-                    onSeeAll = null,
+                    // P1.F parity — exits to the flat list filtered to the
+                    // section's ≤ $100 band (mirrors iOS).
+                    onSeeAll = onSeeAllQuickJobs,
                 )
             }
         }
@@ -245,12 +250,23 @@ internal fun GigRailCard(
                     .background(card.category.color),
             contentAlignment = Alignment.Center,
         ) {
+            // P1.F — browse `first_image` thumbnail when the gig has one;
+            // the category glyph tile stays as the no-photo fallback (and
+            // shows behind the image while it loads).
             PantopusIconImage(
                 icon = taskCategoryGlyph(card.category),
                 contentDescription = null,
                 size = 22.dp,
                 tint = Color.White,
             )
+            if (card.imageUrl != null) {
+                AsyncImage(
+                    model = card.imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                )
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(

@@ -153,6 +153,12 @@ class GigsFeedViewModel
             fetch()
         }
 
+        /** P1.F — Quick jobs "See all": exit browse into the flat list
+         * filtered to the section's ≤ $100 budget band (mirrors iOS). */
+        fun seeAllQuickJobs() {
+            applyFilters(GigFilterCriteria(budgetUpper = QUICK_JOBS_BUDGET_CAP))
+        }
+
         // MARK: - P1.B Radius suggestion
 
         /** Accept the suggestion: bump the radius to the next step + refetch. */
@@ -518,6 +524,10 @@ class GigsFeedViewModel
                 )
             }
 
+            /** P1.F — Quick jobs section budget ceiling (matches the
+             * backend's quick-jobs banding). */
+            const val QUICK_JOBS_BUDGET_CAP = 100f
+
             /** P1.F — `GigDto` → horizontal rail card (urgent / high paying). */
             fun projectRailCard(gig: GigDto): GigRailCardContent =
                 GigRailCardContent(
@@ -527,6 +537,7 @@ class GigsFeedViewModel
                     price = priceLabel(gig.price, gig.payType),
                     distanceLabel = distanceLabel(resolvedDistanceMiles(gig)),
                     bidCount = gig.bidCount ?: 0,
+                    imageUrl = gig.firstImage,
                 )
 
             /** Spatial-RPC rows carry `distance_meters`; list rows `distance_miles`. */

@@ -16,7 +16,8 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * list/map toggle. Same canvas as the generic Nearby map, filtered to
  * tasks with a "Post task" button below the locate / layers controls.
  *
- * No backend — the view-model seeds from [TasksMapSampleData].
+ * Live data from `GET /api/gigs/in-bounds`; previews/snapshots seed from
+ * [TasksMapSampleData].
  */
 @Immutable
 data class TaskMapItem(
@@ -32,6 +33,13 @@ data class TaskMapItem(
     val bidCount: Int,
     /** Gig description — feeds the expanded-detent `GigRow` list. */
     val body: String = "",
+    // P2 follow-up — raw fields the structured filter sheet matches on
+    // (`GigFilterCriteria.matches`). Defaults keep seed/preview items
+    // passing every dimension.
+    val priceValue: Double? = null,
+    val scheduleType: String? = null,
+    val acceptedBy: String? = null,
+    val createdAt: String? = null,
 ) {
     /** Projection into the shell's pin model — colour from the gig category
      * swatch, white-ring / dashed-outline treatment from [state]. */

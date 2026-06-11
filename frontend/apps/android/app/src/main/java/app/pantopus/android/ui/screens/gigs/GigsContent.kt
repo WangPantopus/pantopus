@@ -96,6 +96,8 @@ data class GigRailCardContent(
     val price: String,
     val distanceLabel: String?,
     val bidCount: Int,
+    /** Browse `first_image` — replaces the glyph tile when present. */
+    val imageUrl: String? = null,
 )
 
 /** P1.F — one "Browse by category" cluster chip. */

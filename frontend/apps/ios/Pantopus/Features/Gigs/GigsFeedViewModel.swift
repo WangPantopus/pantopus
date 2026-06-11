@@ -478,7 +478,8 @@ extension GigsFeedViewModel {
             category: GigsCategory.from(backendKey: gig.category),
             title: gig.title,
             price: priceLabel(price: gig.price, payType: nil),
-            distanceLabel: distanceLabel(miles: gig.distanceMeters.map { $0 / metersPerMile })
+            distanceLabel: distanceLabel(miles: gig.distanceMeters.map { $0 / metersPerMile }),
+            imageUrl: gig.firstImage
         )
     }
 

@@ -32,6 +32,13 @@ public struct TaskMapItem: Identifiable, Sendable, Hashable {
     public let price: String
     public let distanceLabel: String
     public let bidCount: Int
+    // P2 follow-up — raw fields the structured filter sheet matches on
+    // (`GigFilterCriteria.matches`). Defaults keep seed/preview items
+    // passing every dimension.
+    public let priceValue: Double?
+    public let scheduleType: String?
+    public let acceptedBy: String?
+    public let createdAt: String?
 
     public init(
         id: String,
@@ -43,7 +50,11 @@ public struct TaskMapItem: Identifiable, Sendable, Hashable {
         body: String = "",
         price: String,
         distanceLabel: String,
-        bidCount: Int
+        bidCount: Int,
+        priceValue: Double? = nil,
+        scheduleType: String? = nil,
+        acceptedBy: String? = nil,
+        createdAt: String? = nil
     ) {
         self.id = id
         self.category = category
@@ -55,6 +66,10 @@ public struct TaskMapItem: Identifiable, Sendable, Hashable {
         self.price = price
         self.distanceLabel = distanceLabel
         self.bidCount = bidCount
+        self.priceValue = priceValue
+        self.scheduleType = scheduleType
+        self.acceptedBy = acceptedBy
+        self.createdAt = createdAt
     }
 
     /// Projection into the shell's pin model — the colour comes from the
