@@ -2,13 +2,19 @@
 //  PostGigV1View.swift
 //  Pantopus
 //
-//  A13.8 — legacy V1 single-screen gig composer.
+//  A13.8 — legacy V1 single-screen gig composer. Phase 4: real photo
+//  uploads (PhotosPicker → `POST /api/files/upload` per tile) and an
+//  edit mode (`editGigId` → prefill + PATCH, title "Edit gig", CTA
+//  "Save").
 //
 
+import PhotosUI
 import SwiftUI
 
 public struct PostGigV1View: View {
     @State private var viewModel: PostGigV1ViewModel
+    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var showsPhotosPicker = false
     private let onClose: @MainActor () -> Void
     private let onPosted: @MainActor (String) -> Void
 
@@ -24,9 +30,9 @@ public struct PostGigV1View: View {
 
     public var body: some View {
         FormShell(
-            title: "Post gig",
+            title: viewModel.screenTitle,
             leading: .back,
-            rightActionLabel: "Post",
+            rightActionLabel: viewModel.commitLabel,
             isValid: viewModel.canAttemptSubmit,
             isDirty: viewModel.isPostEnabled,
             isSaving: viewModel.state.isSubmitting,
@@ -35,6 +41,7 @@ public struct PostGigV1View: View {
         ) {
             content
         }
+        .task { await viewModel.load() }
         .toolbar(.hidden, for: .tabBar)
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("postGigV1")
@@ -96,6 +103,7 @@ public struct PostGigV1View: View {
                     set: { viewModel.updatePrice($0) }
                 ),
                 unit: viewModel.state.form.priceType.unitLabel,
+                isDisabled: viewModel.state.form.priceType == .free,
                 error: viewModel.error(for: .price)
             )
 
@@ -120,9 +128,19 @@ public struct PostGigV1View: View {
             PostGigV1PhotosGrid(
                 photos: viewModel.state.form.photos,
                 canAdd: viewModel.state.form.photos.count < PostGigV1SampleData.maxPhotos,
-                onAdd: viewModel.addPlaceholderPhoto,
-                onRemove: viewModel.removePhoto
+                onAdd: { showsPhotosPicker = true },
+                onRetry: { viewModel.retryUpload(id: $0) },
+                onRemove: { viewModel.removePhoto(id: $0) }
             )
+            .photosPicker(
+                isPresented: $showsPhotosPicker,
+                selection: $pickerItems,
+                maxSelectionCount: max(1, PostGigV1SampleData.maxPhotos - viewModel.state.form.photos.count),
+                matching: .images
+            )
+            .onChange(of: pickerItems) { _, newItems in
+                handlePicked(newItems)
+            }
         }
 
         FormFieldGroup("Location") {
@@ -140,6 +158,18 @@ public struct PostGigV1View: View {
         }
 
         PostGigV1LegacyStamp()
+    }
+
+    private func handlePicked(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self), !data.isEmpty {
+                    viewModel.addPhotoData(data)
+                }
+            }
+            pickerItems = []
+        }
     }
 
     private func fieldState(_ field: PostGigV1Field) -> PantopusFieldState {
@@ -251,6 +281,7 @@ private struct PostGigV1DescriptionField: View {
 private struct PostGigV1PriceField: View {
     @Binding var value: String
     let unit: String?
+    let isDisabled: Bool
     let error: String?
 
     var body: some View {
@@ -261,12 +292,13 @@ private struct PostGigV1PriceField: View {
                     .pantopusTextStyle(.body)
                     .fontWeight(.semibold)
                     .foregroundStyle(value.isEmpty ? Theme.Color.appTextMuted : Theme.Color.appTextStrong)
-                TextField("0", text: $value)
+                TextField(isDisabled ? "Free" : "0", text: $value)
                     .keyboardType(.decimalPad)
                     .font(Theme.Font.body)
                     .fontWeight(value.isEmpty ? .regular : .semibold)
                     .foregroundStyle(Theme.Color.appText)
-                    .accessibilityLabel(error.map { "Price, error: \($0)" } ?? "Price")
+                    .disabled(isDisabled)
+                    .accessibilityLabel(error.map { "Price, error: \($0)" } ?? (isDisabled ? "Price, disabled for free gigs" : "Price"))
                     .accessibilityIdentifier("postGigV1_price")
                 if let unit {
                     Text(unit)
@@ -282,12 +314,13 @@ private struct PostGigV1PriceField: View {
             }
             .frame(minHeight: 44)
             .padding(.horizontal, Spacing.s3)
-            .background(Theme.Color.appSurface)
+            .background(isDisabled ? Theme.Color.appSurfaceMuted : Theme.Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                     .stroke(error == nil ? Theme.Color.appBorder : Theme.Color.error, lineWidth: error == nil ? 1 : 1.5)
             )
+            .opacity(isDisabled ? 0.6 : 1)
             if let error {
                 PostGigV1InlineError(message: error)
             }
@@ -367,115 +400,6 @@ private struct PostGigV1DateField: View {
             if let error {
                 PostGigV1InlineError(message: error)
             }
-        }
-    }
-}
-
-private struct PostGigV1PhotosGrid: View {
-    let photos: [PostGigV1Photo]
-    let canAdd: Bool
-    let onAdd: () -> Void
-    let onRemove: (String) -> Void
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 4)
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s1) {
-                PostGigV1FieldLabel("Photos", required: false)
-                Text("(up to \(PostGigV1SampleData.maxPhotos))")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextMuted)
-            }
-            LazyVGrid(columns: columns, spacing: Spacing.s2) {
-                ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
-                    PostGigV1PhotoTile(photo: photo, isCover: index == 0) {
-                        onRemove(photo.id)
-                    }
-                }
-                if canAdd {
-                    Button(action: onAdd) {
-                        VStack(spacing: Spacing.s1) {
-                            Icon(.plus, size: 18, color: Theme.Color.appTextSecondary)
-                            Text("Add")
-                                .pantopusTextStyle(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Theme.Color.appTextSecondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .aspectRatio(1, contentMode: .fit)
-                        .background(Theme.Color.appSurfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                                .stroke(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Add photo")
-                    .accessibilityIdentifier("postGigV1_addPhoto")
-                }
-            }
-            Text(photos.isEmpty ? "Photos help your gig get picked up faster." : "First photo is the cover. Tap remove to delete.")
-                .pantopusTextStyle(.caption)
-                .italic()
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .accessibilityIdentifier("postGigV1_photoHint")
-        }
-    }
-}
-
-private struct PostGigV1PhotoTile: View {
-    let photo: PostGigV1Photo
-    let isCover: Bool
-    let onRemove: () -> Void
-
-    private var fill: Color {
-        switch photo.tone {
-        case .sofa: Theme.Color.primary100
-        case .stairs: Theme.Color.homeBg
-        case .street: Theme.Color.businessBg
-        case .neutral: Theme.Color.appSurfaceSunken
-        }
-    }
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .fill(fill)
-                .overlay {
-                    Icon(.image, size: 20, color: Theme.Color.appTextSecondary)
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                        .stroke(Theme.Color.appBorder, lineWidth: 1)
-                )
-                .aspectRatio(1, contentMode: .fit)
-
-            if isCover {
-                Text("Cover")
-                    .pantopusTextStyle(.overline)
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, Spacing.s1)
-                    .padding(.vertical, 2)
-                    .background(Theme.Color.appText.opacity(0.78))
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(Spacing.s1)
-                    .accessibilityHidden(true)
-            }
-
-            Button(action: onRemove) {
-                Icon(.x, size: 12, color: Theme.Color.appTextInverse)
-                    .frame(width: 24, height: 24)
-                    .background(Theme.Color.appText.opacity(0.72))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .padding(5)
-            .accessibilityLabel(isCover ? "Remove cover photo" : "Remove photo")
-            .accessibilityIdentifier("postGigV1_removePhoto_\(photo.id)")
         }
     }
 }

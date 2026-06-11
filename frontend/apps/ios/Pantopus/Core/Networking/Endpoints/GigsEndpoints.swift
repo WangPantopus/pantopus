@@ -348,6 +348,14 @@ public enum GigsEndpoints {
     public static func create(_ body: CreateGigBody) -> Endpoint {
         Endpoint(method: .post, path: "/api/gigs", body: body)
     }
+
+    /// `PATCH /api/gigs/:id` — owner-only edit of an `open` gig (the
+    /// backend 403s non-owners and 400s any non-open status). Accepts
+    /// the same field names as create; unknown fields are stripped
+    /// server-side (`stripUnknown`). Route `backend/routes/gigs.js:3587`.
+    public static func update(id: String, body: UpdateGigBody) -> Endpoint {
+        Endpoint(method: .patch, path: "/api/gigs/\(id)", body: body)
+    }
 }
 
 /// Body for `POST /api/gigs/:gigId/dismiss`. Reason is optional

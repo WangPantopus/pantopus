@@ -35,6 +35,7 @@ import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -325,6 +326,18 @@ interface GigsApi {
      */
     @POST("api/gigs")
     suspend fun createGig(
+        @Body body: CreateGigBody,
+    ): CreateGigResponse
+
+    /**
+     * `PATCH /api/gigs/:id` — update a gig. Route
+     * `backend/routes/gigs.js:3587`. Owner-only, open gigs only; takes the
+     * same body fields as create (the update schema strips the rest) and
+     * returns the updated gig in the same `{ gig }` envelope.
+     */
+    @PATCH("api/gigs/{id}")
+    suspend fun updateGig(
+        @Path("id") id: String,
         @Body body: CreateGigBody,
     ): CreateGigResponse
 }

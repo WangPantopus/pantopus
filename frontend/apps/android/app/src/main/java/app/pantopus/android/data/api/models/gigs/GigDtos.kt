@@ -78,6 +78,10 @@ data class GigDto(
     @Json(name = "is_v2") val isV2: Boolean? = null,
     @Json(name = "pickup_address") val pickupAddress: String? = null,
     @Json(name = "dropoff_address") val dropoffAddress: String? = null,
+    /** Owner-visible free-text address on `GET /api/gigs/:id` (A13.8 P4 edit prefill). */
+    @Json(name = "exact_address") val exactAddress: String? = null,
+    /** Uploaded photo URLs from `GET /api/gigs/:id` — prefill the V1 editor's grid (P4). */
+    val attachments: List<String>? = null,
     @Json(name = "bid_count") val bidCount: Int? = null,
     @Json(name = "saved_by_user") val savedByUser: Boolean? = null,
     @Json(name = "distance_miles") val distanceMiles: Double? = null,

@@ -425,7 +425,7 @@ function emitGigUpdate(req, gigId, eventType) {
 const createGigSchema = Joi.object({
   title: Joi.string().min(5).max(255).required(),
   description: Joi.string().min(10).required(),
-  price: Joi.number().positive().required(),
+  price: Joi.number().min(0).required(),
   category: Joi.string().max(100).optional(),
   deadline: Joi.date().iso().min('now').optional(),
   estimated_duration: Joi.number().positive().optional(), // hours
@@ -641,7 +641,7 @@ function computeCancellationInfo(gig, cancellingUserId) {
 const updateGigSchema = Joi.object({
   title: Joi.string().min(5).max(255),
   description: Joi.string().min(10),
-  price: Joi.number().positive(),
+  price: Joi.number().min(0),
   category: Joi.string().max(100),
   deadline: Joi.date().iso().min('now'),
   estimated_duration: Joi.number().positive(),
@@ -661,6 +661,8 @@ const updateGigSchema = Joi.object({
     .max(50),
   schedule_type: Joi.string().valid('asap', 'today', 'scheduled', 'flexible'),
   pay_type: Joi.string().valid('fixed', 'hourly', 'offers'),
+  // P4 — V1 edit mode reschedules one-time gigs; mirrors createGigSchema.
+  scheduled_start: Joi.date().iso().allow(null),
   time_window_start: Joi.date().iso().allow(null),
   time_window_end: Joi.date().iso().allow(null),
   special_instructions: Joi.string().max(2000).allow('', null),

@@ -53,6 +53,13 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     public let location: GigCoordinate?
     public let exactCity: String?
     public let exactState: String?
+    /// Owner-visible street address from `GET /api/gigs/:id` (stripped
+    /// for non-owners by the backend's location-privacy pass). Feeds the
+    /// A13.8 V1 composer's edit-mode location prefill.
+    public let exactAddress: String?
+    /// Uploaded photo URLs riding the gig row. Owner edit mode rehydrates
+    /// the photo grid from these.
+    public let attachments: [String]?
     public let creator: GigCreator?
 
     enum CodingKeys: String, CodingKey {
@@ -84,6 +91,8 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case location
         case exactCity = "exact_city"
         case exactState = "exact_state"
+        case exactAddress = "exact_address"
+        case attachments
         case creator
         case legacyCreator = "User"
     }
@@ -123,6 +132,10 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         location = try c.decodeIfPresent(GigCoordinate.self, forKey: .location)
         exactCity = try c.decodeIfPresent(String.self, forKey: .exactCity)
         exactState = try c.decodeIfPresent(String.self, forKey: .exactState)
+        exactAddress = try c.decodeIfPresent(String.self, forKey: .exactAddress)
+        // Lenient — legacy rows may carry non-string entries; drop rather
+        // than fail the whole gig decode.
+        attachments = try? c.decode([String].self, forKey: .attachments)
         creator = try c.decodeIfPresent(GigCreator.self, forKey: .creator)
             ?? c.decodeIfPresent(GigCreator.self, forKey: .legacyCreator)
     }
@@ -161,7 +174,9 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         location: GigCoordinate?,
         exactCity: String?,
         exactState: String?,
-        creator: GigCreator?
+        creator: GigCreator?,
+        exactAddress: String? = nil,
+        attachments: [String]? = nil
     ) {
         self.id = id
         self.title = title
@@ -197,6 +212,8 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         self.exactCity = exactCity
         self.exactState = exactState
         self.creator = creator
+        self.exactAddress = exactAddress
+        self.attachments = attachments
     }
 }
 
@@ -590,6 +607,56 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
         case cancellationPolicy = "cancellation_policy"
         case isUrgent = "is_urgent"
         case tags
+        case location
+    }
+}
+
+/// Body for `PATCH /api/gigs/:id` (`updateGigSchema`,
+/// `backend/routes/gigs.js:641`). Same field names as create; every
+/// field is optional (the backend requires at least one). Note the
+/// update schema strips `scheduled_start` today (`stripUnknown`) — we
+/// still send it for create-parity so it persists if the backend adds
+/// it to the schema. `location` should only ride when real coordinates
+/// are known, otherwise the PATCH would overwrite the stored point.
+public struct UpdateGigBody: Encodable, Sendable, Equatable {
+    public let title: String?
+    public let description: String?
+    public let category: String?
+    public let price: Double?
+    public let payType: String?
+    public let scheduleType: String?
+    public let scheduledStart: String?
+    public let attachments: [String]?
+    public let location: CreateGigLocation?
+
+    public init(
+        title: String?,
+        description: String?,
+        category: String?,
+        price: Double?,
+        payType: String?,
+        scheduleType: String?,
+        scheduledStart: String?,
+        attachments: [String]?,
+        location: CreateGigLocation?
+    ) {
+        self.title = title
+        self.description = description
+        self.category = category
+        self.price = price
+        self.payType = payType
+        self.scheduleType = scheduleType
+        self.scheduledStart = scheduledStart
+        self.attachments = attachments
+        self.location = location
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case title, description, category, price
+        case payType = "pay_type"
+        case scheduleType = "schedule_type"
+        case scheduledStart = "scheduled_start"
+        case attachments
         case location
     }
 }
