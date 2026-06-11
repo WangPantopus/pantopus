@@ -19,9 +19,13 @@ import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.GigTemplatesResponse
 import app.pantopus.android.data.api.models.gigs.HiddenCategoryBody
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
+import app.pantopus.android.data.api.models.gigs.MagicPostBody
+import app.pantopus.android.data.api.models.gigs.MagicPostResponse
+import app.pantopus.android.data.api.models.gigs.MagicUndoResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.MyGigsResponse
@@ -107,6 +111,15 @@ class GigsRepository
 
         /** `POST /api/gigs/magic-draft` — NLP-parse the describe text. */
         suspend fun magicDraft(body: MagicDraftRequest): NetworkResult<MagicDraftResponse> = safeApiCall { api.magicDraft(body) }
+
+        /** `POST /api/gigs/magic-post` — A12.8 wizard submission with an undo window. */
+        suspend fun magicPost(body: MagicPostBody): NetworkResult<MagicPostResponse> = safeApiCall { api.magicPost(body) }
+
+        /** `POST /api/gigs/:gigId/undo` — undo a just-posted gig within its window. */
+        suspend fun undoMagicPost(gigId: String): NetworkResult<MagicUndoResponse> = safeApiCall { api.undoMagicPost(gigId) }
+
+        /** `GET /api/gigs/templates/library` — smart-template chips (silent failure at call sites). */
+        suspend fun templatesLibrary(): NetworkResult<GigTemplatesResponse> = safeApiCall { api.templatesLibrary() }
 
         suspend fun nearby(
             latitude: Double,

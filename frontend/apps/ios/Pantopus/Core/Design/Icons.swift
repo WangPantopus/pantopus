@@ -360,6 +360,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case maximize
     case mapPinOff = "map-pin-off"
 
+    // A12.8 Magic Task wizard — describe-card mic, manual-picker ghost
+    // CTA (`layout-grid`), and the engagement tiles (`circle-dot` /
+    // `repeat-2`; Open-ended reuses `infinity`).
+    case mic
+    case layoutGrid = "layout-grid"
+    case circleDot = "circle-dot"
+    case repeat2 = "repeat-2"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -636,6 +644,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .layers: "square.3.layers.3d"
         case .maximize: "arrow.up.left.and.arrow.down.right"
         case .mapPinOff: "mappin.slash"
+        // A12.8 Magic Task wizard. `mic` and `circle-dot` have direct SF
+        // equivalents; `layout-grid` maps to the 2×2 grid; `repeat-2`
+        // collapses onto the same cycle glyph as `repeat`.
+        case .mic: "mic"
+        case .layoutGrid: "square.grid.2x2"
+        case .circleDot: "smallcircle.filled.circle"
+        case .repeat2: "arrow.triangle.2.circlepath"
         }
     }
 }

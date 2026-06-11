@@ -36,6 +36,11 @@ public struct WizardChrome: Sendable, Equatable {
     public let leading: WizardLeadingControl
     public let primaryCTALabel: String
     public let primaryCTAEnabled: Bool
+    /// Accessibility identifier on the primary CTA. Defaults to the
+    /// legacy shell-wide `wizardPrimaryCTA`; features override it when a
+    /// design ships canonical per-step ids (e.g. A12.8's
+    /// `gigCompose.cta.reviewPost`).
+    public let primaryCTAIdentifier: String
     public let secondaryCTA: WizardSecondaryCTA?
     public let isSubmitting: Bool
     /// Optional caption rendered above the primary CTA in the sticky dock —
@@ -52,6 +57,7 @@ public struct WizardChrome: Sendable, Equatable {
         leading: WizardLeadingControl,
         primaryCTALabel: String,
         primaryCTAEnabled: Bool,
+        primaryCTAIdentifier: String = "wizardPrimaryCTA",
         secondaryCTA: WizardSecondaryCTA? = nil,
         isSubmitting: Bool = false,
         footerHint: String? = nil,
@@ -64,6 +70,7 @@ public struct WizardChrome: Sendable, Equatable {
         self.leading = leading
         self.primaryCTALabel = primaryCTALabel
         self.primaryCTAEnabled = primaryCTAEnabled
+        self.primaryCTAIdentifier = primaryCTAIdentifier
         self.secondaryCTA = secondaryCTA
         self.isSubmitting = isSubmitting
         self.footerHint = footerHint
@@ -77,9 +84,13 @@ public struct WizardChrome: Sendable, Equatable {
 public struct WizardSecondaryCTA: Sendable, Equatable {
     public let label: String
     public let identifier: String
+    /// Optional leading glyph (e.g. A12.8's `layout-grid` on the
+    /// "Pick category" ghost). nil renders a plain text ghost.
+    public let icon: PantopusIcon?
 
-    public init(label: String, identifier: String) {
+    public init(label: String, identifier: String, icon: PantopusIcon? = nil) {
         self.label = label
         self.identifier = identifier
+        self.icon = icon
     }
 }

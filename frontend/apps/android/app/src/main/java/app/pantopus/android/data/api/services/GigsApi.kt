@@ -21,8 +21,12 @@ import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
 import app.pantopus.android.data.api.models.gigs.HiddenCategoryBody
 import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
+import app.pantopus.android.data.api.models.gigs.GigTemplatesResponse
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
+import app.pantopus.android.data.api.models.gigs.MagicPostBody
+import app.pantopus.android.data.api.models.gigs.MagicPostResponse
+import app.pantopus.android.data.api.models.gigs.MagicUndoResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.MyGigsResponse
@@ -75,6 +79,32 @@ interface GigsApi {
     suspend fun magicDraft(
         @Body body: MagicDraftRequest,
     ): MagicDraftResponse
+
+    /**
+     * `POST /api/gigs/magic-post` — create a gig from a magic/classic
+     * draft with a 10s undo window. Route `backend/routes/magicTask.js:397`.
+     * A12.8 — replaces `POST /api/gigs` for the Post-a-Task wizard.
+     */
+    @POST("api/gigs/magic-post")
+    suspend fun magicPost(
+        @Body body: MagicPostBody,
+    ): MagicPostResponse
+
+    /**
+     * `POST /api/gigs/:gigId/undo` — delete a just-posted gig within its
+     * undo window. Route `backend/routes/magicTask.js:682`.
+     */
+    @POST("api/gigs/{gigId}/undo")
+    suspend fun undoMagicPost(
+        @Path("gigId") gigId: String,
+    ): MagicUndoResponse
+
+    /**
+     * `GET /api/gigs/templates/library` — static smart-template chips for
+     * the empty describe state. Route `backend/routes/magicTask.js:326`.
+     */
+    @GET("api/gigs/templates/library")
+    suspend fun templatesLibrary(): GigTemplatesResponse
 
     /**
      * `GET /api/gigs/browse` — pre-sectioned browse feed (best matches,

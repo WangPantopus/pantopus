@@ -129,6 +129,28 @@ public enum GigsEndpoints {
         Endpoint(method: .post, path: "/api/gigs/magic-draft", body: body)
     }
 
+    /// `POST /api/gigs/magic-post` — create a gig from a (magic or
+    /// classic) draft with a 10-second undo window. The gig is inserted
+    /// immediately but hidden from search/feed until the window lapses.
+    /// Route `backend/routes/magicTask.js:397`.
+    public static func magicPost(body: MagicPostBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/magic-post", body: body)
+    }
+
+    /// `POST /api/gigs/:gigId/undo` — undo a freshly magic-posted gig
+    /// (within the 10-second undo window; deletes it entirely). Route
+    /// `backend/routes/magicTask.js:682`.
+    public static func undoGig(gigId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/undo")
+    }
+
+    /// `GET /api/gigs/templates/library` — static smart-template chips
+    /// for the Magic describe step's inspiration row. Route
+    /// `backend/routes/magicTask.js:326`.
+    public static func templatesLibrary() -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/templates/library")
+    }
+
     /// `GET /api/gigs/nearby` — radius search around `latitude/longitude`.
     /// `radius` is **meters** to match the backend signature.
     public static func nearby(

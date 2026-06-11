@@ -127,6 +127,7 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
@@ -159,6 +160,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
@@ -466,6 +468,11 @@ enum class PantopusIcon(
     ReceiptText("receipt-text"),
     Paperclip("paperclip"),
     ArrowDownUp("arrow-down-up"),
+
+    // A12.8 Magic Task wizard — describe-card voice note + One-time
+    // engagement tile glyph.
+    Mic("mic"),
+    CircleDot("circle-dot"),
 
     // T6.6b — Chat conversation refresh: header trailing (phone / video /
     // more-vertical for person, history / more-vertical for AI) +
@@ -826,6 +833,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.ReceiptText -> IconSource.Material(Icons.Filled.Description)
         PantopusIcon.Paperclip -> IconSource.Material(Icons.Filled.AttachFile)
         PantopusIcon.ArrowDownUp -> IconSource.Material(Icons.Filled.Sort)
+
+        // A12.8 Magic Task wizard — `Mic` is a direct match; Lucide's
+        // `circle-dot` (One-time engagement tile) maps to Material's
+        // `RadioButtonChecked` ring-with-dot glyph.
+        PantopusIcon.Mic -> IconSource.Material(Icons.Filled.Mic)
+        PantopusIcon.CircleDot -> IconSource.Material(Icons.Filled.RadioButtonChecked)
 
         // T6.6b — Chat conversation refresh. Material's `MoreVert` is a
         // direct match for `more-vertical`; `Videocam` matches Lucide's

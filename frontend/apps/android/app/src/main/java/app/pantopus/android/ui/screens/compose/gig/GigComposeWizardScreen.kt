@@ -2,8 +2,12 @@
 
 package app.pantopus.android.ui.screens.compose.gig
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.media.MediaRecorder
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,9 +47,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
@@ -65,7 +72,9 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -79,9 +88,9 @@ const val GIG_COMPOSE_SCREEN_TAG = "composeGigWizard"
 private const val REVIEW_DESCRIPTION_MAX_LENGTH = 140
 
 /**
- * Concrete Post-a-Task wizard composable. The view model survives
- * config changes via Hilt's `SavedStateHandle`, so the wizard restores
- * after process death.
+ * A12.8 — concrete describe-first Post-a-Task wizard composable. The
+ * view model survives config changes via Hilt's `SavedStateHandle`, so
+ * the wizard restores after process death.
  */
 @Composable
 fun GigComposeWizardScreen(
@@ -103,9 +112,72 @@ fun GigComposeWizardScreen(
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), onPicked)
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent(), onPicked)
 
+    // A12.8 — voice-note recording (mic tool button). RECORD_AUDIO is a
+    // runtime permission; the recorder writes an m4a/AAC file into the
+    // cache dir, which is transcribed via `POST /api/ai/transcribe`.
+    var isRecording by remember { mutableStateOf(false) }
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    val voiceNoteFile = remember { File(context.cacheDir, "gigComposeVoiceNote.m4a") }
+
+    fun startRecording() {
+        if (isRecording) return
+        runCatching {
+            val mediaRecorder =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    MediaRecorder(context)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaRecorder()
+                }
+            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            mediaRecorder.setOutputFile(voiceNoteFile.absolutePath)
+            mediaRecorder.prepare()
+            mediaRecorder.start()
+            recorder = mediaRecorder
+            isRecording = true
+        }.onFailure {
+            recorder?.release()
+            recorder = null
+            isRecording = false
+        }
+    }
+
+    fun stopRecordingAndTranscribe() {
+        val active = recorder ?: return
+        isRecording = false
+        recorder = null
+        runCatching {
+            active.stop()
+            active.release()
+        }
+        runCatching { voiceNoteFile.readBytes() }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() && it.size <= VOICE_NOTE_MAX_BYTES }
+            ?.let { viewModel.transcribeAudio("voice-note.m4a", "audio/mp4", it) }
+    }
+
+    val micPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startRecording()
+        }
+
+    fun onMicTap() {
+        when {
+            isRecording -> stopRecordingAndTranscribe()
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED -> startRecording()
+            else -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     LaunchedEffect(preselectedCategoryKey) {
         viewModel.preselectCategoryIfNeeded(GigComposeCategory.fromRawKey(preselectedCategoryKey))
     }
+
+    // A12.8 — inspiration templates for the empty describe state (silent failure).
+    LaunchedEffect(Unit) { viewModel.loadTemplatesIfNeeded() }
 
     LaunchedEffect(pendingEvent) {
         when (val event = pendingEvent) {
@@ -138,20 +210,27 @@ fun GigComposeWizardScreen(
         modifier = Modifier.testTag(GIG_COMPOSE_SCREEN_TAG),
     ) {
         when (state.form.currentStep) {
-            GigComposeStep.Category ->
-                // B.3 — Step 1 renders Magic describe (default) or the
+            GigComposeStep.Describe ->
+                // A12.8 — step 1 renders Magic describe (default) or the
                 // manual archetype picker, toggled by `composeMode`.
                 if (state.form.composeMode == ComposeMode.Magic) {
-                    MagicDescribeStep(state, viewModel)
+                    MagicDescribeStep(
+                        state = state,
+                        vm = viewModel,
+                        isRecording = isRecording,
+                        onMicTap = ::onMicTap,
+                        onImageTap = {
+                            photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onAttachTap = { filePicker.launch("*/*") },
+                    )
                 } else {
                     ManualPickerStep(state, viewModel)
                 }
-            GigComposeStep.Basics -> BasicsStep(state, viewModel)
-            GigComposeStep.Budget -> BudgetStep(state, viewModel)
-            GigComposeStep.Schedule -> ScheduleStep(state, viewModel)
-            GigComposeStep.Location -> LocationStep(state, viewModel)
+            GigComposeStep.FillGaps -> FillGapsStep(state, viewModel)
+            GigComposeStep.BudgetMode -> BudgetModeStep(state, viewModel)
             GigComposeStep.Review -> ReviewStep(state, viewModel)
-            GigComposeStep.Success -> SuccessStep()
+            GigComposeStep.Success -> SuccessStep(state, viewModel)
         }
         state.errorMessage?.let { ErrorBanner(it) }
     }
@@ -167,6 +246,9 @@ fun GigComposeWizardScreen(
         onPickFile = { filePicker.launch("*/*") },
     )
 }
+
+/** A12.8 — backend transcribe cap (25 MB Whisper limit). */
+private const val VOICE_NOTE_MAX_BYTES = 25 * 1024 * 1024
 
 /**
  * P0.2 — copy a picked content URI to bytes + mime for the multipart
@@ -198,15 +280,19 @@ private fun extensionFor(mime: String): String =
         else -> "jpg"
     }
 
-// MARK: - Step 2: Basics
+// MARK: - Step 2: Fill gaps
 
+/**
+ * A12.8 — title + description (AI-prefilled, editable) + photos + the
+ * missing When/Where pickers + the detected archetype's module fields.
+ */
 @Composable
-private fun BasicsStep(
+internal fun FillGapsStep(
     state: GigComposeUiState,
     vm: GigComposeViewModel,
 ) {
-    HeadlineBlock("Describe the task")
-    SubcopyBlock("A clear title and a few details help neighbors decide if it's right for them.")
+    HeadlineBlock("Fill in the gaps")
+    SubcopyBlock("We drafted what we could. Check the title, add what's missing, and you're set.")
     FormFieldsBlock {
         PantopusTextField(
             label = "Title",
@@ -232,6 +318,97 @@ private fun BasicsStep(
         onRemoveUploaded = vm::removePhoto,
         onRemoveUpload = vm::removePhotoUpload,
         onRetryUpload = vm::retryPhotoUpload,
+    )
+    WhenSection(state, vm)
+    WhereSection(state, vm)
+    // A12.8 — archetype-specific module fields (care / logistics /
+    // remote / event / items).
+    GigComposeModuleFields(state, vm)
+}
+
+@Composable
+private fun WhenSection(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        SectionOverline("WHEN")
+        GigComposeScheduleType.entries.forEach { type ->
+            RadioRow(
+                label = type.label,
+                subcopy = type.subcopy(),
+                isSelected = state.form.scheduleType == type,
+                testTag = "composeGig_schedule_${type.name.lowercase()}",
+                onTap = { vm.selectScheduleType(type) },
+            )
+        }
+        if (state.form.scheduleType == GigComposeScheduleType.OneTime) {
+            OneTimeDateRow(state, vm)
+        }
+    }
+}
+
+@Composable
+private fun WhereSection(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        SectionOverline("WHERE")
+        GigComposeLocationMode.entries.forEach { mode ->
+            RadioRow(
+                label = mode.label,
+                subcopy = mode.subcopy(),
+                isSelected = state.form.locationMode == mode,
+                testTag = "composeGig_location_${mode.name.lowercase()}",
+                onTap = { vm.selectLocationMode(mode) },
+            )
+        }
+        if (state.form.locationMode == GigComposeLocationMode.APlace) {
+            FormFieldsBlock {
+                PantopusTextField(
+                    label = "Street",
+                    value = state.form.placeAddress.line1,
+                    onValueChange = { vm.updatePlaceAddress(line1 = it) },
+                    placeholder = "123 Main St",
+                    fieldTestTag = "composeGig_place_line1",
+                )
+                PantopusTextField(
+                    label = "City",
+                    value = state.form.placeAddress.city,
+                    onValueChange = { vm.updatePlaceAddress(city = it) },
+                    fieldTestTag = "composeGig_place_city",
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    PantopusTextField(
+                        label = "State",
+                        value = state.form.placeAddress.state,
+                        onValueChange = { vm.updatePlaceAddress(state = it) },
+                        modifier = Modifier.weight(1f),
+                        fieldTestTag = "composeGig_place_state",
+                    )
+                    PantopusTextField(
+                        label = "ZIP",
+                        value = state.form.placeAddress.zip,
+                        onValueChange = { vm.updatePlaceAddress(zip = it) },
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f),
+                        fieldTestTag = "composeGig_place_zip",
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionOverline(text: String) {
+    Text(
+        text,
+        fontSize = 10.5.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.6.sp,
+        color = PantopusColors.appTextSecondary,
     )
 }
 
@@ -441,17 +618,21 @@ private fun UploadingPhotoTile(
     }
 }
 
-// MARK: - Step 3: Budget
+// MARK: - Step 3: Budget & mode
 
+/**
+ * A12.8 — pay selector (fixed/hourly/offers + amount + estimated hours)
+ * plus the editable wire `engagement_mode` segmented control.
+ */
 @Composable
-private fun BudgetStep(
+internal fun BudgetModeStep(
     state: GigComposeUiState,
     vm: GigComposeViewModel,
 ) {
     // P1.G — covers a restored wizard landing directly on this step;
     // the VM dedupes per category so the step-advance fetch isn't repeated.
     LaunchedEffect(Unit) { vm.fetchPriceBenchmark() }
-    HeadlineBlock("Set your budget")
+    HeadlineBlock("Budget & mode")
     SubcopyBlock("Pick a price model. Helpers see this on the gig card.")
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         GigComposeBudgetType.entries.forEach { type ->
@@ -490,6 +671,18 @@ private fun BudgetStep(
             }
         }
     }
+    if (selected != null && selected != GigComposeBudgetType.Offers) {
+        FormFieldsBlock {
+            PantopusTextField(
+                label = "Estimated hours (optional)",
+                value = state.form.estimatedHours,
+                onValueChange = vm::setEstimatedHours,
+                placeholder = "2",
+                keyboardType = KeyboardType.Decimal,
+                fieldTestTag = "composeGig_estimatedHours",
+            )
+        }
+    }
     // P1.G — nearby price-benchmark hint; hidden when the fetch failed
     // or there are no comparable tasks.
     state.priceBenchmark?.let { benchmark ->
@@ -514,153 +707,65 @@ private fun BudgetStep(
             }
         }
     }
+    EngagementWireControl(state, vm)
 }
 
-// MARK: - Step 4: Schedule
-
+/**
+ * A12.8 — segmented control for the wire `engagement_mode`. Selection
+ * defaults to [GigComposeViewModel.resolvedEngagementMode]'s inference
+ * (pro → quotes, asap/urgent → instant accept, else curated offers).
+ */
 @Composable
-private fun ScheduleStep(
+private fun EngagementWireControl(
     state: GigComposeUiState,
     vm: GigComposeViewModel,
 ) {
-    HeadlineBlock("When does it need to happen?")
-    SubcopyBlock("Pick one — you can change it later.")
+    val resolvedWire = vm.resolvedEngagementMode(state.form)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        GigComposeScheduleType.entries.forEach { type ->
-            RadioRow(
-                label = type.label,
-                subcopy = type.subcopy(),
-                isSelected = state.form.scheduleType == type,
-                testTag = "composeGig_schedule_${type.name.lowercase()}",
-                onTap = { vm.selectScheduleType(type) },
-            )
-        }
-    }
-    if (state.form.scheduleType == GigComposeScheduleType.OneTime) {
-        OneTimeDateRow(state, vm)
-    }
-}
-
-@Composable
-private fun OneTimeDateRow(
-    state: GigComposeUiState,
-    vm: GigComposeViewModel,
-) {
-    // P0.3 — real Material3 date (today onward) + time picker pair. The
-    // VM keeps the existing "must be in the future" validation on the
-    // composed instant.
-    var showPickers by remember { mutableStateOf(false) }
-    val current =
-        state.form.scheduledStartISO?.let { iso ->
-            runCatching { Instant.parse(iso) }.getOrNull()
-        }
-    FormFieldsBlock {
-        val formatted =
-            current?.let { instant ->
-                LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
-            } ?: "Pick a date & time"
+        SectionOverline("ENGAGEMENT MODE")
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.md))
-                    .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(Radii.md))
-                    .clickable(role = Role.Button) { showPickers = true }
-                    .padding(Spacing.s3)
-                    .testTag("composeGig_scheduledStart"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurfaceSunken)
+                    .padding(Spacing.s1),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
-            PantopusIconImage(
-                icon = PantopusIcon.Calendar,
-                contentDescription = null,
-                size = 18.dp,
-                tint = PantopusColors.appTextSecondary,
-            )
-            Text(
-                text = formatted,
-                style = PantopusTextStyle.body,
-                color = PantopusColors.appText,
-                modifier = Modifier.weight(1f),
-            )
-            PantopusIconImage(
-                icon = PantopusIcon.ChevronRight,
-                contentDescription = null,
-                size = 18.dp,
-                tint = PantopusColors.appTextSecondary,
-            )
-        }
-    }
-    if (showPickers) {
-        FutureDateTimePickerDialogs(
-            initial = current?.let { LocalDateTime.ofInstant(it, ZoneId.systemDefault()) },
-            onPicked = { picked ->
-                showPickers = false
-                vm.setScheduledStart(picked.atZone(ZoneId.systemDefault()).toInstant().toString())
-            },
-            onDismiss = { showPickers = false },
-        )
-    }
-}
-
-// MARK: - Step 5: Location
-
-@Composable
-private fun LocationStep(
-    state: GigComposeUiState,
-    vm: GigComposeViewModel,
-) {
-    HeadlineBlock("Where does the task happen?")
-    SubcopyBlock("Your exact address is shared only after a helper is selected.")
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        GigComposeLocationMode.entries.forEach { mode ->
-            RadioRow(
-                label = mode.label,
-                subcopy = mode.subcopy(),
-                isSelected = state.form.locationMode == mode,
-                testTag = "composeGig_location_${mode.name.lowercase()}",
-                onTap = { vm.selectLocationMode(mode) },
-            )
-        }
-    }
-    if (state.form.locationMode == GigComposeLocationMode.APlace) {
-        FormFieldsBlock {
-            PantopusTextField(
-                label = "Street",
-                value = state.form.placeAddress.line1,
-                onValueChange = { vm.updatePlaceAddress(line1 = it) },
-                placeholder = "123 Main St",
-                fieldTestTag = "composeGig_place_line1",
-            )
-            PantopusTextField(
-                label = "City",
-                value = state.form.placeAddress.city,
-                onValueChange = { vm.updatePlaceAddress(city = it) },
-                fieldTestTag = "composeGig_place_city",
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                PantopusTextField(
-                    label = "State",
-                    value = state.form.placeAddress.state,
-                    onValueChange = { vm.updatePlaceAddress(state = it) },
-                    modifier = Modifier.weight(1f),
-                    fieldTestTag = "composeGig_place_state",
-                )
-                PantopusTextField(
-                    label = "ZIP",
-                    value = state.form.placeAddress.zip,
-                    onValueChange = { vm.updatePlaceAddress(zip = it) },
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.weight(1f),
-                    fieldTestTag = "composeGig_place_zip",
-                )
+            GigEngagementMode.entries.forEach { option ->
+                val active = option.wireValue == resolvedWire
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(if (active) PantopusColors.appSurface else androidx.compose.ui.graphics.Color.Transparent)
+                            .let {
+                                if (active) {
+                                    it.border(1.dp, PantopusColors.primary600, RoundedCornerShape(Radii.md))
+                                } else {
+                                    it
+                                }
+                            }
+                            .clickable(role = Role.Button, onClick = { vm.selectEngagementOverride(option) })
+                            .padding(vertical = Spacing.s2)
+                            .testTag("gigCompose.engagementMode_${option.wireValue}")
+                            .semantics { contentDescription = option.label },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        option.label,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (active) PantopusColors.primary700 else PantopusColors.appTextSecondary,
+                    )
+                }
             }
         }
     }
 }
 
-// MARK: - Step 6: Review
+// MARK: - Step 4: Review & post
 
 @Composable
 private fun ReviewStep(
@@ -670,6 +775,11 @@ private fun ReviewStep(
     HeadlineBlock("Review and post")
     SubcopyBlock("Check the details. Helpers see what's below as your gig card.")
     val form = state.form
+
+    // A12.8 — successful undo lands back here with the form intact.
+    if (state.showUndoneToast) {
+        UndoneToast(onDismiss = vm::acknowledgeUndoneToast)
+    }
 
     ReviewSummaryBlock(
         rows =
@@ -681,11 +791,36 @@ private fun ReviewStep(
                 ReviewSummaryRow("Budget", budgetSummary(form)),
                 ReviewSummaryRow("Schedule", scheduleSummary(form)),
                 ReviewSummaryRow("Location", locationSummary(form)),
+                ReviewSummaryRow("Mode", GigEngagementMode.fromWire(vm.resolvedEngagementMode(form))?.label ?: "—"),
             ),
     )
     // E.1 — optional composer fields backed by the picker sheets.
     GigComposeOptionsBlock(form = form, vm = vm)
 }
+
+@Composable
+private fun UndoneToast(onDismiss: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(UNDONE_TOAST_MS)
+        onDismiss()
+    }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.successBg)
+                .padding(Spacing.s3)
+                .testTag("gigCompose.undoneToast"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.CheckCircle, contentDescription = null, size = 16.dp, tint = PantopusColors.success)
+        Text("Task undone", style = PantopusTextStyle.caption, color = PantopusColors.success)
+    }
+}
+
+private const val UNDONE_TOAST_MS = 4_000L
 
 private fun photosSummary(count: Int): String =
     when (count) {
@@ -759,15 +894,149 @@ private fun condensedDescription(raw: String): String {
 
 // MARK: - Success
 
+/**
+ * A12.8 — "Task posted" + notified count + 10s undo countdown pill
+ * (`POST /api/gigs/:gigId/undo` → back to Review with the form intact).
+ */
 @Composable
-private fun SuccessStep() {
+private fun SuccessStep(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
+    val result = state.postResult
     SuccessHeroBlock(
         headline = "Task posted",
         subcopy = "Helpers can now see it on the Gigs feed. We'll notify you when bids come in.",
     )
+    if (result != null) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Text(
+                "Notified ${result.notifiedCount} nearby helpers",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.testTag("gigCompose.success.notified"),
+            )
+            UndoCountdownPill(result = result, onUndo = vm::undoPost)
+        }
+    }
 }
 
+@Composable
+private fun UndoCountdownPill(
+    result: GigComposePostResult,
+    onUndo: () -> Unit,
+) {
+    var remainingMs by remember(result.gigId) {
+        mutableLongStateOf(result.undoDeadlineEpochMs - System.currentTimeMillis())
+    }
+    LaunchedEffect(result.gigId) {
+        while (remainingMs > 0) {
+            delay(UNDO_TICK_MS)
+            remainingMs = result.undoDeadlineEpochMs - System.currentTimeMillis()
+        }
+    }
+    if (remainingMs <= 0) return
+    val seconds = ((remainingMs + MS_PER_SECOND - 1) / MS_PER_SECOND).coerceAtLeast(1)
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                .clickable(role = Role.Button, onClick = onUndo)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                .testTag("gigCompose.success.undo")
+                .semantics { contentDescription = "Undo, $seconds seconds left" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.History,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.appTextStrong,
+        )
+        Text(
+            "Undo · ${seconds}s",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextStrong,
+        )
+    }
+}
+
+private const val UNDO_TICK_MS = 250L
+private const val MS_PER_SECOND = 1_000L
+
 // MARK: - Helpers
+
+@Composable
+private fun OneTimeDateRow(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
+    // P0.3 — real Material3 date (today onward) + time picker pair. The
+    // VM keeps the existing "must be in the future" validation on the
+    // composed instant.
+    var showPickers by remember { mutableStateOf(false) }
+    val current =
+        state.form.scheduledStartISO?.let { iso ->
+            runCatching { Instant.parse(iso) }.getOrNull()
+        }
+    FormFieldsBlock {
+        val formatted =
+            current?.let { instant ->
+                LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
+            } ?: "Pick a date & time"
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(Radii.md))
+                    .clickable(role = Role.Button) { showPickers = true }
+                    .padding(Spacing.s3)
+                    .testTag("composeGig_scheduledStart"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Calendar,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = formatted,
+                style = PantopusTextStyle.body,
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+    if (showPickers) {
+        FutureDateTimePickerDialogs(
+            initial = current?.let { LocalDateTime.ofInstant(it, ZoneId.systemDefault()) },
+            onPicked = { picked ->
+                showPickers = false
+                vm.setScheduledStart(picked.atZone(ZoneId.systemDefault()).toInstant().toString())
+            },
+            onDismiss = { showPickers = false },
+        )
+    }
+}
 
 @Composable
 private fun RadioRow(

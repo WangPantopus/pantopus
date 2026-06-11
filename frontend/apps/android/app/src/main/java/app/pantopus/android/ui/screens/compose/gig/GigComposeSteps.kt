@@ -2,50 +2,52 @@
 
 package app.pantopus.android.ui.screens.compose.gig
 
+import app.pantopus.android.data.api.models.gigs.CareDetailsDto
+import app.pantopus.android.data.api.models.gigs.EventDetailsDto
+import app.pantopus.android.data.api.models.gigs.LogisticsDetailsDto
+import app.pantopus.android.data.api.models.gigs.MagicTaskItemDto
+import app.pantopus.android.data.api.models.gigs.RemoteDetailsDto
+
 /**
- * The six pre-success steps of the Post-a-Task wizard, in order. The
- * success state is a sentinel terminal step used to render the success
- * hero block.
+ * A12.8 — the describe-first Post-a-Task wizard: four steps + a success
+ * terminal. Step 1 renders either the Magic describe surface (default)
+ * or the manual category grid, toggled by [ComposeMode].
  */
 enum class GigComposeStep(
     val ordinal0: Int,
 ) {
-    Category(0),
-    Basics(1),
-    Budget(2),
-    Schedule(3),
-    Location(4),
-    Review(5),
-    Success(6),
+    Describe(0),
+    FillGaps(1),
+    BudgetMode(2),
+    Review(3),
+    Success(4),
     ;
 
     /**
-     * One-indexed position used in the "N of M" top-bar readout, or
+     * One-indexed position used in the "N of 4" top-bar readout, or
      * `null` for the success terminal.
      */
     val stepNumber: Int?
         get() =
             when (this) {
-                Category -> 1
-                Basics -> 2
-                Budget -> 3
-                Schedule -> 4
-                Location -> 5
-                Review -> 6
+                Describe -> 1
+                FillGaps -> 2
+                BudgetMode -> 3
+                Review -> 4
                 Success -> null
             }
 
     companion object {
         /** Total number of "step N of M" steps shown in the readout. */
-        const val PROGRESS_TOTAL: Int = 6
+        const val PROGRESS_TOTAL: Int = 4
 
-        fun fromOrdinal(value: Int): GigComposeStep = entries.firstOrNull { it.ordinal0 == value } ?: Category
+        fun fromOrdinal(value: Int): GigComposeStep = entries.firstOrNull { it.ordinal0 == value } ?: Describe
     }
 }
 
 /**
- * One-of-nine category the user picks in step 1. Mirrors the chip
- * palette in `gigs-frames.jsx` CATS plus an `Other` bucket that is
+ * One-of-nine category the user picks (or Magic detects). Mirrors the
+ * chip palette in `gigs-frames.jsx` CATS plus an `Other` bucket that is
  * surfaced in the composer but not in the feed filter.
  */
 enum class GigComposeCategory(
@@ -78,20 +80,40 @@ enum class GigComposeCategory(
 }
 
 /**
- * B.3 (A12.8) — entry mode for step 1. `Magic` is the default AI-assisted
- * describe path; `Manual` is the category-grid fallback reachable via the
- * "Pick a category instead" link.
+ * A12.8 — entry mode for step 1. `Magic` is the default AI-assisted
+ * describe path; `Manual` is the category-grid alternate reachable via
+ * the "Pick category" ghost CTA.
  */
 enum class ComposeMode { Magic, Manual }
 
 /**
- * B.3 (A12.8) — compact Magic Task engagement selector. It pre-fills the
- * downstream schedule / budget steps instead of adding a separate backend
- * field.
+ * A12.8 — describe-step engagement tiles (One-time "Done once" /
+ * Recurring "Weekly +" / Open-ended "Until done"). They prefill the
+ * schedule downstream; the wire `engagement_mode` is a separate control
+ * on the Budget & mode step ([GigEngagementMode]).
  */
-enum class GigComposeEngagementMode { OneTime, Recurring, OpenBidding }
+enum class GigComposeEngagementMode { OneTime, Recurring, OpenEnded }
 
-/** Budget-type radio in step 3. */
+/**
+ * A12.8 — backend `engagement_mode` on `POST /api/gigs/magic-post`.
+ * Defaulted by [GigComposeViewModel.inferEngagementMode] and overridable
+ * on the Budget & mode step's segmented control.
+ */
+enum class GigEngagementMode(
+    val wireValue: String,
+    val label: String,
+) {
+    InstantAccept("instant_accept", "Instant accept"),
+    CuratedOffers("curated_offers", "Curated offers"),
+    Quotes("quotes", "Quotes"),
+    ;
+
+    companion object {
+        fun fromWire(raw: String?): GigEngagementMode? = entries.firstOrNull { it.wireValue == raw }
+    }
+}
+
+/** Budget-type radio on the Budget & mode step. */
 enum class GigComposeBudgetType(
     val wireValue: String,
     val label: String,
@@ -109,7 +131,7 @@ enum class GigComposeBudgetType(
         }
 }
 
-/** Schedule-type radio in step 4. */
+/** Schedule-type radio in the Fill-gaps "When" section. */
 enum class GigComposeScheduleType(
     val label: String,
 ) {
@@ -119,10 +141,9 @@ enum class GigComposeScheduleType(
     ;
 
     /**
-     * Wire value forwarded as `schedule_type` to `POST /api/gigs`.
-     * `Recurring` maps to `flexible` until the backend gains a true
-     * recurring schedule_type — the spec surfaces it in the UI but the
-     * API doesn't model it yet.
+     * Wire value forwarded as `schedule_type` on magic-post. `OneTime`
+     * with a date is `scheduled`; everything else maps to `flexible`
+     * (urgent posts override to `asap` at body-build time).
      */
     val wireValue: String
         get() =
@@ -140,7 +161,7 @@ enum class GigComposeScheduleType(
         }
 }
 
-/** Location-mode radio in step 5. */
+/** Location-mode radio in the Fill-gaps "Where" section. */
 enum class GigComposeLocationMode(
     val label: String,
 ) {
@@ -184,10 +205,9 @@ enum class GigCancellationPolicy(
 enum class GigPickerSheet { Attachment, Category, Deadline, Policy, Urgency, Tags }
 
 /**
- * P0.2 — one in-flight (or failed) photo upload tile in the Basics step.
- * Uploaded photos graduate into [GigComposeFormState.photoIds] as URLs;
- * these transient tiles are never persisted (raw bytes can't survive
- * process death anyway).
+ * P0.2 — one in-flight (or failed) photo upload tile. Uploaded photos
+ * graduate into [GigComposeFormState.photoIds] as URLs; these transient
+ * tiles are never persisted (raw bytes can't survive process death anyway).
  */
 data class GigComposePhotoUpload(
     val id: String,
@@ -217,7 +237,7 @@ class GigComposePickedPhoto(
     val bytes: ByteArray,
 )
 
-/** Plain-old-data address fields collected in step 5 for `APlace`. */
+/** Plain-old-data address fields collected for `APlace`. */
 data class GigComposePlaceAddress(
     val line1: String = "",
     val city: String = "",
@@ -232,10 +252,32 @@ data class GigComposePlaceAddress(
                 zip.trim().isNotEmpty()
 }
 
+/** A12.8 — projected smart-template chip for the empty describe state. */
+data class GigComposeTemplate(
+    val id: String,
+    val label: String,
+    /** Emoji glyph (may be empty). */
+    val icon: String,
+    /** Text seeded into the describe field on tap. */
+    val seedText: String,
+)
+
+/**
+ * A12.8 — post-submit success metadata from magic-post: undo window +
+ * notified counts for the success step.
+ */
+data class GigComposePostResult(
+    val gigId: String,
+    /** Epoch millis when the undo window closes. */
+    val undoDeadlineEpochMs: Long,
+    val nearbyHelpers: Int,
+    val notifiedCount: Int,
+)
+
 /**
  * Validation constants enforced at the UI layer. The backend also
- * validates (`backend/routes/gigs.js:425`); these mirror the prompt's
- * stricter UI rules.
+ * validates (`backend/routes/magicTask.js:57`); these mirror the
+ * prompt's stricter UI rules.
  */
 object GigComposeLimits {
     const val TITLE_MIN: Int = 5
@@ -244,25 +286,32 @@ object GigComposeLimits {
     const val DESCRIPTION_MAX: Int = 2000
     const val MAX_PHOTOS: Int = 6
 
-    /** E.1 — gig tag cap. Mirrors `tags` `.max(5)` in `createGigSchema`. */
+    /** E.1 — gig tag cap. Mirrors `tags` `.max(5)` in the backend schema. */
     const val MAX_TAGS: Int = 5
 
-    /** B.3 — Magic Task describe textarea cap (matches A12.8 "184 / 500"). */
+    /** Magic Task describe textarea cap (matches A12.8 "184 / 500"). */
     const val DESCRIBE_MAX: Int = 500
+
+    /** delivery_errand items cap — mirrors `items` `.max(20)`. */
+    const val MAX_ITEMS: Int = 20
 }
 
 /**
- * Snapshot of all wizard form state. Mirrored into [androidx.lifecycle.SavedStateHandle]
- * so the wizard survives config changes and process death.
+ * Snapshot of all wizard form state. Scalar fields mirror into
+ * [androidx.lifecycle.SavedStateHandle] so the wizard survives config
+ * changes and process death (module objects + items are kept in-memory
+ * only — see [GigComposeViewModel]).
  */
 data class GigComposeFormState(
-    val step: Int = GigComposeStep.Category.ordinal0,
-    /** B.3 — step-1 entry mode (Magic describe vs manual picker). */
+    val step: Int = GigComposeStep.Describe.ordinal0,
+    /** A12.8 — step-1 entry mode (Magic describe vs manual picker). */
     val composeMode: ComposeMode = ComposeMode.Magic,
-    /** B.3 — plain-English Magic Task input. */
+    /** A12.8 — plain-English Magic Task input. */
     val describeText: String = "",
-    /** B.3 — archetype parsed from [describeText] (debounced), mirrored into [category]. */
+    /** Archetype-category parsed from [describeText] (debounced), mirrored into [category]. */
     val detectedArchetype: GigComposeCategory? = null,
+    /** Backend `task_archetype` (e.g. "home_service") from the magic draft. */
+    val taskArchetype: String? = null,
     val category: GigComposeCategory? = null,
     val title: String = "",
     val description: String = "",
@@ -270,6 +319,8 @@ data class GigComposeFormState(
     val budgetType: GigComposeBudgetType? = null,
     val budgetMin: String = "",
     val budgetMax: String = "",
+    /** A12.8 — optional effort estimate (hours, decimal string). */
+    val estimatedHours: String = "",
     val scheduleType: GigComposeScheduleType? = null,
     val scheduledStartISO: String? = null,
     val locationMode: GigComposeLocationMode? = null,
@@ -282,18 +333,27 @@ data class GigComposeFormState(
     val isUrgent: Boolean = false,
     /** E.1 — freeform tags (`tags`), stored without the leading `#`. */
     val tags: List<String> = emptyList(),
+    /** A12.8 — user override of the inferred wire `engagement_mode`. */
+    val engagementOverride: GigEngagementMode? = null,
+    // Archetype module objects — prefilled from the magic draft, edited
+    // in Fill gaps, forwarded verbatim on magic-post. In-memory only.
+    val careDetails: CareDetailsDto? = null,
+    val logisticsDetails: LogisticsDetailsDto? = null,
+    val remoteDetails: RemoteDetailsDto? = null,
+    val eventDetails: EventDetailsDto? = null,
+    /** delivery_errand shopping list (≤[GigComposeLimits.MAX_ITEMS]). */
+    val items: List<MagicTaskItemDto> = emptyList(),
 ) {
     val currentStep: GigComposeStep
         get() = GigComposeStep.fromOrdinal(step)
 
+    /** Describe-step tile selection, derived from the schedule prefill. */
     val engagementMode: GigComposeEngagementMode
         get() =
-            if (budgetType == GigComposeBudgetType.Offers) {
-                GigComposeEngagementMode.OpenBidding
-            } else if (scheduleType == GigComposeScheduleType.Recurring) {
-                GigComposeEngagementMode.Recurring
-            } else {
-                GigComposeEngagementMode.OneTime
+            when (scheduleType) {
+                GigComposeScheduleType.Recurring -> GigComposeEngagementMode.Recurring
+                GigComposeScheduleType.Flexible -> GigComposeEngagementMode.OpenEnded
+                else -> GigComposeEngagementMode.OneTime
             }
 
     /** True when any user-visible field carries data — drives the close-confirm gate. */
@@ -307,6 +367,7 @@ data class GigComposeFormState(
                 budgetType != null ||
                 budgetMin.isNotEmpty() ||
                 budgetMax.isNotEmpty() ||
+                estimatedHours.isNotEmpty() ||
                 scheduleType != null ||
                 scheduledStartISO != null ||
                 locationMode != null ||
@@ -315,7 +376,8 @@ data class GigComposeFormState(
                 deadlineISO != null ||
                 cancellationPolicy != null ||
                 isUrgent ||
-                tags.isNotEmpty()
+                tags.isNotEmpty() ||
+                items.isNotEmpty()
 
     companion object {
         val EMPTY = GigComposeFormState()

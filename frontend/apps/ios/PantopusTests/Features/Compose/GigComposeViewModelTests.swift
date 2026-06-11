@@ -2,10 +2,10 @@
 //  GigComposeViewModelTests.swift
 //  PantopusTests
 //
-//  Covers the P2.2 Post-a-Task wizard state machine: per-step validation
-//  gates, forward/back navigation, preselect category, submit happy path,
-//  submit error rollback, close-confirm dirty flag, and the per-step
-//  chrome shape used by the snapshot baselines.
+//  Covers the A12.8 Post-a-Task wizard state machine: per-step validation
+//  gates, forward/back navigation, preselect category, magic-post happy
+//  path, submit error rollback, undo window, close-confirm dirty flag,
+//  and the per-step chrome shape used by the snapshot baselines.
 //
 
 import XCTest
@@ -47,16 +47,15 @@ final class GigComposeViewModelTests: XCTestCase {
         ) { true }
     }
 
-    private static let createGigJSON = """
-    {"message":"ok","gig":{
-      "id":"gig_42","title":"Hang 3 shelves","description":"Need 3 IKEA shelves mounted","price":60.0,
-      "category":"handyman","status":"open","created_at":"2025-01-01T00:00:00Z"
-    }}
+    private static let magicPostJSON = """
+    {"message":"Task posted","gig":{
+      "id":"gig_42","title":"Hang 3 shelves","undo_window_ms":10000,"can_undo":true
+    },"nearby_helpers":12,"notified_count":7}
     """
 
-    private func filledAtBasics() -> GigComposeFormState {
+    private func filledAtFillGaps() -> GigComposeFormState {
         GigComposeFormState(
-            step: GigComposeStep.basics.rawValue,
+            step: GigComposeStep.fillGaps.rawValue,
             category: .handyman,
             title: "Hang 3 shelves in the living room",
             description: "Need three IKEA Lack shelves mounted on drywall. I have studs marked.",
@@ -81,29 +80,32 @@ final class GigComposeViewModelTests: XCTestCase {
         )
     }
 
-    // MARK: - Initial chrome (Step 1 — Category)
+    // MARK: - Initial chrome (Step 1 — Describe)
 
-    func testInitialChromeReflectsCategoryStep() {
+    func testInitialChromeReflectsDescribeStep() {
         let vm = makeVM()
         let chrome = vm.chrome
         XCTAssertEqual(chrome.title, "Post a task")
-        XCTAssertEqual(chrome.primaryCTALabel, "Continue")
-        XCTAssertFalse(chrome.primaryCTAEnabled, "Continue must be disabled until a category is selected.")
+        XCTAssertEqual(chrome.primaryCTALabel, "Review & post →")
+        XCTAssertEqual(chrome.primaryCTAIdentifier, "gigCompose.cta.reviewPost")
+        XCTAssertFalse(chrome.primaryCTAEnabled, "CTA must be disabled until a category is detected.")
         XCTAssertEqual(chrome.leading, .close)
-        XCTAssertEqual(chrome.progressLabel, .stepOf(current: 1, total: 6))
+        XCTAssertEqual(chrome.progressLabel, .stepOf(current: 1, total: 4))
         XCTAssertTrue(chrome.showsProgressBar)
     }
 
-    func testSelectCategoryEnablesContinue() {
-        // B.3 — category selection enables Continue in the manual picker.
+    func testManualChromeNudgesUntilCategoryPicked() {
         let vm = makeVM()
         vm.setComposeMode(.manual)
+        XCTAssertEqual(vm.chrome.primaryCTALabel, "Pick a category to continue")
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled)
         vm.selectCategory(.handyman)
+        XCTAssertEqual(vm.chrome.primaryCTALabel, "Continue")
         XCTAssertTrue(vm.chrome.primaryCTAEnabled)
     }
 
     func testPreselectFromRouteArgument() {
-        // B.3 — a preselected category lands on the manual picker so the
+        // A preselected category lands on the manual picker so the
         // pre-chosen tile keeps Continue enabled.
         let preselected = GigComposeFormState(composeMode: .manual, category: .cleaning)
         let vm = makeVM(initialState: preselected)
@@ -120,10 +122,10 @@ final class GigComposeViewModelTests: XCTestCase {
         XCTAssertNil(GigComposeCategory.from(rawKey: "nope"))
     }
 
-    // MARK: - Step 2 — Basics validation
+    // MARK: - Step 2 — Fill gaps validation
 
-    func testBasicsStepRequiresTitleAndDescriptionLengths() {
-        let seed = GigComposeFormState(step: GigComposeStep.basics.rawValue, category: .handyman)
+    func testFillGapsRequiresTitleAndDescriptionLengths() {
+        let seed = GigComposeFormState(step: GigComposeStep.fillGaps.rawValue, category: .handyman)
         let vm = makeVM(initialState: seed)
         XCTAssertFalse(vm.chrome.primaryCTAEnabled, "Empty fields must block Continue.")
         vm.setTitle("1234")
@@ -135,14 +137,14 @@ final class GigComposeViewModelTests: XCTestCase {
     }
 
     func testTitleCannotExceedMax() {
-        let vm = makeVM(initialState: GigComposeFormState(step: GigComposeStep.basics.rawValue, category: .handyman))
+        let vm = makeVM(initialState: GigComposeFormState(step: GigComposeStep.fillGaps.rawValue, category: .handyman))
         let oversize = String(repeating: "a", count: GigComposeLimits.titleMax + 50)
         vm.setTitle(oversize)
         XCTAssertEqual(vm.form.title.count, GigComposeLimits.titleMax)
     }
 
     func testPhotoCapEnforcedOnAdd() async {
-        let vm = makeVM(initialState: GigComposeFormState(step: GigComposeStep.basics.rawValue, category: .handyman))
+        let vm = makeVM(initialState: GigComposeFormState(step: GigComposeStep.fillGaps.rawValue, category: .handyman))
         for _ in 0..<GigComposeLimits.maxPhotos + 3 {
             vm.addPhotoData(Data([0x1]))
         }
@@ -152,10 +154,45 @@ final class GigComposeViewModelTests: XCTestCase {
         await vm.awaitUploadsForTesting()
     }
 
+    func testFillGapsAllowsUnsetScheduleAndLocation() {
+        // A12.8 — When/Where are optional on Fill gaps; magic-post
+        // defaults them ("flexible" + no location).
+        let vm = makeVM(initialState: filledAtFillGaps())
+        XCTAssertNil(vm.form.scheduleType)
+        XCTAssertNil(vm.form.locationMode)
+        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
+    }
+
+    func testFillGapsOneTimeScheduleRequiresFutureDate() {
+        let vm = makeVM(initialState: filledAtFillGaps())
+        vm.selectScheduleType(.oneTime)
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled, "One-time without a date must block.")
+        vm.setScheduledStart(Date().addingTimeInterval(-3600))
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled, "Past dates must not satisfy the future-only rule.")
+        vm.setScheduledStart(Date().addingTimeInterval(3600))
+        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
+    }
+
+    func testSelectingNonOneTimeClearsDate() {
+        var seed = filledAtFillGaps()
+        seed.scheduledStartISO = ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600))
+        let vm = makeVM(initialState: seed)
+        vm.selectScheduleType(.flexible)
+        XCTAssertNil(vm.form.scheduledStartISO, "Switching off one-time must clear the leftover date.")
+    }
+
+    func testFillGapsAPlaceRequiresCompleteAddress() {
+        let vm = makeVM(initialState: filledAtFillGaps())
+        vm.selectLocationMode(.aPlace)
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled)
+        vm.updatePlaceAddress(line1: "123 Main St", city: "Portland", state: "OR", zip: "97214")
+        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
+    }
+
     // MARK: - Step 3 — Budget validation
 
     func testBudgetOffersEnablesContinueWithoutNumbers() {
-        var seed = filledAtBasics()
+        var seed = filledAtFillGaps()
         seed.step = GigComposeStep.budget.rawValue
         let vm = makeVM(initialState: seed)
         XCTAssertFalse(vm.chrome.primaryCTAEnabled)
@@ -164,7 +201,7 @@ final class GigComposeViewModelTests: XCTestCase {
     }
 
     func testBudgetFixedRequiresPositiveMin() {
-        var seed = filledAtBasics()
+        var seed = filledAtFillGaps()
         seed.step = GigComposeStep.budget.rawValue
         let vm = makeVM(initialState: seed)
         vm.selectBudgetType(.fixed)
@@ -183,82 +220,32 @@ final class GigComposeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.form.budgetMin, "12.34", "Only one decimal point survives sanitisation.")
     }
 
-    // MARK: - Step 4 — Schedule validation
-
-    func testScheduleOneTimeRequiresFutureDate() {
-        var seed = filledAtBasics()
-        seed.step = GigComposeStep.schedule.rawValue
-        seed.budgetType = .offers
-        let vm = makeVM(initialState: seed)
-        vm.selectScheduleType(.oneTime)
-        XCTAssertFalse(vm.chrome.primaryCTAEnabled, "One-time without a date must block.")
-        vm.setScheduledStart(Date().addingTimeInterval(-3600))
-        XCTAssertFalse(vm.chrome.primaryCTAEnabled, "Past dates must not satisfy the future-only rule.")
-        vm.setScheduledStart(Date().addingTimeInterval(3600))
-        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
-    }
-
-    func testScheduleFlexibleNeedsNoDate() {
-        var seed = filledAtBasics()
-        seed.step = GigComposeStep.schedule.rawValue
-        let vm = makeVM(initialState: seed)
-        vm.selectScheduleType(.flexible)
-        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
-    }
-
-    func testSelectingNonOneTimeClearsDate() {
-        var seed = filledAtBasics()
-        seed.step = GigComposeStep.schedule.rawValue
-        seed.scheduledStartISO = ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600))
-        let vm = makeVM(initialState: seed)
-        vm.selectScheduleType(.flexible)
-        XCTAssertNil(vm.form.scheduledStartISO, "Switching off one-time must clear the leftover date.")
-    }
-
-    // MARK: - Step 5 — Location validation
-
-    func testLocationYourAddressOrVirtualNeedsNoFields() {
-        var seed = filledAtBasics()
-        seed.step = GigComposeStep.location.rawValue
-        let vm = makeVM(initialState: seed)
-        vm.selectLocationMode(.yourAddress)
-        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
-        vm.selectLocationMode(.virtual)
-        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
-    }
-
-    func testLocationAPlaceRequiresCompleteAddress() {
-        var seed = filledAtBasics()
-        seed.step = GigComposeStep.location.rawValue
-        let vm = makeVM(initialState: seed)
-        vm.selectLocationMode(.aPlace)
-        XCTAssertFalse(vm.chrome.primaryCTAEnabled)
-        vm.updatePlaceAddress(line1: "123 Main St", city: "Portland", state: "OR", zip: "97214")
-        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
-    }
-
-    // MARK: - Step 6 — Review chrome
+    // MARK: - Step 4 — Review chrome + magic-post body
 
     func testReviewChromeAndBuildBody() {
         let vm = makeVM(initialState: filledAtReview())
         let chrome = vm.chrome
         XCTAssertEqual(chrome.primaryCTALabel, "Post task")
         XCTAssertEqual(chrome.leading, .back)
-        let body = vm.buildCreateBody()
+        let body = vm.buildMagicPostBody()
         XCTAssertNotNil(body)
-        XCTAssertEqual(body?.title, "Hang 3 shelves in the living room")
-        XCTAssertEqual(body?.payType, "fixed")
-        XCTAssertEqual(body?.scheduleType, "scheduled")
-        XCTAssertEqual(body?.location.mode, "home")
+        XCTAssertEqual(body?.draft.title, "Hang 3 shelves in the living room")
+        XCTAssertEqual(body?.draft.payType, "fixed")
+        XCTAssertEqual(body?.draft.budgetFixed, 60)
+        XCTAssertEqual(body?.draft.scheduleType, "scheduled")
+        XCTAssertEqual(body?.draft.category, "Handyman", "Category rides as the backend's spelled label.")
+        XCTAssertEqual(body?.location?.mode, "home")
+        XCTAssertEqual(body?.sourceFlow, "magic")
+        XCTAssertNil(body?.beneficiaryUserId, "Persona switching is deferred — always posts as yourself.")
     }
 
     func testVirtualMapsToRemoteTaskFormat() {
         var seed = filledAtReview()
         seed.locationMode = .virtual
         let vm = makeVM(initialState: seed)
-        let body = vm.buildCreateBody()
+        let body = vm.buildMagicPostBody()
         XCTAssertEqual(body?.taskFormat, "remote")
-        XCTAssertEqual(body?.location.mode, "custom")
+        XCTAssertEqual(body?.location?.mode, "custom")
     }
 
     func testRecurringMapsToFlexibleWireValue() {
@@ -266,42 +253,64 @@ final class GigComposeViewModelTests: XCTestCase {
         seed.scheduleType = .recurring
         seed.scheduledStartISO = nil
         let vm = makeVM(initialState: seed)
-        XCTAssertEqual(vm.buildCreateBody()?.scheduleType, "flexible")
+        XCTAssertEqual(vm.buildMagicPostBody()?.draft.scheduleType, "flexible")
+    }
+
+    func testManualPathPostsAsClassicWithTitleFallbackText() {
+        var seed = filledAtReview()
+        seed.composeMode = .manual
+        seed.describeText = ""
+        let vm = makeVM(initialState: seed)
+        let body = vm.buildMagicPostBody()
+        XCTAssertEqual(body?.sourceFlow, "classic")
+        XCTAssertEqual(body?.text, "Hang 3 shelves in the living room", "Empty describe falls back to the title.")
+        XCTAssertNil(body?.aiDraftJson, "Manual posts carry no AI draft echo.")
     }
 
     // MARK: - Forward / back navigation
 
     func testForwardAdvancesThroughSteps() async {
         let vm = makeVM()
+        vm.setComposeMode(.manual)
         vm.selectCategory(.handyman)
         await vm.advanceForTesting()
-        XCTAssertEqual(vm.currentStep, .basics)
+        XCTAssertEqual(vm.currentStep, .fillGaps)
         vm.setTitle("Hang 3 shelves")
         vm.setDescription("Need three IKEA Lack shelves mounted on drywall.")
         await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .budget)
+        vm.selectBudgetType(.offers)
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .review)
     }
 
     func testBackPreservesData() async {
         let vm = makeVM()
+        vm.setComposeMode(.manual)
         vm.selectCategory(.handyman)
         await vm.advanceForTesting()
         vm.leadingTapped()
-        XCTAssertEqual(vm.currentStep, .category)
+        XCTAssertEqual(vm.currentStep, .describe)
         XCTAssertEqual(vm.form.category, .handyman, "Going back must not stomp the user's category pick.")
     }
 
     // MARK: - Submit happy path / error rollback
 
-    func testSubmitAdvancesToSuccessAndRecordsGigId() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.createGigJSON)]
+    func testSubmitPostsToMagicPostAndRecordsGigId() async {
+        SequencedURLProtocol.sequence = [.status(201, body: Self.magicPostJSON)]
         let vm = makeVM(initialState: filledAtReview())
         await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .success)
         XCTAssertEqual(vm.createdGigId, "gig_42")
+        XCTAssertEqual(vm.notifiedCount, 7)
+        XCTAssertEqual(vm.nearbyHelpers, 12)
+        XCTAssertEqual(vm.undoSecondsRemaining, 10, "Undo countdown starts at the response's window.")
         XCTAssertEqual(vm.chrome.primaryCTALabel, "View task")
         XCTAssertEqual(vm.chrome.secondaryCTA?.identifier, "composeGigDone")
         XCTAssertFalse(vm.chrome.showsProgressBar)
+        let request = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(request?.url?.path, "/api/gigs/magic-post")
+        XCTAssertEqual(request?.httpMethod, "POST")
     }
 
     func testSubmitErrorKeepsUserOnReview() async {
@@ -313,7 +322,7 @@ final class GigComposeViewModelTests: XCTestCase {
     }
 
     func testSuccessPrimaryFiresOpenGigDetailEvent() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.createGigJSON)]
+        SequencedURLProtocol.sequence = [.status(201, body: Self.magicPostJSON)]
         let vm = makeVM(initialState: filledAtReview())
         await vm.advanceForTesting()
         await vm.advanceForTesting()
@@ -321,11 +330,45 @@ final class GigComposeViewModelTests: XCTestCase {
     }
 
     func testSuccessSecondaryFiresDismissEvent() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.createGigJSON)]
+        SequencedURLProtocol.sequence = [.status(201, body: Self.magicPostJSON)]
         let vm = makeVM(initialState: filledAtReview())
         await vm.advanceForTesting()
         vm.secondaryTapped()
         XCTAssertEqual(vm.pendingEvent, .dismiss)
+    }
+
+    // MARK: - Undo window
+
+    func testUndoReturnsToReviewWithFormIntact() async {
+        SequencedURLProtocol.sequence = [
+            .status(201, body: Self.magicPostJSON),
+            .status(200, body: #"{"message":"Task undone","gigId":"gig_42"}"#)
+        ]
+        let vm = makeVM(initialState: filledAtReview())
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .success)
+        await vm.undoPost()
+        XCTAssertEqual(vm.currentStep, .review, "Undo lands back on Review with the form intact.")
+        XCTAssertNil(vm.createdGigId)
+        XCTAssertEqual(vm.undoSecondsRemaining, 0)
+        XCTAssertEqual(vm.infoMessage, "Task undone")
+        XCTAssertEqual(vm.form.title, "Hang 3 shelves in the living room")
+        let request = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(request?.url?.path, "/api/gigs/gig_42/undo")
+        XCTAssertEqual(request?.httpMethod, "POST")
+    }
+
+    func testUndoFailureClearsCountdownButStaysOnSuccess() async {
+        SequencedURLProtocol.sequence = [
+            .status(201, body: Self.magicPostJSON),
+            .status(400, body: #"{"error":"Undo window has expired"}"#)
+        ]
+        let vm = makeVM(initialState: filledAtReview())
+        await vm.advanceForTesting()
+        await vm.undoPost()
+        XCTAssertEqual(vm.currentStep, .success)
+        XCTAssertEqual(vm.undoSecondsRemaining, 0, "A refused undo kills the pill.")
+        XCTAssertEqual(vm.createdGigId, "gig_42")
     }
 
     // MARK: - Close-confirm
@@ -342,7 +385,7 @@ final class GigComposeViewModelTests: XCTestCase {
     }
 
     func testCloseOnSuccessStepIsClean() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.createGigJSON)]
+        SequencedURLProtocol.sequence = [.status(201, body: Self.magicPostJSON)]
         let vm = makeVM(initialState: filledAtReview())
         await vm.advanceForTesting()
         XCTAssertFalse(vm.chrome.dirty, "Success step must not gate dismiss with a discard confirm.")
@@ -352,13 +395,13 @@ final class GigComposeViewModelTests: XCTestCase {
 
     func testRestoreCopiesSnapshotIntoEmptyForm() {
         let vm = makeVM()
-        vm.restore(from: filledAtBasics())
-        XCTAssertEqual(vm.currentStep, .basics)
+        vm.restore(from: filledAtFillGaps())
+        XCTAssertEqual(vm.currentStep, .fillGaps)
         XCTAssertEqual(vm.form.title, "Hang 3 shelves in the living room")
     }
 
     func testRestoreNoOpsOnceFormIsDirty() {
-        let vm = makeVM(initialState: filledAtBasics())
+        let vm = makeVM(initialState: filledAtFillGaps())
         let other = GigComposeFormState(step: GigComposeStep.budget.rawValue, category: .cleaning, title: "X")
         vm.restore(from: other)
         XCTAssertEqual(vm.form.title, "Hang 3 shelves in the living room", "Restore must not stomp existing data.")
@@ -374,19 +417,19 @@ final class GigComposeViewModelTests: XCTestCase {
         vm.setUrgent(true)
         vm.addTag("#Heavy Lifting")
         vm.addTag("weekend")
-        let body = try XCTUnwrap(vm.buildCreateBody())
-        XCTAssertEqual(body.deadline, deadline)
-        XCTAssertEqual(body.cancellationPolicy, "standard", "Moderate maps onto the backend's standard tier.")
-        XCTAssertEqual(body.isUrgent, true)
-        XCTAssertEqual(body.tags, ["heavy-lifting", "weekend"])
+        let body = try XCTUnwrap(vm.buildMagicPostBody())
+        XCTAssertEqual(body.draft.timeWindowEnd, deadline, "Deadline rides as the schedule window's end.")
+        XCTAssertEqual(body.draft.cancellationPolicy, "standard", "Moderate maps onto the backend's standard tier.")
+        XCTAssertTrue(body.draft.isUrgent)
+        XCTAssertEqual(body.draft.tags, ["heavy-lifting", "weekend"])
     }
 
     func testBuildBodyOmitsPickerFieldsWhenUnset() throws {
-        let body = try XCTUnwrap(makeVM(initialState: filledAtReview()).buildCreateBody())
-        XCTAssertNil(body.deadline)
-        XCTAssertNil(body.cancellationPolicy)
-        XCTAssertNil(body.isUrgent, "is_urgent is omitted when the boost is off.")
-        XCTAssertNil(body.tags)
+        let body = try XCTUnwrap(makeVM(initialState: filledAtReview()).buildMagicPostBody())
+        XCTAssertNil(body.draft.timeWindowEnd)
+        XCTAssertNil(body.draft.cancellationPolicy)
+        XCTAssertFalse(body.draft.isUrgent)
+        XCTAssertNil(body.draft.tags)
     }
 
     func testCancellationPolicyWireValues() {
@@ -428,6 +471,18 @@ final class GigComposeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.activePickerSheet, .tags)
         vm.dismissPicker()
         XCTAssertNil(vm.activePickerSheet)
+    }
+
+    func testModulePromptTapRoutesToEditors() {
+        let vm = makeVM()
+        vm.handleModulePromptTap(.when)
+        XCTAssertEqual(vm.activePickerSheet, .when)
+        vm.handleModulePromptTap(.location)
+        XCTAssertEqual(vm.activePickerSheet, .location)
+        vm.handleModulePromptTap(.effort)
+        XCTAssertEqual(vm.activePickerSheet, .effort)
+        vm.handleModulePromptTap(.budget)
+        XCTAssertEqual(vm.currentStep, .budget, "Budget row jumps straight to the Budget & mode step.")
     }
 
     func testUrgencyAndDeadlineCountTowardDirty() {

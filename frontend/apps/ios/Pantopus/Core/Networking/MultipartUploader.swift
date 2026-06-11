@@ -204,6 +204,44 @@ public final class MultipartUploader: @unchecked Sendable {
         }
     }
 
+    /// Transcribe a recorded audio note via `POST /api/ai/transcribe`
+    /// (multipart, field name `audio`, ≤25MB — Whisper's cap). Route
+    /// `backend/routes/ai.js:387`.
+    public func transcribeAudio(_ file: MultipartFile) async throws -> AITranscriptionResponse {
+        let token = await AuthManager.shared.accessToken
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        let url = environment.apiBaseURL.appendingPathComponent("/api/ai/transcribe")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let body = Self.buildBody(boundary: boundary, file: file)
+        let (data, response) = try await session.upload(for: request, from: body)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(AITranscriptionResponse.self, from: data)
+            } catch {
+                logger.error("Transcription decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            await AuthManager.shared.handleUnauthorized()
+            throw APIError.unauthorized
+        case 413:
+            throw APIError.clientError(status: 413, message: "Audio file exceeds the 25MB limit.")
+        case 400..<500:
+            throw APIError.clientError(status: http.statusCode, message: String(data: data, encoding: .utf8))
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     /// Upload images to `POST /api/upload/ai-media` for AI vision prompts.
     public func uploadAIMedia(files: [MultipartFile]) async throws -> AIMediaUploadResponse {
         guard !files.isEmpty else {
