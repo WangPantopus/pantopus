@@ -237,8 +237,10 @@ async function geocodeToTractCached(lat, lng) {
     });
     return payload || null;
   } catch (err) {
-    logger.warn('geocodeToTractCached failed', { error: err.message });
-    return null;
+    // The cache layer must never make geocoding WORSE than uncached —
+    // any cache-side failure degrades to the direct lookup.
+    logger.warn('geocodeToTractCached cache layer failed — direct lookup', { error: err.message });
+    return geocodeToTract(lat, lng);
   }
 }
 
