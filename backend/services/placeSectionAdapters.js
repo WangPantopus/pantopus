@@ -213,7 +213,12 @@ async function composeRentBand(home) {
       })];
     }
 
-    const bedrooms = Math.min(4, Math.max(0, Number(home.bedrooms) || 2));
+    // Default to the 2-bedroom band only when bedrooms is unknown — a
+    // studio (0) is a real value and gets the efficiency band.
+    const rawBedrooms = Number(home.bedrooms);
+    const bedrooms = Number.isFinite(rawBedrooms) && home.bedrooms != null
+      ? Math.min(4, Math.max(0, Math.round(rawBedrooms)))
+      : 2;
     const fmrLo = row.fmr_lo[bedrooms];
     const fmrHi = row.fmr_hi[bedrooms];
     // HUD FMRs are 40th-percentile point estimates; where HUD prices a
@@ -646,20 +651,26 @@ async function composeCivicDistricts(home) {
         if (!geo) return null;
         const { districts, codes } = districtsFromGeographies(geo);
         if (!districts.length) return null;
-        // Names/contacts for the federal + state seats (both keyless
-        // sources, each individually cached 7 d). City/county officials
-        // have no national source — the list is honestly partial.
-        const representatives = await lookupRepresentatives(home.state, codes);
-        return { districts, representatives };
+        return { districts, codes };
       },
     });
     if (!payload) return [serializePlaceSection('civic_districts', { status: 'unavailable' })];
+
+    // Names/contacts resolve OUTSIDE the 90-day district cache so a seat
+    // change surfaces on the rep sources' own 7-day cadence. (Both lookups
+    // are keyless and individually cached; city/county officials have no
+    // national source — the list is honestly partial.) Rows cached before
+    // codes existed carry their old reps until the geo cache expires.
+    const representatives = payload.codes
+      ? await lookupRepresentatives(home.state, payload.codes)
+      : (payload.representatives || []);
+
     return [serializePlaceSection('civic_districts', {
       asOf: fetchedAt,
       status: stale ? 'stale' : 'ready',
       source: 'U.S. Census Bureau · unitedstates/congress-legislators · OpenStates',
-      coverage: payload.representatives && payload.representatives.length ? 'full' : 'partial',
-      data: payload,
+      coverage: representatives.length ? 'full' : 'partial',
+      data: { districts: payload.districts, representatives },
     })];
   } catch (err) {
     logger.warn('placeSections: civic_districts failed', { homeId: home.id, error: err.message });
