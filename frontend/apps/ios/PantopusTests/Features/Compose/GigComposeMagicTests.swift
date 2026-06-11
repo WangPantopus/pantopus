@@ -2,19 +2,19 @@
 //  GigComposeMagicTests.swift
 //  PantopusTests
 //
-//  B.3 (A12.8) — Magic Task step-1 behaviour: the magic-draft backend
-//  parse (success mapping, keyword fallback on failure, short-input
-//  skip, advance-time prefill), compose-mode toggling, the mode-aware
-//  Continue gate + secondary CTA, module-prompt fixture, and a
-//  structural render of both design frames (Magic populated · manual
-//  picker).
+//  A12.8 — Magic Task step-1 behaviour: the magic-draft backend parse
+//  (success mapping, keyword fallback on failure, short-input skip,
+//  advance-time prefill incl. module objects), compose-mode toggling,
+//  the mode-aware CTA gate + secondary CTA, live module prompts, entity
+//  highlight ranges, engagement-mode inference, the templates library,
+//  and a structural render of both design frames.
 //
 
 import SwiftUI
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 
 @MainActor
 final class GigComposeMagicTests: XCTestCase {
@@ -59,13 +59,15 @@ final class GigComposeMagicTests: XCTestCase {
         "pay_type": "fixed",
         "budget_fixed": 120,
         "hourly_rate": null,
+        "estimated_hours": 2,
         "budget_range": {"min": 90, "max": 150},
         "schedule_type": "scheduled",
         "location_mode": "home",
         "privacy_level": "exact_after_accept",
         "tags": ["indoor", "tv-mount"],
         "is_urgent": false,
-        "attachments_suggested": true
+        "attachments_suggested": true,
+        "logistics_details": {"workerCount": 1, "heavyLifting": false, "stairsInfo": "none"}
       },
       "confidence": 0.91,
       "fieldConfidence": {"title": 0.95, "category": 0.9},
@@ -75,7 +77,7 @@ final class GigComposeMagicTests: XCTestCase {
     }
     """
 
-    func testMagicDraftSuccessMapsCategoryAndClarifyingQuestion() async {
+    func testMagicDraftSuccessMapsCategoryArchetypeAndQuestion() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.magicDraftJSON)]
         let text = "Need someone to mount my TV this weekend"
         // Seed via initial state (not setDescribeText) so no background
@@ -84,7 +86,9 @@ final class GigComposeMagicTests: XCTestCase {
         await vm.parseDescribe(text)
         XCTAssertEqual(vm.form.detectedArchetype, .handyman, "Backend category string maps onto the compose enum.")
         XCTAssertEqual(vm.form.category, .handyman)
+        XCTAssertEqual(vm.form.taskArchetype, "home_service", "task_archetype is mirrored for module groups.")
         XCTAssertEqual(vm.clarifyingQuestion, "Do you already have a wall mount bracket?")
+        XCTAssertEqual(vm.draftConfidence, 0.91, "Top-level confidence is stashed for the magic-post echo.")
         XCTAssertFalse(vm.isParsingDraft, "Loading flag resets once the parse settles.")
         let request = SequencedURLProtocol.capturedRequests.last
         XCTAssertEqual(request?.url?.path, "/api/gigs/magic-draft")
@@ -97,7 +101,7 @@ final class GigComposeMagicTests: XCTestCase {
         let vm = makeVM(GigComposeFormState(describeText: text))
         await vm.parseDescribe(text)
         await vm.advanceForTesting()
-        XCTAssertEqual(vm.currentStep, .basics)
+        XCTAssertEqual(vm.currentStep, .fillGaps)
         XCTAssertEqual(vm.form.title, "Mount TV on living room wall")
         XCTAssertEqual(vm.form.description, "Mount a 55-inch TV on drywall, cables hidden if possible.")
         XCTAssertEqual(vm.form.budgetType, .fixed)
@@ -105,6 +109,9 @@ final class GigComposeMagicTests: XCTestCase {
         XCTAssertEqual(vm.form.budgetMax, "150", "budget_range.max fills the optional ceiling.")
         XCTAssertEqual(vm.form.scheduleType, .oneTime, "Backend \"scheduled\" cleanly maps to one-time.")
         XCTAssertEqual(vm.form.tags, ["indoor", "tv-mount"])
+        XCTAssertEqual(vm.form.estimatedHours, "2", "estimated_hours prefills the effort field.")
+        XCTAssertEqual(vm.form.logisticsDetails?.workerCount, 1, "Draft module objects ride into the form.")
+        XCTAssertEqual(vm.form.logisticsDetails?.stairsInfo, "none")
     }
 
     func testMagicDraftPrefillSkipsUserEditedFields() async {
@@ -112,12 +119,12 @@ final class GigComposeMagicTests: XCTestCase {
         let text = "Need someone to mount my TV this weekend"
         let vm = makeVM(GigComposeFormState(describeText: text))
         await vm.parseDescribe(text)
-        // User typed a title and picked open bidding before advancing.
+        // User typed a title and picked open-to-offers before advancing.
         vm.setTitle("My own title for this")
-        vm.selectEngagementMode(.openBidding)
+        vm.selectBudgetType(.offers)
         await vm.advanceForTesting()
         XCTAssertEqual(vm.form.title, "My own title for this", "Prefill must not stomp user input.")
-        XCTAssertEqual(vm.form.budgetType, .offers, "User's open-bidding pick survives the draft's fixed pay type.")
+        XCTAssertEqual(vm.form.budgetType, .offers, "User's offers pick survives the draft's fixed pay type.")
         XCTAssertEqual(vm.form.budgetMin, "", "No draft numbers bleed into a user-chosen budget type.")
         XCTAssertEqual(
             vm.form.description,
@@ -187,7 +194,7 @@ final class GigComposeMagicTests: XCTestCase {
     func testApplyDetectionMirrorsIntoCategory() {
         let vm = makeVM()
         vm.setDescribeText("Need someone to assemble an IKEA desk this Saturday")
-        // Apply synchronously rather than waiting on the 350ms debounce.
+        // Apply synchronously rather than waiting on the debounce.
         vm.applyDetection(for: vm.form.describeText)
         XCTAssertEqual(vm.form.detectedArchetype, .handyman)
         XCTAssertEqual(vm.form.category, .handyman)
@@ -206,17 +213,43 @@ final class GigComposeMagicTests: XCTestCase {
         XCTAssertEqual(vm.form.describeText.count, GigComposeLimits.describeMax)
     }
 
-    // MARK: - Continue gate
+    // MARK: - Entity highlight ranges
 
-    func testMagicContinueGatedOnDetection() {
-        let vm = makeVM()
-        XCTAssertFalse(vm.chrome.primaryCTAEnabled, "Magic Continue is disabled before an archetype is detected.")
-        vm.setDescribeText("Assemble an IKEA desk")
-        vm.applyDetection(for: vm.form.describeText)
-        XCTAssertTrue(vm.chrome.primaryCTAEnabled, "Detection enables Continue.")
+    func testHighlightRangesCoverMoneyTimeAndKeywords() {
+        let text = "Assemble an IKEA desk Saturday morning, budget $120, takes 2 hours"
+        let ranges = magicHighlightRanges(text: text, draft: nil)
+        let snippets = ranges.map { String(text[$0]).lowercased() }
+        XCTAssertTrue(snippets.contains("$120"), "Dollar amounts highlight. Got: \(snippets)")
+        XCTAssertTrue(snippets.contains("2 hours"), "Numbers glued to hour words highlight. Got: \(snippets)")
+        XCTAssertTrue(snippets.contains("saturday"), "Day words highlight. Got: \(snippets)")
+        XCTAssertTrue(snippets.contains("morning"), "Time-of-day words highlight. Got: \(snippets)")
+        XCTAssertTrue(snippets.contains("assemble"), "Detected-category keywords highlight. Got: \(snippets)")
+        XCTAssertTrue(snippets.contains("ikea"), "All matching keywords highlight. Got: \(snippets)")
     }
 
-    func testManualContinueGatedOnCategory() {
+    func testHighlightRangesAreSortedAndNonOverlapping() {
+        let text = "Move moving boxes Saturday for $40-60"
+        let ranges = magicHighlightRanges(text: text, draft: nil)
+        for (left, right) in zip(ranges, ranges.dropFirst()) {
+            XCTAssertLessThanOrEqual(left.upperBound, right.lowerBound, "Ranges must be merged + sorted.")
+        }
+    }
+
+    func testHighlightRangesEmptyForEmptyText() {
+        XCTAssertTrue(magicHighlightRanges(text: "", draft: nil).isEmpty)
+    }
+
+    // MARK: - CTA gate
+
+    func testMagicCTAGatedOnDetection() {
+        let vm = makeVM()
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled, "Magic CTA is disabled before an archetype is detected.")
+        vm.setDescribeText("Assemble an IKEA desk")
+        vm.applyDetection(for: vm.form.describeText)
+        XCTAssertTrue(vm.chrome.primaryCTAEnabled, "Detection enables Review & post.")
+    }
+
+    func testManualCTAGatedOnCategory() {
         let vm = makeVM()
         vm.setComposeMode(.manual)
         XCTAssertFalse(vm.chrome.primaryCTAEnabled)
@@ -233,7 +266,8 @@ final class GigComposeMagicTests: XCTestCase {
 
     func testMagicStepExposesPickCategorySecondary() {
         let vm = makeVM()
-        XCTAssertEqual(vm.chrome.secondaryCTA?.identifier, "composeGigPickCategory")
+        XCTAssertEqual(vm.chrome.secondaryCTA?.identifier, "gigCompose.cta.pickCategory")
+        XCTAssertEqual(vm.chrome.secondaryCTA?.icon, .layoutGrid)
     }
 
     func testSecondaryTapSwitchesToManual() {
@@ -248,28 +282,132 @@ final class GigComposeMagicTests: XCTestCase {
         XCTAssertNil(vm.chrome.secondaryCTA, "Manual picker's back-to-magic affordance is an in-content banner.")
     }
 
-    func testOpenBiddingEngagementPrefillsOffersBudget() {
-        let vm = makeVM()
-        XCTAssertEqual(vm.form.engagementMode, .oneTime)
+    // MARK: - Engagement tiles (schedule mirror)
 
-        vm.selectEngagementMode(.openBidding)
-        XCTAssertEqual(vm.form.engagementMode, .openBidding)
-        XCTAssertEqual(vm.form.budgetType, .offers)
+    func testEngagementTilesMirrorIntoScheduleType() {
+        let vm = makeVM()
+        XCTAssertEqual(vm.form.engagementTile, .oneTime)
 
         vm.selectEngagementMode(.recurring)
-        XCTAssertEqual(vm.form.engagementMode, .recurring)
+        XCTAssertEqual(vm.form.engagementTile, .recurring)
         XCTAssertEqual(vm.form.scheduleType, .recurring)
-        XCTAssertNil(vm.form.budgetType)
+
+        vm.selectEngagementMode(.openEnded)
+        XCTAssertEqual(vm.form.engagementTile, .openEnded)
+        XCTAssertEqual(vm.form.scheduleType, .flexible)
+
+        vm.selectEngagementMode(.oneTime)
+        XCTAssertEqual(vm.form.engagementTile, .oneTime)
+        XCTAssertNil(vm.form.scheduleType, "One-time clears the recurring/flexible leftover so When re-prompts.")
     }
 
-    // MARK: - Module prompts fixture
+    // MARK: - Backend engagement-mode inference
 
-    func testModulePromptsReflectParsedState() {
-        let prompts = gigMagicModulePrompts(for: .handyman)
+    func testInferEngagementModeRules() {
+        XCTAssertEqual(
+            GigComposeViewModel.inferEngagementMode(archetype: "pro_service_quote", scheduleType: "asap", isUrgent: true),
+            .quotes,
+            "Pro-quote archetype always wins."
+        )
+        XCTAssertEqual(
+            GigComposeViewModel.inferEngagementMode(archetype: "quick_help", scheduleType: "asap", isUrgent: false),
+            .instantAccept
+        )
+        XCTAssertEqual(
+            GigComposeViewModel.inferEngagementMode(archetype: "home_service", scheduleType: "scheduled", isUrgent: true),
+            .instantAccept,
+            "Urgent (non-pro) tasks instant-accept."
+        )
+        XCTAssertEqual(
+            GigComposeViewModel.inferEngagementMode(archetype: "home_service", scheduleType: "scheduled", isUrgent: false),
+            .curatedOffers
+        )
+        XCTAssertEqual(
+            GigComposeViewModel.inferEngagementMode(archetype: nil, scheduleType: nil, isUrgent: false),
+            .curatedOffers
+        )
+    }
+
+    func testEffectiveEngagementModeHonorsOverride() {
+        let vm = makeVM()
+        XCTAssertEqual(vm.effectiveEngagementMode, .curatedOffers, "Default inference with no archetype.")
+        vm.selectEngagementOverride(.quotes)
+        XCTAssertEqual(vm.effectiveEngagementMode, .quotes, "Explicit override wins over inference.")
+    }
+
+    // MARK: - Live module prompts
+
+    func testModulePromptsReflectLiveFormState() {
+        let future = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86400))
+        let vm = makeVM(
+            GigComposeFormState(
+                detectedArchetype: .handyman,
+                category: .handyman,
+                photoIds: [],
+                budgetType: .fixed,
+                budgetMin: "80",
+                budgetMax: "120",
+                scheduleType: .oneTime,
+                scheduledStartISO: future,
+                locationMode: .yourAddress,
+                estimatedHours: "2"
+            )
+        )
+        let prompts = vm.modulePrompts
         XCTAssertEqual(prompts.count, 5)
-        XCTAssertEqual(prompts.filter(\.isFilled).count, 4, "4 of 5 filled, one nudge (Photos).")
-        XCTAssertEqual(prompts.first { !$0.isFilled }?.label, "Photos")
-        XCTAssertTrue(gigMagicModulePrompts(for: nil).isEmpty, "No prompts until an archetype is parsed.")
+        XCTAssertEqual(prompts.map(\.key), [.when, .location, .effort, .photos, .budget])
+        XCTAssertEqual(prompts.filter(\.isFilled).count, 4, "Everything but Photos is filled.")
+        XCTAssertEqual(prompts.first { !$0.isFilled }?.key, .photos)
+        XCTAssertEqual(prompts.first { !$0.isFilled }?.value, "Recommended for better bids")
+        XCTAssertEqual(prompts.first { $0.key == .effort }?.value, "~2 hours")
+        XCTAssertEqual(prompts.first { $0.key == .budget }?.value, "$80–120")
+        XCTAssertEqual(prompts.first { $0.key == .location }?.value, "Your saved address")
+    }
+
+    func testModulePromptsAllNeededOnEmptyForm() {
+        let vm = makeVM()
+        XCTAssertTrue(vm.modulePrompts.allSatisfy { !$0.isFilled }, "Empty form → all five rows prompt.")
+    }
+
+    // MARK: - Templates library
+
+    private static let templatesJSON = """
+    {"templates":[
+      {"id":"mount_tv","label":"Mount TV","icon":"📺",
+       "template":{"title":"Mount TV on wall","category":"Handyman","tags":["indoor"],
+                   "pay_type":"fixed","schedule_type":"today"}},
+      {"id":"dog_walk","label":"Dog walking","icon":"🐕",
+       "template":{"title":"Dog walking needed","category":"Pet Care","tags":["outdoor"],
+                   "pay_type":"fixed","schedule_type":"today"}}
+    ]}
+    """
+
+    func testTemplatesLoadOncePerSession() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.templatesJSON)]
+        let vm = makeVM()
+        await vm.loadTemplatesIfNeeded()
+        await vm.loadTemplatesIfNeeded()
+        XCTAssertEqual(vm.templates.count, 2)
+        XCTAssertEqual(vm.templates.first?.id, "mount_tv")
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1, "Templates are cached per session.")
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.last?.url?.path, "/api/gigs/templates/library")
+    }
+
+    func testTemplatesFailureIsSilent() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = makeVM()
+        await vm.loadTemplatesIfNeeded()
+        XCTAssertTrue(vm.templates.isEmpty)
+        XCTAssertNil(vm.errorMessage, "A failed templates fetch never surfaces an error.")
+    }
+
+    func testApplyTemplateSeedsDescribeText() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.templatesJSON)]
+        let vm = makeVM()
+        await vm.loadTemplatesIfNeeded()
+        guard let template = vm.templates.first else { return XCTFail("Expected a template") }
+        vm.applyTemplate(template)
+        XCTAssertEqual(vm.form.describeText, "Mount TV on wall", "Chip tap seeds the describe field.")
     }
 
     // MARK: - Structural render of both frames
@@ -280,13 +418,25 @@ final class GigComposeMagicTests: XCTestCase {
             describeText: "Assemble an IKEA desk this Saturday morning",
             detectedArchetype: .handyman,
             category: .handyman,
-            scheduleType: .oneTime
+            scheduleType: .flexible,
+            taskArchetype: "home_service"
         )
         assertRenders(GigComposeWizardView(viewModel: makeVM(state)) { _ in })
     }
 
     func testManualPickerFrameRenders() {
         let state = GigComposeFormState(composeMode: .manual)
+        assertRenders(GigComposeWizardView(viewModel: makeVM(state)) { _ in })
+    }
+
+    func testFillGapsFrameRenders() {
+        let state = GigComposeFormState(
+            step: GigComposeStep.fillGaps.rawValue,
+            category: .handyman,
+            title: "Mount TV on wall",
+            description: "Mount a 55-inch TV on drywall, cables hidden.",
+            taskArchetype: "home_service"
+        )
         assertRenders(GigComposeWizardView(viewModel: makeVM(state)) { _ in })
     }
 

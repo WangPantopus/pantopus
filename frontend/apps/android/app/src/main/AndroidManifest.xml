@@ -15,6 +15,9 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
+    <!-- Voice notes (A12.8 Magic Task describe transcription) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Push notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

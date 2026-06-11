@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.pantopus.android.data.ai.AiTranscriptionRepository
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.network.NetworkMonitor
@@ -43,6 +44,7 @@ class GigComposeMagicSnapshotTest {
             SavedStateHandle(),
             mockk<NetworkMonitor>(relaxed = true),
             mockk<FilesRepository>(relaxed = true),
+            mockk<AiTranscriptionRepository>(relaxed = true),
         )
 
     @Test

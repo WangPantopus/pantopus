@@ -3,10 +3,10 @@
 //  Pantopus
 //
 //  Step identifiers + form-state value types for the Post-a-Task wizard
-//  (P2.2). Six pre-success steps + a terminal success step, mirroring
-//  `Wizard.html` / `wizard-frames.jsx`. The form state is a
-//  `Codable`/`Equatable` snapshot so the wizard can survive process
-//  death via `@SceneStorage` (same pattern as `AddHomeFormState`).
+//  (A12.8 describe-first restructure). Four pre-success steps + a
+//  terminal success step. The form state is a `Codable`/`Equatable`
+//  snapshot so the wizard can survive process death via `@SceneStorage`
+//  (same pattern as `AddHomeFormState`).
 //
 
 import Foundation
@@ -36,6 +36,23 @@ public enum GigComposeCategory: String, CaseIterable, Sendable, Codable, Hashabl
         case .tutoring: "Tutoring"
         case .delivery: "Delivery"
         case .tech: "Tech"
+        case .other: "Other"
+        }
+    }
+
+    /// The backend's `VALID_CATEGORIES` spelling
+    /// (`backend/services/magicTaskService.js`) forwarded as
+    /// `draft.category` on `POST /api/gigs/magic-post`.
+    public var backendLabel: String {
+        switch self {
+        case .handyman: "Handyman"
+        case .cleaning: "Cleaning"
+        case .moving: "Moving"
+        case .petcare: "Pet Care"
+        case .childcare: "Child Care"
+        case .tutoring: "Tutoring"
+        case .delivery: "Delivery"
+        case .tech: "Tech Support"
         case .other: "Other"
         }
     }
@@ -81,13 +98,39 @@ public enum ComposeMode: String, CaseIterable, Sendable, Codable, Hashable {
     case manual
 }
 
-/// B.3 (A12.8) — compact Magic Task engagement selector. It pre-fills the
-/// downstream schedule / budget steps instead of adding a separate backend
-/// field.
-public enum GigComposeEngagementMode: String, CaseIterable, Sendable, Hashable {
+/// A12.8 — step-1 engagement tiles (One-time / Recurring / Open-ended).
+/// SCHEDULE-ish display selector — it mirrors into `scheduleType`; the
+/// backend `engagement_mode` is modeled separately (`GigEngagementMode`).
+public enum GigComposeEngagementMode: String, CaseIterable, Sendable, Codable, Hashable {
     case oneTime
     case recurring
-    case openBidding
+    case openEnded
+}
+
+/// Backend `engagement_mode` for `POST /api/gigs/magic-post`
+/// (`backend/routes/magicTask.js:397`). Defaults via
+/// `GigComposeViewModel.inferEngagementMode(...)`; user-overridable on
+/// the Budget & mode step.
+public enum GigEngagementMode: String, CaseIterable, Sendable, Codable, Hashable {
+    case instantAccept = "instant_accept"
+    case curatedOffers = "curated_offers"
+    case quotes
+
+    public var label: String {
+        switch self {
+        case .instantAccept: "Instant accept"
+        case .curatedOffers: "Curated offers"
+        case .quotes: "Quotes"
+        }
+    }
+
+    public var subcopy: String {
+        switch self {
+        case .instantAccept: "First helper takes it"
+        case .curatedOffers: "Pick from ranked offers"
+        case .quotes: "Pros send estimates"
+        }
+    }
 }
 
 /// Budget-type radio in step 3.
@@ -237,29 +280,27 @@ public struct GigComposePlaceAddress: Codable, Sendable, Equatable {
     }
 }
 
-/// The six pre-success steps of the Post-a-Task wizard, in order.
+/// The four pre-success steps of the A12.8 wizard, in order:
+/// Describe (magic default / manual picker) → Fill gaps → Budget & mode
+/// → Review & post, plus the terminal success step.
 public enum GigComposeStep: Int, CaseIterable, Sendable {
-    case category = 0
-    case basics
+    case describe = 0
+    case fillGaps
     case budget
-    case schedule
-    case location
     case review
     case success
 
     /// Total number of "step N of M" steps shown in the readout. Excludes
     /// the success terminal.
-    public static let progressTotal: Int = 6
+    public static let progressTotal: Int = 4
 
     /// One-indexed position used in the "N of M" top-bar readout.
     public var stepNumber: Int? {
         switch self {
-        case .category: 1
-        case .basics: 2
+        case .describe: 1
+        case .fillGaps: 2
         case .budget: 3
-        case .schedule: 4
-        case .location: 5
-        case .review: 6
+        case .review: 4
         case .success: nil
         }
     }
@@ -314,9 +355,29 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
     public var isUrgent: Bool
     /// E.1 — freeform tags (`tags`), stored without the leading `#`.
     public var tags: [String]
+    /// A12.8 — step-1 engagement tile (One-time / Recurring / Open-ended).
+    public var engagementTile: GigComposeEngagementMode
+    /// A12.8 — explicit backend `engagement_mode` override picked on the
+    /// Budget & mode step. nil ⇒ inferred from archetype + schedule.
+    public var engagementOverride: GigEngagementMode?
+    /// A12.8 — optional effort estimate ("~2 hours"), wire
+    /// `estimated_hours`. Stored as text like the budget fields.
+    public var estimatedHours: String
+    /// A12.8 — backend task archetype ("home_service", "care_task", …)
+    /// parsed from the magic draft; drives which module field group the
+    /// Fill-gaps step renders.
+    public var taskArchetype: String?
+    /// A12.8 — delivery/errand shopping items (`items`).
+    public var items: [GigTaskItemDraft]
+    /// A12.8 — archetype module field groups (wire `care_details` etc.).
+    public var careDetails: GigCareDetails?
+    public var logisticsDetails: GigLogisticsDetails?
+    public var remoteDetails: GigRemoteDetails?
+    public var urgentDetails: GigUrgentDetails?
+    public var eventDetails: GigEventDetails?
 
     public init(
-        step: Int = GigComposeStep.category.rawValue,
+        step: Int = GigComposeStep.describe.rawValue,
         composeMode: ComposeMode = .magic,
         describeText: String = "",
         detectedArchetype: GigComposeCategory? = nil,
@@ -334,7 +395,17 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         deadlineISO: String? = nil,
         cancellationPolicy: GigCancellationPolicy? = nil,
         isUrgent: Bool = false,
-        tags: [String] = []
+        tags: [String] = [],
+        engagementTile: GigComposeEngagementMode = .oneTime,
+        engagementOverride: GigEngagementMode? = nil,
+        estimatedHours: String = "",
+        taskArchetype: String? = nil,
+        items: [GigTaskItemDraft] = [],
+        careDetails: GigCareDetails? = nil,
+        logisticsDetails: GigLogisticsDetails? = nil,
+        remoteDetails: GigRemoteDetails? = nil,
+        urgentDetails: GigUrgentDetails? = nil,
+        eventDetails: GigEventDetails? = nil
     ) {
         self.step = step
         self.composeMode = composeMode
@@ -355,14 +426,19 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         self.cancellationPolicy = cancellationPolicy
         self.isUrgent = isUrgent
         self.tags = tags
+        self.engagementTile = engagementTile
+        self.engagementOverride = engagementOverride
+        self.estimatedHours = estimatedHours
+        self.taskArchetype = taskArchetype
+        self.items = items
+        self.careDetails = careDetails
+        self.logisticsDetails = logisticsDetails
+        self.remoteDetails = remoteDetails
+        self.urgentDetails = urgentDetails
+        self.eventDetails = eventDetails
     }
 
     public static let empty = GigComposeFormState()
-
-    public var engagementMode: GigComposeEngagementMode {
-        if budgetType == .offers { return .openBidding }
-        return scheduleType == .recurring ? .recurring : .oneTime
-    }
 
     /// True when any user-visible field carries data — drives the
     /// discard-confirm gate.
@@ -384,5 +460,7 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
             || cancellationPolicy != nil
             || isUrgent
             || !tags.isEmpty
+            || !estimatedHours.isEmpty
+            || !items.isEmpty
     }
 }

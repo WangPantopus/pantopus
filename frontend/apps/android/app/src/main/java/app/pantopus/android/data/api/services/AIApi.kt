@@ -1,7 +1,12 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.ai.AIConversationsResponse
+import app.pantopus.android.data.api.models.ai.TranscriptionResponse
+import okhttp3.MultipartBody
 import retrofit2.http.GET
+import retrofit2.http.Multipart
+import retrofit2.http.POST
+import retrofit2.http.Part
 
 /**
  * AI assistant endpoints under `/api/ai/[*]` from `backend/routes/ai.js`.
@@ -15,4 +20,14 @@ interface AIApi {
      */
     @GET("api/ai/conversations")
     suspend fun conversations(): AIConversationsResponse
+
+    /**
+     * A12.8 — Whisper transcription of a recorded voice note (m4a/AAC,
+     * ≤25 MB, part name `audio`). Route `backend/routes/ai.js:387`.
+     */
+    @Multipart
+    @POST("api/ai/transcribe")
+    suspend fun transcribe(
+        @Part audio: MultipartBody.Part,
+    ): TranscriptionResponse
 }

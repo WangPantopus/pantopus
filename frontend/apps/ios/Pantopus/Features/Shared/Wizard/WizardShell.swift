@@ -99,11 +99,21 @@ public struct WizardShell<Content: View>: View {
             }
             HStack(spacing: Spacing.s3) {
                 if let secondary = chrome.secondaryCTA {
-                    GhostButton(title: secondary.label) {
-                        dismissKeyboard()
-                        await MainActor.run { model.secondaryTapped() }
+                    if let icon = secondary.icon {
+                        // Iconed ghost (A12.8 "Pick category") hugs its
+                        // content so the primary keeps the wider flex.
+                        WizardIconGhostCTA(title: secondary.label, icon: icon) {
+                            dismissKeyboard()
+                            model.secondaryTapped()
+                        }
+                        .accessibilityIdentifier(secondary.identifier)
+                    } else {
+                        GhostButton(title: secondary.label) {
+                            dismissKeyboard()
+                            await MainActor.run { model.secondaryTapped() }
+                        }
+                        .accessibilityIdentifier(secondary.identifier)
                     }
-                    .accessibilityIdentifier(secondary.identifier)
                 }
                 WizardPrimaryCTA(
                     title: chrome.isSubmitting ? "Working…" : chrome.primaryCTALabel,
@@ -115,7 +125,7 @@ public struct WizardShell<Content: View>: View {
                     dismissKeyboard()
                     await MainActor.run { model.primaryTapped() }
                 }
-                .accessibilityIdentifier("wizardPrimaryCTA")
+                .accessibilityIdentifier(chrome.primaryCTAIdentifier)
             }
             .padding(Spacing.s4)
             .background(Theme.Color.appSurface)
@@ -200,6 +210,37 @@ private struct WizardTopBar: View {
         case .close: "Close"
         case .back: "Back"
         }
+    }
+}
+
+/// Content-hugging outlined ghost with a leading icon — the A12.8 dual
+/// CTA's "Pick category" affordance. Distinct from `GhostButton` (full
+/// width, text only) so the adjacent primary keeps the wider flex.
+private struct WizardIconGhostCTA: View {
+    let title: String
+    let icon: PantopusIcon
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s2) {
+                Icon(icon, size: 16, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+                Text(title)
+                    .pantopusTextStyle(.body)
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .frame(minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
     }
 }
 

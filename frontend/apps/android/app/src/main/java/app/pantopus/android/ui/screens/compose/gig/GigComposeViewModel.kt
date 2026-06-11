@@ -5,14 +5,21 @@ package app.pantopus.android.ui.screens.compose.gig
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.ai.AiTranscriptionRepository
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
-import app.pantopus.android.data.api.models.gigs.CreateGigBody
-import app.pantopus.android.data.api.models.gigs.CreateGigLocation
+import app.pantopus.android.data.api.models.gigs.CareDetailsDto
+import app.pantopus.android.data.api.models.gigs.EventDetailsDto
+import app.pantopus.android.data.api.models.gigs.LogisticsDetailsDto
 import app.pantopus.android.data.api.models.gigs.MagicDraftDto
 import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
 import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
+import app.pantopus.android.data.api.models.gigs.MagicPostBody
+import app.pantopus.android.data.api.models.gigs.MagicPostLocation
+import app.pantopus.android.data.api.models.gigs.MagicTaskItemDto
 import app.pantopus.android.data.api.models.gigs.PriceBenchmarkDto
+import app.pantopus.android.data.api.models.gigs.RemoteDetailsDto
+import app.pantopus.android.data.api.models.gigs.UrgentDetailsDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
@@ -59,15 +66,26 @@ data class GigComposeUiState(
     val photoUploads: List<GigComposePhotoUpload> = emptyList(),
     /** P1.G — price-benchmark hint for the budget step; null hides it. */
     val priceBenchmark: GigComposePriceBenchmark? = null,
+    /** A12.8 — smart-template chips for the empty describe state. */
+    val templates: List<GigComposeTemplate> = emptyList(),
+    /** A12.8 — magic-post result driving the success step (undo + counts). */
+    val postResult: GigComposePostResult? = null,
+    /** A12.8 — true while a voice note is being transcribed. */
+    val isTranscribing: Boolean = false,
+    /** A12.8 — true right after a successful undo ("Task undone" toast). */
+    val showUndoneToast: Boolean = false,
 )
 
 /**
- * Drives the 6-step + success Post-a-Task wizard. Posts to
- * `POST /api/gigs` via [GigsRepository] and exposes [WizardChrome] for
- * the shared [app.pantopus.android.ui.screens.shared.wizard.WizardShell].
+ * A12.8 — drives the describe-first 4-step + success Post-a-Task wizard.
+ * Both paths submit through `POST /api/gigs/magic-post` via
+ * [GigsRepository.magicPost] and expose [WizardChrome] for the shared
+ * [app.pantopus.android.ui.screens.shared.wizard.WizardShell].
  *
- * Form state is mirrored into [SavedStateHandle] so the wizard survives
- * config changes and process death.
+ * Scalar form state is mirrored into [SavedStateHandle] (new
+ * `composeGig2.*` keys, so stale 6-step snapshots are ignored). Module
+ * objects + items are kept in-memory only — they don't survive process
+ * death (config changes keep the VM alive, so rotation is safe).
  */
 @HiltViewModel
 open class GigComposeViewModel
@@ -77,6 +95,7 @@ open class GigComposeViewModel
         private val savedStateHandle: SavedStateHandle,
         private val networkMonitor: NetworkMonitor,
         private val filesRepository: FilesRepository,
+        private val transcriptionRepository: AiTranscriptionRepository,
     ) : ViewModel(),
         WizardModel {
         private val _state =
@@ -89,9 +108,9 @@ open class GigComposeViewModel
         val pendingEvent = MutableStateFlow<GigComposeOutboundEvent?>(null)
 
         /**
-         * B.3 / P0.1 — in-flight debounce + magic-draft call for the Magic
-         * Task parse. Cancelled (which also aborts the HTTP call) whenever
-         * new describe input arrives.
+         * P0.1 — in-flight debounce + magic-draft call for the Magic Task
+         * parse. Cancelled (which also aborts the HTTP call) whenever new
+         * describe input arrives.
          */
         private var detectionJob: Job? = null
 
@@ -108,6 +127,15 @@ open class GigComposeViewModel
 
         /** P0.2 — per-tile upload jobs so remove can cancel in flight. */
         private val uploadJobs = mutableMapOf<String, Job>()
+
+        /** A12.8 — last backend draft, echoed as `ai_draft_json` + module fallbacks. */
+        private var lastDraft: MagicDraftDto? = null
+
+        /** A12.8 — confidence of [lastDraft], forwarded as `ai_confidence`. */
+        private var lastConfidence: Double? = null
+
+        /** A12.8 — templates fetched once per VM (silent failure). */
+        private var templatesLoaded = false
 
         // MARK: - WizardModel
 
@@ -135,7 +163,7 @@ open class GigComposeViewModel
             when {
                 form.currentStep == GigComposeStep.Success ->
                     pendingEvent.value = GigComposeOutboundEvent.Dismiss
-                form.currentStep == GigComposeStep.Category && form.composeMode == ComposeMode.Magic ->
+                form.currentStep == GigComposeStep.Describe && form.composeMode == ComposeMode.Magic ->
                     setComposeMode(ComposeMode.Manual)
             }
         }
@@ -160,7 +188,7 @@ open class GigComposeViewModel
             persist()
         }
 
-        // MARK: - B.3 Magic Task
+        // MARK: - A12.8 Magic Task
 
         /** Switch the step-1 entry mode (Magic describe ⇄ manual picker). */
         fun setComposeMode(mode: ComposeMode) {
@@ -185,6 +213,64 @@ open class GigComposeViewModel
                     delay(DETECTION_DEBOUNCE_MS)
                     parseDescribe(clamped)
                 }
+        }
+
+        /**
+         * A12.8 — fetch the smart-template chip row once. Failures are
+         * silent — the describe step renders fine without templates.
+         */
+        fun loadTemplatesIfNeeded() {
+            if (templatesLoaded) return
+            templatesLoaded = true
+            viewModelScope.launch {
+                when (val result = repository.templatesLibrary()) {
+                    is NetworkResult.Success ->
+                        _state.update { state ->
+                            state.copy(
+                                templates =
+                                    result.data.templates.map { dto ->
+                                        GigComposeTemplate(
+                                            id = dto.id,
+                                            label = dto.label,
+                                            icon = dto.icon.orEmpty(),
+                                            seedText = dto.template?.title ?: dto.label,
+                                        )
+                                    },
+                            )
+                        }
+                    is NetworkResult.Failure -> Unit
+                }
+            }
+        }
+
+        /** A12.8 — a template chip seeds the describe text + parse. */
+        fun applyTemplate(template: GigComposeTemplate) {
+            setDescribeText(template.seedText)
+        }
+
+        /**
+         * A12.8 — transcribe a recorded voice note (m4a/AAC) via
+         * `POST /api/ai/transcribe` and append the text to the describe
+         * field. Failures are silent — the recording UI simply resets.
+         */
+        fun transcribeAudio(
+            filename: String,
+            mimeType: String,
+            bytes: ByteArray,
+        ) {
+            _state.update { it.copy(isTranscribing = true) }
+            viewModelScope.launch {
+                val result = transcriptionRepository.transcribe(filename, mimeType, bytes)
+                _state.update { it.copy(isTranscribing = false) }
+                if (result is NetworkResult.Success) {
+                    val transcript = result.data.text.trim()
+                    if (transcript.isNotEmpty()) {
+                        val current = _state.value.form.describeText
+                        val joined = if (current.isBlank()) transcript else "$current $transcript"
+                        setDescribeText(joined)
+                    }
+                }
+            }
         }
 
         /**
@@ -237,6 +323,7 @@ open class GigComposeViewModel
                         it.form.copy(
                             detectedArchetype = detected,
                             category = detected ?: it.form.category,
+                            taskArchetype = it.form.taskArchetype ?: detected?.let(::archetypeForCategory),
                         ),
                 )
             }
@@ -244,15 +331,14 @@ open class GigComposeViewModel
         }
 
         /**
-         * P0.1 — map a magic-draft response onto the form. **Decision:**
-         * the draft is applied the moment it arrives (not on step advance),
-         * but only into fields the user hasn't manually edited
-         * ([touchedFields]) — this keeps the prefill live while the user
-         * types, matches how the keyword matcher already mirrored the
-         * category, and never overwrites explicit input.
+         * P0.1 — map a magic-draft response onto the form. The draft is
+         * applied the moment it arrives, but only into fields the user
+         * hasn't manually edited ([touchedFields]).
          */
         private fun applyMagicDraft(response: MagicDraftResponse) {
             val draft = response.draft
+            lastDraft = draft
+            lastConfidence = response.confidence
             _state.update { state ->
                 state.copy(
                     isParsingDraft = false,
@@ -263,6 +349,7 @@ open class GigComposeViewModel
             persist()
         }
 
+        @Suppress("CyclomaticComplexMethod")
         private fun prefillFormFromDraft(
             form: GigComposeFormState,
             draft: MagicDraftDto,
@@ -281,8 +368,13 @@ open class GigComposeViewModel
                     .distinct()
                     .take(GigComposeLimits.MAX_TAGS)
                     .ifEmpty { null }
+            val draftItems =
+                draft.items
+                    ?.take(GigComposeLimits.MAX_ITEMS)
+                    ?.ifEmpty { null }
             return form.copy(
                 detectedArchetype = category ?: form.detectedArchetype,
+                taskArchetype = draft.taskArchetype ?: form.taskArchetype ?: category?.let(::archetypeForCategory),
                 category = prefill(FIELD_CATEGORY, category, form.category),
                 title = prefill(FIELD_TITLE, draft.title?.take(GigComposeLimits.TITLE_MAX), form.title),
                 description =
@@ -294,9 +386,23 @@ open class GigComposeViewModel
                 budgetType = prefill(FIELD_BUDGET, budgetType, form.budgetType),
                 budgetMin = prefill(FIELD_BUDGET, draftMin, form.budgetMin),
                 budgetMax = prefill(FIELD_BUDGET, draftMax, form.budgetMax),
+                estimatedHours =
+                    prefill(
+                        FIELD_EFFORT,
+                        formatBudgetValue(draft.estimatedHours),
+                        form.estimatedHours,
+                    ),
                 scheduleType = prefill(FIELD_SCHEDULE, scheduleTypeFromDraft(draft.scheduleType), form.scheduleType),
+                scheduledStartISO = prefill(FIELD_SCHEDULE, draft.timeWindowStart, form.scheduledStartISO),
                 tags = prefill(FIELD_TAGS, draftTags, form.tags),
                 isUrgent = prefill(FIELD_URGENT, draft.isUrgent, form.isUrgent),
+                // Module objects — prefill wholesale when the user hasn't
+                // edited that module's fields yet.
+                careDetails = prefill(FIELD_MODULES, draft.careDetails, form.careDetails),
+                logisticsDetails = prefill(FIELD_MODULES, draft.logisticsDetails, form.logisticsDetails),
+                remoteDetails = prefill(FIELD_MODULES, draft.remoteDetails, form.remoteDetails),
+                eventDetails = prefill(FIELD_MODULES, draft.eventDetails, form.eventDetails),
+                items = prefill(FIELD_MODULES, draftItems, form.items),
             )
         }
 
@@ -316,34 +422,37 @@ open class GigComposeViewModel
 
         fun selectCategory(category: GigComposeCategory) {
             markTouched(FIELD_CATEGORY)
-            _state.update { it.copy(form = it.form.copy(category = category)) }
+            _state.update {
+                it.copy(
+                    form =
+                        it.form.copy(
+                            category = category,
+                            taskArchetype = archetypeForCategory(category),
+                        ),
+                )
+            }
             persist()
         }
 
+        /**
+         * A12.8 — describe-step engagement tile. Prefills the schedule:
+         * One-time keeps/expects a date, Recurring repeats, Open-ended
+         * maps to the flexible schedule.
+         */
         fun selectEngagementMode(mode: GigComposeEngagementMode) {
-            // Deliberate user choice that prefills schedule + budget — both
-            // count as touched so the magic draft won't override them.
             markTouched(FIELD_SCHEDULE)
-            markTouched(FIELD_BUDGET)
-            _state.update {
-                val form = it.form
-                val next =
-                    when (mode) {
-                        GigComposeEngagementMode.OneTime ->
-                            form.copy(
-                                scheduleType = GigComposeScheduleType.OneTime,
-                                budgetType = form.budgetType.takeUnless { type -> type == GigComposeBudgetType.Offers },
-                            )
-                        GigComposeEngagementMode.Recurring ->
-                            form.copy(
-                                scheduleType = GigComposeScheduleType.Recurring,
-                                budgetType = form.budgetType.takeUnless { type -> type == GigComposeBudgetType.Offers },
-                            )
-                        GigComposeEngagementMode.OpenBidding ->
-                            form.copy(budgetType = GigComposeBudgetType.Offers)
-                    }
-                it.copy(form = next)
-            }
+            val scheduleType =
+                when (mode) {
+                    GigComposeEngagementMode.OneTime -> GigComposeScheduleType.OneTime
+                    GigComposeEngagementMode.Recurring -> GigComposeScheduleType.Recurring
+                    GigComposeEngagementMode.OpenEnded -> GigComposeScheduleType.Flexible
+                }
+            applyScheduleType(scheduleType)
+        }
+
+        /** A12.8 — Budget & mode step override of the wire `engagement_mode`. */
+        fun selectEngagementOverride(mode: GigEngagementMode) {
+            _state.update { it.copy(form = it.form.copy(engagementOverride = mode)) }
             persist()
         }
 
@@ -359,6 +468,62 @@ open class GigComposeViewModel
             val clamped = description.take(GigComposeLimits.DESCRIPTION_MAX)
             _state.update { it.copy(form = it.form.copy(description = clamped)) }
             persist()
+        }
+
+        /** A12.8 — optional effort estimate in hours (decimal string). */
+        fun setEstimatedHours(value: String) {
+            markTouched(FIELD_EFFORT)
+            _state.update { it.copy(form = it.form.copy(estimatedHours = sanitizeBudget(value))) }
+            persist()
+        }
+
+        // MARK: - A12.8 Module field updates (in-memory only)
+
+        fun updateCareDetails(details: CareDetailsDto?) {
+            markTouched(FIELD_MODULES)
+            _state.update { it.copy(form = it.form.copy(careDetails = details)) }
+        }
+
+        fun updateLogisticsDetails(details: LogisticsDetailsDto?) {
+            markTouched(FIELD_MODULES)
+            _state.update { it.copy(form = it.form.copy(logisticsDetails = details)) }
+        }
+
+        fun updateRemoteDetails(details: RemoteDetailsDto?) {
+            markTouched(FIELD_MODULES)
+            _state.update { it.copy(form = it.form.copy(remoteDetails = details)) }
+        }
+
+        fun updateEventDetails(details: EventDetailsDto?) {
+            markTouched(FIELD_MODULES)
+            _state.update { it.copy(form = it.form.copy(eventDetails = details)) }
+        }
+
+        /** delivery_errand — add an empty item row (≤[GigComposeLimits.MAX_ITEMS]). */
+        fun addItem() {
+            markTouched(FIELD_MODULES)
+            val items = _state.value.form.items
+            if (items.size >= GigComposeLimits.MAX_ITEMS) return
+            _state.update { it.copy(form = it.form.copy(items = items + MagicTaskItemDto(name = ""))) }
+        }
+
+        fun updateItemName(
+            index: Int,
+            name: String,
+        ) {
+            markTouched(FIELD_MODULES)
+            val items = _state.value.form.items.toMutableList()
+            if (index !in items.indices) return
+            items[index] = items[index].copy(name = name)
+            _state.update { it.copy(form = it.form.copy(items = items)) }
+        }
+
+        fun removeItem(index: Int) {
+            markTouched(FIELD_MODULES)
+            val items = _state.value.form.items.toMutableList()
+            if (index !in items.indices) return
+            items.removeAt(index)
+            _state.update { it.copy(form = it.form.copy(items = items)) }
         }
 
         // MARK: - P0.2 Photo upload pipeline
@@ -462,6 +627,10 @@ open class GigComposeViewModel
 
         fun selectScheduleType(type: GigComposeScheduleType) {
             markTouched(FIELD_SCHEDULE)
+            applyScheduleType(type)
+        }
+
+        private fun applyScheduleType(type: GigComposeScheduleType) {
             _state.update {
                 it.copy(
                     form =
@@ -570,11 +739,9 @@ open class GigComposeViewModel
 
         private suspend fun advance() {
             when (_state.value.form.currentStep) {
-                GigComposeStep.Category,
-                GigComposeStep.Basics,
-                GigComposeStep.Budget,
-                GigComposeStep.Schedule,
-                GigComposeStep.Location,
+                GigComposeStep.Describe,
+                GigComposeStep.FillGaps,
+                GigComposeStep.BudgetMode,
                 -> {
                     val next = GigComposeStep.fromOrdinal(_state.value.form.step + 1)
                     transitionTo(next)
@@ -592,6 +759,16 @@ open class GigComposeViewModel
             transitionTo(previous)
         }
 
+        /**
+         * A12.8 — module-prompt rows jump straight to the step that owns
+         * the missing detail (When/Where/Photos → Fill gaps; Effort/Budget
+         * → Budget & mode).
+         */
+        fun jumpToStep(step: GigComposeStep) {
+            if (step == GigComposeStep.Success) return
+            transitionTo(step)
+        }
+
         private fun transitionTo(step: GigComposeStep) {
             _state.update {
                 it.copy(form = it.form.copy(step = step.ordinal0), errorMessage = null)
@@ -599,7 +776,7 @@ open class GigComposeViewModel
             persist()
             // P1.G — entering the budget step with a category fetches the
             // nearby price benchmark for the hint under the fields.
-            if (step == GigComposeStep.Budget) fetchPriceBenchmark()
+            if (step == GigComposeStep.BudgetMode) fetchPriceBenchmark()
             step.stepNumber?.let { number ->
                 Analytics.track(
                     AnalyticsEvent.ScreenComposeGigWizardStepViewed(
@@ -618,9 +795,7 @@ open class GigComposeViewModel
         /**
          * P1.G — fetch the completed-task price percentiles for the form's
          * category. Failures are silent and `comparable_count == 0` hides
-         * the hint — the budget step renders fine without it. Re-invoked
-         * (idempotently) from the budget step so a restored wizard landing
-         * directly on Budget still gets the hint.
+         * the hint — the budget step renders fine without it.
          */
         fun fetchPriceBenchmark() {
             val category = _state.value.form.category ?: return
@@ -636,7 +811,7 @@ open class GigComposeViewModel
             }
         }
 
-        // MARK: - API
+        // MARK: - A12.8 Submit via magic-post
 
         private suspend fun submit() {
             Analytics.track(AnalyticsEvent.CtaComposeGigSubmit)
@@ -645,17 +820,27 @@ open class GigComposeViewModel
                 return
             }
             val body =
-                buildCreateBody() ?: run {
+                buildMagicPostBody() ?: run {
                     _state.update { it.copy(errorMessage = "Please complete each step before posting.") }
                     return
                 }
             _state.update { it.copy(isSubmitting = true, errorMessage = null) }
-            when (val result = repository.create(body)) {
+            when (val result = repository.magicPost(body)) {
                 is NetworkResult.Success -> {
+                    val gig = result.data.gig
                     _state.update {
                         it.copy(
-                            createdGigId = result.data.gig.id,
+                            createdGigId = gig.id,
+                            postResult =
+                                GigComposePostResult(
+                                    gigId = gig.id,
+                                    undoDeadlineEpochMs =
+                                        System.currentTimeMillis() + (gig.undoWindowMs ?: DEFAULT_UNDO_WINDOW_MS),
+                                    nearbyHelpers = result.data.nearbyHelpers ?: 0,
+                                    notifiedCount = result.data.notifiedCount ?: 0,
+                                ),
                             isSubmitting = false,
+                            showUndoneToast = false,
                             form = it.form.copy(step = GigComposeStep.Success.ordinal0),
                         )
                     }
@@ -672,94 +857,144 @@ open class GigComposeViewModel
         }
 
         /**
-         * Assemble a [CreateGigBody] from the form. Returns null if any
-         * required field is missing — [primaryEnabled] should have caught
-         * it but we double-check before sending.
+         * A12.8 — undo a just-posted gig within its window
+         * (`POST /api/gigs/:gigId/undo`). Success returns to the Review
+         * step with the form intact + a "Task undone" toast.
          */
-        fun buildCreateBody(): CreateGigBody? {
-            val form = _state.value.form
-            val fields = createGigRequiredFields(form) ?: return null
-            return CreateGigBody(
-                title = fields.title,
-                description = fields.description,
-                category = form.category?.key,
-                // Backend requires positive number; we send 1 for
-                // open-to-bids so the schema accepts it and treat
-                // `pay_type` as the source of truth.
-                price = if (fields.price > 0) fields.price else 1.0,
-                payType = fields.budgetType.wireValue,
-                scheduleType = fields.scheduleType.wireValue,
-                scheduledStart = fields.scheduledStart,
-                taskFormat = fields.taskFormat,
-                attachments = form.photoIds.ifEmpty { null },
-                // E.1 — composer picker-sheet fields. `is_urgent` only rides
-                // along when the boost is on; the rest are omitted when unset.
-                deadline = form.deadlineISO,
-                cancellationPolicy = form.cancellationPolicy?.wireValue,
-                isUrgent = if (form.isUrgent) true else null,
-                tags = form.tags.ifEmpty { null },
-                location = fields.location,
-            )
-        }
-
-        private data class CreateGigRequiredFields(
-            val budgetType: GigComposeBudgetType,
-            val scheduleType: GigComposeScheduleType,
-            val title: String,
-            val description: String,
-            val price: Double,
-            val scheduledStart: String?,
-            val taskFormat: String?,
-            val location: CreateGigLocation,
-        )
-
-        private data class CreateGigRequiredOptions(
-            val budgetType: GigComposeBudgetType,
-            val scheduleType: GigComposeScheduleType,
-            val locationMode: GigComposeLocationMode,
-        )
-
-        private fun createGigRequiredFields(form: GigComposeFormState): CreateGigRequiredFields? {
-            val options = requiredCreateOptions(form) ?: return null
-            val title = form.title.trim()
-            val description = form.description.trim()
-            val price = priceFromBudget(options.budgetType, form.budgetMin)
-            val scheduledStart = if (options.scheduleType == GigComposeScheduleType.OneTime) form.scheduledStartISO else null
-            val location = composedLocation(options.locationMode, form.placeAddress) ?: return null
-            return CreateGigRequiredFields(
-                budgetType = options.budgetType,
-                scheduleType = options.scheduleType,
-                title = title,
-                description = description,
-                price = price,
-                scheduledStart = scheduledStart,
-                taskFormat = taskFormatFor(options.locationMode),
-                location = location,
-            ).takeIf {
-                hasValidTitleAndDescription(title, description) &&
-                    hasValidPrice(options.budgetType, price) &&
-                    hasValidScheduledStart(options.scheduleType, scheduledStart)
+        fun undoPost() {
+            val result = _state.value.postResult ?: return
+            if (System.currentTimeMillis() > result.undoDeadlineEpochMs) return
+            viewModelScope.launch {
+                when (repository.undoMagicPost(result.gigId)) {
+                    is NetworkResult.Success -> {
+                        _state.update {
+                            it.copy(
+                                createdGigId = null,
+                                postResult = null,
+                                showUndoneToast = true,
+                                form = it.form.copy(step = GigComposeStep.Review.ordinal0),
+                            )
+                        }
+                        persist()
+                    }
+                    is NetworkResult.Failure ->
+                        _state.update {
+                            it.copy(errorMessage = "Couldn't undo — the task may already be live.")
+                        }
+                }
             }
         }
 
-        private fun requiredCreateOptions(form: GigComposeFormState): CreateGigRequiredOptions? {
+        /** Clear the post-undo toast once the screen has shown it. */
+        fun acknowledgeUndoneToast() {
+            _state.update { it.copy(showUndoneToast = false) }
+        }
+
+        /**
+         * Assemble the [MagicPostBody] from the form. Returns null if any
+         * required field is missing — [primaryEnabled] should have caught
+         * it but we double-check before sending.
+         */
+        @Suppress("ReturnCount")
+        fun buildMagicPostBody(): MagicPostBody? {
+            val form = _state.value.form
+            val title = form.title.trim()
+            val description = form.description.trim()
             val budgetType = form.budgetType ?: return null
             val scheduleType = form.scheduleType ?: return null
             val locationMode = form.locationMode ?: return null
-            return CreateGigRequiredOptions(
-                budgetType = budgetType,
-                scheduleType = scheduleType,
-                locationMode = locationMode,
+            if (!hasValidTitleAndDescription(title, description)) return null
+            if (!hasValidPrice(budgetType, priceFromBudget(budgetType, form.budgetMin))) return null
+            if (!hasValidScheduledStart(scheduleType, form.scheduledStartISO)) return null
+            val location = composedLocation(locationMode, form.placeAddress) ?: return null
+            val amount = form.budgetMin.toDoubleOrNull()
+            val scheduleWire = scheduleWireValue(form)
+            val urgentDetails = resolvedUrgentDetails(form)
+            val draft =
+                MagicDraftDto(
+                    title = title,
+                    description = description,
+                    category = form.category?.key,
+                    taskArchetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory),
+                    payType = budgetType.wireValue,
+                    budgetFixed = if (budgetType == GigComposeBudgetType.Fixed) amount else null,
+                    hourlyRate = if (budgetType == GigComposeBudgetType.Hourly) amount else null,
+                    estimatedHours = form.estimatedHours.toDoubleOrNull(),
+                    scheduleType = scheduleWire,
+                    timeWindowStart = if (scheduleWire == "scheduled") form.scheduledStartISO else null,
+                    // E.1 deadline sheet → the draft's time-window end (the
+                    // magic-post schema has no standalone `deadline`).
+                    timeWindowEnd = form.deadlineISO,
+                    locationMode = draftLocationMode(locationMode),
+                    isUrgent = form.isUrgent.takeIf { it },
+                    tags = form.tags.ifEmpty { null },
+                    attachments = form.photoIds.ifEmpty { null },
+                    items = form.items.filter { it.name.isNotBlank() }.ifEmpty { null },
+                    cancellationPolicy = form.cancellationPolicy?.wireValue,
+                    startsAsap = urgentDetails?.startsAsap,
+                    responseWindowMinutes = urgentDetails?.responseWindowMinutes,
+                    careDetails = form.careDetails,
+                    logisticsDetails = form.logisticsDetails,
+                    remoteDetails = form.remoteDetails,
+                    urgentDetails = urgentDetails,
+                    eventDetails = form.eventDetails,
+                )
+            return MagicPostBody(
+                text = magicPostText(form, title, description),
+                draft = draft,
+                location =
+                    MagicPostLocation(
+                        mode = location.mode,
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        address = location.address,
+                        city = location.city,
+                        state = location.state,
+                        zip = location.zip,
+                    ),
+                // Persona switching deferred — the identity chip is static.
+                beneficiaryUserId = null,
+                sourceFlow = if (form.composeMode == ComposeMode.Magic) "magic" else "classic",
+                engagementMode = resolvedEngagementMode(form),
+                taskFormat = taskFormatFor(locationMode),
+                aiConfidence = lastConfidence,
+                aiDraftJson = lastDraft,
             )
         }
+
+        /** Wire `engagement_mode` — user override, else the inferred default. */
+        fun resolvedEngagementMode(form: GigComposeFormState = _state.value.form): String =
+            form.engagementOverride?.wireValue
+                ?: inferEngagementMode(
+                    archetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory),
+                    scheduleType = scheduleWireValue(form),
+                    isUrgent = form.isUrgent,
+                )
+
+        /** Urgent module rides along whenever the boost is on. */
+        private fun resolvedUrgentDetails(form: GigComposeFormState): UrgentDetailsDto? =
+            when {
+                !form.isUrgent -> null
+                else -> lastDraft?.urgentDetails ?: UrgentDetailsDto(startsAsap = true)
+            }
+
+        private data class ComposedLocation(
+            val mode: String,
+            val latitude: Double,
+            val longitude: Double,
+            val address: String,
+            val city: String? = null,
+            val state: String? = null,
+            val zip: String? = null,
+        )
 
         private fun composedLocation(
             mode: GigComposeLocationMode,
             place: GigComposePlaceAddress,
-        ): CreateGigLocation? =
+        ): ComposedLocation? =
             when (mode) {
                 GigComposeLocationMode.YourAddress ->
-                    CreateGigLocation(
+                    ComposedLocation(
                         mode = mode.wireMode,
                         latitude = 0.0,
                         longitude = 0.0,
@@ -769,7 +1004,7 @@ open class GigComposeViewModel
                     if (!place.isComplete) {
                         null
                     } else {
-                        CreateGigLocation(
+                        ComposedLocation(
                             mode = mode.wireMode,
                             latitude = 0.0,
                             longitude = 0.0,
@@ -781,7 +1016,7 @@ open class GigComposeViewModel
                     }
                 }
                 GigComposeLocationMode.Virtual ->
-                    CreateGigLocation(
+                    ComposedLocation(
                         mode = mode.wireMode,
                         latitude = 0.0,
                         longitude = 0.0,
@@ -798,36 +1033,40 @@ open class GigComposeViewModel
                 progressLabel = progressLabel(step),
                 progressFraction = progressFraction(step),
                 leading = leadingControl(step),
-                primaryCtaLabel = primaryCtaLabel(step),
+                primaryCtaLabel = primaryCtaLabel(state.form),
                 primaryCtaEnabled = primaryEnabled(state) && !state.isSubmitting,
                 secondaryCta = secondaryCta(state),
                 isSubmitting = state.isSubmitting,
                 dirty = step != GigComposeStep.Success && state.form.hasAnyData,
                 showsProgressBar = step != GigComposeStep.Success,
+                primaryCtaTestTag = primaryCtaTestTag(state.form),
             )
         }
 
         private fun leadingControl(step: GigComposeStep): WizardLeadingControl =
             when (step) {
-                GigComposeStep.Category, GigComposeStep.Success -> WizardLeadingControl.Close
-                GigComposeStep.Basics,
-                GigComposeStep.Budget,
-                GigComposeStep.Schedule,
-                GigComposeStep.Location,
+                GigComposeStep.Describe, GigComposeStep.Success -> WizardLeadingControl.Close
+                GigComposeStep.FillGaps,
+                GigComposeStep.BudgetMode,
                 GigComposeStep.Review,
                 -> WizardLeadingControl.Back
             }
 
-        private fun primaryCtaLabel(step: GigComposeStep): String =
-            when (step) {
-                GigComposeStep.Category,
-                GigComposeStep.Basics,
-                GigComposeStep.Budget,
-                GigComposeStep.Schedule,
-                GigComposeStep.Location,
-                -> "Continue"
+        private fun primaryCtaLabel(form: GigComposeFormState): String =
+            when (form.currentStep) {
+                GigComposeStep.Describe ->
+                    if (form.composeMode == ComposeMode.Magic) "Review & post →" else "Pick a category to continue"
+                GigComposeStep.FillGaps, GigComposeStep.BudgetMode -> "Continue"
                 GigComposeStep.Review -> "Post task"
                 GigComposeStep.Success -> "View task"
+            }
+
+        /** A12.8 — canonical cross-platform tag for the describe primary. */
+        private fun primaryCtaTestTag(form: GigComposeFormState): String? =
+            if (form.currentStep == GigComposeStep.Describe && form.composeMode == ComposeMode.Magic) {
+                "gigCompose.cta.reviewPost"
+            } else {
+                null
             }
 
         private fun secondaryCta(state: GigComposeUiState): WizardSecondaryCta? {
@@ -835,9 +1074,9 @@ open class GigComposeViewModel
             return when {
                 form.currentStep == GigComposeStep.Success ->
                     WizardSecondaryCta(label = "Done", testTag = "composeGigDone")
-                form.currentStep == GigComposeStep.Category && form.composeMode == ComposeMode.Magic ->
+                form.currentStep == GigComposeStep.Describe && form.composeMode == ComposeMode.Magic ->
                     // Ghost link beside the primary CTA → manual picker.
-                    WizardSecondaryCta(label = "Pick category", testTag = "composeGigPickCategory")
+                    WizardSecondaryCta(label = "Pick category", testTag = "gigCompose.cta.pickCategory")
                 else -> null
             }
         }
@@ -855,17 +1094,16 @@ open class GigComposeViewModel
         private fun primaryEnabled(state: GigComposeUiState): Boolean {
             val form = state.form
             return when (form.currentStep) {
-                GigComposeStep.Category ->
+                GigComposeStep.Describe ->
                     // Magic: enabled once an archetype is detected. Manual:
                     // enabled once a category tile is selected.
                     if (form.composeMode == ComposeMode.Magic) form.detectedArchetype != null else form.category != null
                 // P0.2 — photo uploads in flight gate Continue / Post so a
                 // submit never races a half-done upload.
-                GigComposeStep.Basics -> hasValidBasics(state)
-                GigComposeStep.Budget -> hasValidBudget(form)
-                GigComposeStep.Schedule -> hasValidSchedule(form)
-                GigComposeStep.Location -> hasValidLocation(form)
-                GigComposeStep.Review -> buildCreateBody() != null && !hasUploadsInFlight(state)
+                GigComposeStep.FillGaps ->
+                    hasValidBasics(state) && hasValidSchedule(form) && hasValidLocation(form)
+                GigComposeStep.BudgetMode -> hasValidBudget(form)
+                GigComposeStep.Review -> buildMagicPostBody() != null && !hasUploadsInFlight(state)
                 GigComposeStep.Success -> state.createdGigId != null
             }
         }
@@ -937,6 +1175,7 @@ open class GigComposeViewModel
             savedStateHandle[KEY_COMPOSE_MODE] = form.composeMode.name
             savedStateHandle[KEY_DESCRIBE] = form.describeText
             savedStateHandle[KEY_DETECTED] = form.detectedArchetype?.name
+            savedStateHandle[KEY_ARCHETYPE] = form.taskArchetype
             savedStateHandle[KEY_CATEGORY] = form.category?.name
             savedStateHandle[KEY_TITLE] = form.title
             savedStateHandle[KEY_DESCRIPTION] = form.description
@@ -944,6 +1183,7 @@ open class GigComposeViewModel
             savedStateHandle[KEY_BUDGET_TYPE] = form.budgetType?.name
             savedStateHandle[KEY_BUDGET_MIN] = form.budgetMin
             savedStateHandle[KEY_BUDGET_MAX] = form.budgetMax
+            savedStateHandle[KEY_ESTIMATED_HOURS] = form.estimatedHours
             savedStateHandle[KEY_SCHEDULE_TYPE] = form.scheduleType?.name
             savedStateHandle[KEY_SCHEDULED_START] = form.scheduledStartISO
             savedStateHandle[KEY_LOCATION_MODE] = form.locationMode?.name
@@ -955,11 +1195,12 @@ open class GigComposeViewModel
             savedStateHandle[KEY_CANCELLATION] = form.cancellationPolicy?.name
             savedStateHandle[KEY_IS_URGENT] = form.isUrgent
             savedStateHandle[KEY_TAGS] = ArrayList(form.tags)
+            savedStateHandle[KEY_ENGAGEMENT] = form.engagementOverride?.name
         }
 
         @Suppress("CyclomaticComplexMethod")
         private fun restoreFormState(): GigComposeFormState {
-            val step: Int = savedStateHandle[KEY_STEP] ?: GigComposeStep.Category.ordinal0
+            val step: Int = savedStateHandle[KEY_STEP] ?: GigComposeStep.Describe.ordinal0
             val composeModeName: String? = savedStateHandle[KEY_COMPOSE_MODE]
             val detectedName: String? = savedStateHandle[KEY_DETECTED]
             val categoryName: String? = savedStateHandle[KEY_CATEGORY]
@@ -967,6 +1208,7 @@ open class GigComposeViewModel
             val scheduleTypeName: String? = savedStateHandle[KEY_SCHEDULE_TYPE]
             val locationModeName: String? = savedStateHandle[KEY_LOCATION_MODE]
             val cancellationName: String? = savedStateHandle[KEY_CANCELLATION]
+            val engagementName: String? = savedStateHandle[KEY_ENGAGEMENT]
             val photos: ArrayList<String> = savedStateHandle[KEY_PHOTOS] ?: arrayListOf()
             val tags: ArrayList<String> = savedStateHandle[KEY_TAGS] ?: arrayListOf()
             return GigComposeFormState(
@@ -974,6 +1216,7 @@ open class GigComposeViewModel
                 composeMode = composeModeName?.let { name -> ComposeMode.entries.firstOrNull { it.name == name } } ?: ComposeMode.Magic,
                 describeText = savedStateHandle[KEY_DESCRIBE] ?: "",
                 detectedArchetype = detectedName?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
+                taskArchetype = savedStateHandle[KEY_ARCHETYPE],
                 category = categoryName?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
                 title = savedStateHandle[KEY_TITLE] ?: "",
                 description = savedStateHandle[KEY_DESCRIPTION] ?: "",
@@ -981,6 +1224,7 @@ open class GigComposeViewModel
                 budgetType = budgetTypeName?.let { name -> GigComposeBudgetType.entries.firstOrNull { it.name == name } },
                 budgetMin = savedStateHandle[KEY_BUDGET_MIN] ?: "",
                 budgetMax = savedStateHandle[KEY_BUDGET_MAX] ?: "",
+                estimatedHours = savedStateHandle[KEY_ESTIMATED_HOURS] ?: "",
                 scheduleType = scheduleTypeName?.let { name -> GigComposeScheduleType.entries.firstOrNull { it.name == name } },
                 scheduledStartISO = savedStateHandle[KEY_SCHEDULED_START],
                 locationMode = locationModeName?.let { name -> GigComposeLocationMode.entries.firstOrNull { it.name == name } },
@@ -998,33 +1242,42 @@ open class GigComposeViewModel
                     },
                 isUrgent = savedStateHandle[KEY_IS_URGENT] ?: false,
                 tags = tags.toList(),
+                engagementOverride =
+                    engagementName?.let { name ->
+                        GigEngagementMode.entries.firstOrNull { it.name == name }
+                    },
             )
         }
 
         companion object {
-            private const val KEY_STEP = "composeGig.step"
-            private const val KEY_COMPOSE_MODE = "composeGig.composeMode"
-            private const val KEY_DESCRIBE = "composeGig.describeText"
-            private const val KEY_DETECTED = "composeGig.detectedArchetype"
-            private const val KEY_CATEGORY = "composeGig.category"
-            private const val KEY_TITLE = "composeGig.title"
-            private const val KEY_DESCRIPTION = "composeGig.description"
-            private const val KEY_PHOTOS = "composeGig.photos"
-            private const val KEY_BUDGET_TYPE = "composeGig.budgetType"
-            private const val KEY_BUDGET_MIN = "composeGig.budgetMin"
-            private const val KEY_BUDGET_MAX = "composeGig.budgetMax"
-            private const val KEY_SCHEDULE_TYPE = "composeGig.scheduleType"
-            private const val KEY_SCHEDULED_START = "composeGig.scheduledStart"
-            private const val KEY_LOCATION_MODE = "composeGig.locationMode"
-            private const val KEY_PLACE_LINE1 = "composeGig.placeLine1"
-            private const val KEY_PLACE_CITY = "composeGig.placeCity"
-            private const val KEY_PLACE_STATE = "composeGig.placeState"
-            private const val KEY_PLACE_ZIP = "composeGig.placeZip"
-            private const val KEY_DEADLINE = "composeGig.deadline"
-            private const val KEY_CANCELLATION = "composeGig.cancellationPolicy"
-            private const val KEY_IS_URGENT = "composeGig.isUrgent"
-            private const val KEY_TAGS = "composeGig.tags"
-            private const val KEY_TOUCHED = "composeGig.touchedFields"
+            // A12.8 — `composeGig2.*` prefix so stale 6-step snapshots
+            // (the old `composeGig.*` keys) are ignored on restore.
+            private const val KEY_STEP = "composeGig2.step"
+            private const val KEY_COMPOSE_MODE = "composeGig2.composeMode"
+            private const val KEY_DESCRIBE = "composeGig2.describeText"
+            private const val KEY_DETECTED = "composeGig2.detectedArchetype"
+            private const val KEY_ARCHETYPE = "composeGig2.taskArchetype"
+            private const val KEY_CATEGORY = "composeGig2.category"
+            private const val KEY_TITLE = "composeGig2.title"
+            private const val KEY_DESCRIPTION = "composeGig2.description"
+            private const val KEY_PHOTOS = "composeGig2.photos"
+            private const val KEY_BUDGET_TYPE = "composeGig2.budgetType"
+            private const val KEY_BUDGET_MIN = "composeGig2.budgetMin"
+            private const val KEY_BUDGET_MAX = "composeGig2.budgetMax"
+            private const val KEY_ESTIMATED_HOURS = "composeGig2.estimatedHours"
+            private const val KEY_SCHEDULE_TYPE = "composeGig2.scheduleType"
+            private const val KEY_SCHEDULED_START = "composeGig2.scheduledStart"
+            private const val KEY_LOCATION_MODE = "composeGig2.locationMode"
+            private const val KEY_PLACE_LINE1 = "composeGig2.placeLine1"
+            private const val KEY_PLACE_CITY = "composeGig2.placeCity"
+            private const val KEY_PLACE_STATE = "composeGig2.placeState"
+            private const val KEY_PLACE_ZIP = "composeGig2.placeZip"
+            private const val KEY_DEADLINE = "composeGig2.deadline"
+            private const val KEY_CANCELLATION = "composeGig2.cancellationPolicy"
+            private const val KEY_IS_URGENT = "composeGig2.isUrgent"
+            private const val KEY_TAGS = "composeGig2.tags"
+            private const val KEY_ENGAGEMENT = "composeGig2.engagementMode"
+            private const val KEY_TOUCHED = "composeGig2.touchedFields"
 
             /** P0.1 — debounce ahead of the backend magic-draft call. */
             private const val DETECTION_DEBOUNCE_MS = 700L
@@ -1033,6 +1286,9 @@ open class GigComposeViewModel
             private const val MIN_DRAFT_WORDS = 3
             private const val MIN_DETECT_TEXT_LENGTH = 3
             private const val MAX_TAG_LENGTH = 50
+
+            /** A12.8 — backend `UNDO_WINDOW_MS` fallback. */
+            private const val DEFAULT_UNDO_WINDOW_MS = 10_000L
 
             /** P0.2 — `file_type` form field on `POST /api/files/upload`. */
             private const val GIG_PHOTO_FILE_TYPE = "gig_photo"
@@ -1045,12 +1301,80 @@ open class GigComposeViewModel
             private const val FIELD_SCHEDULE = "schedule"
             private const val FIELD_TAGS = "tags"
             private const val FIELD_URGENT = "urgent"
+            private const val FIELD_EFFORT = "effort"
+            private const val FIELD_MODULES = "modules"
 
             private fun wordCount(text: String): Int = text.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
 
             /** "60.0" reads as "60" in the budget fields; keep cents when present. */
             internal fun formatBudgetValue(value: Double?): String? =
                 value?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
+
+            /**
+             * A12.8 — pure `engagement_mode` default, mirroring
+             * `inferEngagementMode` in `backend/services/offerScoringService.js`:
+             * pro quotes for pro_service_quote, instant accept for
+             * asap/urgent non-pro work, curated offers otherwise.
+             */
+            fun inferEngagementMode(
+                archetype: String?,
+                scheduleType: String?,
+                isUrgent: Boolean,
+            ): String =
+                when {
+                    archetype == "pro_service_quote" -> GigEngagementMode.Quotes.wireValue
+                    scheduleType == "asap" || isUrgent -> GigEngagementMode.InstantAccept.wireValue
+                    else -> GigEngagementMode.CuratedOffers.wireValue
+                }
+
+            /**
+             * A12.8 — manual-path default `task_archetype` for a category
+             * (the magic draft supplies the real one when available).
+             */
+            fun archetypeForCategory(category: GigComposeCategory): String =
+                when (category) {
+                    GigComposeCategory.Handyman, GigComposeCategory.Cleaning -> "home_service"
+                    GigComposeCategory.Moving -> "quick_help"
+                    GigComposeCategory.PetCare, GigComposeCategory.ChildCare -> "care_task"
+                    GigComposeCategory.Tutoring -> "quick_help"
+                    GigComposeCategory.Delivery -> "delivery_errand"
+                    GigComposeCategory.Tech -> "quick_help"
+                    GigComposeCategory.Other -> "general"
+                }
+
+            /** A12.8 — wire `schedule_type` for the magic-post draft. */
+            internal fun scheduleWireValue(form: GigComposeFormState): String =
+                when {
+                    form.isUrgent -> "asap"
+                    form.scheduleType == GigComposeScheduleType.OneTime && form.scheduledStartISO != null -> "scheduled"
+                    else -> "flexible"
+                }
+
+            /** Draft `location_mode` (home/current/address/map_pin only). */
+            internal fun draftLocationMode(mode: GigComposeLocationMode): String =
+                when (mode) {
+                    GigComposeLocationMode.YourAddress -> "home"
+                    GigComposeLocationMode.APlace -> "address"
+                    // "Virtual" has no draft location_mode — home is the
+                    // backend default; the outer location.mode is `custom`
+                    // and task_format `remote` carries the meaning.
+                    GigComposeLocationMode.Virtual -> "home"
+                }
+
+            /** Magic-post `text` — backend requires ≥3 chars even on the classic path. */
+            internal fun magicPostText(
+                form: GigComposeFormState,
+                title: String,
+                description: String,
+            ): String =
+                form.describeText
+                    .trim()
+                    .takeIf { it.length >= MAGIC_POST_TEXT_MIN }
+                    ?.take(MAGIC_POST_TEXT_MAX)
+                    ?: "$title. $description".take(MAGIC_POST_TEXT_MAX)
+
+            private const val MAGIC_POST_TEXT_MIN = 3
+            private const val MAGIC_POST_TEXT_MAX = 2000
 
             /**
              * P1.G — DTO → budget-step hint. Null (hidden) when the
@@ -1093,7 +1417,7 @@ open class GigComposeViewModel
                 when ((raw ?: "").lowercase().replace("_", "").replace("-", "")) {
                     "scheduled", "onetime", "once" -> GigComposeScheduleType.OneTime
                     "recurring", "repeat", "repeating" -> GigComposeScheduleType.Recurring
-                    "flexible", "flex", "anytime" -> GigComposeScheduleType.Flexible
+                    "flexible", "flex", "anytime", "asap", "today" -> GigComposeScheduleType.Flexible
                     else -> null
                 }
 

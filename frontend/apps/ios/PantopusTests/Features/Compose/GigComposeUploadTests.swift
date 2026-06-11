@@ -2,11 +2,11 @@
 //  GigComposeUploadTests.swift
 //  PantopusTests
 //
-//  P15.5 — Post-a-Task Basics-step photo pipeline: picked bytes upload
-//  immediately via `POST /api/files/upload` (per-tile uploading /
-//  failed-with-retry / uploaded states), uploaded URLs ride the create
-//  body's `attachments`, and the Continue/Post CTAs wait for in-flight
-//  uploads.
+//  P15.5 — Post-a-Task Fill-gaps-step photo pipeline: picked bytes
+//  upload immediately via `POST /api/files/upload` (per-tile uploading /
+//  failed-with-retry / uploaded states), uploaded URLs ride the
+//  magic-post draft's `attachments`, and the Continue/Post CTAs wait
+//  for in-flight uploads.
 //
 
 import XCTest
@@ -47,7 +47,7 @@ final class GigComposeUploadTests: XCTestCase {
 
     private func validBasicsState() -> GigComposeFormState {
         GigComposeFormState(
-            step: GigComposeStep.basics.rawValue,
+            step: GigComposeStep.fillGaps.rawValue,
             category: .handyman,
             title: "Hang 3 shelves in the living room",
             description: "Need three IKEA Lack shelves mounted on drywall."
@@ -77,7 +77,7 @@ final class GigComposeUploadTests: XCTestCase {
         )
     }
 
-    func testUploadedURLsRideCreateBodyAttachments() async {
+    func testUploadedURLsRideMagicPostDraftAttachments() async {
         SequencedURLProtocol.sequence = [
             .status(201, body: Self.uploadOKJSON),
             .status(201, body: Self.uploadOK2JSON)
@@ -97,7 +97,7 @@ final class GigComposeUploadTests: XCTestCase {
         vm.addPhotoData(Data([0x2]))
         await vm.awaitUploadsForTesting()
         XCTAssertEqual(
-            vm.buildCreateBody()?.attachments,
+            vm.buildMagicPostBody()?.draft.attachments,
             [
                 "https://cdn.pantopus.app/gigs/photo-1.jpg",
                 "https://cdn.pantopus.app/gigs/photo-2.jpg"

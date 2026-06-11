@@ -2,9 +2,11 @@
 //  GigComposeViewModel.swift
 //  Pantopus
 //
-//  Drives the 6-step Post-a-Task wizard (P2.2). State machine + chrome
+//  Drives the A12.8 describe-first Post-a-Task wizard (Describe → Fill
+//  gaps → Budget & mode → Review → Success). State machine + chrome
 //  derivation mirror `AddHomeWizardViewModel`; submission posts to
-//  `POST /api/gigs` via `GigsEndpoints.create(...)`.
+//  `POST /api/gigs/magic-post` via `GigsEndpoints.magicPost(...)` with
+//  a 10-second undo window.
 //
 
 import Foundation
@@ -20,7 +22,7 @@ public enum GigComposeOutboundEvent: Sendable, Equatable {
     case openGigDetail(gigId: String)
 }
 
-/// One Basics-step photo riding the real upload pipeline
+/// One Fill-gaps-step photo riding the real upload pipeline
 /// (`POST /api/files/upload`). The raw bytes back the grid thumbnail;
 /// `status` drives the per-tile spinner / retry / uploaded chrome.
 struct GigComposeAttachment: Identifiable, Equatable {
@@ -40,6 +42,35 @@ struct GigComposeAttachment: Identifiable, Equatable {
     }
 }
 
+/// One live row of the step-1 "Task details" module-prompts card. Values
+/// derive from form state; tapping jumps to the matching editor.
+struct GigModulePrompt: Identifiable, Hashable {
+    enum Key: String {
+        case when
+        case location = "where"
+        case effort
+        case photos
+        case budget
+    }
+
+    let key: Key
+    let icon: PantopusIcon
+    let label: String
+    let value: String
+    let isFilled: Bool
+
+    var id: String { key.rawValue }
+}
+
+/// Which archetype module field group the Fill-gaps step renders.
+enum GigModuleGroup: Equatable {
+    case care
+    case logistics
+    case remote
+    case event
+    case items
+}
+
 @Observable
 @MainActor
 final class GigComposeViewModel: WizardModel {
@@ -49,16 +80,28 @@ final class GigComposeViewModel: WizardModel {
     /// can be restored after process death.
     private(set) var form: GigComposeFormState
 
-    /// True while the final `POST /api/gigs` is in flight.
+    /// True while the final `POST /api/gigs/magic-post` is in flight.
     private(set) var isSubmitting: Bool = false
 
     /// User-facing error message attached to the active step. Cleared on
     /// any successful step transition.
     private(set) var errorMessage: String?
 
+    /// Transient info toast (e.g. "Task undone"). Cleared on the next
+    /// step transition.
+    private(set) var infoMessage: String?
+
     /// Holds the new gig's id once `submit()` succeeds so the success
     /// step's primary CTA can route to the detail.
     private(set) var createdGigId: String?
+
+    /// Success-step "Notified M nearby helpers" counts from the
+    /// magic-post response.
+    private(set) var notifiedCount: Int = 0
+    private(set) var nearbyHelpers: Int = 0
+
+    /// Success-step undo countdown ("Undo · Ns"). 0 hides the pill.
+    private(set) var undoSecondsRemaining: Int = 0
 
     /// One-shot navigation events the host view consumes.
     var pendingEvent: GigComposeOutboundEvent?
@@ -72,6 +115,9 @@ final class GigComposeViewModel: WizardModel {
     /// flight; the describe card shows a subtle "Parsing" indicator.
     private(set) var isParsingDraft = false
 
+    /// True while a recorded voice note is being transcribed.
+    private(set) var isTranscribing = false
+
     /// B.3 — clarifying question returned by the parser, surfaced as a
     /// hint under the describe card. Cleared on fallback / failure.
     private(set) var clarifyingQuestion: String?
@@ -81,7 +127,15 @@ final class GigComposeViewModel: WizardModel {
     /// advances past the describe step.
     private(set) var magicDraft: MagicDraftDTO?
 
-    /// P15.5 — Basics-step photos with their per-tile upload state.
+    /// Top-level confidence of the latest draft — echoed back as
+    /// `ai_confidence` on magic-post.
+    private(set) var draftConfidence: Double?
+
+    /// Inspiration-template chips (`GET /api/gigs/templates/library`),
+    /// cached per session. Empty on fetch failure (silent).
+    private(set) var templates: [GigTaskTemplateDTO] = []
+
+    /// P15.5 — Fill-gaps-step photos with their per-tile upload state.
     /// Transient (raw bytes can't ride `@SceneStorage`); uploaded URLs
     /// are mirrored into `form.photoIds` so they survive restore.
     private(set) var attachments: [GigComposeAttachment] = []
@@ -101,6 +155,12 @@ final class GigComposeViewModel: WizardModel {
 
     /// B.3 — in-flight debounce for the Magic Task archetype parse.
     private var detectionTask: Task<Void, Never>?
+
+    /// Success-step undo countdown ticker.
+    private var undoCountdownTask: Task<Void, Never>?
+
+    /// One-shot guard around the templates fetch.
+    private var templatesLoaded = false
 
     /// P15.5 — in-flight photo uploads keyed by attachment id.
     private var uploadTasks: [String: Task<Void, Never>] = [:]
@@ -160,6 +220,7 @@ extension GigComposeViewModel {
             leading: leadingControl(for: step),
             primaryCTALabel: primaryCTALabel(for: step),
             primaryCTAEnabled: primaryEnabled(for: step) && !isSubmitting,
+            primaryCTAIdentifier: step == .describe ? "gigCompose.cta.reviewPost" : "wizardPrimaryCTA",
             secondaryCTA: secondaryCTA(for: step),
             isSubmitting: isSubmitting,
             dirty: dirtyForCloseConfirm,
@@ -193,8 +254,8 @@ extension GigComposeViewModel {
         case .success:
             // Success step's "Done" — return to the feed.
             pendingEvent = .dismiss
-        case .category where form.composeMode == .magic:
-            // "Pick category" — drop into the manual archetype picker.
+        case .describe where form.composeMode == .magic:
+            // "Pick category" ghost — drop into the manual archetype picker.
             setComposeMode(.manual)
         default:
             break
@@ -238,6 +299,7 @@ extension GigComposeViewModel {
         let words = snapshot.split(whereSeparator: \.isWhitespace)
         guard words.count >= Self.magicDraftMinWords else {
             magicDraft = nil
+            draftConfidence = nil
             clarifyingQuestion = nil
             applyDetection(for: snapshot)
             return
@@ -250,7 +312,10 @@ extension GigComposeViewModel {
                 text: snapshot,
                 context: coordinate.map {
                     MagicDraftContext(latitude: $0.latitude, longitude: $0.longitude)
-                }
+                },
+                // Uploaded photo/attachment URLs ride along so the
+                // parser can fold them into the draft.
+                attachmentUrls: form.photoIds.isEmpty ? nil : form.photoIds
             )
             let response: MagicDraftResponse = try await api.request(GigsEndpoints.magicDraft(body: body))
             // The text may have changed while the request was in flight —
@@ -260,6 +325,7 @@ extension GigComposeViewModel {
         } catch {
             guard form.describeText == snapshot, !Task.isCancelled else { return }
             magicDraft = nil
+            draftConfidence = nil
             clarifyingQuestion = nil
             applyDetection(for: snapshot)
         }
@@ -267,10 +333,11 @@ extension GigComposeViewModel {
 
     /// Commit a magic-draft response: stash the draft for the
     /// advance-time prefill, surface the clarifying question, and mirror
-    /// the parsed category into the detected-archetype pill. Falls back
+    /// the parsed category into the detected-category row. Falls back
     /// to the keyword matcher when the backend returned no category.
     func apply(draft response: MagicDraftResponse, for text: String) {
         magicDraft = response.draft
+        draftConfidence = response.confidence
         clarifyingQuestion = (response.clarifyingQuestion?.isEmpty == false)
             ? response.clarifyingQuestion
             : nil
@@ -278,6 +345,9 @@ extension GigComposeViewModel {
             ?? Self.detectArchetype(from: text)
         form.detectedArchetype = detected
         if let detected { form.category = detected }
+        if let archetype = response.draft.taskArchetype, !archetype.isEmpty {
+            form.taskArchetype = archetype
+        }
     }
 
     /// Apply the keyword-matched archetype if the text hasn't changed
@@ -290,37 +360,84 @@ extension GigComposeViewModel {
         if let detected { form.category = detected }
     }
 
+    /// Keyword → archetype map shared by the deterministic detector and
+    /// the describe-card entity highlighter. Order matters — first hit
+    /// wins.
+    static let archetypeKeywords: [(category: GigComposeCategory, keywords: [String])] = [
+        (.moving, ["move", "moving", "haul", "u-haul", "load boxes"]),
+        (.cleaning, ["clean", "tidy", "scrub", "vacuum", "mop"]),
+        (
+            .handyman,
+            [
+                "assemble", "ikea", "furniture", "shelf", "shelves", "mount", "drill",
+                "fix", "repair", "install", "handy", "patch", "drywall"
+            ]
+        ),
+        (.petcare, ["dog", "cat", " pet", "puppy", "litter", "groom", "walk"]),
+        (.childcare, ["babysit", "nanny", "kids", "child", "daycare"]),
+        (.tutoring, ["tutor", "lesson", "math", "homework", "test prep", "teach"]),
+        (.delivery, ["deliver", "pickup", "pick up", "drop off", "errand", "courier"]),
+        (.tech, ["wifi", "wi-fi", "computer", "laptop", "printer", "router", "troubleshoot", "setup"])
+    ]
+
     /// Deterministic keyword → archetype map. Synchronous fallback for
     /// short input and for magic-draft request failures.
     static func detectArchetype(from text: String) -> GigComposeCategory? {
         let lower = text.lowercased()
         guard lower.count >= 3 else { return nil }
-        func has(_ words: [String]) -> Bool {
-            words.contains { lower.contains($0) }
+        for entry in archetypeKeywords where entry.keywords.contains(where: { lower.contains($0) }) {
+            return entry.category
         }
-        if has(["move", "moving", "haul", "u-haul", "load boxes"]) { return .moving }
-        if has(["clean", "tidy", "scrub", "vacuum", "mop"]) { return .cleaning }
-        if has([
-            "assemble",
-            "ikea",
-            "furniture",
-            "shelf",
-            "shelves",
-            "mount",
-            "drill",
-            "fix",
-            "repair",
-            "install",
-            "handy",
-            "patch",
-            "drywall"
-        ]) { return .handyman }
-        if has(["dog", "cat", " pet", "puppy", "litter", "groom", "walk"]) { return .petcare }
-        if has(["babysit", "nanny", "kids", "child", "daycare"]) { return .childcare }
-        if has(["tutor", "lesson", "math", "homework", "test prep", "teach"]) { return .tutoring }
-        if has(["deliver", "pickup", "pick up", "drop off", "errand", "courier"]) { return .delivery }
-        if has(["wifi", "wi-fi", "computer", "laptop", "printer", "router", "troubleshoot", "setup"]) { return .tech }
         return nil
+    }
+
+    // MARK: - Templates library
+
+    /// Fetch the inspiration-template chips once per session
+    /// (`GET /api/gigs/templates/library`). Failure is silent — the row
+    /// simply doesn't render.
+    func loadTemplatesIfNeeded() async {
+        guard !templatesLoaded else { return }
+        templatesLoaded = true
+        do {
+            let response: GigTemplateLibraryResponse = try await api.request(GigsEndpoints.templatesLibrary())
+            templates = response.templates
+        } catch {
+            templates = []
+        }
+    }
+
+    /// Seed the describe field from a tapped template chip and kick the
+    /// debounced parse.
+    func applyTemplate(_ template: GigTaskTemplateDTO) {
+        guard let title = template.template?.title, !title.isEmpty else { return }
+        setDescribeText(title)
+    }
+
+    // MARK: - Voice note → transcription
+
+    /// Push a recorded `.m4a` through `POST /api/ai/transcribe` and
+    /// append the text to the describe field (which re-kicks the parse).
+    /// Failures are silent — the recording UI simply resets.
+    func appendTranscribedAudio(_ data: Data) async {
+        guard !data.isEmpty else { return }
+        isTranscribing = true
+        defer { isTranscribing = false }
+        do {
+            let response = try await uploader.transcribeAudio(
+                MultipartFile(
+                    fieldName: "audio",
+                    filename: "describe.m4a",
+                    mimeType: "audio/m4a",
+                    data: data
+                )
+            )
+            let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return }
+            setDescribeText(form.describeText.isEmpty ? text : form.describeText + " " + text)
+        } catch {
+            // Silent — mic stays available for another take.
+        }
     }
 
     // MARK: - Field updates
@@ -329,17 +446,32 @@ extension GigComposeViewModel {
         form.category = category
     }
 
+    /// A12.8 — step-1 engagement tile. Mirrors into `scheduleType`
+    /// (Recurring → recurring, Open-ended → flexible); One-time clears a
+    /// recurring/flexible leftover so the When picker re-prompts.
     func selectEngagementMode(_ mode: GigComposeEngagementMode) {
+        form.engagementTile = mode
         switch mode {
         case .oneTime:
-            form.scheduleType = .oneTime
-            if form.budgetType == .offers { form.budgetType = nil }
+            if form.scheduleType == .recurring || form.scheduleType == .flexible {
+                form.scheduleType = nil
+            }
         case .recurring:
             form.scheduleType = .recurring
-            if form.budgetType == .offers { form.budgetType = nil }
-        case .openBidding:
-            form.budgetType = .offers
+        case .openEnded:
+            form.scheduleType = .flexible
         }
+    }
+
+    /// A12.8 — explicit backend engagement-mode override (Budget & mode
+    /// step segmented control).
+    func selectEngagementOverride(_ mode: GigEngagementMode) {
+        form.engagementOverride = mode
+    }
+
+    /// A12.8 — optional effort estimate, hours as text ("2", "2.5").
+    func setEstimatedHours(_ value: String) {
+        form.estimatedHours = sanitizeBudget(value)
     }
 
     func setTitle(_ title: String) {
@@ -353,10 +485,16 @@ extension GigComposeViewModel {
         form.description = String(description.prefix(GigComposeLimits.descriptionMax))
     }
 
+    /// Generic form mutator for the Fill-gaps module field groups —
+    /// avoids one bespoke setter per module field.
+    func updateForm(_ mutate: (inout GigComposeFormState) -> Void) {
+        mutate(&form)
+    }
+
     // MARK: - P15.5 Photo uploads
 
-    /// True while any Basics-step photo upload is still in flight —
-    /// gates the Continue / Post CTAs so a half-uploaded gig can't ship.
+    /// True while any photo upload is still in flight — gates the
+    /// Continue / Post CTAs so a half-uploaded gig can't ship.
     var hasUploadsInFlight: Bool {
         attachments.contains { $0.status == .uploading }
     }
@@ -397,7 +535,7 @@ extension GigComposeViewModel {
 
     /// Push one photo through `POST /api/files/upload` (same mechanism
     /// as the Delivery Proof sheet) and mirror the resulting URL into
-    /// `form.photoIds` so it rides the create body's `attachments`.
+    /// `form.photoIds` so it rides the post body's `attachments`.
     func performUpload(attachmentId: String) async {
         guard let attachment = attachments.first(where: { $0.id == attachmentId }) else { return }
         do {
@@ -484,6 +622,17 @@ extension GigComposeViewModel {
         activePickerSheet = nil
     }
 
+    /// Step-1 module-prompt row tap → the matching editor.
+    func handleModulePromptTap(_ key: GigModulePrompt.Key) {
+        switch key {
+        case .when: presentPicker(.when)
+        case .location: presentPicker(.location)
+        case .effort: presentPicker(.effort)
+        case .budget: transition(to: .budget)
+        case .photos: break // The view owns the PhotosPicker presentation.
+        }
+    }
+
     /// E.1 — set (or clear) the optional deadline. `iso == nil` ⇒ flexible.
     func setDeadline(_ iso: String?) {
         form.deadlineISO = iso
@@ -540,7 +689,7 @@ extension GigComposeViewModel {
     // MARK: - State transitions
 
     var currentStep: GigComposeStep {
-        GigComposeStep(rawValue: form.step) ?? .category
+        GigComposeStep(rawValue: form.step) ?? .describe
     }
 
     /// True when the active step's inputs are valid enough to advance.
@@ -551,17 +700,16 @@ extension GigComposeViewModel {
 
     private func advance() async {
         switch currentStep {
-        case .category:
-            // B.3 — leaving the Magic describe step commits the parsed
-            // draft into any fields the user hasn't filled themselves.
+        case .describe:
+            // Leaving the describe step on the Magic path commits the
+            // parsed draft into any fields the user hasn't filled
+            // themselves. The manual path lands on Fill gaps unprefilled.
             if form.composeMode == .magic { prefillFromMagicDraft() }
-            if let next = GigComposeStep(rawValue: form.step + 1) {
-                transition(to: next)
-            }
-        case .basics, .budget, .schedule, .location:
-            if let next = GigComposeStep(rawValue: form.step + 1) {
-                transition(to: next)
-            }
+            transition(to: .fillGaps)
+        case .fillGaps:
+            transition(to: .budget)
+        case .budget:
+            transition(to: .review)
         case .review:
             await submit()
         case .success:
@@ -573,8 +721,7 @@ extension GigComposeViewModel {
 
     /// B.3 — fold the stashed magic draft into the form. Prefill is
     /// deliberately empty-fields-only so a user who already typed a
-    /// title (or picked a budget via the engagement control) never gets
-    /// stomped by the parser.
+    /// title (or picked a budget) never gets stomped by the parser.
     private func prefillFromMagicDraft() {
         guard let draft = magicDraft else { return }
         if form.title.isEmpty, let title = draft.title, !title.isEmpty {
@@ -612,7 +759,7 @@ extension GigComposeViewModel {
         if form.scheduleType == nil {
             // Only the clean maps: backend "scheduled" → one-time,
             // "flexible" → flexible. "asap"/"today" have no wizard
-            // equivalent, so the user picks on the schedule step.
+            // equivalent, so the user picks on the Fill-gaps step.
             switch draft.scheduleType {
             case "scheduled": form.scheduleType = .oneTime
             case "flexible": form.scheduleType = .flexible
@@ -624,6 +771,21 @@ extension GigComposeViewModel {
                 addTag(tag)
             }
         }
+        if form.estimatedHours.isEmpty, let hours = draft.estimatedHours, hours > 0 {
+            form.estimatedHours = Self.formatBudgetValue(hours)
+        }
+        if form.taskArchetype == nil, let archetype = draft.taskArchetype, !archetype.isEmpty {
+            form.taskArchetype = archetype
+        }
+        if draft.isUrgent == true { form.isUrgent = true }
+        // Module objects ride straight through when the parser carried
+        // them (empty-only so user edits never get stomped).
+        if form.careDetails == nil { form.careDetails = draft.careDetails }
+        if form.logisticsDetails == nil { form.logisticsDetails = draft.logisticsDetails }
+        if form.remoteDetails == nil { form.remoteDetails = draft.remoteDetails }
+        if form.urgentDetails == nil { form.urgentDetails = draft.urgentDetails }
+        if form.eventDetails == nil { form.eventDetails = draft.eventDetails }
+        if form.items.isEmpty, let items = draft.items { form.items = Array(items.prefix(20)) }
     }
 
     /// Render a draft dollar amount into the budget text fields —
@@ -642,6 +804,7 @@ extension GigComposeViewModel {
     private func transition(to step: GigComposeStep) {
         form.step = step.rawValue
         errorMessage = nil
+        infoMessage = nil
         if let stepNumber = step.stepNumber {
             Analytics.track(
                 .screenComposeGigWizardStepViewed(
@@ -654,6 +817,163 @@ extension GigComposeViewModel {
 }
 
 extension GigComposeViewModel {
+    // MARK: - A12.8 Live module prompts ("Task details" card)
+
+    /// The five live When / Where / Effort / Photos / Budget rows. Values
+    /// derive from form state; filled-ness drives the green-check vs
+    /// amber-Add chrome.
+    var modulePrompts: [GigModulePrompt] {
+        [
+            GigModulePrompt(
+                key: .when,
+                icon: .calendar,
+                label: "When",
+                value: whenSummary ?? "When does it happen?",
+                isFilled: whenSummary != nil
+            ),
+            GigModulePrompt(
+                key: .location,
+                icon: .mapPin,
+                label: "Where",
+                value: whereSummary ?? "Where does it happen?",
+                isFilled: whereSummary != nil
+            ),
+            GigModulePrompt(
+                key: .effort,
+                icon: .timer,
+                label: "Effort",
+                value: effortSummary ?? "Rough time estimate",
+                isFilled: effortSummary != nil
+            ),
+            GigModulePrompt(
+                key: .photos,
+                icon: .camera,
+                label: "Photos",
+                value: photosSummaryValue ?? "Recommended for better bids",
+                isFilled: photosSummaryValue != nil
+            ),
+            GigModulePrompt(
+                key: .budget,
+                icon: .wallet,
+                label: "Budget",
+                value: budgetSummaryValue ?? "Set a budget",
+                isFilled: budgetSummaryValue != nil
+            )
+        ]
+    }
+
+    /// "Sat Oct 18 · 9:00 AM" / "Flexible" / "Recurring" — nil when the
+    /// schedule is still unset (or one-time without a date).
+    var whenSummary: String? {
+        switch form.scheduleType {
+        case .oneTime:
+            guard let iso = form.scheduledStartISO,
+                  let date = ISO8601DateFormatter().date(from: iso) else { return nil }
+            let fmt = DateFormatter()
+            fmt.dateFormat = "EEE MMM d · h:mm a"
+            return fmt.string(from: date)
+        case .recurring:
+            return "Recurring"
+        case .flexible:
+            return "Flexible"
+        case nil:
+            return nil
+        }
+    }
+
+    /// Resolved location line — nil when unset or an incomplete address.
+    var whereSummary: String? {
+        switch form.locationMode {
+        case .yourAddress:
+            return "Your saved address"
+        case .virtual:
+            return "Remote / Online"
+        case .aPlace:
+            guard form.placeAddress.isComplete else { return nil }
+            return form.placeAddress.line1.trimmingCharacters(in: .whitespacesAndNewlines)
+        case nil:
+            return nil
+        }
+    }
+
+    /// "~2 hours" — nil when no estimate is set.
+    var effortSummary: String? {
+        guard let hours = Double(form.estimatedHours), hours > 0 else { return nil }
+        let rendered = hours.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(hours))
+            : String(format: "%.1f", hours)
+        return "~\(rendered) hour\(hours == 1 ? "" : "s")"
+    }
+
+    private var photosSummaryValue: String? {
+        let count = form.photoIds.count
+        guard count > 0 else { return nil }
+        return count == 1 ? "1 photo added" : "\(count) photos added"
+    }
+
+    private var budgetSummaryValue: String? {
+        guard let type = form.budgetType else { return nil }
+        switch type {
+        case .offers:
+            return "Open to offers"
+        case .fixed, .hourly:
+            guard !form.budgetMin.isEmpty else { return nil }
+            let suffix = type == .hourly ? "/hr" : ""
+            if !form.budgetMax.isEmpty {
+                return "$\(form.budgetMin)–\(form.budgetMax)\(suffix)"
+            }
+            return "$\(form.budgetMin)\(suffix)"
+        }
+    }
+
+    /// Which archetype module field group the Fill-gaps step renders.
+    /// Derived from the parsed `task_archetype`, falling back to a
+    /// category-based default on the manual path.
+    var activeModuleGroup: GigModuleGroup? {
+        switch form.taskArchetype {
+        case "care_task": return .care
+        case "home_service", "quick_help", "recurring_service": return .logistics
+        case "remote_task": return .remote
+        case "event_shift": return .event
+        case "delivery_errand": return .items
+        case "pro_service_quote", "general": return nil
+        default:
+            break
+        }
+        switch form.category {
+        case .petcare, .childcare: return .care
+        case .handyman, .cleaning, .moving, .tutoring, .tech: return .logistics
+        case .delivery: return .items
+        case .other, nil: return nil
+        }
+    }
+
+    // MARK: - A12.8 Engagement mode
+
+    /// Default backend `engagement_mode` per the A12.8 inference rules:
+    /// pro-quote archetype → quotes; ASAP/urgent (non-pro) → instant
+    /// accept; everything else → curated offers.
+    static func inferEngagementMode(
+        archetype: String?,
+        scheduleType: String?,
+        isUrgent: Bool
+    ) -> GigEngagementMode {
+        if archetype == "pro_service_quote" { return .quotes }
+        if scheduleType == "asap" || isUrgent { return .instantAccept }
+        return .curatedOffers
+    }
+
+    /// The engagement mode the post will carry — user override first,
+    /// inference otherwise.
+    var effectiveEngagementMode: GigEngagementMode {
+        if let override = form.engagementOverride { return override }
+        return Self.inferEngagementMode(
+            archetype: form.taskArchetype,
+            scheduleType: form.scheduleType?.wireValue ?? magicDraft?.scheduleType,
+            isUrgent: form.isUrgent
+        )
+    }
+
     // MARK: - G. Price benchmark
 
     /// Fetch the low/median/high benchmark for the chosen category
@@ -699,64 +1019,134 @@ extension GigComposeViewModel {
             errorMessage = "You're offline. Try again when you're back online."
             return
         }
-        guard let body = buildCreateBody() else {
+        guard let body = buildMagicPostBody() else {
             errorMessage = "Please complete each step before posting."
             return
         }
         isSubmitting = true
         defer { isSubmitting = false }
         do {
-            let response: CreateGigResponse = try await api.request(GigsEndpoints.create(body))
+            let response: MagicPostResponse = try await api.request(GigsEndpoints.magicPost(body: body))
             createdGigId = response.gig.id
+            notifiedCount = response.notifiedCount ?? 0
+            nearbyHelpers = response.nearbyHelpers ?? 0
             transition(to: .success)
+            startUndoCountdown(windowMs: response.gig.undoWindowMs ?? 10_000)
         } catch {
             errorMessage = (error as? APIError)?.errorDescription
                 ?? "Couldn't post your task. Please try again."
         }
     }
 
-    /// Assemble a `CreateGigBody` from the form. Returns nil if any
-    /// required field is missing — `primaryEnabled(...)` should have
-    /// caught it but we double-check before sending.
-    func buildCreateBody() -> CreateGigBody? {
-        guard let budgetType = form.budgetType,
-              let scheduleType = form.scheduleType,
-              let locationMode = form.locationMode
-        else { return nil }
+    /// Tick the success step's "Undo · Ns" pill down once a second.
+    private func startUndoCountdown(windowMs: Int) {
+        undoCountdownTask?.cancel()
+        undoSecondsRemaining = max(0, Int((Double(windowMs) / 1000).rounded()))
+        undoCountdownTask = Task { [weak self] in
+            while let self, undoSecondsRemaining > 0, !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                undoSecondsRemaining = max(0, undoSecondsRemaining - 1)
+            }
+        }
+    }
+
+    /// `POST /api/gigs/:gigId/undo` — pull the freshly posted gig back
+    /// within the window and return to the review step, form intact.
+    func undoPost() async {
+        guard let gigId = createdGigId, undoSecondsRemaining > 0 else { return }
+        do {
+            _ = try await api.request(GigsEndpoints.undoGig(gigId: gigId), as: GigUndoResponse.self)
+            undoCountdownTask?.cancel()
+            undoSecondsRemaining = 0
+            createdGigId = nil
+            transition(to: .review)
+            infoMessage = "Task undone"
+        } catch {
+            // Window raced out (or server refused) — kill the pill so the
+            // user isn't offered an undo that can't succeed.
+            undoCountdownTask?.cancel()
+            undoSecondsRemaining = 0
+        }
+    }
+
+    /// Assemble the `POST /api/gigs/magic-post` body from the form.
+    /// Returns nil if any required field is missing —
+    /// `primaryEnabled(...)` should have caught it but we double-check
+    /// before sending.
+    func buildMagicPostBody() -> MagicPostBody? {
         let title = form.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let description = form.description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard title.count >= GigComposeLimits.titleMin,
               title.count <= GigComposeLimits.titleMax,
               description.count >= GigComposeLimits.descriptionMin
         else { return nil }
-        let price = priceFromBudget(type: budgetType)
-        guard price > 0 || budgetType == .offers else { return nil }
-        let scheduledStart = scheduleType == .oneTime ? form.scheduledStartISO : nil
-        if scheduleType == .oneTime, scheduledStart == nil { return nil }
-        let taskFormat: String? = locationMode == .virtual ? "remote" : nil
-        let location = composedLocation(for: locationMode) ?? fallbackLocation()
-        return CreateGigBody(
+        guard let budgetType = form.budgetType else { return nil }
+        let budgetMin = Double(form.budgetMin) ?? 0
+        switch budgetType {
+        case .fixed, .hourly:
+            guard budgetMin > 0 else { return nil }
+        case .offers:
+            break
+        }
+        // One-time needs its date; aPlace needs a complete address.
+        if form.scheduleType == .oneTime, form.scheduledStartISO == nil { return nil }
+        if form.locationMode == .aPlace, !form.placeAddress.isComplete { return nil }
+
+        let wireSchedule = form.scheduleType?.wireValue ?? "flexible"
+        let location = form.locationMode.flatMap { composedLocation(for: $0) }
+        let isVirtual = form.locationMode == .virtual
+        let items = form.items.filter { !($0.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let draft = MagicPostDraft(
             title: title,
             description: description,
-            category: form.category?.rawValue,
-            // Backend requires positive number; we send `1` for
-            // open-to-bids so the schema accepts it and treat the
-            // `pay_type` as the source of truth.
-            price: price > 0 ? price : 1,
-            payType: budgetType.wireValue,
-            scheduleType: scheduleType.wireValue,
-            scheduledStart: scheduledStart,
-            taskFormat: taskFormat,
-            attachments: form.photoIds.isEmpty ? nil : form.photoIds,
-            // E.1 — composer picker-sheet fields. Each is omitted from the
-            // JSON when unset (optional + `encodeIfPresent`); `is_urgent`
-            // only rides along when the boost is on.
-            deadline: form.deadlineISO,
-            cancellationPolicy: form.cancellationPolicy?.wireValue,
-            isUrgent: form.isUrgent ? true : nil,
+            category: form.category?.backendLabel,
             tags: form.tags.isEmpty ? nil : form.tags,
-            location: location
+            payType: budgetType.wireValue,
+            budgetFixed: budgetType == .fixed ? budgetMin : nil,
+            hourlyRate: budgetType == .hourly ? budgetMin : nil,
+            estimatedHours: Double(form.estimatedHours),
+            scheduleType: wireSchedule,
+            timeWindowStart: form.scheduleType == .oneTime ? form.scheduledStartISO : nil,
+            // E.1's optional deadline rides as the window's end.
+            timeWindowEnd: form.deadlineISO,
+            locationMode: draftLocationMode,
+            privacyLevel: magicDraft?.privacyLevel ?? "exact_after_accept",
+            isUrgent: form.isUrgent,
+            attachments: form.photoIds.isEmpty ? nil : Array(form.photoIds.prefix(10)),
+            items: items.isEmpty ? nil : Array(items.prefix(20)),
+            cancellationPolicy: form.cancellationPolicy?.wireValue,
+            taskArchetype: form.taskArchetype,
+            careDetails: activeModuleGroup == .care ? form.careDetails : nil,
+            logisticsDetails: activeModuleGroup == .logistics ? form.logisticsDetails : nil,
+            remoteDetails: activeModuleGroup == .remote ? form.remoteDetails : nil,
+            urgentDetails: form.isUrgent ? form.urgentDetails : nil,
+            eventDetails: activeModuleGroup == .event ? form.eventDetails : nil
         )
+        // magic-post requires `text` (min 3 chars) — manual/classic posts
+        // may have an empty describe field, so fall back to the title.
+        let describe = form.describeText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return MagicPostBody(
+            text: describe.count >= 3 ? describe : title,
+            draft: draft,
+            location: location,
+            beneficiaryUserId: nil,
+            sourceFlow: form.composeMode == .magic ? "magic" : "classic",
+            engagementMode: effectiveEngagementMode.rawValue,
+            taskFormat: isVirtual ? "remote" : nil,
+            aiConfidence: form.composeMode == .magic ? draftConfidence : nil,
+            aiDraftJson: form.composeMode == .magic ? magicDraft : nil
+        )
+    }
+
+    /// `draft.location_mode` wire value (home | current | address |
+    /// map_pin). Virtual tasks keep `home` and signal remoteness via
+    /// `task_format`.
+    private var draftLocationMode: String {
+        switch form.locationMode {
+        case .aPlace: "address"
+        case .yourAddress, .virtual, nil: "home"
+        }
     }
 
     private func composedLocation(for mode: GigComposeLocationMode) -> CreateGigLocation? {
@@ -801,15 +1191,6 @@ extension GigComposeViewModel {
             )
         }
     }
-
-    private func fallbackLocation() -> CreateGigLocation {
-        CreateGigLocation(
-            mode: "custom",
-            latitude: 0,
-            longitude: 0,
-            address: "Remote / Online"
-        )
-    }
 }
 
 extension GigComposeViewModel {
@@ -829,14 +1210,20 @@ extension GigComposeViewModel {
 
     private func leadingControl(for step: GigComposeStep) -> WizardLeadingControl {
         switch step {
-        case .category, .success: .close
-        case .basics, .budget, .schedule, .location, .review: .back
+        case .describe, .success: .close
+        case .fillGaps, .budget, .review: .back
         }
     }
 
     private func primaryCTALabel(for step: GigComposeStep) -> String {
         switch step {
-        case .category, .basics, .budget, .schedule, .location: "Continue"
+        case .describe:
+            form.composeMode == .magic
+                ? "Review & post →"
+                // Manual path: the disabled CTA carries the nudge copy
+                // until a tile is selected.
+                : (form.category == nil ? "Pick a category to continue" : "Continue")
+        case .fillGaps, .budget: "Continue"
         case .review: "Post task"
         case .success: "View task"
         }
@@ -846,9 +1233,13 @@ extension GigComposeViewModel {
         switch step {
         case .success:
             WizardSecondaryCTA(label: "Done", identifier: "composeGigDone")
-        case .category where form.composeMode == .magic:
-            // Ghost link beside the primary CTA → manual picker.
-            WizardSecondaryCTA(label: "Pick category", identifier: "composeGigPickCategory")
+        case .describe where form.composeMode == .magic:
+            // Ghost beside the primary CTA → manual picker.
+            WizardSecondaryCTA(
+                label: "Pick category",
+                identifier: "gigCompose.cta.pickCategory",
+                icon: .layoutGrid
+            )
         default:
             nil
         }
@@ -856,22 +1247,18 @@ extension GigComposeViewModel {
 
     private func primaryEnabled(for step: GigComposeStep) -> Bool {
         switch step {
-        case .category:
+        case .describe:
             // Magic: enabled once an archetype is detected. Manual:
             // enabled once a category tile is selected.
-            form.composeMode == .magic ? form.detectedArchetype != nil : hasSelectedCategory
-        case .basics:
-            hasValidBasics
+            form.composeMode == .magic ? form.detectedArchetype != nil : form.category != nil
+        case .fillGaps:
+            hasValidFillGaps
         case .budget:
             hasValidBudget
-        case .schedule:
-            hasValidSchedule
-        case .location:
-            hasValidLocation
         case .review:
             // P15.5 — don't allow posting while a photo upload is still
             // settling (the URL wouldn't make it into `attachments`).
-            buildCreateBody() != nil && !hasUploadsInFlight
+            buildMagicPostBody() != nil && !hasUploadsInFlight
         case .success:
             createdGigId != nil
         }
@@ -898,27 +1285,17 @@ extension GigComposeViewModel {
         }
         return out
     }
-
-    /// Resolve the wire `price` from the active budget type. For
-    /// `fixed` it's the min; for `hourly` it's the min hourly rate; for
-    /// `offers` it's 0 (we send `1` so the schema accepts it).
-    private func priceFromBudget(type: GigComposeBudgetType) -> Double {
-        switch type {
-        case .offers: 0
-        case .fixed, .hourly: Double(form.budgetMin) ?? 0
-        }
-    }
 }
 
 private extension GigComposeViewModel {
-    var hasSelectedCategory: Bool {
-        form.category != nil
-    }
-
-    var hasValidBasics: Bool {
+    /// Fill-gaps gate: valid basics, plus the conditional When/Where
+    /// rules. Unset schedule/location are allowed — magic-post defaults
+    /// them ("flexible" + no location) — but a chosen one-time schedule
+    /// needs its date and a chosen "a place" needs the full address.
+    var hasValidFillGaps: Bool {
         let title = form.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let desc = form.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        return title.count >= GigComposeLimits.titleMin
+        let basics = title.count >= GigComposeLimits.titleMin
             && title.count <= GigComposeLimits.titleMax
             && desc.count >= GigComposeLimits.descriptionMin
             && desc.count <= GigComposeLimits.descriptionMax
@@ -926,6 +1303,7 @@ private extension GigComposeViewModel {
             // P15.5 — Continue waits for in-flight photo uploads (the
             // grid shows an "uploading" hint while this gate is closed).
             && !hasUploadsInFlight
+        return basics && hasValidSchedule && hasValidLocation
     }
 
     var hasValidBudget: Bool {
@@ -940,7 +1318,7 @@ private extension GigComposeViewModel {
     }
 
     var hasValidSchedule: Bool {
-        guard let type = form.scheduleType else { return false }
+        guard let type = form.scheduleType else { return true }
         if type == .oneTime {
             guard let iso = form.scheduledStartISO,
                   let date = ISO8601DateFormatter().date(from: iso)
@@ -951,7 +1329,7 @@ private extension GigComposeViewModel {
     }
 
     var hasValidLocation: Bool {
-        guard let mode = form.locationMode else { return false }
+        guard let mode = form.locationMode else { return true }
         switch mode {
         case .yourAddress, .virtual:
             return true

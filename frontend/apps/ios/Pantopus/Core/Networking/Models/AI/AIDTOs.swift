@@ -33,3 +33,15 @@ public struct AIConversationSummaryDTO: Decodable, Sendable, Hashable, Identifia
 public struct AIConversationsResponse: Decodable, Sendable, Hashable {
     public let conversations: [AIConversationSummaryDTO]
 }
+
+/// Envelope from `POST /api/ai/transcribe` (`backend/routes/ai.js:387`)
+/// — Whisper transcription of a recorded describe-step voice note.
+public struct AITranscriptionResponse: Decodable, Sendable, Hashable {
+    public let text: String
+    public let durationSeconds: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case text
+        case durationSeconds = "duration_seconds"
+    }
+}

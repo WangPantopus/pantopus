@@ -35,6 +35,11 @@ data class MagicDraftBudgetRange(
  * The structured draft the backend NLP extracts from the describe text.
  * Every field is nullable — the parser only emits what it's confident
  * about, and unknown keys are tolerated (Moshi skips them by default).
+ *
+ * A12.8 — extended with the archetype module objects + power fields so
+ * the Fill-gaps step can prefill from the parse and the same shape can
+ * ride back out on `POST /api/gigs/magic-post` (`draft` body key,
+ * `backend/routes/magicTask.js:397`).
  */
 @JsonClass(generateAdapter = true)
 data class MagicDraftDto(
@@ -46,13 +51,108 @@ data class MagicDraftDto(
     @Json(name = "pay_type") val payType: String? = null,
     @Json(name = "budget_fixed") val budgetFixed: Double? = null,
     @Json(name = "hourly_rate") val hourlyRate: Double? = null,
+    @Json(name = "estimated_hours") val estimatedHours: Double? = null,
     @Json(name = "budget_range") val budgetRange: MagicDraftBudgetRange? = null,
+    /** "asap" | "today" | "scheduled" | "flexible". */
     @Json(name = "schedule_type") val scheduleType: String? = null,
+    @Json(name = "time_window_start") val timeWindowStart: String? = null,
+    @Json(name = "time_window_end") val timeWindowEnd: String? = null,
     @Json(name = "location_mode") val locationMode: String? = null,
     @Json(name = "privacy_level") val privacyLevel: String? = null,
     val tags: List<String>? = null,
     @Json(name = "is_urgent") val isUrgent: Boolean? = null,
+    val attachments: List<String>? = null,
     @Json(name = "attachments_suggested") val attachmentsSuggested: Boolean? = null,
+    /** delivery_errand shopping list (camelCase inside, ≤20). */
+    val items: List<MagicTaskItemDto>? = null,
+    @Json(name = "special_instructions") val specialInstructions: String? = null,
+    @Json(name = "access_notes") val accessNotes: String? = null,
+    @Json(name = "required_tools") val requiredTools: List<String>? = null,
+    @Json(name = "language_preference") val languagePreference: String? = null,
+    /** "flexible" | "standard" | "strict". */
+    @Json(name = "cancellation_policy") val cancellationPolicy: String? = null,
+    @Json(name = "starts_asap") val startsAsap: Boolean? = null,
+    @Json(name = "response_window_minutes") val responseWindowMinutes: Int? = null,
+    // Archetype module objects (`backend/utils/moduleSchemas.js`) —
+    // snake_case keys, camelCase fields INSIDE each object.
+    @Json(name = "care_details") val careDetails: CareDetailsDto? = null,
+    @Json(name = "logistics_details") val logisticsDetails: LogisticsDetailsDto? = null,
+    @Json(name = "remote_details") val remoteDetails: RemoteDetailsDto? = null,
+    @Json(name = "urgent_details") val urgentDetails: UrgentDetailsDto? = null,
+    @Json(name = "event_details") val eventDetails: EventDetailsDto? = null,
+)
+
+/** One delivery-errand list item. Fields are camelCase on the wire. */
+@JsonClass(generateAdapter = true)
+data class MagicTaskItemDto(
+    val name: String,
+    val notes: String? = null,
+    val budgetCap: Double? = null,
+    val preferredStore: String? = null,
+)
+
+/** care_task module — `careDetailsSchema`. */
+@JsonClass(generateAdapter = true)
+data class CareDetailsDto(
+    /** "child" | "pet" | "elder" | "other". */
+    val careType: String? = null,
+    val agesOrDetails: String? = null,
+    val count: Int? = null,
+    val specialNeeds: String? = null,
+    val languagePreference: String? = null,
+    val emergencyNotes: String? = null,
+)
+
+/** home_service / quick_help module — `logisticsDetailsSchema`. */
+@JsonClass(generateAdapter = true)
+data class LogisticsDetailsDto(
+    val workerCount: Int? = null,
+    val vehicleNeeded: Boolean? = null,
+    val vehicleType: String? = null,
+    val toolsNeeded: List<String>? = null,
+    val accessInstructions: String? = null,
+    val petsOnProperty: Boolean? = null,
+    /** "none" | "few_steps" | "multiple_flights". */
+    val stairsInfo: String? = null,
+    val heavyLifting: Boolean? = null,
+)
+
+/** remote_task module — `remoteDetailsSchema`. */
+@JsonClass(generateAdapter = true)
+data class RemoteDetailsDto(
+    /** "document" | "design" | "code" | "video" | "other". */
+    val deliverableType: String? = null,
+    val fileFormat: String? = null,
+    val revisionCount: Int? = null,
+    val timezone: String? = null,
+    val meetingRequired: Boolean? = null,
+    val dueDate: String? = null,
+)
+
+/** is_urgent module — `urgentDetailsSchema`. */
+@JsonClass(generateAdapter = true)
+data class UrgentDetailsDto(
+    val startsAsap: Boolean? = null,
+    val responseWindowMinutes: Int? = null,
+    val arrivalNeededBy: String? = null,
+    val shareLocationDuringTask: Boolean? = null,
+    val liveStatusEnabled: Boolean? = null,
+    val roadsideVehicleNotes: String? = null,
+    val pickupDropoffMode: String? = null,
+)
+
+/** event_shift module — `eventDetailsSchema`. */
+@JsonClass(generateAdapter = true)
+data class EventDetailsDto(
+    /** "party" | "wedding" | "corporate" | "community" | "other". */
+    val eventType: String? = null,
+    val guestCount: Int? = null,
+    val shiftStart: String? = null,
+    val shiftEnd: String? = null,
+    val dressCode: String? = null,
+    /** "setup" | "serving" | "bartending" | "cleanup" | "general". */
+    val roleType: String? = null,
+    val venueDetails: String? = null,
 )
 
 /** Envelope from `POST /api/gigs/magic-draft`. */
