@@ -1,15 +1,24 @@
 // ============================================================
 // Place — Risk & Readiness detail (C5).
-// Flood zone with its plain meaning (FEMA), the deferred hazards as
-// "coming soon", and an informational household-readiness checklist
-// (device-local, never instructions). Flood reads from the contract;
-// the checklist is a self-assessment tool the resident keeps privately.
+// Flood zone with its plain meaning (FEMA), the health & environment
+// screenings (lead/radon, drinking water, EPA facilities — the
+// `health_environment` group folds into this page; it has no designed
+// screen of its own), the deferred hazards as "coming soon", and an
+// informational household-readiness checklist (device-local, never
+// instructions).
 // ============================================================
 
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
-import type { PlaceIntelligence, PlaceFloodData, FloodRiskLevel } from '@pantopus/types';
+import type {
+  PlaceIntelligence,
+  PlaceFloodData,
+  FloodRiskLevel,
+  PlaceLeadRadonData,
+  PlaceDrinkingWaterData,
+  PlaceEnvironmentalHazardsData,
+} from '@pantopus/types';
 import {
   Waves,
   ShieldCheck,
@@ -21,6 +30,9 @@ import {
   Phone,
   MapPin,
   Check,
+  TestTube,
+  GlassWater,
+  Factory,
 } from 'lucide-react';
 import Chip, { type ChipVariant } from '@/components/archetypes/primitives/Chip';
 import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, ComingSoonRow, InfoNote } from '@/components/archetypes/place';
@@ -55,6 +67,95 @@ function FloodCard({ data }: { data: PlaceFloodData }) {
           <span className="font-semibold">What this means:</span> {data.plain_meaning}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ── Health & environment (folded group) ─────────────────────
+
+const LEAD_CHIP: Record<PlaceLeadRadonData['lead_paint_risk'], { label: string; variant: ChipVariant }> = {
+  unlikely: { label: 'Lead unlikely', variant: 'success' },
+  possible: { label: 'Lead possible', variant: 'warning' },
+  likely: { label: 'Lead likely', variant: 'warning' },
+};
+
+function LeadRadonCard({ data }: { data: PlaceLeadRadonData }) {
+  const chip = LEAD_CHIP[data.lead_paint_risk];
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-app-home-bg flex items-center justify-center shrink-0">
+          <TestTube size={22} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Lead & radon</span>
+            <Chip label={chip.label} variant={chip.variant} />
+            {data.radon_zone ? <Chip label={`Radon zone ${data.radon_zone}`} variant={data.radon_zone === 1 ? 'warning' : 'neutral'} /> : null}
+          </div>
+          <div className="text-[13px] text-app-text-secondary leading-[19px] mt-1">{data.summary}</div>
+        </div>
+      </div>
+      <div className="text-[12px] text-app-text-muted leading-[17px] mt-3 pt-3 border-t border-app-border-subtle">{data.disclaimer}</div>
+    </div>
+  );
+}
+
+function DrinkingWaterCard({ data }: { data: PlaceDrinkingWaterData }) {
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-app-home-bg flex items-center justify-center shrink-0">
+          <GlassWater size={22} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em] truncate">{data.utility_name}</span>
+            <Chip
+              label={data.recent_health_violations ? `${data.violation_count} health violation${data.violation_count === 1 ? '' : 's'}` : 'No health violations'}
+              variant={data.recent_health_violations ? 'warning' : 'success'}
+              icon={data.recent_health_violations ? TriangleAlert : ShieldCheck}
+            />
+          </div>
+          <div className="text-[13px] text-app-text-secondary leading-[19px] mt-1">{data.summary}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EnvironmentalHazardsCard({ data }: { data: PlaceEnvironmentalHazardsData }) {
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-app-home-bg flex items-center justify-center shrink-0">
+          <Factory size={22} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">EPA-regulated nearby</span>
+            <Chip
+              label={`${data.facilities_within_mile} within ${data.radius_mi} mi`}
+              variant={data.facilities_within_mile === 0 ? 'success' : 'neutral'}
+            />
+          </div>
+          <div className="text-[13px] text-app-text-secondary leading-[19px] mt-1">{data.summary}</div>
+        </div>
+      </div>
+      {data.facilities.length > 0 ? (
+        <div className="mt-3 pt-1 border-t border-app-border-subtle">
+          {data.facilities.map((f, i) => (
+            <div key={`${f.name}-${i}`} className={`flex items-center justify-between gap-3 py-2 ${i === data.facilities.length - 1 ? '' : 'border-b border-app-border-subtle'}`}>
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-semibold text-app-text truncate">{f.name}</div>
+                <div className="text-[12px] text-app-text-muted">{f.program}</div>
+              </div>
+              <span className="text-[12.5px] text-app-text-secondary shrink-0">{f.distance_mi} mi</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="text-[12px] text-app-text-muted leading-[17px] mt-3 pt-3 border-t border-app-border-subtle">{data.disclaimer}</div>
     </div>
   );
 }
@@ -163,9 +264,15 @@ function EmergencyPlan({ homeId }: { homeId: string | null }) {
   );
 }
 
+const isReady = (s: { status: string; data: unknown } | null | undefined) =>
+  Boolean(s && (s.status === 'ready' || s.status === 'stale' || s.status === 'partial') && s.data);
+
 export default function RiskDetail({ intelligence, homeId }: { intelligence: PlaceIntelligence; homeId: string | null }) {
   const flood = findPlaceSection(intelligence, 'flood');
-  const floodReady = flood && (flood.status === 'ready' || flood.status === 'stale' || flood.status === 'partial') && flood.data;
+  const floodReady = isReady(flood);
+  const leadRadon = findPlaceSection(intelligence, 'lead_radon');
+  const water = findPlaceSection(intelligence, 'drinking_water');
+  const hazards = findPlaceSection(intelligence, 'environmental_hazards');
 
   return (
     <>
@@ -178,6 +285,28 @@ export default function RiskDetail({ intelligence, homeId }: { intelligence: Pla
           <SectionCard icon={Waves} title="Flood" state={flood ? statusToState(flood.status) : 'unavailable'} caption={flood?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
         )}
         {flood?.source ? <SourceNote name={flood.source} asOf="as of 2024" /> : null}
+
+        <DetailSectionLabel>Health & environment</DetailSectionLabel>
+        <div className="flex flex-col gap-2.5">
+          {isReady(leadRadon) ? (
+            <LeadRadonCard data={leadRadon!.data as PlaceLeadRadonData} />
+          ) : (
+            <SectionCard icon={TestTube} title="Lead & radon" state={leadRadon ? statusToState(leadRadon.status) : 'unavailable'} caption={leadRadon?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
+          )}
+          {isReady(water) ? (
+            <DrinkingWaterCard data={water!.data as PlaceDrinkingWaterData} />
+          ) : (
+            <SectionCard icon={GlassWater} title="Drinking water" state={water ? statusToState(water.status) : 'unavailable'} caption={water?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
+          )}
+          {isReady(hazards) ? (
+            <EnvironmentalHazardsCard data={hazards!.data as PlaceEnvironmentalHazardsData} />
+          ) : (
+            <SectionCard icon={Factory} title="EPA-regulated nearby" state={hazards ? statusToState(hazards.status) : 'unavailable'} caption={hazards?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
+          )}
+        </div>
+        {[leadRadon, water, hazards].some(isReady) ? (
+          <SourceNote name="EPA radon zones · HUD lead rules · EPA SDWIS · EPA ECHO" />
+        ) : null}
 
         <DetailSectionLabel>Other hazards</DetailSectionLabel>
         <div className="flex flex-col gap-2">

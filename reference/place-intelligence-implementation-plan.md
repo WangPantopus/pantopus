@@ -100,7 +100,21 @@ Today "Generate a residency letter" prints browser-built HTML (`IdentityDetail.t
 
 ---
 
-## Phase 2 — Fill the Band-A data sections (8 BUILD_PENDING → live)
+## Phase 2 — Fill the Band-A data sections ✅ MOSTLY DONE (2026-06-11, on `feature/place-web`)
+
+> Shipped 5 of 8 + the slug fold: **sunrise_sunset** (Open-Meteo, 6 h cache), **lead_radon** (migration 158
+> `CountyRadonZone` — EPA 1993 radon zones joined to 2020 county FIPS, 3,128 counties + year-built lead screening),
+> **rent_band** (migration 158 `HudFmr` — HUD FY2026 FMRs, 3,223 counties, NE town lo/hi folded), **drinking_water**
+> (EPA SDWIS via data.epa.gov dmapservice — county CWS, city-name match then largest, health violations last 5 y,
+> 90 d cache), **environmental_hazards** (EPA ECHO get_facilities, 1 mi radius, 90 d cache — wired to the documented
+> contract but ECHO **blocks this dev network's IP**; verify from the deployed server). All ride the Phase-0
+> `PlaceSectionCache` via `services/placeSectionAdapters.js`; county FIPS comes from the Census geocoder, cached
+> 90 d per home. Web: `health_environment` now folds into the **Risk & readiness** page (lead/radon, drinking water,
+> EPA facilities cards + dashboard tap-through). Verified live: Camas home → sunrise 5:19 AM/sunset 8:58 PM, built
+> 1972 → lead possible + radon zone 1, CAMAS MUNICIPAL WATER (0 violations), 3BR FMR $2,619–$3,143.
+> **Still pending:** `incentives` (DSIRE API is license-gated — needs a license or a different source; curated
+> federal copy would rot post-OBBBA), civic pair (Phase 3). NOTE: Census ACS now requires `CENSUS_API_KEY` and the
+> radon/FMR joins miss ~14 renamed counties (CT planning regions, old AK areas) — they degrade gracefully.
 
 Each is an adapter implementing the existing `fetchSection(home) → envelope` pattern + cache (0.3) + targeted tests.
 The frontend detail pages already render these sections — they light up with zero client change. Order by effort:

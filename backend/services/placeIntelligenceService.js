@@ -34,6 +34,7 @@ const {
 const providerOrchestrator = require('./context/providerOrchestrator');
 const neighborhoodProfileService = require('./ai/neighborhoodProfileService');
 const propertyIntelligenceService = require('./ai/propertyIntelligenceService');
+const placeSectionAdapters = require('./placeSectionAdapters');
 const { getHomePrivacy } = require('./homePrivacyService');
 
 const HOME_SELECT =
@@ -434,12 +435,20 @@ async function composeBillBenchmark(home) {
 // Which launch-set sections each wired composer produces, so a
 // `?sections=` subset request only runs (and only pays for) the
 // composers it actually needs.
+//
+// Still BUILD_PENDING: `incentives` (DSIRE's API is license-gated;
+// curated federal copy would rot) and the civic pair (Phase 3).
 const COMPOSER_SECTIONS = [
   { ids: ['weather', 'air_quality', 'alerts'], run: ({ userId }) => composeToday(userId) },
+  { ids: ['sunrise_sunset'], run: ({ home }) => placeSectionAdapters.composeSunriseSunset(home) },
   { ids: ['flood', 'census_context'], run: ({ home }) => composeNeighborhood(home) },
+  { ids: ['lead_radon'], run: ({ home }) => placeSectionAdapters.composeLeadRadon(home) },
+  { ids: ['drinking_water'], run: ({ home }) => placeSectionAdapters.composeDrinkingWater(home) },
+  { ids: ['environmental_hazards'], run: ({ home }) => placeSectionAdapters.composeEnvironmentalHazards(home) },
   { ids: ['block_density'], run: ({ home }) => composeDensity(home) },
   { ids: ['your_home'], run: ({ home, tier }) => composeYourHome(home, tier) },
   { ids: ['bill_benchmark'], run: ({ home }) => composeBillBenchmark(home) },
+  { ids: ['rent_band'], run: ({ home }) => placeSectionAdapters.composeRentBand(home) },
 ];
 
 // ── Per-home privacy → the place address ref (§ homePrivacy) ──

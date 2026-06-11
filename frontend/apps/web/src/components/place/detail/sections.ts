@@ -5,9 +5,9 @@
 // through to `/app/place/<slug>`; the slugs are URL-friendly aliases
 // for the contract group ids.
 //
-// `health_environment` deliberately has NO slug: there is no designed
-// detail screen for it in this wave, so its dashboard cards don't tap
-// through (a chevron to nowhere would be a dead control).
+// `health_environment` has no detail page of its own (no designed
+// screen): its dashboard cards tap through to the Risk & readiness
+// page, which renders the group's three sections.
 // ============================================================
 
 import type {
@@ -34,11 +34,16 @@ export const PLACE_DETAIL_BY_SLUG: Record<string, PlaceDetailMeta> = {
   identity: { group: 'identity', title: 'Identity' },
 };
 
-/** Group → slug, for the dashboard's tap-through. Omits health_environment. */
+/**
+ * Group → slug, for the dashboard's tap-through. `health_environment`
+ * folds into the Risk & readiness page (it has no designed screen of
+ * its own; the risk detail renders its three sections).
+ */
 export const GROUP_TO_SLUG: Partial<Record<PlaceGroup, string>> = {
   today: 'today',
   your_home: 'your-home',
   risk_readiness: 'risk',
+  health_environment: 'risk',
   your_block: 'block',
   money_signals: 'money',
   civic: 'civic',
