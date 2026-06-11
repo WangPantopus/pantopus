@@ -212,6 +212,37 @@ export interface PlaceFloodData {
   plain_meaning: string;
 }
 
+/** ASCE 7 seismic design categories (A lowest demand → E highest). */
+export type SeismicDesignCategory = 'A' | 'B' | 'C' | 'D' | 'E';
+
+/**
+ * Phase-4 layer — Earthquake (USGS seismic design values, ASCE 7-22).
+ * Engineering demand at this point, not a prediction. Informational.
+ */
+export interface PlaceSeismicData {
+  design_category: SeismicDesignCategory;
+  /** Design spectral acceleration, short period (g). */
+  sds: number | null;
+  summary: string;
+  disclaimer: string;
+}
+
+/** USFS Wildfire Hazard Potential classes (1 very low → 5 very high). */
+export type WildfireHazardClass = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * Phase-4 layer — Wildfire (USFS Wildfire Hazard Potential, 2023).
+ * `hazard_class` is null for non-burnable / water pixels (developed
+ * cores, agriculture) — `burnable: false` carries that meaning.
+ */
+export interface PlaceWildfireData {
+  hazard_class: WildfireHazardClass | null;
+  hazard_label: string;
+  burnable: boolean;
+  summary: string;
+  disclaimer: string;
+}
+
 // ── Health & environment ─────────────────────────────────────
 
 export type LeadPaintRisk = 'unlikely' | 'possible' | 'likely';
@@ -438,6 +469,8 @@ export interface PlaceSectionDataMap {
   alerts: PlaceAlertsData;
   sunrise_sunset: PlaceSunriseSunsetData;
   flood: PlaceFloodData;
+  seismic: PlaceSeismicData;
+  wildfire: PlaceWildfireData;
   lead_radon: PlaceLeadRadonData;
   drinking_water: PlaceDrinkingWaterData;
   environmental_hazards: PlaceEnvironmentalHazardsData;
@@ -461,6 +494,8 @@ export const PLACE_SECTION_IDS = [
   'sunrise_sunset',
   'your_home',
   'flood',
+  'seismic',
+  'wildfire',
   'lead_radon',
   'drinking_water',
   'environmental_hazards',
@@ -490,6 +525,8 @@ export const PLACE_SECTION_META: Record<PlaceSectionId, PlaceSectionMeta> = {
   sunrise_sunset: { group: 'today', band: 'A', source: 'Open-Meteo', layer: null },
   your_home: { group: 'your_home', band: 'B', source: 'County records · ATTOM', layer: null },
   flood: { group: 'risk_readiness', band: 'A', source: 'FEMA National Flood Hazard Layer', layer: 3 },
+  seismic: { group: 'risk_readiness', band: 'A', source: 'USGS seismic design values (ASCE 7-22)', layer: null },
+  wildfire: { group: 'risk_readiness', band: 'A', source: 'USFS Wildfire Hazard Potential', layer: null },
   lead_radon: { group: 'health_environment', band: 'A', source: 'EPA radon zones · HUD lead-paint rules', layer: 6 },
   drinking_water: { group: 'health_environment', band: 'A', source: 'EPA SDWIS', layer: 7 },
   environmental_hazards: { group: 'health_environment', band: 'A', source: 'EPA ECHO', layer: 5 },

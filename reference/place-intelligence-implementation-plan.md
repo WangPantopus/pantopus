@@ -159,7 +159,16 @@ Decide: give health_environment its own detail page or fold into Risk — small 
 
 ---
 
-## Phase 4 — Risk completion (#3)
+## Phase 4 — Risk completion ✅ DONE (2026-06-11, on `feature/place-web`)
+
+> Contract extended with two new section ids (TS + backend serializer): **seismic** — USGS design-maps service
+> (ASCE 7-22, keyless) returns the point's Seismic Design Category (Camas → **D**, SDS 0.67, Cascadia checks out);
+> **wildfire** — USFS Wildfire Hazard Potential 2023 classified raster via the geoplatform.gov ImageServer
+> identify (keyless; geometry needs embedded wkid:4326; classes 1–5 + non-burnable/water → `burnable:false`).
+> Both cached 180 d (multi-year data vintages). Risk detail's "coming soon" rows replaced with real cards;
+> dashboard cards show Design-category / hazard chips. ALSO: the Today sun arc now plots the sun's REAL position
+> (daylight fraction elapsed, parametrized on the arc's true ellipse; pre-dawn/after-dark states). Emergency-plan
+> stays the informational checklist (liability stance unchanged). Verified live end-to-end.
 
 - **seismic** — USGS NSHM hazard value at lat/lng → qualitative band (the current "Cascadia" copy is editorial; replace
   with per-address data).

@@ -15,6 +15,8 @@ import type {
   PlaceIntelligence,
   PlaceFloodData,
   FloodRiskLevel,
+  PlaceSeismicData,
+  PlaceWildfireData,
   PlaceLeadRadonData,
   PlaceDrinkingWaterData,
   PlaceEnvironmentalHazardsData,
@@ -35,7 +37,7 @@ import {
   Factory,
 } from 'lucide-react';
 import Chip, { type ChipVariant } from '@/components/archetypes/primitives/Chip';
-import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, ComingSoonRow, InfoNote } from '@/components/archetypes/place';
+import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote } from '@/components/archetypes/place';
 import { findPlaceSection, detailAddress } from './sections';
 import { statusToState } from './format';
 import { useLocalDraft } from './useLocalDraft';
@@ -67,6 +69,50 @@ function FloodCard({ data }: { data: PlaceFloodData }) {
           <span className="font-semibold">What this means:</span> {data.plain_meaning}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ── Other hazards — earthquake (USGS) + wildfire (USFS) ─────
+
+function SeismicCard({ data }: { data: PlaceSeismicData }) {
+  const high = data.design_category === 'D' || data.design_category === 'E';
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-app-home-bg flex items-center justify-center shrink-0">
+          <Activity size={22} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Earthquake</span>
+            <Chip label={`Design category ${data.design_category}`} variant={high ? 'warning' : 'success'} />
+          </div>
+          <div className="text-[13px] text-app-text-secondary leading-[19px] mt-1">{data.summary}</div>
+        </div>
+      </div>
+      <div className="text-[12px] text-app-text-muted leading-[17px] mt-3 pt-3 border-t border-app-border-subtle">{data.disclaimer}</div>
+    </div>
+  );
+}
+
+function WildfireCard({ data }: { data: PlaceWildfireData }) {
+  const high = data.hazard_class != null && data.hazard_class >= 4;
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-app-home-bg flex items-center justify-center shrink-0">
+          <Flame size={22} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Wildfire</span>
+            <Chip label={data.hazard_label} variant={high ? 'warning' : data.burnable ? 'success' : 'neutral'} />
+          </div>
+          <div className="text-[13px] text-app-text-secondary leading-[19px] mt-1">{data.summary}</div>
+        </div>
+      </div>
+      <div className="text-[12px] text-app-text-muted leading-[17px] mt-3 pt-3 border-t border-app-border-subtle">{data.disclaimer}</div>
     </div>
   );
 }
@@ -270,6 +316,8 @@ const isReady = (s: { status: string; data: unknown } | null | undefined) =>
 export default function RiskDetail({ intelligence, homeId }: { intelligence: PlaceIntelligence; homeId: string | null }) {
   const flood = findPlaceSection(intelligence, 'flood');
   const floodReady = isReady(flood);
+  const seismic = findPlaceSection(intelligence, 'seismic');
+  const wildfire = findPlaceSection(intelligence, 'wildfire');
   const leadRadon = findPlaceSection(intelligence, 'lead_radon');
   const water = findPlaceSection(intelligence, 'drinking_water');
   const hazards = findPlaceSection(intelligence, 'environmental_hazards');
@@ -309,10 +357,21 @@ export default function RiskDetail({ intelligence, homeId }: { intelligence: Pla
         ) : null}
 
         <DetailSectionLabel>Other hazards</DetailSectionLabel>
-        <div className="flex flex-col gap-2">
-          <ComingSoonRow icon={Activity} title="Earthquake" sub="Seismic zone and liquefaction risk" />
-          <ComingSoonRow icon={Flame} title="Wildfire" sub="Wildland-urban interface rating" />
+        <div className="flex flex-col gap-2.5">
+          {isReady(seismic) ? (
+            <SeismicCard data={seismic!.data as PlaceSeismicData} />
+          ) : (
+            <SectionCard icon={Activity} title="Earthquake" state={seismic ? statusToState(seismic.status) : 'unavailable'} caption={seismic?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
+          )}
+          {isReady(wildfire) ? (
+            <WildfireCard data={wildfire!.data as PlaceWildfireData} />
+          ) : (
+            <SectionCard icon={Flame} title="Wildfire" state={wildfire ? statusToState(wildfire.status) : 'unavailable'} caption={wildfire?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
+          )}
         </div>
+        {[seismic, wildfire].some(isReady) ? (
+          <SourceNote name="USGS seismic design values · USFS Wildfire Hazard Potential" />
+        ) : null}
 
         <DetailSectionLabel>Emergency plan</DetailSectionLabel>
         <EmergencyPlan homeId={homeId} />

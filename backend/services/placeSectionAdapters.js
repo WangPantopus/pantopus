@@ -600,6 +600,124 @@ async function composeCivicElection(home) {
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// seismic — USGS seismic design values (ASCE 7-22, keyless)
+// ════════════════════════════════════════════════════════════
+// Returns the point's Seismic Design Category (A lowest demand → E
+// highest) straight from the USGS design-maps service — engineering
+// demand for this location, not an earthquake prediction.
+const SDC_PHRASES = {
+  A: 'very low expected shaking demand',
+  B: 'low expected shaking demand',
+  C: 'moderate expected shaking demand',
+  D: 'high expected shaking demand',
+  E: 'very high expected shaking demand (near a major fault)',
+};
+
+async function composeSeismic(home) {
+  const ll = homeLatLng(home);
+  if (!ll) return [serializePlaceSection('seismic', { status: 'unavailable' })];
+  try {
+    const gh5 = encodeGeohash(ll.lat, ll.lng, 5);
+    const { payload, fetchedAt, stale } = await readThrough({
+      cacheKey: `geo:${gh5}`,
+      sectionId: 'seismic',
+      ttlMs: 180 * DAY_MS, // hazard model updates on a multi-year cycle
+      fetch: async () => {
+        const data = await fetchJson(
+          'https://earthquake.usgs.gov/ws/designmaps/asce7-22.json' +
+          `?latitude=${ll.lat}&longitude=${ll.lng}&riskCategory=II&siteClass=Default&title=pantopus`,
+        );
+        const d = data && data.response && data.response.data;
+        const sdc = d && String(d.sdc || '').toUpperCase();
+        if (!sdc || !SDC_PHRASES[sdc]) return null;
+        return { design_category: sdc, sds: Number.isFinite(Number(d.sds)) ? Number(d.sds) : null };
+      },
+    });
+    if (!payload) {
+      return [serializePlaceSection('seismic', {
+        status: 'unavailable',
+        unavailableReason: 'No seismic design data for this point.',
+      })];
+    }
+    return [serializePlaceSection('seismic', {
+      asOf: fetchedAt,
+      status: stale ? 'stale' : 'ready',
+      data: {
+        design_category: payload.design_category,
+        sds: payload.sds,
+        summary: `Seismic design category ${payload.design_category} — ${SDC_PHRASES[payload.design_category]}.`,
+        disclaimer: 'Engineering demand for new construction at this point (ASCE 7-22) — not an earthquake forecast.',
+      },
+    })];
+  } catch (err) {
+    logger.warn('placeSections: seismic failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('seismic', { status: 'error' })];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// wildfire — USFS Wildfire Hazard Potential (2023, keyless)
+// ════════════════════════════════════════════════════════════
+// One pixel identify against the classified WHP raster. Classes 1–5
+// run very low → very high; 6 is non-burnable (developed/agriculture)
+// and 7 is water — both render as "not classified as burnable".
+const WHP_URL =
+  'https://imagery.geoplatform.gov/iipp/rest/services/Fire_Aviation/USFS_EDW_RMRS_WildfireHazardPotentialClassified/ImageServer/identify';
+const WHP_LABELS = { 1: 'Very low', 2: 'Low', 3: 'Moderate', 4: 'High', 5: 'Very high' };
+
+async function composeWildfire(home) {
+  const ll = homeLatLng(home);
+  if (!ll) return [serializePlaceSection('wildfire', { status: 'unavailable' })];
+  try {
+    const gh6 = encodeGeohash(ll.lat, ll.lng, 6);
+    const { payload, fetchedAt, stale } = await readThrough({
+      cacheKey: `geo:${gh6}`,
+      sectionId: 'wildfire',
+      ttlMs: 180 * DAY_MS, // WHP is a vintage raster (2023)
+      fetch: async () => {
+        const geometry = JSON.stringify({ x: ll.lng, y: ll.lat, spatialReference: { wkid: 4326 } });
+        const params = new URLSearchParams({
+          geometry,
+          geometryType: 'esriGeometryPoint',
+          returnGeometry: 'false',
+          f: 'json',
+        });
+        const data = await fetchJson(`${WHP_URL}?${params}`);
+        const raw = data && data.value;
+        if (raw == null || raw === 'NoData') return null;
+        const cls = Number(raw);
+        if (!Number.isFinite(cls)) return null;
+        return { class: cls };
+      },
+    });
+    if (!payload) {
+      return [serializePlaceSection('wildfire', {
+        status: 'unavailable',
+        unavailableReason: 'No wildfire hazard data for this point.',
+      })];
+    }
+    const cls = payload.class;
+    const burnable = cls >= 1 && cls <= 5;
+    return [serializePlaceSection('wildfire', {
+      asOf: fetchedAt,
+      status: stale ? 'stale' : 'ready',
+      data: {
+        hazard_class: burnable ? cls : null,
+        hazard_label: burnable ? WHP_LABELS[cls] : 'Not classified as burnable',
+        burnable,
+        summary: burnable
+          ? `${WHP_LABELS[cls]} wildfire hazard potential for the vegetation around this point.`
+          : 'This point sits on land the USFS classes as non-burnable (developed or water) — nearby wildlands may still carry risk.',
+        disclaimer: 'USFS Wildfire Hazard Potential (2023) — landscape fuel conditions, not a prediction for this home.',
+      },
+    })];
+  } catch (err) {
+    logger.warn('placeSections: wildfire failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('wildfire', { status: 'error' })];
+  }
+}
+
 module.exports = {
   composeSunriseSunset,
   composeLeadRadon,
@@ -608,6 +726,8 @@ module.exports = {
   composeEnvironmentalHazards,
   composeCivicDistricts,
   composeCivicElection,
+  composeSeismic,
+  composeWildfire,
   // Exported for testing.
   leadRiskForYear,
   haversineMiles,

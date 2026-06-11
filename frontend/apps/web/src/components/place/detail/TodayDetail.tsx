@@ -283,9 +283,34 @@ function AlertsCard({ data }: { data: PlaceAlertsData }) {
 }
 
 // ── Sun — sunrise / sunset with the daylight arc ────────────
+// The dot plots the sun's REAL position: the fraction of daylight
+// elapsed right now, parametrized along the arc's true ellipse
+// (center 100,52 · rx 96 · ry 44). Before sunrise the dot waits at
+// the left horizon; after sunset it rests at the right.
+const SUN_ARC = { cx: 100, cy: 52, rx: 96, ry: 44 };
+
+function sunArcPoint(t: number): { x: number; y: number } {
+  const theta = Math.PI * (1 - Math.min(1, Math.max(0, t)));
+  return {
+    x: SUN_ARC.cx + SUN_ARC.rx * Math.cos(theta),
+    y: SUN_ARC.cy - SUN_ARC.ry * Math.sin(theta),
+  };
+}
+
 function SunCard({ data }: { data: PlaceSunriseSunsetData }) {
   const hours = Math.floor(data.daylight_minutes / 60);
   const mins = data.daylight_minutes % 60;
+
+  // Open-Meteo returns the home's local wall-clock time (no offset);
+  // Date parses it in the viewer's zone — viewer ≈ resident here.
+  const rise = new Date(data.sunrise).getTime();
+  const set = new Date(data.sunset).getTime();
+  const now = Date.now();
+  const span = Math.max(1, set - rise);
+  const t = (now - rise) / span;
+  const sunUp = t >= 0 && t <= 1;
+  const { x, y } = sunArcPoint(t);
+
   return (
     <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px]">
       <div className="flex items-center justify-between">
@@ -296,11 +321,28 @@ function SunCard({ data }: { data: PlaceSunriseSunsetData }) {
         </div>
         <div className="flex-1 px-[18px]">
           <svg width="100%" height="50" viewBox="0 0 200 56" preserveAspectRatio="none" className="overflow-visible" aria-hidden="true">
-            <path d="M4 52 A 96 70 0 0 1 196 52" fill="none" stroke="rgb(var(--app-border))" strokeWidth="2" strokeDasharray="2 4" />
-            <path d="M4 52 A 96 70 0 0 1 130 12" fill="none" stroke="var(--color-warning)" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="130" cy="12" r="5.5" fill="var(--color-warning)" stroke="rgb(var(--app-surface))" strokeWidth="2" />
+            <path d={`M4 52 A ${SUN_ARC.rx} ${SUN_ARC.ry} 0 0 1 196 52`} fill="none" stroke="rgb(var(--app-border))" strokeWidth="2" strokeDasharray="2 4" />
+            {t > 0 ? (
+              <path
+                d={`M4 52 A ${SUN_ARC.rx} ${SUN_ARC.ry} 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}`}
+                fill="none"
+                stroke="var(--color-warning)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            ) : null}
+            <circle
+              cx={x.toFixed(1)}
+              cy={y.toFixed(1)}
+              r="5.5"
+              fill={sunUp ? 'var(--color-warning)' : 'rgb(var(--app-text-muted))'}
+              stroke="rgb(var(--app-surface))"
+              strokeWidth="2"
+            />
           </svg>
-          <div className="text-center text-[12px] text-app-text-muted mt-0.5">{hours}h {mins}m of daylight</div>
+          <div className="text-center text-[12px] text-app-text-muted mt-0.5">
+            {hours}h {mins}m of daylight{sunUp ? '' : t < 0 ? ' · before sunrise' : ' · sun has set'}
+          </div>
         </div>
         <div className="text-center">
           <Sunset size={22} strokeWidth={2} className="text-app-warning mx-auto" />
