@@ -2,12 +2,14 @@
 //  TasksMapSampleData.swift
 //  Pantopus
 //
-//  Deterministic seed for the Tasks map (backend removed). The nine items
-//  reproduce the design's nine pins — handyman ×2, cleaning ×2, pet care
-//  ×2, plus moving / child care / tutoring (the moving + tutoring pins are
-//  `.pending`). The first three mirror the design's rail cards verbatim so
-//  previews and snapshots match the frame. Coordinates cluster inside the
-//  ~0.024° camera span around the anchor so every pin lands on screen.
+//  Deterministic seed for the Tasks map (previews + unit tests). The nine
+//  items reproduce the design's nine pins — handyman ×2, cleaning ×2, pet
+//  care ×2, plus moving / child care / tutoring. The moving + tutoring
+//  pins are `.pending` (A11.1 semantic: unverified poster — no white
+//  ring, dashed category outline). The first three mirror the design's
+//  rail cards verbatim so previews and snapshots match the frame.
+//  Coordinates cluster inside the ~0.024° camera span around the anchor
+//  so every pin lands on screen.
 //
 
 import Foundation
@@ -25,6 +27,7 @@ public enum TasksMapSampleData {
             latitude: 40.7499,
             longitude: -73.9881,
             title: "Hang 3 floating shelves",
+            body: "Drywall anchors provided. Two are above the desk, one in the hallway.",
             price: "$60",
             distanceLabel: "0.2 mi",
             bidCount: 4
@@ -36,6 +39,7 @@ public enum TasksMapSampleData {
             latitude: 40.7515,
             longitude: -73.9845,
             title: "Deep clean 2BR before move-out",
+            body: "Landlord inspection Friday — kitchen, bathroom, and inside the oven.",
             price: "$180",
             distanceLabel: "0.5 mi",
             bidCount: 7
@@ -47,6 +51,7 @@ public enum TasksMapSampleData {
             latitude: 40.7468,
             longitude: -73.9832,
             title: "Midday dog walks Tue/Thu",
+            body: "Friendly golden retriever, 30-minute loop around the park.",
             price: "$22/walk",
             distanceLabel: "0.3 mi",
             bidCount: 2

@@ -78,6 +78,85 @@ public enum MapPinState: Sendable, Hashable {
     case pending
 }
 
+/// Several pins collapsed into one marker at low zoom (A11.1). Built by
+/// consumers via a pure clustering function — the shell only renders
+/// the 28 pt primary disc with the white count + ring.
+public struct MapClusterPin: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let latitude: Double
+    public let longitude: Double
+    public let count: Int
+
+    public init(id: String, latitude: Double, longitude: Double, count: Int) {
+        self.id = id
+        self.latitude = latitude
+        self.longitude = longitude
+        self.count = count
+    }
+}
+
+/// MapKit-free viewport descriptor — the shell reports the settled
+/// camera through it (`onCameraChange`) and consumers request camera
+/// moves with it (`MapListHybridCameraRequest`), so view-models stay
+/// unit-testable without the map SDK.
+public struct MapListHybridRegion: Sendable, Equatable {
+    public let centerLatitude: Double
+    public let centerLongitude: Double
+    public let latitudeSpan: Double
+    public let longitudeSpan: Double
+
+    public init(
+        centerLatitude: Double,
+        centerLongitude: Double,
+        latitudeSpan: Double,
+        longitudeSpan: Double
+    ) {
+        self.centerLatitude = centerLatitude
+        self.centerLongitude = centerLongitude
+        self.latitudeSpan = latitudeSpan
+        self.longitudeSpan = longitudeSpan
+    }
+
+    public var minLatitude: Double { centerLatitude - latitudeSpan / 2 }
+    public var maxLatitude: Double { centerLatitude + latitudeSpan / 2 }
+    public var minLongitude: Double { centerLongitude - longitudeSpan / 2 }
+    public var maxLongitude: Double { centerLongitude + longitudeSpan / 2 }
+
+    /// Same center, span multiplied — the "Widen search" ×2.5 zoom-out
+    /// and the cluster-tap ÷2 zoom-in both go through here.
+    public func scaled(by factor: Double) -> MapListHybridRegion {
+        MapListHybridRegion(
+            centerLatitude: centerLatitude,
+            centerLongitude: centerLongitude,
+            latitudeSpan: latitudeSpan * factor,
+            longitudeSpan: longitudeSpan * factor
+        )
+    }
+
+    /// Same span, new center — rail-page → pan-to-pin sync.
+    public func recentered(latitude: Double, longitude: Double) -> MapListHybridRegion {
+        MapListHybridRegion(
+            centerLatitude: latitude,
+            centerLongitude: longitude,
+            latitudeSpan: latitudeSpan,
+            longitudeSpan: longitudeSpan
+        )
+    }
+}
+
+/// Token-identified camera move. The shell applies `region` (animated)
+/// whenever the value changes — bump `token` to re-request the same
+/// region twice.
+public struct MapListHybridCameraRequest: Sendable, Equatable {
+    public let token: Int
+    public let region: MapListHybridRegion
+
+    public init(token: Int, region: MapListHybridRegion) {
+        self.token = token
+        self.region = region
+    }
+}
+
 /// User-coordinate anchor for the "you are here" overlay disc. The
 /// shell defaults to `nil` (no overlay) — callers pass in their
 /// `LocationProviding` snapshot when available.

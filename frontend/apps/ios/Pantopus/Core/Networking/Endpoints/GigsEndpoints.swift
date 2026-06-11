@@ -151,7 +151,11 @@ public enum GigsEndpoints {
         )
     }
 
-    /// `GET /api/gigs/in-bounds` — map-viewport pins for T2.4 Map+List.
+    /// `GET /api/gigs/in-bounds` — map-viewport pins for T2.4 Map+List
+    /// and the A11.1 Tasks map. Response also carries
+    /// `nearest_activity_center` (only when the viewport has zero gigs)
+    /// for the empty-state "Jump to activity" recenter.
+    /// Route backend/routes/gigs.js:2603
     public static func inBounds(
         minLat: Double,
         minLon: Double,
