@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -140,11 +141,15 @@ class GigsFeedViewModelTest {
             assertEquals(GigsCategory.Cleaning, loaded.rows.first().category)
         }
 
-    @Test fun apply_budget_filter_narrows_loaded_list() =
+    @Test fun apply_budget_filter_refetches_with_price_params() =
         runTest {
             coEvery {
                 repo.list(null, "newest", null, null, 1.0, 20, 0)
             } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig(), cleaningGig()), 2))
+            // P0.4 — budget pushes minPrice/maxPrice server-side on refetch.
+            coEvery {
+                repo.list(null, "newest", null, null, 1.0, 20, 0, maxPrice = 100.0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig()), 1))
             val vm = GigsFeedViewModel(repo)
             vm.load()
             // handyman is $60, cleaning is $180 → a $0–$100 budget keeps only the first.
@@ -152,6 +157,85 @@ class GigsFeedViewModelTest {
             val loaded = vm.state.value as GigsFeedUiState.Loaded
             assertEquals(listOf("g1"), loaded.rows.map { it.id })
             assertEquals(1, vm.activeFilterCount.value)
+            coVerify(exactly = 1) {
+                repo.list(null, "newest", null, null, 1.0, 20, 0, maxPrice = 100.0)
+            }
+        }
+
+    @Test fun apply_filters_maps_every_server_expressible_dimension() =
+        runTest {
+            coEvery {
+                repo.list(null, "newest", null, null, 1.0, 20, 0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig(), cleaningGig()), 2))
+            val scheduledOpenGig = handymanGig().copy(scheduleType = "scheduled")
+            coEvery {
+                repo.list(
+                    null,
+                    "newest",
+                    null,
+                    null,
+                    1.0,
+                    20,
+                    0,
+                    minPrice = 50.0,
+                    maxPrice = 100.0,
+                    scheduleType = "scheduled",
+                    payType = "offers",
+                )
+            } returns NetworkResult.Success(GigsListResponse(listOf(scheduledOpenGig), 1))
+            val vm = GigsFeedViewModel(repo)
+            vm.load()
+            vm.applyFilters(
+                GigFilterCriteria(
+                    budgetLower = 50f,
+                    budgetUpper = 100f,
+                    schedules = setOf(GigScheduleFilter.OneTime),
+                    openToBids = true,
+                ),
+            )
+            val loaded = vm.state.value as GigsFeedUiState.Loaded
+            assertEquals(listOf("g1"), loaded.rows.map { it.id })
+            coVerify(exactly = 1) {
+                repo.list(
+                    null,
+                    "newest",
+                    null,
+                    null,
+                    1.0,
+                    20,
+                    0,
+                    minPrice = 50.0,
+                    maxPrice = 100.0,
+                    scheduleType = "scheduled",
+                    payType = "offers",
+                )
+            }
+        }
+
+    @Test fun multi_schedule_selection_stays_client_side() =
+        runTest {
+            // Two schedule buckets can't ride the single-value backend
+            // param — the refetch carries no schedule_type and the
+            // intersection happens client-side.
+            coEvery {
+                repo.list(null, "newest", null, null, 1.0, 20, 0)
+            } returns
+                NetworkResult.Success(
+                    GigsListResponse(
+                        listOf(
+                            handymanGig().copy(scheduleType = "scheduled"),
+                            cleaningGig().copy(scheduleType = "recurring"),
+                        ),
+                        2,
+                    ),
+                )
+            val vm = GigsFeedViewModel(repo)
+            vm.load()
+            vm.applyFilters(
+                GigFilterCriteria(schedules = setOf(GigScheduleFilter.OneTime, GigScheduleFilter.Flexible)),
+            )
+            val loaded = vm.state.value as GigsFeedUiState.Loaded
+            assertEquals(listOf("g1"), loaded.rows.map { it.id })
         }
 
     @Test fun apply_filter_with_no_matches_falls_to_empty() =

@@ -82,14 +82,25 @@ class GigsFeedViewModel
             fetch()
         }
 
-        /** Apply structured filters from the sheet. Re-derives the
-         * visible rows from the already-loaded gigs without a refetch. */
+        /**
+         * P0.4 — apply structured filters from the sheet. Server-expressible
+         * dimensions (budget → `minPrice`/`maxPrice`, open-to-bids →
+         * `pay_type=offers`, exactly-one schedule → `schedule_type`) ride
+         * the refetch as query params; [rebuild] keeps only what the server
+         * can't express client-side.
+         */
         fun applyFilters(criteria: GigFilterCriteria) {
             _filters.value = criteria
             _activeFilterCount.value = criteria.activeCount
-            rebuild()
+            fetch()
         }
 
+        /**
+         * Client-side residual filtering over the fetched page: multi-
+         * category, multi-schedule intersection, and posted-within (the
+         * backend has no posted-within param). The server-applied
+         * dimensions re-check harmlessly.
+         */
         private fun rebuild() {
             val now = Instant.now().epochSecond
             val visible = loadedGigs.filter { _filters.value.matches(it, now) }
@@ -111,6 +122,7 @@ class GigsFeedViewModel
                 try {
                     val category = _activeCategory.value
                     val sort = _activeSort.value
+                    val criteria = _filters.value
                     when (
                         val result =
                             repo.list(
@@ -119,6 +131,17 @@ class GigsFeedViewModel
                                 latitude = latitude,
                                 longitude = longitude,
                                 radiusMiles = radiusMiles,
+                                minPrice =
+                                    criteria.budgetLower
+                                        .toDouble()
+                                        .takeIf { criteria.budgetLower > GigFilterCriteria.BUDGET_MIN },
+                                maxPrice =
+                                    criteria.budgetUpper
+                                        .toDouble()
+                                        // BUDGET_MAX is the "$500+" no-ceiling handle.
+                                        .takeIf { criteria.budgetUpper < GigFilterCriteria.BUDGET_MAX },
+                                scheduleType = criteria.schedules.singleOrNull()?.backendValue,
+                                payType = if (criteria.openToBids) OFFERS_PAY_TYPE else null,
                             )
                     ) {
                         is NetworkResult.Success -> {
@@ -136,6 +159,9 @@ class GigsFeedViewModel
         }
 
         companion object {
+            /** P0.4 — `pay_type` wire value for the open-to-bids filter. */
+            private const val OFFERS_PAY_TYPE = "offers"
+
             /**
              * `GigDto` → render-only [GigCardContent]. Exposed on the
              * companion so the Gig Search surface projects identical rows

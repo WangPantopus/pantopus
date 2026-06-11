@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "TooManyFunctions")
+@file:Suppress("PackageNaming", "TooManyFunctions", "LargeClass")
 
 package app.pantopus.android.ui.screens.compose.gig
 
@@ -9,7 +9,11 @@ import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigLocation
+import app.pantopus.android.data.api.models.gigs.MagicDraftDto
+import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
+import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
@@ -46,6 +50,12 @@ data class GigComposeUiState(
      * (a half-open sheet shouldn't survive process death).
      */
     val activeSheet: GigPickerSheet? = null,
+    /** P0.1 — true while the magic-draft parse call is in flight. */
+    val isParsingDraft: Boolean = false,
+    /** P0.1 — backend follow-up question shown under the describe field. */
+    val clarifyingQuestion: String? = null,
+    /** P0.2 — in-flight / failed photo uploads (uploaded URLs live in [form.photoIds]). */
+    val photoUploads: List<GigComposePhotoUpload> = emptyList(),
 )
 
 /**
@@ -63,6 +73,7 @@ open class GigComposeViewModel
         private val repository: GigsRepository,
         private val savedStateHandle: SavedStateHandle,
         private val networkMonitor: NetworkMonitor,
+        private val filesRepository: FilesRepository,
     ) : ViewModel(),
         WizardModel {
         private val _state =
@@ -74,8 +85,26 @@ open class GigComposeViewModel
         /** One-shot navigation events the screen reacts to. */
         val pendingEvent = MutableStateFlow<GigComposeOutboundEvent?>(null)
 
-        /** B.3 — in-flight debounce for the Magic Task archetype parse. */
+        /**
+         * B.3 / P0.1 — in-flight debounce + magic-draft call for the Magic
+         * Task parse. Cancelled (which also aborts the HTTP call) whenever
+         * new describe input arrives.
+         */
         private var detectionJob: Job? = null
+
+        /**
+         * P0.1 — field keys the user has manually edited. The magic-draft
+         * prefill skips these so a backend parse never stomps explicit
+         * input. Persisted alongside the form so restore keeps the rule.
+         */
+        private val touchedFields: MutableSet<String> =
+            (savedStateHandle.get<ArrayList<String>>(KEY_TOUCHED) ?: arrayListOf()).toMutableSet()
+
+        /** P0.2 — picked-photo bytes held for upload + tap-to-retry. */
+        private val pendingPhotoBytes = mutableMapOf<String, GigComposePickedPhoto>()
+
+        /** P0.2 — per-tile upload jobs so remove can cancel in flight. */
+        private val uploadJobs = mutableMapOf<String, Job>()
 
         // MARK: - WizardModel
 
@@ -138,8 +167,10 @@ open class GigComposeViewModel
 
         /**
          * Update the plain-English describe text and (re)schedule a
-         * debounced archetype parse. Real backend NLP is deferred;
-         * [detectArchetype] is a deterministic keyword match standing in.
+         * debounced parse. P0.1 — the parse is the real backend
+         * `POST /api/gigs/magic-draft` call; the [detectArchetype] keyword
+         * matcher remains the offline / short-input fallback. Cancelling
+         * [detectionJob] also cancels any magic-draft call still in flight.
          */
         fun setDescribeText(text: String) {
             val clamped = text.take(GigComposeLimits.DESCRIBE_MAX)
@@ -149,13 +180,50 @@ open class GigComposeViewModel
             detectionJob =
                 viewModelScope.launch {
                     delay(DETECTION_DEBOUNCE_MS)
-                    applyDetection(clamped)
+                    parseDescribe(clamped)
                 }
         }
 
         /**
-         * Apply the parsed archetype if the text hasn't changed since the
-         * debounce fired. Mirrors the detected category into [form.category].
+         * P0.1 — parse the describe text. Input of ≥ [MIN_DRAFT_WORDS]
+         * words goes to the backend magic-draft endpoint; shorter input —
+         * and any network failure — falls back to the deterministic
+         * keyword matcher so the step still works offline.
+         */
+        suspend fun parseDescribe(text: String) {
+            if (_state.value.form.describeText != text) return
+            if (wordCount(text) < MIN_DRAFT_WORDS) {
+                // Too short for the backend — drop any stale follow-up
+                // question and fall back to the keyword matcher.
+                _state.update { it.copy(clarifyingQuestion = null) }
+                applyDetection(text)
+                return
+            }
+            _state.update { it.copy(isParsingDraft = true) }
+            val request =
+                MagicDraftRequest(
+                    text = text.trim(),
+                    attachmentUrls = _state.value.form.photoIds.ifEmpty { null },
+                )
+            val result = repository.magicDraft(request)
+            if (_state.value.form.describeText != text) {
+                // Stale — newer input arrived while the call was in flight.
+                _state.update { it.copy(isParsingDraft = false) }
+                return
+            }
+            when (result) {
+                is NetworkResult.Success -> applyMagicDraft(result.data)
+                is NetworkResult.Failure -> {
+                    _state.update { it.copy(isParsingDraft = false, clarifyingQuestion = null) }
+                    applyDetection(text)
+                }
+            }
+        }
+
+        /**
+         * Apply the keyword-matched archetype if the text hasn't changed
+         * since the debounce fired. Mirrors the detected category into
+         * [form.category]. Kept as the magic-draft fallback (offline etc.).
          */
         fun applyDetection(text: String) {
             if (_state.value.form.describeText != text) return
@@ -172,14 +240,88 @@ open class GigComposeViewModel
             persist()
         }
 
+        /**
+         * P0.1 — map a magic-draft response onto the form. **Decision:**
+         * the draft is applied the moment it arrives (not on step advance),
+         * but only into fields the user hasn't manually edited
+         * ([touchedFields]) — this keeps the prefill live while the user
+         * types, matches how the keyword matcher already mirrored the
+         * category, and never overwrites explicit input.
+         */
+        private fun applyMagicDraft(response: MagicDraftResponse) {
+            val draft = response.draft
+            _state.update { state ->
+                state.copy(
+                    isParsingDraft = false,
+                    clarifyingQuestion = response.clarifyingQuestion?.takeIf { it.isNotBlank() },
+                    form = prefillFormFromDraft(state.form, draft),
+                )
+            }
+            persist()
+        }
+
+        private fun prefillFormFromDraft(
+            form: GigComposeFormState,
+            draft: MagicDraftDto,
+        ): GigComposeFormState {
+            val category =
+                GigComposeCategory.fromRawKey(draft.category)
+                    ?: GigComposeCategory.fromRawKey(draft.taskArchetype)
+                    ?: detectArchetype(form.describeText)
+            val budgetType =
+                draft.payType?.let { pay -> GigComposeBudgetType.entries.firstOrNull { it.wireValue == pay } }
+            val (draftMin, draftMax) = draftBudgetBounds(draft)
+            val draftTags =
+                draft.tags
+                    .orEmpty()
+                    .mapNotNull { normalizeTag(it) }
+                    .distinct()
+                    .take(GigComposeLimits.MAX_TAGS)
+                    .ifEmpty { null }
+            return form.copy(
+                detectedArchetype = category ?: form.detectedArchetype,
+                category = prefill(FIELD_CATEGORY, category, form.category),
+                title = prefill(FIELD_TITLE, draft.title?.take(GigComposeLimits.TITLE_MAX), form.title),
+                description =
+                    prefill(
+                        FIELD_DESCRIPTION,
+                        draft.description?.take(GigComposeLimits.DESCRIPTION_MAX),
+                        form.description,
+                    ),
+                budgetType = prefill(FIELD_BUDGET, budgetType, form.budgetType),
+                budgetMin = prefill(FIELD_BUDGET, draftMin, form.budgetMin),
+                budgetMax = prefill(FIELD_BUDGET, draftMax, form.budgetMax),
+                scheduleType = prefill(FIELD_SCHEDULE, scheduleTypeFromDraft(draft.scheduleType), form.scheduleType),
+                tags = prefill(FIELD_TAGS, draftTags, form.tags),
+                isUrgent = prefill(FIELD_URGENT, draft.isUrgent, form.isUrgent),
+            )
+        }
+
+        /** Draft value wins only when present and the field is untouched. */
+        private fun <T> prefill(
+            field: String,
+            draftValue: T?,
+            current: T,
+        ): T = if (draftValue != null && field !in touchedFields) draftValue else current
+
+        private fun markTouched(field: String) {
+            touchedFields.add(field)
+            savedStateHandle[KEY_TOUCHED] = ArrayList(touchedFields)
+        }
+
         // MARK: - Field updates
 
         fun selectCategory(category: GigComposeCategory) {
+            markTouched(FIELD_CATEGORY)
             _state.update { it.copy(form = it.form.copy(category = category)) }
             persist()
         }
 
         fun selectEngagementMode(mode: GigComposeEngagementMode) {
+            // Deliberate user choice that prefills schedule + budget — both
+            // count as touched so the magic draft won't override them.
+            markTouched(FIELD_SCHEDULE)
+            markTouched(FIELD_BUDGET)
             _state.update {
                 val form = it.form
                 val next =
@@ -203,31 +345,89 @@ open class GigComposeViewModel
         }
 
         fun setTitle(title: String) {
+            markTouched(FIELD_TITLE)
             val clamped = title.take(GigComposeLimits.TITLE_MAX)
             _state.update { it.copy(form = it.form.copy(title = clamped)) }
             persist()
         }
 
         fun setDescription(description: String) {
+            markTouched(FIELD_DESCRIPTION)
             val clamped = description.take(GigComposeLimits.DESCRIPTION_MAX)
             _state.update { it.copy(form = it.form.copy(description = clamped)) }
             persist()
         }
 
+        // MARK: - P0.2 Photo upload pipeline
+
         /**
-         * Append a placeholder photo id. Today the upload pipeline isn't
-         * wired (lands with P15.5); the wizard treats the id as opaque
-         * so the underlying mechanism can swap later.
+         * P0.2 — accept a picked attachment and upload it immediately via
+         * `POST /api/files/upload`. The tile is tracked as uploading /
+         * failed (tap-to-retry) until the URL lands in [form.photoIds].
          */
-        fun addPlaceholderPhoto() {
-            val current = _state.value.form.photoIds
-            if (current.size >= GigComposeLimits.MAX_PHOTOS) return
-            _state.update {
-                it.copy(form = it.form.copy(photoIds = current + "placeholder://photo/${UUID.randomUUID()}"))
-            }
-            persist()
+        fun addPickedPhoto(photo: GigComposePickedPhoto) {
+            val current = _state.value
+            if (current.form.photoIds.size + current.photoUploads.size >= GigComposeLimits.MAX_PHOTOS) return
+            val id = UUID.randomUUID().toString()
+            pendingPhotoBytes[id] = photo
+            _state.update { it.copy(photoUploads = it.photoUploads + GigComposePhotoUpload(id = id)) }
+            startUpload(id)
         }
 
+        /** P0.2 — retry a failed upload tile (bytes are still held). */
+        fun retryPhotoUpload(id: String) {
+            if (pendingPhotoBytes[id] == null) return
+            _state.update {
+                it.copy(photoUploads = it.photoUploads.map { tile -> if (tile.id == id) tile.copy(failed = false) else tile })
+            }
+            startUpload(id)
+        }
+
+        /** P0.2 — drop an uploading / failed tile, cancelling its call. */
+        fun removePhotoUpload(id: String) {
+            uploadJobs.remove(id)?.cancel()
+            pendingPhotoBytes.remove(id)
+            _state.update { it.copy(photoUploads = it.photoUploads.filterNot { tile -> tile.id == id }) }
+        }
+
+        private fun startUpload(id: String) {
+            val photo = pendingPhotoBytes[id] ?: return
+            uploadJobs[id] =
+                viewModelScope.launch {
+                    val result =
+                        filesRepository.uploadFile(
+                            filename = photo.filename,
+                            mimeType = photo.mimeType,
+                            bytes = photo.bytes,
+                            fileType = GIG_PHOTO_FILE_TYPE,
+                            visibility = "public",
+                        )
+                    when (result) {
+                        is NetworkResult.Success -> {
+                            pendingPhotoBytes.remove(id)
+                            uploadJobs.remove(id)
+                            _state.update {
+                                it.copy(
+                                    form = it.form.copy(photoIds = it.form.photoIds + result.data.file.url),
+                                    photoUploads = it.photoUploads.filterNot { tile -> tile.id == id },
+                                )
+                            }
+                            persist()
+                        }
+                        is NetworkResult.Failure ->
+                            _state.update {
+                                it.copy(
+                                    photoUploads =
+                                        it.photoUploads.map { tile ->
+                                            if (tile.id == id) tile.copy(failed = true) else tile
+                                        },
+                                )
+                            }
+                    }
+                }
+        }
+
+        /** Remove an already-uploaded photo URL by its slot index. */
         fun removePhoto(index: Int) {
             val current = _state.value.form.photoIds
             if (index !in current.indices) return
@@ -240,21 +440,25 @@ open class GigComposeViewModel
         }
 
         fun selectBudgetType(type: GigComposeBudgetType) {
+            markTouched(FIELD_BUDGET)
             _state.update { it.copy(form = it.form.copy(budgetType = type)) }
             persist()
         }
 
         fun setBudgetMin(value: String) {
+            markTouched(FIELD_BUDGET)
             _state.update { it.copy(form = it.form.copy(budgetMin = sanitizeBudget(value))) }
             persist()
         }
 
         fun setBudgetMax(value: String) {
+            markTouched(FIELD_BUDGET)
             _state.update { it.copy(form = it.form.copy(budgetMax = sanitizeBudget(value))) }
             persist()
         }
 
         fun selectScheduleType(type: GigComposeScheduleType) {
+            markTouched(FIELD_SCHEDULE)
             _state.update {
                 it.copy(
                     form =
@@ -269,6 +473,7 @@ open class GigComposeViewModel
         }
 
         fun setScheduledStart(iso: String?) {
+            markTouched(FIELD_SCHEDULE)
             _state.update { it.copy(form = it.form.copy(scheduledStartISO = iso)) }
             persist()
         }
@@ -328,6 +533,7 @@ open class GigComposeViewModel
 
         /** E.1 — toggle the urgent boost flag. */
         fun setUrgent(isUrgent: Boolean) {
+            markTouched(FIELD_URGENT)
             _state.update { it.copy(form = it.form.copy(isUrgent = isUrgent)) }
             persist()
         }
@@ -335,6 +541,7 @@ open class GigComposeViewModel
         /** E.1 — add a tag if there's room ([GigComposeLimits.MAX_TAGS]). */
         fun addTag(raw: String) {
             val tag = normalizeTag(raw) ?: return
+            markTouched(FIELD_TAGS)
             val current = _state.value.form.tags
             if (current.size >= GigComposeLimits.MAX_TAGS || current.contains(tag)) return
             _state.update { it.copy(form = it.form.copy(tags = current + tag)) }
@@ -343,6 +550,7 @@ open class GigComposeViewModel
 
         /** E.1 — remove a tag by its normalised value. */
         fun removeTag(tag: String) {
+            markTouched(FIELD_TAGS)
             _state.update {
                 it.copy(form = it.form.copy(tags = it.form.tags.filterNot { existing -> existing == tag }))
             }
@@ -619,18 +827,23 @@ open class GigComposeViewModel
                     // Magic: enabled once an archetype is detected. Manual:
                     // enabled once a category tile is selected.
                     if (form.composeMode == ComposeMode.Magic) form.detectedArchetype != null else form.category != null
-                GigComposeStep.Basics -> hasValidBasics(form)
+                // P0.2 — photo uploads in flight gate Continue / Post so a
+                // submit never races a half-done upload.
+                GigComposeStep.Basics -> hasValidBasics(state)
                 GigComposeStep.Budget -> hasValidBudget(form)
                 GigComposeStep.Schedule -> hasValidSchedule(form)
                 GigComposeStep.Location -> hasValidLocation(form)
-                GigComposeStep.Review -> buildCreateBody() != null
+                GigComposeStep.Review -> buildCreateBody() != null && !hasUploadsInFlight(state)
                 GigComposeStep.Success -> state.createdGigId != null
             }
         }
 
-        private fun hasValidBasics(form: GigComposeFormState): Boolean =
-            hasValidTitleAndDescription(form.title.trim(), form.description.trim()) &&
-                form.photoIds.size <= GigComposeLimits.MAX_PHOTOS
+        private fun hasUploadsInFlight(state: GigComposeUiState): Boolean = state.photoUploads.any { !it.failed }
+
+        private fun hasValidBasics(state: GigComposeUiState): Boolean =
+            hasValidTitleAndDescription(state.form.title.trim(), state.form.description.trim()) &&
+                state.form.photoIds.size + state.photoUploads.size <= GigComposeLimits.MAX_PHOTOS &&
+                !hasUploadsInFlight(state)
 
         private fun hasValidTitleAndDescription(
             title: String,
@@ -779,9 +992,54 @@ open class GigComposeViewModel
             private const val KEY_CANCELLATION = "composeGig.cancellationPolicy"
             private const val KEY_IS_URGENT = "composeGig.isUrgent"
             private const val KEY_TAGS = "composeGig.tags"
-            private const val DETECTION_DEBOUNCE_MS = 350L
+            private const val KEY_TOUCHED = "composeGig.touchedFields"
+
+            /** P0.1 — debounce ahead of the backend magic-draft call. */
+            private const val DETECTION_DEBOUNCE_MS = 700L
+
+            /** P0.1 — minimum word count before the backend parse fires. */
+            private const val MIN_DRAFT_WORDS = 3
             private const val MIN_DETECT_TEXT_LENGTH = 3
             private const val MAX_TAG_LENGTH = 50
+
+            /** P0.2 — `file_type` form field on `POST /api/files/upload`. */
+            private const val GIG_PHOTO_FILE_TYPE = "gig_photo"
+
+            // P0.1 — touched-field keys for the magic-draft prefill guard.
+            private const val FIELD_CATEGORY = "category"
+            private const val FIELD_TITLE = "title"
+            private const val FIELD_DESCRIPTION = "description"
+            private const val FIELD_BUDGET = "budget"
+            private const val FIELD_SCHEDULE = "schedule"
+            private const val FIELD_TAGS = "tags"
+            private const val FIELD_URGENT = "urgent"
+
+            private fun wordCount(text: String): Int = text.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
+
+            /** "60.0" reads as "60" in the budget fields; keep cents when present. */
+            internal fun formatBudgetValue(value: Double?): String? =
+                value?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
+
+            /** P0.1 — draft budget → (min, max) field strings. */
+            internal fun draftBudgetBounds(draft: MagicDraftDto): Pair<String?, String?> {
+                val range = draft.budgetRange
+                return when {
+                    range?.min != null || range?.max != null ->
+                        formatBudgetValue(range?.min) to formatBudgetValue(range?.max)
+                    draft.budgetFixed != null -> formatBudgetValue(draft.budgetFixed) to null
+                    draft.hourlyRate != null -> formatBudgetValue(draft.hourlyRate) to null
+                    else -> null to null
+                }
+            }
+
+            /** P0.1 — tolerant backend `schedule_type` → composer enum. */
+            internal fun scheduleTypeFromDraft(raw: String?): GigComposeScheduleType? =
+                when ((raw ?: "").lowercase().replace("_", "").replace("-", "")) {
+                    "scheduled", "onetime", "once" -> GigComposeScheduleType.OneTime
+                    "recurring", "repeat", "repeating" -> GigComposeScheduleType.Recurring
+                    "flexible", "flex", "anytime" -> GigComposeScheduleType.Flexible
+                    else -> null
+                }
 
             /** B.3 — deterministic keyword → archetype map (stand-in for backend NLP). */
             fun detectArchetype(text: String): GigComposeCategory? {

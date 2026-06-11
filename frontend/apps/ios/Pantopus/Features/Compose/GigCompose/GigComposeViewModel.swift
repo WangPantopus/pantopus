@@ -20,6 +20,26 @@ public enum GigComposeOutboundEvent: Sendable, Equatable {
     case openGigDetail(gigId: String)
 }
 
+/// One Basics-step photo riding the real upload pipeline
+/// (`POST /api/files/upload`). The raw bytes back the grid thumbnail;
+/// `status` drives the per-tile spinner / retry / uploaded chrome.
+struct GigComposeAttachment: Identifiable, Equatable, Sendable {
+    enum Status: Equatable, Sendable {
+        case uploading
+        case failed
+        case uploaded(url: String)
+    }
+
+    let id: String
+    let imageData: Data
+    var status: Status
+
+    var uploadedURL: String? {
+        if case let .uploaded(url) = status { return url }
+        return nil
+    }
+}
+
 @Observable
 @MainActor
 final class GigComposeViewModel: WizardModel {
@@ -48,19 +68,42 @@ final class GigComposeViewModel: WizardModel {
     /// `@SceneStorage` (a half-open sheet shouldn't survive process death).
     var activePickerSheet: GigPickerSheet?
 
+    /// B.3 — true while the `POST /api/gigs/magic-draft` parse is in
+    /// flight; the describe card shows a subtle "Parsing" indicator.
+    private(set) var isParsingDraft = false
+
+    /// B.3 — clarifying question returned by the parser, surfaced as a
+    /// hint under the describe card. Cleared on fallback / failure.
+    private(set) var clarifyingQuestion: String?
+
+    /// B.3 — the latest backend draft for the current describe text.
+    /// Committed into the form (empty fields only) when the user
+    /// advances past the describe step.
+    private(set) var magicDraft: MagicDraftDTO?
+
+    /// P15.5 — Basics-step photos with their per-tile upload state.
+    /// Transient (raw bytes can't ride `@SceneStorage`); uploaded URLs
+    /// are mirrored into `form.photoIds` so they survive restore.
+    private(set) var attachments: [GigComposeAttachment] = []
+
     // MARK: - Private dependencies
 
     private let api: APIClient
+    private let uploader: MultipartUploader
     private let location: any LocationProviding
     private let isOnlineProvider: @MainActor () -> Bool
 
     /// B.3 — in-flight debounce for the Magic Task archetype parse.
     private var detectionTask: Task<Void, Never>?
 
+    /// P15.5 — in-flight photo uploads keyed by attachment id.
+    private var uploadTasks: [String: Task<Void, Never>] = [:]
+
     // MARK: - Init
 
     init(
         api: APIClient = .shared,
+        uploader: MultipartUploader = .shared,
         location: any LocationProviding = DeviceLocationProvider.shared,
         initialState: GigComposeFormState = .empty,
         // Defaults to the live NetworkMonitor in production. Tests inject
@@ -69,9 +112,11 @@ final class GigComposeViewModel: WizardModel {
         isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
     ) {
         self.api = api
+        self.uploader = uploader
         self.location = location
         self.isOnlineProvider = isOnlineProvider
         form = initialState
+        seedAttachmentsFromPhotoIds()
     }
 
     /// Replace the in-memory form state from scene storage on first
@@ -79,6 +124,17 @@ final class GigComposeViewModel: WizardModel {
     func restore(from snapshot: GigComposeFormState) {
         guard form == .empty else { return }
         form = snapshot
+        seedAttachmentsFromPhotoIds()
+    }
+
+    /// Rehydrate the attachment grid from restored `photoIds`. Only real
+    /// uploaded URLs survive; legacy placeholder ids are dropped so they
+    /// can't leak into the create body.
+    private func seedAttachmentsFromPhotoIds() {
+        form.photoIds = form.photoIds.filter { $0.hasPrefix("http") }
+        attachments = form.photoIds.map {
+            GigComposeAttachment(id: UUID().uuidString, imageData: Data(), status: .uploaded(url: $0))
+        }
     }
 }
 
@@ -142,23 +198,81 @@ extension GigComposeViewModel {
         form.composeMode = mode
     }
 
+    /// Debounce before the describe text is parsed (real NLP roundtrip,
+    /// so longer than a local keyword match would need).
+    static let describeDebounceNanos: UInt64 = 700_000_000
+
+    /// Minimum word count before the backend parser is worth a roundtrip.
+    static let magicDraftMinWords = 3
+
     /// Update the plain-English describe text and (re)schedule a debounced
-    /// archetype parse. Real backend NLP is deferred; `detectArchetype`
-    /// is a deterministic keyword match standing in for it.
+    /// parse. Cancelling the previous task also cancels any in-flight
+    /// magic-draft request (URLSession honours task cancellation).
     func setDescribeText(_ text: String) {
         form.describeText = String(text.prefix(GigComposeLimits.describeMax))
         detectionTask?.cancel()
         let snapshot = form.describeText
         detectionTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 350_000_000)
+            try? await Task.sleep(nanoseconds: Self.describeDebounceNanos)
             guard let self, !Task.isCancelled else { return }
+            await parseDescribe(snapshot)
+        }
+    }
+
+    /// Debounced describe-text parse. ≥ `magicDraftMinWords` words →
+    /// `POST /api/gigs/magic-draft`; shorter input — or a failed /
+    /// errored request — falls back to the deterministic keyword
+    /// matcher so detection always works offline.
+    func parseDescribe(_ snapshot: String) async {
+        guard form.describeText == snapshot else { return }
+        let words = snapshot.split(whereSeparator: \.isWhitespace)
+        guard words.count >= Self.magicDraftMinWords else {
+            magicDraft = nil
+            clarifyingQuestion = nil
+            applyDetection(for: snapshot)
+            return
+        }
+        isParsingDraft = true
+        defer { isParsingDraft = false }
+        do {
+            let coordinate = location.cachedCoordinate()
+            let body = MagicDraftRequestBody(
+                text: snapshot,
+                context: coordinate.map {
+                    MagicDraftContext(latitude: $0.latitude, longitude: $0.longitude)
+                }
+            )
+            let response: MagicDraftResponse = try await api.request(GigsEndpoints.magicDraft(body: body))
+            // The text may have changed while the request was in flight —
+            // a newer debounce owns the field now.
+            guard form.describeText == snapshot else { return }
+            apply(draft: response, for: snapshot)
+        } catch {
+            guard form.describeText == snapshot, !Task.isCancelled else { return }
+            magicDraft = nil
+            clarifyingQuestion = nil
             applyDetection(for: snapshot)
         }
     }
 
-    /// Apply the parsed archetype if the text hasn't changed since the
-    /// debounce fired. Mirrors the detected category into `form.category`
-    /// so the rest of the wizard + submission consume it.
+    /// Commit a magic-draft response: stash the draft for the
+    /// advance-time prefill, surface the clarifying question, and mirror
+    /// the parsed category into the detected-archetype pill. Falls back
+    /// to the keyword matcher when the backend returned no category.
+    func apply(draft response: MagicDraftResponse, for text: String) {
+        magicDraft = response.draft
+        clarifyingQuestion = (response.clarifyingQuestion?.isEmpty == false)
+            ? response.clarifyingQuestion
+            : nil
+        let detected = GigComposeCategory.from(backendCategory: response.draft.category)
+            ?? Self.detectArchetype(from: text)
+        form.detectedArchetype = detected
+        if let detected { form.category = detected }
+    }
+
+    /// Apply the keyword-matched archetype if the text hasn't changed
+    /// since the debounce fired. Mirrors the detected category into
+    /// `form.category` so the rest of the wizard + submission consume it.
     func applyDetection(for text: String) {
         guard form.describeText == text else { return }
         let detected = Self.detectArchetype(from: text)
@@ -166,7 +280,8 @@ extension GigComposeViewModel {
         if let detected { form.category = detected }
     }
 
-    /// Deterministic keyword → archetype map (stand-in for backend NLP).
+    /// Deterministic keyword → archetype map. Synchronous fallback for
+    /// short input and for magic-draft request failures.
     static func detectArchetype(from text: String) -> GigComposeCategory? {
         let lower = text.lowercased()
         guard lower.count >= 3 else { return nil }
@@ -228,20 +343,87 @@ extension GigComposeViewModel {
         form.description = String(description.prefix(GigComposeLimits.descriptionMax))
     }
 
-    /// Append a photo identifier. Caps the list at
-    /// `GigComposeLimits.maxPhotos` — extra calls are ignored. Today the
-    /// id is a free-form string (a placeholder until a real photo-upload
-    /// pipeline lands in P15.5); the wizard treats it as opaque so the
-    /// underlying mechanism can swap later.
-    func addPhoto(_ id: String) {
-        guard form.photoIds.count < GigComposeLimits.maxPhotos else { return }
-        form.photoIds.append(id)
+    // MARK: - P15.5 Photo uploads
+
+    /// True while any Basics-step photo upload is still in flight —
+    /// gates the Continue / Post CTAs so a half-uploaded gig can't ship.
+    var hasUploadsInFlight: Bool {
+        attachments.contains { $0.status == .uploading }
     }
 
-    func removePhoto(at index: Int) {
-        guard form.photoIds.indices.contains(index) else { return }
-        form.photoIds.remove(at: index)
+    /// Add a picked photo and immediately upload it in the background.
+    /// Caps the grid at `GigComposeLimits.maxPhotos` — extra calls are
+    /// ignored. The first photo is the gig's cover.
+    func addPhotoData(_ data: Data) {
+        guard attachments.count < GigComposeLimits.maxPhotos, !data.isEmpty else { return }
+        let attachment = GigComposeAttachment(id: UUID().uuidString, imageData: data, status: .uploading)
+        attachments.append(attachment)
+        startUpload(attachmentId: attachment.id)
     }
+
+    /// Tap-to-retry on a failed tile.
+    func retryUpload(id: String) {
+        guard let index = attachments.firstIndex(where: { $0.id == id }),
+              attachments[index].status == .failed else { return }
+        attachments[index].status = .uploading
+        startUpload(attachmentId: id)
+    }
+
+    /// Remove a photo (any state). Cancels an in-flight upload and drops
+    /// the mirrored URL from `form.photoIds`.
+    func removeAttachment(id: String) {
+        uploadTasks[id]?.cancel()
+        uploadTasks[id] = nil
+        guard let index = attachments.firstIndex(where: { $0.id == id }) else { return }
+        attachments.remove(at: index)
+        syncPhotoIds()
+    }
+
+    private func startUpload(attachmentId: String) {
+        uploadTasks[attachmentId] = Task { [weak self] in
+            await self?.performUpload(attachmentId: attachmentId)
+        }
+    }
+
+    /// Push one photo through `POST /api/files/upload` (same mechanism
+    /// as the Delivery Proof sheet) and mirror the resulting URL into
+    /// `form.photoIds` so it rides the create body's `attachments`.
+    func performUpload(attachmentId: String) async {
+        guard let attachment = attachments.first(where: { $0.id == attachmentId }) else { return }
+        do {
+            let response = try await uploader.uploadFile(
+                MultipartFile(
+                    fieldName: "file",
+                    filename: "gig-\(attachmentId.prefix(6)).jpg",
+                    mimeType: "image/jpeg",
+                    data: attachment.imageData
+                ),
+                formFields: ["file_type": "gig_photo"]
+            )
+            guard let index = attachments.firstIndex(where: { $0.id == attachmentId }) else { return }
+            attachments[index].status = .uploaded(url: response.file.url)
+            syncPhotoIds()
+        } catch {
+            guard let index = attachments.firstIndex(where: { $0.id == attachmentId }) else { return }
+            attachments[index].status = .failed
+        }
+    }
+
+    /// Rebuild `form.photoIds` in *grid* order (not upload-completion
+    /// order) so the first tile stays the cover even when concurrent
+    /// uploads finish out of order.
+    private func syncPhotoIds() {
+        form.photoIds = attachments.compactMap(\.uploadedURL)
+    }
+
+    #if DEBUG
+    /// Test hook — wait for every kicked upload task to settle.
+    func awaitUploadsForTesting() async {
+        for task in uploadTasks.values {
+            await task.value
+        }
+    }
+    #endif
 
     func selectBudgetType(_ type: GigComposeBudgetType) {
         form.budgetType = type
@@ -359,7 +541,14 @@ extension GigComposeViewModel {
 
     private func advance() async {
         switch currentStep {
-        case .category, .basics, .budget, .schedule, .location:
+        case .category:
+            // B.3 — leaving the Magic describe step commits the parsed
+            // draft into any fields the user hasn't filled themselves.
+            if form.composeMode == .magic { prefillFromMagicDraft() }
+            if let next = GigComposeStep(rawValue: form.step + 1) {
+                transition(to: next)
+            }
+        case .basics, .budget, .schedule, .location:
             if let next = GigComposeStep(rawValue: form.step + 1) {
                 transition(to: next)
             }
@@ -370,6 +559,69 @@ extension GigComposeViewModel {
                 pendingEvent = .openGigDetail(gigId: gigId)
             }
         }
+    }
+
+    /// B.3 — fold the stashed magic draft into the form. Prefill is
+    /// deliberately empty-fields-only so a user who already typed a
+    /// title (or picked a budget via the engagement control) never gets
+    /// stomped by the parser.
+    private func prefillFromMagicDraft() {
+        guard let draft = magicDraft else { return }
+        if form.title.isEmpty, let title = draft.title, !title.isEmpty {
+            form.title = String(title.prefix(GigComposeLimits.titleMax))
+        }
+        if form.description.isEmpty, let description = draft.description, !description.isEmpty {
+            form.description = String(description.prefix(GigComposeLimits.descriptionMax))
+        }
+        if form.budgetType == nil, form.budgetMin.isEmpty, form.budgetMax.isEmpty {
+            switch draft.payType {
+            case "fixed":
+                form.budgetType = .fixed
+                if let fixed = draft.budgetFixed, fixed > 0 {
+                    form.budgetMin = Self.formatBudgetValue(fixed)
+                }
+            case "hourly":
+                form.budgetType = .hourly
+                if let rate = draft.hourlyRate, rate > 0 {
+                    form.budgetMin = Self.formatBudgetValue(rate)
+                }
+            case "offers":
+                form.budgetType = .offers
+            default:
+                break
+            }
+            if let range = draft.budgetRange, form.budgetType != .offers, form.budgetType != nil {
+                if form.budgetMin.isEmpty, range.min > 0 {
+                    form.budgetMin = Self.formatBudgetValue(range.min)
+                }
+                if range.max > 0 {
+                    form.budgetMax = Self.formatBudgetValue(range.max)
+                }
+            }
+        }
+        if form.scheduleType == nil {
+            // Only the clean maps: backend "scheduled" → one-time,
+            // "flexible" → flexible. "asap"/"today" have no wizard
+            // equivalent, so the user picks on the schedule step.
+            switch draft.scheduleType {
+            case "scheduled": form.scheduleType = .oneTime
+            case "flexible": form.scheduleType = .flexible
+            default: break
+            }
+        }
+        if form.tags.isEmpty, let tags = draft.tags {
+            for tag in tags.prefix(GigComposeLimits.maxTags) {
+                addTag(tag)
+            }
+        }
+    }
+
+    /// Render a draft dollar amount into the budget text fields —
+    /// whole numbers without the trailing ".0".
+    private static func formatBudgetValue(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(value))
+            : String(format: "%.2f", value)
     }
 
     private func goBack() {
@@ -570,7 +822,9 @@ extension GigComposeViewModel {
         case .location:
             hasValidLocation
         case .review:
-            buildCreateBody() != nil
+            // P15.5 — don't allow posting while a photo upload is still
+            // settling (the URL wouldn't make it into `attachments`).
+            buildCreateBody() != nil && !hasUploadsInFlight
         case .success:
             createdGigId != nil
         }
@@ -622,6 +876,9 @@ private extension GigComposeViewModel {
             && desc.count >= GigComposeLimits.descriptionMin
             && desc.count <= GigComposeLimits.descriptionMax
             && form.photoIds.count <= GigComposeLimits.maxPhotos
+            // P15.5 — Continue waits for in-flight photo uploads (the
+            // grid shows an "uploading" hint while this gate is closed).
+            && !hasUploadsInFlight
     }
 
     var hasValidBudget: Bool {

@@ -41,6 +41,13 @@ class GigFilterCriteriaTest {
         assertEquals(0, GigFilterCriteria().activeCount)
     }
 
+    @Test fun schedule_backend_values_match_wire_contract() {
+        // P0.4 — single-selection schedule rides as `schedule_type`.
+        assertEquals("scheduled", GigScheduleFilter.OneTime.backendValue)
+        assertEquals("recurring", GigScheduleFilter.Recurring.backendValue)
+        assertEquals("flexible", GigScheduleFilter.Flexible.backendValue)
+    }
+
     @Test fun sections_cover_every_dimension_in_order() {
         assertEquals(
             listOf("category", "budget", "schedule", "openToBids", "postedWithin"),

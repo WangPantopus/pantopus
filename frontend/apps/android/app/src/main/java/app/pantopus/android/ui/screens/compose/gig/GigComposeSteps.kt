@@ -183,6 +183,28 @@ enum class GigCancellationPolicy(
 /** E.1 — the composer picker sheets, presented one-at-a-time over the wizard. */
 enum class GigPickerSheet { Attachment, Category, Deadline, Policy, Urgency, Tags }
 
+/**
+ * P0.2 — one in-flight (or failed) photo upload tile in the Basics step.
+ * Uploaded photos graduate into [GigComposeFormState.photoIds] as URLs;
+ * these transient tiles are never persisted (raw bytes can't survive
+ * process death anyway).
+ */
+data class GigComposePhotoUpload(
+    val id: String,
+    val failed: Boolean = false,
+)
+
+/**
+ * P0.2 — raw bytes of a picked attachment, held by the view-model for
+ * upload + retry. Not a data class — [bytes] is an array, so structural
+ * equality would be misleading.
+ */
+class GigComposePickedPhoto(
+    val filename: String,
+    val mimeType: String,
+    val bytes: ByteArray,
+)
+
 /** Plain-old-data address fields collected in step 5 for `APlace`. */
 data class GigComposePlaceAddress(
     val line1: String = "",

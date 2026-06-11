@@ -182,8 +182,12 @@ struct MagicDescribeStep: View {
                 set: { viewModel.setDescribeText($0) }
             ),
             isParsed: viewModel.form.detectedArchetype != nil,
+            isParsing: viewModel.isParsingDraft,
             isFocused: $isDescribeFocused
         )
+        if let question = viewModel.clarifyingQuestion {
+            MagicClarifyingHint(question: question)
+        }
         if let archetype = viewModel.form.detectedArchetype {
             DetectedArchetypePill(archetype: archetype) {
                 isDescribeFocused = false
@@ -203,6 +207,7 @@ struct MagicDescribeStep: View {
 private struct MagicDescribeCard: View {
     @Binding var text: String
     let isParsed: Bool
+    let isParsing: Bool
     @FocusState.Binding var isFocused: Bool
 
     var body: some View {
@@ -255,7 +260,18 @@ private struct MagicDescribeCard: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Theme.Color.magic)
             Spacer(minLength: Spacing.s0)
-            if isParsed {
+            if isParsing {
+                HStack(spacing: Spacing.s1) {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(Theme.Color.magic)
+                    Text("PARSING")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.4)
+                        .foregroundStyle(Theme.Color.magic)
+                }
+                .accessibilityIdentifier("composeGigParsingIndicator")
+            } else if isParsed {
                 HStack(spacing: Spacing.s1) {
                     Circle().fill(Theme.Color.success).frame(width: 6, height: 6)
                     Text("PARSED")
@@ -293,6 +309,26 @@ private struct MagicDescribeCard: View {
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
         }
+    }
+}
+
+/// B.3 — small hint under the describe card surfacing the parser's
+/// clarifying question (e.g. "Roughly how many boxes?").
+private struct MagicClarifyingHint: View {
+    let question: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.info, size: 13, strokeWidth: 2.2, color: Theme.Color.magic)
+                .padding(.top, 1)
+            Text(question)
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: Spacing.s0)
+        }
+        .accessibilityIdentifier("composeGigClarifyingQuestion")
+        .accessibilityLabel("Suggestion: \(question)")
     }
 }
 

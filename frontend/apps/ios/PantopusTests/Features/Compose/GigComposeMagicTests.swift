@@ -2,21 +2,38 @@
 //  GigComposeMagicTests.swift
 //  PantopusTests
 //
-//  B.3 (A12.8) — Magic Task step-1 behaviour: deterministic archetype
-//  detection, compose-mode toggling, the mode-aware Continue gate +
-//  secondary CTA, module-prompt fixture, and a structural render of both
-//  design frames (Magic populated · manual picker).
+//  B.3 (A12.8) — Magic Task step-1 behaviour: the magic-draft backend
+//  parse (success mapping, keyword fallback on failure, short-input
+//  skip, advance-time prefill), compose-mode toggling, the mode-aware
+//  Continue gate + secondary CTA, module-prompt fixture, and a
+//  structural render of both design frames (Magic populated · manual
+//  picker).
 //
 
 import SwiftUI
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable type_body_length
+
 @MainActor
 final class GigComposeMagicTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
     private func makeVM(_ state: GigComposeFormState = .empty) -> GigComposeViewModel {
         GigComposeViewModel(
-            api: APIClient.shared,
+            api: APIClient(
+                environment: .current,
+                session: SequencedURLProtocol.makeSession(),
+                retryPolicy: .none
+            ),
+            uploader: MultipartUploader(
+                environment: .current,
+                session: SequencedURLProtocol.makeSession()
+            ),
             location: FixedLocationProvider(
                 UserCoordinate(latitude: 40.7484, longitude: -73.9857, accuracyMeters: 100)
             ),
@@ -28,6 +45,130 @@ final class GigComposeMagicTests: XCTestCase {
 
     func testDefaultComposeModeIsMagic() {
         XCTAssertEqual(makeVM().form.composeMode, .magic)
+    }
+
+    // MARK: - Magic draft (POST /api/gigs/magic-draft)
+
+    private static let magicDraftJSON = """
+    {
+      "draft": {
+        "title": "Mount TV on living room wall",
+        "description": "Mount a 55-inch TV on drywall, cables hidden if possible.",
+        "category": "Handyman",
+        "task_archetype": "home_service",
+        "pay_type": "fixed",
+        "budget_fixed": 120,
+        "hourly_rate": null,
+        "budget_range": {"min": 90, "max": 150},
+        "schedule_type": "scheduled",
+        "location_mode": "home",
+        "privacy_level": "exact_after_accept",
+        "tags": ["indoor", "tv-mount"],
+        "is_urgent": false,
+        "attachments_suggested": true
+      },
+      "confidence": 0.91,
+      "fieldConfidence": {"title": 0.95, "category": 0.9},
+      "clarifyingQuestion": "Do you already have a wall mount bracket?",
+      "source": "ai",
+      "elapsed": 420
+    }
+    """
+
+    func testMagicDraftSuccessMapsCategoryAndClarifyingQuestion() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.magicDraftJSON)]
+        let text = "Need someone to mount my TV this weekend"
+        // Seed via initial state (not setDescribeText) so no background
+        // debounce task races the direct parse call.
+        let vm = makeVM(GigComposeFormState(describeText: text))
+        await vm.parseDescribe(text)
+        XCTAssertEqual(vm.form.detectedArchetype, .handyman, "Backend category string maps onto the compose enum.")
+        XCTAssertEqual(vm.form.category, .handyman)
+        XCTAssertEqual(vm.clarifyingQuestion, "Do you already have a wall mount bracket?")
+        XCTAssertFalse(vm.isParsingDraft, "Loading flag resets once the parse settles.")
+        let request = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(request?.url?.path, "/api/gigs/magic-draft")
+        XCTAssertEqual(request?.httpMethod, "POST")
+    }
+
+    func testMagicDraftPrefillsFormOnAdvance() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.magicDraftJSON)]
+        let text = "Need someone to mount my TV this weekend"
+        let vm = makeVM(GigComposeFormState(describeText: text))
+        await vm.parseDescribe(text)
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .basics)
+        XCTAssertEqual(vm.form.title, "Mount TV on living room wall")
+        XCTAssertEqual(vm.form.description, "Mount a 55-inch TV on drywall, cables hidden if possible.")
+        XCTAssertEqual(vm.form.budgetType, .fixed)
+        XCTAssertEqual(vm.form.budgetMin, "120", "budget_fixed wins the min field for fixed pay.")
+        XCTAssertEqual(vm.form.budgetMax, "150", "budget_range.max fills the optional ceiling.")
+        XCTAssertEqual(vm.form.scheduleType, .oneTime, "Backend \"scheduled\" cleanly maps to one-time.")
+        XCTAssertEqual(vm.form.tags, ["indoor", "tv-mount"])
+    }
+
+    func testMagicDraftPrefillSkipsUserEditedFields() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.magicDraftJSON)]
+        let text = "Need someone to mount my TV this weekend"
+        let vm = makeVM(GigComposeFormState(describeText: text))
+        await vm.parseDescribe(text)
+        // User typed a title and picked open bidding before advancing.
+        vm.setTitle("My own title for this")
+        vm.selectEngagementMode(.openBidding)
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.form.title, "My own title for this", "Prefill must not stomp user input.")
+        XCTAssertEqual(vm.form.budgetType, .offers, "User's open-bidding pick survives the draft's fixed pay type.")
+        XCTAssertEqual(vm.form.budgetMin, "", "No draft numbers bleed into a user-chosen budget type.")
+        XCTAssertEqual(
+            vm.form.description,
+            "Mount a 55-inch TV on drywall, cables hidden if possible.",
+            "Untouched fields still prefill."
+        )
+    }
+
+    func testMagicDraftFailureFallsBackToKeywordMatcher() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"down\"}")]
+        let text = "Assemble an IKEA desk this Saturday morning"
+        let vm = makeVM(GigComposeFormState(describeText: text))
+        await vm.parseDescribe(text)
+        XCTAssertEqual(vm.form.detectedArchetype, .handyman, "Keyword matcher still detects on request failure.")
+        XCTAssertNil(vm.clarifyingQuestion)
+        XCTAssertNil(vm.magicDraft, "A failed parse leaves nothing to prefill.")
+        XCTAssertFalse(vm.isParsingDraft)
+    }
+
+    func testShortDescribeSkipsBackendAndUsesKeywords() async {
+        // No stubbed responses on purpose — a network call would surface
+        // as a 599 capture.
+        let text = "clean apartment"
+        let vm = makeVM(GigComposeFormState(describeText: text))
+        await vm.parseDescribe(text)
+        XCTAssertEqual(vm.form.detectedArchetype, .cleaning)
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.isEmpty,
+            "Fewer than 3 words must not hit /api/gigs/magic-draft."
+        )
+    }
+
+    func testStaleParseResultIsIgnored() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.magicDraftJSON)]
+        let vm = makeVM(GigComposeFormState(describeText: "walk my dog every morning"))
+        await vm.parseDescribe("Need someone to mount my TV") // stale snapshot
+        XCTAssertNil(vm.form.detectedArchetype, "Stale snapshots must not apply.")
+        XCTAssertNil(vm.magicDraft)
+        XCTAssertTrue(SequencedURLProtocol.capturedRequests.isEmpty, "Stale snapshots never hit the network.")
+    }
+
+    func testBackendCategoryMapping() {
+        XCTAssertEqual(GigComposeCategory.from(backendCategory: "Handyman"), .handyman)
+        XCTAssertEqual(GigComposeCategory.from(backendCategory: "Pet Care"), .petcare)
+        XCTAssertEqual(GigComposeCategory.from(backendCategory: "Child Care"), .childcare)
+        XCTAssertEqual(GigComposeCategory.from(backendCategory: "Tech Support"), .tech)
+        XCTAssertEqual(GigComposeCategory.from(backendCategory: "Grocery Pickup"), .delivery)
+        XCTAssertEqual(GigComposeCategory.from(backendCategory: "Gardening"), .other, "Unknown buckets land on Other.")
+        XCTAssertEqual(GigComposeCategory.from(backendCategory: "Other"), .other)
+        XCTAssertNil(GigComposeCategory.from(backendCategory: nil))
+        XCTAssertNil(GigComposeCategory.from(backendCategory: " "), "Blank category defers to the keyword fallback.")
     }
 
     // MARK: - Deterministic detection

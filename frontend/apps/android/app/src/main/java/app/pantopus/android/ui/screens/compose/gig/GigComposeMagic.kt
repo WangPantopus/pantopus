@@ -158,8 +158,13 @@ internal fun MagicDescribeStep(
         text = state.form.describeText,
         onTextChange = vm::setDescribeText,
         isParsed = state.form.detectedArchetype != null,
+        isParsing = state.isParsingDraft,
         onDismissKeyboard = focusManager::clearFocus,
     )
+    // P0.1 — backend follow-up question rides under the describe field.
+    state.clarifyingQuestion?.let { question ->
+        ClarifyingQuestionHint(question)
+    }
     state.form.detectedArchetype?.let { archetype ->
         DetectedArchetypePill(
             archetype = archetype,
@@ -177,6 +182,30 @@ internal fun MagicDescribeStep(
             vm.selectEngagementMode(mode)
         },
     )
+}
+
+@Composable
+private fun ClarifyingQuestionHint(question: String) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.magic.copy(alpha = 0.08f))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag("composeGigClarifyingQuestion"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Sparkles,
+            contentDescription = null,
+            size = 13.dp,
+            strokeWidth = 2.2f,
+            tint = PantopusColors.magic,
+        )
+        Text(question, fontSize = 12.sp, color = PantopusColors.appTextSecondary, lineHeight = 17.sp)
+    }
 }
 
 @Composable
@@ -201,6 +230,7 @@ private fun MagicDescribeCard(
     text: String,
     onTextChange: (String) -> Unit,
     isParsed: Boolean,
+    isParsing: Boolean = false,
     onDismissKeyboard: () -> Unit,
 ) {
     Column(
@@ -235,7 +265,17 @@ private fun MagicDescribeCard(
             }
             Text("Magic Task", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PantopusColors.magic)
             Spacer(Modifier.weight(1f))
-            if (isParsed) {
+            if (isParsing) {
+                // P0.1 — backend magic-draft call in flight.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    modifier = Modifier.testTag("composeGigParsingBadge"),
+                ) {
+                    Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.magic))
+                    Text("PARSING…", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PantopusColors.magic)
+                }
+            } else if (isParsed) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.success))
                     Text("PARSED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PantopusColors.success)

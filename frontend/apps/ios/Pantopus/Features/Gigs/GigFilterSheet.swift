@@ -5,9 +5,11 @@
 //  P5.3 — Gig filter bottom sheet. A thin projection over the shared
 //  `FilterSheetShell`: `GigFilterCriteria` builds the `[FilterSection]`
 //  the shell renders and parses the applied sections back into a typed
-//  value the feed view-model filters its already-fetched gigs against.
-//  Filtering is client-side (the `/api/gigs` list endpoint only models
-//  category + sort) so Apply narrows the loaded rows immediately.
+//  value. Budget bounds (`minPrice`/`maxPrice`), open-to-bids
+//  (`pay_type=offers`), and a single schedule (`schedule_type`) are
+//  forwarded to `GET /api/gigs` as query params — Apply refetches. The
+//  dimensions the API can't express (multi-category, multi-schedule,
+//  posted-within) stay client-side via `matchesClientSide`.
 //
 
 import Foundation
@@ -220,6 +222,38 @@ public struct GigFilterCriteria: Sendable, Hashable {
         }
     }
 
+    // MARK: Server-side query mapping (GET /api/gigs)
+
+    /// `minPrice` query param — only when the lower handle moved.
+    public var serverMinPrice: Double? {
+        budgetLower > Self.budgetMin ? budgetLower : nil
+    }
+
+    /// `maxPrice` query param — `budgetMax` is the open-ended "$500+"
+    /// ceiling, so it imposes no upper bound.
+    public var serverMaxPrice: Double? {
+        budgetUpper < Self.budgetMax ? budgetUpper : nil
+    }
+
+    /// `pay_type=offers` — the backend models "open to bids" as a pay type.
+    public var serverPayType: String? {
+        openToBids ? "offers" : nil
+    }
+
+    /// `schedule_type` query param. The backend takes a single value, so
+    /// it's only forwarded when exactly one schedule is selected *and*
+    /// that selection has a backend equivalent — `recurring` has none
+    /// (gigs store it as `flexible`-ish seed values), so it stays
+    /// client-side, as does any multi-select.
+    public var serverScheduleType: String? {
+        guard schedules.count == 1, let only = schedules.first else { return nil }
+        switch only {
+        case .oneTime: return "scheduled"
+        case .flexible: return "flexible"
+        case .recurring: return nil
+        }
+    }
+
     // MARK: Predicates
 
     /// `true` when `category` survives the category dimension.
@@ -237,7 +271,8 @@ public struct GigFilterCriteria: Sendable, Hashable {
         return true
     }
 
-    /// Full gig predicate across every dimension.
+    /// Full gig predicate across every dimension. Used by surfaces that
+    /// filter purely client-side (e.g. the Nearby map pins).
     public func matches(_ gig: GigDTO, now: Date = Date()) -> Bool {
         guard matchesCategory(GigsCategory.from(backendKey: gig.category)) else { return false }
         guard matchesBudget(gig.price) else { return false }
@@ -246,6 +281,23 @@ public struct GigFilterCriteria: Sendable, Hashable {
                   schedules.contains(bucket) else { return false }
         }
         if openToBids, !(gig.acceptedBy ?? "").isEmpty { return false }
+        if let cutoff = postedWithin.cutoff(from: now) {
+            guard let posted = Self.parseDate(gig.createdAt), posted >= cutoff else { return false }
+        }
+        return true
+    }
+
+    /// Residual predicate for the Gigs feed — only the dimensions
+    /// `GET /api/gigs` can't express. Budget + open-to-bids (+ a single
+    /// mappable schedule) ride the request as query params, so they're
+    /// deliberately absent here. Posted-within stays client-side: the
+    /// backend has no posted-within / created-after param.
+    public func matchesClientSide(_ gig: GigDTO, now: Date = Date()) -> Bool {
+        guard matchesCategory(GigsCategory.from(backendKey: gig.category)) else { return false }
+        if !schedules.isEmpty, serverScheduleType == nil {
+            guard let bucket = GigScheduleFilter.from(backendKey: gig.scheduleType),
+                  schedules.contains(bucket) else { return false }
+        }
         if let cutoff = postedWithin.cutoff(from: now) {
             guard let posted = Self.parseDate(gig.createdAt), posted >= cutoff else { return false }
         }
