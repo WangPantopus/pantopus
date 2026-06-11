@@ -57,6 +57,10 @@ public enum YouRoute: Hashable {
     /// P2.2 — Post-a-Task wizard. Pushed from the My tasks FAB / empty
     /// CTA. Routes to the new gig's detail on success.
     case composeTask
+    /// A13.8 Phase 4 — edit an open gig with the V1 single-screen
+    /// composer (prefill + `PATCH /api/gigs/:id`). Pushed from the My
+    /// tasks per-row "Edit" action; routes to the gig's detail on save.
+    case editGig(gigId: String)
     /// T5.3.3 — My posts. The "me.posts" Activity-section row pushes here.
     case myPosts
     /// Compose a Pulse post from the You tab's My posts surface.
@@ -1219,7 +1223,7 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
                     },
                     onEditTask: { dto in
-                        Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
+                        Task { @MainActor in path.append(.editGig(gigId: dto.id)) }
                     },
                     onMessageWorker: { dto in
                         Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
@@ -1241,6 +1245,19 @@ public struct YouTabRoot: View {
                 // back to My tasks, not the success screen.
                 path.removeAll { $0 == .composeTask }
                 path.append(.gigDetail(gigId: gigId))
+            }
+        case let .editGig(gigId):
+            PostGigV1View(
+                viewModel: PostGigV1ViewModel(editGigId: gigId),
+                onClose: { Task { @MainActor in pop() } }
+            ) { savedGigId in
+                // Replace the editor with the gig's detail so Back goes
+                // back to My tasks, not the stale edit form.
+                path.removeAll { route in
+                    if case .editGig = route { return true }
+                    return false
+                }
+                path.append(.gigDetail(gigId: savedGigId))
             }
         case .connections:
             ConnectionsView(

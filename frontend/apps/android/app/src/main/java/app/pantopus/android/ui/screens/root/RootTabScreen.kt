@@ -88,6 +88,7 @@ import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
 import app.pantopus.android.ui.screens.gigs.quickpost.PostGigV1Screen
+import app.pantopus.android.ui.screens.gigs.quickpost.PostGigV1ViewModel
 import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
@@ -858,9 +859,14 @@ private object ChildRoutes {
     const val COMPOSE_GIG_CATEGORY_KEY = "category"
     const val COMPOSE_GIG = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY={$COMPOSE_GIG_CATEGORY_KEY}"
 
-    /** Quick-post V1 single-screen gig form. Hub action chip entry point. */
+    /** Quick-post V1 single-screen gig form. Hub action chip entry point.
+     *  A13.8 P4 — an optional `editGigId` arg turns the same screen into
+     *  the owner's gig editor (My Tasks → Edit). */
     const val QUICK_POST_GIG_CATEGORY_KEY = "category"
-    const val QUICK_POST_GIG = "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY={$QUICK_POST_GIG_CATEGORY_KEY}"
+    const val QUICK_POST_GIG_EDIT_ID_KEY = PostGigV1ViewModel.EDIT_GIG_ID_KEY
+    const val QUICK_POST_GIG =
+        "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY={$QUICK_POST_GIG_CATEGORY_KEY}" +
+            "&$QUICK_POST_GIG_EDIT_ID_KEY={$QUICK_POST_GIG_EDIT_ID_KEY}"
 
     /** Nearby map opened from the Gigs feed map-toggle — seeded with the
      *  active category so the same filter applies on the map. */
@@ -1044,6 +1050,10 @@ private object ChildRoutes {
 
     fun quickPostGig(category: String): String =
         "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
+    /** P4 — open the quick-post V1 screen as the owner's gig editor. */
+    fun editGig(gigId: String): String =
+        "gigs/quick-post?$QUICK_POST_GIG_EDIT_ID_KEY=${java.net.URLEncoder.encode(gigId, "UTF-8")}"
 
     /** @deprecated Legacy path — resolves to [tasksMap]. */
     fun nearbyMapForGigs(category: String): String = tasksMap(category)
@@ -2987,6 +2997,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 type = NavType.StringType
                                 defaultValue = GigsCategory.All.key
                             },
+                            // P4 — set when opened as the owner's gig editor;
+                            // PostGigV1ViewModel reads it via SavedStateHandle.
+                            navArgument(ChildRoutes.QUICK_POST_GIG_EDIT_ID_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
                         ),
                 ) { entry ->
                     val raw = entry.arguments?.getString(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
@@ -3190,7 +3207,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onBack = { navController.popBackStack() },
                         onOpenTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
                         onOpenBids = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
-                        onEditTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                        // P4 — Edit reopens the V1 quick-post screen prefilled.
+                        onEditTask = { dto -> navController.navigate(ChildRoutes.editGig(dto.id)) },
                         onMessageWorker = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
                         onLeaveReview = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
                         onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },

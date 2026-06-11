@@ -27,9 +27,9 @@ public enum PostGigV1SampleData {
             scheduledAt: makeDate(year: 2026, month: 5, day: 30, hour: 14),
             location: "Pearl District · NW 11th & Johnson",
             photos: [
-                PostGigV1Photo(id: "sofa", tone: .sofa),
-                PostGigV1Photo(id: "stairs", tone: .stairs),
-                PostGigV1Photo(id: "street", tone: .street)
+                PostGigV1Photo(id: "sofa", status: .uploaded(url: "https://cdn.pantopus.app/gigs/sofa.jpg")),
+                PostGigV1Photo(id: "stairs", status: .uploaded(url: "https://cdn.pantopus.app/gigs/stairs.jpg")),
+                PostGigV1Photo(id: "street", status: .uploaded(url: "https://cdn.pantopus.app/gigs/street.jpg"))
             ]
         )
     }

@@ -2,10 +2,12 @@
 
 package app.pantopus.android.ui.screens.gigs.quickpost
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigLocation
+import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
@@ -106,8 +109,22 @@ class PostGigV1ViewModel
     constructor(
         private val repo: GigsRepository,
         private val filesRepo: FilesRepository,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val _state = MutableStateFlow<PostGigV1UiState>(PostGigV1UiState.Content())
+        /**
+         * A13.8 P4 — edit mode. Set via the `gigs/quick-post?editGigId=…`
+         * route variant; the form prefills from `GET /api/gigs/{id}` and
+         * submit PATCHes instead of POSTing.
+         */
+        private val editGigId: String? = savedStateHandle.get<String>(EDIT_GIG_ID_KEY)
+
+        /** Drives the "Edit gig" title + "Save" CTA on the shell. */
+        val isEditMode: Boolean = editGigId != null
+
+        private val _state =
+            MutableStateFlow<PostGigV1UiState>(
+                if (editGigId == null) PostGigV1UiState.Content() else PostGigV1UiState.Loading,
+            )
         val state: StateFlow<PostGigV1UiState> = _state.asStateFlow()
 
         private val _pendingEvent = MutableStateFlow<PostGigV1Event?>(null)
@@ -121,12 +138,24 @@ class PostGigV1ViewModel
         private val pendingPhotoBytes = mutableMapOf<String, PostGigV1PickedPhoto>()
         private val uploadJobs = mutableMapOf<String, Job>()
 
+        init {
+            editGigId?.let(::loadForEdit)
+        }
+
         fun acknowledgeEvent() {
             _pendingEvent.value = null
         }
 
         fun retry() {
-            _state.value = PostGigV1UiState.Content(form = lastForm ?: PostGigV1Form())
+            val stashed = lastForm
+            // P4 — a failed edit-mode *load* has no stashed form: re-fetch
+            // instead of dropping the user into a blank create form.
+            if (stashed == null && editGigId != null) {
+                _state.value = PostGigV1UiState.Loading
+                loadForEdit(editGigId)
+                return
+            }
+            _state.value = PostGigV1UiState.Content(form = stashed ?: PostGigV1Form())
             lastForm = null
         }
 
@@ -160,7 +189,12 @@ class PostGigV1ViewModel
 
         fun updatePrice(price: String) {
             updateForm {
-                it.copy(price = price.filter { char -> char.isDigit() || char == '.' })
+                // P4 — the field is disabled for Free; guard against stray edits.
+                if (it.priceType == PostGigV1PriceType.Free) {
+                    it
+                } else {
+                    it.copy(price = price.filter { char -> char.isDigit() || char == '.' })
+                }
             }
         }
 
@@ -251,11 +285,72 @@ class PostGigV1ViewModel
         }
 
         /**
+         * P4 — edit mode. Prefill the form from `GET /api/gigs/{id}`
+         * (`GigsRepository.detail`); attachments become already-uploaded
+         * photo tiles. A load failure flips to FatalError and retry
+         * re-fetches.
+         */
+        private fun loadForEdit(gigId: String) {
+            viewModelScope.launch {
+                when (val result = repo.detail(gigId)) {
+                    is NetworkResult.Success ->
+                        _state.value = PostGigV1UiState.Content(form = formFrom(result.data.gig))
+                    is NetworkResult.Failure ->
+                        _state.value = PostGigV1UiState.FatalError(result.error.message)
+                }
+            }
+        }
+
+        /** P4 — map a loaded gig back onto the V1 form for editing. */
+        private fun formFrom(gig: GigDto): PostGigV1Form {
+            val priceType =
+                when (gig.payType) {
+                    "hourly" -> PostGigV1PriceType.Hourly
+                    "offers" -> PostGigV1PriceType.Free
+                    else -> PostGigV1PriceType.Flat
+                }
+            return PostGigV1Form(
+                category = GigsCategory.fromBackendKey(gig.category),
+                title = gig.title,
+                description = gig.description.orEmpty(),
+                price = if (priceType == PostGigV1PriceType.Free) "" else formatPrice(gig.price),
+                priceType = priceType,
+                scheduledAt = parseScheduledStart(gig.scheduledStart) ?: PostGigV1Form().scheduledAt,
+                location = gig.exactAddress ?: gig.pickupAddress ?: "",
+                photos =
+                    gig.attachments.orEmpty().mapIndexed { index, url ->
+                        PostGigV1Photo(
+                            id = "existing-$index",
+                            tone = PostGigV1PhotoTone.Neutral,
+                            status = PostGigV1PhotoStatus.Uploaded,
+                            url = url,
+                        )
+                    },
+            )
+        }
+
+        private fun formatPrice(price: Double?): String =
+            when {
+                price == null || price <= 0.0 -> ""
+                price % 1.0 == 0.0 -> price.toLong().toString()
+                else -> price.toString()
+            }
+
+        /** Backend timestamps ride ISO offsets; Supabase can also emit naive stamps. */
+        private fun parseScheduledStart(iso: String?): LocalDateTime? {
+            if (iso.isNullOrBlank()) return null
+            return runCatching {
+                OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime()
+            }.recoverCatching { LocalDateTime.parse(iso) }.getOrNull()
+        }
+
+        /**
          * Validate, then create the gig via `POST /api/gigs`
          * (`GigsRepository.create`) — the same create path the V2 composer
-         * and gigs feed use. On success the backend-issued id drives the
-         * Posted event; on failure we flip to FatalError (the form is stashed
-         * so retry restores it).
+         * and gigs feed use — or, in edit mode, `PATCH /api/gigs/{id}`
+         * (`GigsRepository.update`, same body fields). On success the
+         * backend-issued id drives the Posted event; on failure we flip to
+         * FatalError (the form is stashed so retry restores it).
          */
         fun submit(now: LocalDateTime = LocalDateTime.now()) {
             val current = _state.value as? PostGigV1UiState.Content ?: return
@@ -269,7 +364,10 @@ class PostGigV1ViewModel
             }
             _state.value = current.copy(validationErrors = emptyList(), isSubmitting = true)
             viewModelScope.launch {
-                when (val result = repo.create(buildCreateBody(current.form))) {
+                val body = buildCreateBody(current.form, forEdit = editGigId != null)
+                val result =
+                    if (editGigId == null) repo.create(body) else repo.update(editGigId, body)
+                when (result) {
                     is NetworkResult.Success -> {
                         val gigId = result.data.gig.id
                         _state.value = current.copy(isSubmitting = false, postedGigId = gigId)
@@ -284,13 +382,19 @@ class PostGigV1ViewModel
         }
 
         /**
-         * Map the V1 form onto the `POST /api/gigs` body. The legacy composer
-         * collects a free-text location only, so it rides as the `custom`
-         * location `address` with a `(0, 0)` placeholder coordinate. Pay-type
-         * maps Flat→`fixed`, Hourly→`hourly`, Free→`offers`; the backend
-         * rejects a non-positive price so Free uses a `1` sentinel.
+         * Map the V1 form onto the `POST /api/gigs` body (also reused as the
+         * `PATCH /api/gigs/{id}` body — the route strips fields the update
+         * schema doesn't take). The legacy composer collects a free-text
+         * location only, so it rides as the `custom` location `address` with
+         * a `(0, 0)` placeholder coordinate. Pay-type maps Flat→`fixed`,
+         * Hourly→`hourly`, Free→`offers` with a true `price: 0` — the
+         * backend schema accepts zero (`Joi.number().min(0)`,
+         * `backend/routes/gigs.js:428` / `:644`).
          */
-        private fun buildCreateBody(form: PostGigV1Form): CreateGigBody {
+        private fun buildCreateBody(
+            form: PostGigV1Form,
+            forEdit: Boolean = false,
+        ): CreateGigBody {
             val trimmedPrice = form.price.trim().toDoubleOrNull() ?: 0.0
             val payType: String
             val price: Double
@@ -305,7 +409,7 @@ class PostGigV1ViewModel
                 }
                 PostGigV1PriceType.Free -> {
                     payType = "offers"
-                    price = 1.0
+                    price = 0.0
                 }
             }
             return CreateGigBody(
@@ -317,8 +421,12 @@ class PostGigV1ViewModel
                 scheduleType = "scheduled",
                 scheduledStart = form.scheduledAt.atZone(ZoneId.systemDefault()).toInstant().toString(),
                 taskFormat = null,
-                // P0.2 — uploaded photo URLs ride as attachments.
-                attachments = form.photos.mapNotNull { it.url }.ifEmpty { null },
+                // P0.2 — uploaded photo URLs ride as attachments. P4 — edit
+                // sends `[]` (not omission) so removing every photo persists.
+                attachments =
+                    form.photos.mapNotNull { it.url }.let { urls ->
+                        if (forEdit) urls else urls.ifEmpty { null }
+                    },
                 location =
                     CreateGigLocation(
                         mode = "custom",
@@ -373,9 +481,12 @@ class PostGigV1ViewModel
             return errors
         }
 
-        private companion object {
+        companion object {
             /** P0.2 — `file_type` form field on `POST /api/files/upload`. */
-            const val GIG_PHOTO_FILE_TYPE = "gig_photo"
+            private const val GIG_PHOTO_FILE_TYPE = "gig_photo"
+
+            /** P4 — nav arg carrying the gig id when opened as an editor. */
+            const val EDIT_GIG_ID_KEY = "editGigId"
         }
     }
 

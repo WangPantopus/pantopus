@@ -46,9 +46,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
@@ -121,9 +123,10 @@ fun PostGigV1Screen(
     }
 
     FormShell(
-        title = "Post gig",
+        // P4 — the same screen doubles as the owner's gig editor.
+        title = if (viewModel.isEditMode) "Edit gig" else "Post gig",
         leading = FormShellLeading.Back,
-        rightActionLabel = "Post",
+        rightActionLabel = if (viewModel.isEditMode) "Save" else "Post",
         isValid = content?.canAttemptSubmit == true,
         isDirty = content?.isPostEnabled == true,
         isSaving = content?.isSubmitting == true,
@@ -228,6 +231,8 @@ fun PostGigV1Content(
         PriceField(
             value = form.price,
             unit = form.priceType.unitLabel,
+            // P4 — Free disables (and the VM clears) the price input.
+            enabled = form.priceType != PostGigV1PriceType.Free,
             error = errors.messageFor(PostGigV1Field.Price),
             onValueChange = actions.onPrice,
         )
@@ -380,9 +385,10 @@ private fun DescriptionField(
         Row(verticalAlignment = Alignment.Top) {
             if (error != null) InlineError(error)
             Spacer(modifier = Modifier.weight(1f))
+            // A13.8 P4 — 11sp monospace counter; the 40-char minimum is enforced by validation.
             Text(
                 text = "${value.length} / ${PostGigV1SampleData.DESCRIPTION_MAX_LENGTH}",
-                style = PantopusTextStyle.caption.copy(fontFamily = FontFamily.Monospace),
+                style = PantopusTextStyle.caption.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
                 color = PantopusColors.appTextMuted,
                 modifier = Modifier.testTag("postGigV1_descriptionCount"),
             )
@@ -394,19 +400,20 @@ private fun DescriptionField(
 private fun PriceField(
     value: String,
     unit: String?,
+    enabled: Boolean,
     error: String?,
     onValueChange: (String) -> Unit,
 ) {
     val border = if (error == null) PantopusColors.appBorder else PantopusColors.error
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        FieldLabel("Price", required = true)
+        FieldLabel("Price", required = enabled)
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(Radii.md))
-                    .background(PantopusColors.appSurface)
+                    .background(if (enabled) PantopusColors.appSurface else PantopusColors.appSurfaceSunken)
                     .border(
                         width = if (error == null) 1.dp else 1.5.dp,
                         color = border,
@@ -424,6 +431,7 @@ private fun PriceField(
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
+                enabled = enabled,
                 textStyle = PantopusTextStyle.body.copy(color = PantopusColors.appText, fontWeight = FontWeight.SemiBold),
                 cursorBrush = SolidColor(PantopusColors.primary600),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -432,10 +440,21 @@ private fun PriceField(
                     Modifier
                         .weight(1f)
                         .testTag("postGigV1_price")
-                        .semantics { contentDescription = if (error == null) "Price" else "Price, error: $error" },
+                        .semantics {
+                            contentDescription =
+                                when {
+                                    !enabled -> "Price, free gig"
+                                    error == null -> "Price"
+                                    else -> "Price, error: $error"
+                                }
+                        },
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
-                        Text("0", style = PantopusTextStyle.body, color = PantopusColors.appTextMuted)
+                        Text(
+                            text = if (enabled) "0" else "Free",
+                            style = PantopusTextStyle.body,
+                            color = PantopusColors.appTextMuted,
+                        )
                     }
                     inner()
                 },
@@ -595,14 +614,15 @@ private fun PhotosGrid(
                 }
             }
         }
+        // A13.8 P4 — design-exact 11sp italic captions.
         Text(
             text =
                 if (photos.isEmpty()) {
                     "Photos help your gig get picked up faster."
                 } else {
-                    "First photo is the cover. Tap remove to delete."
+                    "First photo is the cover. Tap × to remove."
                 },
-            style = PantopusTextStyle.caption,
+            style = PantopusTextStyle.caption.copy(fontSize = 11.sp, fontStyle = FontStyle.Italic),
             color = PantopusColors.appTextSecondary,
             modifier = Modifier.testTag("postGigV1_photoHint"),
         )
@@ -809,19 +829,19 @@ private fun PostGigV1ErrorBanner(
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1), modifier = Modifier.weight(1f)) {
+            // A13.8 P4 — design-exact banner copy; per-field messages render
+            // inline under the highlighted fields, not in the banner.
             Text(
-                text = "${errors.size} problems - please fix",
+                text = "${errors.size} problems — please fix",
                 style = PantopusTextStyle.small,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.error,
             )
-            errors.forEach { error ->
-                Text(
-                    text = "• ${error.message}",
-                    style = PantopusTextStyle.caption,
-                    color = PantopusColors.error,
-                )
-            }
+            Text(
+                text = "We couldn't post your gig. See the highlighted fields below.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.error,
+            )
         }
     }
 }
@@ -835,7 +855,12 @@ private fun InlineError(message: String) {
             size = 11.dp,
             tint = PantopusColors.error,
         )
-        Text(text = message, style = PantopusTextStyle.caption, color = PantopusColors.error)
+        // A13.8 P4 — design-exact 11sp inline error rows.
+        Text(
+            text = message,
+            style = PantopusTextStyle.caption.copy(fontSize = 11.sp),
+            color = PantopusColors.error,
+        )
     }
 }
 

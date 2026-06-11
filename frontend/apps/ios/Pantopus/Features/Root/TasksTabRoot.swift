@@ -12,7 +12,9 @@ import SwiftUI
 public enum TasksRoute: Hashable {
     case gigDetail(gigId: String)
     case composeGig(category: String)
-    case quickPostGig(category: String)
+    /// A13.8 V1 single-screen composer. `editGigId` flips it into the
+    /// owner-only "Edit gig" mode (prefill + `PATCH /api/gigs/:id`).
+    case quickPostGig(category: String, editGigId: String?)
     case tasksMap(categoryKey: String)
     case gigSearch
     case listingDetail(listingId: String)
@@ -105,8 +107,8 @@ public struct TasksTabRoot: View {
             gigDetailDestination(gigId: gigId)
         case let .composeGig(category):
             composeGigDestination(category: category)
-        case let .quickPostGig(category):
-            quickPostGigDestination(category: category)
+        case let .quickPostGig(category, editGigId):
+            quickPostGigDestination(category: category, editGigId: editGigId)
         case let .tasksMap(categoryKey):
             tasksMapDestination(categoryKey: categoryKey)
         case .gigSearch:
@@ -138,12 +140,13 @@ public struct TasksTabRoot: View {
         }
     }
 
-    private func quickPostGigDestination(category: String) -> some View {
+    private func quickPostGigDestination(category: String, editGigId: String?) -> some View {
         PostGigV1View(
             viewModel: PostGigV1ViewModel(
                 initialState: PostGigV1State(
                     form: PostGigV1Form(category: GigsCategory(rawValue: category) ?? .all)
-                )
+                ),
+                editGigId: editGigId
             ),
             onClose: pop
         ) { gigId in

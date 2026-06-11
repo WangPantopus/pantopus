@@ -207,4 +207,10 @@ class GigsRepository
 
         /** `POST /api/gigs` — create a new gig. */
         suspend fun create(body: CreateGigBody): NetworkResult<CreateGigResponse> = safeApiCall { api.createGig(body) }
+
+        /** `PATCH /api/gigs/:id` — owner edits an open gig (A13.8 P4 edit mode). */
+        suspend fun update(
+            id: String,
+            body: CreateGigBody,
+        ): NetworkResult<CreateGigResponse> = safeApiCall { api.updateGig(id, body) }
     }
