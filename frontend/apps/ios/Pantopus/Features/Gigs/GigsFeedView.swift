@@ -56,7 +56,7 @@ public struct GigsFeedView: View {
         .sheet(isPresented: $showFilterSheet) {
             GigFilterSheet(
                 criteria: viewModel.filters,
-                onApply: { viewModel.applyFilters($0) },
+                onApply: { criteria in Task { await viewModel.applyFilters(criteria) } },
                 onClose: { showFilterSheet = false }
             )
         }

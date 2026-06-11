@@ -3,8 +3,16 @@
 package app.pantopus.android.ui.screens.compose.gig
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.gigs.MagicDraftBudgetRange
+import app.pantopus.android.data.api.models.gigs.MagicDraftDto
+import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +20,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,10 +34,13 @@ import org.junit.Test
  * B.3 (A12.8) — Magic Task step-1 behaviour, mirroring iOS
  * `GigComposeMagicTests`: deterministic detection, compose-mode toggling,
  * mode-aware Continue gate + secondary CTA, and the module-prompt fixture.
+ * P0.1 adds the real magic-draft parse: success mapping, touched-field
+ * guard, keyword fallback on failure, and the short-input gate.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigComposeMagicTest {
     private val repo: GigsRepository = mockk(relaxed = true)
+    private val filesRepo: FilesRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor =
         mockk<NetworkMonitor>(relaxed = true).also {
             every { it.isOnline } returns MutableStateFlow(true)
@@ -44,7 +56,7 @@ class GigComposeMagicTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm() = GigComposeViewModel(repo, SavedStateHandle(), networkMonitor)
+    private fun makeVm() = GigComposeViewModel(repo, SavedStateHandle(), networkMonitor, filesRepo)
 
     @Test
     fun defaultComposeModeIsMagic() {
@@ -153,5 +165,133 @@ class GigComposeMagicTest {
         assertEquals(4, prompts.count { it.isFilled })
         assertEquals("Photos", prompts.first { !it.isFilled }.label)
         assertTrue(gigMagicModulePrompts(null).isEmpty())
+    }
+
+    // MARK: - P0.1 Real magic draft
+
+    private val describeText = "Need someone to assemble an IKEA desk this Saturday morning"
+
+    private fun fullDraftResponse(clarifyingQuestion: String? = null) =
+        MagicDraftResponse(
+            draft =
+                MagicDraftDto(
+                    title = "Assemble an IKEA desk",
+                    description = "Assemble a desk with drawers — 3 boxes, about 2 hours of work.",
+                    category = "handyman",
+                    payType = "fixed",
+                    budgetRange = MagicDraftBudgetRange(min = 80.0, max = 120.0),
+                    scheduleType = "scheduled",
+                    tags = listOf("#Furniture", "ikea"),
+                    isUrgent = true,
+                ),
+            confidence = 0.92,
+            clarifyingQuestion = clarifyingQuestion,
+            source = "llm",
+            elapsed = 412,
+        )
+
+    @Test
+    fun magicDraftSuccessPrefillsForm() =
+        runTest {
+            coEvery { repo.magicDraft(any()) } returns NetworkResult.Success(fullDraftResponse("Which floor is the desk on?"))
+            val vm = makeVm()
+            vm.setDescribeText(describeText)
+            vm.parseDescribe(describeText)
+            val state = vm.state.value
+            assertEquals(GigComposeCategory.Handyman, state.form.detectedArchetype)
+            assertEquals(GigComposeCategory.Handyman, state.form.category)
+            assertEquals("Assemble an IKEA desk", state.form.title)
+            assertEquals("Assemble a desk with drawers — 3 boxes, about 2 hours of work.", state.form.description)
+            assertEquals(GigComposeBudgetType.Fixed, state.form.budgetType)
+            assertEquals("80", state.form.budgetMin)
+            assertEquals("120", state.form.budgetMax)
+            assertEquals(GigComposeScheduleType.OneTime, state.form.scheduleType)
+            assertEquals(listOf("furniture", "ikea"), state.form.tags)
+            assertTrue(state.form.isUrgent)
+            assertEquals("Which floor is the desk on?", state.clarifyingQuestion)
+            assertFalse(state.isParsingDraft)
+            assertTrue("Magic Continue gate opens on a parsed draft.", vm.chrome.primaryCtaEnabled)
+        }
+
+    @Test
+    fun magicDraftSkipsManuallyEditedFields() =
+        runTest {
+            coEvery { repo.magicDraft(any()) } returns NetworkResult.Success(fullDraftResponse())
+            val vm = makeVm()
+            vm.setTitle("My own title")
+            vm.setBudgetMin("55")
+            vm.setDescribeText(describeText)
+            vm.parseDescribe(describeText)
+            val form = vm.state.value.form
+            assertEquals("Touched title survives the draft.", "My own title", form.title)
+            assertEquals("Touched budget survives the draft.", "55", form.budgetMin)
+            assertNull("Touched budget type is not prefilled either.", form.budgetType)
+            // Untouched fields still prefill.
+            assertEquals(GigComposeCategory.Handyman, form.category)
+            assertEquals(GigComposeScheduleType.OneTime, form.scheduleType)
+        }
+
+    @Test
+    fun magicDraftFailureFallsBackToKeywordMatcher() =
+        runTest {
+            coEvery { repo.magicDraft(any()) } returns NetworkResult.Failure(NetworkError.Transport(java.io.IOException("offline")))
+            val vm = makeVm()
+            vm.setDescribeText(describeText)
+            vm.parseDescribe(describeText)
+            val state = vm.state.value
+            assertEquals(
+                "Keyword fallback still detects the archetype offline.",
+                GigComposeCategory.Handyman,
+                state.form.detectedArchetype,
+            )
+            assertNull(state.clarifyingQuestion)
+            assertFalse(state.isParsingDraft)
+            assertTrue("Title is not keyword-prefilled.", state.form.title.isEmpty())
+        }
+
+    @Test
+    fun shortInputSkipsBackendAndUsesKeywords() =
+        runTest {
+            val vm = makeVm()
+            vm.setDescribeText("clean apartment")
+            vm.parseDescribe("clean apartment")
+            assertEquals(GigComposeCategory.Cleaning, vm.state.value.form.detectedArchetype)
+            coVerify(exactly = 0) { repo.magicDraft(any()) }
+        }
+
+    @Test
+    fun staleParseIsIgnored() =
+        runTest {
+            coEvery { repo.magicDraft(any()) } returns NetworkResult.Success(fullDraftResponse())
+            val vm = makeVm()
+            vm.setDescribeText("walk my dog tomorrow")
+            vm.parseDescribe("an older snapshot of the text")
+            assertNull(vm.state.value.form.title.ifEmpty { null })
+            coVerify(exactly = 0) { repo.magicDraft(any()) }
+        }
+
+    @Test
+    fun draftBudgetBoundsMapping() {
+        // budget_range wins when present.
+        assertEquals(
+            "80" to "120",
+            GigComposeViewModel.draftBudgetBounds(
+                MagicDraftDto(budgetRange = MagicDraftBudgetRange(80.0, 120.0), budgetFixed = 60.0),
+            ),
+        )
+        // budget_fixed / hourly_rate land in the min field.
+        assertEquals("60" to null, GigComposeViewModel.draftBudgetBounds(MagicDraftDto(budgetFixed = 60.0)))
+        assertEquals("22.5" to null, GigComposeViewModel.draftBudgetBounds(MagicDraftDto(hourlyRate = 22.5)))
+        assertEquals(null to null, GigComposeViewModel.draftBudgetBounds(MagicDraftDto()))
+    }
+
+    @Test
+    fun draftScheduleTypeMapping() {
+        assertEquals(GigComposeScheduleType.OneTime, GigComposeViewModel.scheduleTypeFromDraft("scheduled"))
+        assertEquals(GigComposeScheduleType.OneTime, GigComposeViewModel.scheduleTypeFromDraft("one_time"))
+        assertEquals(GigComposeScheduleType.Recurring, GigComposeViewModel.scheduleTypeFromDraft("recurring"))
+        assertEquals(GigComposeScheduleType.Flexible, GigComposeViewModel.scheduleTypeFromDraft("flexible"))
+        assertNull(GigComposeViewModel.scheduleTypeFromDraft("nope"))
+        assertNull(GigComposeViewModel.scheduleTypeFromDraft(null))
     }
 }

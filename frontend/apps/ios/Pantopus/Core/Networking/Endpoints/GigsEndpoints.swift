@@ -11,8 +11,11 @@ import Foundation
 /// Endpoints under `/api/gigs/*`.
 public enum GigsEndpoints {
     /// `GET /api/gigs` — paginated list with filter + sort. The backend
-    /// excludes the caller's own gigs by default. Route
-    /// `backend/routes/gigs.js`.
+    /// excludes the caller's own gigs by default. Besides category +
+    /// sort it models price bounds (`minPrice`/`maxPrice`), a single
+    /// `schedule_type`, `pay_type` (e.g. "offers"), and a `deadline`
+    /// window ("today" | "tomorrow" | "this_week"). Route
+    /// `backend/routes/gigs.js:2083`.
     public static func list(
         category: String? = nil,
         sort: String? = nil,
@@ -22,6 +25,9 @@ public enum GigsEndpoints {
         includeRemote: Bool? = nil,
         minPrice: Double? = nil,
         maxPrice: Double? = nil,
+        payType: String? = nil,
+        scheduleType: String? = nil,
+        deadline: String? = nil,
         search: String? = nil,
         limit: Int = 20,
         offset: Int = 0
@@ -38,8 +44,19 @@ public enum GigsEndpoints {
         if let includeRemote { query["includeRemote"] = includeRemote ? "true" : "false" }
         if let minPrice { query["minPrice"] = String(minPrice) }
         if let maxPrice { query["maxPrice"] = String(maxPrice) }
+        if let payType { query["pay_type"] = payType }
+        if let scheduleType { query["schedule_type"] = scheduleType }
+        if let deadline { query["deadline"] = deadline }
         if let search, !search.isEmpty { query["search"] = search }
         return Endpoint(method: .get, path: "/api/gigs", query: query)
+    }
+
+    /// `POST /api/gigs/magic-draft` — parse plain-English describe text
+    /// into a structured draft (title / category / budget / schedule +
+    /// per-field confidence and an optional clarifying question). Route
+    /// `backend/routes/magicTask.js:335`.
+    public static func magicDraft(body: MagicDraftRequestBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/magic-draft", body: body)
     }
 
     /// `GET /api/gigs/nearby` — radius search around `latitude/longitude`.

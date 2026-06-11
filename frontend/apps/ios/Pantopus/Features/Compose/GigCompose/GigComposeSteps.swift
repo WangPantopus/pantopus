@@ -47,6 +47,30 @@ public enum GigComposeCategory: String, CaseIterable, Sendable, Codable, Hashabl
         guard let raw = rawKey?.lowercased(), !raw.isEmpty, raw != "all" else { return nil }
         return GigComposeCategory.allCases.first { $0.rawValue == raw }
     }
+
+    /// Maps a Magic Task backend category ("Handyman", "Pet Care",
+    /// "Tech Support", …, see `backend/services/magicTaskService.js`
+    /// `VALID_CATEGORIES`) onto the compose enum. Unknown non-empty
+    /// values land on `.other` (the composer's catch-all bucket);
+    /// nil/empty returns nil so the keyword fallback can take over.
+    public static func from(backendCategory raw: String?) -> GigComposeCategory? {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let key = raw.lowercased()
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        switch key {
+        case "handyman": return .handyman
+        case "cleaning": return .cleaning
+        case "moving": return .moving
+        case "petcare": return .petcare
+        case "childcare": return .childcare
+        case "tutoring": return .tutoring
+        case "delivery", "errands", "grocerypickup": return .delivery
+        case "tech", "techsupport": return .tech
+        default: return .other
+        }
+    }
 }
 
 /// B.3 (A12.8) — entry mode for step 1. `.magic` is the default

@@ -16,6 +16,8 @@ import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.MagicDraftRequest
+import app.pantopus.android.data.api.models.gigs.MagicDraftResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.MyGigsResponse
@@ -45,6 +47,10 @@ class GigsRepository
             limit: Int = 20,
             offset: Int = 0,
             search: String? = null,
+            minPrice: Double? = null,
+            maxPrice: Double? = null,
+            scheduleType: String? = null,
+            payType: String? = null,
         ): NetworkResult<GigsListResponse> =
             safeApiCall {
                 api.list(
@@ -53,11 +59,18 @@ class GigsRepository
                     latitude = latitude,
                     longitude = longitude,
                     radiusMiles = radiusMiles,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    scheduleType = scheduleType,
+                    payType = payType,
                     search = search,
                     limit = limit,
                     offset = offset,
                 )
             }
+
+        /** `POST /api/gigs/magic-draft` — NLP-parse the describe text. */
+        suspend fun magicDraft(body: MagicDraftRequest): NetworkResult<MagicDraftResponse> = safeApiCall { api.magicDraft(body) }
 
         suspend fun nearby(
             latitude: Double,

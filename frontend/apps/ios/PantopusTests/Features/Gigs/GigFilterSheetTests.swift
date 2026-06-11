@@ -87,6 +87,90 @@ final class GigFilterSheetTests: XCTestCase {
         XCTAssertEqual(GigPostedWithin.week.cutoff(from: now), now.addingTimeInterval(-604_800))
     }
 
+    // MARK: - Server-side query mapping
+
+    func testServerPriceParamsDeriveFromBudgetHandles() {
+        XCTAssertNil(GigFilterCriteria().serverMinPrice, "Default lower handle sends no minPrice.")
+        XCTAssertNil(GigFilterCriteria().serverMaxPrice, "The $500+ ceiling sends no maxPrice.")
+        let active = GigFilterCriteria(budgetLower: 100, budgetUpper: 300)
+        XCTAssertEqual(active.serverMinPrice, 100)
+        XCTAssertEqual(active.serverMaxPrice, 300)
+        let openEnded = GigFilterCriteria(budgetLower: 100, budgetUpper: GigFilterCriteria.budgetMax)
+        XCTAssertNil(openEnded.serverMaxPrice, "Upper at max imposes no ceiling server-side either.")
+    }
+
+    func testServerPayTypeMapsOpenToBids() {
+        XCTAssertNil(GigFilterCriteria().serverPayType)
+        XCTAssertEqual(GigFilterCriteria(openToBids: true).serverPayType, "offers")
+    }
+
+    func testServerScheduleTypeOnlyForSingleMappableSelection() {
+        XCTAssertNil(GigFilterCriteria().serverScheduleType)
+        XCTAssertEqual(GigFilterCriteria(schedules: [.oneTime]).serverScheduleType, "scheduled")
+        XCTAssertEqual(GigFilterCriteria(schedules: [.flexible]).serverScheduleType, "flexible")
+        XCTAssertNil(
+            GigFilterCriteria(schedules: [.recurring]).serverScheduleType,
+            "recurring has no backend schedule_type value."
+        )
+        XCTAssertNil(
+            GigFilterCriteria(schedules: [.oneTime, .flexible]).serverScheduleType,
+            "The backend takes a single value — multi-select stays client-side."
+        )
+    }
+
+    func testMatchesClientSideSkipsServerHandledDimensions() {
+        // Budget + open-to-bids are server-side: a gig outside the budget
+        // band still passes the residual predicate.
+        let gig = makeGig(price: 999, scheduleType: "asap", acceptedBy: "worker-1")
+        let criteria = GigFilterCriteria(budgetLower: 50, budgetUpper: 100, openToBids: true)
+        XCTAssertTrue(criteria.matchesClientSide(gig))
+        // …while a single mappable schedule (server param) is skipped too.
+        let serverSchedule = GigFilterCriteria(schedules: [.oneTime])
+        XCTAssertTrue(serverSchedule.matchesClientSide(gig))
+        // …but a residual schedule selection still filters locally.
+        let residualSchedule = GigFilterCriteria(schedules: [.oneTime, .flexible])
+        XCTAssertFalse(residualSchedule.matchesClientSide(gig), "asap matches neither residual bucket.")
+    }
+
+    private func makeGig(price: Double?, scheduleType: String?, acceptedBy: String?) -> GigDTO {
+        GigDTO(
+            id: "g-test",
+            title: "Test gig",
+            description: nil,
+            price: price,
+            category: "handyman",
+            status: "open",
+            createdAt: "2026-06-09T08:00:00Z",
+            deadline: nil,
+            isUrgent: nil,
+            tags: nil,
+            userId: "u1",
+            acceptedBy: acceptedBy,
+            acceptedAt: nil,
+            ownerConfirmedAt: nil,
+            scheduledStart: nil,
+            paymentStatus: nil,
+            engagementMode: nil,
+            scheduleType: scheduleType,
+            payType: nil,
+            taskArchetype: nil,
+            isV2: nil,
+            pickupAddress: nil,
+            dropoffAddress: nil,
+            bidCount: nil,
+            savedByUser: nil,
+            distanceMiles: nil,
+            latitude: nil,
+            longitude: nil,
+            approxLocation: nil,
+            locationUnlocked: nil,
+            location: nil,
+            exactCity: nil,
+            exactState: nil,
+            creator: nil
+        )
+    }
+
     // MARK: - Sheet construction
 
     func testSheetConstructsAndParsesOnApply() {
@@ -128,39 +212,50 @@ final class GigFilterSheetTests: XCTestCase {
         "{\"gigs\":[\(rows.joined(separator: ","))],\"total\":\(rows.count)}"
     }
 
-    func testApplyBudgetFilterNarrowsLoadedList() async {
+    func testApplyBudgetFilterRefetchesWithPriceParams() async {
         SequencedURLProtocol.reset()
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
+            // Budget rides the request — the backend returns the
+            // already-narrowed page.
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
         ]
         let vm = GigsFeedViewModel(api: makeAPI())
         await vm.load()
-        vm.applyFilters(GigFilterCriteria(budgetLower: 0, budgetUpper: 100))
+        await vm.applyFilters(GigFilterCriteria(budgetLower: 0, budgetUpper: 100))
         guard case let .loaded(rows) = vm.state else { return XCTFail("Expected .loaded, got \(vm.state)") }
-        XCTAssertEqual(rows.map(\.id), ["g1"], "only the $60 gig survives a $0–$100 budget")
+        XCTAssertEqual(rows.map(\.id), ["g1"], "rows reflect the server's filtered page")
         XCTAssertEqual(vm.activeFilterCount, 1)
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.last?.url?.query?.contains("maxPrice=100") ?? false,
+            "budget ceiling rides the refetch as maxPrice"
+        )
     }
 
     func testApplyCategoryFilterWithNoMatchesFallsToEmpty() async {
         SequencedURLProtocol.reset()
         SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
         ]
         let vm = GigsFeedViewModel(api: makeAPI())
         await vm.load()
-        vm.applyFilters(GigFilterCriteria(categories: [.tech]))
+        // Multi-category is client-side — both fetched rows fall out.
+        await vm.applyFilters(GigFilterCriteria(categories: [.tech]))
         guard case .empty = vm.state else { return XCTFail("Expected .empty when nothing matches, got \(vm.state)") }
     }
 
     func testResettingFiltersRestoresFullList() async {
         SequencedURLProtocol.reset()
         SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
         ]
         let vm = GigsFeedViewModel(api: makeAPI())
         await vm.load()
-        vm.applyFilters(GigFilterCriteria(categories: [.tech]))
-        vm.applyFilters(GigFilterCriteria())
+        await vm.applyFilters(GigFilterCriteria(categories: [.tech]))
+        await vm.applyFilters(GigFilterCriteria())
         guard case let .loaded(rows) = vm.state else { return XCTFail("Expected .loaded, got \(vm.state)") }
         XCTAssertEqual(rows.count, 2)
         XCTAssertEqual(vm.activeFilterCount, 0)

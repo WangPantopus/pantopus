@@ -2,6 +2,11 @@
 
 package app.pantopus.android.ui.screens.compose.gig
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -16,14 +22,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -35,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
 import app.pantopus.android.ui.screens.shared.wizard.blocks.FormFieldsBlock
@@ -49,20 +63,18 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.util.UUID
 
 /** Test tag applied to the GigCompose screen container. */
 const val GIG_COMPOSE_SCREEN_TAG = "composeGigWizard"
 
-private const val SECONDS_PER_MINUTE = 60L
-private const val MINUTES_PER_HOUR = 60L
-private const val HOURS_PER_DAY = 24L
-private const val ONE_TIME_PICKER_PLACEHOLDER_SECONDS =
-    SECONDS_PER_MINUTE * MINUTES_PER_HOUR * HOURS_PER_DAY
 private const val REVIEW_DESCRIPTION_MAX_LENGTH = 140
 
 /**
@@ -79,6 +91,16 @@ fun GigComposeWizardScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // P0.2 — modern photo picker (no storage permission needed). Picked
+    // URIs are copied to bytes and uploaded immediately by the VM.
+    val onPicked: (Uri?) -> Unit = { uri ->
+        uri?.let { scope.launch { readPickedPhoto(context, it)?.let(viewModel::addPickedPhoto) } }
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), onPicked)
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent(), onPicked)
 
     LaunchedEffect(preselectedCategoryKey) {
         viewModel.preselectCategoryIfNeeded(GigComposeCategory.fromRawKey(preselectedCategoryKey))
@@ -133,9 +155,47 @@ fun GigComposeWizardScreen(
         state.errorMessage?.let { ErrorBanner(it) }
     }
 
-    // E.1 — composer picker sheets presented over the wizard.
-    GigComposePickerSheetHost(state = state, viewModel = viewModel)
+    // E.1 — composer picker sheets presented over the wizard. The
+    // attachment sheet's sources launch the real pickers (P0.2).
+    GigComposePickerSheetHost(
+        state = state,
+        viewModel = viewModel,
+        onPickPhoto = {
+            photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+        onPickFile = { filePicker.launch("*/*") },
+    )
 }
+
+/**
+ * P0.2 — copy a picked content URI to bytes + mime for the multipart
+ * upload (the same read pattern as `DeliveryProofSheet`). Returns null
+ * when the stream can't be opened.
+ */
+private fun readPickedPhoto(
+    context: Context,
+    uri: Uri,
+): GigComposePickedPhoto? {
+    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+    return GigComposePickedPhoto(
+        filename = "gig-${UUID.randomUUID().toString().take(FILENAME_SUFFIX_LENGTH)}.${extensionFor(mime)}",
+        mimeType = mime,
+        bytes = bytes,
+    )
+}
+
+private const val FILENAME_SUFFIX_LENGTH = 6
+
+/** Filename extension for the uploaded part, derived from the mime type. */
+private fun extensionFor(mime: String): String =
+    when (mime.substringAfterLast('/')) {
+        "png" -> "png"
+        "webp" -> "webp"
+        "gif" -> "gif"
+        "pdf" -> "pdf"
+        else -> "jpg"
+    }
 
 // MARK: - Step 2: Basics
 
@@ -162,12 +222,15 @@ private fun BasicsStep(
         )
     }
     PhotoSlotsRow(
-        count = state.form.photoIds.size,
+        uploadedUrls = state.form.photoIds,
+        uploads = state.photoUploads,
         max = GigComposeLimits.MAX_PHOTOS,
         // E.1 — the add tile opens the attachment-source sheet
         // (camera / library / file).
         onAdd = { vm.presentPicker(GigPickerSheet.Attachment) },
-        onRemove = vm::removePhoto,
+        onRemoveUploaded = vm::removePhoto,
+        onRemoveUpload = vm::removePhotoUpload,
+        onRetryUpload = vm::retryPhotoUpload,
     )
 }
 
@@ -231,11 +294,15 @@ private fun CharacterCounter(
 
 @Composable
 private fun PhotoSlotsRow(
-    count: Int,
+    uploadedUrls: List<String>,
+    uploads: List<GigComposePhotoUpload>,
     max: Int,
     onAdd: () -> Unit,
-    onRemove: (Int) -> Unit,
+    onRemoveUploaded: (Int) -> Unit,
+    onRemoveUpload: (String) -> Unit,
+    onRetryUpload: (String) -> Unit,
 ) {
+    val total = uploadedUrls.size + uploads.size
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(
             text = "Photos & files (optional, up to $max)",
@@ -243,34 +310,18 @@ private fun PhotoSlotsRow(
             color = PantopusColors.appTextSecondary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            repeat(count) { index ->
-                Box(
-                    modifier =
-                        Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(Radii.md))
-                            .background(PantopusColors.primary50)
-                            .clickable(role = Role.Button) { onRemove(index) }
-                            .testTag("composeGig_photo_$index")
-                            .semantics { contentDescription = "Remove photo ${index + 1}" },
-                ) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.Camera,
-                        contentDescription = null,
-                        size = 22.dp,
-                        tint = PantopusColors.primary600,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
-                    PantopusIconImage(
-                        icon = PantopusIcon.X,
-                        contentDescription = null,
-                        size = 14.dp,
-                        tint = PantopusColors.appText,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.s1),
-                    )
-                }
+            uploadedUrls.forEachIndexed { index, url ->
+                UploadedPhotoTile(url = url, index = index, onRemove = { onRemoveUploaded(index) })
             }
-            if (count < max) {
+            // P0.2 — in-flight / failed tiles render after the uploaded ones.
+            uploads.forEach { upload ->
+                UploadingPhotoTile(
+                    upload = upload,
+                    onRetry = { onRetryUpload(upload.id) },
+                    onRemove = { onRemoveUpload(upload.id) },
+                )
+            }
+            if (total < max) {
                 Box(
                     modifier =
                         Modifier
@@ -290,6 +341,101 @@ private fun PhotoSlotsRow(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun UploadedPhotoTile(
+    url: String,
+    index: Int,
+    onRemove: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.primary50)
+                .clickable(role = Role.Button, onClick = onRemove)
+                .testTag("composeGig_photo_$index")
+                .semantics { contentDescription = "Remove photo ${index + 1}" },
+    ) {
+        AsyncImage(
+            model = url,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.X,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.appTextInverse,
+            modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.s1),
+        )
+    }
+}
+
+/** P0.2 — uploading (spinner) or failed (tap-to-retry) tile. */
+@Composable
+private fun UploadingPhotoTile(
+    upload: GigComposePhotoUpload,
+    onRetry: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(if (upload.failed) PantopusColors.errorBg else PantopusColors.primary50)
+                .border(
+                    width = 1.dp,
+                    color = if (upload.failed) PantopusColors.error else PantopusColors.appBorder,
+                    shape = RoundedCornerShape(Radii.md),
+                )
+                .clickable(role = Role.Button, enabled = upload.failed, onClick = onRetry)
+                .testTag(
+                    if (upload.failed) "composeGig_retryUpload_${upload.id}" else "composeGig_uploading_${upload.id}",
+                )
+                .semantics {
+                    contentDescription = if (upload.failed) "Upload failed, tap to retry" else "Uploading photo"
+                },
+    ) {
+        if (upload.failed) {
+            PantopusIconImage(
+                icon = PantopusIcon.AlertCircle,
+                contentDescription = null,
+                size = 22.dp,
+                tint = PantopusColors.error,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        } else {
+            CircularProgressIndicator(
+                color = PantopusColors.primary600,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(22.dp).align(Alignment.Center),
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp)
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .clickable(role = Role.Button, onClick = onRemove)
+                    .testTag("composeGig_removeUpload_${upload.id}")
+                    .semantics { contentDescription = "Remove photo" },
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.X,
+                contentDescription = null,
+                size = 12.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
         }
     }
 }
@@ -372,11 +518,15 @@ private fun OneTimeDateRow(
     state: GigComposeUiState,
     vm: GigComposeViewModel,
 ) {
+    // P0.3 — real Material3 date (today onward) + time picker pair. The
+    // VM keeps the existing "must be in the future" validation on the
+    // composed instant.
+    var showPickers by remember { mutableStateOf(false) }
+    val current =
+        state.form.scheduledStartISO?.let { iso ->
+            runCatching { Instant.parse(iso) }.getOrNull()
+        }
     FormFieldsBlock {
-        val current =
-            state.form.scheduledStartISO?.let { iso ->
-                runCatching { Instant.parse(iso) }.getOrNull()
-            }
         val formatted =
             current?.let { instant ->
                 LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
@@ -388,15 +538,7 @@ private fun OneTimeDateRow(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(Radii.md))
                     .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(Radii.md))
-                    .clickable(role = Role.Button) {
-                        // Native pickers aren't wired in this prompt — the
-                        // tap shortcuts a 24h-out placeholder so the
-                        // form's "must be future" check passes and the
-                        // wizard can advance. Real date / time pickers
-                        // land with the calendar P18 follow-up.
-                        val nextDay = Instant.now().plusSeconds(ONE_TIME_PICKER_PLACEHOLDER_SECONDS)
-                        vm.setScheduledStart(nextDay.toString())
-                    }
+                    .clickable(role = Role.Button) { showPickers = true }
                     .padding(Spacing.s3)
                     .testTag("composeGig_scheduledStart"),
             verticalAlignment = Alignment.CenterVertically,
@@ -421,6 +563,16 @@ private fun OneTimeDateRow(
                 tint = PantopusColors.appTextSecondary,
             )
         }
+    }
+    if (showPickers) {
+        FutureDateTimePickerDialogs(
+            initial = current?.let { LocalDateTime.ofInstant(it, ZoneId.systemDefault()) },
+            onPicked = { picked ->
+                showPickers = false
+                vm.setScheduledStart(picked.atZone(ZoneId.systemDefault()).toInstant().toString())
+            },
+            onDismiss = { showPickers = false },
+        )
     }
 }
 

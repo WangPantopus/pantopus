@@ -28,9 +28,11 @@ public final class GigsFeedViewModel {
     /// remote toggle, urgency, etc.). Drives the "N filters" pill.
     public private(set) var activeFilterCount: Int = 0
 
-    /// Applied structured filters. Narrows `loadedItems` client-side —
-    /// the list endpoint only models category + sort, so budget /
-    /// schedule / open-to-bids / posted-within are filtered locally.
+    /// Applied structured filters. Budget bounds, open-to-bids, and a
+    /// single schedule selection ride the `GET /api/gigs` request as
+    /// query params; the dimensions the API can't express (multi-
+    /// category, multi-schedule, posted-within) narrow `loadedItems`
+    /// client-side.
     public private(set) var filters = GigFilterCriteria()
 
     /// Radius used by the current query (in miles). Surfaced on the
@@ -79,12 +81,15 @@ public final class GigsFeedViewModel {
         await fetch()
     }
 
-    /// Apply structured filters from the filter sheet. Re-derives the
-    /// visible rows from the already-loaded gigs without a refetch.
-    public func applyFilters(_ criteria: GigFilterCriteria) {
+    /// Apply structured filters from the filter sheet. Server-side
+    /// dimensions (budget → `minPrice`/`maxPrice`, open-to-bids →
+    /// `pay_type=offers`, single schedule → `schedule_type`) require a
+    /// refetch; the residual client-side dimensions are applied in
+    /// `rebuildState()` on the fresh page.
+    public func applyFilters(_ criteria: GigFilterCriteria) async {
         filters = criteria
         activeFilterCount = criteria.activeCount
-        rebuildState()
+        await fetch()
     }
 
     // MARK: - Fetch
@@ -102,6 +107,10 @@ public final class GigsFeedViewModel {
                     latitude: latitude,
                     longitude: longitude,
                     radiusMiles: radiusMiles,
+                    minPrice: filters.serverMinPrice,
+                    maxPrice: filters.serverMaxPrice,
+                    payType: filters.serverPayType,
+                    scheduleType: filters.serverScheduleType,
                     limit: 20
                 )
             )
@@ -113,12 +122,15 @@ public final class GigsFeedViewModel {
         }
     }
 
-    /// Project `loadedItems` through the active filters into the render
-    /// state. An empty result (no gigs, or none survive the filters)
-    /// falls to the designed empty state.
+    /// Project `loadedItems` through the residual client-side filters
+    /// into the render state. Budget / open-to-bids / single-schedule
+    /// were already applied server-side by `fetch()`; only the
+    /// dimensions the API can't express run here — posted-within stays
+    /// client-side because the backend has no posted-within param.
+    /// An empty result falls to the designed empty state.
     private func rebuildState() {
         let now = Date()
-        let visible = loadedItems.filter { filters.matches($0, now: now) }
+        let visible = loadedItems.filter { filters.matchesClientSide($0, now: now) }
         if visible.isEmpty {
             state = .empty(GigsFeedEmpty(radiusMiles: radiusMiles))
         } else {
