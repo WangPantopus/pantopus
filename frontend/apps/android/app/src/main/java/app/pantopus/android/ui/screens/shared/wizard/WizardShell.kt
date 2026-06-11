@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -82,6 +83,7 @@ fun WizardShell(
 ) {
     var showDiscard by remember { mutableStateOf(false) }
     val chrome = model.chrome
+    val focusManager = LocalFocusManager.current
 
     Scaffold(
         modifier = modifier.fillMaxSize().testTag(WizardShellTags.SHELL),
@@ -93,6 +95,7 @@ fun WizardShell(
                     leading = chrome.leading,
                     progressLabel = chrome.progressLabel,
                     onLeading = {
+                        focusManager.clearFocus()
                         if (chrome.leading == WizardLeadingControl.Close && chrome.dirty) {
                             showDiscard = true
                         } else {
@@ -127,8 +130,14 @@ fun WizardShell(
                 chrome = chrome,
                 tint = identity.accent,
                 shadow = identity.ctaShadow,
-                onPrimary = model::onPrimary,
-                onSecondary = model::onSecondary,
+                onPrimary = {
+                    focusManager.clearFocus()
+                    model.onPrimary()
+                },
+                onSecondary = {
+                    focusManager.clearFocus()
+                    model.onSecondary()
+                },
             )
         },
     ) { padding: PaddingValues ->
@@ -144,6 +153,11 @@ fun WizardShell(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { focusManager.clearFocus() },
+                        )
                         .padding(horizontal = Spacing.s4, vertical = Spacing.s4),
                 verticalArrangement = Arrangement.spacedBy(Spacing.s5),
             ) {

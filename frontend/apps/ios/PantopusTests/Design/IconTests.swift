@@ -20,7 +20,7 @@ final class IconTests: XCTestCase {
         "mailbox", "search", "user-plus", "file", "copy", "check",
         "more-horizontal", "arrow-left", "arrow-right", "send", "chevron-down", "chevron-up",
         "trash-2", "edit-2", "upload", "shield", "lock", "check-circle",
-        "alert-circle", "circle", "info", "wifi-off", "heart", "thumbs-up", "star",
+        "alert-circle", "circle", "info", "wifi-off", "heart", "thumbs-up", "star", "star-fill",
         "help-circle", "calendar", "calendar-check", "lightbulb", "eye", "share", "radio", "rss", "map-pin",
         "pencil", "briefcase", "gavel", "sliders-horizontal", "message-circle",
         "at-sign", "badge-check", "tag", "shield-alert", "check-check", "history",

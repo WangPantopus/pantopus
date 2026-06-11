@@ -13,7 +13,28 @@ import com.squareup.moshi.JsonClass
 data class ChatTopic(
     val id: String? = null,
     @Json(name = "topic_type") val topicType: String? = null,
+    @Json(name = "topic_ref_id") val topicRefId: String? = null,
     val title: String? = null,
+    val status: String? = null,
+    @Json(name = "last_activity_at") val lastActivityAt: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ConversationTopicsResponse(
+    val topics: List<ChatTopic>,
+)
+
+@JsonClass(generateAdapter = true)
+data class FindOrCreateTopicBody(
+    val topicType: String,
+    val topicRefId: String? = null,
+    val title: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class FindOrCreateTopicResponse(
+    val topic: ChatTopic,
+    val created: Boolean,
 )
 
 /**
@@ -101,9 +122,14 @@ data class ChatMessageDto(
     @Json(name = "room_id") val roomId: String,
     @Json(name = "user_id") val userId: String? = null,
     @Json(name = "message_text") val messageText: String? = null,
-    @Json(name = "message_type") val messageType: String = "text",
+    /** Canonical DB column — preferred when `message_text` is absent. */
+    val message: String? = null,
+    @Json(name = "message_type") val messageType: String? = null,
+    /** Canonical DB column — preferred when `message_type` is absent. */
+    val type: String? = null,
     val metadata: Map<String, Any>? = null,
     @Json(name = "reply_to_id") val replyToId: String? = null,
+    @Json(name = "topic_id") val topicId: String? = null,
     @Json(name = "client_message_id") val clientMessageId: String? = null,
     @Json(name = "created_at") val createdAt: String,
     @Json(name = "edited_at") val editedAt: String? = null,
@@ -111,6 +137,54 @@ data class ChatMessageDto(
     @Json(name = "delivered_at") val deliveredAt: String? = null,
     @Json(name = "read_at") val readAt: String? = null,
     val sender: ChatMessageSender? = null,
+    val reactions: List<ChatReactionSummary> = emptyList(),
+    val attachments: List<ChatAttachmentDto> = emptyList(),
+)
+
+/** Body text — API may return canonical `message` or alias `message_text`. */
+val ChatMessageDto.resolvedText: String
+    get() = messageText ?: message.orEmpty()
+
+/** Message kind — API may return canonical `type` or alias `message_type`. */
+val ChatMessageDto.resolvedType: String
+    get() = messageType ?: type ?: "text"
+
+@JsonClass(generateAdapter = true)
+data class ChatAttachmentDto(
+    val id: String,
+    @Json(name = "file_url") val fileUrl: String? = null,
+    @Json(name = "original_filename") val originalFilename: String? = null,
+    @Json(name = "mime_type") val mimeType: String? = null,
+    @Json(name = "file_size") val fileSize: Int? = null,
+    @Json(name = "file_type") val fileType: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ChatMediaUploadResponse(
+    val message: String,
+    val media: List<ChatAttachmentDto>,
+)
+
+@JsonClass(generateAdapter = true)
+data class AIMediaUploadResponse(
+    val message: String,
+    val images: List<AIUploadedImage>,
+)
+
+@JsonClass(generateAdapter = true)
+data class AIUploadedImage(
+    val url: String,
+    val key: String? = null,
+    val name: String? = null,
+    @Json(name = "mime_type") val mimeType: String? = null,
+    val size: Int? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ChatReactionSummary(
+    val reaction: String,
+    val count: Int,
+    @Json(name = "reacted_by_me") val reactedByMe: Boolean = false,
 )
 
 /** `GET /messages` envelope. */
@@ -118,6 +192,7 @@ data class ChatMessageDto(
 data class ChatMessagesResponse(
     val messages: List<ChatMessageDto>,
     val hasMore: Boolean? = null,
+    @Json(name = "nextCursor") val nextCursor: String? = null,
     val roomIds: List<String>? = null,
 )
 
@@ -127,8 +202,11 @@ data class SendChatMessageBody(
     val roomId: String,
     val messageText: String? = null,
     val messageType: String = "text",
+    val fileIds: List<String>? = null,
     val clientMessageId: String? = null,
     val replyToId: String? = null,
+    val topicId: String? = null,
+    val metadata: Map<String, Any>? = null,
 )
 
 /** `POST /messages` envelope. */
@@ -149,4 +227,25 @@ data class ReactToChatMessageResponse(
     val messageId: String? = null,
     val reaction: String? = null,
     val counts: Map<String, Int>? = null,
+    val reactions: List<ChatReactionSummary>? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class EditChatMessageBody(
+    val messageText: String,
+)
+
+/** `POST /direct` body — route `chats.js:871`, validator `chats.js:135`. */
+@JsonClass(generateAdapter = true)
+data class CreateDirectChatBody(
+    val otherUserId: String,
+)
+
+/**
+ * `POST /direct` envelope. The backend also returns an `otherUser`
+ * summary; the conversation flow only needs the room id.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateDirectChatResponse(
+    val roomId: String,
 )

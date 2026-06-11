@@ -9,7 +9,7 @@
 import SwiftUI
 
 /// A tappable capability chip ("Price a task", "Summarize mail", …) shown
-/// in the AI welcome card. Renders an icon in the `magic` accent plus a
+/// in the AI welcome card. Renders an icon in the primary accent plus a
 /// label; the whole chip is one ≥44pt tap target.
 public struct AICapabilityChip: View {
     private let chip: ChatPromptChip
@@ -23,7 +23,8 @@ public struct AICapabilityChip: View {
     public var body: some View {
         Button(action: onTap) {
             HStack(spacing: 6) {
-                Icon(chip.icon, size: 13, strokeWidth: 2, color: Theme.Color.magic)
+                // A15.3 `.aw-cap` — capability icon in the primary accent.
+                Icon(chip.icon, size: 13, strokeWidth: 2, color: Theme.Color.primary600)
                 Text(chip.label)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextStrong)

@@ -115,6 +115,7 @@ public struct PulseComposeContentActions {
 public struct PulseComposeContent: View {
     private let state: PulseComposeContentState
     private let actions: PulseComposeContentActions
+    @FocusState private var isBodyFieldFocused: Bool
 
     public init(state: PulseComposeContentState, actions: PulseComposeContentActions) {
         self.state = state
@@ -122,16 +123,28 @@ public struct PulseComposeContent: View {
     }
 
     public var body: some View {
-        if state.isFlowMode {
-            flowContextHeader
-        } else {
-            intentPicker
-            identitySection
+        // Single container — `.toolbar(placement: .keyboard)` on a `Group`
+        // registers once per child and stacks duplicate Done buttons.
+        VStack(alignment: .leading, spacing: Spacing.s5) {
+            if state.isFlowMode {
+                flowContextHeader
+            } else {
+                intentPicker
+                identitySection
+            }
+            intentSpecificSection
+            photosSection
+            if !state.isFlowMode || state.visibility != .connections {
+                visibilitySection
+            }
         }
-        intentSpecificSection
-        photosSection
-        if !state.isFlowMode || state.visibility != .connections {
-            visibilitySection
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { isBodyFieldFocused = false }
+                    .font(.system(size: 16, weight: .semibold))
+                    .accessibilityIdentifier("composePulseBodyKeyboardDone")
+            }
         }
     }
 
@@ -334,9 +347,12 @@ public struct PulseComposeContent: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
             HStack(spacing: Spacing.s2) {
                 ForEach(1...5, id: \.self) { value in
-                    Button { actions.onSelectRecommendRating(value) } label: {
+                    Button {
+                        isBodyFieldFocused = false
+                        actions.onSelectRecommendRating(value)
+                    } label: {
                         Icon(
-                            value <= state.recommendRating ? .star : .star,
+                            value <= state.recommendRating ? .starFill : .star,
                             size: 28,
                             strokeWidth: 2,
                             color: value <= state.recommendRating ? Theme.Color.warning : Theme.Color.appTextMuted
@@ -674,6 +690,7 @@ public struct PulseComposeContent: View {
                     get: { snapshot.value },
                     set: { actions.onUpdateField(.body, $0) }
                 ))
+                .focused($isBodyFieldFocused)
                 .frame(minHeight: minHeight)
                 .padding(Spacing.s2)
                 .background(Theme.Color.appSurface)

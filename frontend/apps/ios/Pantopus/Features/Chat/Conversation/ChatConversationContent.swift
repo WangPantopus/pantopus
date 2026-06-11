@@ -92,6 +92,22 @@ public enum ChatCounterparty: Sendable, Hashable {
     }
 }
 
+/// A15 `.ctx-strip` — pinned gig context rendered under the header of
+/// a gig-room thread. Built by the VM from `GET /api/gigs/:id`.
+public struct ChatGigContextStrip: Sendable, Hashable {
+    public let gigId: String
+    /// "<gig title> · $<price>" (price omitted when the gig has none).
+    public let title: String
+    /// Secondary meta line, e.g. "Yard · Open".
+    public let meta: String?
+
+    public init(gigId: String, title: String, meta: String?) {
+        self.gigId = gigId
+        self.title = title
+        self.meta = meta
+    }
+}
+
 /// Sender side of a single message — speaker on the left ("in") or the
 /// signed-in user on the right ("out").
 public enum ChatMessageSide: String, Sendable, Hashable {
@@ -145,11 +161,21 @@ public struct ChatQueuedAttachment: Identifiable, Sendable, Hashable {
     public let id: String
     public let kind: ChatQueuedAttachmentKind
     public let filename: String
+    public let mimeType: String
+    public let data: Data?
 
-    public init(id: String, kind: ChatQueuedAttachmentKind, filename: String) {
+    public init(
+        id: String,
+        kind: ChatQueuedAttachmentKind,
+        filename: String,
+        mimeType: String = "application/octet-stream",
+        data: Data? = nil
+    ) {
         self.id = id
         self.kind = kind
         self.filename = filename
+        self.mimeType = mimeType
+        self.data = data
     }
 }
 
@@ -170,17 +196,164 @@ public struct ChatEstimate: Sendable, Hashable {
     }
 }
 
+public struct ChatAIDraftCard: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let type: String
+    public let title: String
+    public let summary: String?
+    public let priceLabel: String?
+    public let valid: Bool
+}
+
+public struct ChatReplyPreview: Sendable, Hashable {
+    public let messageId: String
+    public let senderName: String
+    public let text: String
+}
+
+public struct ChatBubbleReaction: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let reaction: String
+    public let count: Int
+    public let reactedByMe: Bool
+}
+
+public struct ChatConversationTopic: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let topicType: String
+    public let title: String
+    /// Backend topic status (`active`, …). Rendered in the
+    /// conversation-details drawer when present.
+    public let status: String?
+
+    public init(id: String, topicType: String, title: String, status: String? = nil) {
+        self.id = id
+        self.topicType = topicType
+        self.title = title
+        self.status = status
+    }
+}
+
+public struct ChatLocationCard: Sendable, Hashable {
+    public let latitude: Double
+    public let longitude: Double
+    public let address: String
+
+    public init(latitude: Double, longitude: Double, address: String) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.address = address
+    }
+}
+
+public struct ChatGigOfferCard: Sendable, Hashable {
+    public let gigId: String
+    public let title: String
+    public let category: String?
+    public let priceLabel: String?
+    public let status: String?
+
+    public init(
+        gigId: String,
+        title: String,
+        category: String? = nil,
+        priceLabel: String? = nil,
+        status: String? = nil
+    ) {
+        self.gigId = gigId
+        self.title = title
+        self.category = category
+        self.priceLabel = priceLabel
+        self.status = status
+    }
+}
+
+public struct ChatListingOfferCard: Sendable, Hashable {
+    public let listingId: String
+    public let title: String
+    public let category: String?
+    public let priceLabel: String
+    public let condition: String?
+    public let imageURL: URL?
+
+    public init(
+        listingId: String,
+        title: String,
+        category: String? = nil,
+        priceLabel: String,
+        condition: String? = nil,
+        imageURL: URL? = nil
+    ) {
+        self.listingId = listingId
+        self.title = title
+        self.category = category
+        self.priceLabel = priceLabel
+        self.condition = condition
+        self.imageURL = imageURL
+    }
+}
+
+/// Share-sheet row for attaching a gig to chat.
+public struct ChatShareGigOption: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let title: String
+    public let category: String?
+    public let price: Double?
+    public let status: String?
+
+    public init(id: String, title: String, category: String?, price: Double?, status: String?) {
+        self.id = id
+        self.title = title
+        self.category = category
+        self.price = price
+        self.status = status
+    }
+}
+
+/// Share-sheet row for attaching a listing to chat.
+public struct ChatShareListingOption: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let title: String
+    public let category: String?
+    public let price: Double?
+    public let isFree: Bool
+    public let condition: String?
+    public let imageURL: String?
+
+    public init(
+        id: String,
+        title: String,
+        category: String?,
+        price: Double?,
+        isFree: Bool,
+        condition: String?,
+        imageURL: String?
+    ) {
+        self.id = id
+        self.title = title
+        self.category = category
+        self.price = price
+        self.isFree = isFree
+        self.condition = condition
+        self.imageURL = imageURL
+    }
+}
+
 /// Per-bubble render model.
 public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
     public enum Body: Sendable, Hashable {
         case text(String)
+        case textWithImages(text: String, imageURLs: [URL])
         case image(url: URL?)
         case attachment(filename: String, sizeLabel: String?)
+        case locationCard(ChatLocationCard)
+        case gigOfferCard(ChatGigOfferCard)
+        case listingOfferCard(ChatListingOfferCard)
         case systemLink(label: String, sub: String, accent: SystemLinkAccent)
         /// Structured AI reply: prose plus an optional inline estimate
         /// card. Renders wider than a plain bubble with a "Pantopus AI"
         /// tag (`.aiAssistant` mode only).
-        case aiReply(text: String, estimate: ChatEstimate?)
+        case aiReply(text: String, estimate: ChatEstimate?, drafts: [ChatAIDraftCard] = [])
     }
 
     public enum SystemLinkAccent: String, Sendable, Hashable {
@@ -190,6 +363,8 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
     public let id: String
     public let side: ChatMessageSide
     public let body: Body
+    public let replyPreview: ChatReplyPreview?
+    public let reactions: [ChatBubbleReaction]
     /// Whether this bubble carries the 4pt tail (last in a same-sender
     /// run). The VM groups consecutive same-sender bubbles and sets
     /// `tail = true` only on the last.
@@ -211,6 +386,8 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
         id: String,
         side: ChatMessageSide,
         body: Body,
+        replyPreview: ChatReplyPreview? = nil,
+        reactions: [ChatBubbleReaction] = [],
         hasTail: Bool,
         isContinuation: Bool = false,
         stamp: String?,
@@ -221,6 +398,8 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
         self.id = id
         self.side = side
         self.body = body
+        self.replyPreview = replyPreview
+        self.reactions = reactions
         self.hasTail = hasTail
         self.isContinuation = isContinuation
         self.stamp = stamp
@@ -234,6 +413,21 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
 public struct ChatDayDivider: Identifiable, Sendable, Hashable {
     public let id: String
     public let label: String
+}
+
+/// Topic-divider element inserted in the "All" person-thread view
+/// between consecutive messages filed under different topics. `id` is
+/// the message id that starts the new topic segment (stable across
+/// rebuilds); `label` is the topic title, or "General" for untopiced
+/// runs.
+public struct ChatTopicDivider: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
+    }
 }
 
 /// Inline creator-side reference to a broadcast that prompted the DM.
@@ -254,12 +448,14 @@ public struct ChatBroadcastReference: Identifiable, Sendable, Hashable {
 /// Heterogeneous timeline row.
 public enum ChatTimelineRow: Identifiable, Sendable, Hashable {
     case dayDivider(ChatDayDivider)
+    case topicDivider(ChatTopicDivider)
     case broadcastReference(ChatBroadcastReference)
     case bubble(ChatBubbleContent)
 
     public var id: String {
         switch self {
         case let .dayDivider(divider): "divider_\(divider.id)"
+        case let .topicDivider(divider): "topic_\(divider.id)"
         case let .broadcastReference(reference): "broadcast_\(reference.id)"
         case let .bubble(bubble): "bubble_\(bubble.id)"
         }

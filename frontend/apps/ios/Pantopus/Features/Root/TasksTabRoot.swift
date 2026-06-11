@@ -232,7 +232,8 @@ public struct TasksTabRoot: View {
                         displayName: name,
                         initials: Self.initials(from: name),
                         identityKind: nil,
-                        verified: false
+                        verified: false,
+                        initialTopic: ChatInitialTopic(topicType: "listing", topicRefId: listing.id, title: name)
                     )))
                 }
             },
@@ -254,9 +255,13 @@ public struct TasksTabRoot: View {
             viewModel: ChatConversationViewModel(
                 mode: Self.chatMode(for: dest.mode),
                 counterparty: Self.chatCounterparty(for: dest),
-                currentUserId: currentUserId
+                currentUserId: currentUserId,
+                initialTopic: dest.initialTopic
             ),
-            mode: dest.kind
+            mode: dest.kind,
+            onUseAIDraft: { draft in
+                path.append(Self.route(for: draft))
+            }
         ) {
             pop()
         }
@@ -310,6 +315,15 @@ public struct TasksTabRoot: View {
                 verified: dest.verified,
                 online: false
             )
+        }
+    }
+
+    private static func route(for draft: ChatAIDraftCard) -> TasksRoute {
+        switch draft.type {
+        case "gig": .composeGig(category: GigsCategory.all.rawValue)
+        case "listing": .placeholder(label: "Open Marketplace to create listing")
+        case "post": .placeholder(label: "Open Pulse composer from Messages tab")
+        default: .placeholder(label: "Draft")
         }
     }
 }

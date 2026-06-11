@@ -9,7 +9,12 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.stripe.android.PaymentConfiguration
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
 import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -69,9 +74,14 @@ class PantopusApplication :
      * loader keeps avatar / discovery / mailbox imagery from re-decoding
      * during fast scrolls.
      */
-    override fun newImageLoader(): ImageLoader =
-        ImageLoader
+    override fun newImageLoader(): ImageLoader {
+        val okHttp =
+            EntryPointAccessors
+                .fromApplication(this, CoilNetworkEntryPoint::class.java)
+                .okHttpClient()
+        return ImageLoader
             .Builder(this)
+            .okHttpClient(okHttp)
             .memoryCache {
                 MemoryCache
                     .Builder(this)
@@ -85,6 +95,13 @@ class PantopusApplication :
                     .build()
             }.crossfade(true)
             .build()
+    }
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface CoilNetworkEntryPoint {
+        fun okHttpClient(): OkHttpClient
+    }
 
     private companion object {
         const val IMAGE_CACHE_MEMORY_PERCENT = 0.15

@@ -10,7 +10,7 @@
 import Foundation
 
 enum ChatConversationSampleData {
-    static let aiName = "Ask Pantopus"
+    static let aiName = "Pantopus AI"
     static let fanPersonaName = "Wynn B."
     static let creatorFanName = "Priya R."
     static let creatorContext = ChatCreatorThreadContext.defaults(fanTierName: "Bronze", fanTierRank: 2)

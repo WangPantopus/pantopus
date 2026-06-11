@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.chats.ChatMessageDto
 import app.pantopus.android.data.api.models.chats.UnifiedConversationDto
+import app.pantopus.android.data.api.models.chats.resolvedText
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.chats.ChatRepository
 import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
@@ -85,10 +86,10 @@ class ChatSearchViewModel
                 // most recent one — the message we scroll to.
                 val bodyMatch =
                     entry.messages.firstOrNull { message ->
-                        val text = message.messageText
+                        val text = message.resolvedText
                         !text.isNullOrEmpty() && ChatSearchText.matches(text, query)
                     }
-                val bodyText = bodyMatch?.messageText
+                val bodyText = bodyMatch?.resolvedText
 
                 val snippet: String
                 val matchedMessageId: String?

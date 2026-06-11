@@ -3,6 +3,7 @@
 package app.pantopus.android.push
 
 import android.content.Context
+import app.pantopus.android.data.chats.ActiveChatThread
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -18,7 +19,11 @@ import org.junit.Test
  * permission test — that runs against a real Notification manager.
  */
 class NotificationDispatcherTest {
-    private val dispatcher = NotificationDispatcher(appContext = mockk<Context>(relaxed = true))
+    private val dispatcher =
+        NotificationDispatcher(
+            appContext = mockk<Context>(relaxed = true),
+            activeChatThread = ActiveChatThread(),
+        )
 
     // MARK: - channelFor
 
@@ -135,5 +140,35 @@ class NotificationDispatcherTest {
         assertEquals(NotificationDispatcher.Channel.SYSTEM, routing.channel)
         assertEquals("Heads up", routing.title)
         assertEquals("Something happened", routing.body)
+    }
+
+    @Test
+    fun chat_route_appends_sender_name_to_deep_link() {
+        // Backend chat push: `{ type: chat_message, room_id, link: /chat/<id> }`
+        // with the sender name as the title (`backend/routes/chats.js:1834`).
+        // The name is forwarded as a query param so the conversation header
+        // has a display name when opened from the notification.
+        val routing =
+            dispatcher.route(
+                data =
+                    mapOf(
+                        "type" to "chat_message",
+                        "title" to "Maria K.",
+                        "body" to "See you at 9",
+                        "room_id" to "r1",
+                        "link" to "/chat/r1",
+                    ),
+            )
+        assertEquals(NotificationDispatcher.Channel.CHAT, routing.channel)
+        assertEquals("/chat/r1?name=Maria+K.", routing.deepLink)
+    }
+
+    @Test
+    fun non_chat_deep_links_stay_untouched() {
+        val routing =
+            dispatcher.route(
+                data = mapOf("type" to "bid_received", "title" to "New bid", "link" to "/gig/g_1"),
+            )
+        assertEquals("/gig/g_1", routing.deepLink)
     }
 }

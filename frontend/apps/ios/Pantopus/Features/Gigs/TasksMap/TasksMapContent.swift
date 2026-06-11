@@ -5,7 +5,7 @@
 //  A11.1 Tasks map — the Gigs-only mode of the map+list hybrid archetype
 //  (`Features/Shared/MapListHybrid`). Reached from the Gigs feed's
 //  list/map toggle. Same canvas as the generic Nearby map, filtered to
-//  tasks and topped with a "Post task" FAB.
+//  tasks with a "Post task" button below the locate / layers controls.
 //
 //  Content the view consumes: one `TaskMapItem` per pin / rail card, the
 //  four render states, and the category→glyph mapping for the rail-card

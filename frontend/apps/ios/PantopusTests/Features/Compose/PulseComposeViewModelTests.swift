@@ -29,6 +29,10 @@ final class PulseComposeViewModelTests: XCTestCase {
     }
 
     private static let successResponse = """
+    {"message":"Post created successfully","post":{"id":"p_42"}}
+    """
+
+    private static let legacySuccessResponse = """
     {"message":"Posted","post_id":"p_42"}
     """
 
@@ -260,7 +264,7 @@ final class PulseComposeViewModelTests: XCTestCase {
     // MARK: - Submit pipeline
 
     func testSubmitHappyPathSucceedsAndDismisses() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.successResponse)]
+        SequencedURLProtocol.sequence = [.status(201, body: Self.successResponse)]
         let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
         vm.update(.title, to: "Need a plumber")
         vm.update(.body, to: "Pipe is leaking.")
@@ -270,6 +274,37 @@ final class PulseComposeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.toast?.text, "Posted")
         XCTAssertEqual(vm.toast?.kind, .success)
         XCTAssertTrue(vm.shouldDismiss)
+    }
+
+    func testSubmitAcceptsLegacyPostIdField() async {
+        SequencedURLProtocol.sequence = [.status(201, body: Self.legacySuccessResponse)]
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        let ok = await vm.submit()
+        XCTAssertTrue(ok)
+        if case let .success(id) = vm.state { XCTAssertEqual(id, "p_42") } else { XCTFail("state was \(vm.state)") }
+    }
+
+    func testSubmitUploadsPhotosAfterCreate() async {
+        SequencedURLProtocol.sequence = [
+            .status(201, body: Self.successResponse),
+            .status(200, body: """
+            {"message":"1 file(s) uploaded","media_urls":["https://cdn.example.com/p.jpg"],\
+            "media_types":["image"],"media_thumbnails":[""],"media_live_urls":[""]}
+            """)
+        ]
+        let uploader = MultipartUploader(session: SequencedURLProtocol.makeSession())
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI(), multipartUploader: uploader)
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        vm.append(photo: PulseComposePhoto(data: Data([0xFF, 0xD8, 0xFF, 0x00])))
+        let ok = await vm.submit()
+        XCTAssertTrue(ok)
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 2)
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.last?.url?.path.contains("/api/upload/post-media/p_42") ?? false
+        )
     }
 
     func testSubmitErrorSurfacesToast() async {

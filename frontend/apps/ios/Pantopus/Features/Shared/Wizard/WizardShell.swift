@@ -54,6 +54,7 @@ public struct WizardShell<Content: View>: View {
                 .padding(.top, Spacing.s4)
                 .padding(.bottom, Spacing.s8)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Theme.Color.appBg)
             stickyCTA(chrome: chrome)
         }
@@ -99,6 +100,7 @@ public struct WizardShell<Content: View>: View {
             HStack(spacing: Spacing.s3) {
                 if let secondary = chrome.secondaryCTA {
                     GhostButton(title: secondary.label) {
+                        dismissKeyboard()
                         await MainActor.run { model.secondaryTapped() }
                     }
                     .accessibilityIdentifier(secondary.identifier)
@@ -110,6 +112,7 @@ public struct WizardShell<Content: View>: View {
                     tint: identity.accent,
                     shadow: identity.ctaShadow
                 ) {
+                    dismissKeyboard()
                     await MainActor.run { model.primaryTapped() }
                 }
                 .accessibilityIdentifier("wizardPrimaryCTA")
@@ -120,6 +123,7 @@ public struct WizardShell<Content: View>: View {
     }
 
     private func handleLeading() {
+        dismissKeyboard()
         switch model.chrome.leading {
         case .back:
             model.leadingTapped()
@@ -130,6 +134,15 @@ public struct WizardShell<Content: View>: View {
                 model.leadingTapped()
             }
         }
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 }
 

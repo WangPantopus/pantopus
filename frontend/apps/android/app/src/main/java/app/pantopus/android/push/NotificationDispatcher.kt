@@ -16,6 +16,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import app.pantopus.android.MainActivity
 import app.pantopus.android.R
+import app.pantopus.android.data.chats.ActiveChatThread
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
@@ -44,6 +45,7 @@ class NotificationDispatcher
     @Inject
     constructor(
         @ApplicationContext private val appContext: Context,
+        private val activeChatThread: ActiveChatThread,
     ) {
         /** Channels match the four top-level families the backend emits. */
         enum class Channel(
@@ -94,6 +96,14 @@ class NotificationDispatcher
          */
         fun dispatch(message: RemoteMessage) {
             val routing = route(message.data, message.notification?.title, message.notification?.body)
+            // The backend's chat push (`backend/routes/chats.js:1834`) is
+            // data-only with `{ type: "chat_message", room_id, link }`, so
+            // this fires in the foreground too — skip the system post when
+            // the user is already looking at that very conversation.
+            if (routing.channel == Channel.CHAT && activeChatThread.isViewing(message.data["room_id"])) {
+                Timber.d("Chat push suppressed — conversation is on screen")
+                return
+            }
             postNotification(routing)
         }
 
@@ -111,7 +121,14 @@ class NotificationDispatcher
             val channel = channelFor(data["type"])
             val title = notificationTitle ?: data["title"]
             val body = notificationBody ?: data["body"]
-            val deepLink = data["link"] ?: data["deepLink"]
+            var deepLink = data["link"] ?: data["deepLink"]
+            // Chat pushes link to `/chat/<roomId>` with the sender name in
+            // the title — forward it as a `name` query param so the
+            // conversation header has a display name on cold-open
+            // (`DeepLinkRouter.Destination.Conversation.name`).
+            if (channel == Channel.CHAT && deepLink != null && !title.isNullOrBlank() && !deepLink.contains('?')) {
+                deepLink = "$deepLink?name=${java.net.URLEncoder.encode(title, "UTF-8")}"
+            }
             return Routing(channel = channel, title = title, body = body, deepLink = deepLink)
         }
 

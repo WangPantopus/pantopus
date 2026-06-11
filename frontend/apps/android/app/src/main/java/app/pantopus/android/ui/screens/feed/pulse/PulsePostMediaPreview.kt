@@ -33,14 +33,12 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import coil.compose.SubcomposeAsyncImage
 
-/** Resolves feed-card image URLs, preferring thumbnails when present. */
+/** Resolves feed-card image URLs from the original uploads. */
+@Suppress("UNUSED_PARAMETER")
 internal fun resolvePulsePostMediaUrls(
     urls: List<String>,
-    thumbnails: List<String>,
-): List<String> =
-    urls.mapIndexed { index, url ->
-        thumbnails.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: url
-    }.filter { it.isNotEmpty() }
+    thumbnails: List<String> = emptyList(),
+): List<String> = urls.filter { it.isNotBlank() }
 
 /**
  * Compact media strip for a Pulse feed card. Mirrors the detail

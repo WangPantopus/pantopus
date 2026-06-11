@@ -5,7 +5,7 @@
 //  Loads `GET /api/chat/unified-conversations` + `/stats` and reacts to
 //  socket events (`badge:update`, `message:new`). Projects the
 //  hetero DTO into a homogeneous list of `ConversationRowContent` plus
-//  a synthetic, pinned "Ask Pantopus" AI assistant row.
+//  a synthetic, pinned "Pantopus AI" assistant row.
 //
 
 import Foundation
@@ -28,14 +28,18 @@ public final class ChatListViewModel {
 
     private let api: APIClient
     private let socket: SocketClient
+    private let preferences: ChatConversationPreferences
     private let logger = Logger(label: "app.pantopus.ios.ChatList")
     private var allRows: [ConversationRowContent] = []
+    private var serverTotalUnread: Int = 0
+    private var hiddenKeys: Set<String> = []
+    private var mutedKeys: Set<String> = []
     /// Always-pinned synthetic AI assistant row.
     private let aiRow: ConversationRowContent = .init(
         id: "ai_assistant",
         variant: .aiAssistant,
-        displayName: "Ask Pantopus",
-        initials: "AP",
+        displayName: "Pantopus AI",
+        initials: "AI",
         avatarURL: nil,
         identityChip: nil,
         verified: false,
@@ -43,15 +47,21 @@ public final class ChatListViewModel {
         timeLabel: "now",
         unread: 0,
         pinned: true,
-        topicKinds: []
+        topicKinds: [],
+        storageKey: "ai_assistant"
     )
 
     private var badgeTask: Task<Void, Never>?
     private var messageTask: Task<Void, Never>?
 
-    init(api: APIClient = .shared, socket: SocketClient = .shared) {
+    init(
+        api: APIClient = .shared,
+        socket: SocketClient = .shared,
+        preferences: ChatConversationPreferences = .shared
+    ) {
         self.api = api
         self.socket = socket
+        self.preferences = preferences
     }
 
     // No `deinit { cancel }` — Swift 6's strict concurrency disallows
@@ -89,6 +99,26 @@ public final class ChatListViewModel {
         messageTask = nil
     }
 
+    /// Swipe action — remove the conversation from the list until new unread arrives.
+    public func hideConversation(storageKey: String) {
+        guard storageKey != aiRow.storageKey else { return }
+        let unreadBaseline = allRows.first { $0.storageKey == storageKey }?.unread ?? 0
+        preferences.hide(storageKey, unreadBaseline: unreadBaseline)
+        hiddenKeys.insert(storageKey)
+        applyFilter()
+        publishBadgeCount()
+    }
+
+    /// Swipe action — exclude this conversation's unread from the tab badge.
+    public func toggleMute(storageKey: String) {
+        guard storageKey != aiRow.storageKey else { return }
+        preferences.toggleMute(storageKey)
+        mutedKeys = preferences.mutedKeys()
+        decorateRowsWithMuteState()
+        applyFilter()
+        publishBadgeCount()
+    }
+
     // MARK: - Fetch
 
     private func fetch() async {
@@ -103,15 +133,42 @@ public final class ChatListViewModel {
             return
         }
         let stats = await statsTask?.stats
-        let rows = response.conversations.map(Self.project)
-        allRows = rows
+        loadPreferences()
+        serverTotalUnread = stats?.totalUnread ?? response.totalUnread ?? rowsUnreadTotal(from: response.conversations)
+        allRows = response.conversations.map { Self.project($0, mutedKeys: mutedKeys) }
+        updateUnreadByFilter()
+        applyFilter()
+        publishBadgeCount()
+    }
+
+    private func loadPreferences() {
+        hiddenKeys = preferences.hiddenKeys()
+        mutedKeys = preferences.mutedKeys()
+    }
+
+    private func rowsUnreadTotal(from conversations: [UnifiedConversation]) -> Int {
+        conversations.reduce(0) { $0 + $1.totalUnread }
+    }
+
+    private func updateUnreadByFilter() {
+        let adjustedUnread = ChatUnreadBadgeMath.adjustedTotal(
+            serverTotal: serverTotalUnread,
+            rows: allRows,
+            mutedKeys: mutedKeys
+        )
         unreadByFilter = [
             .all: 0,
-            .unread: stats?.totalUnread ?? response.totalUnread ?? rows.reduce(0) { $0 + $1.unread },
-            .gigs: stats?.gigChats ?? rows.filter { $0.topicKinds.contains("gig") }.count,
-            .market: rows.filter { $0.topicKinds.contains("marketplace") }.count
+            .unread: adjustedUnread,
+            .gigs: allRows.filter { $0.topicKinds.contains("gig") }.count,
+            .market: allRows.filter { $0.topicKinds.contains("marketplace") }.count
         ]
-        applyFilter()
+    }
+
+    private func publishBadgeCount() {
+        ChatBadgeStore.shared.applyListSnapshot(
+            totalUnread: serverTotalUnread,
+            rows: allRows
+        )
     }
 
     private func optional<T: Sendable>(_ operation: @Sendable () async throws -> T) async -> T? {
@@ -124,12 +181,14 @@ public final class ChatListViewModel {
     }
 
     private func applyFilter() {
+        autoUnhideConversationsWithUnread()
+        let visibleRows = allRows.filter { !hiddenKeys.contains($0.storageKey) }
         let filtered: [ConversationRowContent] =
             switch activeFilter {
-            case .all: allRows
-            case .unread: allRows.filter { $0.unread > 0 }
-            case .gigs: allRows.filter { $0.topicKinds.contains("gig") }
-            case .market: allRows.filter { $0.topicKinds.contains("marketplace") }
+            case .all: visibleRows
+            case .unread: visibleRows.filter { $0.unread > 0 }
+            case .gigs: visibleRows.filter { $0.topicKinds.contains("gig") }
+            case .market: visibleRows.filter { $0.topicKinds.contains("marketplace") }
             }
         // Pin synthetic AI row on top of every filter. The verified
         // floor is enforced by the empty-state copy + the absence of
@@ -147,6 +206,40 @@ public final class ChatListViewModel {
         } else {
             state = .loaded(rows: pinnedFirst)
         }
+        updateUnreadByFilter()
+    }
+
+    private func autoUnhideConversationsWithUnread() {
+        let toUnhide =
+            allRows
+                .filter { preferences.shouldAutoUnhide(key: $0.storageKey, currentUnread: $0.unread) }
+                .map(\.storageKey)
+        guard !toUnhide.isEmpty else { return }
+        preferences.unhide(toUnhide)
+        hiddenKeys.subtract(toUnhide)
+    }
+
+    private func decorateRowsWithMuteState() {
+        allRows = allRows.map { row in
+            ConversationRowContent(
+                id: row.id,
+                variant: row.variant,
+                displayName: row.displayName,
+                initials: row.initials,
+                avatarURL: row.avatarURL,
+                identityChip: row.identityChip,
+                verified: row.verified,
+                preview: row.preview,
+                timeLabel: row.timeLabel,
+                unread: row.unread,
+                pinned: row.pinned,
+                topicKinds: row.topicKinds,
+                topics: row.topics,
+                gigId: row.gigId,
+                storageKey: row.storageKey,
+                isMuted: mutedKeys.contains(row.storageKey)
+            )
+        }
     }
 
     // MARK: - Realtime
@@ -157,7 +250,9 @@ public final class ChatListViewModel {
                 guard let self else { return }
                 let stream = socket.events(named: "badge:update", as: ChatBadgeUpdate.self)
                 for await update in stream {
-                    unreadByFilter[.unread] = update.totalUnread
+                    serverTotalUnread = update.totalUnread
+                    updateUnreadByFilter()
+                    publishBadgeCount()
                 }
             }
         }
@@ -199,20 +294,36 @@ public final class ChatListViewModel {
             timeLabel: time,
             unread: nextUnread,
             pinned: original.pinned,
-            topicKinds: original.topicKinds
+            topicKinds: original.topicKinds,
+            topics: original.topics,
+            gigId: original.gigId,
+            storageKey: original.storageKey,
+            isMuted: original.isMuted
         )
         allRows[index] = updated
+        if nextUnread > original.unread {
+            serverTotalUnread += nextUnread - original.unread
+        }
         applyFilter()
+        publishBadgeCount()
     }
 
     // MARK: - Projection
 
-    private static func project(_ dto: UnifiedConversation) -> ConversationRowContent {
+    private static func project(
+        _ dto: UnifiedConversation,
+        mutedKeys: Set<String>
+    ) -> ConversationRowContent {
         let unread = dto.totalUnread
         let preview = dto.lastMessagePreview ?? defaultPreview(for: dto)
         let time = dto.lastMessageAt.flatMap(relative(timestamp:)) ?? ""
         let identityChip = identityChip(for: dto)
         let displayName = dto.name?.nilIfEmpty ?? defaultName(for: dto)
+        let storageKey =
+            switch dto.kind {
+            case .conversation: ChatConversationPreferences.personKey(dto.id)
+            case .room: ChatConversationPreferences.roomKey(dto.id)
+            }
         return ConversationRowContent(
             id: dto.id,
             variant: variant(for: dto),
@@ -225,7 +336,13 @@ public final class ChatListViewModel {
             timeLabel: time,
             unread: unread,
             pinned: false,
-            topicKinds: Set(dto.topicKinds)
+            topicKinds: Set(dto.topicKinds),
+            topics: dto.topics.map {
+                ConversationRowTopic(id: $0.id, title: $0.title, topicType: $0.topicType)
+            },
+            gigId: dto.gigId,
+            storageKey: storageKey,
+            isMuted: mutedKeys.contains(storageKey)
         )
     }
 

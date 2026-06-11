@@ -35,6 +35,16 @@ enum class ConversationIdentityChip(val label: String) {
     Home("Home"),
 }
 
+/**
+ * One topic pill under a row's preview — projected from
+ * `UnifiedConversationDto.topics` (title + type drive label + icon).
+ */
+@Immutable
+data class ConversationRowTopic(
+    val title: String,
+    val topicType: String,
+)
+
 /** Render-only content for one row. */
 @Immutable
 data class ConversationRowContent(
@@ -50,6 +60,14 @@ data class ConversationRowContent(
     val unread: Int,
     val pinned: Boolean,
     val topicKinds: Set<String>,
+    /** Stable key for mute/hide persistence — `person:<id>` or `room:<id>`. */
+    val storageKey: String,
+    /** Whether the user muted notifications for this conversation. */
+    val isMuted: Boolean = false,
+    /** Per-row topic pills (first 2 render, the rest collapse to "+N"). */
+    val topics: List<ConversationRowTopic> = emptyList(),
+    /** Backing gig for gig-room rows — plumbs the A15 pinned context strip. */
+    val gigId: String? = null,
 )
 
 /** Filter-tab entry the view renders. */

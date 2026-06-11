@@ -20,9 +20,11 @@ import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.observability.Observability
+import app.pantopus.android.data.realtime.SocketManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -114,7 +116,8 @@ class AuthRepositoryTest {
         authApi: AuthApi = mockk(relaxed = true),
         storage: TokenStorage = mockk(relaxed = true),
         obs: Observability = mockk(relaxed = true),
-    ) = AuthRepository(api, authApi, storage, obs)
+        socketManager: SocketManager = mockk(relaxed = true),
+    ) = AuthRepository(api, authApi, storage, obs, socketManager)
 
     private fun httpException(
         code: Int,
@@ -130,10 +133,11 @@ class AuthRepositoryTest {
             val api = mockk<ApiService>()
             val storage = mockk<TokenStorage>(relaxed = true)
             val obs = mockk<Observability>(relaxed = true)
+            val socketManager = mockk<SocketManager>(relaxed = true)
 
             coEvery { api.login(LoginRequest("a@b.com", "hunter22")) } returns loginResponse
 
-            val repo = buildRepo(api = api, storage = storage, obs = obs)
+            val repo = buildRepo(api = api, storage = storage, obs = obs, socketManager = socketManager)
 
             repo.state.test {
                 assertEquals(AuthRepository.State.Unknown, awaitItem())
@@ -144,6 +148,7 @@ class AuthRepositoryTest {
             }
 
             coVerify { storage.save(accessToken = "at", refreshToken = "rt", userId = "u_1") }
+            verify { socketManager.connect("at") }
             coVerify { obs.identify(userId = "u_1", email = "a@b.com") }
             coVerify { obs.track("auth.signed_in", any()) }
         }

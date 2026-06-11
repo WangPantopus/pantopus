@@ -8,7 +8,7 @@ package app.pantopus.android.ui.screens.inbox.conversation
  * in for what the SSE stream will eventually produce.
  */
 object ChatConversationSampleData {
-    const val AI_NAME = "Ask Pantopus"
+    const val AI_NAME = "Pantopus AI"
     const val FAN_PERSONA_NAME = "Wynn B."
     const val CREATOR_FAN_NAME = "Priya R."
 

@@ -37,6 +37,11 @@ fun ChatConversationHost(
     onBack: () -> Unit,
     chrome: ChatConversationChrome = ChatConversationChrome(),
     scrollToMessageId: String? = null,
+    initialTopic: ChatInitialTopic? = null,
+    gigId: String? = null,
+    onUseAIDraft: (ChatAIDraftCard) -> Unit = {},
+    onOpenGig: (String) -> Unit = {},
+    onOpenListing: (String) -> Unit = {},
     authViewModel: ChatConversationHostViewModel = hiltViewModel(),
 ) {
     val state by authViewModel.authState.collectAsStateWithLifecycle()
@@ -48,8 +53,13 @@ fun ChatConversationHost(
                 counterparty = counterparty,
                 currentUserId = currentUserId,
                 scrollToMessageId = scrollToMessageId,
+                initialTopic = initialTopic,
+                gigId = gigId,
             ),
         chrome = chrome,
         onBack = onBack,
+        onUseAIDraft = onUseAIDraft,
+        onOpenGig = onOpenGig,
+        onOpenListing = onOpenListing,
     )
 }

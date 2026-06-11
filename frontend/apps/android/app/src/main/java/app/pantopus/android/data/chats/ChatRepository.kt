@@ -2,6 +2,12 @@ package app.pantopus.android.data.chats
 
 import app.pantopus.android.data.api.models.chats.ChatMessagesResponse
 import app.pantopus.android.data.api.models.chats.ChatStatsResponse
+import app.pantopus.android.data.api.models.chats.ConversationTopicsResponse
+import app.pantopus.android.data.api.models.chats.CreateDirectChatBody
+import app.pantopus.android.data.api.models.chats.CreateDirectChatResponse
+import app.pantopus.android.data.api.models.chats.EditChatMessageBody
+import app.pantopus.android.data.api.models.chats.FindOrCreateTopicBody
+import app.pantopus.android.data.api.models.chats.FindOrCreateTopicResponse
 import app.pantopus.android.data.api.models.chats.ReactToChatMessageBody
 import app.pantopus.android.data.api.models.chats.ReactToChatMessageResponse
 import app.pantopus.android.data.api.models.chats.SendChatMessageBody
@@ -37,9 +43,20 @@ class ChatRepository
             before: String? = null,
             after: String? = null,
             limit: Int = 60,
-        ): NetworkResult<ChatMessagesResponse> = safeApiCall { api.conversationMessages(otherUserId, limit, before, after) }
+            topicId: String? = null,
+        ): NetworkResult<ChatMessagesResponse> = safeApiCall { api.conversationMessages(otherUserId, limit, before, after, topicId) }
+
+        suspend fun createDirectChat(otherUserId: String): NetworkResult<CreateDirectChatResponse> =
+            safeApiCall { api.createDirectChat(CreateDirectChatBody(otherUserId)) }
 
         suspend fun sendMessage(body: SendChatMessageBody): NetworkResult<SendChatMessageResponse> = safeApiCall { api.sendMessage(body) }
+
+        suspend fun editMessage(
+            messageId: String,
+            messageText: String,
+        ): NetworkResult<SendChatMessageResponse> = safeApiCall { api.editMessage(messageId, EditChatMessageBody(messageText)) }
+
+        suspend fun deleteMessage(messageId: String): NetworkResult<Unit> = safeApiCall { api.deleteMessage(messageId) }
 
         suspend fun reactToMessage(
             messageId: String,
@@ -49,4 +66,12 @@ class ChatRepository
         suspend fun markRoomRead(roomId: String): NetworkResult<Unit> = safeApiCall { api.markRoomRead(roomId) }
 
         suspend fun markConversationRead(otherUserId: String): NetworkResult<Unit> = safeApiCall { api.markConversationRead(otherUserId) }
+
+        suspend fun conversationTopics(otherUserId: String): NetworkResult<ConversationTopicsResponse> =
+            safeApiCall { api.conversationTopics(otherUserId) }
+
+        suspend fun findOrCreateTopic(
+            otherUserId: String,
+            body: FindOrCreateTopicBody,
+        ): NetworkResult<FindOrCreateTopicResponse> = safeApiCall { api.findOrCreateTopic(otherUserId, body) }
     }

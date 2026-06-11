@@ -124,7 +124,16 @@ public struct ChatListView: View {
         ScrollView {
             LazyVStack(spacing: Spacing.s0) {
                 ForEach(rows) { row in
-                    ConversationRow(content: row) { onOpenConversation(row) }
+                    if row.variant == .aiAssistant {
+                        ConversationRow(content: row) { onOpenConversation(row) }
+                    } else {
+                        SwipeableConversationRow(
+                            content: row,
+                            onTap: { onOpenConversation(row) },
+                            onMute: { viewModel.toggleMute(storageKey: row.storageKey) },
+                            onHide: { viewModel.hideConversation(storageKey: row.storageKey) }
+                        )
+                    }
                 }
             }
         }

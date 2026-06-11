@@ -1,6 +1,7 @@
 package app.pantopus.android.data.realtime
 
 import app.pantopus.android.BuildConfig
+import io.socket.client.Ack
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.channels.awaitClose
@@ -9,10 +10,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 /**
  * Socket.IO client wrapper.
@@ -31,9 +35,18 @@ class SocketManager
         val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
         private var socket: Socket? = null
+        private var authToken: String? = null
 
         fun connect(token: String) {
-            if (socket?.connected() == true) return
+            if (authToken == token && socket != null) {
+                if (socket?.connected() != true) {
+                    _connectionState.value = ConnectionState.Connecting
+                    socket?.connect()
+                }
+                return
+            }
+            if (socket != null) disconnect()
+            authToken = token
             _connectionState.value = ConnectionState.Connecting
             val options =
                 IO.Options
@@ -65,6 +78,7 @@ class SocketManager
             socket?.disconnect()
             socket?.off()
             socket = null
+            authToken = null
             _connectionState.value = ConnectionState.Disconnected
         }
 
@@ -92,5 +106,21 @@ class SocketManager
             payload: JSONObject,
         ) {
             socket?.emit(event, payload)
+        }
+
+        suspend fun emitWithAck(
+            event: String,
+            payload: JSONObject,
+            timeoutMs: Long = 5_000,
+        ): JSONObject? {
+            val s = socket ?: return null
+            return withTimeoutOrNull(timeoutMs) {
+                suspendCancellableCoroutine { continuation ->
+                    s.emit(event, payload, Ack { args ->
+                        val response = args.firstOrNull() as? JSONObject
+                        if (continuation.isActive) continuation.resume(response)
+                    })
+                }
+            }
         }
     }

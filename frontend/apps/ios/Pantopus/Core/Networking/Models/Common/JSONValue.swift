@@ -11,7 +11,7 @@
 import Foundation
 
 /// A dynamic JSON value we can losslessly round-trip through `Codable`.
-public indirect enum JSONValue: Decodable, Sendable, Hashable {
+public indirect enum JSONValue: Codable, Sendable, Hashable {
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -38,6 +38,24 @@ public indirect enum JSONValue: Decodable, Sendable, Hashable {
                 in: container,
                 debugDescription: "Unknown JSON value"
             )
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .null:
+            try container.encodeNil()
+        case let .bool(value):
+            try container.encode(value)
+        case let .number(value):
+            try container.encode(value)
+        case let .string(value):
+            try container.encode(value)
+        case let .object(value):
+            try container.encode(value)
+        case let .array(value):
+            try container.encode(value)
         }
     }
 

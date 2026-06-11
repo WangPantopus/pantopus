@@ -85,7 +85,13 @@ fun ChatListScreen(
         when (val s = state) {
             ChatListUiState.Loading -> LoadingFrame()
             ChatListUiState.Empty -> EmptyFrame(onCompose = onCompose)
-            is ChatListUiState.Loaded -> PopulatedFrame(rows = s.rows, onTap = onOpenConversation)
+            is ChatListUiState.Loaded ->
+                PopulatedFrame(
+                    rows = s.rows,
+                    onTap = onOpenConversation,
+                    onMute = viewModel::toggleMute,
+                    onHide = viewModel::hideConversation,
+                )
             is ChatListUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
         }
     }
@@ -390,10 +396,21 @@ internal fun EmptyFrame(onCompose: () -> Unit) {
 internal fun PopulatedFrame(
     rows: List<ConversationRowContent>,
     onTap: (ConversationRowContent) -> Unit,
+    onMute: (String) -> Unit = {},
+    onHide: (String) -> Unit = {},
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize().testTag("chatListContent")) {
         items(items = rows, key = { it.id }) { row ->
-            ConversationRow(content = row, onTap = { onTap(row) })
+            if (row.variant == ConversationRowVariant.AiAssistant) {
+                ConversationRow(content = row, onTap = { onTap(row) })
+            } else {
+                SwipeableConversationRow(
+                    content = row,
+                    onTap = { onTap(row) },
+                    onMute = { onMute(row.storageKey) },
+                    onHide = { onHide(row.storageKey) },
+                )
+            }
         }
     }
 }

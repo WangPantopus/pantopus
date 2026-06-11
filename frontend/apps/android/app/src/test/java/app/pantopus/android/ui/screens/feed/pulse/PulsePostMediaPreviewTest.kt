@@ -7,13 +7,13 @@ import org.junit.Test
 
 class PulsePostMediaPreviewTest {
     @Test
-    fun resolvePulsePostMediaUrls_prefersThumbnails() {
+    fun resolvePulsePostMediaUrls_usesFullResolutionUrls() {
         val resolved =
             resolvePulsePostMediaUrls(
                 urls = listOf("https://cdn.example.com/full.jpg"),
                 thumbnails = listOf("https://cdn.example.com/thumb.jpg"),
             )
-        assertEquals(listOf("https://cdn.example.com/thumb.jpg"), resolved)
+        assertEquals(listOf("https://cdn.example.com/full.jpg"), resolved)
     }
 
     @Test

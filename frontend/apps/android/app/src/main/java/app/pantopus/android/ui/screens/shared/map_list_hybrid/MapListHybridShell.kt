@@ -111,6 +111,7 @@ fun MapListHybridShell(
     topPill: @Composable () -> Unit = {},
     categoryChips: @Composable () -> Unit = {},
     mapControls: @Composable () -> Unit = {},
+    mapControlsStackHeight: Dp = MAP_CONTROLS_STACK_HEIGHT,
     floatingAction: @Composable () -> Unit = {},
     sheetHeader: @Composable () -> Unit = {},
     sheetBody: @Composable () -> Unit = {},
@@ -174,7 +175,7 @@ fun MapListHybridShell(
         // can't push the stack (e.g. a Post-task FAB) off the top.
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val maxControlsBottom =
-            (containerHeight - statusBarTop - MAP_CONTROLS_STACK_HEIGHT - SHEET_TO_CONTROLS_GAP)
+            (containerHeight - statusBarTop - mapControlsStackHeight - SHEET_TO_CONTROLS_GAP)
                 .coerceAtLeast(SHEET_TO_CONTROLS_GAP)
         val maxFabBottom =
             (containerHeight - statusBarTop - FAB_TOP_RESERVE).coerceAtLeast(FAB_LIFT_ABOVE_SHEET)

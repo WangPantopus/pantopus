@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -52,7 +53,7 @@ fun ConversationRow(
                     if (content.pinned) PantopusColors.primary50.copy(alpha = 0.5f) else PantopusColors.appSurface,
                 )
                 .clickable(onClick = onTap)
-                .padding(horizontal = Spacing.s4, vertical = 14.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s4)
                 .semantics(mergeDescendants = true) {
                     contentDescription = buildA11yLabel(content)
                 }
@@ -102,8 +103,13 @@ private fun DmAvatar(
     initials: String,
     verified: Boolean,
 ) {
-    Box(modifier = Modifier.size(46.dp), contentAlignment = Alignment.BottomEnd) {
-        InitialsCircle(size = 44.dp, color = PantopusColors.appBorderStrong, initials = initials)
+    Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.BottomEnd) {
+        InitialsCircle(
+            size = 52.dp,
+            color = PantopusColors.personalBg,
+            initials = initials,
+            fg = PantopusColors.primary600,
+        )
         if (verified) {
             Box(
                 modifier =
@@ -150,6 +156,7 @@ private fun InitialsCircle(
     size: Dp,
     color: Color,
     initials: String,
+    fg: Color = PantopusColors.appTextInverse,
 ) {
     Box(
         modifier =
@@ -164,7 +171,7 @@ private fun InitialsCircle(
             text = initials,
             fontSize = (size.value * 0.34f).sp,
             fontWeight = FontWeight.Bold,
-            color = PantopusColors.appTextInverse,
+            color = fg,
         )
     }
 }
@@ -174,44 +181,152 @@ private fun Middle(
     content: ConversationRowContent,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    val isAiRow = content.variant == ConversationRowVariant.AiAssistant
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 text = content.displayName,
-                fontSize = 14.5.sp,
-                fontWeight = if (content.unread > 0) FontWeight.Bold else FontWeight.SemiBold,
-                color = PantopusColors.appText,
+                fontSize = 16.sp,
+                fontWeight = if (content.unread > 0 || isAiRow) FontWeight.Bold else FontWeight.Medium,
+                // A15.3 swaps the AI row's business purple for primary blues.
+                color = if (isAiRow) PantopusColors.primary700 else PantopusColors.appText,
                 maxLines = 1,
             )
+            if (isAiRow) {
+                Text(
+                    text = "AI",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.primary700,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.primary50)
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                )
+            }
             content.identityChip?.let { IdentityDisclosureChip(chip = it) }
         }
         Text(
             text = content.preview,
-            fontSize = 12.5.sp,
-            fontWeight = if (content.unread > 0) FontWeight.Medium else FontWeight.Normal,
-            color = if (content.unread > 0) PantopusColors.appTextStrong else PantopusColors.appTextSecondary,
+            fontSize = 14.sp,
+            fontWeight = if (content.unread > 0) FontWeight.SemiBold else FontWeight.Normal,
+            color =
+                when {
+                    isAiRow -> PantopusColors.primary600
+                    content.unread > 0 -> PantopusColors.appTextStrong
+                    else -> PantopusColors.appTextSecondary
+                },
+            maxLines = 1,
+        )
+        if (content.topics.isNotEmpty()) {
+            TopicPillsRow(topics = content.topics)
+        }
+    }
+}
+
+/**
+ * Up to two topic pills under the preview plus a "+N" overflow pill.
+ * The Column's spacedBy already contributes 4dp; the extra 2dp top
+ * padding lands the designed 6dp gap.
+ */
+@Composable
+private fun TopicPillsRow(topics: List<ConversationRowTopic>) {
+    Row(
+        modifier = Modifier.padding(top = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        topics.take(2).forEach { topic ->
+            TopicPill(title = topic.title, icon = rowTopicIcon(topic.topicType))
+        }
+        val overflow = topics.size - 2
+        if (overflow > 0) {
+            TopicPill(title = "+$overflow", icon = null)
+        }
+    }
+}
+
+@Composable
+private fun TopicPill(
+    title: String,
+    icon: PantopusIcon?,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        if (icon != null) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 10.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = title,
+            fontSize = 11.sp,
+            color = PantopusColors.appTextSecondary,
             maxLines = 1,
         )
     }
 }
 
+/** Icon per topic type — mirrors the conversation screen's topic strip. */
+private fun rowTopicIcon(type: String): PantopusIcon =
+    when (type) {
+        "task", "gig" -> PantopusIcon.Briefcase
+        "listing" -> PantopusIcon.Tag
+        "marketplace" -> PantopusIcon.ShoppingBag
+        else -> PantopusIcon.MessageCircle
+    }
+
 @Composable
 private fun Trailing(content: ConversationRowContent) {
+    if (content.variant == ConversationRowVariant.AiAssistant) {
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 18.dp,
+            tint = PantopusColors.primary600,
+        )
+        return
+    }
     Column(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            text = content.timeLabel,
-            fontSize = 10.5.sp,
-            fontWeight = if (content.unread > 0) FontWeight.Bold else FontWeight.Medium,
-            color = if (content.unread > 0) PantopusColors.primary600 else PantopusColors.appTextSecondary,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            if (content.isMuted) {
+                PantopusIconImage(
+                    icon = PantopusIcon.BellOff,
+                    contentDescription = "Muted",
+                    size = 14.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
+            Text(
+                text = content.timeLabel,
+                fontSize = 12.sp,
+                fontWeight = if (content.unread > 0) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (content.unread > 0) PantopusColors.primary600 else PantopusColors.appTextMuted,
+            )
+        }
         if (content.unread > 0) {
             Box(
                 modifier =
                     Modifier
-                        .heightIn(min = 18.dp)
+                        .heightIn(min = 20.dp)
+                        .widthIn(min = 20.dp)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.primary600)
                         .padding(horizontal = 6.dp, vertical = 1.dp)
@@ -220,7 +335,7 @@ private fun Trailing(content: ConversationRowContent) {
             ) {
                 Text(
                     text = "${content.unread}",
-                    fontSize = 10.5.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = PantopusColors.appTextInverse,
                 )
