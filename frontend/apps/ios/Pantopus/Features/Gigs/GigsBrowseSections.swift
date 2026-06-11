@@ -195,6 +195,18 @@ struct GigRailCard: View {
                             )
                         )
                     Icon(taskCategoryGlyph(content.category), size: 22, color: .white)
+                    // P1.F follow-up — browse `first_image` thumbnail when
+                    // the gig has one; the glyph tile shows while loading
+                    // and stays as the no-photo fallback.
+                    if let imageUrl = content.imageUrl, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.clear
+                        }
+                        .frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
                 }
                 .frame(width: 48, height: 48)
                 VStack(alignment: .leading, spacing: Spacing.s1) {

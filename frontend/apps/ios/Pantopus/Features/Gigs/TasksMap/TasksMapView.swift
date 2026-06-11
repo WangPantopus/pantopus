@@ -24,7 +24,6 @@ public struct TasksMapView: View {
     @State private var detent: MapListHybridDetent = .standard
     @State private var recenterToken = 0
     @State private var showFilterSheet = false
-    @State private var filterCriteria = GigFilterCriteria()
     /// Rail scroll-snap position (item id) — kept in lockstep with
     /// `viewModel.selectedId` for the pin↔card sync.
     @State private var railPosition: String?
@@ -84,9 +83,11 @@ public struct TasksMapView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .sheet(isPresented: $showFilterSheet) {
+            // P2 follow-up — criteria live in the VM so the layers sheet
+            // actually filters the pins (not just the badge).
             GigFilterSheet(
-                criteria: filterCriteria,
-                onApply: { filterCriteria = $0 },
+                criteria: viewModel.filterCriteria,
+                onApply: { viewModel.applyFilters($0) },
                 onClose: { showFilterSheet = false }
             )
         }
@@ -155,7 +156,7 @@ public struct TasksMapView: View {
     }
 
     private var filtersButton: some View {
-        let activeCount = filterCriteria.activeCount
+        let activeCount = viewModel.filterCriteria.activeCount
         return Button { showFilterSheet = true } label: {
             ZStack(alignment: .topTrailing) {
                 Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)

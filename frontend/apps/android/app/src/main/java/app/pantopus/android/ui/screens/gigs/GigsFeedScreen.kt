@@ -144,6 +144,7 @@ fun GigsFeedScreen(
                             onSeeAll = viewModel::exitBrowse,
                             onSelectCategory = viewModel::selectCategory,
                             onSeeAllTasks = { viewModel.exitBrowse(GigsSort.Newest) },
+                            onSeeAllQuickJobs = viewModel::seeAllQuickJobs,
                         )
                     is GigsFeedUiState.Error ->
                         ErrorFrame(message = s.message, onRetry = viewModel::refresh)

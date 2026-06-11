@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
+import app.pantopus.android.ui.screens.gigs.GigFilterCriteria
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsSort
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapAnchor
@@ -154,6 +155,18 @@ class TasksMapViewModel
         fun selectSort(sort: GigsSort) {
             if (sort == _activeSort.value) return
             _activeSort.value = sort
+            recompute()
+        }
+
+        /** P2 follow-up — structured criteria from the layers sheet, applied
+         * client-side to the fetched pins. The filters badge rides
+         * `criteria.activeCount`. */
+        private val _filterCriteria = MutableStateFlow(GigFilterCriteria())
+        val filterCriteria: StateFlow<GigFilterCriteria> = _filterCriteria.asStateFlow()
+
+        fun applyFilters(criteria: GigFilterCriteria) {
+            if (criteria == _filterCriteria.value) return
+            _filterCriteria.value = criteria
             recompute()
         }
 
@@ -376,8 +389,21 @@ class TasksMapViewModel
         }
 
         private fun filteredSorted(): List<TaskMapItem> {
+            val criteria = _filterCriteria.value
+            val nowEpochSeconds = System.currentTimeMillis() / MILLIS_PER_SECOND
             val filtered =
-                items.filter { _activeCategory.value == GigsCategory.All || it.category == _activeCategory.value }
+                items
+                    .filter { _activeCategory.value == GigsCategory.All || it.category == _activeCategory.value }
+                    .filter { item ->
+                        criteria.matches(
+                            category = item.category,
+                            price = item.priceValue,
+                            scheduleType = item.scheduleType,
+                            acceptedBy = item.acceptedBy,
+                            createdAt = item.createdAt,
+                            nowEpochSeconds = nowEpochSeconds,
+                        )
+                    }
             return when (_activeSort.value) {
                 // Urgency (P1.F) proxies to newest server-side; the map has
                 // no per-pin deadline, so it shares the newest-first order.
@@ -397,6 +423,7 @@ class TasksMapViewModel
             const val DEFAULT_LON_SPAN = 0.032
             val FALLBACK_ANCHOR = MapAnchor(40.7484, -73.9857)
             private const val EARTH_RADIUS_MILES = 3958.8
+            private const val MILLIS_PER_SECOND = 1000L
 
             /**
              * `GigDto` → pin↔card [TaskMapItem]. Drops gigs without
@@ -427,6 +454,10 @@ class TasksMapViewModel
                     distanceLabel = String.format(Locale.US, "%.1f mi", miles),
                     bidCount = gig.bidCount ?: 0,
                     body = gig.description.orEmpty(),
+                    priceValue = gig.price,
+                    scheduleType = gig.scheduleType,
+                    acceptedBy = gig.acceptedBy,
+                    createdAt = gig.createdAt,
                 )
             }
 

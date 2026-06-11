@@ -153,19 +153,23 @@ public struct GigRailCardContent: Identifiable, Sendable, Hashable {
     public let title: String
     public let price: String
     public let distanceLabel: String?
+    /// Browse `first_image` — replaces the glyph tile when present.
+    public let imageUrl: String?
 
     public init(
         id: String,
         category: GigsCategory,
         title: String,
         price: String,
-        distanceLabel: String?
+        distanceLabel: String?,
+        imageUrl: String? = nil
     ) {
         self.id = id
         self.category = category
         self.title = title
         self.price = price
         self.distanceLabel = distanceLabel
+        self.imageUrl = imageUrl
     }
 }
 

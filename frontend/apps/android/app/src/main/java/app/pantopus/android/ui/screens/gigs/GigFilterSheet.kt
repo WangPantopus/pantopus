@@ -182,12 +182,34 @@ data class GigFilterCriteria(
     fun matches(
         gig: GigDto,
         nowEpochSeconds: Long,
+    ): Boolean =
+        matches(
+            category = GigsCategory.fromBackendKey(gig.category),
+            price = gig.price,
+            scheduleType = gig.scheduleType,
+            acceptedBy = gig.acceptedBy,
+            createdAt = gig.createdAt,
+            nowEpochSeconds = nowEpochSeconds,
+        )
+
+    /**
+     * Primitive-field overload for surfaces that project away the DTO
+     * (the Tasks map's `TaskMapItem` — seed/preview mode has no `GigDto`).
+     */
+    @Suppress("LongParameterList")
+    fun matches(
+        category: GigsCategory,
+        price: Double?,
+        scheduleType: String?,
+        acceptedBy: String?,
+        createdAt: String?,
+        nowEpochSeconds: Long,
     ): Boolean {
-        return matchesCategory(GigsCategory.fromBackendKey(gig.category)) &&
-            matchesBudget(gig.price) &&
-            matchesSchedule(gig.scheduleType) &&
-            matchesOpenToBids(gig.acceptedBy) &&
-            matchesPostedWithin(gig.createdAt, nowEpochSeconds)
+        return matchesCategory(category) &&
+            matchesBudget(price) &&
+            matchesSchedule(scheduleType) &&
+            matchesOpenToBids(acceptedBy) &&
+            matchesPostedWithin(createdAt, nowEpochSeconds)
     }
 
     private fun matchesSchedule(scheduleType: String?): Boolean {

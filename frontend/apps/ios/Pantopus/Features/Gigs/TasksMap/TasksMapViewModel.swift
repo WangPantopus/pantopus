@@ -148,6 +148,17 @@ public final class TasksMapViewModel {
         recompute()
     }
 
+    /// P2 follow-up — structured criteria from the layers sheet, applied
+    /// client-side to the fetched pins. The filters badge rides
+    /// `filterCriteria.activeCount`.
+    public private(set) var filterCriteria = GigFilterCriteria()
+
+    public func applyFilters(_ criteria: GigFilterCriteria) {
+        guard criteria != filterCriteria else { return }
+        filterCriteria = criteria
+        recompute()
+    }
+
     /// Pin↔card link — the shell fires this on pin tap; the view also
     /// snaps the sheet to `.standard` and scrolls the rail so the
     /// matching card surfaces. No camera move (the pin is on screen).
@@ -386,7 +397,11 @@ public final class TasksMapViewModel {
             body: gig.description ?? "",
             price: priceLabel(price: gig.price, payType: gig.payType),
             distanceLabel: String(format: "%.1f mi", miles),
-            bidCount: gig.bidCount ?? 0
+            bidCount: gig.bidCount ?? 0,
+            priceValue: gig.price,
+            scheduleType: gig.scheduleType,
+            acceptedBy: gig.acceptedBy,
+            createdAt: gig.createdAt
         )
     }
 
@@ -433,7 +448,19 @@ public final class TasksMapViewModel {
     }
 
     private func filteredSorted() -> [TaskMapItem] {
-        let filtered = items.filter { activeCategory == .all || $0.category == activeCategory }
+        let now = Date()
+        let filtered = items
+            .filter { activeCategory == .all || $0.category == activeCategory }
+            .filter {
+                filterCriteria.matches(
+                    category: $0.category,
+                    price: $0.priceValue,
+                    scheduleType: $0.scheduleType,
+                    acceptedBy: $0.acceptedBy,
+                    createdAt: $0.createdAt,
+                    now: now
+                )
+            }
         switch activeSort {
         case .newest, .urgency:
             return filtered // backend returns newest-first (urgency has no local signal)

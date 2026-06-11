@@ -274,15 +274,35 @@ public struct GigFilterCriteria: Sendable, Hashable {
     /// Full gig predicate across every dimension. Used by surfaces that
     /// filter purely client-side (e.g. the Nearby map pins).
     public func matches(_ gig: GigDTO, now: Date = Date()) -> Bool {
-        guard matchesCategory(GigsCategory.from(backendKey: gig.category)) else { return false }
-        guard matchesBudget(gig.price) else { return false }
+        matches(
+            category: GigsCategory.from(backendKey: gig.category),
+            price: gig.price,
+            scheduleType: gig.scheduleType,
+            acceptedBy: gig.acceptedBy,
+            createdAt: gig.createdAt,
+            now: now
+        )
+    }
+
+    /// Primitive-field overload for surfaces that project away the DTO
+    /// (the Tasks map's `TaskMapItem` — seed/preview mode has no `GigDTO`).
+    public func matches(
+        category: GigsCategory,
+        price: Double?,
+        scheduleType: String?,
+        acceptedBy: String?,
+        createdAt: String?,
+        now: Date = Date()
+    ) -> Bool {
+        guard matchesCategory(category) else { return false }
+        guard matchesBudget(price) else { return false }
         if !schedules.isEmpty {
-            guard let bucket = GigScheduleFilter.from(backendKey: gig.scheduleType),
+            guard let bucket = GigScheduleFilter.from(backendKey: scheduleType),
                   schedules.contains(bucket) else { return false }
         }
-        if openToBids, !(gig.acceptedBy ?? "").isEmpty { return false }
+        if openToBids, !(acceptedBy ?? "").isEmpty { return false }
         if let cutoff = postedWithin.cutoff(from: now) {
-            guard let posted = Self.parseDate(gig.createdAt), posted >= cutoff else { return false }
+            guard let posted = Self.parseDate(createdAt), posted >= cutoff else { return false }
         }
         return true
     }

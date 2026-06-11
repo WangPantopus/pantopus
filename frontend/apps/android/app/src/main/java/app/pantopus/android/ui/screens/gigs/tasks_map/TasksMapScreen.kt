@@ -110,11 +110,13 @@ fun TasksMapScreen(
     val mapPins by viewModel.mapPins.collectAsStateWithLifecycle()
     val mapClusters by viewModel.mapClusters.collectAsStateWithLifecycle()
     val emptyAction by viewModel.emptyAction.collectAsStateWithLifecycle()
+    // P2 follow-up — criteria live in the VM so the layers sheet actually
+    // filters the pins (not just the badge).
+    val filterCriteria by viewModel.filterCriteria.collectAsStateWithLifecycle()
 
     var detent by remember { mutableStateOf(MapListHybridDetent.Standard) }
     var recenterToken by remember { mutableIntStateOf(0) }
     var showFilters by remember { mutableStateOf(false) }
-    var filterCriteria by remember { mutableStateOf(GigFilterCriteria()) }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
@@ -227,7 +229,7 @@ fun TasksMapScreen(
     if (showFilters) {
         GigFilterSheet(
             criteria = filterCriteria,
-            onApply = { filterCriteria = it },
+            onApply = viewModel::applyFilters,
             onDismiss = { showFilters = false },
         )
     }
