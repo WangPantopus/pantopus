@@ -2,7 +2,9 @@ package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.reviews.CreateReviewBody
 import app.pantopus.android.data.api.models.reviews.CreateReviewResponse
+import app.pantopus.android.data.api.models.reviews.MyPendingReviewsResponse
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
 /**
@@ -20,4 +22,12 @@ interface ReviewsApi {
     suspend fun create(
         @Body body: CreateReviewBody,
     ): CreateReviewResponse
+
+    /**
+     * `GET /api/reviews/my-pending` — completed gigs the caller still
+     * owes a review on. Route `backend/routes/reviews.js:333`. Phase 5
+     * uses this to gate "Leave a review" vs "Reviewed" on gig detail.
+     */
+    @GET("api/reviews/my-pending")
+    suspend fun myPending(): MyPendingReviewsResponse
 }

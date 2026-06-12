@@ -4,11 +4,14 @@
 //
 //  A11.1 Tasks map — the Gigs-only mode of the MapListHybrid archetype.
 //  Same canvas as the generic Nearby map (`NearbyMapView`), filtered to
-//  tasks, titled "Tasks map", with a primary "Post task" button stacked
-//  below the locate / layers controls on the right.
+//  tasks, titled "Tasks map", and topped with a primary "Post task" FAB
+//  stacked above the locate / layers / focus-pins controls.
 //
 //  Reached from the Gigs feed's list/map toggle. The floating-pill chevron
 //  returns to the list.
+//
+//  Accessibility identifiers follow the canonical `tasksMap.*` grammar —
+//  Android mirrors them verbatim as test tags.
 //
 
 // swiftlint:disable file_length type_body_length
@@ -21,11 +24,16 @@ public struct TasksMapView: View {
     @State private var detent: MapListHybridDetent = .standard
     @State private var recenterToken = 0
     @State private var showFilterSheet = false
-    @State private var filterCriteria = GigFilterCriteria()
+    /// Rail scroll-snap position (item id) — kept in lockstep with
+    /// `viewModel.selectedId` for the pin↔card sync.
+    @State private var railPosition: String?
 
     private let onOpenTask: @MainActor (String) -> Void
     private let onCompose: @MainActor (GigsCategory) -> Void
     private let onBack: (@MainActor () -> Void)?
+
+    /// FAB (48) + three 38 pt controls + three 8 pt gaps.
+    private static let controlsStackHeight: CGFloat = 186
 
     init(
         viewModel: TasksMapViewModel = TasksMapViewModel(),
@@ -41,7 +49,8 @@ public struct TasksMapView: View {
 
     public var body: some View {
         MapListHybridShell(
-            pins: pins,
+            pins: viewModel.mapPins,
+            clusters: viewModel.mapClusters,
             anchor: viewModel.anchor,
             selectedPinId: viewModel.selectedId,
             recenterTrigger: recenterToken,
@@ -49,15 +58,24 @@ public struct TasksMapView: View {
                 if case .empty = viewModel.state { return true }
                 return false
             }(),
+            cameraRequest: viewModel.cameraTarget,
+            markerAccessibilityPrefix: "tasksMap",
+            controlsStackHeight: Self.controlsStackHeight,
             detent: $detent,
             onPinTap: { id in
                 viewModel.select(id)
                 snapTo(.standard)
             },
+            onClusterTap: { id in
+                viewModel.tapCluster(id: id)
+            },
+            onCameraChange: { region in
+                viewModel.cameraSettled(on: region)
+            },
             topPill: { topChrome },
             categoryChips: { EmptyView() },
             mapControls: { mapControls },
-            mapControlsStackHeight: Self.tasksMapControlsStackHeight,
+            floatingAction: { EmptyView() },
             sheetHeader: { sheetHeader },
             sheetBody: { sheetBody }
         )
@@ -65,22 +83,21 @@ public struct TasksMapView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .sheet(isPresented: $showFilterSheet) {
+            // P2 follow-up — criteria live in the VM so the layers sheet
+            // actually filters the pins (not just the badge).
             GigFilterSheet(
-                criteria: filterCriteria,
-                onApply: { filterCriteria = $0 },
+                criteria: viewModel.filterCriteria,
+                onApply: { viewModel.applyFilters($0) },
                 onClose: { showFilterSheet = false }
             )
         }
-        .accessibilityIdentifier("tasksMap")
-    }
-
-    /// Pins shown on the map — only the populated state carries tasks; the
-    /// loading / empty / error states clear the map to anchor-only.
-    private var pins: [MapPin] {
-        if case let .populated(items) = viewModel.state {
-            return items.map(\.pin)
+        .onChange(of: viewModel.selectedId) { _, newValue in
+            guard let newValue, railPosition != newValue else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                railPosition = newValue
+            }
         }
-        return []
+        .accessibilityIdentifier("tasksMap")
     }
 
     private func snapTo(_ target: MapListHybridDetent) {
@@ -89,36 +106,75 @@ public struct TasksMapView: View {
         }
     }
 
-    // MARK: - Top chrome (back · category chips · filters — one row under status bar)
+    // MARK: - Top chrome (title pill · chips · search-this-area)
 
     private var topChrome: some View {
-        HStack(spacing: 8) {
-            if onBack != nil {
-                chromeButton(
-                    icon: .chevronLeft,
-                    iconSize: 18,
-                    label: "Back to list",
-                    identifier: "tasksMapBack"
-                ) {
-                    onBack?()
-                }
-            } else {
-                Color.clear.frame(width: 38, height: 38)
-            }
+        VStack(spacing: Spacing.s2) {
+            titlePill
             categoryChipStrip
-            chromeButton(
-                icon: .slidersHorizontal,
-                iconSize: 16,
-                label: "Filters",
-                identifier: "tasksMapFilters"
-            ) {
-                showFilterSheet = true
+            if viewModel.showsSearchThisArea {
+                searchThisAreaPill
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, 14)
-        .accessibilityIdentifier("tasksMapPill")
-        .accessibilityLabel("Tasks map")
-        .accessibilityAddTraits(.isHeader)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.showsSearchThisArea)
+    }
+
+    /// A11.1 top floating pill — back chevron · centered "Tasks map" ·
+    /// filters icon with an active-filter-count badge.
+    private var titlePill: some View {
+        ZStack {
+            Text("Tasks map")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
+            HStack {
+                if onBack != nil {
+                    Button { onBack?() } label: {
+                        Icon(.chevronLeft, size: 18, strokeWidth: 2.2, color: Theme.Color.appText)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back to list")
+                    .accessibilityIdentifier("tasksMap.backPill")
+                } else {
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                Spacer(minLength: Spacing.s0)
+                filtersButton
+            }
+        }
+        .padding(.horizontal, Spacing.s2)
+        .frame(height: 44)
+        .background(Theme.Color.appSurface.opacity(0.96))
+        .background(.ultraThinMaterial)
+        .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.10), radius: 6, x: 0, y: 4)
+    }
+
+    private var filtersButton: some View {
+        let activeCount = viewModel.filterCriteria.activeCount
+        return Button { showFilterSheet = true } label: {
+            ZStack(alignment: .topTrailing) {
+                Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)
+                    .frame(width: 32, height: 32)
+                if activeCount > 0 {
+                    Text("\(activeCount)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .frame(minWidth: 14, minHeight: 14)
+                        .background(Circle().fill(Theme.Color.primary600))
+                        .offset(x: 2, y: -2)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(activeCount > 0 ? "Filters, \(activeCount) active" : "Filters")
+        .accessibilityIdentifier("tasksMap.filters")
     }
 
     private var categoryChipStrip: some View {
@@ -156,50 +212,50 @@ public struct TasksMapView: View {
             .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("tasksMapCategoryChip_\(category.rawValue)")
+        .accessibilityIdentifier("tasksMap.chip_\(category.rawValue)")
     }
 
-    private func chromeButton(
-        icon: PantopusIcon,
-        iconSize: CGFloat,
-        label: String,
-        identifier: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Icon(icon, size: iconSize, strokeWidth: 2.2, color: Theme.Color.appText)
-                .frame(width: 38, height: 38)
-                .background(.ultraThinMaterial)
-                .overlay(Circle().stroke(Theme.Color.appBorder, lineWidth: 1))
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
+    /// Floating refetch affordance — shown when the camera settles on a
+    /// viewport significantly away from the last-fetched region.
+    private var searchThisAreaPill: some View {
+        Button { Task { await viewModel.searchThisArea() } } label: {
+            HStack(spacing: 6) {
+                Icon(.refreshCw, size: 13, strokeWidth: 2.4, color: Theme.Color.primary600)
+                Text("Search this area")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary600)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 34)
+            .background(Theme.Color.appSurface.opacity(0.96))
+            .background(.ultraThinMaterial)
+            .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.10), radius: 6, x: 0, y: 4)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(identifier)
+        .accessibilityIdentifier("tasksMap.searchThisArea")
     }
 
-    /// Locate + layers + Post task (two 38pt buttons, 8pt gaps, 48pt FAB).
-    private static var tasksMapControlsStackHeight: CGFloat {
-        140
-    }
-
-    // MARK: - Map controls (locate / layers / post — sit just above the sheet)
+    // MARK: - Map controls (locate / layers / focus-pins, "Post task" pill
+    // at the bottom of the stack — product call, diverges from the A11.1
+    // frame which drew the FAB on top)
 
     private var mapControls: some View {
         VStack(alignment: .trailing, spacing: Spacing.s2) {
-            controlButton(icon: .mapPin, label: "Locate me", identifier: "tasksMapLocate") {
+            controlButton(icon: .locateFixed, label: "Locate me", identifier: "tasksMap.locate") {
                 Task { await viewModel.locate() }
                 recenterToken += 1
             }
-            controlButton(icon: .map, label: "Layers", identifier: "tasksMapLayers") {
+            controlButton(icon: .layers, label: "Map layers", identifier: "tasksMap.layers") {
                 showFilterSheet = true
+            }
+            controlButton(icon: .maximize, label: "Fit all tasks", identifier: "tasksMap.focusPins") {
+                viewModel.focusOnPins()
             }
             postTaskFAB
         }
     }
-
-    // MARK: - Post-task button (A11.1 — bottom of the right-hand control stack)
 
     private var postTaskFAB: some View {
         Button { onCompose(viewModel.activeCategory) } label: {
@@ -218,7 +274,7 @@ public struct TasksMapView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Post task")
-        .accessibilityIdentifier("tasksMapPostFab")
+        .accessibilityIdentifier("tasksMap.postTask")
     }
 
     private func controlButton(
@@ -230,6 +286,7 @@ public struct TasksMapView: View {
         Button(action: action) {
             Icon(icon, size: 16, color: Theme.Color.appText)
                 .frame(width: 38, height: 38)
+                .background(Theme.Color.appSurface.opacity(0.96))
                 .background(.ultraThinMaterial)
                 .overlay(Circle().stroke(Theme.Color.appBorder, lineWidth: 1))
                 .clipShape(Circle())
@@ -274,7 +331,7 @@ public struct TasksMapView: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("tasksMapSort")
+            .accessibilityIdentifier("tasksMap.sheet.sort")
         }
         .padding(.horizontal, 18)
         .padding(.top, Spacing.s1)
@@ -288,18 +345,31 @@ public struct TasksMapView: View {
         return 0
     }
 
-    // MARK: - Sheet body (four states)
+    // MARK: - Sheet body (four states × detent projection)
 
     @ViewBuilder private var sheetBody: some View {
         switch viewModel.state {
         case .loading:
             loadingBody
         case let .populated(items):
-            railBody(items)
+            populatedBody(items)
         case .empty:
             emptyBody
         case let .error(message):
             errorBody(message)
+        }
+    }
+
+    /// Populated body per detent: header-only when collapsed, the card
+    /// rail at the standard stop, the full vertical list when expanded.
+    @ViewBuilder private func populatedBody(_ items: [TaskMapItem]) -> some View {
+        switch TasksMapSheetMode.mode(for: detent) {
+        case .headerOnly:
+            Spacer(minLength: Spacing.s0)
+        case .rail:
+            railBody(items)
+        case .fullList:
+            fullListBody(items)
         }
     }
 
@@ -329,13 +399,46 @@ public struct TasksMapView: View {
                         }
                     }
                 }
+                .scrollTargetLayout()
                 .padding(.horizontal, Spacing.s4)
                 .padding(.bottom, Spacing.s3)
             }
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $railPosition)
             .accessibilityIdentifier("tasksMapRail")
-            PaginationDots(total: min(items.count, 3), index: 0)
+            PaginationDots(total: items.count, index: viewModel.selectedIndex ?? 0)
                 .padding(.bottom, Spacing.s3)
         }
+        .onAppear {
+            railPosition = viewModel.selectedId
+        }
+        .onChange(of: railPosition) { _, newValue in
+            // Rail page settled → select that pin + pan the camera to it.
+            guard let newValue, newValue != viewModel.selectedId,
+                  let index = items.firstIndex(where: { $0.id == newValue }) else { return }
+            viewModel.selectIndex(index)
+        }
+    }
+
+    /// Expanded detent — full vertical list reusing the feed's `GigRow`.
+    private func fullListBody(_ items: [TaskMapItem]) -> some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.s2) {
+                ForEach(items) { item in
+                    Button {
+                        viewModel.select(item.id)
+                        onOpenTask(item.id)
+                    } label: {
+                        GigRow(content: item.cardContent)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("tasksMap.fullListRow_\(item.id)")
+                }
+                Spacer(minLength: Spacing.s10)
+            }
+            .padding(.horizontal, Spacing.s3)
+        }
+        .accessibilityIdentifier("tasksMap.fullList")
     }
 
     private var emptyBody: some View {
@@ -347,7 +450,7 @@ public struct TasksMapView: View {
                         RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                             .stroke(Theme.Color.primary100, lineWidth: 1)
                     )
-                Icon(.mapPin, size: 24, color: Theme.Color.primary600)
+                Icon(.mapPinOff, size: 24, color: Theme.Color.primary600)
             }
             .frame(width: 56, height: 56)
             .padding(.bottom, Spacing.s3)
@@ -376,22 +479,8 @@ public struct TasksMapView: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("tasksMapEmptyPost")
-                Button { viewModel.selectCategory(.all) } label: {
-                    HStack(spacing: 6) {
-                        Icon(.search, size: 13, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
-                        Text("Widen search")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appTextStrong)
-                    }
-                    .padding(.horizontal, 14)
-                    .frame(height: 36)
-                    .background(Theme.Color.appSurface)
-                    .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("tasksMapWiden")
+                .accessibilityIdentifier("tasksMap.empty.postTask")
+                emptySecondaryButton
             }
             Spacer(minLength: Spacing.s0)
         }
@@ -399,6 +488,51 @@ public struct TasksMapView: View {
         .padding(.top, Spacing.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityIdentifier("tasksMapEmpty")
+    }
+
+    /// Widen → jump-to-activity ladder (see `TasksMapEmptyAction`).
+    @ViewBuilder private var emptySecondaryButton: some View {
+        switch viewModel.emptyAction {
+        case .widen:
+            outlinedEmptyButton(
+                title: "Widen search",
+                icon: .search,
+                identifier: "tasksMap.empty.widenSearch"
+            ) {
+                Task { await viewModel.widenSearch() }
+            }
+        case .jumpToActivity:
+            outlinedEmptyButton(
+                title: "Jump to activity",
+                icon: .navigation,
+                identifier: "tasksMap.empty.jumpToActivity"
+            ) {
+                Task { await viewModel.jumpToActivity() }
+            }
+        }
+    }
+
+    private func outlinedEmptyButton(
+        title: String,
+        icon: PantopusIcon,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Icon(icon, size: 13, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(Theme.Color.appSurface)
+            .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     private func errorBody(_ message: String) -> some View {
@@ -498,7 +632,7 @@ private struct TaskRailCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityIdentifier("tasksMapCard_\(item.id)")
+        .accessibilityIdentifier("tasksMap.railCard_\(item.id)")
         .accessibilityLabel(accessibilityText)
     }
 
@@ -525,7 +659,9 @@ private struct PaginationDots: View {
                     .frame(width: i == index ? 16 : 5, height: 5)
             }
         }
-        .accessibilityHidden(true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Page \(min(index + 1, max(total, 1))) of \(max(total, 1))")
+        .accessibilityIdentifier("tasksMap.pageDots")
     }
 }
 

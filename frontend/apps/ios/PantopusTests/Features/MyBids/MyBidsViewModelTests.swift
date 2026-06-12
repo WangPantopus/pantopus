@@ -810,6 +810,105 @@ final class MyBidsViewModelTests: XCTestCase {
         XCTAssertNil(parts.terms)
     }
 
+    // MARK: - Counter response (Phase 5)
+
+    func testChip_CounteredPendingShowsCounterAmount() {
+        let dto = makeBid(id: "x", status: "countered", counterAmount: 80, counterStatus: "pending")
+        XCTAssertEqual(
+            MyBidsViewModel.derivedStatus(for: dto, now: Self.fixedNow),
+            .countered(amount: "$80")
+        )
+    }
+
+    func testChip_CounteredResolvedFallsBackToPending() {
+        let dto = makeBid(id: "x", status: "countered", counterAmount: 80, counterStatus: "declined")
+        XCTAssertEqual(MyBidsViewModel.derivedStatus(for: dto, now: Self.fixedNow), .pending)
+    }
+
+    func testFooter_CounteredGetsAcceptDeclineActions() {
+        let dto = makeBid(id: "c1", status: "countered", counterAmount: 80, counterStatus: "pending")
+        let status = MyBidsViewModel.derivedStatus(for: dto, now: Self.fixedNow)
+        let footer = MyBidsViewModel.footerFor(dto: dto, tab: MyBidsTab.active, status: status)
+        XCTAssertEqual(footer, .counter(amount: "$80"))
+        let row = MyBidsViewModel.row(
+            projection: MyBidsViewModel.BidProjection(dto: dto, tab: MyBidsTab.active, status: status, footer: footer),
+            now: Self.fixedNow,
+            callbacks: MyBidsViewModel.RowCallbacks()
+        )
+        XCTAssertEqual(row.footer?.actions.map(\.title), ["Decline counter", "Accept $80"])
+        XCTAssertEqual(
+            row.footer?.actions.map(\.identifier),
+            ["myBids.counter_c1.decline", "myBids.counter_c1.accept"]
+        )
+    }
+
+    private static let counteredBidsJSON = """
+    {"bids":[{"id":"c1","gig_id":"g_c1","user_id":"u","bid_amount":100,"status":"countered",
+              "counter_amount":80,"counter_status":"pending","created_at":"2026-05-14T09:00:00Z",
+              "gig":{"id":"g_c1","title":"TV mount","price":120,"category":"handyman",
+                     "status":"open","user_id":"u_owner"}}],"total":1}
+    """
+
+    func testAcceptCounter_PostsEndpointAndAdoptsCounterAmount() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.counteredBidsJSON),
+            .status(200, body: #"{"bid":{"id":"c1","status":"pending","bid_amount":80}}"#)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.acceptCounter(makeBid(id: "c1", status: "countered", counterAmount: 80, counterStatus: "pending"))
+        let request = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(request?.httpMethod, "POST")
+        XCTAssertEqual(request?.url?.path, "/api/gigs/g_c1/bids/c1/counter/accept")
+        XCTAssertEqual(vm.toast?.kind, .success)
+        XCTAssertTrue(vm.toast?.text.contains("$80") ?? false)
+        // Row settles back to a plain pending bid at the counter amount.
+        guard case let .loaded(sections, _) = vm.state else { return XCTFail("Expected .loaded") }
+        let row = sections.first?.rows.first
+        XCTAssertEqual(row?.chips?.first?.text, "Pending")
+        if case let .priceStack(amount, _)? = row?.trailing {
+            XCTAssertEqual(amount, "$80")
+        } else {
+            XCTFail("Expected priceStack trailing")
+        }
+    }
+
+    func testDeclineCounter_PostsEndpointAndKeepsOriginalAmount() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.counteredBidsJSON),
+            .status(200, body: #"{"bid":{"id":"c1","status":"pending","bid_amount":100}}"#)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.declineCounter(makeBid(id: "c1", status: "countered", counterAmount: 80, counterStatus: "pending"))
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.last?.url?.path, "/api/gigs/g_c1/bids/c1/counter/decline")
+        XCTAssertEqual(vm.toast?.kind, .success)
+        guard case let .loaded(sections, _) = vm.state else { return XCTFail("Expected .loaded") }
+        let row = sections.first?.rows.first
+        if case let .priceStack(amount, _)? = row?.trailing {
+            XCTAssertEqual(amount, "$100", "Decline keeps the original bid amount.")
+        } else {
+            XCTFail("Expected priceStack trailing")
+        }
+    }
+
+    func testAcceptCounter_RollsBackOnFailure() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.counteredBidsJSON),
+            .status(500, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        await vm.acceptCounter(makeBid(id: "c1", status: "countered", counterAmount: 80, counterStatus: "pending"))
+        XCTAssertEqual(vm.toast?.kind, .error)
+        guard case let .loaded(sections, _) = vm.state else { return XCTFail("Expected .loaded") }
+        XCTAssertEqual(
+            sections.first?.rows.first?.chips?.first?.text,
+            "Countered $80",
+            "Failed POST restores the countered row."
+        )
+    }
+
     // MARK: - Test fixtures
 
     private static let iso8601: ISO8601DateFormatter = {
@@ -846,7 +945,9 @@ final class MyBidsViewModelTests: XCTestCase {
         category: String? = "handyman",
         shortlisted: Bool? = nil,
         yourRank: Int? = nil,
-        topPrice: Double? = nil
+        topPrice: Double? = nil,
+        counterAmount: Double? = nil,
+        counterStatus: String? = nil
     ) -> BidDTO {
         BidDTO(
             id: id,
@@ -859,8 +960,8 @@ final class MyBidsViewModelTests: XCTestCase {
             createdAt: createdAt,
             updatedAt: nil,
             expiresAt: expiresAt,
-            counterAmount: nil,
-            counterStatus: nil,
+            counterAmount: counterAmount,
+            counterStatus: counterStatus,
             counteredAt: nil,
             withdrawnAt: nil,
             withdrawalReason: nil,

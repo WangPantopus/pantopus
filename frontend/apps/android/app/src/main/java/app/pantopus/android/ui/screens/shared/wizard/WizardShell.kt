@@ -173,6 +173,12 @@ fun WizardShell(
             model.onDiscard()
         },
         onKeepGoing = { showDiscard = false },
+        // P6c — wizards with a draft store offer "Save draft" too.
+        saveDraftLabel = chrome.saveDraftLabel,
+        onSaveDraft = {
+            showDiscard = false
+            model.onSaveDraft()
+        },
     )
 }
 
@@ -291,7 +297,7 @@ private fun WizardStickyCta(
                 isEnabled = chrome.primaryCtaEnabled,
                 tint = tint,
                 shadow = shadow,
-                modifier = Modifier.weight(1f).testTag(WizardShellTags.PRIMARY_CTA),
+                modifier = Modifier.weight(1f).testTag(chrome.primaryCtaTestTag ?: WizardShellTags.PRIMARY_CTA),
             )
         }
     }

@@ -2,6 +2,12 @@
 
 package app.pantopus.android.ui.screens.gigs.quickpost
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -21,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -29,21 +37,30 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.gigs.GigsCategory
@@ -56,9 +73,13 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
+import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
 
 @Composable
 fun PostGigV1Screen(
@@ -70,6 +91,69 @@ fun PostGigV1Screen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
     val content = state as? PostGigV1UiState.Content
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // P0.3 — real Material3 date + time pickers behind the date field.
+    var showDateTimePicker by remember { mutableStateOf(false) }
+
+    // P0.2 — modern photo picker; picked URIs are copied to bytes and
+    // uploaded immediately by the VM.
+    val handlePicked: (Uri?) -> Unit = { uri ->
+        if (uri != null) {
+            scope.launch {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes != null) {
+                    val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                    viewModel.addPickedPhoto(
+                        PostGigV1PickedPhoto(
+                            filename = "gig-${UUID.randomUUID().toString().take(6)}.jpg",
+                            mimeType = mime,
+                            bytes = bytes,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), handlePicked)
+
+    // P6b — real camera capture behind the Add tile's "Take a photo"
+    // option (closes the P0 deferral). `TakePicture()` writes into a
+    // cache-dir file exposed through the app FileProvider, then the
+    // captured URI rides the SAME `handlePicked` upload path as library
+    // picks. Saveable across process death during capture.
+    var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val cameraCapture =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val uri = pendingCameraUri?.let(Uri::parse)
+            pendingCameraUri = null
+            if (success) handlePicked(uri)
+        }
+    val launchCamera = {
+        val photoFile = File(context.cacheDir, "gig-camera-${UUID.randomUUID()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        pendingCameraUri = uri.toString()
+        // No camera app (or a broken resolver) must not crash — drop it.
+        runCatching { cameraCapture.launch(uri) }.onFailure { pendingCameraUri = null }
+        Unit
+    }
+    // CAMERA is declared in the manifest, so the TakePicture intent
+    // requires the runtime grant first. Denial is graceful: skip capture.
+    val cameraPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchCamera()
+        }
+    val onTakePhoto = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            launchCamera()
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     LaunchedEffect(preselectedCategoryKey) {
         viewModel.preselectCategoryIfNeeded(GigsCategory.fromBackendKey(preselectedCategoryKey))
@@ -86,9 +170,10 @@ fun PostGigV1Screen(
     }
 
     FormShell(
-        title = "Post gig",
+        // P4 — the same screen doubles as the owner's gig editor.
+        title = if (viewModel.isEditMode) "Edit gig" else "Post gig",
         leading = FormShellLeading.Back,
-        rightActionLabel = "Post",
+        rightActionLabel = if (viewModel.isEditMode) "Save" else "Post",
         isValid = content?.canAttemptSubmit == true,
         isDirty = content?.isPostEnabled == true,
         isSaving = content?.isSubmitting == true,
@@ -109,13 +194,30 @@ fun PostGigV1Screen(
                             onDescription = viewModel::updateDescription,
                             onPrice = viewModel::updatePrice,
                             onPriceType = viewModel::updatePriceType,
-                            onPickDate = viewModel::pickNextSaturday,
+                            onPickDate = { showDateTimePicker = true },
                             onLocation = viewModel::updateLocation,
-                            onAddPhoto = viewModel::addPlaceholderPhoto,
+                            onAddPhoto = {
+                                photoPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                            onTakePhoto = onTakePhoto,
                             onRemovePhoto = viewModel::removePhoto,
+                            onRetryPhoto = viewModel::retryPhotoUpload,
                         ),
                 )
         }
+    }
+
+    if (showDateTimePicker) {
+        FutureDateTimePickerDialogs(
+            initial = content?.form?.scheduledAt,
+            onPicked = { picked ->
+                showDateTimePicker = false
+                viewModel.updateScheduledAt(picked)
+            },
+            onDismiss = { showDateTimePicker = false },
+        )
     }
 }
 
@@ -128,7 +230,11 @@ data class PostGigV1Actions(
     val onPickDate: () -> Unit = {},
     val onLocation: (String) -> Unit = {},
     val onAddPhoto: () -> Unit = {},
+    /** P6b — camera capture option on the Add tile. */
+    val onTakePhoto: () -> Unit = {},
     val onRemovePhoto: (String) -> Unit = {},
+    /** P0.2 — tap-to-retry on a failed upload tile. */
+    val onRetryPhoto: (String) -> Unit = {},
 )
 
 @Composable
@@ -175,6 +281,8 @@ fun PostGigV1Content(
         PriceField(
             value = form.price,
             unit = form.priceType.unitLabel,
+            // P4 — Free disables (and the VM clears) the price input.
+            enabled = form.priceType != PostGigV1PriceType.Free,
             error = errors.messageFor(PostGigV1Field.Price),
             onValueChange = actions.onPrice,
         )
@@ -194,7 +302,9 @@ fun PostGigV1Content(
             photos = form.photos,
             canAdd = form.photos.size < PostGigV1SampleData.MAX_PHOTOS,
             onAdd = actions.onAddPhoto,
+            onTakePhoto = actions.onTakePhoto,
             onRemove = actions.onRemovePhoto,
+            onRetry = actions.onRetryPhoto,
         )
     }
 
@@ -326,9 +436,10 @@ private fun DescriptionField(
         Row(verticalAlignment = Alignment.Top) {
             if (error != null) InlineError(error)
             Spacer(modifier = Modifier.weight(1f))
+            // A13.8 P4 — 11sp monospace counter; the 40-char minimum is enforced by validation.
             Text(
                 text = "${value.length} / ${PostGigV1SampleData.DESCRIPTION_MAX_LENGTH}",
-                style = PantopusTextStyle.caption.copy(fontFamily = FontFamily.Monospace),
+                style = PantopusTextStyle.caption.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
                 color = PantopusColors.appTextMuted,
                 modifier = Modifier.testTag("postGigV1_descriptionCount"),
             )
@@ -340,19 +451,20 @@ private fun DescriptionField(
 private fun PriceField(
     value: String,
     unit: String?,
+    enabled: Boolean,
     error: String?,
     onValueChange: (String) -> Unit,
 ) {
     val border = if (error == null) PantopusColors.appBorder else PantopusColors.error
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        FieldLabel("Price", required = true)
+        FieldLabel("Price", required = enabled)
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(Radii.md))
-                    .background(PantopusColors.appSurface)
+                    .background(if (enabled) PantopusColors.appSurface else PantopusColors.appSurfaceSunken)
                     .border(
                         width = if (error == null) 1.dp else 1.5.dp,
                         color = border,
@@ -370,6 +482,7 @@ private fun PriceField(
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
+                enabled = enabled,
                 textStyle = PantopusTextStyle.body.copy(color = PantopusColors.appText, fontWeight = FontWeight.SemiBold),
                 cursorBrush = SolidColor(PantopusColors.primary600),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -378,10 +491,21 @@ private fun PriceField(
                     Modifier
                         .weight(1f)
                         .testTag("postGigV1_price")
-                        .semantics { contentDescription = if (error == null) "Price" else "Price, error: $error" },
+                        .semantics {
+                            contentDescription =
+                                when {
+                                    !enabled -> "Price, free gig"
+                                    error == null -> "Price"
+                                    else -> "Price, error: $error"
+                                }
+                        },
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
-                        Text("0", style = PantopusTextStyle.body, color = PantopusColors.appTextMuted)
+                        Text(
+                            text = if (enabled) "0" else "Free",
+                            style = PantopusTextStyle.body,
+                            color = PantopusColors.appTextMuted,
+                        )
                     }
                     inner()
                 },
@@ -500,7 +624,9 @@ private fun PhotosGrid(
     photos: List<PostGigV1Photo>,
     canAdd: Boolean,
     onAdd: () -> Unit,
+    onTakePhoto: () -> Unit,
     onRemove: (String) -> Unit,
+    onRetry: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), verticalAlignment = Alignment.CenterVertically) {
@@ -522,7 +648,8 @@ private fun PhotosGrid(
                     when (item) {
                         PhotoGridItem.Add ->
                             AddPhotoTile(
-                                onClick = onAdd,
+                                onPickLibrary = onAdd,
+                                onTakePhoto = onTakePhoto,
                                 modifier = Modifier.weight(1f),
                             )
                         is PhotoGridItem.Photo ->
@@ -530,6 +657,7 @@ private fun PhotosGrid(
                                 photo = item.photo,
                                 isCover = index == 0,
                                 onRemove = onRemove,
+                                onRetry = onRetry,
                                 modifier = Modifier.weight(1f),
                             )
                     }
@@ -539,14 +667,15 @@ private fun PhotosGrid(
                 }
             }
         }
+        // A13.8 P4 — design-exact 11sp italic captions.
         Text(
             text =
                 if (photos.isEmpty()) {
                     "Photos help your gig get picked up faster."
                 } else {
-                    "First photo is the cover. Tap remove to delete."
+                    "First photo is the cover. Tap × to remove."
                 },
-            style = PantopusTextStyle.caption,
+            style = PantopusTextStyle.caption.copy(fontSize = 11.sp, fontStyle = FontStyle.Italic),
             color = PantopusColors.appTextSecondary,
             modifier = Modifier.testTag("postGigV1_photoHint"),
         )
@@ -563,37 +692,61 @@ private sealed interface PhotoGridItem {
 
 @Composable
 private fun AddPhotoTile(
-    onClick: () -> Unit,
+    onPickLibrary: () -> Unit,
+    onTakePhoto: () -> Unit,
     modifier: Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurfaceMuted)
-                .border(
-                    width = 1.5.dp,
-                    color = PantopusColors.appBorderStrong,
-                    shape = RoundedCornerShape(Radii.lg),
-                ).clickable(onClick = onClick)
-                .testTag("postGigV1_addPhoto")
-                .semantics { contentDescription = "Add photo" },
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Plus,
-            contentDescription = null,
-            size = 18.dp,
-            tint = PantopusColors.appTextSecondary,
-        )
-        Text(
-            text = "Add",
-            style = PantopusTextStyle.caption,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appTextSecondary,
-        )
+    // P6b — the tile opens a two-option source menu (camera capture vs
+    // library pick) instead of jumping straight into the library.
+    var sourceMenuOpen by remember { mutableStateOf(false) }
+    Box(modifier = modifier.aspectRatio(1f)) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurfaceMuted)
+                    .border(
+                        width = 1.5.dp,
+                        color = PantopusColors.appBorderStrong,
+                        shape = RoundedCornerShape(Radii.lg),
+                    ).clickable { sourceMenuOpen = true }
+                    .testTag("postGigV1_addPhoto")
+                    .semantics { contentDescription = "Add photo" },
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Plus,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = "Add",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        DropdownMenu(expanded = sourceMenuOpen, onDismissRequest = { sourceMenuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text("Take a photo") },
+                onClick = {
+                    sourceMenuOpen = false
+                    onTakePhoto()
+                },
+                modifier = Modifier.testTag("postGigV1_addPhoto_camera"),
+            )
+            DropdownMenuItem(
+                text = { Text("Photo library") },
+                onClick = {
+                    sourceMenuOpen = false
+                    onPickLibrary()
+                },
+                modifier = Modifier.testTag("postGigV1_addPhoto_library"),
+            )
+        }
     }
 }
 
@@ -602,6 +755,7 @@ private fun PhotoTile(
     photo: PostGigV1Photo,
     isCover: Boolean,
     onRemove: (String) -> Unit,
+    onRetry: (String) -> Unit,
     modifier: Modifier,
 ) {
     val fill =
@@ -617,15 +771,72 @@ private fun PhotoTile(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(fill)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+                .border(
+                    width = 1.dp,
+                    color =
+                        if (photo.status == PostGigV1PhotoStatus.Failed) {
+                            PantopusColors.error
+                        } else {
+                            PantopusColors.appBorder
+                        },
+                    shape = RoundedCornerShape(Radii.lg),
+                ),
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Image,
-            contentDescription = null,
-            size = Radii.xl2,
-            tint = PantopusColors.appTextSecondary,
-            modifier = Modifier.align(Alignment.Center),
-        )
+        if (photo.url != null) {
+            AsyncImage(
+                model = photo.url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            )
+        } else {
+            PantopusIconImage(
+                icon = PantopusIcon.Image,
+                contentDescription = null,
+                size = Radii.xl2,
+                tint = PantopusColors.appTextSecondary,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        // P0.2 — per-tile upload state overlays.
+        when (photo.status) {
+            PostGigV1PhotoStatus.Uploading ->
+                Box(
+                    modifier =
+                        Modifier
+                            .aspectRatio(1f)
+                            .fillMaxWidth()
+                            .background(PantopusColors.appText.copy(alpha = 0.35f))
+                            .testTag("postGigV1_uploadingPhoto_${photo.id}"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        color = PantopusColors.appTextInverse,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            PostGigV1PhotoStatus.Failed ->
+                Box(
+                    modifier =
+                        Modifier
+                            .aspectRatio(1f)
+                            .fillMaxWidth()
+                            .background(PantopusColors.errorBg.copy(alpha = 0.85f))
+                            .clickable { onRetry(photo.id) }
+                            .testTag("postGigV1_retryPhoto_${photo.id}")
+                            .semantics { contentDescription = "Upload failed, tap to retry" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.AlertCircle,
+                        contentDescription = null,
+                        size = 22.dp,
+                        tint = PantopusColors.error,
+                    )
+                }
+            PostGigV1PhotoStatus.Uploaded -> Unit
+        }
         if (isCover) {
             Text(
                 text = "Cover",
@@ -695,19 +906,19 @@ private fun PostGigV1ErrorBanner(
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1), modifier = Modifier.weight(1f)) {
+            // A13.8 P4 — design-exact banner copy; per-field messages render
+            // inline under the highlighted fields, not in the banner.
             Text(
-                text = "${errors.size} problems - please fix",
+                text = "${errors.size} problems — please fix",
                 style = PantopusTextStyle.small,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.error,
             )
-            errors.forEach { error ->
-                Text(
-                    text = "• ${error.message}",
-                    style = PantopusTextStyle.caption,
-                    color = PantopusColors.error,
-                )
-            }
+            Text(
+                text = "We couldn't post your gig. See the highlighted fields below.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.error,
+            )
         }
     }
 }
@@ -721,7 +932,12 @@ private fun InlineError(message: String) {
             size = 11.dp,
             tint = PantopusColors.error,
         )
-        Text(text = message, style = PantopusTextStyle.caption, color = PantopusColors.error)
+        // A13.8 P4 — design-exact 11sp inline error rows.
+        Text(
+            text = message,
+            style = PantopusTextStyle.caption.copy(fontSize = 11.sp),
+            color = PantopusColors.error,
+        )
     }
 }
 

@@ -85,6 +85,9 @@ import java.util.Locale
 internal fun GigComposePickerSheetHost(
     state: GigComposeUiState,
     viewModel: GigComposeViewModel,
+    onPickPhoto: () -> Unit = {},
+    onTakePhoto: () -> Unit = {},
+    onPickFile: () -> Unit = {},
 ) {
     val sheet = state.activeSheet ?: return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -94,12 +97,113 @@ internal fun GigComposePickerSheetHost(
         containerColor = PantopusColors.appSurface,
     ) {
         when (sheet) {
-            GigPickerSheet.Attachment -> AttachmentSheetContent(viewModel)
+            GigPickerSheet.Attachment ->
+                AttachmentSheetContent(
+                    viewModel,
+                    onPickPhoto = onPickPhoto,
+                    onTakePhoto = onTakePhoto,
+                    onPickFile = onPickFile,
+                )
             GigPickerSheet.Category -> CategorySheetContent(state, viewModel)
             GigPickerSheet.Deadline -> DeadlineSheetContent(state, viewModel)
             GigPickerSheet.Policy -> PolicySheetContent(state, viewModel)
             GigPickerSheet.Urgency -> UrgencySheetContent(state, viewModel)
             GigPickerSheet.Tags -> TagsSheetContent(state, viewModel)
+            GigPickerSheet.Identity -> IdentitySheetContent(state, viewModel)
+        }
+    }
+}
+
+// ─── P6c — Posting identity (persona switching) ───────────────────
+
+/**
+ * P6c — "Post as" picker behind the identity chip. Lists Personal plus
+ * every business with a postable user id; the selection rides
+ * magic-post as `beneficiary_user_id` (null for Personal).
+ */
+@Composable
+private fun IdentitySheetContent(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
+    PickerSheetScaffold(
+        rootTestTag = "gigCompose.identitySheet",
+        title = "Post as",
+        subtitle = "Choose who this task is posted for.",
+        onClose = vm::dismissPicker,
+    ) {
+        IdentityOptionRow(
+            label = "Personal · You",
+            sublabel = "Your personal profile",
+            icon = PantopusIcon.User,
+            accent = PantopusColors.personal,
+            accentBg = PantopusColors.personalBg,
+            isSelected = state.form.beneficiaryUserId == null,
+            testTag = "gigCompose.identity.option_personal",
+            onTap = { vm.selectIdentity(null) },
+        )
+        state.identityOptions.forEach { option ->
+            Spacer(Modifier.size(Spacing.s2))
+            IdentityOptionRow(
+                label = option.name,
+                sublabel = "Business",
+                icon = PantopusIcon.Briefcase,
+                accent = PantopusColors.business,
+                accentBg = PantopusColors.businessBg,
+                isSelected = state.form.beneficiaryUserId == option.id,
+                testTag = "gigCompose.identity.option_${option.id}",
+                onTap = { vm.selectIdentity(option) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun IdentityOptionRow(
+    label: String,
+    sublabel: String,
+    icon: PantopusIcon,
+    accent: Color,
+    accentBg: Color,
+    isSelected: Boolean,
+    testTag: String,
+    onTap: () -> Unit,
+) {
+    val borderColor = if (isSelected) accent else PantopusColors.appBorder
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .border(width = if (isSelected) 2.dp else 1.dp, color = borderColor, shape = RoundedCornerShape(Radii.md))
+                .clickable(role = Role.Button, onClick = onTap)
+                .padding(Spacing.s3)
+                .testTag(testTag)
+                .semantics {
+                    contentDescription = "$label. $sublabel"
+                    selected = isSelected
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier = Modifier.size(34.dp).clip(CircleShape).background(accentBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = accent)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+            Text(sublabel, fontSize = 11.5.sp, color = PantopusColors.appTextSecondary)
+        }
+        if (isSelected) {
+            PantopusIconImage(
+                icon = PantopusIcon.CheckCircle,
+                contentDescription = null,
+                size = 18.dp,
+                tint = accent,
+            )
         }
     }
 }
@@ -689,12 +793,28 @@ private fun SuggestionChipView(
 // ─── Sheet 5: Attachment source ───────────────────────────────────
 
 @Composable
-private fun AttachmentSheetContent(vm: GigComposeViewModel) {
-    // Real upload lands in P15.5 — each source mints a placeholder
-    // attachment so the cap + count behaviour stays exercisable.
-    fun add() {
-        vm.addPlaceholderPhoto()
+private fun AttachmentSheetContent(
+    vm: GigComposeViewModel,
+    onPickPhoto: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickFile: () -> Unit,
+) {
+    // P0.2 — sources launch the host's system pickers; the picked bytes
+    // upload immediately via the VM. P6b — "Take a photo" launches real
+    // camera capture (`TakePicture()` + FileProvider) wired by the host.
+    fun pickPhoto() {
         vm.dismissPicker()
+        onPickPhoto()
+    }
+
+    fun takePhoto() {
+        vm.dismissPicker()
+        onTakePhoto()
+    }
+
+    fun pickFile() {
+        vm.dismissPicker()
+        onPickFile()
     }
     Column(
         modifier =
@@ -732,7 +852,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.primary600,
                 container = PantopusColors.primary50,
                 testTag = "gigPicker.attach.photos",
-            ) { add() }
+            ) { takePhoto() }
             HorizontalDivider(color = PantopusColors.appBorderSubtle, modifier = Modifier.padding(start = 70.dp))
             AttachmentActionRow(
                 icon = PantopusIcon.Image,
@@ -741,7 +861,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.success,
                 container = PantopusColors.successBg,
                 testTag = "gigPicker.attach.library",
-            ) { add() }
+            ) { pickPhoto() }
             HorizontalDivider(color = PantopusColors.appBorderSubtle, modifier = Modifier.padding(start = 70.dp))
             AttachmentActionRow(
                 icon = PantopusIcon.FileText,
@@ -750,7 +870,7 @@ private fun AttachmentSheetContent(vm: GigComposeViewModel) {
                 tint = PantopusColors.magic,
                 container = PantopusColors.magicBg,
                 testTag = "gigPicker.attach.file",
-            ) { add() }
+            ) { pickFile() }
         }
         Box(
             modifier =

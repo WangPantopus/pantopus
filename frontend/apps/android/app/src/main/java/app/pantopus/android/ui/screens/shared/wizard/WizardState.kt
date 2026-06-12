@@ -53,4 +53,17 @@ data class WizardChrome(
     val footerHint: String? = null,
     val dirty: Boolean,
     val showsProgressBar: Boolean,
+    /**
+     * A12.8 — optional override for the primary CTA's test tag so a
+     * wizard can expose a canonical cross-platform identifier (e.g.
+     * `gigCompose.cta.reviewPost`). `null` keeps the shared
+     * [WizardShellTags.PRIMARY_CTA] tag.
+     */
+    val primaryCtaTestTag: String? = null,
+    /**
+     * P6c — when non-null, the dirty-close confirm offers a third
+     * "save draft" action (label = this value) that routes to
+     * [WizardModel.onSaveDraft]. `null` keeps the two-button dialog.
+     */
+    val saveDraftLabel: String? = null,
 )

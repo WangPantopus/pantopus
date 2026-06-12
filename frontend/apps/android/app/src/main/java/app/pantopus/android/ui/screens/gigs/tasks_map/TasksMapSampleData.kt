@@ -7,7 +7,7 @@ import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapAnchor
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapPinState
 
 /**
- * Deterministic seed for the Tasks map (backend removed). Mirrors the iOS
+ * Deterministic preview/snapshot seed for the Tasks map. Mirrors the iOS
  * `TasksMapSampleData`: nine items reproducing the design's nine pins —
  * handyman ×2, cleaning ×2, pet care ×2, plus moving / child care /
  * tutoring (moving + tutoring are pending). The first three mirror the
@@ -29,6 +29,7 @@ object TasksMapSampleData {
                 price = "$60",
                 distanceLabel = "0.2 mi",
                 bidCount = 4,
+                body = "Three 24-inch floating shelves, hardware included. Drywall anchors needed — no studs where they're going.",
             ),
             TaskMapItem(
                 id = "cleaning-1",
@@ -40,6 +41,7 @@ object TasksMapSampleData {
                 price = "$180",
                 distanceLabel = "0.5 mi",
                 bidCount = 7,
+                body = "Two-bedroom apartment, move-out deep clean before the walkthrough. Oven + fridge included.",
             ),
             TaskMapItem(
                 id = "petcare-1",
@@ -51,6 +53,7 @@ object TasksMapSampleData {
                 price = "$22/walk",
                 distanceLabel = "0.3 mi",
                 bidCount = 2,
+                body = "Friendly golden retriever needs 30-minute midday walks every Tuesday and Thursday.",
             ),
             TaskMapItem(
                 id = "moving-1",

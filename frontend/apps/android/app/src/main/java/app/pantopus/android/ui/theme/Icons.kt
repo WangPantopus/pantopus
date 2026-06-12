@@ -116,6 +116,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocalFlorist
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -126,6 +127,7 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
@@ -158,6 +160,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
@@ -201,6 +204,7 @@ import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -465,6 +469,11 @@ enum class PantopusIcon(
     Paperclip("paperclip"),
     ArrowDownUp("arrow-down-up"),
 
+    // A12.8 Magic Task wizard — describe-card voice note + One-time
+    // engagement tile glyph.
+    Mic("mic"),
+    CircleDot("circle-dot"),
+
     // T6.6b — Chat conversation refresh: header trailing (phone / video /
     // more-vertical for person, history / more-vertical for AI) +
     // empty-state "Introduce yourself" quick-chip.
@@ -557,6 +566,12 @@ enum class PantopusIcon(
     // (`file-plus-2`).
     FilePlus2("file-plus-2"),
     FileWarning("file-warning"),
+
+    // A11.1 Tasks map — `maximize` backs the focus-on-pins map control
+    // (fit camera to all pins); `map-pin-off` backs the zero-results
+    // empty-state hero tile. Material fallbacks: ZoomOutMap / LocationOff.
+    Maximize("maximize"),
+    MapPinOff("map-pin-off"),
     ;
 
     companion object {
@@ -819,6 +834,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Paperclip -> IconSource.Material(Icons.Filled.AttachFile)
         PantopusIcon.ArrowDownUp -> IconSource.Material(Icons.Filled.Sort)
 
+        // A12.8 Magic Task wizard — `Mic` is a direct match; Lucide's
+        // `circle-dot` (One-time engagement tile) maps to Material's
+        // `RadioButtonChecked` ring-with-dot glyph.
+        PantopusIcon.Mic -> IconSource.Material(Icons.Filled.Mic)
+        PantopusIcon.CircleDot -> IconSource.Material(Icons.Filled.RadioButtonChecked)
+
         // T6.6b — Chat conversation refresh. Material's `MoreVert` is a
         // direct match for `more-vertical`; `Videocam` matches Lucide's
         // `video`. Lucide's `hand` (waving open hand for the "Introduce
@@ -900,6 +921,11 @@ internal fun PantopusIcon.source(): IconSource =
         // `file-warning` falls back to the generic warning triangle.
         PantopusIcon.FilePlus2 -> IconSource.Material(Icons.Filled.NoteAdd)
         PantopusIcon.FileWarning -> IconSource.Material(Icons.Filled.Warning)
+        // A11.1 Tasks map. `ZoomOutMap` is the outward-arrows fit-to-bounds
+        // glyph for `maximize`; `LocationOff` is the slashed pin for
+        // `map-pin-off`.
+        PantopusIcon.Maximize -> IconSource.Material(Icons.Filled.ZoomOutMap)
+        PantopusIcon.MapPinOff -> IconSource.Material(Icons.Filled.LocationOff)
     }
 
 /**

@@ -9,6 +9,7 @@
 
 package app.pantopus.android.ui.screens.my_bids
 
+import app.pantopus.android.data.api.models.gigs.GigBidMutationResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.offers.BidDto
 import app.pantopus.android.data.api.models.offers.BidGigDto
@@ -76,6 +77,8 @@ class MyBidsViewModelTest {
         shortlisted: Boolean? = null,
         yourRank: Int? = null,
         topPrice: Double? = null,
+        counterAmount: Double? = null,
+        counterStatus: String? = null,
     ) = BidDto(
         id = id,
         gigId = "g_$id",
@@ -87,8 +90,8 @@ class MyBidsViewModelTest {
         createdAt = createdAt,
         updatedAt = null,
         expiresAt = expiresAt,
-        counterAmount = null,
-        counterStatus = null,
+        counterAmount = counterAmount,
+        counterStatus = counterStatus,
         counteredAt = null,
         withdrawnAt = null,
         withdrawalReason = null,
@@ -846,5 +849,59 @@ class MyBidsViewModelTest {
             assertNotNull(viewModel.toast.value)
             viewModel.dismissToast()
             assertNull(viewModel.toast.value)
+        }
+
+    // MARK: - Phase 5 · counter-offers (work item 2)
+
+    @Test
+    fun countered_bid_with_pending_counter_derives_countered_status() {
+        val d = dto("c1", status = "countered", counterAmount = 80.0, counterStatus = "pending")
+        val status = MyBidsViewModel.derivedStatus(d, fixedNow)
+        assertEquals(MyBidsStatus.Countered("$80"), status)
+        assertEquals(MyBidsTab.ACTIVE, MyBidsViewModel.tabFor(d, fixedNow))
+        assertEquals(MyBidsFooter.CounterRespond, MyBidsViewModel.footerFor(d, MyBidsTab.ACTIVE, status))
+        assertEquals("pending", MyBidsViewModel.statusFilterId(status))
+    }
+
+    @Test
+    fun resolved_counter_no_longer_shows_countered_chip() {
+        val declined = dto("c2", status = "countered", counterAmount = 80.0, counterStatus = "declined")
+        val status = MyBidsViewModel.derivedStatus(declined, fixedNow)
+        assertEquals(MyBidsStatus.Pending, status)
+        assertEquals(MyBidsFooter.Edit, MyBidsViewModel.footerFor(declined, MyBidsTab.ACTIVE, status))
+    }
+
+    @Test
+    fun accept_counter_adopts_counter_amount_and_posts() =
+        runTest {
+            val countered = dto("c3", status = "countered", bidAmount = 100.0, counterAmount = 80.0, counterStatus = "pending")
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(MyBidsResponse(bids = listOf(countered)))
+            coEvery { gigsRepo.acceptCounterOffer("g_c3", "c3") } returns
+                NetworkResult.Success(GigBidMutationResponse())
+            val viewModel = vm()
+            viewModel.load()
+            viewModel.acceptCounter(countered)
+            val state = viewModel.state.value as ListOfRowsUiState.Loaded
+            val trailing = state.sections.first().rows.first().trailing as RowTrailing.PriceStack
+            assertEquals("$80", trailing.amount)
+            assertEquals("Counter accepted — new amount locked in.", viewModel.toast.value?.text)
+        }
+
+    @Test
+    fun decline_counter_failure_reverts_row() =
+        runTest {
+            val countered = dto("c4", status = "countered", counterAmount = 80.0, counterStatus = "pending")
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(MyBidsResponse(bids = listOf(countered)))
+            coEvery { gigsRepo.declineCounterOffer("g_c4", "c4") } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            val viewModel = vm()
+            viewModel.load()
+            viewModel.declineCounter(countered)
+            val state = viewModel.state.value as ListOfRowsUiState.Loaded
+            val chip = state.sections.first().rows.first().chips!!.first()
+            assertEquals("Countered $80", chip.text)
+            assertTrue(viewModel.toast.value?.isError == true)
         }
 }

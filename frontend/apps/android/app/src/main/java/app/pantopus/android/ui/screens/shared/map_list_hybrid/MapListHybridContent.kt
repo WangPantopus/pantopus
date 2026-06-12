@@ -47,6 +47,63 @@ data class MapPin(
 enum class MapPinState { Confirmed, Pending }
 
 /**
+ * A11.1 — several pins collapsed into one marker at low zoom (28dp
+ * primary disc + white count). Consumers build these from their own pure
+ * clustering pass (see `TasksMapGeometry.buildClusteredPins`) so the
+ * shell stays free of the maps-utils clustering lib. [id] is the
+ * deterministic `cluster_<x>_<y>` bucket key (taps round-trip through
+ * it); the `…cluster_<index>` testTags use the render-order ordinal.
+ */
+@Immutable
+data class MapClusterPin(
+    val id: String,
+    val latitude: Double,
+    val longitude: Double,
+    val count: Int,
+)
+
+/**
+ * Map-SDK-free viewport descriptor — the shell reports the settled
+ * camera through it (`onCameraChange`) and consumers request camera
+ * moves with it ([MapListHybridCameraRequest]), so view-models stay
+ * unit-testable without Google Maps. Mirrors iOS `MapListHybridRegion`.
+ */
+@Immutable
+data class MapListHybridRegion(
+    val centerLatitude: Double,
+    val centerLongitude: Double,
+    val latitudeSpan: Double,
+    val longitudeSpan: Double,
+) {
+    val minLatitude: Double get() = centerLatitude - latitudeSpan / 2
+    val maxLatitude: Double get() = centerLatitude + latitudeSpan / 2
+    val minLongitude: Double get() = centerLongitude - longitudeSpan / 2
+    val maxLongitude: Double get() = centerLongitude + longitudeSpan / 2
+
+    /** Same center, span multiplied — the "Widen search" ×2.5 zoom-out
+     * and the cluster-tap ÷2 zoom-in both go through here. */
+    fun scaled(factor: Double): MapListHybridRegion =
+        copy(latitudeSpan = latitudeSpan * factor, longitudeSpan = longitudeSpan * factor)
+
+    /** Same span, new center — rail-page → pan-to-pin sync. */
+    fun recentered(
+        latitude: Double,
+        longitude: Double,
+    ): MapListHybridRegion = copy(centerLatitude = latitude, centerLongitude = longitude)
+}
+
+/**
+ * Token-identified camera move. The shell applies [region] (animated)
+ * whenever the value changes — bump [token] to re-request the same
+ * region twice.
+ */
+@Immutable
+data class MapListHybridCameraRequest(
+    val token: Int,
+    val region: MapListHybridRegion,
+)
+
+/**
  * Optional "you are here" anchor overlay. Callers pass in their latest
  * `UserCoordinate` snapshot when location is available.
  */

@@ -9,9 +9,11 @@
 //  options, and an optional confirm affordance, presented from
 //  `GigComposeWizardView` via `.sheet(item:)`.
 //
-//  Six sheets: Attachment source · Category · Deadline · Cancellation
-//  policy · Urgency · Tags. Results bind straight back into
-//  `GigComposeViewModel` / `GigComposeFormState`.
+//  Five sheets: Category · Deadline · Cancellation policy · Urgency ·
+//  Tags. Results bind straight back into `GigComposeViewModel` /
+//  `GigComposeFormState`. (The former attachment-source sheet was
+//  retired in P15.5 — the Basics step now opens the system PhotosPicker
+//  directly and uploads for real via `POST /api/files/upload`.)
 //
 
 import SwiftUI
@@ -22,12 +24,15 @@ import SwiftUI
 
 /// The composer picker sheets, presented one-at-a-time over the wizard.
 public enum GigPickerSheet: String, Identifiable, CaseIterable, Sendable {
-    case attachment
     case category
     case deadline
     case policy
     case urgency
     case tags
+    // A12.8 — step-1 module-prompt quick editors (When / Where / Effort).
+    case when
+    case location
+    case effort
 
     public var id: String {
         rawValue
@@ -37,8 +42,8 @@ public enum GigPickerSheet: String, Identifiable, CaseIterable, Sendable {
     var detents: Set<PresentationDetent> {
         switch self {
         case .deadline: [.large]
-        case .attachment, .urgency: [.medium]
-        case .category, .policy, .tags: [.medium, .large]
+        case .urgency, .effort: [.medium]
+        case .category, .policy, .tags, .when, .location: [.medium, .large]
         }
     }
 }
@@ -54,12 +59,14 @@ struct GigPickerSheetHost: View {
     var body: some View {
         Group {
             switch sheet {
-            case .attachment: GigAttachmentSheet(viewModel: viewModel)
             case .category: GigCategorySheet(viewModel: viewModel)
             case .deadline: GigDeadlineSheet(viewModel: viewModel)
             case .policy: GigPolicySheet(viewModel: viewModel)
             case .urgency: GigUrgencySheet(viewModel: viewModel)
             case .tags: GigTagsSheet(viewModel: viewModel)
+            case .when: GigWhenSheet(viewModel: viewModel)
+            case .location: GigWhereSheet(viewModel: viewModel)
+            case .effort: GigEffortSheet(viewModel: viewModel)
             }
         }
         .presentationDetents(sheet.detents)
@@ -792,144 +799,7 @@ private struct SuggestionChip: View {
     }
 }
 
-// MARK: - Sheet 5: Attachment source
-
-private struct GigAttachmentSheet: View {
-    let viewModel: GigComposeViewModel
-
-    var body: some View {
-        VStack(spacing: Spacing.s2) {
-            SheetGrabHandle()
-            VStack(spacing: Spacing.s0) {
-                header
-                AttachmentActionRow(
-                    icon: .camera,
-                    label: "Take a photo",
-                    subtitle: "Use the camera now",
-                    tint: Theme.Color.primary600,
-                    background: Theme.Color.primary50,
-                    identifier: "gigPicker.attach.photos"
-                ) { add(prefix: "photo") }
-                rowDivider
-                AttachmentActionRow(
-                    icon: .image,
-                    label: "Photo library",
-                    subtitle: "Choose existing photos",
-                    tint: Theme.Color.success,
-                    background: Theme.Color.successBg,
-                    identifier: "gigPicker.attach.library"
-                ) { add(prefix: "photo") }
-                rowDivider
-                AttachmentActionRow(
-                    icon: .fileText,
-                    label: "Choose a file",
-                    subtitle: "PDF, doc, or spreadsheet",
-                    tint: Theme.Color.magic,
-                    background: Theme.Color.magicBg,
-                    identifier: "gigPicker.attach.file"
-                ) { add(prefix: "file") }
-            }
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous)
-                    .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-            )
-            cancelButton
-        }
-        .padding(.horizontal, Spacing.s2)
-        .padding(.bottom, Spacing.s3)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Theme.Color.appSurface)
-        .accessibilityIdentifier("gigPicker.attachmentSheet")
-    }
-
-    private var header: some View {
-        VStack(spacing: 2) {
-            Text("Add a photo or file")
-                .font(.system(size: 13.5, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-            Text("Up to \(GigComposeLimits.maxPhotos) attachments · 10 MB each")
-                .font(.system(size: 11.5))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.s3)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-        }
-    }
-
-    private var rowDivider: some View {
-        Rectangle()
-            .fill(Theme.Color.appBorderSubtle)
-            .frame(height: 1)
-            .padding(.leading, 70)
-    }
-
-    private var cancelButton: some View {
-        Button(action: viewModel.dismissPicker) {
-            Text("Cancel")
-                .font(.system(size: 15.5, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Spacing.s3 + 3)
-                .background(Theme.Color.appSurface)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous)
-                        .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Real upload lands in P15.5 — minting a placeholder URL keeps the cap
-    /// + count behaviour exercisable and binds straight into `attachments`.
-    private func add(prefix: String) {
-        viewModel.addPhoto("placeholder://\(prefix)/\(UUID().uuidString)")
-        viewModel.dismissPicker()
-    }
-}
-
-private struct AttachmentActionRow: View {
-    let icon: PantopusIcon
-    let label: String
-    let subtitle: String
-    let tint: Color
-    let background: Color
-    let identifier: String
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Spacing.s4 - 2) {
-                Icon(icon, size: 20, color: tint)
-                    .frame(width: 40, height: 40)
-                    .background(background)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg - 1, style: .continuous))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(label)
-                        .font(.system(size: 15.5, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Spacer(minLength: Spacing.s0)
-                Icon(.chevronRight, size: 18, color: Theme.Color.appTextMuted)
-            }
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, Spacing.s4 - 1)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(identifier)
-        .accessibilityLabel("\(label). \(subtitle)")
-    }
-}
-
-// MARK: - Sheet 6: Category
+// MARK: - Sheet 5: Category
 
 private struct GigCategorySheet: View {
     let viewModel: GigComposeViewModel
@@ -1063,6 +933,252 @@ private struct SheetInfoNote: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.md + 2, style: .continuous))
+    }
+}
+
+// MARK: - Sheet 6: When (A12.8 step-1 module prompt)
+
+/// Quick When editor — schedule-type cards + a date picker for one-time.
+/// Mirrors the Fill-gaps step's schedule fields.
+private struct GigWhenSheet: View {
+    let viewModel: GigComposeViewModel
+
+    var body: some View {
+        PickerSheetScaffold(
+            testID: "gigPicker.whenSheet",
+            title: "When",
+            subtitle: "When does the task need to happen?",
+            applyLabel: "Done",
+            applyIdentifier: "gigPicker.whenApply",
+            onApply: viewModel.dismissPicker,
+            onClose: viewModel.dismissPicker
+        ) {
+            VStack(spacing: Spacing.s2) {
+                ForEach(GigComposeScheduleType.allCases, id: \.self) { type in
+                    Button {
+                        viewModel.selectScheduleType(type)
+                    } label: {
+                        HStack(spacing: Spacing.s3) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(type.label)
+                                    .font(.system(size: 14.5, weight: .semibold))
+                                    .foregroundStyle(Theme.Color.appText)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            RadioGlyph(isOn: viewModel.form.scheduleType == type)
+                        }
+                        .padding(Spacing.s3)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            viewModel.form.scheduleType == type ? Theme.Color.primary50 : Theme.Color.appSurface
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .stroke(
+                                    viewModel.form.scheduleType == type
+                                        ? Theme.Color.primary600
+                                        : Theme.Color.appBorder,
+                                    lineWidth: 1.5
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gigPicker.when.\(type.rawValue)")
+                    .accessibilityAddTraits(
+                        viewModel.form.scheduleType == type ? [.isButton, .isSelected] : .isButton
+                    )
+                }
+                if viewModel.form.scheduleType == .oneTime {
+                    DatePicker(
+                        "Date & time",
+                        selection: scheduledStartBinding,
+                        in: Date().addingTimeInterval(60)...,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.compact)
+                    .tint(Theme.Color.primary600)
+                    .padding(.top, Spacing.s2)
+                    .accessibilityIdentifier("gigPicker.when.date")
+                }
+            }
+        }
+    }
+
+    private var scheduledStartBinding: Binding<Date> {
+        Binding(
+            get: {
+                if let iso = viewModel.form.scheduledStartISO,
+                   let date = ISO8601DateFormatter().date(from: iso) {
+                    return date
+                }
+                return Date().addingTimeInterval(3600)
+            },
+            set: { viewModel.setScheduledStart($0) }
+        )
+    }
+}
+
+// MARK: - Sheet 7: Where (A12.8 step-1 module prompt)
+
+/// Quick Where editor — location-mode cards + the address fields for
+/// "a place". Mirrors the Fill-gaps step's location fields.
+private struct GigWhereSheet: View {
+    let viewModel: GigComposeViewModel
+
+    var body: some View {
+        PickerSheetScaffold(
+            testID: "gigPicker.whereSheet",
+            title: "Where",
+            subtitle: "Your exact address is shared only after a helper is selected.",
+            applyLabel: "Done",
+            applyIdentifier: "gigPicker.whereApply",
+            onApply: viewModel.dismissPicker,
+            onClose: viewModel.dismissPicker
+        ) {
+            VStack(spacing: Spacing.s2) {
+                ForEach(GigComposeLocationMode.allCases, id: \.self) { mode in
+                    Button {
+                        viewModel.selectLocationMode(mode)
+                    } label: {
+                        HStack(spacing: Spacing.s3) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.label)
+                                    .font(.system(size: 14.5, weight: .semibold))
+                                    .foregroundStyle(Theme.Color.appText)
+                                Text(mode.subcopy)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Theme.Color.appTextSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            RadioGlyph(isOn: viewModel.form.locationMode == mode)
+                        }
+                        .padding(Spacing.s3)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            viewModel.form.locationMode == mode ? Theme.Color.primary50 : Theme.Color.appSurface
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .stroke(
+                                    viewModel.form.locationMode == mode
+                                        ? Theme.Color.primary600
+                                        : Theme.Color.appBorder,
+                                    lineWidth: 1.5
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gigPicker.where.\(mode.rawValue)")
+                    .accessibilityAddTraits(
+                        viewModel.form.locationMode == mode ? [.isButton, .isSelected] : .isButton
+                    )
+                }
+                if viewModel.form.locationMode == .aPlace {
+                    VStack(spacing: Spacing.s2) {
+                        PantopusTextField(
+                            "Street",
+                            text: addressBinding(\.line1) { viewModel.updatePlaceAddress(line1: $0) },
+                            placeholder: "123 Main St",
+                            identifier: "gigPicker.where.line1"
+                        )
+                        PantopusTextField(
+                            "City",
+                            text: addressBinding(\.city) { viewModel.updatePlaceAddress(city: $0) },
+                            identifier: "gigPicker.where.city"
+                        )
+                        HStack(alignment: .top, spacing: Spacing.s2) {
+                            PantopusTextField(
+                                "State",
+                                text: addressBinding(\.state) { viewModel.updatePlaceAddress(state: $0) },
+                                identifier: "gigPicker.where.state"
+                            )
+                            PantopusTextField(
+                                "ZIP",
+                                text: addressBinding(\.zip) { viewModel.updatePlaceAddress(zip: $0) },
+                                identifier: "gigPicker.where.zip"
+                            )
+                        }
+                    }
+                    .padding(.top, Spacing.s2)
+                }
+            }
+        }
+    }
+
+    private func addressBinding(
+        _ keyPath: KeyPath<GigComposePlaceAddress, String>,
+        set: @escaping (String) -> Void
+    ) -> Binding<String> {
+        Binding(
+            get: { viewModel.form.placeAddress[keyPath: keyPath] },
+            set: set
+        )
+    }
+}
+
+// MARK: - Sheet 8: Effort (A12.8 step-1 module prompt)
+
+/// Small stepper sheet for the optional effort estimate ("~2 hours").
+private struct GigEffortSheet: View {
+    let viewModel: GigComposeViewModel
+
+    @State private var hours: Double = 2
+
+    var body: some View {
+        PickerSheetScaffold(
+            testID: "gigPicker.effortSheet",
+            title: "Effort",
+            subtitle: "Roughly how long should this take?",
+            applyLabel: "Set estimate",
+            applyIdentifier: "gigPicker.effortApply",
+            onApply: apply,
+            onClose: viewModel.dismissPicker
+        ) {
+            HStack(spacing: Spacing.s3) {
+                Icon(.timer, size: 18, strokeWidth: 2.2, color: Theme.Color.primary600)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.Color.primary50)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                Text(hoursLabel)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Spacer(minLength: Spacing.s0)
+                Stepper("", value: $hours, in: 0.5...24, step: 0.5)
+                    .labelsHidden()
+                    .accessibilityIdentifier("gigPicker.effortStepper")
+                    .accessibilityLabel("Estimated hours: \(hoursLabel)")
+            }
+            .padding(Spacing.s3)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+        }
+        .onAppear {
+            if let existing = Double(viewModel.form.estimatedHours), existing > 0 {
+                hours = existing
+            }
+        }
+    }
+
+    private var hoursLabel: String {
+        let rendered = hours.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(hours))
+            : String(format: "%.1f", hours)
+        return "~\(rendered) hour\(hours == 1 ? "" : "s")"
+    }
+
+    private func apply() {
+        let rendered = hours.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(hours))
+            : String(format: "%.1f", hours)
+        viewModel.setEstimatedHours(rendered)
+        viewModel.dismissPicker()
     }
 }
 

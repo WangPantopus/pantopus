@@ -47,11 +47,27 @@ public struct MapListHybridShell<
     FloatingAction: View
 >: View {
     private let pins: [MapPin]
+    private let clusters: [MapClusterPin]
     private let anchor: MapAnchor?
     private let selectedPinId: String?
     private let recenterTrigger: Int
     private let showSearchRadius: Bool
+    private let cameraRequest: MapListHybridCameraRequest?
+    /// When set, the shell-owned markers carry consumer-namespaced
+    /// identifiers — `<prefix>.pin_<id>`, `<prefix>.cluster_<index>`,
+    /// `<prefix>.youAreHere`, `<prefix>.radiusRing`, `<prefix>.sheet` —
+    /// so cross-platform UI tests can mirror by string (A11.1 canonical
+    /// ids). `nil` keeps the legacy `mapListHybrid*` names.
+    private let markerAccessibilityPrefix: String?
+    /// Height of the consumer's map-control stack — drives where the
+    /// controls clamp when the sheet expands. Default matches the
+    /// original two-button stack (2 × 38 + 8).
+    private let controlsStackHeight: CGFloat
     private let onPinTap: (String) -> Void
+    private let onClusterTap: (String) -> Void
+    /// Fired when the camera settles (`.onMapCameraChange(.onEnd)` —
+    /// MapKit's own settle debounce stands in for the design's ~350 ms).
+    private let onCameraChange: ((MapListHybridRegion) -> Void)?
     @Binding private var detent: MapListHybridDetent
 
     private let topPill: () -> TopPill
@@ -60,7 +76,6 @@ public struct MapListHybridShell<
     private let sheetHeader: () -> SheetHeader
     private let sheetBody: () -> SheetBody
     private let floatingAction: () -> FloatingAction
-    private let mapControlsStackHeightOverride: CGFloat?
 
     @State private var dragTranslation: CGFloat = 0
     @State private var cameraPosition: MapCameraPosition = .automatic
@@ -72,14 +87,9 @@ public struct MapListHybridShell<
         56
     }
 
-    /// Locate + layers stack height (two 38pt buttons + 8pt gap).
-    private static var mapControlsStackHeight: CGFloat {
-        84
-    }
-
-    /// A11.1 — gap above sheet, control stack, gap, then FAB (14+84+14).
-    private static var fabLiftAboveSheet: CGFloat {
-        112
+    /// A11.1 — gap above sheet, control stack, gap, then FAB.
+    private var fabLiftAboveSheet: CGFloat {
+        Self.sheetToControlsGap + controlsStackHeight + Self.sheetToControlsGap
     }
 
     private static var sheetToControlsGap: CGFloat {
@@ -88,51 +98,82 @@ public struct MapListHybridShell<
 
     public init(
         pins: [MapPin],
+        clusters: [MapClusterPin] = [],
         anchor: MapAnchor? = nil,
         selectedPinId: String? = nil,
         recenterTrigger: Int = 0,
         showSearchRadius: Bool = false,
+        cameraRequest: MapListHybridCameraRequest? = nil,
+        markerAccessibilityPrefix: String? = nil,
+        controlsStackHeight: CGFloat = 84,
         detent: Binding<MapListHybridDetent>,
         onPinTap: @escaping (String) -> Void = { _ in },
+        onClusterTap: @escaping (String) -> Void = { _ in },
+        onCameraChange: ((MapListHybridRegion) -> Void)? = nil,
         @ViewBuilder topPill: @escaping () -> TopPill = { EmptyView() },
         @ViewBuilder categoryChips: @escaping () -> CategoryChips = { EmptyView() },
         @ViewBuilder mapControls: @escaping () -> MapControlsContent = { EmptyView() },
-        mapControlsStackHeight: CGFloat? = nil,
         @ViewBuilder floatingAction: @escaping () -> FloatingAction = { EmptyView() },
         @ViewBuilder sheetHeader: @escaping () -> SheetHeader = { EmptyView() },
         @ViewBuilder sheetBody: @escaping () -> SheetBody
     ) {
         self.pins = pins
+        self.clusters = clusters
         self.anchor = anchor
         self.selectedPinId = selectedPinId
         self.recenterTrigger = recenterTrigger
         self.showSearchRadius = showSearchRadius
+        self.cameraRequest = cameraRequest
+        self.markerAccessibilityPrefix = markerAccessibilityPrefix
+        self.controlsStackHeight = controlsStackHeight
         _detent = detent
         self.onPinTap = onPinTap
+        self.onClusterTap = onClusterTap
+        self.onCameraChange = onCameraChange
         self.topPill = topPill
         self.categoryChips = categoryChips
         self.mapControls = mapControls
-        self.mapControlsStackHeightOverride = mapControlsStackHeight
         self.floatingAction = floatingAction
         self.sheetHeader = sheetHeader
         self.sheetBody = sheetBody
+    }
+
+    // MARK: - Marker identifiers
+
+    private func pinIdentifier(_ id: String) -> String {
+        markerAccessibilityPrefix.map { "\($0).pin_\(id)" } ?? "mapListHybridPin_\(id)"
+    }
+
+    private func clusterIdentifier(_ index: Int) -> String {
+        markerAccessibilityPrefix.map { "\($0).cluster_\(index)" } ?? "mapListHybridCluster_\(index)"
+    }
+
+    private var anchorIdentifier: String {
+        markerAccessibilityPrefix.map { "\($0).youAreHere" } ?? "mapListHybridYouAreHere"
+    }
+
+    private var radiusRingIdentifier: String {
+        markerAccessibilityPrefix.map { "\($0).radiusRing" } ?? "mapListHybridRadiusRing"
+    }
+
+    private var sheetIdentifier: String {
+        markerAccessibilityPrefix.map { "\($0).sheet" } ?? "mapListHybridSheet"
     }
 
     public var body: some View {
         GeometryReader { geo in
             let sheetHeight = max(120, detent.height(in: geo.size.height) + dragTranslation)
             let mapStripTop = geo.safeAreaInsets.top
-            let controlsStackHeight = mapControlsStackHeightOverride ?? Self.mapControlsStackHeight
             let maxControlsBottom = max(
                 Self.sheetToControlsGap,
                 geo.size.height - mapStripTop - controlsStackHeight - Self.sheetToControlsGap
             )
             let maxFabBottom = max(
-                Self.fabLiftAboveSheet,
+                fabLiftAboveSheet,
                 geo.size.height - mapStripTop - Self.fabTopReserve
             )
             let controlsInset = min(sheetHeight + Self.sheetToControlsGap, maxControlsBottom)
-            let fabInset = min(sheetHeight + Self.fabLiftAboveSheet, maxFabBottom)
+            let fabInset = min(sheetHeight + fabLiftAboveSheet, maxFabBottom)
             ZStack(alignment: .top) {
                 mapLayer
                 topPill()
@@ -155,6 +196,12 @@ public struct MapListHybridShell<
         .onChange(of: recenterTrigger) { _, _ in
             recenterCamera()
         }
+        .onChange(of: cameraRequest) { _, request in
+            guard let request else { return }
+            withAnimation(reduceMotion ? .linear(duration: 0.001) : .easeInOut(duration: 0.45)) {
+                cameraPosition = .region(request.region.mkRegion)
+            }
+        }
     }
 
     // MARK: - Map
@@ -173,27 +220,56 @@ public struct MapListHybridShell<
                         )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("mapListHybridPin_\(pin.id)")
+                    .accessibilityIdentifier(pinIdentifier(pin.id))
                     .accessibilityLabel("Map pin")
+                }
+            }
+            ForEach(Array(clusters.enumerated()), id: \.element.id) { index, cluster in
+                Annotation("", coordinate: cluster.coordinate, anchor: .center) {
+                    Button {
+                        onClusterTap(cluster.id)
+                    } label: {
+                        MapListHybridClusterDot(count: cluster.count)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(clusterIdentifier(index))
+                    .accessibilityLabel("\(cluster.count) pins, zoom in")
                 }
             }
             if let anchor {
                 Annotation("", coordinate: anchor.coordinate, anchor: .center) {
                     MapListHybridAnchorDot()
+                        .accessibilityIdentifier(anchorIdentifier)
                         .accessibilityLabel("You are here")
                 }
                 if showSearchRadius {
-                    // Dashed search-radius ring — A11.1 empty-map treatment.
-                    MapCircle(center: anchor.coordinate, radius: 800)
-                        .foregroundStyle(Theme.Color.primary600.opacity(0.05))
-                        .stroke(
-                            Theme.Color.primary600.opacity(0.45),
-                            style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
-                        )
+                    // Dashed search-radius ring — A11.1 empty-map
+                    // treatment. Screen-pt sized (~220 pt diameter per
+                    // the design frame) so it reads the same at every
+                    // zoom; annotation-based so it can carry the
+                    // canonical identifier.
+                    Annotation("", coordinate: anchor.coordinate, anchor: .center) {
+                        ZStack {
+                            Circle()
+                                .fill(Theme.Color.primary600.opacity(0.05))
+                            Circle()
+                                .stroke(
+                                    Theme.Color.primary600.opacity(0.45),
+                                    style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+                                )
+                        }
+                        .frame(width: 220, height: 220)
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier(radiusRingIdentifier)
+                        .accessibilityLabel("Search radius")
+                    }
                 }
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
+        .onMapCameraChange(frequency: .onEnd) { context in
+            onCameraChange?(MapListHybridRegion(mkRegion: context.region))
+        }
         .accessibilityIdentifier("mapListHybridMap")
     }
 
@@ -276,7 +352,7 @@ public struct MapListHybridShell<
                     }
             )
         }
-        .accessibilityIdentifier("mapListHybridSheet")
+        .accessibilityIdentifier(sheetIdentifier)
         .accessibilityElement(children: .contain)
     }
 
@@ -322,20 +398,23 @@ struct MapListHybridPinDot: View {
     var body: some View {
         ZStack {
             if isActive && !reduceMotion {
+                // A11.1 pulse spec: two halos, scale 0.6 → 1.6 with
+                // opacity 0.6 → 0 over 1.6 s easeOut, repeating; second
+                // layer offset by 0.4 s.
                 Circle()
-                    .fill(pin.color.opacity(0.25))
-                    .frame(width: 46, height: 46)
-                    .scaleEffect(pulse ? 1.2 : 0.85)
-                    .opacity(pulse ? 0 : 1)
+                    .fill(pin.color)
+                    .frame(width: 30, height: 30)
+                    .scaleEffect(pulse ? 1.6 : 0.6)
+                    .opacity(pulse ? 0 : 0.6)
                     .animation(
                         .easeOut(duration: 1.6).repeatForever(autoreverses: false),
                         value: pulse
                     )
                 Circle()
-                    .fill(pin.color.opacity(0.35))
-                    .frame(width: 34, height: 34)
-                    .scaleEffect(pulse ? 1.15 : 0.85)
-                    .opacity(pulse ? 0 : 1)
+                    .fill(pin.color)
+                    .frame(width: 30, height: 30)
+                    .scaleEffect(pulse ? 1.6 : 0.6)
+                    .opacity(pulse ? 0 : 0.6)
                     .animation(
                         .easeOut(duration: 1.6).delay(0.4).repeatForever(autoreverses: false),
                         value: pulse
@@ -372,17 +451,34 @@ struct MapListHybridPinDot: View {
     }
 }
 
+/// "You are here" — 14 pt primary disc, 3 pt white border, 6 pt soft
+/// halo (primary600 at 18%) per the A11.1 frame.
 struct MapListHybridAnchorDot: View {
     var body: some View {
         ZStack {
             Circle()
                 .fill(Theme.Color.primary600.opacity(0.18))
-                .frame(width: 28, height: 28)
+                .frame(width: 26, height: 26)
             Circle()
                 .fill(Theme.Color.primary600)
                 .frame(width: 14, height: 14)
                 .overlay(Circle().stroke(Color.white, lineWidth: 3))
         }
+    }
+}
+
+/// Cluster marker — 28 pt primary600 disc, white count, white ring.
+struct MapListHybridClusterDot: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .frame(width: 28, height: 28)
+            .background(Circle().fill(Theme.Color.primary600))
+            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+            .shadow(color: .black.opacity(0.30), radius: 4, x: 0, y: 2)
     }
 }
 
@@ -394,8 +490,34 @@ extension MapPin {
     }
 }
 
+extension MapClusterPin {
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 extension MapAnchor {
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+// MARK: - Region bridging (MapKit stays inside the shell)
+
+extension MapListHybridRegion {
+    init(mkRegion: MKCoordinateRegion) {
+        self.init(
+            centerLatitude: mkRegion.center.latitude,
+            centerLongitude: mkRegion.center.longitude,
+            latitudeSpan: mkRegion.span.latitudeDelta,
+            longitudeSpan: mkRegion.span.longitudeDelta
+        )
+    }
+
+    var mkRegion: MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLatitude, longitude: centerLongitude),
+            span: MKCoordinateSpan(latitudeDelta: latitudeSpan, longitudeDelta: longitudeSpan)
+        )
     }
 }

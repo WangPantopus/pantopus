@@ -9,5 +9,9 @@
 		<string>applinks:pantopus.app</string>
 		<string>applinks:www.pantopus.app</string>
 	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.app.pantopus.ios</string>
+	</array>
 </dict>
 </plist>

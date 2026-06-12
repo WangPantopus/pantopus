@@ -3,10 +3,10 @@
 //  Pantopus
 //
 //  Step identifiers + form-state value types for the Post-a-Task wizard
-//  (P2.2). Six pre-success steps + a terminal success step, mirroring
-//  `Wizard.html` / `wizard-frames.jsx`. The form state is a
-//  `Codable`/`Equatable` snapshot so the wizard can survive process
-//  death via `@SceneStorage` (same pattern as `AddHomeFormState`).
+//  (A12.8 describe-first restructure). Four pre-success steps + a
+//  terminal success step. The form state is a `Codable`/`Equatable`
+//  snapshot so the wizard can survive process death via `@SceneStorage`
+//  (same pattern as `AddHomeFormState`).
 //
 
 import Foundation
@@ -40,12 +40,53 @@ public enum GigComposeCategory: String, CaseIterable, Sendable, Codable, Hashabl
         }
     }
 
+    /// The backend's `VALID_CATEGORIES` spelling
+    /// (`backend/services/magicTaskService.js`) forwarded as
+    /// `draft.category` on `POST /api/gigs/magic-post`.
+    public var backendLabel: String {
+        switch self {
+        case .handyman: "Handyman"
+        case .cleaning: "Cleaning"
+        case .moving: "Moving"
+        case .petcare: "Pet Care"
+        case .childcare: "Child Care"
+        case .tutoring: "Tutoring"
+        case .delivery: "Delivery"
+        case .tech: "Tech Support"
+        case .other: "Other"
+        }
+    }
+
     /// Maps a `GigsCategory.rawValue` (or any unrecognised string) into
     /// the compose enum. Used so the Hub's category-specific entry
     /// preselects the right tile.
     public static func from(rawKey: String?) -> GigComposeCategory? {
         guard let raw = rawKey?.lowercased(), !raw.isEmpty, raw != "all" else { return nil }
         return GigComposeCategory.allCases.first { $0.rawValue == raw }
+    }
+
+    /// Maps a Magic Task backend category ("Handyman", "Pet Care",
+    /// "Tech Support", …, see `backend/services/magicTaskService.js`
+    /// `VALID_CATEGORIES`) onto the compose enum. Unknown non-empty
+    /// values land on `.other` (the composer's catch-all bucket);
+    /// nil/empty returns nil so the keyword fallback can take over.
+    public static func from(backendCategory raw: String?) -> GigComposeCategory? {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let key = raw.lowercased()
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        switch key {
+        case "handyman": return .handyman
+        case "cleaning": return .cleaning
+        case "moving": return .moving
+        case "petcare": return .petcare
+        case "childcare": return .childcare
+        case "tutoring": return .tutoring
+        case "delivery", "errands", "grocerypickup": return .delivery
+        case "tech", "techsupport": return .tech
+        default: return .other
+        }
     }
 }
 
@@ -57,13 +98,39 @@ public enum ComposeMode: String, CaseIterable, Sendable, Codable, Hashable {
     case manual
 }
 
-/// B.3 (A12.8) — compact Magic Task engagement selector. It pre-fills the
-/// downstream schedule / budget steps instead of adding a separate backend
-/// field.
-public enum GigComposeEngagementMode: String, CaseIterable, Sendable, Hashable {
+/// A12.8 — step-1 engagement tiles (One-time / Recurring / Open-ended).
+/// SCHEDULE-ish display selector — it mirrors into `scheduleType`; the
+/// backend `engagement_mode` is modeled separately (`GigEngagementMode`).
+public enum GigComposeEngagementMode: String, CaseIterable, Sendable, Codable, Hashable {
     case oneTime
     case recurring
-    case openBidding
+    case openEnded
+}
+
+/// Backend `engagement_mode` for `POST /api/gigs/magic-post`
+/// (`backend/routes/magicTask.js:397`). Defaults via
+/// `GigComposeViewModel.inferEngagementMode(...)`; user-overridable on
+/// the Budget & mode step.
+public enum GigEngagementMode: String, CaseIterable, Sendable, Codable, Hashable {
+    case instantAccept = "instant_accept"
+    case curatedOffers = "curated_offers"
+    case quotes
+
+    public var label: String {
+        switch self {
+        case .instantAccept: "Instant accept"
+        case .curatedOffers: "Curated offers"
+        case .quotes: "Quotes"
+        }
+    }
+
+    public var subcopy: String {
+        switch self {
+        case .instantAccept: "First helper takes it"
+        case .curatedOffers: "Pick from ranked offers"
+        case .quotes: "Pros send estimates"
+        }
+    }
 }
 
 /// Budget-type radio in step 3.
@@ -213,29 +280,27 @@ public struct GigComposePlaceAddress: Codable, Sendable, Equatable {
     }
 }
 
-/// The six pre-success steps of the Post-a-Task wizard, in order.
+/// The four pre-success steps of the A12.8 wizard, in order:
+/// Describe (magic default / manual picker) → Fill gaps → Budget & mode
+/// → Review & post, plus the terminal success step.
 public enum GigComposeStep: Int, CaseIterable, Sendable {
-    case category = 0
-    case basics
+    case describe = 0
+    case fillGaps
     case budget
-    case schedule
-    case location
     case review
     case success
 
     /// Total number of "step N of M" steps shown in the readout. Excludes
     /// the success terminal.
-    public static let progressTotal: Int = 6
+    public static let progressTotal: Int = 4
 
     /// One-indexed position used in the "N of M" top-bar readout.
     public var stepNumber: Int? {
         switch self {
-        case .category: 1
-        case .basics: 2
+        case .describe: 1
+        case .fillGaps: 2
         case .budget: 3
-        case .schedule: 4
-        case .location: 5
-        case .review: 6
+        case .review: 4
         case .success: nil
         }
     }
@@ -254,6 +319,31 @@ public enum GigComposeLimits {
     public static let maxTags: Int = 5
     /// B.3 — Magic Task describe textarea cap (matches A12.8 "184 / 500").
     public static let describeMax: Int = 500
+}
+
+/// P6c — one row of the composer's identity picker: post as yourself or
+/// on behalf of a business you hold a seat on. `beneficiaryUserId` is
+/// nil for the personal identity; for a business it is the business's
+/// own user id (`business_user_id` on the my-businesses membership row),
+/// forwarded as magic-post's `beneficiary_user_id`.
+public struct GigComposeIdentityOption: Identifiable, Sendable, Equatable, Hashable {
+    public let id: String
+    public let beneficiaryUserId: String?
+    /// Menu label — "Personal · You" or the business name.
+    public let label: String
+
+    public init(id: String, beneficiaryUserId: String?, label: String) {
+        self.id = id
+        self.beneficiaryUserId = beneficiaryUserId
+        self.label = label
+    }
+
+    /// The default post-as-yourself identity.
+    public static let personal = GigComposeIdentityOption(
+        id: "personal",
+        beneficiaryUserId: nil,
+        label: "Personal · You"
+    )
 }
 
 /// Snapshot of all wizard form state. Encoded into `@SceneStorage` so
@@ -290,9 +380,35 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
     public var isUrgent: Bool
     /// E.1 — freeform tags (`tags`), stored without the leading `#`.
     public var tags: [String]
+    /// A12.8 — step-1 engagement tile (One-time / Recurring / Open-ended).
+    public var engagementTile: GigComposeEngagementMode
+    /// A12.8 — explicit backend `engagement_mode` override picked on the
+    /// Budget & mode step. nil ⇒ inferred from archetype + schedule.
+    public var engagementOverride: GigEngagementMode?
+    /// A12.8 — optional effort estimate ("~2 hours"), wire
+    /// `estimated_hours`. Stored as text like the budget fields.
+    public var estimatedHours: String
+    /// A12.8 — backend task archetype ("home_service", "care_task", …)
+    /// parsed from the magic draft; drives which module field group the
+    /// Fill-gaps step renders.
+    public var taskArchetype: String?
+    /// A12.8 — delivery/errand shopping items (`items`).
+    public var items: [GigTaskItemDraft]
+    /// A12.8 — archetype module field groups (wire `care_details` etc.).
+    public var careDetails: GigCareDetails?
+    public var logisticsDetails: GigLogisticsDetails?
+    public var remoteDetails: GigRemoteDetails?
+    public var urgentDetails: GigUrgentDetails?
+    public var eventDetails: GigEventDetails?
+    /// P6c — persona switching. nil posts as yourself; a business user id
+    /// rides magic-post's `beneficiary_user_id`. Optional fields keep old
+    /// `@SceneStorage` snapshots decodable.
+    public var beneficiaryUserId: String?
+    /// Display name backing the identity chip ("ACME PLUMBING").
+    public var beneficiaryName: String?
 
     public init(
-        step: Int = GigComposeStep.category.rawValue,
+        step: Int = GigComposeStep.describe.rawValue,
         composeMode: ComposeMode = .magic,
         describeText: String = "",
         detectedArchetype: GigComposeCategory? = nil,
@@ -310,7 +426,19 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         deadlineISO: String? = nil,
         cancellationPolicy: GigCancellationPolicy? = nil,
         isUrgent: Bool = false,
-        tags: [String] = []
+        tags: [String] = [],
+        engagementTile: GigComposeEngagementMode = .oneTime,
+        engagementOverride: GigEngagementMode? = nil,
+        estimatedHours: String = "",
+        taskArchetype: String? = nil,
+        items: [GigTaskItemDraft] = [],
+        careDetails: GigCareDetails? = nil,
+        logisticsDetails: GigLogisticsDetails? = nil,
+        remoteDetails: GigRemoteDetails? = nil,
+        urgentDetails: GigUrgentDetails? = nil,
+        eventDetails: GigEventDetails? = nil,
+        beneficiaryUserId: String? = nil,
+        beneficiaryName: String? = nil
     ) {
         self.step = step
         self.composeMode = composeMode
@@ -331,14 +459,21 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         self.cancellationPolicy = cancellationPolicy
         self.isUrgent = isUrgent
         self.tags = tags
+        self.engagementTile = engagementTile
+        self.engagementOverride = engagementOverride
+        self.estimatedHours = estimatedHours
+        self.taskArchetype = taskArchetype
+        self.items = items
+        self.careDetails = careDetails
+        self.logisticsDetails = logisticsDetails
+        self.remoteDetails = remoteDetails
+        self.urgentDetails = urgentDetails
+        self.eventDetails = eventDetails
+        self.beneficiaryUserId = beneficiaryUserId
+        self.beneficiaryName = beneficiaryName
     }
 
     public static let empty = GigComposeFormState()
-
-    public var engagementMode: GigComposeEngagementMode {
-        if budgetType == .offers { return .openBidding }
-        return scheduleType == .recurring ? .recurring : .oneTime
-    }
 
     /// True when any user-visible field carries data — drives the
     /// discard-confirm gate.
@@ -360,5 +495,7 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
             || cancellationPolicy != nil
             || isUrgent
             || !tags.isEmpty
+            || !estimatedHours.isEmpty
+            || !items.isEmpty
     }
 }

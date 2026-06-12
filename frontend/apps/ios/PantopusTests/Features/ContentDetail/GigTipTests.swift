@@ -70,6 +70,8 @@ final class GigTipTests: XCTestCase {
             + #""accepted_by":"worker-1","owner_confirmed_at":"2026-06-01T00:00:00Z"}}"#
     private static let bidsJSON = #"{"bids":[]}"#
     private static let questionsJSON = #"{"questions":[]}"#
+    /// Phase 5 — completed gigs also fetch `/api/reviews/my-pending`.
+    private static let pendingJSON = #"{"pending":[]}"#
     private static let tipJSON =
         #"{"success":true,"clientSecret":"pi_tip","paymentId":"pay-tip-1","customer":"cus","ephemeralKey":"ek","publishableKey":"pk"}"#
     private static let refreshJSON =
@@ -89,11 +91,11 @@ final class GigTipTests: XCTestCase {
     func testSendTipSucceedsAndReconciles() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON), // load
+            .status(200, body: Self.questionsJSON), .status(200, body: Self.pendingJSON), // load
             .status(200, body: Self.tipJSON), // POST /tip
             .status(200, body: Self.refreshJSON), // refresh-status
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON) // reload
+            .status(200, body: Self.questionsJSON) // reload (my-pending settled on load)
         ]
         let presenter = StubTipPresenter()
         presenter.outcome = .completed
@@ -110,7 +112,7 @@ final class GigTipTests: XCTestCase {
     func testSendTipDeclined() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON), // load
+            .status(200, body: Self.questionsJSON), .status(200, body: Self.pendingJSON), // load
             .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()
@@ -125,7 +127,7 @@ final class GigTipTests: XCTestCase {
     func testSendTipCanceled() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON), // load
+            .status(200, body: Self.questionsJSON), .status(200, body: Self.pendingJSON), // load
             .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()

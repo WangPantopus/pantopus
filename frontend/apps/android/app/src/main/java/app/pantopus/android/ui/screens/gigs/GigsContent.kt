@@ -59,6 +59,8 @@ enum class GigsSort(
     Newest("newest", "Newest"),
     Closest("closest", "Closest"),
     HighestPay("highest_pay", "Highest pay"),
+    /** P1.F — "Urgent nearby" see-all sort. Backend proxies it to newest + deadline filter. */
+    Urgency("urgency", "Most urgent"),
     FewestBids("fewest_bids", "Fewest bids"),
     ;
 
@@ -81,11 +83,129 @@ data class GigCardContent(
     val bidCount: Int,
     /** Right-aligned distance label ("0.2mi"). `null` hides it. */
     val distanceLabel: String?,
+    /** P1.A — amber URGENT pill next to the category badge. */
+    val isUrgent: Boolean = false,
 )
 
-/** Render state for the Gigs feed screen. */
+/** P1.F — one ~240dp card in a horizontal browse rail (urgent / high paying). */
+@Immutable
+data class GigRailCardContent(
+    val id: String,
+    val category: GigsCategory,
+    val title: String,
+    val price: String,
+    val distanceLabel: String?,
+    val bidCount: Int,
+    /** Browse `first_image` — replaces the glyph tile when present. */
+    val imageUrl: String? = null,
+)
+
+/** P1.F — one "Browse by category" cluster chip. */
+@Immutable
+data class GigsBrowseClusterChip(
+    val category: GigsCategory,
+    val count: Int,
+)
+
+/** P1.F — projected browse sections. Each section renders only when non-empty. */
+@Immutable
+data class GigsBrowseContent(
+    val bestMatches: List<GigCardContent>,
+    val urgent: List<GigRailCardContent>,
+    val newToday: List<GigCardContent>,
+    val highPaying: List<GigRailCardContent>,
+    val quickJobs: List<GigCardContent>,
+    val clusters: List<GigsBrowseClusterChip>,
+    val totalActive: Int,
+) {
+    val isEmpty: Boolean
+        get() =
+            bestMatches.isEmpty() && urgent.isEmpty() && newToday.isEmpty() &&
+                highPaying.isEmpty() && quickJobs.isEmpty() && clusters.isEmpty()
+}
+
+/**
+ * P1.B — radius suggestion exposed when a flat load lands < 3 rows with
+ * no active filters. `suggestedRadiusMiles` is the next ladder step
+ * (1 → 3 → 5 → 10 cap).
+ */
+@Immutable
+data class GigsRadiusSuggestion(
+    val visibleCount: Int,
+    val currentRadiusMiles: Double,
+    val suggestedRadiusMiles: Double,
+)
+
+/** P1.D — undo target carried on a feed toast. */
+sealed interface GigsFeedUndo {
+    data class Dismiss(
+        val gigId: String,
+    ) : GigsFeedUndo
+
+    data class HideCategory(
+        val category: GigsCategory,
+    ) : GigsFeedUndo
+}
+
+/** P1.D — transient toast over the feed (mirrors the MyBids overlay). */
+@Immutable
+data class GigsFeedToast(
+    val text: String,
+    val isError: Boolean = false,
+    val undo: GigsFeedUndo? = null,
+)
+
+/**
+ * P6c — slim offline-draft banner ("1 draft waiting — Post now /
+ * Discard"). Shown only when online with queued composer drafts.
+ */
+@Immutable
+data class GigsDraftBanner(
+    val count: Int,
+    /** Title of the oldest draft (the one Post now / Discard act on). */
+    val title: String,
+)
+
+/**
+ * P6a — one row in the "Saved searches" manage sheet (projected from
+ * `GigSavedSearchDto`).
+ */
+@Immutable
+data class GigSavedSearchRowContent(
+    val id: String,
+    /** Stored name, falling back to the derived criteria label. */
+    val title: String,
+    /** Derived criteria summary; `null` when identical to [title]. */
+    val summary: String?,
+    /** "Saved 2d ago" relative caption; `null` without a timestamp. */
+    val savedAgo: String?,
+    val notify: Boolean,
+)
+
+/** P6a — render state for the "Saved searches" manage sheet. */
+sealed interface GigSavedSearchesUiState {
+    data object Loading : GigSavedSearchesUiState
+
+    data object Empty : GigSavedSearchesUiState
+
+    data class Loaded(
+        val rows: List<GigSavedSearchRowContent>,
+    ) : GigSavedSearchesUiState
+
+    data class Error(
+        val message: String,
+    ) : GigSavedSearchesUiState
+}
+
+/**
+ * Render state for the Gigs feed screen. The browse pair (P1.F) joins
+ * the four base states: `BrowseLoading` renders stacked section
+ * skeletons, `BrowseLoaded` the sectioned discovery feed.
+ */
 sealed interface GigsFeedUiState {
     data object Loading : GigsFeedUiState
+
+    data object BrowseLoading : GigsFeedUiState
 
     data class Empty(
         val radiusMiles: Double,
@@ -93,6 +213,10 @@ sealed interface GigsFeedUiState {
 
     data class Loaded(
         val rows: List<GigCardContent>,
+    ) : GigsFeedUiState
+
+    data class BrowseLoaded(
+        val browse: GigsBrowseContent,
     ) : GigsFeedUiState
 
     data class Error(

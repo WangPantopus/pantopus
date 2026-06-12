@@ -5,7 +5,11 @@
 //  Designed Gigs feed (T2.3). Three frames — populated (4-row category
 //  mix), empty (briefcase circle + radius pill), loading (4 shimmer
 //  rows). Category chips are per-category brand-colored when active.
+//  Phase 1 adds the radius-suggestion banner, the realtime "new tasks"
+//  pill, dismiss/hide undo toasts, and the sectioned browse frame.
 //
+
+// swiftlint:disable file_length type_body_length
 
 import SwiftUI
 
@@ -42,7 +46,14 @@ public struct GigsFeedView: View {
                 searchBar
                 categoryChipRow
                 sortFilterRow
+                if let suggestion = viewModel.radiusSuggestion {
+                    radiusSuggestionBanner(suggestion)
+                }
+                if viewModel.showsDraftBanner {
+                    draftBanner
+                }
                 content
+                    .overlay(alignment: .top) { newTasksBanner }
             }
             .background(Theme.Color.appBg)
             FeedComposeFAB(accessibilityLabel: "Post a task") {
@@ -52,15 +63,193 @@ public struct GigsFeedView: View {
             .padding(.bottom, Spacing.s10)
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
-        .task { await viewModel.load() }
+        .task {
+            await viewModel.load()
+            viewModel.startRealtime()
+        }
+        .onDisappear { viewModel.stopRealtime() }
         .sheet(isPresented: $showFilterSheet) {
             GigFilterSheet(
                 criteria: viewModel.filters,
-                onApply: { viewModel.applyFilters($0) },
-                onClose: { showFilterSheet = false }
+                onApply: { criteria in Task { await viewModel.applyFilters(criteria) } },
+                onClose: { showFilterSheet = false },
+                onSaveSearch: { criteria in
+                    // Close first so the feed's toast overlay is visible.
+                    showFilterSheet = false
+                    Task { await viewModel.saveSearch(criteria: criteria) }
+                }
             )
         }
+        .overlay(alignment: .bottom) { undoOverlay }
+        .overlay(alignment: .bottom) { toastOverlay }
         .accessibilityIdentifier("gigsFeed")
+    }
+
+    // MARK: - Radius suggestion banner (B)
+
+    private func radiusSuggestionBanner(_ suggestion: GigsRadiusSuggestion) -> some View {
+        let noun = suggestion.resultCount == 1 ? "task" : "tasks"
+        return HStack(spacing: Spacing.s2) {
+            Icon(.mapPin, size: 13, strokeWidth: 2.2, color: Theme.Color.primary600)
+            Text("Only \(suggestion.resultCount) \(noun) within \(Self.radiusLabel(suggestion.currentMiles))")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.primary600)
+                .lineLimit(1)
+            Spacer(minLength: Spacing.s1)
+            Button {
+                Task { await viewModel.expandRadius() }
+            } label: {
+                Text("Search \(Self.radiusLabel(suggestion.suggestedMiles))")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary600)
+                    .frame(minHeight: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigsFeed.radiusSuggestion.accept")
+            Button {
+                viewModel.dismissRadiusSuggestion()
+            } label: {
+                Icon(.x, size: 13, strokeWidth: 2.2, color: Theme.Color.primary600)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+            .accessibilityIdentifier("gigsFeed.radiusSuggestion.dismiss")
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 6)
+        .background(Theme.Color.primary50)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .padding(.horizontal, Spacing.s3)
+        .padding(.bottom, Spacing.s2)
+        .accessibilityIdentifier("gigsFeed.radiusSuggestion")
+    }
+
+    // MARK: - P6c Offline draft banner
+
+    /// Slim "N draft(s) waiting — Post now / Discard" strip shown when
+    /// the user is back online with composer drafts queued offline.
+    private var draftBanner: some View {
+        let count = viewModel.pendingDraftCount
+        return HStack(spacing: Spacing.s2) {
+            Icon(.fileText, size: 13, strokeWidth: 2.2, color: Theme.Color.warning)
+            Text("\(count) draft\(count == 1 ? "" : "s") waiting")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.warning)
+                .lineLimit(1)
+            Spacer(minLength: Spacing.s1)
+            Button {
+                Task { await viewModel.postPendingDraft() }
+            } label: {
+                Text("Post now")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                    .frame(minHeight: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isPostingDraft)
+            .accessibilityIdentifier("gigsFeed.draftBanner.post")
+            Button {
+                viewModel.discardPendingDraft()
+            } label: {
+                Text("Discard")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .frame(minHeight: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigsFeed.draftBanner.discard")
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 6)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .padding(.horizontal, Spacing.s3)
+        .padding(.bottom, Spacing.s2)
+        .accessibilityIdentifier("gigsFeed.draftBanner")
+    }
+
+    // MARK: - New tasks banner (E)
+
+    @ViewBuilder private var newTasksBanner: some View {
+        if viewModel.newTaskCount > 0, !isLoadingState {
+            Button {
+                Task { await viewModel.refreshFromBanner() }
+            } label: {
+                HStack(spacing: 6) {
+                    Icon(.refreshCw, size: 12, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                    Text("\(viewModel.newTaskCount) new \(viewModel.newTaskCount == 1 ? "task" : "tasks") — tap to refresh")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .background(Theme.Color.primary600)
+                .clipShape(Capsule())
+                .shadow(color: Theme.Color.primary600.opacity(0.30), radius: 6, x: 0, y: 4)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, Spacing.s2)
+            .accessibilityIdentifier("gigsFeed.newTasksBanner")
+        }
+    }
+
+    private var isLoadingState: Bool {
+        if case .loading = viewModel.state { return true }
+        return false
+    }
+
+    // MARK: - Undo + error toasts (D)
+
+    @ViewBuilder private var undoOverlay: some View {
+        if let undo = viewModel.pendingUndo {
+            HStack(spacing: Spacing.s3) {
+                Text(undo.message)
+                    .pantopusTextStyle(.small)
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .lineLimit(1)
+                Button {
+                    Task { await viewModel.undoPendingRemoval() }
+                } label: {
+                    Text("Undo")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .underline()
+                        .frame(minHeight: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("gigsFeed.undoButton")
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s2)
+            .background(Theme.Color.appText.opacity(0.92))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+            .padding(.bottom, Spacing.s8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .task(id: undo.id) {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                viewModel.expireUndo(undo.id)
+            }
+            .accessibilityIdentifier("gigsFeed.undoToast")
+        }
+    }
+
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast = viewModel.toast {
+            ToastView(message: toast)
+                .padding(.bottom, Spacing.s8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task(id: toast) {
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    viewModel.toast = nil
+                }
+                .accessibilityIdentifier("gigsFeed.toast")
+        }
     }
 
     // MARK: - Top bar
@@ -122,31 +311,33 @@ public struct GigsFeedView: View {
 
     private var sortFilterRow: some View {
         HStack {
-            Menu {
-                ForEach(GigsSort.allCases) { sort in
-                    Button {
-                        Task { await viewModel.selectSort(sort) }
-                    } label: {
-                        if sort == viewModel.activeSort {
-                            Label(sort.label, systemImage: "checkmark")
-                        } else {
-                            Text(sort.label)
+            if !viewModel.isBrowseMode {
+                Menu {
+                    ForEach(GigsSort.allCases) { sort in
+                        Button {
+                            Task { await viewModel.selectSort(sort) }
+                        } label: {
+                            if sort == viewModel.activeSort {
+                                Label(sort.label, systemImage: "checkmark")
+                            } else {
+                                Text(sort.label)
+                            }
                         }
                     }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("Sort:")
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                        Text(viewModel.activeSort.label)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                        Icon(.chevronDown, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextStrong)
+                    }
                 }
-            } label: {
-                HStack(spacing: 5) {
-                    Text("Sort:")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                    Text(viewModel.activeSort.label)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appTextStrong)
-                    Icon(.chevronDown, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextStrong)
-                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("gigsSortMenu")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("gigsSortMenu")
             Spacer()
             GigsFilterButton(activeCount: viewModel.activeFilterCount) {
                 showFilterSheet = true
@@ -163,21 +354,37 @@ public struct GigsFeedView: View {
         case .loading: loadingFrame
         case let .empty(empty): emptyFrame(empty)
         case let .loaded(rows): populatedFrame(rows)
+        case let .browse(browse): browseFrame(browse)
         case let .error(message): errorFrame(message: message)
         }
     }
 
-    private var loadingFrame: some View {
-        ScrollView {
-            VStack(spacing: Spacing.s2) {
-                FeedSkeletonCard()
-                FeedSkeletonCard(withTitle: true)
-                FeedSkeletonCard()
-                FeedSkeletonCard()
+    @ViewBuilder private var loadingFrame: some View {
+        if viewModel.isBrowseMode {
+            GigsBrowseSkeleton()
+        } else {
+            ScrollView {
+                VStack(spacing: Spacing.s2) {
+                    FeedSkeletonCard()
+                    FeedSkeletonCard(withTitle: true)
+                    FeedSkeletonCard()
+                    FeedSkeletonCard()
+                }
+                .padding(Spacing.s3)
             }
-            .padding(Spacing.s3)
+            .accessibilityIdentifier("gigsFeedLoading")
         }
-        .accessibilityIdentifier("gigsFeedLoading")
+    }
+
+    private func browseFrame(_ browse: GigsBrowseContent) -> some View {
+        GigsBrowseSectionsView(
+            content: browse,
+            onOpenGig: onOpenGig,
+            onSeeAll: { sort in Task { await viewModel.showAllFromBrowse(sort: sort) } },
+            onSeeAllQuickJobs: { Task { await viewModel.showAllQuickJobs() } },
+            onSelectCategory: { category in Task { await viewModel.selectCategory(category) } },
+            onRefresh: { await viewModel.refresh() }
+        )
     }
 
     private func emptyFrame(_ empty: GigsFeedEmpty) -> some View {
@@ -262,6 +469,7 @@ public struct GigsFeedView: View {
                         GigRow(content: row)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { rowMenu(row) }
                     .accessibilityIdentifier("gigsRow_\(row.id)")
                 }
                 Spacer(minLength: 110)
@@ -271,6 +479,23 @@ public struct GigsFeedView: View {
         }
         .refreshable { await viewModel.refresh() }
         .accessibilityIdentifier("gigsFeedList")
+    }
+
+    /// Long-press menu on a feed row — "Not interested" + "Hide all
+    /// <Category>", both optimistic with a 5s undo toast.
+    @ViewBuilder private func rowMenu(_ row: GigCardContent) -> some View {
+        Button(role: .destructive) {
+            Task { await viewModel.dismissGig(id: row.id) }
+        } label: {
+            Label("Not interested", systemImage: "eye.slash")
+        }
+        .accessibilityIdentifier("gigsRow_\(row.id)_notInterested")
+        Button(role: .destructive) {
+            Task { await viewModel.hideCategory(ofGigId: row.id) }
+        } label: {
+            Label("Hide all \(row.category.label)", systemImage: "rectangle.stack.badge.minus")
+        }
+        .accessibilityIdentifier("gigsRow_\(row.id)_hideCategory")
     }
 
     private func errorFrame(message: String) -> some View {
@@ -315,6 +540,9 @@ struct GigRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: Spacing.s2) {
                 CategoryChip(category: content.category)
+                if content.isUrgent {
+                    UrgentChip()
+                }
                 if !content.metaLine.isEmpty {
                     Text(content.metaLine)
                         .font(.system(size: 10))
@@ -337,10 +565,12 @@ struct GigRow: View {
                 Text(content.price)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.Color.primary600)
-                if content.bidCount > 0 {
-                    BidPill(count: content.bidCount)
-                } else {
-                    BeTheFirstPill()
+                if let bidCount = content.bidCount {
+                    if bidCount > 0 {
+                        BidPill(count: bidCount)
+                    } else {
+                        BeTheFirstPill()
+                    }
                 }
                 Spacer()
                 if let distance = content.distanceLabel {
@@ -459,6 +689,23 @@ private struct CategoryChip: View {
             .padding(.vertical, 2)
             .background(category.color.opacity(0.12))
             .clipShape(Capsule())
+    }
+}
+
+/// Amber "URGENT" chip rendered next to the category badge when the gig
+/// carries `is_urgent` (work item A).
+private struct UrgentChip: View {
+    var body: some View {
+        Text("URGENT")
+            .font(.system(size: 9, weight: .bold))
+            .kerning(0.5)
+            .foregroundStyle(Theme.Color.warning)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 2)
+            .background(Theme.Color.warningBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+            .accessibilityLabel("Urgent")
+            .accessibilityIdentifier("gigRow.urgent")
     }
 }
 

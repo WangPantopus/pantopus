@@ -58,6 +58,8 @@
 	<string>Pantopus uses the microphone for voice messages in chat.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pantopus uses your photo library to upload profile photos, listing images, and mail.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>PantopusAPIBaseURL</key>
 	<string>$(PANTOPUS_API_BASE_URL)</string>
 	<key>PantopusSocketURL</key>

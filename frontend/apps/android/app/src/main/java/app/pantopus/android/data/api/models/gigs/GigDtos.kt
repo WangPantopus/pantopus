@@ -68,6 +68,10 @@ data class GigDto(
     @Json(name = "owner_confirmed_at") val ownerConfirmedAt: String? = null,
     @Json(name = "scheduled_start") val scheduledStart: String? = null,
     @Json(name = "payment_status") val paymentStatus: String? = null,
+    // Phase 5 — worker acknowledgement ("I'm on it") while `assigned`.
+    @Json(name = "worker_ack_status") val workerAckStatus: String? = null,
+    // Phase 5b — ETA accompanying a `running_late` acknowledgement.
+    @Json(name = "worker_ack_eta_minutes") val workerAckEtaMinutes: Int? = null,
     @Json(name = "engagement_mode") val engagementMode: String? = null,
     @Json(name = "schedule_type") val scheduleType: String? = null,
     @Json(name = "pay_type") val payType: String? = null,
@@ -78,9 +82,17 @@ data class GigDto(
     @Json(name = "is_v2") val isV2: Boolean? = null,
     @Json(name = "pickup_address") val pickupAddress: String? = null,
     @Json(name = "dropoff_address") val dropoffAddress: String? = null,
+    /** Owner-visible free-text address on `GET /api/gigs/:id` (A13.8 P4 edit prefill). */
+    @Json(name = "exact_address") val exactAddress: String? = null,
+    /** Uploaded photo URLs from `GET /api/gigs/:id` — prefill the V1 editor's grid (P4). */
+    val attachments: List<String>? = null,
     @Json(name = "bid_count") val bidCount: Int? = null,
     @Json(name = "saved_by_user") val savedByUser: Boolean? = null,
     @Json(name = "distance_miles") val distanceMiles: Double? = null,
+    /** Spatial-RPC rows (browse sections, spatial list path) carry meters. */
+    @Json(name = "distance_meters") val distanceMeters: Double? = null,
+    /** First attachment URL, enriched server-side for thumbnails. */
+    @Json(name = "first_image") val firstImage: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
     @Json(name = "approx_location") val approxLocation: GigApproxLocation? = null,
@@ -148,10 +160,18 @@ data class GigBidDto(
     val status: String? = null,
     val message: String? = null,
     @Json(name = "created_at") val createdAt: String? = null,
+    // Phase 5 — counter-offer fields (`POST .../bids/:bidId/counter`).
+    @Json(name = "counter_amount") val counterAmount: Double? = null,
+    @Json(name = "counter_status") val counterStatus: String? = null,
+    @Json(name = "counter_message") val counterMessage: String? = null,
+    @Json(name = "countered_at") val counteredAt: String? = null,
     val bidder: GigCreator? = null,
     @Json(name = "User") val legacyBidder: GigCreator? = null,
 ) {
     fun bidderIdentity(): GigCreator? = bidder ?: legacyBidder
+
+    /** A counter from the poster is outstanding on this bid. */
+    val hasPendingCounter: Boolean get() = counterStatus == "pending" && counterAmount != null
 }
 
 /** Envelope from `GET /api/gigs/:gigId/bids`. */

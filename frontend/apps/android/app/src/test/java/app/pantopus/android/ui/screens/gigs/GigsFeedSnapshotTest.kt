@@ -19,7 +19,9 @@ import org.junit.Test
  * default (all) state, populated grid covering five distinct
  * category colours + the amber bid pill + the "Be the first" zero-
  * bid affordance, empty frame with the radius hint pill, loading
- * skeleton.
+ * skeleton. Phase 1 adds the urgent badge (P1.A), the radius-suggestion
+ * banner (P1.B), the undo toast (P1.D), the new-tasks pill (P1.E), and
+ * the sectioned browse feed + its skeleton (P1.F).
  */
 class GigsFeedSnapshotTest {
     @get:Rule
@@ -62,6 +64,117 @@ class GigsFeedSnapshotTest {
         }
     }
 
+    // MARK: - Phase 1 frames
+
+    @Test
+    fun gigs_radius_suggestion_banner() {
+        paparazzi.snapshot {
+            Frame {
+                RadiusSuggestionBanner(
+                    suggestion =
+                        GigsRadiusSuggestion(
+                            visibleCount = 2,
+                            currentRadiusMiles = 1.0,
+                            suggestedRadiusMiles = 3.0,
+                        ),
+                    onAccept = {},
+                    onDismiss = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun gigs_new_tasks_banner() {
+        paparazzi.snapshot {
+            Frame {
+                NewTasksBanner(count = 3, onTap = {})
+            }
+        }
+    }
+
+    @Test
+    fun gigs_dismiss_undo_toast() {
+        paparazzi.snapshot {
+            Frame {
+                GigsFeedToastOverlay(
+                    payload =
+                        GigsFeedToast(
+                            text = "Not interested — we'll show fewer like this.",
+                            undo = GigsFeedUndo.Dismiss("g1"),
+                        ),
+                    onUndo = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun gigs_browse_sections() {
+        paparazzi.snapshot {
+            Frame {
+                BrowseFrame(
+                    content = browseContent(),
+                    onOpenGig = {},
+                    onSeeAll = {},
+                    onSelectCategory = {},
+                    onSeeAllTasks = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun gigs_browse_loading_skeleton() {
+        paparazzi.snapshot {
+            Frame { BrowseLoadingFrame() }
+        }
+    }
+
+    private fun browseContent(): GigsBrowseContent =
+        GigsBrowseContent(
+            bestMatches = populatedRows().take(2),
+            urgent =
+                listOf(
+                    GigRailCardContent(
+                        id = "u1",
+                        category = GigsCategory.Handyman,
+                        title = "Emergency: leaking pipe under kitchen sink",
+                        price = "$120",
+                        distanceLabel = "0.4mi",
+                        bidCount = 2,
+                    ),
+                    GigRailCardContent(
+                        id = "u2",
+                        category = GigsCategory.Moving,
+                        title = "Need a hand today — couch to curb",
+                        price = "$45",
+                        distanceLabel = "0.7mi",
+                        bidCount = 0,
+                    ),
+                ),
+            newToday = populatedRows().drop(2).take(2),
+            highPaying =
+                listOf(
+                    GigRailCardContent(
+                        id = "h1",
+                        category = GigsCategory.Cleaning,
+                        title = "Full move-out deep clean, 3BR house",
+                        price = "$320",
+                        distanceLabel = "1.2mi",
+                        bidCount = 5,
+                    ),
+                ),
+            quickJobs = listOf(populatedRows().last()),
+            clusters =
+                listOf(
+                    GigsBrowseClusterChip(category = GigsCategory.Cleaning, count = 4),
+                    GigsBrowseClusterChip(category = GigsCategory.PetCare, count = 3),
+                    GigsBrowseClusterChip(category = GigsCategory.Tech, count = 2),
+                ),
+            totalActive = 27,
+        )
+
     private fun populatedRows(): List<GigCardContent> =
         listOf(
             GigCardContent(
@@ -73,6 +186,8 @@ class GigsFeedSnapshotTest {
                 price = "$60",
                 bidCount = 4,
                 distanceLabel = "0.2mi",
+                // P1.A — exercises the amber URGENT pill beside the category badge.
+                isUrgent = true,
             ),
             GigCardContent(
                 id = "g2",

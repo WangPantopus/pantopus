@@ -41,6 +41,13 @@ class GigFilterCriteriaTest {
         assertEquals(0, GigFilterCriteria().activeCount)
     }
 
+    @Test fun schedule_backend_values_match_wire_contract() {
+        // P0.4 — single-selection schedule rides as `schedule_type`.
+        assertEquals("scheduled", GigScheduleFilter.OneTime.backendValue)
+        assertEquals("recurring", GigScheduleFilter.Recurring.backendValue)
+        assertEquals("flexible", GigScheduleFilter.Flexible.backendValue)
+    }
+
     @Test fun sections_cover_every_dimension_in_order() {
         assertEquals(
             listOf("category", "budget", "schedule", "openToBids", "postedWithin"),
@@ -118,5 +125,125 @@ class GigFilterCriteriaTest {
         val criteria = GigFilterCriteria(postedWithin = GigPostedWithin.Today)
         assertTrue(criteria.matches(gig(createdAt = "2026-05-20T06:00:00Z"), now))
         assertFalse(criteria.matches(gig(createdAt = "2026-05-10T06:00:00Z"), now))
+    }
+
+    // MARK: - P6a saved-search label + POST body
+
+    @Test fun saved_search_label_matches_the_spec_example() {
+        assertEquals(
+            "Cleaning · under $100 · 5 mi",
+            savedSearchLabel(categoryLabel = "Cleaning", maxPrice = 100.0, radiusMiles = 5.0),
+        )
+    }
+
+    @Test fun saved_search_label_orders_every_part() {
+        assertEquals(
+            "Cleaning · “mount tv” · $50–$300 · One-time · open to bids · 2.5 mi",
+            savedSearchLabel(
+                categoryLabel = "Cleaning",
+                search = "mount tv",
+                minPrice = 50.0,
+                maxPrice = 300.0,
+                scheduleLabel = "One-time",
+                openToBids = true,
+                radiusMiles = 2.5,
+            ),
+        )
+    }
+
+    @Test fun saved_search_label_handles_lone_bounds_and_fallback() {
+        assertEquals("over $50 · 5 mi", savedSearchLabel(minPrice = 50.0, radiusMiles = 5.0))
+        assertEquals("All tasks · 5 mi", savedSearchLabel(radiusMiles = 5.0))
+        assertEquals("All tasks", savedSearchLabel())
+    }
+
+    @Test fun to_saved_search_body_maps_every_active_dimension() {
+        val body =
+            GigFilterCriteria(
+                budgetLower = 50f,
+                budgetUpper = 300f,
+                schedules = setOf(GigScheduleFilter.OneTime),
+                openToBids = true,
+            ).toSavedSearchBody(
+                category = GigsCategory.Cleaning,
+                search = " mount tv ",
+                latitude = 40.7,
+                longitude = -73.9,
+                radiusMiles = 5.0,
+            )
+        assertEquals("cleaning", body.category)
+        assertEquals("mount tv", body.search)
+        assertEquals(50.0, body.minPrice!!, 0.0)
+        assertEquals(300.0, body.maxPrice!!, 0.0)
+        assertEquals("scheduled", body.scheduleType)
+        assertEquals("offers", body.payType)
+        assertEquals(40.7, body.latitude, 0.0)
+        assertEquals(-73.9, body.longitude, 0.0)
+        assertEquals(5.0, body.radiusMiles, 0.0)
+        assertTrue(body.notify)
+        assertEquals("Cleaning · “mount tv” · $50–$300 · One-time · open to bids · 5 mi", body.name)
+    }
+
+    @Test fun to_saved_search_body_omits_inactive_dimensions() {
+        val body =
+            GigFilterCriteria().toSavedSearchBody(
+                category = GigsCategory.All,
+                search = null,
+                latitude = 40.7,
+                longitude = -73.9,
+                radiusMiles = 5.0,
+            )
+        assertNull(body.category)
+        assertNull(body.search)
+        assertNull(body.minPrice)
+        assertNull(body.maxPrice)
+        assertNull(body.scheduleType)
+        assertNull(body.payType)
+        assertEquals("All tasks · 5 mi", body.name)
+    }
+
+    @Test fun budget_extremes_stay_off_the_wire() {
+        val body =
+            GigFilterCriteria(
+                budgetLower = GigFilterCriteria.BUDGET_MIN,
+                budgetUpper = GigFilterCriteria.BUDGET_MAX,
+            ).toSavedSearchBody(
+                category = null,
+                search = null,
+                latitude = 40.7,
+                longitude = -73.9,
+                radiusMiles = 5.0,
+            )
+        assertNull(body.minPrice)
+        assertNull(body.maxPrice)
+    }
+
+    @Test fun recurring_schedule_is_not_storable_server_side() {
+        // The create schema only accepts asap|today|scheduled|flexible —
+        // the feed's `recurring` bucket stays a client-side filter.
+        val body =
+            GigFilterCriteria(schedules = setOf(GigScheduleFilter.Recurring)).toSavedSearchBody(
+                category = null,
+                search = null,
+                latitude = 40.7,
+                longitude = -73.9,
+                radiusMiles = 5.0,
+            )
+        assertNull(body.scheduleType)
+        assertEquals("Recurring · 5 mi", body.name)
+    }
+
+    @Test fun multi_schedule_selection_sends_no_schedule_type() {
+        val body =
+            GigFilterCriteria(
+                schedules = setOf(GigScheduleFilter.OneTime, GigScheduleFilter.Flexible),
+            ).toSavedSearchBody(
+                category = null,
+                search = null,
+                latitude = 40.7,
+                longitude = -73.9,
+                radiusMiles = 5.0,
+            )
+        assertNull(body.scheduleType)
     }
 }

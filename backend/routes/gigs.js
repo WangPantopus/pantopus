@@ -32,6 +32,7 @@ const affinityService = require('../services/gig/affinityService');
 const rankingService = require('../services/gig/rankingService');
 const optionalAuth = require('../middleware/optionalAuth');
 const gigPricingService = require('../services/gig/gigPricingService');
+const { alertMatchingSavedSearches } = require('../services/savedSearchAlertService');
 const { haversineMiles } = require('../utils/geo');
 const {
   serializeGigAuthorForViewer,
@@ -425,7 +426,7 @@ function emitGigUpdate(req, gigId, eventType) {
 const createGigSchema = Joi.object({
   title: Joi.string().min(5).max(255).required(),
   description: Joi.string().min(10).required(),
-  price: Joi.number().positive().required(),
+  price: Joi.number().min(0).required(),
   category: Joi.string().max(100).optional(),
   deadline: Joi.date().iso().min('now').optional(),
   estimated_duration: Joi.number().positive().optional(), // hours
@@ -641,7 +642,7 @@ function computeCancellationInfo(gig, cancellingUserId) {
 const updateGigSchema = Joi.object({
   title: Joi.string().min(5).max(255),
   description: Joi.string().min(10),
-  price: Joi.number().positive(),
+  price: Joi.number().min(0),
   category: Joi.string().max(100),
   deadline: Joi.date().iso().min('now'),
   estimated_duration: Joi.number().positive(),
@@ -661,6 +662,8 @@ const updateGigSchema = Joi.object({
     .max(50),
   schedule_type: Joi.string().valid('asap', 'today', 'scheduled', 'flexible'),
   pay_type: Joi.string().valid('fixed', 'hourly', 'offers'),
+  // P4 — V1 edit mode reschedules one-time gigs; mirrors createGigSchema.
+  scheduled_start: Joi.date().iso().allow(null),
   time_window_start: Joi.date().iso().allow(null),
   time_window_end: Joi.date().iso().allow(null),
   special_instructions: Joi.string().max(2000).allow('', null),
@@ -1090,6 +1093,9 @@ router.post('/', verifyToken, validate(createGigSchema), async (req, res) => {
     // Invalidate browse cache near this gig's location
     if (location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
       browseCache.invalidateNear(location.latitude, location.longitude);
+      // P6 — saved-search alerts. Fire-and-forget: a fan-out failure
+      // must never fail the post.
+      alertMatchingSavedSearches(gig, location).catch(() => {});
     }
 
     res.status(201).json({
@@ -6384,6 +6390,84 @@ router.get('/:gigId/cancellation-preview', verifyToken, async (req, res) => {
   } catch (err) {
     logger.error('Cancellation preview error', { error: err.message });
     res.status(500).json({ error: 'Failed to preview cancellation' });
+  }
+});
+
+/**
+ * POST /api/gigs/:gigId/reschedule
+ * P6 — poster moves an assigned gig to a new start time instead of
+ * cancelling (the "Reschedule instead" path the cancellation preview's
+ * `can_reschedule` advertises). Mirrors that gate: zone <= 1 and not
+ * yet in progress.
+ *
+ * Body: { scheduled_start: ISO date (future, required), note?: string }
+ */
+router.post('/:gigId/reschedule', verifyToken, async (req, res) => {
+  try {
+    const { gigId } = req.params;
+    const userId = req.user.id;
+    const { scheduled_start, note } = req.body || {};
+
+    const newStart = scheduled_start ? new Date(scheduled_start) : null;
+    if (!newStart || Number.isNaN(newStart.getTime())) {
+      return res.status(400).json({ error: 'scheduled_start must be a valid ISO date' });
+    }
+    if (newStart.getTime() <= Date.now()) {
+      return res.status(400).json({ error: 'scheduled_start must be in the future' });
+    }
+
+    const { data: gig, error: gigError } = await supabaseAdmin
+      .from('Gig')
+      .select('*')
+      .eq('id', gigId)
+      .single();
+    if (gigError || !gig) return res.status(404).json({ error: 'Gig not found' });
+
+    if (String(gig.user_id) !== String(userId)) {
+      return res.status(403).json({ error: 'Only the poster can reschedule' });
+    }
+    if (gig.status !== 'assigned') {
+      return res.status(400).json({ error: 'Only assigned gigs can be rescheduled' });
+    }
+    const info = computeCancellationInfo(gig, userId);
+    if (info.zone > 1) {
+      return res.status(400).json({ error: 'Too close to the start time to reschedule' });
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('Gig')
+      .update({
+        scheduled_start: newStart.toISOString(),
+        schedule_type: 'scheduled',
+        // A reschedule resets the worker's on-my-way state.
+        worker_ack_status: null,
+        worker_ack_eta_minutes: null,
+      })
+      .eq('id', gigId)
+      .select()
+      .single();
+    if (updateError) throw updateError;
+
+    if (gig.accepted_by) {
+      createNotification({
+        userId: gig.accepted_by,
+        type: 'gig_rescheduled',
+        title: 'Task rescheduled',
+        body: `"${gig.title}" was moved to ${newStart.toLocaleString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        })}${note ? ` — ${note}` : ''}`,
+        link: `/gigs/${gigId}`,
+        contextType: 'gig',
+        contextId: gigId,
+        metadata: { gig_id: gigId, scheduled_start: newStart.toISOString() },
+      }).catch(() => {});
+    }
+    emitGigUpdate(req, gigId, 'rescheduled');
+
+    res.json({ message: 'Task rescheduled', gig: updated });
+  } catch (err) {
+    logger.error('Reschedule gig error', { error: err.message });
+    res.status(500).json({ error: 'Failed to reschedule task' });
   }
 });
 

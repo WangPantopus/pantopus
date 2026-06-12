@@ -10,25 +10,25 @@ import SwiftUI
 struct PostGigV1ErrorBanner: View {
     let errors: [PostGigV1ValidationError]
 
+    private var heading: String {
+        "\(errors.count) problem\(errors.count == 1 ? "" : "s") — please fix"
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s3) {
-            Icon(.alertTriangle, size: 14, color: Theme.Color.appTextInverse)
-                .frame(width: 24, height: 24)
+            Icon(.alertTriangle, size: 12, color: Theme.Color.appTextInverse)
+                .frame(width: 22, height: 22)
                 .background(Theme.Color.error)
                 .clipShape(Circle())
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: Spacing.s1) {
-                Text("\(errors.count) problems - please fix")
+                Text(heading)
                     .pantopusTextStyle(.small)
                     .fontWeight(.bold)
                     .foregroundStyle(Theme.Color.error)
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(errors) { error in
-                        Text("• \(error.message)")
-                            .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.error)
-                    }
-                }
+                Text("We couldn't post your gig. See the highlighted fields below.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.error)
             }
             Spacer(minLength: Spacing.s0)
         }
@@ -41,7 +41,7 @@ struct PostGigV1ErrorBanner: View {
                 .stroke(Theme.Color.errorLight, lineWidth: 1)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(errors.count) problems. \(errors.map(\.message).joined(separator: " "))")
+        .accessibilityLabel("\(heading). \(errors.map(\.message).joined(separator: " "))")
         .accessibilityIdentifier("postGigV1_errorBanner")
     }
 }
@@ -53,7 +53,7 @@ struct PostGigV1InlineError: View {
         HStack(spacing: Spacing.s1) {
             Icon(.alertCircle, size: 11, color: Theme.Color.error)
             Text(message)
-                .pantopusTextStyle(.caption)
+                .font(.system(size: 11, weight: .regular))
                 .foregroundStyle(Theme.Color.error)
         }
         .accessibilityElement(children: .combine)
@@ -83,6 +83,165 @@ struct PostGigV1FieldLabel: View {
             }
         }
         .accessibilityLabel(required ? "\(title), required" : title)
+    }
+}
+
+/// 4-up photo grid riding the real upload pipeline: per-tile state
+/// chrome, dashed "+ Add" tile, cover badge on the first photo, and the
+/// design's italic helper captions.
+struct PostGigV1PhotosGrid: View {
+    let photos: [PostGigV1Photo]
+    let canAdd: Bool
+    let onAdd: () -> Void
+    let onRetry: (String) -> Void
+    let onRemove: (String) -> Void
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 4)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s1) {
+                PostGigV1FieldLabel("Photos", required: false)
+                Text("(up to \(PostGigV1SampleData.maxPhotos))")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextMuted)
+            }
+            LazyVGrid(columns: columns, spacing: Spacing.s2) {
+                ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
+                    PostGigV1PhotoTile(
+                        photo: photo,
+                        isCover: index == 0,
+                        onRetry: { onRetry(photo.id) },
+                        onRemove: { onRemove(photo.id) }
+                    )
+                }
+                if canAdd {
+                    Button(action: onAdd) {
+                        VStack(spacing: Spacing.s1) {
+                            Icon(.plus, size: 18, color: Theme.Color.appTextSecondary)
+                            Text("Add")
+                                .pantopusTextStyle(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .aspectRatio(1, contentMode: .fit)
+                        .background(Theme.Color.appSurfaceMuted)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .stroke(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add photo")
+                    .accessibilityIdentifier("postGigV1_addPhoto")
+                }
+            }
+            Text(photos.isEmpty
+                ? "Photos help your gig get picked up faster."
+                : "First photo is the cover. Tap × to remove.")
+                .font(.system(size: 11, weight: .regular))
+                .italic()
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityIdentifier("postGigV1_photoHint")
+        }
+    }
+}
+
+/// One grid tile — uploading spinner / failed tap-to-retry / uploaded
+/// thumbnail (first tile carries the "Cover" badge). Mirrors the V2
+/// wizard's `GigPhotoTile` states.
+struct PostGigV1PhotoTile: View {
+    let photo: PostGigV1Photo
+    let isCover: Bool
+    let onRetry: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            tileBody
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+
+            if isCover {
+                Text("Cover")
+                    .pantopusTextStyle(.overline)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .padding(.horizontal, Spacing.s1)
+                    .padding(.vertical, 2)
+                    .background(Theme.Color.appText.opacity(0.78))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(Spacing.s1)
+                    .accessibilityHidden(true)
+            }
+
+            Button(action: onRemove) {
+                Icon(.x, size: 12, color: Theme.Color.appTextInverse)
+                    .frame(width: 24, height: 24)
+                    .background(Theme.Color.appText.opacity(0.72))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(5)
+            .accessibilityLabel(isCover ? "Remove cover photo" : "Remove photo")
+            .accessibilityIdentifier("postGigV1_removePhoto_\(photo.id)")
+        }
+        .accessibilityLabel(statusAccessibilityText)
+    }
+
+    @ViewBuilder private var tileBody: some View {
+        switch photo.status {
+        case .uploading:
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .fill(Theme.Color.appSurfaceSunken)
+                .overlay(ProgressView().tint(Theme.Color.primary600))
+        case .failed:
+            Button(action: onRetry) {
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .fill(Theme.Color.errorBg)
+                    .overlay(
+                        VStack(spacing: 2) {
+                            Icon(.alertCircle, size: 16, color: Theme.Color.error)
+                            Text("Retry")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.Color.error)
+                        }
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("postGigV1_retryPhoto_\(photo.id)")
+        case let .uploaded(url):
+            if let uiImage = UIImage(data: photo.imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                // Edit-mode prefill carries no bytes — fetch the stored
+                // attachment URL, glyph placeholder while it loads.
+                AsyncImage(url: URL(string: url)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .fill(Theme.Color.primary50)
+                        .overlay(Icon(.image, size: 20, color: Theme.Color.primary600))
+                }
+            }
+        }
+    }
+
+    private var statusAccessibilityText: String {
+        switch photo.status {
+        case .uploading: "Photo, uploading"
+        case .failed: "Photo, upload failed, tap to retry"
+        case .uploaded: isCover ? "Cover photo, uploaded" : "Photo, uploaded"
+        }
     }
 }
 

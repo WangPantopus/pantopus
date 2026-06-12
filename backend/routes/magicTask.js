@@ -33,6 +33,7 @@ const {
   eventDetailsSchema,
 } = require('../utils/moduleSchemas');
 const { fanoutUrgentTask } = require('../services/urgentFanoutService');
+const { alertMatchingSavedSearches } = require('../services/savedSearchAlertService');
 
 // ── Undo window duration (ms) ────────────────────────────────
 const UNDO_WINDOW_MS = 10_000; // 10 seconds
@@ -563,6 +564,12 @@ router.post('/magic-post', verifyToken, validate(magicPostSchema), async (req, r
     const locationCoords = normalizedLocation
       ? { latitude: normalizedLocation.latitude, longitude: normalizedLocation.longitude }
       : null;
+
+    // P6 — saved-search alerts. Fire-and-forget: a fan-out failure must
+    // never fail the post.
+    if (locationCoords) {
+      alertMatchingSavedSearches(gig, locationCoords).catch(() => {});
+    }
 
     let nearbyHelpers = null;
     let notifiedCount = 0;

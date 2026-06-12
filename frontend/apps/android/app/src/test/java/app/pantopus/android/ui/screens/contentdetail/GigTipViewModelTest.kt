@@ -4,12 +4,15 @@ package app.pantopus.android.ui.screens.contentdetail
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import app.pantopus.android.core.notifications.GigActiveNotifier
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
 import app.pantopus.android.data.api.models.payments.TipResponse
+import app.pantopus.android.data.api.models.reviews.MyPendingReviewsResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
@@ -17,6 +20,8 @@ import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.payments.PaymentsRepository
+import app.pantopus.android.data.realtime.SocketManager
+import app.pantopus.android.data.reviews.ReviewsRepository
 import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -47,6 +52,9 @@ class GigTipViewModelTest {
     private val authRepo: AuthRepository = mockk()
     private val filesRepo: FilesRepository = mockk()
     private val paymentsRepo: PaymentsRepository = mockk()
+    private val reviewsRepo: ReviewsRepository = mockk()
+    private val socket: SocketManager = mockk(relaxed = true)
+    private val activeNotifier: GigActiveNotifier = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -77,11 +85,17 @@ class GigTipViewModelTest {
         coEvery { repo.detail("g1") } returns NetworkResult.Success(GigDetailResponse(gig = completedConfirmedGig()))
         coEvery { repo.bids("g1") } returns NetworkResult.Success(GigBidsResponse(bids = emptyList()))
         coEvery { repo.questions("g1") } returns NetworkResult.Success(GigQuestionsResponse(questions = emptyList()))
+        coEvery { reviewsRepo.myPending() } returns NetworkResult.Success(MyPendingReviewsResponse(pending = emptyList()))
+        // Phase 5b — the owner of an assigned+ gig fetches the payment card.
+        coEvery { repo.gigPayment("g1") } returns NetworkResult.Success(GigPaymentResponse())
         return GigDetailViewModel(
             repo,
             authRepo,
             filesRepo,
             paymentsRepo,
+            reviewsRepo,
+            socket,
+            activeNotifier,
             SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
         )
     }
