@@ -126,6 +126,9 @@ public final class GigDetailViewModel {
     private let uploader: MultipartUploader
     private let checkout: CheckoutCoordinator
     private let currentUserId: String?
+    /// Phase 6b — lock-screen Live Activity driver. The default real
+    /// controller no-ops in tests / previews; tests inject a recorder.
+    private let liveActivity: any GigLiveActivityControlling
 
     init(
         gigId: String,
@@ -133,6 +136,7 @@ public final class GigDetailViewModel {
         uploader: MultipartUploader = .shared,
         checkout: CheckoutCoordinator = CheckoutCoordinator(),
         currentUserId: String? = GigDetailViewModel.currentSignedInUserId(),
+        liveActivity: any GigLiveActivityControlling = GigLiveActivityController.shared,
         roomEvents: @escaping @MainActor (String) -> AsyncStream<GigRoomEvent> = { name in
             SocketClient.shared.events(named: name, as: GigRoomEvent.self)
         },
@@ -145,6 +149,7 @@ public final class GigDetailViewModel {
         self.uploader = uploader
         self.checkout = checkout
         self.currentUserId = currentUserId
+        self.liveActivity = liveActivity
         self.roomEvents = roomEvents
         self.emitRoom = emitRoom
     }
@@ -191,6 +196,14 @@ public final class GigDetailViewModel {
                 }
             }
             ownerBids = viewerIsOwner ? bids : []
+            // Phase 6b — reconcile the lock-screen Live Activity on every
+            // fetch (load, post-mutation refresh, gig:* room events): start
+            // once assigned, update on phase changes, end on terminal states.
+            liveActivity.sync(
+                gig: detail.gig,
+                isParticipant: viewerIsOwner || viewerIsWorker,
+                workerName: bids.first { $0.userId == detail.gig.acceptedBy }?.bidder?.resolvedDisplayName
+            )
             state = .loaded(Self.project(
                 gig: detail.gig,
                 bids: bids,
@@ -1000,6 +1013,41 @@ extension GigDetailViewModel {
         }
     }
 
+    // MARK: - Phase 6b — reschedule
+
+    /// Reschedule gate — poster on an `assigned` gig (the `/reschedule`
+    /// route's preconditions, gigs.js:6405). The cancel sheet additionally
+    /// requires the preview's `can_reschedule` (zone <= 1) before showing
+    /// the affordance.
+    public var canRescheduleTask: Bool {
+        guard viewerIsOwner, let gig = rawGig else { return false }
+        return (gig.status ?? "").lowercased() == "assigned"
+    }
+
+    /// Poster moves the assigned gig to a new future start instead of
+    /// cancelling. The backend resets the worker's on-my-way ack, notifies
+    /// them, and fires `gig:rescheduled`; we refresh silently for the new
+    /// `scheduled_start`.
+    @discardableResult
+    public func rescheduleTask(scheduledStart: Date, note: String?) async -> String? {
+        guard canRescheduleTask else { return nil }
+        do {
+            let _: GigRescheduleResponse = try await api.request(
+                GigsEndpoints.reschedule(
+                    gigId: gigId,
+                    body: RescheduleGigBody(
+                        scheduledStart: ISO8601DateFormatter().string(from: scheduledStart),
+                        note: note
+                    )
+                )
+            )
+            await refreshSilently()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't reschedule the task."
+        }
+    }
+
     // MARK: - Realtime (gig:<eventType> room)
 
     /// Room event suffixes `emitGigUpdate` fires (gigs.js / gigsV2.js):
@@ -1009,7 +1057,8 @@ extension GigDetailViewModel {
         "gig:status-change",
         "gig:worker-ack",
         "gig:completion-update",
-        "gig:payment-update"
+        "gig:payment-update",
+        "gig:rescheduled"
     ]
 
     /// Join the `gig:<id>` room and refetch on any room event for this

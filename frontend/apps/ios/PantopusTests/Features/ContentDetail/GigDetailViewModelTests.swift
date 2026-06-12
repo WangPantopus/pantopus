@@ -819,6 +819,130 @@ final class GigDetailViewModelTests: XCTestCase {
         XCTAssertFalse(worker.canReportRunningLate, "Worker-ack is pre-start only (gigs.js:5838).")
     }
 
+    // MARK: - Phase 6b — reschedule
+
+    func testReschedulePostsIsoStartAndNoteThenRefreshes() async {
+        stubRoutes([
+            "/api/gigs/g1": [
+                .status(200, body: Self.gigJSON(#""status":"assigned","user_id":"owner-1","accepted_by":"w1""#)),
+                .status(200, body: Self.gigJSON(
+                    #""status":"assigned","user_id":"owner-1","accepted_by":"w1","scheduled_start":"2026-06-20T15:00:00Z""#
+                ))
+            ],
+            "/api/gigs/g1/bids": [.status(200, body: #"{"bids":[]}"#), .status(200, body: #"{"bids":[]}"#)],
+            "/api/gigs/g1/questions": [
+                .status(200, body: Self.questionsJSON),
+                .status(200, body: Self.questionsJSON)
+            ],
+            "/api/gigs/g1/no-show-check": [
+                .status(200, body: #"{"can_report":false}"#),
+                .status(200, body: #"{"can_report":false}"#)
+            ],
+            "/api/gigs/g1/reschedule": [
+                .status(200, body: #"{"message":"Task rescheduled","gig":{"id":"g1","title":"Hang 3 shelves","status":"assigned"}}"#)
+            ]
+        ])
+        let vm = makeOwnerVM()
+        await vm.load()
+        XCTAssertTrue(vm.canRescheduleTask)
+        let newStart = Date(timeIntervalSince1970: 1_787_230_800) // 2026-08-20T13:00:00Z
+        let error = await vm.rescheduleTask(scheduledStart: newStart, note: "Pushed a day, sorry!")
+        XCTAssertNil(error)
+        let request = SequencedURLProtocol.capturedRequests.first { $0.url?.path == "/api/gigs/g1/reschedule" }
+        XCTAssertEqual(request?.httpMethod, "POST")
+        let body = String(data: request?.httpBodyData() ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains(#""scheduled_start":"2026-08-20T13:00:00Z""#), "ISO-8601 UTC start: \(body)")
+        XCTAssertTrue(body.contains("Pushed a day, sorry!"))
+        XCTAssertEqual(vm.rawGig?.scheduledStart, "2026-06-20T15:00:00Z", "Silent refresh lands the new start.")
+    }
+
+    func testRescheduleGateClosedForWorkerAndNonAssigned() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: workerGig("assigned"))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)]
+        ])
+        let worker = makeVM()
+        await worker.load()
+        XCTAssertFalse(worker.canRescheduleTask, "Reschedule is poster-only (gigs.js:6405).")
+        let workerError = await worker.rescheduleTask(scheduledStart: Date(), note: nil)
+        XCTAssertNil(workerError)
+        XCTAssertFalse(
+            SequencedURLProtocol.capturedRequests.contains { $0.url?.path == "/api/gigs/g1/reschedule" },
+            "Closed gate never hits the network."
+        )
+
+        SequencedURLProtocol.reset()
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: Self.gigJSON(#""status":"open","user_id":"owner-1""#))],
+            "/api/gigs/g1/bids": [.status(200, body: #"{"bids":[]}"#)],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)]
+        ])
+        let owner = makeOwnerVM()
+        await owner.load()
+        XCTAssertFalse(owner.canRescheduleTask, "Open gigs use PATCH edit, not reschedule.")
+    }
+
+    // MARK: - Phase 6b — live activity wiring
+
+    func testLiveActivitySyncsOnEveryFetchWithParticipantFlag() async {
+        stubRoutes([
+            "/api/gigs/g1": [
+                .status(200, body: workerGig("assigned")),
+                .status(200, body: workerGig("in_progress"))
+            ],
+            "/api/gigs/g1/questions": [
+                .status(200, body: Self.questionsJSON),
+                .status(200, body: Self.questionsJSON)
+            ],
+            "/api/gigs/g1/no-show-check": [
+                .status(200, body: #"{"can_report":false}"#),
+                .status(200, body: #"{"can_report":false}"#)
+            ],
+            "/api/gigs/g1/change-orders": [
+                .status(200, body: #"{"change_orders":[]}"#),
+                .status(200, body: #"{"change_orders":[]}"#)
+            ],
+            "/api/gigs/g1/start": [.status(200, body: #"{"message":"ok"}"#)]
+        ])
+        let recorder = LiveActivityRecorder()
+        let vm = GigDetailViewModel(
+            gigId: "g1",
+            api: makeAPI(),
+            currentUserId: "viewer-1",
+            liveActivity: recorder,
+            roomEvents: { _ in AsyncStream { $0.finish() } },
+            emitRoom: { _, _ in }
+        )
+        await vm.load()
+        XCTAssertEqual(recorder.synced, ["assigned:participant"], "Load syncs the assigned phase.")
+        _ = await vm.startTask()
+        XCTAssertEqual(
+            recorder.synced,
+            ["assigned:participant", "in_progress:participant"],
+            "The post-mutation silent refresh re-syncs the live activity."
+        )
+    }
+
+    func testLiveActivitySyncMarksNonParticipants() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: Self.gigJSON(#""status":"assigned","user_id":"owner-1","accepted_by":"w1""#))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)]
+        ])
+        let recorder = LiveActivityRecorder()
+        let vm = GigDetailViewModel(
+            gigId: "g1",
+            api: makeAPI(),
+            currentUserId: "viewer-1", // neither poster nor worker
+            liveActivity: recorder,
+            roomEvents: { _ in AsyncStream { $0.finish() } },
+            emitRoom: { _, _ in }
+        )
+        await vm.load()
+        XCTAssertEqual(recorder.synced, ["assigned:bystander"], "Non-participants sync with the flag down (controller ends/skips).")
+    }
+
     // MARK: - Phase 5b — worker-side no-show
 
     func testWorkerNoShowEligibilityMirrorsOwnerGating() async {
@@ -872,6 +996,17 @@ private extension URLRequest {
 @MainActor
 final class EmitRecorder {
     var events: [String] = []
+}
+
+/// Phase 6b — records `sync` calls instead of touching ActivityKit so
+/// the live-activity wiring stays assertable and deterministic.
+@MainActor
+final class LiveActivityRecorder: GigLiveActivityControlling {
+    private(set) var synced: [String] = []
+
+    func sync(gig: GigDTO, isParticipant: Bool, workerName _: String?) {
+        synced.append("\(gig.status ?? "?"):\(isParticipant ? "participant" : "bystander")")
+    }
 }
 
 /// Scripted PaymentSheet presenter for the owner accept-bid flow.

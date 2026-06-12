@@ -48,6 +48,7 @@ import app.pantopus.android.data.api.models.gigs.GigChangeOrderDto
 import app.pantopus.android.data.api.models.gigs.GigChangeOrderType
 import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigReportReason
+import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -59,6 +60,8 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
@@ -1650,6 +1653,8 @@ fun GigCancelSheetContent(
     previewLoading: Boolean,
     onConfirm: (CancelGigReason) -> Unit,
     onCancel: () -> Unit,
+    /** P6b — opens the reschedule sheet when `can_reschedule` allows it. */
+    onReschedule: (() -> Unit)? = null,
 ) {
     var selected by remember { mutableStateOf<CancelGigReason?>(null) }
     Column(
@@ -1706,10 +1711,18 @@ fun GigCancelSheetContent(
                             color = PantopusColors.appTextMuted,
                         )
                     }
-                    // `preview.canReschedule` intentionally unused — the backend has
-                    // no reschedule endpoint for assigned gigs yet (Phase 5b skip).
                 }
             else -> Unit
+        }
+        // P6b — `POST /reschedule` (`backend/routes/gigs.js:6405`) closes
+        // the Phase 5b deferral: while the preview's `can_reschedule`
+        // gate allows it, the poster can move the start time instead.
+        if (preview?.canReschedule == true && onReschedule != null) {
+            SheetGhostButton(
+                label = "Reschedule instead",
+                modifier = Modifier.fillMaxWidth().testTag("gigDetail.reschedule"),
+                onClick = onReschedule,
+            )
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             CancelGigReason.entries.forEach { reason ->
@@ -1740,6 +1753,134 @@ private fun cancellationFeeCopy(preview: CancellationPreviewResponse): String {
         else -> "A ${formatBidAmount(fee)} cancellation fee applies (${preview.feePct?.toInt() ?: 0}% of the task price)."
     }
 }
+
+// MARK: - P6b · reschedule instead of cancelling
+
+/**
+ * P6b — poster moves an assigned task to a new future start
+ * (`POST /reschedule`, `backend/routes/gigs.js:6405`). Offered from the
+ * cancel sheet while the preview's `can_reschedule` gate allows it;
+ * reuses [FutureDateTimePickerDialogs] plus an optional note that lands
+ * in the worker's `gig_rescheduled` notification.
+ */
+@Composable
+fun GigRescheduleSheetContent(
+    initialStart: LocalDateTime?,
+    onConfirm: (LocalDateTime, String?) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var pickedStart by remember { mutableStateOf<LocalDateTime?>(null) }
+    var note by remember { mutableStateOf("") }
+    var showPicker by remember { mutableStateOf(false) }
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(Spacing.s4)
+                .testTag("gigDetail.rescheduleSheet"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        Text(
+            text = "Reschedule this task",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text = "Pick a new start time — your helper will be notified.",
+            fontSize = 13.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceSunken)
+                    .clickable { showPicker = true }
+                    .padding(horizontal = Spacing.s3)
+                    .testTag("gigDetail.rescheduleSheet.date"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Calendar,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = pickedStart?.format(RescheduleStartFormatter) ?: "Choose a new time",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (pickedStart == null) PantopusColors.appTextMuted else PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronDown,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceSunken)
+                    .padding(Spacing.s3),
+        ) {
+            BasicTextField(
+                value = note,
+                onValueChange = { note = it.take(500) },
+                textStyle = PantopusTextStyle.body.copy(color = PantopusColors.appText),
+                cursorBrush = SolidColor(PantopusColors.primary600),
+                minLines = 2,
+                maxLines = 4,
+                modifier = Modifier.fillMaxWidth().testTag("gigDetail.rescheduleSheet.note"),
+                decorationBox = { inner ->
+                    if (note.isEmpty()) {
+                        Text(
+                            text = "Add a note for your helper (optional)",
+                            style = PantopusTextStyle.body,
+                            color = PantopusColors.appTextMuted,
+                        )
+                    }
+                    inner()
+                },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            SheetGhostButton(
+                label = "Back",
+                modifier = Modifier.weight(1f).testTag("gigDetail.rescheduleSheet.cancel"),
+                onClick = onCancel,
+            )
+            SheetPrimaryButton(
+                label = "Reschedule",
+                enabled = pickedStart != null,
+                modifier = Modifier.weight(1f).testTag("gigDetail.rescheduleSheet.confirm"),
+                onClick = { pickedStart?.let { onConfirm(it, note.trim().ifEmpty { null }) } },
+            )
+        }
+    }
+    if (showPicker) {
+        FutureDateTimePickerDialogs(
+            initial = pickedStart ?: initialStart,
+            onPicked = { picked ->
+                showPicker = false
+                pickedStart = picked
+            },
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+private val RescheduleStartFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a", Locale.US)
 
 // MARK: - Shared bits
 

@@ -192,6 +192,8 @@ const GIG_TYPES = new Set([
   'no_show_reported', 'urgent_status_update',
   // P6 — saved-search alerts ("new task matches your saved search").
   'gig_saved_search_match',
+  // P6 — poster moved an assigned gig's start time.
+  'gig_rescheduled',
   // Change orders
   'change_order', 'change_order_approved', 'change_order_rejected',
   // Payments

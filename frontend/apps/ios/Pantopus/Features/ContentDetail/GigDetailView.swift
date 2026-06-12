@@ -7,8 +7,8 @@
 //  delivers / instant-accepts depending on the lifecycle); the Phase 5/5b
 //  scroll footer carries the owner bids panel, active-task strip (with
 //  running-late badge), changes card, payment card, and review CTA, with
-//  counter / report / cancel / no-show / running-late / change-order
-//  sheets attached.
+//  counter / report / cancel / reschedule / no-show / running-late /
+//  change-order sheets attached.
 //
 
 // swiftlint:disable file_length type_body_length
@@ -33,6 +33,8 @@ public struct GigDetailView: View {
     // Phase 5b — lifecycle completers
     @State private var showRunningLateSheet = false
     @State private var showChangeOrderSheet = false
+    // Phase 6b — reschedule (cancel sheet's "Reschedule instead" path)
+    @State private var showRescheduleSheet = false
     private let onBack: @MainActor () -> Void
     private let onOpenChat: (@MainActor (InboxConversationDestination) -> Void)?
 
@@ -104,6 +106,7 @@ public struct GigDetailView: View {
             reviewTarget: $reviewTarget,
             showRunningLateSheet: $showRunningLateSheet,
             showChangeOrderSheet: $showChangeOrderSheet,
+            showRescheduleSheet: $showRescheduleSheet,
             toast: $toast
         ))
         .confirmationDialog(
@@ -488,10 +491,23 @@ private struct GigLifecycleSheets: ViewModifier {
     @Binding var reviewTarget: LeaveReviewSheetTarget?
     @Binding var showRunningLateSheet: Bool
     @Binding var showChangeOrderSheet: Bool
+    @Binding var showRescheduleSheet: Bool
     @Binding var toast: ToastMessage?
 
     func body(content: Content) -> some View {
         phase5bSheets(phase5Sheets(content))
+    }
+
+    /// Phase 6b — the cancel sheet's "Reschedule instead" hand-off.
+    /// Poster-only by construction (the overflow's "Cancel task" is
+    /// owner-gated); the sheet additionally checks the preview's
+    /// `can_reschedule` before rendering the button.
+    private var rescheduleAction: (@MainActor () -> Void)? {
+        guard viewModel.canRescheduleTask else { return nil }
+        return {
+            showCancelSheet = false
+            showRescheduleSheet = true
+        }
     }
 
     /// Phase 5 — counter / report / cancel / no-show / review.
@@ -527,6 +543,7 @@ private struct GigLifecycleSheets: ViewModifier {
             .sheet(isPresented: $showCancelSheet) {
                 GigCancelSheet(
                     preview: cancelPreview,
+                    onReschedule: rescheduleAction,
                     onConfirm: { reason in
                         if let error = await viewModel.cancelTask(reason: reason) {
                             toast = ToastMessage(text: error, kind: .error)
@@ -570,9 +587,21 @@ private struct GigLifecycleSheets: ViewModifier {
             }
     }
 
-    /// Phase 5b — running-late + propose-a-change.
+    /// Phase 5b — running-late + propose-a-change; Phase 6b — reschedule.
     private func phase5bSheets(_ content: some View) -> some View {
         content
+            .sheet(isPresented: $showRescheduleSheet) {
+                GigRescheduleSheet(
+                    onSubmit: { newStart, note in
+                        let error = await viewModel.rescheduleTask(scheduledStart: newStart, note: note)
+                        if error == nil {
+                            toast = ToastMessage(text: "Task rescheduled", kind: .success)
+                        }
+                        return error
+                    },
+                    onDismiss: { showRescheduleSheet = false }
+                )
+            }
             .sheet(isPresented: $showRunningLateSheet) {
                 GigRunningLateSheet(
                     onSubmit: { etaMinutes, note in

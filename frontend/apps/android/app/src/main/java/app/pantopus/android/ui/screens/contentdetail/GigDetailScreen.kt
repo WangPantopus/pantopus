@@ -71,12 +71,14 @@ fun GigDetailScreen(
     var showTipSheet by remember { mutableStateOf(false) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showCancelSheet by remember { mutableStateOf(false) }
+    var showRescheduleSheet by remember { mutableStateOf(false) }
     var toastText by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val deliverySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val tipSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val reportSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cancelSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val rescheduleSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Block 3D — Stripe PaymentSheet for tipping (created in composition).
     val paymentSheet =
@@ -274,6 +276,51 @@ fun GigDetailScreen(
                     }
                 },
                 onCancel = { showCancelSheet = false },
+                // P6b — only the poster reaches this sheet (canCancelTask),
+                // so `can_reschedule` alone gates the secondary path.
+                onReschedule =
+                    if (viewModel.viewerIsOwner()) {
+                        {
+                            showCancelSheet = false
+                            showRescheduleSheet = true
+                        }
+                    } else {
+                        null
+                    },
+            )
+        }
+    }
+
+    // P6b — "Reschedule instead": FutureDateTimePicker + optional note →
+    // `POST /reschedule`. The VM toasts "Task rescheduled" + refetches.
+    if (showRescheduleSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showRescheduleSheet = false },
+            sheetState = rescheduleSheetState,
+        ) {
+            GigRescheduleSheetContent(
+                initialStart =
+                    viewModel.gigSnapshot()?.scheduledStart?.let { iso ->
+                        runCatching {
+                            java.time.Instant
+                                .parse(iso)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDateTime()
+                        }.getOrNull()
+                    },
+                onConfirm = { start, note ->
+                    viewModel.rescheduleTask(
+                        scheduledStartIso =
+                            start
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toInstant()
+                                .toString(),
+                        note = note,
+                    ) { ok ->
+                        if (ok) showRescheduleSheet = false
+                    }
+                },
+                onCancel = { showRescheduleSheet = false },
             )
         }
     }

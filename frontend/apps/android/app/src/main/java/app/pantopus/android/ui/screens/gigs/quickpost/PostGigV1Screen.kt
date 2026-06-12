@@ -2,6 +2,9 @@
 
 package app.pantopus.android.ui.screens.gigs.quickpost
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -34,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
@@ -68,6 +75,7 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -91,11 +99,11 @@ fun PostGigV1Screen(
 
     // P0.2 — modern photo picker; picked URIs are copied to bytes and
     // uploaded immediately by the VM.
-    val photoPicker =
-        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
-                scope.launch {
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@launch
+    val handlePicked: (Uri?) -> Unit = { uri ->
+        if (uri != null) {
+            scope.launch {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes != null) {
                     val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
                     viewModel.addPickedPhoto(
                         PostGigV1PickedPhoto(
@@ -107,6 +115,45 @@ fun PostGigV1Screen(
                 }
             }
         }
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), handlePicked)
+
+    // P6b — real camera capture behind the Add tile's "Take a photo"
+    // option (closes the P0 deferral). `TakePicture()` writes into a
+    // cache-dir file exposed through the app FileProvider, then the
+    // captured URI rides the SAME `handlePicked` upload path as library
+    // picks. Saveable across process death during capture.
+    var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val cameraCapture =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val uri = pendingCameraUri?.let(Uri::parse)
+            pendingCameraUri = null
+            if (success) handlePicked(uri)
+        }
+    val launchCamera = {
+        val photoFile = File(context.cacheDir, "gig-camera-${UUID.randomUUID()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        pendingCameraUri = uri.toString()
+        // No camera app (or a broken resolver) must not crash — drop it.
+        runCatching { cameraCapture.launch(uri) }.onFailure { pendingCameraUri = null }
+        Unit
+    }
+    // CAMERA is declared in the manifest, so the TakePicture intent
+    // requires the runtime grant first. Denial is graceful: skip capture.
+    val cameraPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchCamera()
+        }
+    val onTakePhoto = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            launchCamera()
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     LaunchedEffect(preselectedCategoryKey) {
         viewModel.preselectCategoryIfNeeded(GigsCategory.fromBackendKey(preselectedCategoryKey))
@@ -154,6 +201,7 @@ fun PostGigV1Screen(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                                 )
                             },
+                            onTakePhoto = onTakePhoto,
                             onRemovePhoto = viewModel::removePhoto,
                             onRetryPhoto = viewModel::retryPhotoUpload,
                         ),
@@ -182,6 +230,8 @@ data class PostGigV1Actions(
     val onPickDate: () -> Unit = {},
     val onLocation: (String) -> Unit = {},
     val onAddPhoto: () -> Unit = {},
+    /** P6b — camera capture option on the Add tile. */
+    val onTakePhoto: () -> Unit = {},
     val onRemovePhoto: (String) -> Unit = {},
     /** P0.2 — tap-to-retry on a failed upload tile. */
     val onRetryPhoto: (String) -> Unit = {},
@@ -252,6 +302,7 @@ fun PostGigV1Content(
             photos = form.photos,
             canAdd = form.photos.size < PostGigV1SampleData.MAX_PHOTOS,
             onAdd = actions.onAddPhoto,
+            onTakePhoto = actions.onTakePhoto,
             onRemove = actions.onRemovePhoto,
             onRetry = actions.onRetryPhoto,
         )
@@ -573,6 +624,7 @@ private fun PhotosGrid(
     photos: List<PostGigV1Photo>,
     canAdd: Boolean,
     onAdd: () -> Unit,
+    onTakePhoto: () -> Unit,
     onRemove: (String) -> Unit,
     onRetry: (String) -> Unit,
 ) {
@@ -596,7 +648,8 @@ private fun PhotosGrid(
                     when (item) {
                         PhotoGridItem.Add ->
                             AddPhotoTile(
-                                onClick = onAdd,
+                                onPickLibrary = onAdd,
+                                onTakePhoto = onTakePhoto,
                                 modifier = Modifier.weight(1f),
                             )
                         is PhotoGridItem.Photo ->
@@ -639,37 +692,61 @@ private sealed interface PhotoGridItem {
 
 @Composable
 private fun AddPhotoTile(
-    onClick: () -> Unit,
+    onPickLibrary: () -> Unit,
+    onTakePhoto: () -> Unit,
     modifier: Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurfaceMuted)
-                .border(
-                    width = 1.5.dp,
-                    color = PantopusColors.appBorderStrong,
-                    shape = RoundedCornerShape(Radii.lg),
-                ).clickable(onClick = onClick)
-                .testTag("postGigV1_addPhoto")
-                .semantics { contentDescription = "Add photo" },
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Plus,
-            contentDescription = null,
-            size = 18.dp,
-            tint = PantopusColors.appTextSecondary,
-        )
-        Text(
-            text = "Add",
-            style = PantopusTextStyle.caption,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appTextSecondary,
-        )
+    // P6b — the tile opens a two-option source menu (camera capture vs
+    // library pick) instead of jumping straight into the library.
+    var sourceMenuOpen by remember { mutableStateOf(false) }
+    Box(modifier = modifier.aspectRatio(1f)) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurfaceMuted)
+                    .border(
+                        width = 1.5.dp,
+                        color = PantopusColors.appBorderStrong,
+                        shape = RoundedCornerShape(Radii.lg),
+                    ).clickable { sourceMenuOpen = true }
+                    .testTag("postGigV1_addPhoto")
+                    .semantics { contentDescription = "Add photo" },
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Plus,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = "Add",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        DropdownMenu(expanded = sourceMenuOpen, onDismissRequest = { sourceMenuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text("Take a photo") },
+                onClick = {
+                    sourceMenuOpen = false
+                    onTakePhoto()
+                },
+                modifier = Modifier.testTag("postGigV1_addPhoto_camera"),
+            )
+            DropdownMenuItem(
+                text = { Text("Photo library") },
+                onClick = {
+                    sourceMenuOpen = false
+                    onPickLibrary()
+                },
+                modifier = Modifier.testTag("postGigV1_addPhoto_library"),
+            )
+        }
     }
 }
 

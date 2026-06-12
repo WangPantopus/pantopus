@@ -800,6 +800,29 @@ public struct GigCancellationPreview: Decodable, Sendable {
     }
 }
 
+/// Body for `POST /api/gigs/:gigId/reschedule` — ISO future start +
+/// optional note relayed to the worker (`backend/routes/gigs.js:6405`).
+public struct RescheduleGigBody: Encodable, Sendable {
+    public let scheduledStart: String
+    public let note: String?
+
+    enum CodingKeys: String, CodingKey {
+        case note
+        case scheduledStart = "scheduled_start"
+    }
+
+    public init(scheduledStart: String, note: String?) {
+        self.scheduledStart = scheduledStart
+        self.note = note
+    }
+}
+
+/// Response from `POST /api/gigs/:gigId/reschedule` — `{message, gig}`.
+public struct GigRescheduleResponse: Decodable, Sendable {
+    public let message: String?
+    public let gig: GigDTO?
+}
+
 /// Response from `POST /api/gigs/:gigId/report`.
 public struct GigReportResponse: Decodable, Sendable {
     public let message: String?

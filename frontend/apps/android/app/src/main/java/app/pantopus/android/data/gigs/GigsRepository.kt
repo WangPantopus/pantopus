@@ -46,6 +46,8 @@ import app.pantopus.android.data.api.models.gigs.ReportGigBody
 import app.pantopus.android.data.api.models.gigs.ReportGigResponse
 import app.pantopus.android.data.api.models.gigs.ReportNoShowBody
 import app.pantopus.android.data.api.models.gigs.ReportNoShowResponse
+import app.pantopus.android.data.api.models.gigs.RescheduleGigBody
+import app.pantopus.android.data.api.models.gigs.RescheduleGigResponse
 import app.pantopus.android.data.api.models.gigs.WorkerAckBody
 import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -248,6 +250,14 @@ class GigsRepository
         /** `GET /api/gigs/:gigId/cancellation-preview` — zone + fee preview. */
         suspend fun cancellationPreview(gigId: String): NetworkResult<CancellationPreviewResponse> =
             safeApiCall { api.cancellationPreview(gigId) }
+
+        /** `POST /api/gigs/:gigId/reschedule` — poster moves the start time. */
+        suspend fun rescheduleGig(
+            gigId: String,
+            scheduledStart: String,
+            note: String? = null,
+        ): NetworkResult<RescheduleGigResponse> =
+            safeApiCall { api.rescheduleGig(gigId, RescheduleGigBody(scheduledStart = scheduledStart, note = note)) }
 
         /** `GET /api/gigs/:gigId/payment` — payment card for poster/worker. */
         suspend fun gigPayment(gigId: String): NetworkResult<GigPaymentResponse> = safeApiCall { api.gigPayment(gigId) }

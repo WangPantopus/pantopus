@@ -4,6 +4,7 @@ package app.pantopus.android.ui.screens.contentdetail
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import app.pantopus.android.core.notifications.GigActiveNotifier
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
@@ -53,6 +54,7 @@ class GigTipViewModelTest {
     private val paymentsRepo: PaymentsRepository = mockk()
     private val reviewsRepo: ReviewsRepository = mockk()
     private val socket: SocketManager = mockk(relaxed = true)
+    private val activeNotifier: GigActiveNotifier = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -93,6 +95,7 @@ class GigTipViewModelTest {
             paymentsRepo,
             reviewsRepo,
             socket,
+            activeNotifier,
             SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
         )
     }

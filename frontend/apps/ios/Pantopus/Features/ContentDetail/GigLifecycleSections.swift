@@ -6,9 +6,9 @@
 //  panel (accept / counter / reject), the active-task phase strip with
 //  role-gated actions + running-late badge, the change-orders card, the
 //  owner's payment card, the post-completion review CTA, and the counter /
-//  report / cancel / no-show / running-late / change-order sheets. All
-//  sections render inside `GigDetailView`'s scroll footer; the view-model
-//  owns every mutation.
+//  report / cancel / reschedule / no-show / running-late / change-order
+//  sheets. All sections render inside `GigDetailView`'s scroll footer; the
+//  view-model owns every mutation.
 //
 
 // swiftlint:disable file_length
@@ -679,6 +679,10 @@ struct GigReportSheet: View {
 /// fetched before presentation; `nil` falls back to generic copy.
 struct GigCancelSheet: View {
     let preview: GigCancellationPreview?
+    /// Phase 6b — non-nil when the viewer is the poster of an `assigned`
+    /// gig; combined with the preview's `can_reschedule` it surfaces the
+    /// "Reschedule instead" path (→ `POST /:gigId/reschedule`).
+    var onReschedule: (@MainActor () -> Void)?
     let onConfirm: @MainActor (CancelGigReason?) async -> Void
     let onDismiss: @MainActor () -> Void
 
@@ -692,9 +696,6 @@ struct GigCancelSheet: View {
                     Text("Cancel this task?")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
-                    // `preview?.canReschedule` stays unsurfaced: no backend
-                    // reschedule endpoint exists for assigned gigs (PATCH /:id
-                    // is open-only), so the CTA would have nothing to call.
                     if let zoneLabel = preview?.zoneLabel {
                         Text(zoneLabel)
                             .font(.system(size: 12, weight: .semibold))
@@ -710,6 +711,22 @@ struct GigCancelSheet: View {
                             identifier: "gigDetail.cancelSheet.reason_\(reason.rawValue)"
                         ) { selected = reason }
                     }
+                }
+                if preview?.canReschedule == true, let onReschedule {
+                    Button(action: onReschedule) {
+                        HStack(spacing: 6) {
+                            Icon(.calendar, size: 14, strokeWidth: 2.2, color: Theme.Color.primary600)
+                            Text("Reschedule instead")
+                                .font(.system(size: 13.5, weight: .bold))
+                                .foregroundStyle(Theme.Color.primary600)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Theme.Color.primary50)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gigDetail.reschedule")
                 }
                 HStack(spacing: Spacing.s2) {
                     SheetButton(title: "Keep task", style: .ghost, identifier: "gigDetail.cancelSheet.dismiss") {
@@ -761,6 +778,93 @@ struct GigCancelSheet: View {
         .background(free ? Theme.Color.successBg : Theme.Color.warningBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         .accessibilityIdentifier("gigDetail.cancelSheet.fee")
+    }
+}
+
+// MARK: - Phase 6b — reschedule sheet
+
+/// Future-only date+time picker + optional note →
+/// `POST /:gigId/reschedule`. Reached from the cancel sheet's
+/// "Reschedule instead" button (poster, assigned gig, zone <= 1).
+struct GigRescheduleSheet: View {
+    let onSubmit: @MainActor (Date, String?) async -> String?
+    let onDismiss: @MainActor () -> Void
+
+    @State private var newStart = Self.defaultStart()
+    @State private var noteText = ""
+    @State private var submitting = false
+    @State private var errorText: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text("Reschedule this task")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Pick a new start time. Your helper is notified and their \"on my way\" status resets.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            DatePicker(
+                "New start",
+                selection: $newStart,
+                in: Date.now...,
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .datePickerStyle(.compact)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.Color.appText)
+            .tint(Theme.Color.primary600)
+            .accessibilityIdentifier("gigDetail.rescheduleSheet.date")
+            TextField("Add a note for your helper (optional)", text: $noteText, axis: .vertical)
+                .lineLimit(2...3)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(Spacing.s3)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .accessibilityIdentifier("gigDetail.rescheduleSheet.note")
+            if let errorText {
+                Text(errorText)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.error)
+            }
+            HStack(spacing: Spacing.s2) {
+                SheetButton(title: "Back", style: .ghost, identifier: "gigDetail.rescheduleSheet.cancel") {
+                    onDismiss()
+                }
+                SheetButton(
+                    title: submitting ? "Rescheduling…" : "Reschedule task",
+                    style: .primary,
+                    enabled: !submitting && newStart > Date.now,
+                    identifier: "gigDetail.rescheduleSheet.confirm"
+                ) {
+                    Task { await submit() }
+                }
+            }
+        }
+        .padding(Spacing.s5)
+        .presentationDetents([.height(360)])
+        .accessibilityIdentifier("gigDetail.rescheduleSheet")
+    }
+
+    /// Top of the next hour, at least an hour out — a sane future default
+    /// that already satisfies the backend's future-only validation.
+    private static func defaultStart() -> Date {
+        let inAnHour = Date.now.addingTimeInterval(3600)
+        return Calendar.current.date(bySetting: .minute, value: 0, of: inAnHour) ?? inAnHour
+    }
+
+    private func submit() async {
+        guard !submitting else { return }
+        submitting = true
+        defer { submitting = false }
+        let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error = await onSubmit(newStart, trimmed.isEmpty ? nil : trimmed) {
+            errorText = error
+        } else {
+            onDismiss()
+        }
     }
 }
 

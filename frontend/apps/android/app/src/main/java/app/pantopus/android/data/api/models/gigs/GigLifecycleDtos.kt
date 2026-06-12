@@ -265,3 +265,21 @@ data class CancellationPreviewResponse(
     @Json(name = "policy_description") val policyDescription: String? = null,
     @Json(name = "can_reschedule") val canReschedule: Boolean? = null,
 )
+
+/**
+ * Body for `POST /api/gigs/:gigId/reschedule`
+ * (`backend/routes/gigs.js:6405`). `scheduled_start` must be a future
+ * ISO date; `note` is forwarded into the worker's notification body.
+ */
+@JsonClass(generateAdapter = true)
+data class RescheduleGigBody(
+    @Json(name = "scheduled_start") val scheduledStart: String,
+    val note: String? = null,
+)
+
+/** Response from the reschedule endpoint (`{ message, gig }`). */
+@JsonClass(generateAdapter = true)
+data class RescheduleGigResponse(
+    val message: String? = null,
+    val gig: GigDto? = null,
+)

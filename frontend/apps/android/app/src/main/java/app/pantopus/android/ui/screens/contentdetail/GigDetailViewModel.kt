@@ -5,6 +5,8 @@ package app.pantopus.android.ui.screens.contentdetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.core.notifications.GigActiveNotification
+import app.pantopus.android.core.notifications.GigActiveNotifier
 import app.pantopus.android.data.api.models.gigs.CancelGigReason
 import app.pantopus.android.data.api.models.gigs.CancellationPreviewResponse
 import app.pantopus.android.data.api.models.gigs.GigBidDto
@@ -84,6 +86,7 @@ class GigDetailViewModel
         private val paymentsRepo: PaymentsRepository,
         private val reviewsRepo: ReviewsRepository,
         private val socket: SocketManager,
+        private val activeNotifier: GigActiveNotifier,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
@@ -173,6 +176,28 @@ class GigDetailViewModel
             /** Shared web link for the Android share sheet (work item 6). */
             fun shareUrl(gigId: String): String = "https://pantopus.app/gigs/$gigId"
 
+            /**
+             * Phase 6b — phase line for the ongoing active-task
+             * notification. Non-null while the task is live for a
+             * participant (assigned / in progress / marked done awaiting
+             * the owner); null once resolved (confirmed complete,
+             * cancelled) or outside the active lifecycle.
+             */
+            fun activeNotificationLine(gig: GigDto): String? =
+                when (gig.status?.lowercase()) {
+                    "assigned" ->
+                        when (gig.workerAckStatus) {
+                            "starting_now" -> "Worker on the way"
+                            "running_late" ->
+                                gig.workerAckEtaMinutes?.let { "Running ~$it min late" } ?: "Running late"
+                            else -> "Assigned — waiting for worker"
+                        }
+                    "in_progress" -> "In progress"
+                    "completed" ->
+                        if (gig.ownerConfirmedAt.isNullOrEmpty()) "Marked done — confirm completion" else null
+                    else -> null
+                }
+
             /** Room events emitted by `emitGigUpdate` (`backend/routes/gigs.js:413`). */
             internal val GIG_ROOM_EVENTS =
                 listOf(
@@ -183,6 +208,9 @@ class GigDetailViewModel
                     "gig:completion-update",
                     "gig:payment-update",
                     "gig:qa-update",
+                    // P6b — `POST /reschedule` fires `gig:rescheduled`
+                    // (`backend/routes/gigs.js:6465`).
+                    "gig:rescheduled",
                 )
         }
 
@@ -433,6 +461,7 @@ class GigDetailViewModel
             canInstantAccept = viewerCanInstantAccept(gig, uid)
             _bids.value = bids
             _activeTask.value = deriveActiveTask(gig, uid)
+            syncActiveNotification(gig, uid)
             refreshNoShowEligibility(gig, uid)
             refreshReviewState(gig, uid)
             refreshPayment(gig, uid)
@@ -483,6 +512,34 @@ class GigDetailViewModel
             gig: GigDto,
             status: String?,
         ): Boolean = status == "assigned" && gig.workerAckStatus == "running_late"
+
+        /**
+         * Phase 6b — mirror the active phase into the ongoing system
+         * notification: post/update for participants while the task is
+         * live, cancel once it resolves (owner-confirmed / cancelled) or
+         * when the viewer isn't involved. Runs on every fresh gig — the
+         * same transitions the phase strip uses, including `gig:*`
+         * room-event refetches.
+         */
+        private fun syncActiveNotification(
+            gig: GigDto,
+            uid: String?,
+        ) {
+            val participant = uid != null && (uid == gig.userId || uid == gig.acceptedBy)
+            val line = activeNotificationLine(gig)
+            if (participant && line != null) {
+                activeNotifier.post(
+                    GigActiveNotification(
+                        gigId = gigId,
+                        title = gig.title,
+                        phaseLine = line,
+                        categoryKey = gig.category,
+                    ),
+                )
+            } else {
+                activeNotifier.cancel(gigId)
+            }
+        }
 
         /**
          * Either party (`/report-no-show` gates poster + worker) on an
@@ -1097,6 +1154,33 @@ class GigDetailViewModel
                     is NetworkResult.Failure -> Unit
                 }
                 _cancelPreviewLoading.value = false
+            }
+        }
+
+        /**
+         * Phase 6b — poster moves an assigned task to a new future start
+         * instead of cancelling (`POST /reschedule`,
+         * `backend/routes/gigs.js:6405`; gated by the preview's
+         * `can_reschedule`). The backend resets the worker's on-my-way
+         * state and notifies them; `gig:rescheduled` refreshes the room.
+         */
+        fun rescheduleTask(
+            scheduledStartIso: String,
+            note: String?,
+            onResult: (Boolean) -> Unit = {},
+        ) {
+            viewModelScope.launch {
+                when (val result = repo.rescheduleGig(gigId, scheduledStartIso, note)) {
+                    is NetworkResult.Success -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast("Task rescheduled"))
+                        silentRefetch()
+                        onResult(true)
+                    }
+                    is NetworkResult.Failure -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(result.error.message, isError = true))
+                        onResult(false)
+                    }
+                }
             }
         }
 

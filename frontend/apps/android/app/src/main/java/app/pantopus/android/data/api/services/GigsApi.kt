@@ -46,6 +46,8 @@ import app.pantopus.android.data.api.models.gigs.ReportGigBody
 import app.pantopus.android.data.api.models.gigs.ReportGigResponse
 import app.pantopus.android.data.api.models.gigs.ReportNoShowBody
 import app.pantopus.android.data.api.models.gigs.ReportNoShowResponse
+import app.pantopus.android.data.api.models.gigs.RescheduleGigBody
+import app.pantopus.android.data.api.models.gigs.RescheduleGigResponse
 import app.pantopus.android.data.api.models.gigs.WorkerAckBody
 import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
 import retrofit2.http.Body
@@ -365,6 +367,18 @@ interface GigsApi {
     suspend fun cancellationPreview(
         @Path("gigId") gigId: String,
     ): CancellationPreviewResponse
+
+    /**
+     * `POST /api/gigs/:gigId/reschedule` — poster moves an assigned gig
+     * to a new future start instead of cancelling (the path the
+     * preview's `can_reschedule` advertises; poster-only, status
+     * `assigned`, zone <= 1). Route `backend/routes/gigs.js:6405`.
+     */
+    @POST("api/gigs/{gigId}/reschedule")
+    suspend fun rescheduleGig(
+        @Path("gigId") gigId: String,
+        @Body body: RescheduleGigBody,
+    ): RescheduleGigResponse
 
     /**
      * `GET /api/gigs/:gigId/payment` — payment details for the gig's

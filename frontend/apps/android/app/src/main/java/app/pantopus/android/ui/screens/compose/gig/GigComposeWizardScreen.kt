@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
@@ -111,6 +113,44 @@ fun GigComposeWizardScreen(
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), onPicked)
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent(), onPicked)
+
+    // P6b — real camera capture for the attachment sheet's "Take a
+    // photo" row (closes the P0.2 deferral). `TakePicture()` writes into
+    // a cache-dir file exposed through the app FileProvider
+    // (xml/file_paths.xml cache-path), then the captured URI rides the
+    // SAME `onPicked` upload path as library picks. Saveable so a
+    // process death during capture still resolves the URI on return.
+    var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val cameraCapture =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val uri = pendingCameraUri?.let(Uri::parse)
+            pendingCameraUri = null
+            if (success) onPicked(uri)
+        }
+    val launchCamera = {
+        val photoFile = File(context.cacheDir, "gig-camera-${UUID.randomUUID()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        pendingCameraUri = uri.toString()
+        // No camera app (or a broken resolver) must not crash — drop it.
+        runCatching { cameraCapture.launch(uri) }.onFailure { pendingCameraUri = null }
+        Unit
+    }
+    // CAMERA is declared in the manifest, so the TakePicture intent
+    // requires the runtime grant first. Denial is graceful: skip capture.
+    val cameraPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchCamera()
+        }
+    val onTakePhoto = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            launchCamera()
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     // A12.8 — voice-note recording (mic tool button). RECORD_AUDIO is a
     // runtime permission; the recorder writes an m4a/AAC file into the
@@ -243,6 +283,7 @@ fun GigComposeWizardScreen(
         onPickPhoto = {
             photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },
+        onTakePhoto = onTakePhoto,
         onPickFile = { filePicker.launch("*/*") },
     )
 }

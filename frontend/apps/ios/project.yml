@@ -105,6 +105,8 @@ targets:
         PostHogAPIKey: $(POSTHOG_API_KEY)
         PostHogHost: $(POSTHOG_HOST)
         LSRequiresIPhoneOS: true
+        # Phase 6b — active-task Live Activity (PantopusWidgets extension).
+        NSSupportsLiveActivities: true
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: "Pantopus connects to the local development server on your Mac while testing."
@@ -179,6 +181,8 @@ targets:
         product: Sentry
       - package: PostHog
         product: PostHog
+      # Phase 6b — Live Activity host, embedded into PlugIns.
+      - target: PantopusWidgets
     scheme:
       testTargets:
         - PantopusTests
@@ -188,6 +192,40 @@ targets:
         - variable: PANTOPUS_API_ENV
           value: local
           isEnabled: true
+
+  # Phase 6b — WidgetKit extension hosting the active-task ActivityKit
+  # Live Activity (lock screen + Dynamic Island). Signing stays inherited
+  # (dev-managed automatic signing, no team committed).
+  PantopusWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: PantopusWidgets
+      # Shared ActivityKit contract — compiled into BOTH the app target
+      # (whose sources glob already includes it) and this extension,
+      # which cannot import the app module.
+      - path: Pantopus/Core/LiveActivity/GigActivityAttributes.swift
+    info:
+      path: PantopusWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Pantopus Widgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.pantopus.ios.widgets
+        PRODUCT_NAME: PantopusWidgets
+        SKIP_INSTALL: YES
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Staging:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: STAGING
+          SWIFT_COMPILATION_MODE: wholemodule
+        Release:
+          SWIFT_COMPILATION_MODE: wholemodule
 
   PantopusTests:
     type: bundle.unit-test

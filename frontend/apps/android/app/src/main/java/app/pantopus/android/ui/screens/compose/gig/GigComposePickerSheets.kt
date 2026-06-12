@@ -86,6 +86,7 @@ internal fun GigComposePickerSheetHost(
     state: GigComposeUiState,
     viewModel: GigComposeViewModel,
     onPickPhoto: () -> Unit = {},
+    onTakePhoto: () -> Unit = {},
     onPickFile: () -> Unit = {},
 ) {
     val sheet = state.activeSheet ?: return
@@ -97,7 +98,12 @@ internal fun GigComposePickerSheetHost(
     ) {
         when (sheet) {
             GigPickerSheet.Attachment ->
-                AttachmentSheetContent(viewModel, onPickPhoto = onPickPhoto, onPickFile = onPickFile)
+                AttachmentSheetContent(
+                    viewModel,
+                    onPickPhoto = onPickPhoto,
+                    onTakePhoto = onTakePhoto,
+                    onPickFile = onPickFile,
+                )
             GigPickerSheet.Category -> CategorySheetContent(state, viewModel)
             GigPickerSheet.Deadline -> DeadlineSheetContent(state, viewModel)
             GigPickerSheet.Policy -> PolicySheetContent(state, viewModel)
@@ -695,14 +701,20 @@ private fun SuggestionChipView(
 private fun AttachmentSheetContent(
     vm: GigComposeViewModel,
     onPickPhoto: () -> Unit,
+    onTakePhoto: () -> Unit,
     onPickFile: () -> Unit,
 ) {
     // P0.2 — sources launch the host's system pickers; the picked bytes
-    // upload immediately via the VM. "Take a photo" routes through the
-    // visual-media picker too (dedicated camera capture is a follow-up).
+    // upload immediately via the VM. P6b — "Take a photo" launches real
+    // camera capture (`TakePicture()` + FileProvider) wired by the host.
     fun pickPhoto() {
         vm.dismissPicker()
         onPickPhoto()
+    }
+
+    fun takePhoto() {
+        vm.dismissPicker()
+        onTakePhoto()
     }
 
     fun pickFile() {
@@ -745,7 +757,7 @@ private fun AttachmentSheetContent(
                 tint = PantopusColors.primary600,
                 container = PantopusColors.primary50,
                 testTag = "gigPicker.attach.photos",
-            ) { pickPhoto() }
+            ) { takePhoto() }
             HorizontalDivider(color = PantopusColors.appBorderSubtle, modifier = Modifier.padding(start = 70.dp))
             AttachmentActionRow(
                 icon = PantopusIcon.Image,

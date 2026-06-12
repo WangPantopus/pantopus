@@ -3,6 +3,8 @@
 package app.pantopus.android.ui.screens.contentdetail
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.core.notifications.GigActiveNotification
+import app.pantopus.android.core.notifications.GigActiveNotifier
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigBidMutationResponse
@@ -18,6 +20,7 @@ import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
+import app.pantopus.android.data.api.models.gigs.RescheduleGigResponse
 import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
@@ -54,6 +57,23 @@ import org.junit.Test
  * `saved_by_user`, optimistic flip with the matching endpoint, and a
  * revert + error callback on failure.
  */
+/**
+ * Phase 6b — recording fake for the ongoing active-task notification;
+ * keeps the VM tests JVM-only (the real impl talks to NotificationManager).
+ */
+private class RecordingActiveNotifier : GigActiveNotifier {
+    val posted = mutableListOf<GigActiveNotification>()
+    val cancelled = mutableListOf<String>()
+
+    override fun post(notification: GigActiveNotification) {
+        posted += notification
+    }
+
+    override fun cancel(gigId: String) {
+        cancelled += gigId
+    }
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigDetailSaveViewModelTest {
     private val repo: GigsRepository = mockk()
@@ -62,6 +82,7 @@ class GigDetailSaveViewModelTest {
     private val paymentsRepo: PaymentsRepository = mockk()
     private val reviewsRepo: ReviewsRepository = mockk()
     private val socket: SocketManager = mockk(relaxed = true)
+    private val activeNotifier = RecordingActiveNotifier()
 
     @Before
     fun setUp() {
@@ -99,6 +120,7 @@ class GigDetailSaveViewModelTest {
                 paymentsRepo,
                 reviewsRepo,
                 socket,
+                activeNotifier,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()
@@ -215,6 +237,7 @@ class GigDetailSaveViewModelTest {
                 paymentsRepo,
                 reviewsRepo,
                 socket,
+                activeNotifier,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()
@@ -289,6 +312,7 @@ class GigDetailSaveViewModelTest {
                     paymentsRepo,
                     reviewsRepo,
                     socket,
+                    activeNotifier,
                     SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
                 )
             vm.load()
@@ -328,6 +352,8 @@ class GigDetailSaveViewModelTest {
         coEvery { repo.changeOrders("g1") } returns
             NetworkResult.Success(GigChangeOrdersResponse(changeOrders = changeOrders))
         coEvery { repo.gigPayment("g1") } returns payment
+        // Completed gigs resolve the review affordance; failure falls back.
+        coEvery { reviewsRepo.myPending() } returns NetworkResult.Failure(NetworkError.Server(500, null))
         val vm =
             GigDetailViewModel(
                 repo,
@@ -336,6 +362,7 @@ class GigDetailSaveViewModelTest {
                 paymentsRepo,
                 reviewsRepo,
                 socket,
+                activeNotifier,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()
@@ -459,4 +486,120 @@ class GigDetailSaveViewModelTest {
             val tooEarly = lifecycleVm(assignedGig(acceptedBy = "viewer-1"), noShowCanReport = false)
             assertFalse(tooEarly.activeTask.value!!.showNoShow)
         }
+
+    // MARK: - Phase 6b · ongoing active-task notification
+
+    @Test
+    fun active_notification_phase_lines() {
+        val base = assignedGig(acceptedBy = "worker-9")
+        assertEquals("Assigned — waiting for worker", GigDetailViewModel.activeNotificationLine(base))
+        assertEquals(
+            "Worker on the way",
+            GigDetailViewModel.activeNotificationLine(base.copy(workerAckStatus = "starting_now")),
+        )
+        assertEquals(
+            "Running ~20 min late",
+            GigDetailViewModel.activeNotificationLine(
+                base.copy(workerAckStatus = "running_late", workerAckEtaMinutes = 20),
+            ),
+        )
+        assertEquals("In progress", GigDetailViewModel.activeNotificationLine(base.copy(status = "in_progress")))
+        assertEquals(
+            "Marked done — confirm completion",
+            GigDetailViewModel.activeNotificationLine(base.copy(status = "completed")),
+        )
+        assertNull(
+            "Owner-confirmed completion resolves the notification",
+            GigDetailViewModel.activeNotificationLine(
+                base.copy(status = "completed", ownerConfirmedAt = "2026-06-01T00:00:00Z"),
+            ),
+        )
+        assertNull(GigDetailViewModel.activeNotificationLine(base.copy(status = "cancelled")))
+        assertNull(GigDetailViewModel.activeNotificationLine(base.copy(status = "open")))
+    }
+
+    @Test
+    fun active_notification_posts_for_participants_on_load() =
+        runTest {
+            lifecycleVm(assignedGig(acceptedBy = "viewer-1"))
+            val posted = activeNotifier.posted.last()
+            assertEquals("g1", posted.gigId)
+            assertEquals("Hang shelves", posted.title)
+            assertEquals("Assigned — waiting for worker", posted.phaseLine)
+            assertTrue(activeNotifier.cancelled.isEmpty())
+        }
+
+    @Test
+    fun active_notification_updates_on_phase_transitions() =
+        runTest {
+            lifecycleVm(
+                assignedGig(acceptedBy = "viewer-1").copy(workerAckStatus = "starting_now"),
+            )
+            assertEquals("Worker on the way", activeNotifier.posted.last().phaseLine)
+
+            lifecycleVm(
+                assignedGig(acceptedBy = "viewer-1")
+                    .copy(workerAckStatus = "running_late", workerAckEtaMinutes = 20),
+            )
+            assertEquals("Running ~20 min late", activeNotifier.posted.last().phaseLine)
+
+            lifecycleVm(assignedGig(acceptedBy = "viewer-1").copy(status = "in_progress"))
+            assertEquals("In progress", activeNotifier.posted.last().phaseLine)
+
+            lifecycleVm(
+                assignedGig(acceptedBy = "worker-9", ownerId = "viewer-1").copy(status = "completed"),
+            )
+            assertEquals("Marked done — confirm completion", activeNotifier.posted.last().phaseLine)
+        }
+
+    @Test
+    fun active_notification_cancels_when_resolved_or_not_participant() =
+        runTest {
+            // Owner-confirmed completion → cancel.
+            lifecycleVm(
+                assignedGig(acceptedBy = "worker-9", ownerId = "viewer-1")
+                    .copy(status = "completed", ownerConfirmedAt = "2026-06-01T00:00:00Z"),
+            )
+            assertEquals(listOf("g1"), activeNotifier.cancelled)
+            assertTrue(activeNotifier.posted.isEmpty())
+
+            // Cancelled task → cancel.
+            lifecycleVm(assignedGig(acceptedBy = "worker-9", ownerId = "viewer-1").copy(status = "cancelled"))
+            assertEquals(2, activeNotifier.cancelled.size)
+
+            // Bystander on someone else's assigned task → never posted.
+            lifecycleVm(assignedGig(acceptedBy = "worker-9", ownerId = "poster-1"))
+            assertEquals(3, activeNotifier.cancelled.size)
+            assertTrue(activeNotifier.posted.isEmpty())
+        }
+
+    // MARK: - Phase 6b · reschedule
+
+    @Test
+    fun reschedule_hits_endpoint_and_reports_success() =
+        runTest {
+            val vm = lifecycleVm(assignedGig(acceptedBy = "worker-9", ownerId = "viewer-1"))
+            coEvery { repo.rescheduleGig("g1", "2026-07-01T16:00:00Z", "running behind") } returns
+                NetworkResult.Success(RescheduleGigResponse(message = "Task rescheduled"))
+            var ok = false
+            vm.rescheduleTask("2026-07-01T16:00:00Z", "running behind") { ok = it }
+            assertTrue(ok)
+            coVerify(exactly = 1) { repo.rescheduleGig("g1", "2026-07-01T16:00:00Z", "running behind") }
+        }
+
+    @Test
+    fun reschedule_failure_reports_false() =
+        runTest {
+            val vm = lifecycleVm(assignedGig(acceptedBy = "worker-9", ownerId = "viewer-1"))
+            coEvery { repo.rescheduleGig("g1", any(), null) } returns
+                NetworkResult.Failure(NetworkError.Server(400, "Too close to the start time to reschedule"))
+            var ok = true
+            vm.rescheduleTask("2026-07-01T16:00:00Z", null) { ok = it }
+            assertFalse(ok)
+        }
+
+    @Test
+    fun realtime_room_events_include_rescheduled() {
+        assertTrue(GigDetailViewModel.GIG_ROOM_EVENTS.contains("gig:rescheduled"))
+    }
 }

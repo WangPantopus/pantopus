@@ -449,6 +449,16 @@ public enum GigsEndpoints {
         Endpoint(method: .get, path: "/api/gigs/\(gigId)/cancellation-preview")
     }
 
+    /// `POST /api/gigs/:gigId/reschedule` — poster moves an `assigned`
+    /// gig to a new future `scheduled_start` instead of cancelling (the
+    /// preview's `can_reschedule` path; zone <= 1). Resets the worker's
+    /// on-my-way ack, notifies them (`gig_rescheduled`), and fires the
+    /// `gig:rescheduled` room event. Returns `{message, gig}`. Route
+    /// `backend/routes/gigs.js:6405`.
+    public static func reschedule(gigId: String, body: RescheduleGigBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/reschedule", body: body)
+    }
+
     // MARK: - Phase 5b — payment + change orders
 
     /// `GET /api/gigs/:gigId/payment` — `{payment, stateInfo}` for the
