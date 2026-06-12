@@ -24,7 +24,13 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
     public let reactions: [PulseReaction]
     public let attendees: PulseAttendeeStrip?
     public let userHasReacted: Bool
-    public let mediaURLs: [URL]
+    public let media: [PostMediaItem]
+    /// Number of comments — shown beside the Reply affordance.
+    public let commentCount: Int
+
+    /// Still-image URLs — kept for call sites (and tests) that only care
+    /// about what the card displays, not the attachment kinds.
+    public var mediaURLs: [URL] { media.map(\.url) }
 
     public init(
         id: String,
@@ -39,7 +45,8 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
         reactions: [PulseReaction],
         attendees: PulseAttendeeStrip?,
         userHasReacted: Bool,
-        mediaURLs: [URL] = []
+        media: [PostMediaItem] = [],
+        commentCount: Int = 0
     ) {
         self.id = id
         self.authorName = authorName
@@ -53,18 +60,8 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
         self.reactions = reactions
         self.attendees = attendees
         self.userHasReacted = userHasReacted
-        self.mediaURLs = mediaURLs
-    }
-
-    /// Resolves feed-card image URLs from the original uploads. Thumbnails
-    /// are tiny (200×200) and look soft when scaled to a full-width card.
-    public static func mediaDisplayURLs(urls: [String], thumbnails: [String] = []) -> [URL] {
-        _ = thumbnails
-        return urls.compactMap { url in
-            let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
-            return URL(string: trimmed)
-        }
+        self.media = media
+        self.commentCount = commentCount
     }
 }
 
@@ -117,8 +114,12 @@ public struct PulsePostCard: View {
                         .lineLimit(content.title?.isEmpty == false ? 2 : 3)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if !content.mediaURLs.isEmpty {
-                    PulsePostMediaStrip(urls: content.mediaURLs, postId: content.id)
+                if !content.media.isEmpty {
+                    PostMediaGridView(
+                        items: content.media,
+                        style: .compact,
+                        accessibilityID: "pulsePostMedia_\(content.id)"
+                    )
                 }
                 if let attendees = content.attendees {
                     attendeeStrip(attendees)
@@ -220,10 +221,16 @@ public struct PulsePostCard: View {
             Spacer()
             HStack(spacing: Spacing.s1) {
                 Icon(.messageCircle, size: 12, color: Theme.Color.appTextSecondary)
-                Text("Reply")
+                Text(content.commentCount > 0 ? "Reply \(content.commentCount)" : "Reply")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
+            .accessibilityElement()
+            .accessibilityLabel(
+                content.commentCount > 0
+                    ? "Reply. \(content.commentCount) comments"
+                    : "Reply"
+            )
         }
         .padding(.top, Spacing.s2)
     }
@@ -267,8 +274,8 @@ public struct PulsePostCard: View {
         var parts = [content.authorName, content.intent.cardChipLabel]
         if let title = content.title, !title.isEmpty { parts.append(title) }
         if !content.body.isEmpty { parts.append(content.body) }
-        if !content.mediaURLs.isEmpty {
-            parts.append("\(content.mediaURLs.count) attached \(content.mediaURLs.count == 1 ? "photo" : "photos")")
+        if !content.media.isEmpty {
+            parts.append("\(content.media.count) attached \(content.media.count == 1 ? "photo" : "photos")")
         }
         return parts.joined(separator: ". ")
     }
@@ -318,94 +325,5 @@ public struct PulseIntentChip: View {
         case .lost: Theme.Color.roseBg
         case .announce: Theme.Color.slateBg
         }
-    }
-}
-
-// MARK: - Media preview
-
-private struct PulsePostMediaStrip: View {
-    private let urls: [URL]
-    private let postId: String
-
-    init(urls: [URL], postId: String) {
-        self.urls = urls
-        self.postId = postId
-    }
-
-    var body: some View {
-        if urls.isEmpty {
-            EmptyView()
-        } else {
-            grid
-                .accessibilityLabel("\(urls.count) attached \(urls.count == 1 ? "photo" : "photos")")
-                .accessibilityIdentifier("pulsePostMedia_\(postId)")
-        }
-    }
-
-    @ViewBuilder
-    private var grid: some View {
-        switch urls.count {
-        case 1:
-            mediaTile(urls[0])
-                .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        case 2:
-            HStack(spacing: Spacing.s2) {
-                mediaTile(urls[0]).aspectRatio(1, contentMode: .fill)
-                mediaTile(urls[1]).aspectRatio(1, contentMode: .fill)
-            }
-            .frame(height: 140)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        case 3:
-            HStack(spacing: Spacing.s2) {
-                mediaTile(urls[0]).frame(maxWidth: .infinity)
-                VStack(spacing: Spacing.s2) {
-                    mediaTile(urls[1]).frame(maxWidth: .infinity)
-                    mediaTile(urls[2]).frame(maxWidth: .infinity)
-                }
-            }
-            .frame(height: 160)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        default:
-            let overflow = urls.count > 4 ? urls.count - 4 : 0
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: Spacing.s2),
-                    GridItem(.flexible(), spacing: Spacing.s2)
-                ],
-                spacing: Spacing.s2
-            ) {
-                ForEach(Array(urls.prefix(4).enumerated()), id: \.offset) { index, url in
-                    ZStack {
-                        mediaTile(url).aspectRatio(1, contentMode: .fill)
-                        if index == 3, overflow > 0 {
-                            Theme.Color.appText.opacity(0.4)
-                            Text("+\(overflow)")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(Theme.Color.appTextInverse)
-                        }
-                    }
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        }
-    }
-
-    private func mediaTile(_ url: URL) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case let .success(image):
-                image.resizable().scaledToFill()
-            case .failure:
-                Theme.Color.appSurfaceSunken
-                    .overlay(Icon(.alertCircle, size: 22, color: Theme.Color.appTextMuted))
-            case .empty:
-                Theme.Color.appSurfaceSunken.overlay(ProgressView())
-            @unknown default:
-                Theme.Color.appSurfaceSunken
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .clipped()
     }
 }

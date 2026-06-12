@@ -108,6 +108,22 @@ public struct PostHomeRefDTO: Decodable, Sendable, Hashable, Identifiable {
     public let state: String?
 }
 
+/// One file attached to a comment — projected by
+/// `attachFilesToComments` (`backend/routes/posts.js:422`).
+public struct CommentAttachmentDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let fileURL: String
+    public let mimeType: String?
+    public let originalFilename: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case fileURL = "file_url"
+        case mimeType = "mime_type"
+        case originalFilename = "original_filename"
+    }
+}
+
 /// A single comment on a post. Route reference:
 /// `backend/routes/posts.js:2157`.
 public struct PostCommentDTO: Decodable, Sendable, Hashable, Identifiable {
@@ -121,6 +137,7 @@ public struct PostCommentDTO: Decodable, Sendable, Hashable, Identifiable {
     public let userHasLiked: Bool?
     public let likeCount: Int?
     public let author: PostCreatorDTO?
+    public let attachments: [CommentAttachmentDTO]?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -133,6 +150,7 @@ public struct PostCommentDTO: Decodable, Sendable, Hashable, Identifiable {
         case userHasLiked
         case likeCount = "like_count"
         case author
+        case attachments
     }
 }
 
@@ -154,6 +172,7 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
     public let purpose: String?
     public let mediaURLs: [String]
     public let mediaTypes: [String]?
+    public let mediaThumbnails: [String]
     public let mediaLiveURLs: [String]
     public let createdAt: String
     public let updatedAt: String?
@@ -181,6 +200,9 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
     public let serviceCategory: String?
     /// Recommended business name — populated for `recommendation` posts.
     public let dealBusinessName: String?
+    /// Post-level place label ("Camas, WA") — preferred over the
+    /// creator's locality for the header meta line.
+    public let locationName: String?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -191,6 +213,7 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         case purpose
         case mediaURLs = "media_urls"
         case mediaTypes = "media_types"
+        case mediaThumbnails = "media_thumbnails"
         case mediaLiveURLs = "media_live_urls"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -208,6 +231,7 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         case lostFoundType = "lost_found_type"
         case serviceCategory = "service_category"
         case dealBusinessName = "deal_business_name"
+        case locationName = "location_name"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -221,6 +245,7 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         purpose = try c.decodeIfPresent(String.self, forKey: .purpose)
         mediaURLs = try (c.decodeIfPresent([String].self, forKey: .mediaURLs)) ?? []
         mediaTypes = try c.decodeIfPresent([String].self, forKey: .mediaTypes)
+        mediaThumbnails = try (c.decodeIfPresent([String].self, forKey: .mediaThumbnails)) ?? []
         mediaLiveURLs = try (c.decodeIfPresent([String].self, forKey: .mediaLiveURLs)) ?? []
         createdAt = try c.decode(String.self, forKey: .createdAt)
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
@@ -241,5 +266,62 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         lostFoundType = try c.decodeIfPresent(String.self, forKey: .lostFoundType)
         serviceCategory = try c.decodeIfPresent(String.self, forKey: .serviceCategory)
         dealBusinessName = try c.decodeIfPresent(String.self, forKey: .dealBusinessName)
+        locationName = try c.decodeIfPresent(String.self, forKey: .locationName)
+    }
+}
+
+// MARK: - Interaction request/response payloads
+
+/// Body for `POST /api/posts/:id/share` — `sharePostSchema`
+/// (`backend/routes/posts.js:344`).
+public struct PostShareRequest: Encodable, Sendable {
+    public let shareType: String
+}
+
+/// Body for `POST /api/posts/:id/report` — `reportPostSchema`
+/// (`backend/routes/posts.js:339`).
+public struct PostReportRequest: Encodable, Sendable {
+    public let reason: String
+    public let details: String?
+}
+
+/// `POST /:postId/comments/:commentId/like` response —
+/// `backend/routes/posts.js:3056`.
+public struct CommentLikeResponse: Decodable, Sendable, Hashable {
+    public let liked: Bool
+    public let likeCount: Int
+}
+
+/// `POST /:id/share` response — `shared` for external shares,
+/// `reposted` for repost toggles (`backend/routes/posts.js:2895`).
+public struct PostShareResponse: Decodable, Sendable, Hashable {
+    public let shared: Bool?
+    public let reposted: Bool?
+    public let shareCount: Int?
+}
+
+/// `POST /:id/save` response — `backend/routes/posts.js:3294`.
+public struct PostSaveResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+    public let saved: Bool
+}
+
+/// Message-only acknowledgement (report / delete-comment routes).
+public struct PostActionAckResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+}
+
+/// `GET /api/posts/place-eligibility` response — `backend/routes/posts.js:1941`.
+public struct PlaceEligibilityResponse: Decodable, Sendable, Hashable {
+    public let eligible: Bool
+    public let readOnly: Bool?
+    public let reason: String?
+    public let trustLevel: String?
+
+    enum CodingKeys: String, CodingKey {
+        case eligible
+        case readOnly
+        case reason
+        case trustLevel
     }
 }

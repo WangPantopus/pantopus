@@ -137,7 +137,13 @@ public extension PulseIntent {
                 PulseReaction(kind: .seen, icon: .eye, label: "seen", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .shared, icon: .share, label: "shared", count: secondaryCount, isInteractive: false)
             ]
-        case .announce, .all:
+        case .announce:
+            // A03 announce card: eye "seen" + heart.
+            [
+                PulseReaction(kind: .seen, icon: .eye, label: "seen", count: helpfulCount, isInteractive: true),
+                PulseReaction(kind: .heart, icon: .heart, label: "", count: secondaryCount, isInteractive: false)
+            ]
+        case .all:
             [
                 PulseReaction(kind: .helpful, icon: .lightbulb, label: "helpful", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .heart, icon: .heart, label: "", count: secondaryCount, isInteractive: false)

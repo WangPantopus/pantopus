@@ -97,6 +97,7 @@ const { runPostCreatedHooks } = require('../services/postCreationHooksService');
 const {
   normalizeFeedPostRow,
   normalizeMediaUrls,
+  normalizeAlignedMediaUrls,
   getMuteAndHideFilters,
   applyMuteHideFilters,
   enrichWithUserStatus,
@@ -1415,8 +1416,8 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
     const responsePost = await serializePostForViewer({
       ...post,
       media_urls: normalizeMediaUrls(post.media_urls),
-      media_thumbnails: normalizeMediaUrls(post.media_thumbnails),
-      media_live_urls: normalizeMediaUrls(post.media_live_urls),
+      media_thumbnails: normalizeAlignedMediaUrls(post.media_thumbnails),
+      media_live_urls: normalizeAlignedMediaUrls(post.media_live_urls),
     }, userId);
 
     res.status(201).json({
@@ -2408,8 +2409,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const responsePost = await serializePostForViewer({
       ...post,
       media_urls: normalizeMediaUrls(post.media_urls),
-      media_thumbnails: normalizeMediaUrls(post.media_thumbnails),
-      media_live_urls: normalizeMediaUrls(post.media_live_urls),
+      media_thumbnails: normalizeAlignedMediaUrls(post.media_thumbnails),
+      media_live_urls: normalizeAlignedMediaUrls(post.media_live_urls),
       userHasLiked: !!userLike,
       userHasSaved: !!userSave,
       userHasReposted: !!userRepost,
@@ -2467,8 +2468,8 @@ router.patch('/:id', verifyToken, validate(updatePostSchema), async (req, res) =
     const responsePost = await serializePostForViewer({
       ...post,
       media_urls: normalizeMediaUrls(post.media_urls),
-      media_thumbnails: normalizeMediaUrls(post.media_thumbnails),
-      media_live_urls: normalizeMediaUrls(post.media_live_urls),
+      media_thumbnails: normalizeAlignedMediaUrls(post.media_thumbnails),
+      media_live_urls: normalizeAlignedMediaUrls(post.media_live_urls),
     }, userId);
     res.json({
       message: 'Post updated successfully',

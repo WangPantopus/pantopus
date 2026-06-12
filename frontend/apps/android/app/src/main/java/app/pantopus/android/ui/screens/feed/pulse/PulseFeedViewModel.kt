@@ -12,6 +12,7 @@ import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.screens.feed.FeedEmptyContent
 import app.pantopus.android.ui.screens.feed.FeedSurface
 import app.pantopus.android.ui.screens.shared.feed.FeedAvatarTint
+import app.pantopus.android.ui.screens.shared.media.buildPostMediaItems
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +58,14 @@ class PulseFeedViewModel
         private val _isRefreshing = MutableStateFlow(false)
         val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+        /** True while a next-page fetch is in flight (drives the list footer). */
+        private val _isLoadingMore = MutableStateFlow(false)
+        val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+        /** Client-side search over the loaded pages. */
+        private val _searchText = MutableStateFlow("")
+        val searchText: StateFlow<String> = _searchText.asStateFlow()
+
         /** Which surface this feed renders (Pulse vs Beacons). */
         var surface: FeedSurface = FeedSurface.Pulse
             private set
@@ -67,6 +76,12 @@ class PulseFeedViewModel
         private var resolvedLatitude: Double? = null
         private var resolvedLongitude: Double? = null
         private var loading = false
+
+        /** All pages loaded so far — search filters project from this. */
+        private var loadedPosts: List<FeedPost> = emptyList()
+        private var nextCursorCreatedAt: String? = null
+        private var nextCursorId: String? = null
+        private var hasMore = false
 
         init {
             viewModelScope.launch {
@@ -101,6 +116,77 @@ class PulseFeedViewModel
             if (_activeIntent.value == intent) return
             _activeIntent.value = intent
             fetch()
+        }
+
+        /** Update the search query — filters the loaded pages client-side. */
+        fun setSearchText(text: String) {
+            _searchText.value = text
+            rebuildLoadedState()
+        }
+
+        /**
+         * Keyset pagination — fires when the last loaded row appears.
+         * No-ops while a fetch is in flight or when the feed is exhausted.
+         */
+        fun loadMoreIfNeeded(rowId: String) {
+            if (!hasMore || _isLoadingMore.value || loading) return
+            val lastId = loadedPosts.lastOrNull()?.id ?: return
+            if (rowId != lastId) return
+            fetchNextPage()
+        }
+
+        private fun fetchNextPage() {
+            val cursorCreatedAt = nextCursorCreatedAt ?: return
+            val cursorId = nextCursorId ?: return
+            _isLoadingMore.value = true
+            viewModelScope.launch {
+                try {
+                    val (lat, lng) = resolvedCoordinates()
+                    when (
+                        val result =
+                            repo.feed(
+                                surface = surface.backendSurface,
+                                latitude = lat,
+                                longitude = lng,
+                                postType = _activeIntent.value.postType,
+                                cursorCreatedAt = cursorCreatedAt,
+                                cursorId = cursorId,
+                            )
+                    ) {
+                        is NetworkResult.Success -> {
+                            val known = loadedPosts.map { it.id }.toSet()
+                            loadedPosts = loadedPosts + result.data.posts.filter { it.id !in known }
+                            applyPagination(result.data.pagination)
+                            rebuildLoadedState()
+                        }
+                        is NetworkResult.Failure -> Unit // keep the loaded rows; retry on next appear
+                    }
+                } finally {
+                    _isLoadingMore.value = false
+                }
+            }
+        }
+
+        private fun applyPagination(pagination: app.pantopus.android.data.api.models.feed.FeedPagination?) {
+            nextCursorCreatedAt = pagination?.nextCursor?.createdAt
+            nextCursorId = pagination?.nextCursor?.id
+            hasMore = pagination?.hasMore == true && nextCursorCreatedAt != null
+        }
+
+        private fun rebuildLoadedState() {
+            if (loadedPosts.isEmpty()) return
+            val query = _searchText.value.trim().lowercase()
+            val visible =
+                if (query.isEmpty()) {
+                    loadedPosts
+                } else {
+                    loadedPosts.filter { post ->
+                        post.content.orEmpty().lowercase().contains(query) ||
+                            post.title.orEmpty().lowercase().contains(query) ||
+                            (post.creator?.displayName() ?: "").lowercase().contains(query)
+                    }
+                }
+            _state.value = PulseFeedUiState.Loaded(rows = visible.map(::projectCard))
         }
 
         /**
@@ -173,14 +259,17 @@ class PulseFeedViewModel
                         is NetworkResult.Success -> {
                             val response = result.data
                             scopeLabel = response.posts.firstOrNull()?.locationName ?: scopeLabel
+                            loadedPosts = response.posts
+                            applyPagination(response.pagination)
                             _state.value =
                                 if (response.posts.isEmpty()) {
                                     PulseFeedUiState.Empty(
                                         content = surface.emptyContent(scopeLabel = scopeLabel, followCount = 0),
                                     )
                                 } else {
-                                    PulseFeedUiState.Loaded(rows = response.posts.map(::projectCard))
+                                    PulseFeedUiState.Loaded(rows = emptyList())
                                 }
+                            if (response.posts.isNotEmpty()) rebuildLoadedState()
                         }
                         is NetworkResult.Failure -> {
                             _state.value = PulseFeedUiState.Error(result.error.message)
@@ -230,7 +319,7 @@ class PulseFeedViewModel
                 authorInitials = initials(authorName),
                 // Beacons authors are all verified by definition; on Pulse, fall
                 // back to account-type until the backend surfaces creator.verified.
-                authorVerified = surface.authorsAlwaysVerified || isBusiness || post.userHasLiked,
+                authorVerified = surface.authorsAlwaysVerified || isBusiness,
                 avatarTint = if (isBusiness) FeedAvatarTint.Violet else FeedAvatarTint.Sky,
                 meta = metaString(post),
                 intent = intent,
@@ -239,7 +328,7 @@ class PulseFeedViewModel
                 reactions =
                     intent.reactionTemplate(
                         helpfulCount = post.likeCount,
-                        secondaryCount = post.commentCount,
+                        secondaryCount = 0,
                     ),
                 attendees =
                     if (intent == PulseIntent.Event) {
@@ -252,10 +341,13 @@ class PulseFeedViewModel
                         null
                     },
                 userHasReacted = post.userHasLiked,
-                mediaUrls =
-                    resolvePulsePostMediaUrls(
+                commentCount = post.commentCount,
+                media =
+                    buildPostMediaItems(
                         urls = post.mediaUrls,
+                        types = post.mediaTypes,
                         thumbnails = post.mediaThumbnails,
+                        liveUrls = post.mediaLiveUrls,
                     ),
             )
         }

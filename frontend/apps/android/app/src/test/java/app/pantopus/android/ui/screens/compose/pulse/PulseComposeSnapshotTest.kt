@@ -118,6 +118,8 @@ class PulseComposeSnapshotTest {
                                 onSelectIdentity = {},
                                 onSelectVisibility = {},
                                 onSelectLostFoundKind = {},
+                                onSelectContactPref = {},
+                                onSelectDealExpires = {},
                                 onSelectAnnounceAudience = {},
                                 onSelectSafetyAlertKind = {},
                                 onSelectAskCategory = {},

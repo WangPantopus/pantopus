@@ -21,6 +21,21 @@ enum class PulseComposePurpose(
     Deal("deal", "Deal", "deal", "deal"),
     ;
 
+    /** Body-field placeholder — mirrors iOS `PulseComposePurpose.placeholder`. */
+    val placeholder: String
+        get() =
+            when (this) {
+                Ask -> "What do you want to ask nearby?"
+                HeadsUp -> "What should people nearby know?"
+                Recommend -> "What are you recommending?"
+                LostFound -> "Describe what was lost or found…"
+                LocalUpdate -> "Share a local update with your neighbors…"
+                NeighborhoodWin -> "Celebrate something great in your neighborhood…"
+                VisitorGuide -> "Share tips for visitors to the area…"
+                Event -> "Tell people about this event…"
+                Deal -> "Describe the deal and where to find it…"
+            }
+
     val legacyIntent: PulseComposeIntent
         get() =
             when (this) {

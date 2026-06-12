@@ -14,6 +14,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.screens.shared.content_detail.headers.PostIntent
 import io.mockk.coEvery
 import io.mockk.every
@@ -53,6 +54,7 @@ class PulsePostDetailViewModelTest {
         PulsePostDetailViewModel(
             repo = repo,
             authRepo = authRepo,
+            postsRefresh = PulsePostsRefreshNotifier(),
             savedStateHandle = SavedStateHandle(mapOf(PULSE_POST_DETAIL_ID_KEY to "p1")),
         )
 

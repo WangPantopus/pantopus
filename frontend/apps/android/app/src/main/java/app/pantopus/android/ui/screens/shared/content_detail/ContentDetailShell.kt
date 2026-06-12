@@ -56,6 +56,7 @@ fun ContentDetailShell(
     title: String?,
     onBack: (() -> Void)? = null,
     topBarAction: ContentDetailTopBarAction? = null,
+    topBarSecondaryAction: ContentDetailTopBarAction? = null,
     cta: @Composable () -> Unit = {},
     header: @Composable () -> Unit,
     body: @Composable () -> Unit,
@@ -68,7 +69,12 @@ fun ContentDetailShell(
                 .testTag(CONTENT_DETAIL_TAG),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            ContentDetailTopBar(title = title, onBack = onBack, action = topBarAction)
+            ContentDetailTopBar(
+                title = title,
+                onBack = onBack,
+                action = topBarAction,
+                secondaryAction = topBarSecondaryAction,
+            )
             Column(
                 modifier =
                     Modifier
@@ -96,6 +102,7 @@ fun ContentDetailTopBar(
     title: String?,
     onBack: (() -> Void)? = null,
     action: ContentDetailTopBarAction? = null,
+    secondaryAction: ContentDetailTopBarAction? = null,
 ) {
     Column {
         Row(
@@ -126,6 +133,10 @@ fun ContentDetailTopBar(
             } else {
                 Spacer(Modifier.size(44.dp))
             }
+            // Balance the trailing pair so the title stays centered.
+            if (secondaryAction != null) {
+                Spacer(Modifier.size(44.dp))
+            }
             Spacer(Modifier.weight(1f))
             if (title != null) {
                 Text(
@@ -137,6 +148,24 @@ fun ContentDetailTopBar(
                 )
             }
             Spacer(Modifier.weight(1f))
+            if (secondaryAction != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(44.dp)
+                            .clickable(onClick = secondaryAction.onClick)
+                            .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
+                            .semantics { contentDescription = secondaryAction.contentDescription },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = secondaryAction.icon,
+                        contentDescription = null,
+                        size = 22.dp,
+                        tint = PantopusColors.appText,
+                    )
+                }
+            }
             if (action != null) {
                 Box(
                     modifier =

@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "LargeClass")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "LargeClass", "ComplexCondition")
 
 package app.pantopus.android.ui.screens.compose.pulse
 
@@ -12,6 +12,8 @@ import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostDetailDto
 import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 import javax.inject.Inject
 
 /**
@@ -79,10 +82,13 @@ enum class PulseComposeField(val key: String) {
     Body("body"),
     RecommendBusiness("recommendBusiness"),
     EventDate("eventDate"),
+    EventEndDate("eventEndDate"),
     EventLocation("eventLocation"),
     EventCapacity("eventCapacity"),
     LostLastSeenLocation("lostLastSeenLocation"),
     LostLastSeenDate("lostLastSeenDate"),
+    ContactPhone("contactPhone"),
+    DealBusinessName("dealBusinessName"),
 }
 
 /** Author identity the post will be created under. */
@@ -106,6 +112,16 @@ enum class PulseComposeVisibility(val key: String, val label: String) {
 enum class PulseLostFoundKind(val key: String, val label: String) {
     Lost("lost", "Lost"),
     Found("found", "Found"),
+}
+
+/**
+ * Lost & Found contact-preference chip. Mirrors mobile `CONTACT_PREF`;
+ * backend stores `phone` combined with the number as `phone|<number>`.
+ */
+enum class PulseLostFoundContactPref(val key: String, val label: String) {
+    Dm("dm", "Direct message"),
+    Comment("comment", "Comments"),
+    Phone("phone", "Phone"),
 }
 
 enum class PulseAnnounceAudience(val key: String, val label: String) {
@@ -190,6 +206,7 @@ class PulseComposeViewModel
         private val uploadRepo: UploadRepository,
         private val networkMonitor: NetworkMonitor,
         private val postsRefresh: PulsePostsRefreshNotifier,
+        private val locationProvider: LocationProvider,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PulseComposeUiState>(PulseComposeUiState.Idle)
@@ -218,6 +235,17 @@ class PulseComposeViewModel
 
         private val _lostFoundKind = MutableStateFlow(PulseLostFoundKind.Lost)
         val lostFoundKind: StateFlow<PulseLostFoundKind> = _lostFoundKind.asStateFlow()
+
+        private val _lostFoundContactPref = MutableStateFlow(PulseLostFoundContactPref.Dm)
+        val lostFoundContactPref: StateFlow<PulseLostFoundContactPref> = _lostFoundContactPref.asStateFlow()
+
+        /** Deal expiry — required by the backend for `postType == deal`. */
+        private val _dealExpiresAt = MutableStateFlow(LocalDateTime.now().plusDays(DEAL_DEFAULT_EXPIRY_DAYS))
+        val dealExpiresAt: StateFlow<LocalDateTime> = _dealExpiresAt.asStateFlow()
+
+        /** Place-eligibility warning surfaced as a banner on the draft step. */
+        private val _eligibilityWarning = MutableStateFlow<String?>(null)
+        val eligibilityWarning: StateFlow<String?> = _eligibilityWarning.asStateFlow()
 
         private val _announceAudience = MutableStateFlow(PulseAnnounceAudience.Neighbors)
         val announceAudience: StateFlow<PulseAnnounceAudience> = _announceAudience.asStateFlow()
@@ -259,6 +287,7 @@ class PulseComposeViewModel
         private var baselineIdentity: PulseComposeIdentity = PulseComposeIdentity.Personal
         private var baselineVisibility: PulseComposeVisibility = PulseComposeVisibility.Neighbors
         private var baselineLostFoundKind: PulseLostFoundKind = PulseLostFoundKind.Lost
+        private var baselineLostFoundContactPref: PulseLostFoundContactPref = PulseLostFoundContactPref.Dm
         private var baselineAnnounceAudience: PulseAnnounceAudience = PulseAnnounceAudience.Neighbors
         private var baselineAskCategory: PulseAskCategory = PulseAskCategory.Handyman
         private var baselineRecommendRating: Int = DEFAULT_RECOMMEND_RATING
@@ -266,6 +295,13 @@ class PulseComposeViewModel
         private var postingTarget: PulsePostingTarget? = null
         private var composePurpose: PulseComposePurpose? = null
         private var flowConfigured = false
+
+        /**
+         * Fresh device fix captured at submit time so the backend's
+         * 5-minute GPS-freshness gate passes even when drafting takes a
+         * while. Pick-time coordinates remain the fallback.
+         */
+        private var freshGpsFix: UserCoordinate? = null
 
         /** True when the draft screen was reached via target/purpose pickers. */
         val isFlowMode: Boolean get() = postingTarget != null
@@ -290,6 +326,36 @@ class PulseComposeViewModel
                 if (target.isNetworkTarget) PulseComposeVisibility.Connections else PulseComposeVisibility.Neighbors
             baselineIdentity = _identity.value
             baselineVisibility = _visibility.value
+            checkPlaceEligibility()
+        }
+
+        /**
+         * Check whether the signed-in user can post to the selected place.
+         * Surfaces a warning banner instead of letting the submit 403.
+         * Errors are non-blocking — the warning is simply cleared.
+         */
+        fun checkPlaceEligibility() {
+            val target = postingTarget ?: return
+            if (!target.isPlaceTarget) return
+            val lat = target.targetLatitude ?: return
+            val lon = target.targetLongitude ?: return
+            viewModelScope.launch {
+                val gps = gpsFields(target)
+                when (
+                    val result =
+                        repo.placeEligibility(
+                            latitude = lat,
+                            longitude = lon,
+                            gpsTimestamp = gps.timestamp,
+                            gpsLatitude = gps.latitude,
+                            gpsLongitude = gps.longitude,
+                        )
+                ) {
+                    is NetworkResult.Success ->
+                        _eligibilityWarning.value = if (result.data.eligible) null else result.data.reason
+                    is NetworkResult.Failure -> _eligibilityWarning.value = null
+                }
+            }
         }
 
         /** True iff this view-model is wired to edit an existing post. */
@@ -322,6 +388,14 @@ class PulseComposeViewModel
 
         fun selectLostFoundKind(kind: PulseLostFoundKind) {
             _lostFoundKind.value = kind
+        }
+
+        fun selectLostFoundContactPref(pref: PulseLostFoundContactPref) {
+            _lostFoundContactPref.value = pref
+        }
+
+        fun selectDealExpires(value: LocalDateTime) {
+            _dealExpiresAt.value = value
         }
 
         fun selectAnnounceAudience(audience: PulseAnnounceAudience) {
@@ -387,7 +461,9 @@ class PulseComposeViewModel
                 return when (_activeIntent.value) {
                     PulseComposeIntent.Ask -> _askCategory.value != baselineAskCategory
                     PulseComposeIntent.Recommend -> _recommendRating.value != baselineRecommendRating
-                    PulseComposeIntent.Lost -> _lostFoundKind.value != baselineLostFoundKind
+                    PulseComposeIntent.Lost ->
+                        _lostFoundKind.value != baselineLostFoundKind ||
+                            _lostFoundContactPref.value != baselineLostFoundContactPref
                     PulseComposeIntent.Announce -> _announceAudience.value != baselineAnnounceAudience
                     PulseComposeIntent.Event -> false
                 }
@@ -408,6 +484,7 @@ class PulseComposeViewModel
                     listOf(
                         PulseComposeField.Title,
                         PulseComposeField.EventDate,
+                        PulseComposeField.EventEndDate,
                         PulseComposeField.EventLocation,
                         PulseComposeField.EventCapacity,
                         PulseComposeField.Body,
@@ -417,8 +494,14 @@ class PulseComposeViewModel
                         PulseComposeField.Body,
                         PulseComposeField.LostLastSeenLocation,
                         PulseComposeField.LostLastSeenDate,
+                        PulseComposeField.ContactPhone,
                     )
-                PulseComposeIntent.Announce -> listOf(PulseComposeField.Title, PulseComposeField.Body)
+                PulseComposeIntent.Announce ->
+                    if (composePurpose == PulseComposePurpose.Deal) {
+                        listOf(PulseComposeField.Title, PulseComposeField.Body, PulseComposeField.DealBusinessName)
+                    } else {
+                        listOf(PulseComposeField.Title, PulseComposeField.Body)
+                    }
             }
 
         val aggregate: FormAggregate
@@ -472,6 +555,30 @@ class PulseComposeViewModel
                 PulseComposeField.LostLastSeenLocation ->
                     FormValidator.all(listOf(FormValidator.required("Last seen"), FormValidator.maxLength(LOCATION_MAX)))
                 PulseComposeField.LostLastSeenDate -> FormValidator.isoDateOrEmpty()
+                PulseComposeField.EventEndDate ->
+                    FormValidator { value ->
+                        val trimmed = value.trim()
+                        when {
+                            trimmed.isEmpty() -> null
+                            PICKER_DATE_TIME_PATTERN.matches(trimmed) -> null
+                            ISO_DATE_ONLY_PATTERN.matches(trimmed) -> null
+                            trimmed.contains('T') &&
+                                runCatching { java.time.Instant.parse(trimmed) }.isSuccess -> null
+                            else -> "Pick a valid end time."
+                        }
+                    }
+                PulseComposeField.ContactPhone ->
+                    FormValidator { value ->
+                        val trimmed = value.trim()
+                        if (trimmed.isEmpty()) return@FormValidator null
+                        val digits = trimmed.count { it.isDigit() }
+                        if (digits < PHONE_MIN_DIGITS || digits > PHONE_MAX_DIGITS) {
+                            "Enter a valid phone number."
+                        } else {
+                            null
+                        }
+                    }
+                PulseComposeField.DealBusinessName -> FormValidator.maxLength(BUSINESS_NAME_MAX)
             }
 
         /** Touch every active field, return the first invalid id if any. */
@@ -480,7 +587,17 @@ class PulseComposeViewModel
             val map = _fields.value.toMutableMap()
             for (field in activeIntentFields()) {
                 val snapshot = map[field] ?: FormFieldState(id = field.key)
-                val message = validator(field).validate(snapshot.value)
+                var message = validator(field).validate(snapshot.value)
+                // Phone is conditionally required — only when the Lost & Found
+                // contact preference is "phone". The base validator can't see
+                // the selector, so the rule lives here (mirrors iOS).
+                if (field == PulseComposeField.ContactPhone && message == null &&
+                    _activeIntent.value == PulseComposeIntent.Lost &&
+                    _lostFoundContactPref.value == PulseLostFoundContactPref.Phone &&
+                    snapshot.value.trim().isEmpty()
+                ) {
+                    message = "Add a phone number for contact."
+                }
                 map[field] = snapshot.copy(error = message, touched = true)
                 if (firstInvalid == null && message != null) firstInvalid = field
             }
@@ -497,7 +614,7 @@ class PulseComposeViewModel
             if (postId == null || _photos.value.isEmpty()) {
                 return (if (isEditing) "Saved" else "Posted") to false
             }
-            return when (val upload = uploadRepo.uploadPostMedia(postId, _photos.value.map { it.data })) {
+            return when (uploadRepo.uploadPostMedia(postId, _photos.value.map { it.data })) {
                 is NetworkResult.Success -> (if (isEditing) "Saved" else "Posted") to false
                 is NetworkResult.Failure ->
                     (
@@ -541,9 +658,20 @@ class PulseComposeViewModel
                 if (editingId != null) {
                     handleUpdate(editingId)
                 } else {
+                    refreshGpsFixIfNeeded()
                     handleCreate()
                 }
             }
+        }
+
+        /**
+         * Re-request a device fix right before submit so the GPS payload
+         * is fresh. Best-effort with a short timeout — pick-time
+         * coordinates remain the fallback.
+         */
+        private suspend fun refreshGpsFixIfNeeded() {
+            if (postingTarget !is PulsePostingTarget.CurrentLocation) return
+            freshGpsFix = locationProvider.requestCurrent(timeoutMillis = GPS_REFRESH_TIMEOUT_MS)
         }
 
         private suspend fun handleCreate() {
@@ -847,6 +975,7 @@ class PulseComposeViewModel
                     PulseComposeIntent.Event -> {
                         val venue = trimmedValue(PulseComposeField.EventLocation)
                         val dateRaw = trimmedValue(PulseComposeField.EventDate)
+                        val endRaw = trimmedValue(PulseComposeField.EventEndDate)
                         PostCreateRequest(
                             content = bodyValue,
                             title = titleValue.ifEmpty { null },
@@ -854,6 +983,7 @@ class PulseComposeViewModel
                             visibility = vis,
                             postAs = postAs,
                             eventDate = dateRaw.ifEmpty { null }?.let { isoDateTime(it) },
+                            eventEndDate = endRaw.ifEmpty { null }?.let { isoDateTime(it) },
                             eventVenue = venue.ifEmpty { null },
                             audience = audience,
                             purpose = purposeTag,
@@ -861,23 +991,31 @@ class PulseComposeViewModel
                     }
                     PulseComposeIntent.Lost -> {
                         val lastSeen = trimmedValue(PulseComposeField.LostLastSeenLocation)
+                        val phone = trimmedValue(PulseComposeField.ContactPhone)
                         PostCreateRequest(
                             content = prefixLastSeen(bodyValue, lastSeen),
                             postType = postType,
                             visibility = vis,
                             postAs = postAs,
                             lostFoundType = _lostFoundKind.value.key,
+                            contactPref = _lostFoundContactPref.value.key,
+                            contactPhone =
+                                if (_lostFoundContactPref.value == PulseLostFoundContactPref.Phone && phone.isNotEmpty()) {
+                                    phone
+                                } else {
+                                    null
+                                },
                             audience = audience,
                             purpose = purposeTag,
                         )
                     }
                     PulseComposeIntent.Announce -> {
-                        val announceVis =
-                            if (postingTarget?.isNetworkTarget == true) {
-                                vis
-                            } else {
-                                _announceAudience.value.backendVisibility
-                            }
+                        // Flow mode: the "Who can see this" radio governs
+                        // visibility. Legacy single-screen mode keeps the
+                        // announce-audience chips.
+                        val announceVis = if (isFlowMode) vis else _announceAudience.value.backendVisibility
+                        val dealBusiness = trimmedValue(PulseComposeField.DealBusinessName)
+                        val isDeal = postType == "deal"
                         PostCreateRequest(
                             content = bodyValue,
                             title = titleValue.ifEmpty { null },
@@ -892,6 +1030,8 @@ class PulseComposeViewModel
                                 } else {
                                     null
                                 },
+                            dealExpiresAt = if (isDeal) isoTimestamp(_dealExpiresAt.value) else null,
+                            businessName = if (isDeal && dealBusiness.isNotEmpty()) dealBusiness else null,
                         )
                     }
                 }
@@ -915,29 +1055,44 @@ class PulseComposeViewModel
             return _visibility.value.key
         }
 
-        private fun effectiveAudience(): String = if (postingTarget?.isNetworkTarget == true) "connections" else "nearby"
+        private fun effectiveAudience(): String {
+            if (postingTarget?.isNetworkTarget == true) return "connections"
+            // Place target with the "Connections" radio selected — the post
+            // should reach the network, not the neighborhood.
+            if (isFlowMode && _visibility.value == PulseComposeVisibility.Connections) return "connections"
+            return "nearby"
+        }
+
+        private data class GpsFields(
+            val timestamp: String?,
+            val latitude: Double?,
+            val longitude: Double?,
+        )
+
+        private fun gpsFields(target: PulsePostingTarget): GpsFields {
+            if (target !is PulsePostingTarget.CurrentLocation) return GpsFields(null, null, null)
+            // Prefer the device fix captured at submit time; fall back to
+            // the coordinates resolved when the target was picked.
+            val fix = freshGpsFix
+            return GpsFields(
+                timestamp = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString(),
+                latitude = fix?.latitude ?: target.lat,
+                longitude = fix?.longitude ?: target.lng,
+            )
+        }
 
         private fun mergeTargetContext(base: PostCreateRequest): PostCreateRequest {
             val target = postingTarget ?: return base
-            val gps =
-                when (target) {
-                    is PulsePostingTarget.CurrentLocation ->
-                        Triple(
-                            java.time.Instant.now().toString(),
-                            target.lat,
-                            target.lng,
-                        )
-                    else -> Triple(null, null, null)
-                }
+            val gps = gpsFields(target)
             return base.copy(
                 latitude = target.targetLatitude,
                 longitude = target.targetLongitude,
                 locationName = if (target.isPlaceTarget) target.displayLabel else null,
                 homeId = target.targetHomeId,
                 businessId = target.targetBusinessId,
-                gpsTimestamp = gps.first,
-                gpsLatitude = gps.second,
-                gpsLongitude = gps.third,
+                gpsTimestamp = gps.timestamp,
+                gpsLatitude = gps.latitude,
+                gpsLongitude = gps.longitude,
             )
         }
 
@@ -958,14 +1113,24 @@ class PulseComposeViewModel
         ): String = if (location.isEmpty()) body else "Last seen: $location\n\n$body"
 
         /**
-         * Normalize an event date to ISO-8601. Accepts plain `yyyy-MM-dd`
-         * (treated as 09:00 UTC). Returns the raw string unchanged when
-         * it already carries a `T` separator — the view emits both shapes.
+         * Normalize an event date to ISO-8601. Accepts the picker-emitted
+         * `yyyy-MM-dd HH:mm` shape (treated as UTC, mirroring iOS) and
+         * plain `yyyy-MM-dd` (treated as 09:00 UTC). Returns the raw
+         * string unchanged when it already carries a `T` separator.
          */
         private fun isoDateTime(raw: String): String {
             if (raw.contains('T')) return raw
+            if (PICKER_DATE_TIME_PATTERN.matches(raw)) return raw.replaceFirst(" ", "T") + ":00Z"
             return "${raw}T09:00:00Z"
         }
+
+        /** Encode a local date-time as an ISO-8601 UTC instant. */
+        private fun isoTimestamp(value: LocalDateTime): String =
+            value
+                .atZone(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                .toString()
 
         companion object {
             const val INTENT_KEY = "intent"
@@ -976,5 +1141,11 @@ class PulseComposeViewModel
             private const val BUSINESS_NAME_MAX = 255
             private const val CAPACITY_MAX = 100_000
             private const val DEFAULT_RECOMMEND_RATING = 5
+            private const val PHONE_MIN_DIGITS = 7
+            private const val PHONE_MAX_DIGITS = 15
+            private const val DEAL_DEFAULT_EXPIRY_DAYS = 7L
+            private const val GPS_REFRESH_TIMEOUT_MS = 3_000L
+            private val PICKER_DATE_TIME_PATTERN = Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$""")
+            private val ISO_DATE_ONLY_PATTERN = Regex("""^\d{4}-\d{2}-\d{2}$""")
         }
     }

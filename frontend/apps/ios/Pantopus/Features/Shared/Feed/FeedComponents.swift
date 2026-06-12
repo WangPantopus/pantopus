@@ -93,21 +93,48 @@ public struct FeedChipItem: Identifiable, Sendable, Hashable {
 public struct FeedChipRow: View {
     private let chips: [FeedChipItem]
     private let activeId: String
+    private let skeleton: Bool
     private let onSelect: @MainActor (String) -> Void
 
     public init(
         chips: [FeedChipItem],
         activeId: String,
+        skeleton: Bool = false,
         onSelect: @escaping @MainActor (String) -> Void
     ) {
         self.chips = chips
         self.activeId = activeId
+        self.skeleton = skeleton
         self.onSelect = onSelect
     }
 
     public var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Spacing.s2) {
+                if skeleton {
+                    // A03 loading frame shimmers the chip row alongside
+                    // the cards — widths echo the real chip labels.
+                    ForEach(Array([50, 60, 92, 64, 96, 84].enumerated()), id: \.offset) { _, width in
+                        Shimmer(width: CGFloat(width), height: 28, cornerRadius: Radii.pill)
+                    }
+                } else {
+                    chipButtons
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
+        }
+        .background(Theme.Color.appBg)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Theme.Color.appBorder)
+                .frame(height: 1)
+        }
+        .accessibilityIdentifier("feedChipRow")
+    }
+
+    private var chipButtons: some View {
+        Group {
                 ForEach(chips) { chip in
                     let active = chip.id == activeId
                     Button { onSelect(chip.id) } label: {
@@ -128,17 +155,7 @@ public struct FeedChipRow: View {
                     .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
                     .accessibilityIdentifier("feedChip_\(chip.id)")
                 }
-            }
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, Spacing.s3)
         }
-        .background(Theme.Color.appBg)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Theme.Color.appBorder)
-                .frame(height: 1)
-        }
-        .accessibilityIdentifier("feedChipRow")
     }
 }
 

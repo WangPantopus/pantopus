@@ -136,6 +136,14 @@ public extension Theme.Color {
     /// behind the `Announce` intent chip.
     static let slateBg = SwiftUI.Color("Accent/SlateBg", bundle: Theme.bundle)
 
+    /// Live Photo badge — `#FFD60A` (iOS system yellow). The indicator dot
+    /// drawn on Live Photo media tiles in Pulse feed cards, post detail
+    /// grids, and the full-screen media viewer. Mirrors the RN app's
+    /// `LivePhotoMedia` dot so the affordance reads identically across
+    /// platforms. Same value in dark mode — it sits on photo content, not
+    /// on a themed surface.
+    static let liveBadge = SwiftUI.Color("Accent/LiveBadge", bundle: Theme.bundle)
+
     // MARK: - Rating
 
     /// Star / rating amber — `#F59E0B` (Tailwind amber-500). Fills the

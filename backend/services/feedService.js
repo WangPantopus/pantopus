@@ -145,6 +145,17 @@ function normalizeMediaUrls(mediaUrls) {
   return mediaUrls.map(resolveStoredMediaUrl).filter(Boolean);
 }
 
+// media_thumbnails / media_live_urls are PARALLEL arrays to media_urls —
+// empty-string slots are intentional padding (see POST /upload/post-media,
+// which pads them to stay index-aligned). Filtering the blanks out, the
+// way normalizeMediaUrls does, shifts every later entry and breaks the
+// pairing whenever a live photo / thumbnailed video isn't the first
+// attachment. This variant resolves stored keys but keeps the slots.
+function normalizeAlignedMediaUrls(mediaUrls) {
+  if (!Array.isArray(mediaUrls)) return [];
+  return mediaUrls.map((url) => resolveStoredMediaUrl(url) || '');
+}
+
 // ---------------------------------------------------------------------------
 // Row normalizer (direct-query rows → frontend shape)
 // ---------------------------------------------------------------------------
@@ -160,8 +171,8 @@ function normalizeFeedPostRow(row, likedPostIds = new Set(), savedPostIds = new 
     content: row.content,
     media_urls: normalizeMediaUrls(row.media_urls),
     media_types: row.media_types || [],
-    media_thumbnails: normalizeMediaUrls(row.media_thumbnails),
-    media_live_urls: normalizeMediaUrls(row.media_live_urls),
+    media_thumbnails: normalizeAlignedMediaUrls(row.media_thumbnails),
+    media_live_urls: normalizeAlignedMediaUrls(row.media_live_urls),
     post_type: row.post_type || 'general',
     post_format: row.post_format || 'standard',
     visibility: row.visibility || 'neighborhood',
@@ -1422,6 +1433,7 @@ module.exports = {
   getActiveSportsEvents,
   // Exported for use by posts.js during migration (these still exist in posts.js too)
   normalizeMediaUrls,
+  normalizeAlignedMediaUrls,
   normalizeFeedPostRow,
   attachIdentityAuthors,
   getMuteAndHideFilters,

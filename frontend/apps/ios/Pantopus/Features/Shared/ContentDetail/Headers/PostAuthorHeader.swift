@@ -60,20 +60,28 @@ public enum PostIntent: String, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    /// Convert a backend `Post.purpose` / `Post.post_type` token into the
-    /// nearest UI intent. Returns `.share` for unknown / generic values.
+    /// Convert a backend `Post.post_type` / `Post.purpose` token into the
+    /// nearest UI intent. `post_type` is the canonical column and wins;
+    /// `purpose` is a backend-derived rollup (e.g. lost_found posts get
+    /// `purpose: "ask"`) so it's only a fallback. Returns `.share` for
+    /// unknown / generic values.
     public static func from(purpose: String?, postType: String?) -> PostIntent {
-        let needle = (purpose ?? postType ?? "").lowercased()
-        switch needle {
-        case "lost_found", "lost", "found": return .lostFound
-        case "ask": return .ask
-        case "offer": return .offer
-        case "event": return .event
-        case "alert", "safety", "heads_up": return .alert
-        case "deal", "recommend", "share", "showcase", "story",
-             "neighborhood_win", "visitor_guide", "local_update", "learn":
-            return .share
-        default: return .share
+        if let mapped = map(postType) { return mapped }
+        return map(purpose) ?? .share
+    }
+
+    private static func map(_ token: String?) -> PostIntent? {
+        switch (token ?? "").lowercased() {
+        case "lost_found", "lost", "found": .lostFound
+        case "ask", "ask_local": .ask
+        case "offer", "service_offer": .offer
+        case "event": .event
+        case "alert", "safety", "heads_up": .alert
+        case "deal", "recommend", "recommendation", "share", "showcase", "story",
+             "neighborhood_win", "visitor_guide", "local_update", "learn",
+             "announcement", "general":
+            .share
+        default: nil
         }
     }
 }

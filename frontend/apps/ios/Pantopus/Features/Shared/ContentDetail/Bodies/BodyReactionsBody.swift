@@ -22,6 +22,11 @@ public struct PostCommentRow: Sendable, Identifiable, Hashable {
     /// 0 for top-level, 1 for nested. We collapse deeper threads to 1.
     public let indentLevel: Int
     public let authorUserId: String?
+    /// Image attachments uploaded with the comment.
+    public let attachmentURLs: [URL]
+    /// True when the signed-in user authored this comment — gates the
+    /// delete affordance.
+    public let isOwn: Bool
 
     public init(
         id: String,
@@ -33,7 +38,9 @@ public struct PostCommentRow: Sendable, Identifiable, Hashable {
         reactionCount: Int = 0,
         userReacted: Bool = false,
         indentLevel: Int,
-        authorUserId: String?
+        authorUserId: String?,
+        attachmentURLs: [URL] = [],
+        isOwn: Bool = false
     ) {
         self.id = id
         self.authorName = authorName
@@ -45,6 +52,26 @@ public struct PostCommentRow: Sendable, Identifiable, Hashable {
         self.userReacted = userReacted
         self.indentLevel = indentLevel
         self.authorUserId = authorUserId
+        self.attachmentURLs = attachmentURLs
+        self.isOwn = isOwn
+    }
+
+    /// Copy with updated heart state — used for optimistic toggles.
+    public func withReaction(count: Int, userReacted: Bool) -> PostCommentRow {
+        PostCommentRow(
+            id: id,
+            authorName: authorName,
+            authorAvatarURL: authorAvatarURL,
+            authorIdentity: authorIdentity,
+            body: body,
+            timestamp: timestamp,
+            reactionCount: count,
+            userReacted: userReacted,
+            indentLevel: indentLevel,
+            authorUserId: authorUserId,
+            attachmentURLs: attachmentURLs,
+            isOwn: isOwn
+        )
     }
 }
 
@@ -82,7 +109,7 @@ public struct PostReactionCounts: Sendable, Hashable {
 @MainActor
 public struct BodyReactionsBody: View {
     private let bodyText: String
-    private let mediaURLs: [URL]
+    private let media: [PostMediaItem]
     private let intent: PostIntent
     private let reactions: PostReactionCounts
     private let onReactionTap: @MainActor (PostReactionKind) -> Void
@@ -95,13 +122,27 @@ public struct BodyReactionsBody: View {
     private let hiddenReplyCount: Int
     private let onShowMoreReplies: (@MainActor () -> Void)?
     private let onCommentAvatarTap: @MainActor (String) -> Void
+    /// Author name the composer is replying to (nil = top-level).
+    private let replyingToName: String?
+    private let onCancelReply: (@MainActor () -> Void)?
+    private let onCommentReply: (@MainActor (PostCommentRow) -> Void)?
+    private let onCommentLike: (@MainActor (String) -> Void)?
+    private let onCommentDelete: (@MainActor (String) -> Void)?
+    /// Place label for the media grid's map-pin badge (A10.4).
+    private let mediaLocationBadge: String?
+    /// Emoji flair on the active heart reaction (long-press popover pick).
+    private let selectedReactionEmoji: String?
+    private let onEmojiSelected: (@MainActor (String) -> Void)?
 
     public init(
         body: String,
-        mediaURLs: [URL],
+        media: [PostMediaItem],
         intent: PostIntent = .share,
         reactions: PostReactionCounts,
         onReactionTap: @escaping @MainActor (PostReactionKind) -> Void,
+        mediaLocationBadge: String? = nil,
+        selectedReactionEmoji: String? = nil,
+        onEmojiSelected: (@MainActor (String) -> Void)? = nil,
         composerAvatarURL: URL?,
         composerAvatarName: String,
         composerText: Binding<String>,
@@ -110,13 +151,21 @@ public struct BodyReactionsBody: View {
         comments: [PostCommentRow],
         hiddenReplyCount: Int = 0,
         onShowMoreReplies: (@MainActor () -> Void)? = nil,
+        replyingToName: String? = nil,
+        onCancelReply: (@MainActor () -> Void)? = nil,
+        onCommentReply: (@MainActor (PostCommentRow) -> Void)? = nil,
+        onCommentLike: (@MainActor (String) -> Void)? = nil,
+        onCommentDelete: (@MainActor (String) -> Void)? = nil,
         onCommentAvatarTap: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         bodyText = body
-        self.mediaURLs = mediaURLs
+        self.media = media
         self.intent = intent
         self.reactions = reactions
         self.onReactionTap = onReactionTap
+        self.mediaLocationBadge = mediaLocationBadge
+        self.selectedReactionEmoji = selectedReactionEmoji
+        self.onEmojiSelected = onEmojiSelected
         self.composerAvatarURL = composerAvatarURL
         self.composerAvatarName = composerAvatarName
         _composerText = composerText
@@ -125,6 +174,11 @@ public struct BodyReactionsBody: View {
         self.comments = comments
         self.hiddenReplyCount = hiddenReplyCount
         self.onShowMoreReplies = onShowMoreReplies
+        self.replyingToName = replyingToName
+        self.onCancelReply = onCancelReply
+        self.onCommentReply = onCommentReply
+        self.onCommentLike = onCommentLike
+        self.onCommentDelete = onCommentDelete
         self.onCommentAvatarTap = onCommentAvatarTap
     }
 
@@ -139,15 +193,22 @@ public struct BodyReactionsBody: View {
                     .accessibilityLabel(bodyText)
             }
 
-            if !mediaURLs.isEmpty {
-                PostMediaGrid(urls: mediaURLs)
-                    .padding(.horizontal, Spacing.s4)
+            if !media.isEmpty {
+                PostMediaGridView(
+                    items: media,
+                    style: .regular,
+                    accessibilityID: "pulsePostDetail-media",
+                    locationBadge: mediaLocationBadge
+                )
+                .padding(.horizontal, Spacing.s4)
             }
 
             ReactionsBar(
                 counts: reactions,
                 commentCount: visibleCommentCount,
                 commentsAreFresh: comments.isEmpty,
+                selectedEmoji: selectedReactionEmoji,
+                onEmojiSelected: onEmojiSelected,
                 onTap: onReactionTap
             )
             .padding(.horizontal, Spacing.s4)
@@ -157,11 +218,40 @@ public struct BodyReactionsBody: View {
                 .frame(height: 1)
                 .padding(.horizontal, Spacing.s4)
 
+            if let replyingToName {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.reply, size: 12, color: Theme.Color.appTextSecondary)
+                    Text("Replying to ")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        + Text(replyingToName)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                    Spacer()
+                    if let onCancelReply {
+                        Button(action: { onCancelReply() }) {
+                            Icon(.x, size: 12, color: Theme.Color.appTextSecondary)
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Cancel reply")
+                        .accessibilityIdentifier("pulsePostDetail-cancelReply")
+                    }
+                }
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s1)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .padding(.horizontal, Spacing.s4)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("pulsePostDetail-replyBanner")
+            }
+
             CommentComposer(
                 avatarName: composerAvatarName,
                 avatarURL: composerAvatarURL,
                 text: $composerText,
-                placeholder: comments.isEmpty ? "Be the first to reply..." : "Add a comment",
+                placeholder: composerPlaceholder,
                 isFocusedPresentation: comments.isEmpty,
                 isSending: isSending,
                 onSend: onSendTap
@@ -171,9 +261,15 @@ public struct BodyReactionsBody: View {
             if !comments.isEmpty {
                 VStack(alignment: .leading, spacing: Spacing.s3) {
                     ForEach(comments) { comment in
-                        CommentRow(comment: comment) {
-                            if let uid = comment.authorUserId { onCommentAvatarTap(uid) }
-                        }
+                        CommentRow(
+                            comment: comment,
+                            onAvatarTap: {
+                                if let uid = comment.authorUserId { onCommentAvatarTap(uid) }
+                            },
+                            onReply: onCommentReply.map { handler in { handler(comment) } },
+                            onToggleLike: onCommentLike.map { handler in { handler(comment.id) } },
+                            onDelete: onCommentDelete.map { handler in { handler(comment.id) } }
+                        )
                     }
                     if hiddenReplyCount > 0, let onShowMoreReplies {
                         Button {
@@ -205,86 +301,61 @@ public struct BodyReactionsBody: View {
     private var visibleCommentCount: Int {
         comments.count + hiddenReplyCount
     }
+
+    private var composerPlaceholder: String {
+        if let replyingToName { return "Reply to \(replyingToName)..." }
+        return comments.isEmpty ? "Be the first to reply..." : "Add a comment"
+    }
 }
 
 // MARK: - Sub-views
-
-private struct PostMediaGrid: View {
-    let urls: [URL]
-
-    var body: some View {
-        switch urls.count {
-        case 0: EmptyView()
-        case 1:
-            mediaTile(urls[0])
-                .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        case 2:
-            HStack(spacing: Spacing.s2) {
-                mediaTile(urls[0]).aspectRatio(1, contentMode: .fill)
-                mediaTile(urls[1]).aspectRatio(1, contentMode: .fill)
-            }
-            .frame(height: 160)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        case 3:
-            HStack(spacing: Spacing.s2) {
-                mediaTile(urls[0]).frame(maxWidth: .infinity)
-                VStack(spacing: Spacing.s2) {
-                    mediaTile(urls[1]).frame(maxWidth: .infinity)
-                    mediaTile(urls[2]).frame(maxWidth: .infinity)
-                }
-            }
-            .frame(height: 200)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        default:
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: Spacing.s2), GridItem(.flexible(), spacing: Spacing.s2)],
-                spacing: Spacing.s2
-            ) {
-                ForEach(Array(urls.prefix(4).enumerated()), id: \.offset) { _, url in
-                    mediaTile(url).aspectRatio(1, contentMode: .fill)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        }
-    }
-
-    private func mediaTile(_ url: URL) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case let .success(image):
-                image.resizable().scaledToFill()
-            case .failure:
-                Color.gray.opacity(0.1)
-                    .overlay(Icon(.alertCircle, size: 22, color: Theme.Color.appTextMuted))
-            case .empty:
-                Color.gray.opacity(0.08).overlay(ProgressView())
-            @unknown default:
-                Color.gray.opacity(0.08)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .clipped()
-    }
-}
 
 private struct ReactionsBar: View {
     let counts: PostReactionCounts
     let commentCount: Int
     let commentsAreFresh: Bool
+    var selectedEmoji: String?
+    var onEmojiSelected: (@MainActor (String) -> Void)?
     let onTap: @MainActor (PostReactionKind) -> Void
+
+    @State private var showsEmojiPicker = false
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
             ReactionPill(
                 id: "heart",
                 icon: .heart,
+                emojiGlyph: counts.userReaction == .helpful ? selectedEmoji : nil,
                 count: counts.helpful,
                 accessibilityLabel: "Heart reaction, \(counts.helpful)",
                 isSelected: counts.userReaction == .helpful,
                 selectedForeground: Theme.Color.error,
                 selectedBackground: Theme.Color.errorBg
             ) { onTap(.helpful) }
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+                        if onEmojiSelected != nil { showsEmojiPicker = true }
+                    }
+                )
+                .popover(isPresented: $showsEmojiPicker) {
+                    HStack(spacing: Spacing.s2) {
+                        ForEach(PulsePostDetailViewModel.reactionEmojis, id: \.self) { emoji in
+                            Button {
+                                showsEmojiPicker = false
+                                onEmojiSelected?(emoji)
+                            } label: {
+                                Text(emoji)
+                                    .font(.system(size: 24))
+                                    .frame(width: 36, height: 36)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("React with \(emoji)")
+                        }
+                    }
+                    .padding(Spacing.s2)
+                    .presentationCompactAdaptation(.popover)
+                    .accessibilityIdentifier("pulsePostDetail-emojiPicker")
+                }
             ReactionPill(
                 id: "hand",
                 icon: .hand,
@@ -323,6 +394,8 @@ private struct ReactionsBar: View {
 private struct ReactionPill: View {
     let id: String
     let icon: PantopusIcon
+    /// Emoji rendered instead of the icon (long-press popover pick).
+    var emojiGlyph: String?
     let count: Int
     let accessibilityLabel: String
     let isSelected: Bool
@@ -349,7 +422,12 @@ private struct ReactionPill: View {
 
     private var pillBody: some View {
         HStack(spacing: Spacing.s1) {
-            Icon(icon, size: 14, color: foreground)
+            if let emojiGlyph {
+                Text(emojiGlyph)
+                    .pantopusTextStyle(.small)
+            } else {
+                Icon(icon, size: 14, color: foreground)
+            }
             Text("\(count)")
                 .font(.system(size: PantopusTextStyle.caption.size, weight: .regular))
                 .foregroundStyle(foreground)
@@ -383,7 +461,7 @@ private struct ReactionPill: View {
     @Previewable @State var text = ""
     BodyReactionsBody(
         body: "Anyone know a reliable handyman for fixing a leaky faucet in Cambridge? Tried two on Angi already.",
-        mediaURLs: [],
+        media: [],
         reactions: PostReactionCounts(helpful: 7, heart: 2, going: 0, userReaction: .helpful),
         onReactionTap: { _ in },
         composerAvatarURL: nil,

@@ -2,8 +2,9 @@
 //  PulsePostTargetPickerView.swift
 //  Pantopus
 //
-//  Step 1 — "Where do you want to post?" Mirrors React Native
-//  `PostTargetPicker.tsx`.
+//  Step 1 — "Where do you want to post?" Card-based chooser grouped
+//  into "Your places" (current location / homes / businesses) and
+//  "Your network" (connections).
 //
 
 import SwiftUI
@@ -27,7 +28,7 @@ public struct PulsePostTargetPickerView: View {
 
     public var body: some View {
         FormShell(
-            title: "New Post",
+            title: "New post",
             leading: .close,
             rightActionLabel: nil,
             isValid: false,
@@ -56,116 +57,141 @@ public struct PulsePostTargetPickerView: View {
         .accessibilityIdentifier("pulsePostTargetPicker")
     }
 
+    // MARK: - Loading
+
     private var loadingBody: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
-            Shimmer(width: 220, height: 18, cornerRadius: Radii.sm)
-            ForEach(0..<4, id: \.self) { _ in
-                HStack(spacing: Spacing.s3) {
-                    Shimmer(width: 40, height: 40, cornerRadius: Radii.md)
-                    VStack(alignment: .leading, spacing: Spacing.s1) {
-                        Shimmer(width: 140, height: 14, cornerRadius: Radii.sm)
-                        Shimmer(width: 200, height: 12, cornerRadius: Radii.sm)
-                    }
-                }
-                .padding(.vertical, Spacing.s2)
+            Shimmer(width: 230, height: 22, cornerRadius: Radii.sm)
+            Shimmer(width: 180, height: 13, cornerRadius: Radii.sm)
+                .padding(.bottom, Spacing.s2)
+            ForEach(0..<3, id: \.self) { _ in
+                Shimmer(height: 72, cornerRadius: Radii.lg)
             }
+            Shimmer(width: 110, height: 11, cornerRadius: Radii.sm)
+                .padding(.top, Spacing.s2)
+            Shimmer(height: 72, cornerRadius: Radii.lg)
         }
+        .padding(.horizontal, Spacing.s4)
     }
 
-    private var listBody: some View {
-        VStack(alignment: .leading, spacing: Spacing.s1) {
-            Text("Where do you want to post?")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .padding(.bottom, Spacing.s2)
+    // MARK: - Body
 
-            targetRow(
-                iconStyle: TargetRowIconStyle(
-                    icon: .compass,
-                    background: Theme.Color.primary50,
-                    color: Theme.Color.primary600
-                ),
-                title: "Current Location",
-                subtitle: "Post to the area where you are right now",
-                isLoading: viewModel.isLocating
-            ) {
-                Task {
-                    locationError = nil
-                    if let target = await viewModel.selectCurrentLocation() {
-                        onSelect(target)
-                    } else {
-                        locationError = "Could not get your location. Check permissions and try again."
+    private var listBody: some View {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text("Where do you want to post?")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Pick the place or audience your post should reach.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+
+            sectionLabel("Your places")
+
+            VStack(spacing: Spacing.s2) {
+                targetCard(
+                    iconStyle: TargetCardIconStyle(
+                        icon: .compass,
+                        background: Theme.Color.primary50,
+                        color: Theme.Color.primary600
+                    ),
+                    title: "Current Location",
+                    subtitle: "Post to the area where you are right now",
+                    isLoading: viewModel.isLocating,
+                    identifier: "pulseTarget_currentLocation"
+                ) {
+                    Task {
+                        locationError = nil
+                        if let target = await viewModel.selectCurrentLocation() {
+                            onSelect(target)
+                        } else {
+                            locationError = "Could not get your location. Check permissions and try again."
+                        }
                     }
                 }
+
+                if let locationError {
+                    Text(locationError)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.error)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                homeSection
+                businessSection
             }
 
-            if let locationError {
-                Text(locationError)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.Color.error)
-            }
+            sectionLabel("Your network")
+                .padding(.top, Spacing.s1)
 
-            homeSection
-            businessSection
-
-            Divider()
-                .padding(.vertical, Spacing.s2)
-
-            targetRow(
-                iconStyle: TargetRowIconStyle(
+            targetCard(
+                iconStyle: TargetCardIconStyle(
                     icon: .link,
                     background: Theme.Color.warmAmberBg,
                     color: Theme.Color.warmAmber
                 ),
                 title: "Connections",
-                subtitle: "Share with people you trust"
+                subtitle: "Share with people you trust, wherever they are",
+                identifier: "pulseTarget_connections"
             ) {
                 onSelect(.connections)
             }
         }
+        .padding(.horizontal, Spacing.s4)
     }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(Theme.Color.appTextMuted)
+    }
+
+    // MARK: - Homes
 
     @ViewBuilder
     private var homeSection: some View {
         if viewModel.homes.isEmpty {
-            targetRow(
-                iconStyle: TargetRowIconStyle(
+            targetCard(
+                iconStyle: TargetCardIconStyle(
                     icon: .home,
                     background: Theme.Color.homeBg,
                     color: Theme.Color.home
                 ),
                 title: "Home Area",
                 subtitle: "Add a home to post here",
-                muted: true
+                muted: true,
+                identifier: "pulseTarget_homeEmpty"
             ) {}
         } else if viewModel.homes.count == 1, let home = viewModel.homes.first {
-            targetRow(
-                iconStyle: TargetRowIconStyle(
+            targetCard(
+                iconStyle: TargetCardIconStyle(
                     icon: .home,
                     background: Theme.Color.homeBg,
                     color: Theme.Color.home
                 ),
                 title: "Home Area",
-                subtitle: home.label
+                subtitle: home.label,
+                identifier: "pulseTarget_home"
             ) {
                 onSelect(.home(homeId: home.id, latitude: home.latitude, longitude: home.longitude, label: home.label))
             }
         } else {
-            targetRow(
-                iconStyle: TargetRowIconStyle(
+            expandableCard(
+                iconStyle: TargetCardIconStyle(
                     icon: .home,
                     background: Theme.Color.homeBg,
                     color: Theme.Color.home
                 ),
                 title: "Home Area",
                 subtitle: "\(viewModel.homes.count) homes",
-                trailing: expandedHomeList ? .chevronUp : .chevronDown
+                isExpanded: expandedHomeList,
+                identifier: "pulseTarget_homeGroup",
+                toggle: { expandedHomeList.toggle() }
             ) {
-                expandedHomeList.toggle()
-            }
-            if expandedHomeList {
                 ForEach(viewModel.homes) { home in
-                    subRow(title: home.label) {
+                    subRow(title: home.label, identifier: "pulseTargetHome_\(home.id)") {
                         onSelect(.home(homeId: home.id, latitude: home.latitude, longitude: home.longitude, label: home.label))
                     }
                 }
@@ -173,37 +199,39 @@ public struct PulsePostTargetPickerView: View {
         }
     }
 
+    // MARK: - Businesses
+
     @ViewBuilder
     private var businessSection: some View {
         if !viewModel.businesses.isEmpty {
             if viewModel.businesses.count == 1, let biz = viewModel.businesses.first {
-                targetRow(
-                    iconStyle: TargetRowIconStyle(
+                targetCard(
+                    iconStyle: TargetCardIconStyle(
                         icon: .building2,
                         background: Theme.Color.businessBg,
                         color: Theme.Color.business
                     ),
                     title: "Business Area",
-                    subtitle: biz.name
+                    subtitle: biz.name,
+                    identifier: "pulseTarget_business"
                 ) {
                     onSelect(.business(businessId: biz.id, latitude: biz.latitude, longitude: biz.longitude, label: biz.label))
                 }
             } else {
-                targetRow(
-                    iconStyle: TargetRowIconStyle(
+                expandableCard(
+                    iconStyle: TargetCardIconStyle(
                         icon: .building2,
                         background: Theme.Color.businessBg,
                         color: Theme.Color.business
                     ),
                     title: "Business Area",
                     subtitle: "\(viewModel.businesses.count) businesses",
-                    trailing: expandedBusinessList ? .chevronUp : .chevronDown
+                    isExpanded: expandedBusinessList,
+                    identifier: "pulseTarget_businessGroup",
+                    toggle: { expandedBusinessList.toggle() }
                 ) {
-                    expandedBusinessList.toggle()
-                }
-                if expandedBusinessList {
                     ForEach(viewModel.businesses) { biz in
-                        subRow(title: biz.name, hint: biz.label) {
+                        subRow(title: biz.name, hint: biz.label, identifier: "pulseTargetBusiness_\(biz.id)") {
                             onSelect(.business(businessId: biz.id, latitude: biz.latitude, longitude: biz.longitude, label: biz.label))
                         }
                     }
@@ -212,57 +240,116 @@ public struct PulsePostTargetPickerView: View {
         }
     }
 
-    private enum TrailingIcon {
-        case chevronRight, chevronDown, chevronUp
-    }
+    // MARK: - Card builders
 
-    private struct TargetRowIconStyle {
+    private struct TargetCardIconStyle {
         let icon: PantopusIcon
         let background: Color
         let color: Color
     }
 
-    private func targetRow(
-        iconStyle: TargetRowIconStyle,
+    private func iconTile(_ style: TargetCardIconStyle, muted: Bool = false) -> some View {
+        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+            .fill(style.background.opacity(muted ? 0.5 : 1))
+            .frame(width: 44, height: 44)
+            .overlay {
+                Icon(style.icon, size: 22, strokeWidth: 2, color: style.color.opacity(muted ? 0.5 : 1))
+            }
+    }
+
+    private func cardLabel(title: String, subtitle: String, muted: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(muted ? Theme.Color.appTextMuted : Theme.Color.appText)
+            Text(subtitle)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineLimit(2)
+        }
+    }
+
+    private func cardBackground(muted: Bool = false) -> some View {
+        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+            .fill(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, style: muted
+                        ? StrokeStyle(lineWidth: 1, dash: [4, 3])
+                        : StrokeStyle(lineWidth: 1))
+            )
+    }
+
+    private func targetCard(
+        iconStyle: TargetCardIconStyle,
         title: String,
         subtitle: String,
         muted: Bool = false,
         isLoading: Bool = false,
-        trailing: TrailingIcon = .chevronRight,
+        identifier: String,
         action: @escaping @MainActor () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: Spacing.s3) {
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(iconStyle.background.opacity(muted ? 0.5 : 1))
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Icon(iconStyle.icon, size: 20, strokeWidth: 2, color: iconStyle.color.opacity(muted ? 0.5 : 1))
-                    }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(muted ? Theme.Color.appTextMuted : Theme.Color.appText)
-                    Text(subtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Spacer(minLength: 0)
+                iconTile(iconStyle, muted: muted)
+                cardLabel(title: title, subtitle: subtitle, muted: muted)
+                Spacer(minLength: Spacing.s0)
                 if isLoading {
                     ProgressView()
                         .controlSize(.small)
-                } else {
-                    Icon(trailingIcon(trailing), size: 18, color: Theme.Color.appTextMuted)
+                } else if !muted {
+                    Icon(.chevronRight, size: 18, color: Theme.Color.appTextMuted)
                 }
             }
-            .padding(.vertical, Spacing.s3)
-            .contentShape(Rectangle())
+            .padding(Spacing.s3)
+            .background(cardBackground(muted: muted))
+            .contentShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(muted || isLoading)
+        .accessibilityIdentifier(identifier)
     }
 
-    private func subRow(title: String, hint: String? = nil, action: @escaping @MainActor () -> Void) -> some View {
+    /// Card that expands in place to reveal one row per home/business.
+    private func expandableCard<Rows: View>(
+        iconStyle: TargetCardIconStyle,
+        title: String,
+        subtitle: String,
+        isExpanded: Bool,
+        identifier: String,
+        toggle: @escaping @MainActor () -> Void,
+        @ViewBuilder rows: () -> Rows
+    ) -> some View {
+        VStack(spacing: Spacing.s0) {
+            Button(action: toggle) {
+                HStack(spacing: Spacing.s3) {
+                    iconTile(iconStyle)
+                    cardLabel(title: title, subtitle: subtitle, muted: false)
+                    Spacer(minLength: Spacing.s0)
+                    Icon(isExpanded ? .chevronUp : .chevronDown, size: 18, color: Theme.Color.appTextMuted)
+                }
+                .padding(Spacing.s3)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(identifier)
+
+            if isExpanded {
+                Divider()
+                    .padding(.horizontal, Spacing.s3)
+                rows()
+            }
+        }
+        .background(cardBackground())
+        .pantopusAnimation(.componentState, value: isExpanded)
+    }
+
+    private func subRow(
+        title: String,
+        hint: String? = nil,
+        identifier: String,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: Spacing.s2) {
                 Icon(.mapPin, size: 16, color: Theme.Color.appTextSecondary)
@@ -272,25 +359,19 @@ public struct PulsePostTargetPickerView: View {
                         .foregroundStyle(Theme.Color.appText)
                     if let hint {
                         Text(hint)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextMuted)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
             }
-            .padding(.leading, 40)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.leading, 44)
             .padding(.vertical, Spacing.s3)
-            .background(Theme.Color.appSurfaceSunken)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private func trailingIcon(_ trailing: TrailingIcon) -> PantopusIcon {
-        switch trailing {
-        case .chevronRight: .chevronRight
-        case .chevronDown: .chevronDown
-        case .chevronUp: .chevronUp
-        }
+        .accessibilityIdentifier(identifier)
     }
 }
