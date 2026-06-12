@@ -79,8 +79,9 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
-/** Locate + layers + focus-on-pins stack (three 38dp buttons + 8dp gaps). */
-internal val TASKS_MAP_CONTROLS_HEIGHT = 130.dp
+/** Locate + layers + focus-on-pins + Post-task stack
+ * (three 38dp buttons + 48dp pill + three 8dp gaps). */
+internal val TASKS_MAP_CONTROLS_HEIGHT = 186.dp
 
 /**
  * A11.1 Tasks map — the Gigs-only mode of the MapListHybrid archetype.
@@ -194,10 +195,8 @@ fun TasksMapScreen(
                 onLocate = { requestLocate() },
                 onLayers = { showFilters = true },
                 onFocus = viewModel::focusOnPins,
+                onPost = { onCompose(activeCategory) },
             )
-        },
-        floatingAction = {
-            TasksMapPostFab(onClick = { onCompose(activeCategory) })
         },
         sheetHeader = {
             TasksMapSheetHeader(
@@ -497,11 +496,17 @@ internal fun TasksMapPostFab(onClick: () -> Unit) {
     }
 }
 
+/**
+ * Locate / layers / focus-pins stack with the "Post task" pill at the
+ * bottom — product call, diverges from the A11.1 frame which drew the
+ * FAB on top. Mirrors iOS `TasksMapView.mapControls`.
+ */
 @Composable
 internal fun TasksMapMapControls(
     onLocate: () -> Unit,
     onLayers: () -> Unit,
     onFocus: () -> Unit,
+    onPost: () -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.End,
@@ -525,6 +530,7 @@ internal fun TasksMapMapControls(
             testTagId = "tasksMap.focusPins",
             onClick = onFocus,
         )
+        TasksMapPostFab(onClick = onPost)
     }
 }
 
@@ -1138,8 +1144,7 @@ internal fun TasksMapStaticPreview(
                 onSearchThisArea = {},
             )
         },
-        mapControls = { TasksMapMapControls(onLocate = {}, onLayers = {}, onFocus = {}) },
-        floatingAction = { TasksMapPostFab(onClick = {}) },
+        mapControls = { TasksMapMapControls(onLocate = {}, onLayers = {}, onFocus = {}, onPost = {}) },
         sheetHeader = { TasksMapSheetHeader(count = count, activeSort = activeSort, onSelectSort = {}) },
         sheetBody = {
             TasksMapSheetBody(

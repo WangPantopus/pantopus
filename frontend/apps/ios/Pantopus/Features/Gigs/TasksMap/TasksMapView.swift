@@ -237,11 +237,12 @@ public struct TasksMapView: View {
         .accessibilityIdentifier("tasksMap.searchThisArea")
     }
 
-    // MARK: - Map controls (A11.1 — FAB on top, then locate / layers / focus-pins)
+    // MARK: - Map controls (locate / layers / focus-pins, "Post task" pill
+    // at the bottom of the stack — product call, diverges from the A11.1
+    // frame which drew the FAB on top)
 
     private var mapControls: some View {
         VStack(alignment: .trailing, spacing: Spacing.s2) {
-            postTaskFAB
             controlButton(icon: .locateFixed, label: "Locate me", identifier: "tasksMap.locate") {
                 Task { await viewModel.locate() }
                 recenterToken += 1
@@ -252,6 +253,7 @@ public struct TasksMapView: View {
             controlButton(icon: .maximize, label: "Fit all tasks", identifier: "tasksMap.focusPins") {
                 viewModel.focusOnPins()
             }
+            postTaskFAB
         }
     }
 
