@@ -1,7 +1,10 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.feed.FeedResponse
+import app.pantopus.android.data.api.models.posts.CommentLikeResponse
 import app.pantopus.android.data.api.models.posts.MyPostsResponse
+import app.pantopus.android.data.api.models.posts.PlaceEligibilityResponse
+import app.pantopus.android.data.api.models.posts.PostActionAckResponse
 import app.pantopus.android.data.api.models.posts.PostArchiveResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
@@ -10,6 +13,10 @@ import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
+import app.pantopus.android.data.api.models.posts.PostReportRequest
+import app.pantopus.android.data.api.models.posts.PostSaveResponse
+import app.pantopus.android.data.api.models.posts.PostShareRequest
+import app.pantopus.android.data.api.models.posts.PostShareResponse
 import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.models.posts.PostUpdateResponse
 import retrofit2.http.Body
@@ -119,4 +126,57 @@ interface PostsApi {
     suspend fun unarchivePost(
         @Path("id") id: String,
     ): PostArchiveResponse
+
+    /**
+     * `POST /api/posts/:postId/comments/:commentId/like` — toggles the
+     * signed-in user's like on a comment. Route `backend/routes/posts.js:2554`.
+     */
+    @POST("api/posts/{postId}/comments/{commentId}/like")
+    suspend fun toggleCommentLike(
+        @Path("postId") postId: String,
+        @Path("commentId") commentId: String,
+    ): CommentLikeResponse
+
+    /**
+     * `DELETE /api/posts/:postId/comments/:commentId` — author-only
+     * comment delete. Route `backend/routes/posts.js:2520`.
+     */
+    @DELETE("api/posts/{postId}/comments/{commentId}")
+    suspend fun deleteComment(
+        @Path("postId") postId: String,
+        @Path("commentId") commentId: String,
+    ): PostActionAckResponse
+
+    /** `POST /api/posts/:id/share` — records a share/repost. Route `backend/routes/posts.js:3210`. */
+    @POST("api/posts/{id}/share")
+    suspend fun share(
+        @Path("id") id: String,
+        @Body body: PostShareRequest,
+    ): PostShareResponse
+
+    /** `POST /api/posts/:id/report` — flags the post. Route `backend/routes/posts.js:3258`. */
+    @POST("api/posts/{id}/report")
+    suspend fun report(
+        @Path("id") id: String,
+        @Body body: PostReportRequest,
+    ): PostActionAckResponse
+
+    /** `POST /api/posts/:id/save` — toggles the bookmark. Route `backend/routes/posts.js:3294`. */
+    @POST("api/posts/{id}/save")
+    suspend fun toggleSave(
+        @Path("id") id: String,
+    ): PostSaveResponse
+
+    /**
+     * `GET /api/posts/place-eligibility` — can the signed-in user post to
+     * the Place feed at these coordinates? Route `backend/routes/posts.js:1941`.
+     */
+    @GET("api/posts/place-eligibility")
+    suspend fun placeEligibility(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("gpsTimestamp") gpsTimestamp: String? = null,
+        @Query("gpsLatitude") gpsLatitude: Double? = null,
+        @Query("gpsLongitude") gpsLongitude: Double? = null,
+    ): PlaceEligibilityResponse
 }

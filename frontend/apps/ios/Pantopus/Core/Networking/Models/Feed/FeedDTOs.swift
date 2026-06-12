@@ -29,6 +29,9 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
     public let mediaURLs: [String]
     public let mediaThumbnails: [String]
     public let mediaTypes: [String]
+    /// Parallel array to `media_urls` — companion video clip URL when
+    /// `media_types[i] == "live_photo"`, empty string otherwise.
+    public let mediaLiveURLs: [String]
     public let creator: PostCreatorDTO?
 
     private enum CodingKeys: String, CodingKey {
@@ -47,6 +50,7 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
         case mediaURLs = "media_urls"
         case mediaThumbnails = "media_thumbnails"
         case mediaTypes = "media_types"
+        case mediaLiveURLs = "media_live_urls"
         case creator
     }
 
@@ -68,6 +72,7 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
         mediaURLs = try c.decodeIfPresent([String].self, forKey: .mediaURLs) ?? []
         mediaThumbnails = try c.decodeIfPresent([String].self, forKey: .mediaThumbnails) ?? []
         mediaTypes = try c.decodeIfPresent([String].self, forKey: .mediaTypes) ?? []
+        mediaLiveURLs = try c.decodeIfPresent([String].self, forKey: .mediaLiveURLs) ?? []
         creator = try c.decodeIfPresent(PostCreatorDTO.self, forKey: .creator)
     }
 }
@@ -77,6 +82,9 @@ public struct FeedPagination: Decodable, Sendable, Hashable {
     /// Opaque cursor id for the next page. The backend v1.1 feed returns an
     /// object `{ createdAt, id, rankBucket? }`; older stubs used a string.
     public let nextCursor: String?
+    /// Companion timestamp for keyset pagination — both `cursorCreatedAt`
+    /// and `cursorId` must ride on the next request.
+    public let nextCursorCreatedAt: String?
     public let hasMore: Bool?
 
     private enum CodingKeys: String, CodingKey {
@@ -94,10 +102,13 @@ public struct FeedPagination: Decodable, Sendable, Hashable {
         hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore)
         if let cursorString = try? container.decode(String.self, forKey: .nextCursor) {
             nextCursor = cursorString
+            nextCursorCreatedAt = nil
         } else if let cursorObject = try? container.decode(CursorObject.self, forKey: .nextCursor) {
             nextCursor = cursorObject.id
+            nextCursorCreatedAt = cursorObject.createdAt
         } else {
             nextCursor = nil
+            nextCursorCreatedAt = nil
         }
     }
 }

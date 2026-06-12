@@ -31,8 +31,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -52,11 +54,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.components.Shimmer
@@ -76,6 +80,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
 import java.util.Calendar
 import java.util.UUID
 
@@ -98,6 +103,9 @@ fun PulseComposeScreen(
     val identity by viewModel.identity.collectAsStateWithLifecycle()
     val visibility by viewModel.visibility.collectAsStateWithLifecycle()
     val lostFoundKind by viewModel.lostFoundKind.collectAsStateWithLifecycle()
+    val lostFoundContactPref by viewModel.lostFoundContactPref.collectAsStateWithLifecycle()
+    val dealExpiresAt by viewModel.dealExpiresAt.collectAsStateWithLifecycle()
+    val eligibilityWarning by viewModel.eligibilityWarning.collectAsStateWithLifecycle()
     val announceAudience by viewModel.announceAudience.collectAsStateWithLifecycle()
     val safetyAlertKind by viewModel.safetyAlertKind.collectAsStateWithLifecycle()
     val askCategory by viewModel.askCategory.collectAsStateWithLifecycle()
@@ -167,6 +175,17 @@ fun PulseComposeScreen(
                 .background(PantopusColors.appBg)
                 .testTag("composePulseShell"),
     ) {
+        // `isValid`/`isDirty` are plain VM getters, not Compose state. Read
+        // every collected form input here in the outer scope so this
+        // composable recomposes when any of them changes — otherwise the
+        // gating would stay frozen at its initial (empty-form) value and the
+        // Post action could never enable. `state` covers isSubmitting.
+        @Suppress("UNUSED_EXPRESSION")
+        run {
+            fields; photos; identity; visibility; lostFoundKind
+            lostFoundContactPref; announceAudience; askCategory
+            recommendRating; activeIntent; dealExpiresAt; state
+        }
         FormShell(
             title = viewModel.displayTitle,
             rightActionLabel = viewModel.ctaLabel,
@@ -191,6 +210,9 @@ fun PulseComposeScreen(
                                 identity = identity,
                                 visibility = visibility,
                                 lostFoundKind = lostFoundKind,
+                                lostFoundContactPref = lostFoundContactPref,
+                                dealExpiresAt = dealExpiresAt,
+                                eligibilityWarning = eligibilityWarning,
                                 announceAudience = announceAudience,
                                 safetyAlertKind = safetyAlertKind,
                                 askCategory = askCategory,
@@ -210,6 +232,8 @@ fun PulseComposeScreen(
                                         onSelectIdentity = viewModel::selectIdentity,
                                         onSelectVisibility = viewModel::selectVisibility,
                                         onSelectLostFoundKind = viewModel::selectLostFoundKind,
+                                        onSelectContactPref = viewModel::selectLostFoundContactPref,
+                                        onSelectDealExpires = viewModel::selectDealExpires,
                                         onSelectAnnounceAudience = viewModel::selectAnnounceAudience,
                                         onSelectSafetyAlertKind = viewModel::selectSafetyAlertKind,
                                         onSelectAskCategory = viewModel::selectAskCategory,
@@ -268,6 +292,9 @@ internal data class PulseComposeContentState(
     val identity: PulseComposeIdentity = PulseComposeIdentity.Personal,
     val visibility: PulseComposeVisibility = PulseComposeVisibility.Neighbors,
     val lostFoundKind: PulseLostFoundKind = PulseLostFoundKind.Lost,
+    val lostFoundContactPref: PulseLostFoundContactPref = PulseLostFoundContactPref.Dm,
+    val dealExpiresAt: LocalDateTime = LocalDateTime.now().plusDays(7),
+    val eligibilityWarning: String? = null,
     val announceAudience: PulseAnnounceAudience = PulseAnnounceAudience.Neighbors,
     val safetyAlertKind: PulseSafetyAlertKind = PulseSafetyAlertKind.Theft,
     val askCategory: PulseAskCategory = PulseAskCategory.Handyman,
@@ -286,6 +313,8 @@ internal data class PulseComposeSelectionActions(
     val onSelectIdentity: (PulseComposeIdentity) -> Unit,
     val onSelectVisibility: (PulseComposeVisibility) -> Unit,
     val onSelectLostFoundKind: (PulseLostFoundKind) -> Unit,
+    val onSelectContactPref: (PulseLostFoundContactPref) -> Unit,
+    val onSelectDealExpires: (LocalDateTime) -> Unit,
     val onSelectAnnounceAudience: (PulseAnnounceAudience) -> Unit,
     val onSelectSafetyAlertKind: (PulseSafetyAlertKind) -> Unit,
     val onSelectAskCategory: (PulseAskCategory) -> Unit,
@@ -305,7 +334,7 @@ internal fun PulseComposeBody(
     actions: PulseComposeActions,
 ) {
     if (state.isFlowMode) {
-        FlowContextHeader(state.composePurpose, state.postingTargetLabel)
+        FlowContextHeader(state.composePurpose, state.postingTargetLabel, state.eligibilityWarning)
     } else {
         IntentPicker(
             active = state.activeIntent,
@@ -318,6 +347,8 @@ internal fun PulseComposeBody(
         state = state,
         onUpdateField = actions.onUpdateField,
         onSelectLostFoundKind = actions.selection.onSelectLostFoundKind,
+        onSelectContactPref = actions.selection.onSelectContactPref,
+        onSelectDealExpires = actions.selection.onSelectDealExpires,
         onSelectAnnounceAudience = actions.selection.onSelectAnnounceAudience,
         onSelectSafetyAlertKind = actions.selection.onSelectSafetyAlertKind,
         onSelectAskCategory = actions.selection.onSelectAskCategory,
@@ -333,6 +364,7 @@ internal fun PulseComposeBody(
 private fun FlowContextHeader(
     purpose: PulseComposePurpose?,
     targetLabel: String?,
+    eligibilityWarning: String? = null,
 ) {
     purpose?.let { p ->
         Row(
@@ -350,6 +382,32 @@ private fun FlowContextHeader(
         ) {
             PantopusIconImage(icon = PantopusIcon.MapPin, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextSecondary)
             Text(text = "Posting to $label", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        }
+    }
+    eligibilityWarning?.let { warning ->
+        Row(
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.s4)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.warningBg)
+                    .padding(Spacing.s3)
+                    .testTag("composePulseEligibilityWarning"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.AlertCircle,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.warning,
+            )
+            Text(
+                text = warning,
+                style = PantopusTextStyle.small.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                color = PantopusColors.appText,
+            )
         }
     }
 }
@@ -510,10 +568,13 @@ private fun IdentityChip(
 }
 
 @Composable
+@Suppress("LongParameterList")
 private fun IntentSpecificSection(
     state: PulseComposeContentState,
     onUpdateField: (PulseComposeField, String) -> Unit,
     onSelectLostFoundKind: (PulseLostFoundKind) -> Unit,
+    onSelectContactPref: (PulseLostFoundContactPref) -> Unit,
+    onSelectDealExpires: (LocalDateTime) -> Unit,
     onSelectAnnounceAudience: (PulseAnnounceAudience) -> Unit,
     onSelectSafetyAlertKind: (PulseSafetyAlertKind) -> Unit,
     onSelectAskCategory: (PulseAskCategory) -> Unit,
@@ -540,26 +601,39 @@ private fun IntentSpecificSection(
             LostSection(
                 fields = state.fields,
                 kind = state.lostFoundKind,
+                contactPref = state.lostFoundContactPref,
                 onUpdateField = onUpdateField,
                 onSelectKind = onSelectLostFoundKind,
+                onSelectContactPref = onSelectContactPref,
             )
         PulseComposeIntent.Announce ->
-            if (state.composePurpose == PulseComposePurpose.HeadsUp) {
-                HeadsUpSection(
-                    fields = state.fields,
-                    audience = state.announceAudience,
-                    safetyKind = state.safetyAlertKind,
-                    onUpdateField = onUpdateField,
-                    onSelectAudience = onSelectAnnounceAudience,
-                    onSelectSafetyKind = onSelectSafetyAlertKind,
-                )
-            } else {
-                AnnounceSection(
-                    fields = state.fields,
-                    audience = state.announceAudience,
-                    onUpdateField = onUpdateField,
-                    onSelectAudience = onSelectAnnounceAudience,
-                )
+            when (state.composePurpose) {
+                PulseComposePurpose.HeadsUp ->
+                    HeadsUpSection(
+                        fields = state.fields,
+                        audience = state.announceAudience,
+                        safetyKind = state.safetyAlertKind,
+                        isFlowMode = state.isFlowMode,
+                        onUpdateField = onUpdateField,
+                        onSelectAudience = onSelectAnnounceAudience,
+                        onSelectSafetyKind = onSelectSafetyAlertKind,
+                    )
+                PulseComposePurpose.Deal ->
+                    DealSection(
+                        fields = state.fields,
+                        dealExpiresAt = state.dealExpiresAt,
+                        onUpdateField = onUpdateField,
+                        onSelectDealExpires = onSelectDealExpires,
+                    )
+                else ->
+                    AnnounceSection(
+                        fields = state.fields,
+                        audience = state.announceAudience,
+                        purpose = state.composePurpose,
+                        isFlowMode = state.isFlowMode,
+                        onUpdateField = onUpdateField,
+                        onSelectAudience = onSelectAnnounceAudience,
+                    )
             }
     }
 }
@@ -690,18 +764,16 @@ private fun EventSection(
             fields = fields,
             onUpdate = onUpdateField,
         )
-        FieldRow(
-            field = PulseComposeField.EventLocation,
-            label = "Location",
-            placeholder = "Where?",
+        DateTimeRow(
+            field = PulseComposeField.EventEndDate,
+            label = "End time (optional)",
             fields = fields,
             onUpdate = onUpdateField,
         )
         FieldRow(
-            field = PulseComposeField.EventCapacity,
-            label = "Capacity (optional)",
-            placeholder = "e.g. 20",
-            keyboardType = KeyboardType.Number,
+            field = PulseComposeField.EventLocation,
+            label = "Location",
+            placeholder = "Where?",
             fields = fields,
             onUpdate = onUpdateField,
         )
@@ -718,8 +790,10 @@ private fun EventSection(
 private fun LostSection(
     fields: Map<PulseComposeField, FormFieldState>,
     kind: PulseLostFoundKind,
+    contactPref: PulseLostFoundContactPref,
     onUpdateField: (PulseComposeField, String) -> Unit,
     onSelectKind: (PulseLostFoundKind) -> Unit,
+    onSelectContactPref: (PulseLostFoundContactPref) -> Unit,
 ) {
     FormFieldGroup("Lost & Found") {
         LostFoundToggle(active = kind, onSelect = onSelectKind)
@@ -744,6 +818,23 @@ private fun LostSection(
             fields = fields,
             onUpdate = onUpdateField,
         )
+        ChipRow(
+            label = "How should people contact you?",
+            options = PulseLostFoundContactPref.entries.map { it.key to it.label },
+            activeKey = contactPref.key,
+            identifierPrefix = "composePulseContactPref",
+            onSelect = { key -> onSelectContactPref(PulseLostFoundContactPref.entries.first { it.key == key }) },
+        )
+        if (contactPref == PulseLostFoundContactPref.Phone) {
+            FieldRow(
+                field = PulseComposeField.ContactPhone,
+                label = "Phone number",
+                placeholder = "(555) 555-0123",
+                keyboardType = KeyboardType.Phone,
+                fields = fields,
+                onUpdate = onUpdateField,
+            )
+        }
     }
 }
 
@@ -799,6 +890,7 @@ private fun HeadsUpSection(
     fields: Map<PulseComposeField, FormFieldState>,
     audience: PulseAnnounceAudience,
     safetyKind: PulseSafetyAlertKind,
+    isFlowMode: Boolean,
     onUpdateField: (PulseComposeField, String) -> Unit,
     onSelectAudience: (PulseAnnounceAudience) -> Unit,
     onSelectSafetyKind: (PulseSafetyAlertKind) -> Unit,
@@ -820,13 +912,15 @@ private fun HeadsUpSection(
             fields = fields,
             onUpdate = onUpdateField,
         )
-        ChipRow(
-            label = "Audience",
-            options = PulseAnnounceAudience.entries.map { it.key to it.label },
-            activeKey = audience.key,
-            identifierPrefix = "composePulseAnnounceAudience",
-            onSelect = { key -> onSelectAudience(PulseAnnounceAudience.entries.first { it.key == key }) },
-        )
+        if (!isFlowMode) {
+            ChipRow(
+                label = "Audience",
+                options = PulseAnnounceAudience.entries.map { it.key to it.label },
+                activeKey = audience.key,
+                identifierPrefix = "composePulseAnnounceAudience",
+                onSelect = { key -> onSelectAudience(PulseAnnounceAudience.entries.first { it.key == key }) },
+            )
+        }
         BodyEditor(
             label = "Details",
             placeholder = "Describe what happened…",
@@ -840,10 +934,12 @@ private fun HeadsUpSection(
 private fun AnnounceSection(
     fields: Map<PulseComposeField, FormFieldState>,
     audience: PulseAnnounceAudience,
+    purpose: PulseComposePurpose?,
+    isFlowMode: Boolean,
     onUpdateField: (PulseComposeField, String) -> Unit,
     onSelectAudience: (PulseAnnounceAudience) -> Unit,
 ) {
-    FormFieldGroup("Announcement") {
+    FormFieldGroup(announceSectionTitle(purpose)) {
         FieldRow(
             field = PulseComposeField.Title,
             label = "Headline",
@@ -851,18 +947,105 @@ private fun AnnounceSection(
             fields = fields,
             onUpdate = onUpdateField,
         )
-        ChipRow(
-            label = "Audience",
-            options = PulseAnnounceAudience.entries.map { it.key to it.label },
-            activeKey = audience.key,
-            identifierPrefix = "composePulseAnnounceAudience",
-            onSelect = { key -> onSelectAudience(PulseAnnounceAudience.entries.first { it.key == key }) },
-        )
+        if (!isFlowMode) {
+            ChipRow(
+                label = "Audience",
+                options = PulseAnnounceAudience.entries.map { it.key to it.label },
+                activeKey = audience.key,
+                identifierPrefix = "composePulseAnnounceAudience",
+                onSelect = { key -> onSelectAudience(PulseAnnounceAudience.entries.first { it.key == key }) },
+            )
+        }
         BodyEditor(
             label = "Details",
-            placeholder = "Share what your neighbors should know…",
+            placeholder = purpose?.placeholder ?: "Share what your neighbors should know…",
             fields = fields,
             onUpdate = onUpdateField,
+        )
+    }
+}
+
+private fun announceSectionTitle(purpose: PulseComposePurpose?): String =
+    when (purpose) {
+        PulseComposePurpose.LocalUpdate -> "Local Update"
+        PulseComposePurpose.NeighborhoodWin -> "Neighborhood Win"
+        PulseComposePurpose.VisitorGuide -> "Visitor Guide"
+        else -> "Announcement"
+    }
+
+@Composable
+private fun DealSection(
+    fields: Map<PulseComposeField, FormFieldState>,
+    dealExpiresAt: LocalDateTime,
+    onUpdateField: (PulseComposeField, String) -> Unit,
+    onSelectDealExpires: (LocalDateTime) -> Unit,
+) {
+    FormFieldGroup("Deal") {
+        FieldRow(
+            field = PulseComposeField.Title,
+            label = "Headline",
+            placeholder = "What's the deal?",
+            fields = fields,
+            onUpdate = onUpdateField,
+        )
+        FieldRow(
+            field = PulseComposeField.DealBusinessName,
+            label = "Business (optional)",
+            placeholder = "Who's offering it?",
+            fields = fields,
+            onUpdate = onUpdateField,
+        )
+        DealExpiryRow(value = dealExpiresAt, onSelect = onSelectDealExpires)
+        BodyEditor(
+            label = "Details",
+            placeholder = "Describe the deal and where to find it…",
+            fields = fields,
+            onUpdate = onUpdateField,
+        )
+    }
+}
+
+/** Required deal-expiry date+time picker — defaults to now + 7 days. */
+@Composable
+private fun DealExpiryRow(
+    value: LocalDateTime,
+    onSelect: (LocalDateTime) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+        Text(
+            text = "Deal ends",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(Radii.md))
+                    .clickable { showPicker = true }
+                    .padding(horizontal = Spacing.s3)
+                    .testTag("composePulseField_dealExpires"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = formatPickerDateTime(value),
+                style = PantopusTextStyle.body,
+                color = PantopusColors.appText,
+            )
+        }
+    }
+    if (showPicker) {
+        FutureDateTimePickerDialogs(
+            initial = value,
+            onPicked = { picked ->
+                showPicker = false
+                onSelect(picked)
+            },
+            onDismiss = { showPicker = false },
         )
     }
 }
@@ -1197,6 +1380,102 @@ private fun DateRow(
             )
         }
     }
+}
+
+/**
+ * Optional date+time row backed by [FutureDateTimePickerDialogs]. The
+ * field stores the picker-emitted `yyyy-MM-dd HH:mm` shape; a Clear
+ * affordance empties it back out.
+ */
+@Composable
+private fun DateTimeRow(
+    field: PulseComposeField,
+    label: String,
+    fields: Map<PulseComposeField, FormFieldState>,
+    onUpdate: (PulseComposeField, String) -> Unit,
+) {
+    val snapshot = fields[field] ?: FormFieldState(id = field.key)
+    var showPicker by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            if (snapshot.value.isNotEmpty()) {
+                Text(
+                    text = "Clear",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.primary600,
+                    modifier =
+                        Modifier
+                            .clickable { onUpdate(field, "") }
+                            .padding(start = Spacing.s2)
+                            .testTag("composePulseField_${field.key}_clear"),
+                )
+            }
+        }
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(
+                        width = 1.dp,
+                        color = if (snapshot.error != null) PantopusColors.error else PantopusColors.appBorder,
+                        shape = RoundedCornerShape(Radii.md),
+                    ).clickable { showPicker = true }
+                    .padding(horizontal = Spacing.s3)
+                    .alpha(if (snapshot.value.isEmpty()) 0.65f else 1f)
+                    .testTag("composePulseField_${field.key}"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (snapshot.value.isEmpty()) "Tap to pick" else snapshot.value,
+                style = PantopusTextStyle.body,
+                color =
+                    if (snapshot.value.isEmpty()) PantopusColors.appTextMuted else PantopusColors.appText,
+            )
+        }
+        if (snapshot.error != null) {
+            Text(
+                text = snapshot.error.orEmpty(),
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.error,
+            )
+        }
+    }
+    if (showPicker) {
+        FutureDateTimePickerDialogs(
+            initial = parsePickerDateTime(snapshot.value),
+            onPicked = { picked ->
+                showPicker = false
+                onUpdate(field, formatPickerDateTime(picked))
+            },
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+/** Encode a [LocalDateTime] as the picker-emitted `yyyy-MM-dd HH:mm` shape. */
+private fun formatPickerDateTime(value: LocalDateTime): String =
+    "%04d-%02d-%02d %02d:%02d".format(
+        value.year,
+        value.monthValue,
+        value.dayOfMonth,
+        value.hour,
+        value.minute,
+    )
+
+/** Reverse of [formatPickerDateTime]; null for empty/unparsable values. */
+private fun parsePickerDateTime(raw: String): LocalDateTime? {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return null
+    return runCatching { LocalDateTime.parse(trimmed.replaceFirst(" ", "T")) }.getOrNull()
 }
 
 @Composable

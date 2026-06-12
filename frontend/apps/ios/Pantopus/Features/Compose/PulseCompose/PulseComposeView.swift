@@ -105,6 +105,9 @@ public struct PulseComposeView: View {
             if viewModel.isEditing, case .loading = viewModel.prefillState {
                 await viewModel.loadForEdit()
             }
+            if !viewModel.isEditing {
+                await viewModel.checkPlaceEligibility()
+            }
         }
         .onAppear {
             Analytics.track(.screenPulseComposeViewed(intent: viewModel.activeIntent.rawValue))
@@ -156,10 +159,12 @@ public struct PulseComposeView: View {
             onSelectIdentity: { viewModel.identity = $0 },
             onSelectVisibility: { viewModel.visibility = $0 },
             onSelectLostFoundKind: { viewModel.lostFoundKind = $0 },
+            onSelectContactPref: { viewModel.lostFoundContactPref = $0 },
             onSelectAnnounceAudience: { viewModel.announceAudience = $0 },
             onSelectSafetyAlertKind: { viewModel.safetyAlertKind = $0 },
             onSelectAskCategory: { viewModel.askCategory = $0 },
             onSelectRecommendRating: { viewModel.recommendRating = $0 },
+            onSelectDealExpires: { viewModel.dealExpiresAt = $0 },
             onUpdateField: { viewModel.update($0, to: $1) },
             onPickPhotos: { showsPhotosPicker = true },
             onRemovePhoto: { viewModel.remove(photo: $0) }
@@ -193,10 +198,13 @@ public extension PulseComposeViewModel {
             identity: identity,
             visibility: visibility,
             lostFoundKind: lostFoundKind,
+            lostFoundContactPref: lostFoundContactPref,
             announceAudience: announceAudience,
             safetyAlertKind: safetyAlertKind,
             askCategory: askCategory,
             recommendRating: recommendRating,
+            dealExpiresAt: dealExpiresAt,
+            eligibilityWarning: eligibilityWarning,
             fields: fields,
             photos: photos,
             isIntentLocked: isIntentLocked,

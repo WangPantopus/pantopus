@@ -29,7 +29,7 @@ public enum PulsePostDetailSampleData {
             authorVerified: true,
             timeAndLocality: "22m · Elm Park · 5th & Elm",
             intent: intent,
-            mediaURLs: [],
+            media: [],
             reactions: reactions,
             comments: comments,
             hiddenReplyCount: 0

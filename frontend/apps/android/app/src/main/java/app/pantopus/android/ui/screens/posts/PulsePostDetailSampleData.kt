@@ -106,7 +106,7 @@ object PulsePostDetailSampleData {
             authorVerified = true,
             timeAndLocality = "22m · Elm Park · 5th & Elm",
             intent = intent,
-            mediaUrls = emptyList(),
+            media = emptyList(),
             reactions = reactions,
             comments = comments,
             hiddenReplyCount = 0,

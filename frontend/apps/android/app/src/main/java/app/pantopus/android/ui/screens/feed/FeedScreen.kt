@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "LongParameterList")
 
 package app.pantopus.android.ui.screens.feed
 
@@ -24,14 +24,22 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -75,6 +83,10 @@ fun FeedScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIntent by viewModel.activeIntent.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val searchText by viewModel.searchText.collectAsStateWithLifecycle()
+    var showsSearch by remember { mutableStateOf(false) }
+    var showsIntentPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.configureSurface(surface)
@@ -84,7 +96,49 @@ fun FeedScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg).testTag("pulseFeed")) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopBar(title = surface.title, onBack = onBack)
+            TopBar(
+                title = surface.title,
+                onBack = onBack,
+                onSearchTap = {
+                    showsSearch = !showsSearch
+                    if (!showsSearch) viewModel.setSearchText("")
+                },
+                onFilterTap = { showsIntentPicker = true },
+            )
+            if (showsSearch) {
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { viewModel.setSearchText(it) },
+                    placeholder = { Text("Search posts", fontSize = 14.sp) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(Radii.pill),
+                    trailingIcon = {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(32.dp)
+                                    .clickable {
+                                        showsSearch = false
+                                        viewModel.setSearchText("")
+                                    }
+                                    .semantics { contentDescription = "Clear search" },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            PantopusIconImage(
+                                icon = PantopusIcon.X,
+                                contentDescription = null,
+                                size = 14.dp,
+                                tint = PantopusColors.appTextSecondary,
+                            )
+                        }
+                    },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
+                            .testTag("pulseSearchField"),
+                )
+            }
             FeedChipRow(
                 chips = PulseIntent.entries.map { FeedChipItem(id = it.key, label = it.label) },
                 activeId = activeIntent.key,
@@ -101,10 +155,41 @@ fun FeedScreen(
                         onTapReaction = viewModel::tapReaction,
                         isRefreshing = isRefreshing,
                         onRefresh = viewModel::refresh,
+                        isLoadingMore = isLoadingMore,
+                        onRowAppeared = viewModel::loadMoreIfNeeded,
+                        searchActive = searchText.isNotBlank(),
                     )
                 is PulseFeedUiState.Error ->
                     ErrorFrame(message = s.message, onRetry = { viewModel.refresh() })
             }
+        }
+        if (showsIntentPicker) {
+            AlertDialog(
+                onDismissRequest = { showsIntentPicker = false },
+                title = { Text("Filter by intent") },
+                text = {
+                    Column {
+                        PulseIntent.entries.forEach { intent ->
+                            TextButton(
+                                onClick = {
+                                    showsIntentPicker = false
+                                    viewModel.selectIntent(intent)
+                                },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .testTag("pulseIntentFilter_${intent.key}"),
+                            ) {
+                                Text(intent.label, color = PantopusColors.appText)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showsIntentPicker = false }) { Text("Cancel") }
+                },
+            )
         }
         FeedComposeFAB(
             onClick = { onCompose(activeIntent) },
@@ -120,6 +205,8 @@ fun FeedScreen(
 private fun TopBar(
     title: String,
     onBack: (() -> Unit)?,
+    onSearchTap: (() -> Unit)? = null,
+    onFilterTap: (() -> Unit)? = null,
 ) {
     Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appBg)) {
         Row(
@@ -154,6 +241,43 @@ private fun TopBar(
                 color = PantopusColors.appText,
                 modifier = Modifier.semantics { heading() },
             )
+            Spacer(modifier = Modifier.weight(1f))
+            if (onSearchTap != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clickable(onClick = onSearchTap)
+                            .testTag("pulseSearchButton")
+                            .semantics { contentDescription = "Search posts" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Search,
+                        contentDescription = null,
+                        size = 20.dp,
+                        tint = PantopusColors.appText,
+                    )
+                }
+            }
+            if (onFilterTap != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clickable(onClick = onFilterTap)
+                            .testTag("pulseFilterButton")
+                            .semantics { contentDescription = "Filter by intent" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.SlidersHorizontal,
+                        contentDescription = null,
+                        size = 20.dp,
+                        tint = PantopusColors.appText,
+                    )
+                }
+            }
         }
         Box(
             modifier =
@@ -305,21 +429,51 @@ private fun PopulatedFrame(
     onTapReaction: (String) -> Unit,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
+    isLoadingMore: Boolean = false,
+    onRowAppeared: (String) -> Unit = {},
+    searchActive: Boolean = false,
 ) {
     val pullState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
     Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
+        if (state.rows.isEmpty() && searchActive) {
+            Text(
+                text = "No posts match your search",
+                fontSize = 14.sp,
+                color = PantopusColors.appTextSecondary,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = Spacing.s10)
+                        .testTag("pulseSearchEmpty"),
+            )
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize().testTag("pulseFeedList"),
             contentPadding = PaddingValues(Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             items(items = state.rows, key = { it.id }) { row ->
+                LaunchedEffect(row.id) { onRowAppeared(row.id) }
                 PulsePostCard(
                     content = row,
                     onTap = { onTapPost(row.id) },
                     onPrimaryReaction = { onTapReaction(row.id) },
                     onRSVP = if (row.attendees == null) null else ({ onTapReaction(row.id) }),
                 )
+            }
+            if (isLoadingMore) {
+                item {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(Spacing.s3)
+                                .testTag("pulseFeedLoadingMore"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                    }
+                }
             }
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }

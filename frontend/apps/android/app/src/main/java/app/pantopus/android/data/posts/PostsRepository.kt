@@ -1,7 +1,10 @@
 package app.pantopus.android.data.posts
 
 import app.pantopus.android.data.api.models.feed.FeedResponse
+import app.pantopus.android.data.api.models.posts.CommentLikeResponse
 import app.pantopus.android.data.api.models.posts.MyPostsResponse
+import app.pantopus.android.data.api.models.posts.PlaceEligibilityResponse
+import app.pantopus.android.data.api.models.posts.PostActionAckResponse
 import app.pantopus.android.data.api.models.posts.PostArchiveResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
@@ -10,6 +13,10 @@ import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
+import app.pantopus.android.data.api.models.posts.PostReportRequest
+import app.pantopus.android.data.api.models.posts.PostSaveResponse
+import app.pantopus.android.data.api.models.posts.PostShareRequest
+import app.pantopus.android.data.api.models.posts.PostShareResponse
 import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.models.posts.PostUpdateResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -32,6 +39,8 @@ class PostsRepository
             longitude: Double? = null,
             postType: String? = null,
             limit: Int = 20,
+            cursorCreatedAt: String? = null,
+            cursorId: String? = null,
         ): NetworkResult<FeedResponse> =
             safeApiCall {
                 api.feed(
@@ -40,6 +49,8 @@ class PostsRepository
                     longitude = longitude,
                     postType = postType,
                     limit = limit,
+                    cursorCreatedAt = cursorCreatedAt,
+                    cursorId = cursorId,
                 )
             }
 
@@ -90,4 +101,50 @@ class PostsRepository
 
         /** `POST /api/posts/:id/unarchive`. */
         suspend fun unarchivePost(id: String): NetworkResult<PostArchiveResponse> = safeApiCall { api.unarchivePost(id) }
+
+        /** `POST /api/posts/:postId/comments/:commentId/like`. */
+        suspend fun toggleCommentLike(
+            postId: String,
+            commentId: String,
+        ): NetworkResult<CommentLikeResponse> = safeApiCall { api.toggleCommentLike(postId, commentId) }
+
+        /** `DELETE /api/posts/:postId/comments/:commentId`. */
+        suspend fun deleteComment(
+            postId: String,
+            commentId: String,
+        ): NetworkResult<PostActionAckResponse> = safeApiCall { api.deleteComment(postId, commentId) }
+
+        /** `POST /api/posts/:id/share`. */
+        suspend fun share(
+            id: String,
+            shareType: String = "external",
+        ): NetworkResult<PostShareResponse> = safeApiCall { api.share(id, PostShareRequest(shareType = shareType)) }
+
+        /** `POST /api/posts/:id/report`. */
+        suspend fun report(
+            id: String,
+            reason: String,
+            details: String? = null,
+        ): NetworkResult<PostActionAckResponse> = safeApiCall { api.report(id, PostReportRequest(reason = reason, details = details)) }
+
+        /** `POST /api/posts/:id/save`. */
+        suspend fun toggleSave(id: String): NetworkResult<PostSaveResponse> = safeApiCall { api.toggleSave(id) }
+
+        /** `GET /api/posts/place-eligibility`. */
+        suspend fun placeEligibility(
+            latitude: Double,
+            longitude: Double,
+            gpsTimestamp: String? = null,
+            gpsLatitude: Double? = null,
+            gpsLongitude: Double? = null,
+        ): NetworkResult<PlaceEligibilityResponse> =
+            safeApiCall {
+                api.placeEligibility(
+                    latitude = latitude,
+                    longitude = longitude,
+                    gpsTimestamp = gpsTimestamp,
+                    gpsLatitude = gpsLatitude,
+                    gpsLongitude = gpsLongitude,
+                )
+            }
     }

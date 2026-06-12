@@ -12,6 +12,10 @@ import SwiftUI
 @MainActor
 public struct PulsePostDetailView: View {
     @State private var viewModel: PulsePostDetailViewModel
+    @State private var showsShareSheet = false
+    @State private var showsReportDialog = false
+    @State private var showsDeleteConfirm = false
+    @State private var commentPendingDelete: String?
     private let onBack: @MainActor () -> Void
     private let onOpenProfile: @MainActor (String) -> Void
     private let onEdit: @MainActor (String) -> Void
@@ -49,16 +53,72 @@ public struct PulsePostDetailView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("pulsePostDetail")
         .task { await viewModel.load() }
+        .onChange(of: viewModel.didDeletePost) { _, deleted in
+            if deleted { onBack() }
+        }
         .confirmationDialog(
             "Post options",
             isPresented: $bindable.showsOverflowMenu,
             titleVisibility: .hidden
         ) {
-            if case let .loaded(detail) = viewModel.state {
-                Button("Edit post") { onEdit(detail.post.id) }
-                    .accessibilityIdentifier("pulsePostDetail-edit")
+            Button(viewModel.isSaved ? "Remove bookmark" : "Save post") {
+                Task { await viewModel.toggleSave() }
+            }
+            Button(viewModel.isReposted ? "Undo repost" : "Repost") {
+                Task { await viewModel.toggleRepost() }
+            }
+            if viewModel.isOwner {
+                Button("Edit post") {
+                    if case let .loaded(detail) = viewModel.state { onEdit(detail.post.id) }
+                }
+                Button("Delete post", role: .destructive) { showsDeleteConfirm = true }
+            } else {
+                Button("Report post", role: .destructive) { showsReportDialog = true }
             }
             Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "Why are you reporting this post?",
+            isPresented: $showsReportDialog,
+            titleVisibility: .visible
+        ) {
+            ForEach(Self.reportReasons, id: \.token) { reason in
+                Button(reason.label) {
+                    Task { await viewModel.reportPost(reason: reason.token) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Delete this post?", isPresented: $showsDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                Task { await viewModel.deletePost() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
+        }
+        .alert(
+            "Delete this reply?",
+            isPresented: Binding(
+                get: { commentPendingDelete != nil },
+                set: { if !$0 { commentPendingDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let id = commentPendingDelete {
+                    commentPendingDelete = nil
+                    Task { await viewModel.deleteComment(commentId: id) }
+                }
+            }
+            Button("Cancel", role: .cancel) { commentPendingDelete = nil }
+        }
+        .sheet(
+            isPresented: $showsShareSheet,
+            onDismiss: { Task { await viewModel.recordShare() } }
+        ) {
+            if let url = viewModel.shareURL {
+                SystemShareSheet(items: [url])
+            }
         }
     }
 
@@ -83,12 +143,21 @@ public struct PulsePostDetailView: View {
                 set: { viewModel.composerText = $0 }
             ),
             isSendingComment: viewModel.isSendingComment,
-            topBarAction: viewModel.isOwner ? overflowAction : nil,
+            replyingToName: viewModel.replyTarget?.authorName,
+            selectedReactionEmoji: viewModel.selectedReactionEmoji,
+            topBarAction: overflowAction,
+            topBarSecondaryAction: shareAction,
             onBack: onBack,
             onOpenProfile: onOpenProfile,
             onReactionTap: { kind in Task { await viewModel.tapReaction(kind) } },
+            onEmojiSelected: { emoji in Task { await viewModel.pickReactionEmoji(emoji) } },
             onSendTap: { Task { await viewModel.sendComment() } },
-            onShowMoreReplies: { viewModel.showMoreReplies() }
+            onShowMoreReplies: { viewModel.showMoreReplies() },
+            onCancelReply: { viewModel.cancelReply() },
+            onCommentReply: { comment in viewModel.beginReply(to: comment) },
+            onCommentLike: { id in Task { await viewModel.toggleCommentLike(commentId: id) } },
+            onCommentDelete: { id in commentPendingDelete = id },
+            onRefresh: { [viewModel] in await viewModel.refresh() }
         )
     }
 
@@ -98,6 +167,23 @@ public struct PulsePostDetailView: View {
             accessibilityLabel: "Post options"
         ) { Task { @MainActor in viewModel.showsOverflowMenu = true } }
     }
+
+    private var shareAction: ContentDetailTopBarAction {
+        ContentDetailTopBarAction(
+            icon: .share,
+            accessibilityLabel: "Share post"
+        ) { Task { @MainActor in showsShareSheet = true } }
+    }
+
+    /// `reportPostSchema` reasons (`backend/routes/posts.js:339`).
+    private static let reportReasons: [(token: String, label: String)] = [
+        ("spam", "Spam"),
+        ("harassment", "Harassment"),
+        ("inappropriate", "Inappropriate content"),
+        ("misinformation", "Misinformation"),
+        ("safety", "Safety concern"),
+        ("other", "Something else")
+    ]
 }
 
 @MainActor
@@ -105,33 +191,60 @@ public struct PulsePostDetailLoadedContent: View {
     private let detail: PulsePostDetailContent
     @Binding private var composerText: String
     private let isSendingComment: Bool
+    private let replyingToName: String?
+    private let selectedReactionEmoji: String?
     private let topBarAction: ContentDetailTopBarAction?
+    private let topBarSecondaryAction: ContentDetailTopBarAction?
     private let onBack: @MainActor () -> Void
     private let onOpenProfile: @MainActor (String) -> Void
     private let onReactionTap: @MainActor (PostReactionKind) -> Void
+    private let onEmojiSelected: (@MainActor (String) -> Void)?
     private let onSendTap: @MainActor () -> Void
     private let onShowMoreReplies: @MainActor () -> Void
+    private let onCancelReply: (@MainActor () -> Void)?
+    private let onCommentReply: (@MainActor (PostCommentRow) -> Void)?
+    private let onCommentLike: (@MainActor (String) -> Void)?
+    private let onCommentDelete: (@MainActor (String) -> Void)?
+    private let onRefresh: (@Sendable () async -> Void)?
 
     public init(
         detail: PulsePostDetailContent,
         composerText: Binding<String>,
         isSendingComment: Bool,
+        replyingToName: String? = nil,
+        selectedReactionEmoji: String? = nil,
         topBarAction: ContentDetailTopBarAction? = nil,
+        topBarSecondaryAction: ContentDetailTopBarAction? = nil,
         onBack: @escaping @MainActor () -> Void = {},
         onOpenProfile: @escaping @MainActor (String) -> Void = { _ in },
         onReactionTap: @escaping @MainActor (PostReactionKind) -> Void = { _ in },
+        onEmojiSelected: (@MainActor (String) -> Void)? = nil,
         onSendTap: @escaping @MainActor () -> Void = {},
-        onShowMoreReplies: @escaping @MainActor () -> Void = {}
+        onShowMoreReplies: @escaping @MainActor () -> Void = {},
+        onCancelReply: (@MainActor () -> Void)? = nil,
+        onCommentReply: (@MainActor (PostCommentRow) -> Void)? = nil,
+        onCommentLike: (@MainActor (String) -> Void)? = nil,
+        onCommentDelete: (@MainActor (String) -> Void)? = nil,
+        onRefresh: (@Sendable () async -> Void)? = nil
     ) {
         self.detail = detail
         _composerText = composerText
         self.isSendingComment = isSendingComment
+        self.replyingToName = replyingToName
+        self.selectedReactionEmoji = selectedReactionEmoji
         self.topBarAction = topBarAction
+        self.topBarSecondaryAction = topBarSecondaryAction
         self.onBack = onBack
         self.onOpenProfile = onOpenProfile
         self.onReactionTap = onReactionTap
+        self.onEmojiSelected = onEmojiSelected
         self.onSendTap = onSendTap
         self.onShowMoreReplies = onShowMoreReplies
+        self.onCancelReply = onCancelReply
+        self.onCommentReply = onCommentReply
+        self.onCommentLike = onCommentLike
+        self.onCommentDelete = onCommentDelete
+        self.onRefresh = onRefresh
     }
 
     public var body: some View {
@@ -139,6 +252,8 @@ public struct PulsePostDetailLoadedContent: View {
             title: "Post",
             onBack: onBack,
             topBarAction: topBarAction,
+            topBarSecondaryAction: topBarSecondaryAction,
+            onRefresh: onRefresh,
             header: {
                 PostAuthorHeader(
                     displayName: detail.authorDisplayName,
@@ -152,10 +267,13 @@ public struct PulsePostDetailLoadedContent: View {
             body: {
                 BodyReactionsBody(
                     body: detail.post.content,
-                    mediaURLs: detail.mediaURLs,
+                    media: detail.media,
                     intent: detail.intent,
                     reactions: detail.reactions,
                     onReactionTap: onReactionTap,
+                    mediaLocationBadge: detail.post.locationName,
+                    selectedReactionEmoji: selectedReactionEmoji,
+                    onEmojiSelected: onEmojiSelected,
                     composerAvatarURL: nil,
                     composerAvatarName: "You",
                     composerText: $composerText,
@@ -163,7 +281,12 @@ public struct PulsePostDetailLoadedContent: View {
                     onSendTap: onSendTap,
                     comments: detail.comments,
                     hiddenReplyCount: detail.hiddenReplyCount,
-                    onShowMoreReplies: onShowMoreReplies
+                    onShowMoreReplies: onShowMoreReplies,
+                    replyingToName: replyingToName,
+                    onCancelReply: onCancelReply,
+                    onCommentReply: onCommentReply,
+                    onCommentLike: onCommentLike,
+                    onCommentDelete: onCommentDelete
                 ) { userId in
                     onOpenProfile(userId)
                 }

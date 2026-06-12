@@ -300,4 +300,11 @@ object PantopusColors {
      * iOS as `Theme.Color.star`.
      */
     val star = Color(0xFFF59E0B)
+
+    /**
+     * Live Photo badge yellow — `#FFD60A` (iOS systemYellow). Marks the
+     * 7dp dot on Live Photo tiles and the LIVE replay pill in the media
+     * viewer. Mirrored on iOS as `Theme.Color.liveBadge`.
+     */
+    val liveBadge = Color(0xFFFFD60A)
 }

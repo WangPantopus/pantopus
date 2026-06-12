@@ -235,6 +235,12 @@ final class APIClient: @unchecked Sendable {
             components.queryItems = endpoint.query
                 .sorted { $0.key < $1.key }
                 .map { URLQueryItem(name: $0.key, value: $0.value) }
+            // URLComponents leaves "+" bare in query values (legal per RFC
+            // 3986), but Express decodes bare "+" as a space — which
+            // corrupts ISO-8601 cursor timestamps like "…+00:00". Encode
+            // it explicitly so the backend sees the literal plus.
+            components.percentEncodedQuery = components.percentEncodedQuery?
+                .replacingOccurrences(of: "+", with: "%2B")
         }
         guard let url = components.url else { throw APIError.invalidURL }
 

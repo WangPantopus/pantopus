@@ -98,10 +98,13 @@ public enum PulseComposeField: String, CaseIterable, Sendable {
     case body
     case recommendBusiness
     case eventDate
+    case eventEndDate
     case eventLocation
     case eventCapacity
     case lostLastSeenLocation
     case lostLastSeenDate
+    case contactPhone
+    case dealBusinessName
 }
 
 /// Identity the post will be authored under.
@@ -146,6 +149,22 @@ public enum PulseComposeVisibility: String, CaseIterable, Sendable, Hashable {
 public enum PulseLostFoundKind: String, CaseIterable, Sendable, Hashable {
     case lost
     case found
+}
+
+/// Lost & Found contact-preference chip. Mirrors mobile `CONTACT_PREF`;
+/// backend stores `phone` combined with the number as `phone|<number>`.
+public enum PulseLostFoundContactPref: String, CaseIterable, Sendable, Hashable {
+    case dm
+    case comment
+    case phone
+
+    public var label: String {
+        switch self {
+        case .dm: "Direct message"
+        case .comment: "Comments"
+        case .phone: "Phone"
+        }
+    }
 }
 
 /// Announce-audience chip option.
@@ -244,6 +263,15 @@ public final class PulseComposeViewModel {
     /// Lost & Found type — drives the segmented control.
     public var lostFoundKind: PulseLostFoundKind = .lost
 
+    /// Lost & Found contact preference. `.phone` requires `contactPhone`.
+    public var lostFoundContactPref: PulseLostFoundContactPref = .dm
+
+    /// Deal expiry — required by the backend for `postType == deal`.
+    public var dealExpiresAt: Date = Date().addingTimeInterval(7 * 86_400)
+
+    /// Place-eligibility warning surfaced as a banner on the draft step.
+    public private(set) var eligibilityWarning: String?
+
     /// Announce audience chip selection.
     public var announceAudience: PulseAnnounceAudience = .neighbors
 
@@ -284,12 +312,18 @@ public final class PulseComposeViewModel {
     private var baselineIdentity: PulseComposeIdentity = .personal
     private var baselineVisibility: PulseComposeVisibility = .neighbors
     private var baselineLostFoundKind: PulseLostFoundKind = .lost
+    private var baselineLostFoundContactPref: PulseLostFoundContactPref = .dm
     private var baselineAnnounceAudience: PulseAnnounceAudience = .neighbors
     private var baselineAskCategory: PulseAskCategory = .handyman
     private var baselineRecommendRating: Int = 5
 
     private let api: APIClient
     private let multipartUploader: MultipartUploader
+    private let locationProvider: any LocationProviding
+
+    /// Fresh device fix captured at submit time so the backend's 5-minute
+    /// GPS-freshness gate passes even when drafting takes a while.
+    private var freshGPSFix: UserCoordinate?
 
     /// Step 1 target — set when entering via the three-step flow.
     public let postingTarget: PulsePostingTarget?
@@ -304,8 +338,10 @@ public final class PulseComposeViewModel {
         composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
         api: APIClient = .shared,
-        multipartUploader: MultipartUploader = .shared
+        multipartUploader: MultipartUploader = .shared,
+        locationProvider: any LocationProviding = DeviceLocationProvider.shared
     ) {
+        self.locationProvider = locationProvider
         activeIntent = composePurpose?.legacyIntent ?? intent
         self.postingTarget = postingTarget
         self.composePurpose = composePurpose
@@ -402,7 +438,9 @@ public final class PulseComposeViewModel {
         switch activeIntent {
         case .ask: if askCategory != baselineAskCategory { return true }
         case .recommend: if recommendRating != baselineRecommendRating { return true }
-        case .lost: if lostFoundKind != baselineLostFoundKind { return true }
+        case .lost:
+            if lostFoundKind != baselineLostFoundKind { return true }
+            if lostFoundContactPref != baselineLostFoundContactPref { return true }
         case .announce: if announceAudience != baselineAnnounceAudience { return true }
         case .event: break
         }
@@ -482,6 +520,31 @@ public final class PulseComposeViewModel {
             .all([.required("Last seen"), .maxLength(FieldLimits.location)])
         case .lostLastSeenDate:
             .isoDateOrEmpty()
+        case .eventEndDate:
+            FormValidator { value in
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return nil }
+                let formatter = DateFormatter()
+                formatter.calendar = Calendar(identifier: .iso8601)
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                for shape in ["yyyy-MM-dd HH:mm", "yyyy-MM-dd"] {
+                    formatter.dateFormat = shape
+                    if formatter.date(from: trimmed) != nil { return nil }
+                }
+                if trimmed.contains("T"), ISO8601DateFormatter().date(from: trimmed) != nil { return nil }
+                return "Pick a valid end time."
+            }
+        case .contactPhone:
+            FormValidator { value in
+                let trimmed = value.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return nil }
+                let digits = trimmed.filter(\.isNumber)
+                if digits.count < 7 || digits.count > 15 { return "Enter a valid phone number." }
+                return nil
+            }
+        case .dealBusinessName:
+            .maxLength(FieldLimits.businessName)
         }
     }
 
@@ -497,11 +560,11 @@ public final class PulseComposeViewModel {
         case .recommend:
             [.recommendBusiness, .body]
         case .event:
-            [.title, .eventDate, .eventLocation, .eventCapacity, .body]
+            [.title, .eventDate, .eventEndDate, .eventLocation, .eventCapacity, .body]
         case .lost:
-            [.body, .lostLastSeenLocation, .lostLastSeenDate]
+            [.body, .lostLastSeenLocation, .lostLastSeenDate, .contactPhone]
         case .announce:
-            [.title, .body]
+            composePurpose == .deal ? [.title, .body, .dealBusinessName] : [.title, .body]
         }
     }
 
@@ -512,7 +575,15 @@ public final class PulseComposeViewModel {
         var firstInvalid: PulseComposeField?
         for field in fieldsActiveForCurrentIntent() {
             guard var snapshot = fields[field] else { continue }
-            let message = validator(for: field).validate(snapshot.value)
+            var message = validator(for: field).validate(snapshot.value)
+            // Phone is conditionally required — only when the Lost & Found
+            // contact preference is "phone". The base validator can't see
+            // the selector (it's @Sendable), so the rule lives here.
+            if field == .contactPhone, message == nil,
+               activeIntent == .lost, lostFoundContactPref == .phone,
+               snapshot.value.trimmingCharacters(in: .whitespaces).isEmpty {
+                message = "Add a phone number for contact."
+            }
             snapshot.touched = true
             snapshot.error = message
             fields[field] = snapshot
@@ -545,6 +616,9 @@ public final class PulseComposeViewModel {
             return false
         }
         state = .submitting
+        if editingPostId == nil {
+            await refreshGPSFixIfNeeded()
+        }
         do {
             let postId: String?
             if let editingPostId {
@@ -771,6 +845,7 @@ public final class PulseComposeViewModel {
         case .event:
             let venue = trimmedValue(.eventLocation)
             let dateRaw = trimmedValue(.eventDate)
+            let endRaw = trimmedValue(.eventEndDate)
             base = PostCreateRequest(
                 content: bodyValue,
                 title: titleValue.isEmpty ? nil : titleValue,
@@ -778,25 +853,31 @@ public final class PulseComposeViewModel {
                 visibility: vis,
                 postAs: postAs,
                 eventDate: dateRaw.isEmpty ? nil : isoDateTime(from: dateRaw),
+                eventEndDate: endRaw.isEmpty ? nil : isoDateTime(from: endRaw),
                 eventVenue: venue.isEmpty ? nil : venue,
                 audience: audience,
                 purpose: purposeTag
             )
         case .lost:
             let lastSeen = trimmedValue(.lostLastSeenLocation)
+            let phone = trimmedValue(.contactPhone)
             base = PostCreateRequest(
                 content: prefixLastSeen(body: bodyValue, location: lastSeen),
                 postType: postType,
                 visibility: vis,
                 postAs: postAs,
                 lostFoundType: lostFoundKind.rawValue,
+                contactPref: lostFoundContactPref.rawValue,
+                contactPhone: lostFoundContactPref == .phone && !phone.isEmpty ? phone : nil,
                 audience: audience,
                 purpose: purposeTag
             )
         case .announce:
-            let announceVis = postingTarget?.isNetworkTarget == true
-                ? vis
-                : announceAudience.backendVisibility
+            // Flow mode: the "Who can see this" radio governs visibility.
+            // Legacy single-screen mode keeps the announce-audience chips.
+            let announceVis = isFlowMode ? vis : announceAudience.backendVisibility
+            let dealBusiness = trimmedValue(.dealBusinessName)
+            let isDeal = postType == "deal"
             base = PostCreateRequest(
                 content: bodyValue,
                 title: titleValue.isEmpty ? nil : titleValue,
@@ -804,11 +885,19 @@ public final class PulseComposeViewModel {
                 visibility: announceVis,
                 postAs: postAs,
                 safetyAlertKind: postType == "alert" ? safetyAlertKind.rawValue : nil,
+                dealExpiresAt: isDeal ? isoTimestamp(from: dealExpiresAt) : nil,
+                businessName: isDeal && !dealBusiness.isEmpty ? dealBusiness : nil,
                 audience: audience,
                 purpose: purposeTag
             )
         }
         return mergeTargetContext(into: base)
+    }
+
+    private func isoTimestamp(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: date)
     }
 
     private var effectivePostType: String {
@@ -829,7 +918,11 @@ public final class PulseComposeViewModel {
     }
 
     private var effectiveAudience: String {
-        postingTarget?.isNetworkTarget == true ? "connections" : "nearby"
+        if postingTarget?.isNetworkTarget == true { return "connections" }
+        // Place target with the "Connections" radio selected — the post
+        // should reach the network, not the neighborhood.
+        if isFlowMode, visibility == .connections { return "connections" }
+        return "nearby"
     }
 
     private func mergeTargetContext(into base: PostCreateRequest) -> PostCreateRequest {
@@ -882,7 +975,47 @@ public final class PulseComposeViewModel {
         }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        return GPSFields(timestamp: formatter.string(from: Date()), latitude: lat, longitude: lon)
+        // Prefer the device fix captured at submit time; fall back to the
+        // coordinates resolved when the target was picked.
+        let fix = freshGPSFix
+        return GPSFields(
+            timestamp: formatter.string(from: Date()),
+            latitude: fix?.latitude ?? lat,
+            longitude: fix?.longitude ?? lon
+        )
+    }
+
+    /// Re-request a device fix right before submit so the GPS payload is
+    /// fresh. Best-effort with a short timeout — pick-time coordinates
+    /// remain the fallback.
+    private func refreshGPSFixIfNeeded() async {
+        guard case .currentLocation = postingTarget else { return }
+        freshGPSFix = await locationProvider.requestCurrent(timeoutSeconds: 3)
+    }
+
+    // MARK: - Place eligibility
+
+    /// Check whether the signed-in user can post to the selected place.
+    /// Surfaces a warning banner instead of letting the submit 403.
+    public func checkPlaceEligibility() async {
+        guard let target = postingTarget, target.isPlaceTarget,
+              let lat = target.latitude, let lon = target.longitude else { return }
+        let gps = gpsFields(for: target)
+        do {
+            let response: PlaceEligibilityResponse = try await api.request(
+                PostsEndpoints.placeEligibility(
+                    latitude: lat,
+                    longitude: lon,
+                    gpsTimestamp: gps.timestamp,
+                    gpsLatitude: gps.latitude,
+                    gpsLongitude: gps.longitude
+                )
+            )
+            eligibilityWarning = response.eligible ? nil : response.reason
+        } catch {
+            // Non-blocking — the submit path still reports real errors.
+            eligibilityWarning = nil
+        }
     }
 
     /// Build the `PATCH /api/posts/:id` body from the active intent's

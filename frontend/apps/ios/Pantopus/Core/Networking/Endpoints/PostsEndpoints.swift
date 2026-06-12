@@ -55,6 +55,26 @@ public enum PostsEndpoints {
         Endpoint(method: .get, path: "/api/posts/\(id)")
     }
 
+    /// `GET /api/posts/place-eligibility` — can the signed-in user post
+    /// to the Place feed at these coordinates? Route
+    /// `backend/routes/posts.js:1941`.
+    public static func placeEligibility(
+        latitude: Double,
+        longitude: Double,
+        gpsTimestamp: String? = nil,
+        gpsLatitude: Double? = nil,
+        gpsLongitude: Double? = nil
+    ) -> Endpoint {
+        var query: [String: String] = [
+            "latitude": String(latitude),
+            "longitude": String(longitude)
+        ]
+        if let gpsTimestamp { query["gpsTimestamp"] = gpsTimestamp }
+        if let gpsLatitude { query["gpsLatitude"] = String(gpsLatitude) }
+        if let gpsLongitude { query["gpsLongitude"] = String(gpsLongitude) }
+        return Endpoint(method: .get, path: "/api/posts/place-eligibility", query: query)
+    }
+
     /// `POST /api/posts/:id/like` — toggles the like; returns the new
     /// `{liked, likeCount}` state. Route `backend/routes/posts.js:2595`.
     public static func toggleLike(id: String) -> Endpoint {
@@ -97,6 +117,40 @@ public enum PostsEndpoints {
     /// `backend/routes/posts.js:2483`.
     public static func deletePost(id: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/posts/\(id)")
+    }
+
+    /// `POST /api/posts/:postId/comments/:commentId/like` — toggles a
+    /// heart on a comment; returns `{liked, likeCount}`. Route
+    /// `backend/routes/posts.js:2983`.
+    public static func toggleCommentLike(postId: String, commentId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/posts/\(postId)/comments/\(commentId)/like")
+    }
+
+    /// `DELETE /api/posts/:postId/comments/:commentId` — author-only
+    /// comment delete (soft-deletes server-side). Route
+    /// `backend/routes/posts.js:2955`.
+    public static func deleteComment(postId: String, commentId: String) -> Endpoint {
+        Endpoint(method: .delete, path: "/api/posts/\(postId)/comments/\(commentId)")
+    }
+
+    /// `POST /api/posts/:id/share` — records an external share
+    /// (`shareType: "external"`) or toggles a repost (`"repost"`);
+    /// returns `{shared|reposted, shareCount}`. Route
+    /// `backend/routes/posts.js:2829`.
+    public static func share(id: String, shareType: String = "external") -> Endpoint {
+        Endpoint(method: .post, path: "/api/posts/\(id)/share", body: PostShareRequest(shareType: shareType))
+    }
+
+    /// `POST /api/posts/:id/report` — files a report with one of the
+    /// `reportPostSchema` reasons. Route `backend/routes/posts.js:3167`.
+    public static func report(id: String, reason: String, details: String? = nil) -> Endpoint {
+        Endpoint(method: .post, path: "/api/posts/\(id)/report", body: PostReportRequest(reason: reason, details: details))
+    }
+
+    /// `POST /api/posts/:id/save` — toggles the viewer's bookmark;
+    /// returns `{saved}`. Route `backend/routes/posts.js:3276`.
+    public static func toggleSave(id: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/posts/\(id)/save")
     }
 
     /// `POST /api/posts/:id/archive` — author-only archive.

@@ -1,17 +1,20 @@
-@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@file:OptIn(
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+)
 @file:Suppress("MagicNumber", "PackageNaming", "LongParameterList", "LongMethod", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.shared.content_detail.bodies
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -24,11 +27,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,13 +56,15 @@ import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.AvatarWithIdentityRing
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.content_detail.headers.PostIntent
+import app.pantopus.android.ui.screens.shared.media.PostMediaGridStyle
+import app.pantopus.android.ui.screens.shared.media.PostMediaGridWithViewer
+import app.pantopus.android.ui.screens.shared.media.PostMediaItem
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-import coil.compose.SubcomposeAsyncImage
 
 /** One row in the flattened comment thread. */
 data class PostCommentRow(
@@ -69,6 +79,8 @@ data class PostCommentRow(
     /** 0 for top-level, 1 for nested. Deeper threads collapse to 1. */
     val indentLevel: Int,
     val authorUserId: String?,
+    /** True when the signed-in user wrote it — gates the Delete action. */
+    val isOwn: Boolean = false,
 )
 
 /** Quick-reply prompt rendered in the empty thread state. */
@@ -92,7 +104,7 @@ data class PostReactionCounts(
 @Composable
 fun BodyReactionsBody(
     body: String,
-    mediaUrls: List<String>,
+    media: List<PostMediaItem>,
     intent: PostIntent = PostIntent.Share,
     reactions: PostReactionCounts,
     onReactionTap: (app.pantopus.android.data.api.models.posts.PostReactionKind) -> Unit,
@@ -106,6 +118,15 @@ fun BodyReactionsBody(
     hiddenReplyCount: Int = 0,
     onShowMoreReplies: (() -> Unit)? = null,
     onCommentAvatarTap: (String) -> Unit = {},
+    mediaLocationBadge: String? = null,
+    selectedReactionEmoji: String? = null,
+    onEmojiSelected: ((String) -> Unit)? = null,
+    reactionEmojis: List<String> = emptyList(),
+    replyingToName: String? = null,
+    onCancelReply: () -> Unit = {},
+    onCommentReply: ((PostCommentRow) -> Unit)? = null,
+    onCommentLike: ((PostCommentRow) -> Unit)? = null,
+    onCommentDelete: ((PostCommentRow) -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -120,9 +141,12 @@ fun BodyReactionsBody(
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             )
         }
-        if (mediaUrls.isNotEmpty()) {
-            PostMediaGrid(
-                urls = mediaUrls,
+        if (media.isNotEmpty()) {
+            PostMediaGridWithViewer(
+                items = media,
+                style = PostMediaGridStyle.Regular,
+                testTag = "pulsePostDetail-media",
+                locationBadge = mediaLocationBadge,
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             )
         }
@@ -131,6 +155,9 @@ fun BodyReactionsBody(
             commentCount = comments.size + hiddenReplyCount,
             commentsAreFresh = comments.isEmpty(),
             onTap = onReactionTap,
+            selectedEmoji = selectedReactionEmoji,
+            onEmojiSelected = onEmojiSelected,
+            reactionEmojis = reactionEmojis,
             modifier = Modifier.padding(horizontal = Spacing.s4),
         )
         HorizontalDivider(
@@ -138,12 +165,53 @@ fun BodyReactionsBody(
             thickness = 1.dp,
             modifier = Modifier.padding(horizontal = Spacing.s4),
         )
+        if (replyingToName != null) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.s4),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Text(
+                    text = "Replying to $replyingToName",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.primary600,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.appSurfaceSunken)
+                            .clickable(onClick = onCancelReply)
+                            .testTag("pulsePostDetail-cancelReply")
+                            .semantics { contentDescription = "Cancel reply" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.X,
+                        contentDescription = null,
+                        size = 12.dp,
+                        tint = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+        }
         CommentComposer(
             avatarName = composerAvatarName,
             avatarUrl = composerAvatarUrl,
             text = composerText,
             onTextChange = onComposerTextChange,
-            placeholder = if (comments.isEmpty()) "Be the first to reply..." else "Add a comment",
+            placeholder =
+                when {
+                    replyingToName != null -> "Reply to $replyingToName..."
+                    comments.isEmpty() -> "Be the first to reply..."
+                    else -> "Add a comment"
+                },
             isFocusedPresentation = comments.isEmpty(),
             isSending = isSending,
             onSend = onSendTap,
@@ -160,6 +228,9 @@ fun BodyReactionsBody(
                         onAvatarTap = {
                             row.authorUserId?.let(onCommentAvatarTap)
                         },
+                        onReply = onCommentReply?.let { handler -> { handler(row) } },
+                        onToggleLike = onCommentLike?.let { handler -> { handler(row) } },
+                        onDelete = if (row.isOwn) onCommentDelete?.let { handler -> { handler(row) } } else null,
                     )
                 }
                 if (hiddenReplyCount > 0 && onShowMoreReplies != null) {
@@ -191,115 +262,72 @@ fun BodyReactionsBody(
 }
 
 @Composable
-private fun PostMediaGrid(
-    urls: List<String>,
-    modifier: Modifier = Modifier,
-) {
-    when (urls.size) {
-        0 -> Unit
-        1 -> {
-            MediaTile(
-                url = urls[0],
-                modifier =
-                    modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(Radii.lg)),
-            )
-        }
-        2 -> {
-            Row(
-                modifier = modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(Radii.lg)),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
-                MediaTile(url = urls[0], modifier = Modifier.weight(1f).fillMaxWidth())
-                MediaTile(url = urls[1], modifier = Modifier.weight(1f).fillMaxWidth())
-            }
-        }
-        3 -> {
-            Row(
-                modifier = modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(Radii.lg)),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
-                MediaTile(url = urls[0], modifier = Modifier.weight(1f).fillMaxWidth())
-                Column(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-                ) {
-                    MediaTile(url = urls[1], modifier = Modifier.weight(1f).fillMaxWidth())
-                    MediaTile(url = urls[2], modifier = Modifier.weight(1f).fillMaxWidth())
-                }
-            }
-        }
-        else -> {
-            // 4+ → 2x2 of the first 4.
-            Column(
-                modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.lg)),
-                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                    MediaTile(url = urls[0], modifier = Modifier.weight(1f).aspectRatio(1f))
-                    MediaTile(url = urls[1], modifier = Modifier.weight(1f).aspectRatio(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                    MediaTile(url = urls[2], modifier = Modifier.weight(1f).aspectRatio(1f))
-                    MediaTile(url = urls[3], modifier = Modifier.weight(1f).aspectRatio(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MediaTile(
-    url: String,
-    modifier: Modifier = Modifier,
-) {
-    SubcomposeAsyncImage(
-        model = url,
-        contentDescription = null,
-        modifier = modifier.background(PantopusColors.appSurfaceSunken),
-        loading = {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-            }
-        },
-        error = {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PantopusIconImage(
-                    icon = PantopusIcon.AlertCircle,
-                    contentDescription = null,
-                    size = 22.dp,
-                    tint = PantopusColors.appTextMuted,
-                )
-            }
-        },
-    )
-}
-
-@Composable
 private fun ReactionsBar(
     counts: PostReactionCounts,
     commentCount: Int,
     commentsAreFresh: Boolean,
     onTap: (app.pantopus.android.data.api.models.posts.PostReactionKind) -> Unit,
     modifier: Modifier = Modifier,
+    selectedEmoji: String? = null,
+    onEmojiSelected: ((String) -> Unit)? = null,
+    reactionEmojis: List<String> = emptyList(),
 ) {
+    var showsEmojiPicker by remember { mutableStateOf(false) }
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ReactionPill(
-            id = "heart",
-            icon = PantopusIcon.Heart,
-            count = counts.helpful,
-            isSelected = counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful,
-            selectedForeground = PantopusColors.error,
-            selectedBackground = PantopusColors.errorBg,
-            onTap = { onTap(app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful) },
-            accessibilityLabel = "Heart reaction, ${counts.helpful}",
-        )
+        Box {
+            ReactionPill(
+                id = "heart",
+                icon = PantopusIcon.Heart,
+                count = counts.helpful,
+                isSelected = counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful,
+                selectedForeground = PantopusColors.error,
+                selectedBackground = PantopusColors.errorBg,
+                onTap = { onTap(app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful) },
+                onLongPress =
+                    if (onEmojiSelected != null && reactionEmojis.isNotEmpty()) {
+                        { showsEmojiPicker = true }
+                    } else {
+                        null
+                    },
+                emojiGlyph =
+                    selectedEmoji?.takeIf {
+                        counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful
+                    },
+                accessibilityLabel = "Heart reaction, ${counts.helpful}",
+            )
+            DropdownMenu(
+                expanded = showsEmojiPicker,
+                onDismissRequest = { showsEmojiPicker = false },
+            ) {
+                Row(
+                    modifier =
+                        Modifier
+                            .padding(horizontal = Spacing.s2)
+                            .testTag("pulsePostDetail-emojiPicker"),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    reactionEmojis.forEach { emoji ->
+                        Text(
+                            text = emoji,
+                            fontSize = 24.sp,
+                            modifier =
+                                Modifier
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        showsEmojiPicker = false
+                                        onEmojiSelected?.invoke(emoji)
+                                    }
+                                    .padding(Spacing.s1)
+                                    .semantics { contentDescription = "React with $emoji" },
+                        )
+                    }
+                }
+            }
+        }
         ReactionPill(
             id = "hand",
             icon = PantopusIcon.Hand,
@@ -347,6 +375,9 @@ private fun ReactionPill(
     selectedBackground: Color = PantopusColors.primary50,
     /** `null` renders the pill as display-only (no click handler). */
     onTap: (() -> Unit)?,
+    onLongPress: (() -> Unit)? = null,
+    /** Renders the chosen emoji instead of the icon glyph when set. */
+    emojiGlyph: String? = null,
     accessibilityLabel: String,
 ) {
     val background = if (isSelected) selectedBackground else PantopusColors.appSurface
@@ -365,10 +396,11 @@ private fun ReactionPill(
             }
             .sizeIn(minHeight = 44.dp)
     val withClick =
-        if (onTap != null) {
-            baseModifier.clickable(onClick = onTap)
-        } else {
-            baseModifier
+        when {
+            onTap != null && onLongPress != null ->
+                baseModifier.combinedClickable(onClick = onTap, onLongClick = onLongPress)
+            onTap != null -> baseModifier.clickable(onClick = onTap)
+            else -> baseModifier
         }
     Box(
         modifier =
@@ -382,7 +414,11 @@ private fun ReactionPill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = foreground)
+            if (emojiGlyph != null) {
+                Text(text = emojiGlyph, fontSize = 14.sp)
+            } else {
+                PantopusIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = foreground)
+            }
             Text(
                 text = "$count",
                 fontSize = 12.sp,
@@ -479,6 +515,9 @@ private fun CommentComposer(
 private fun CommentRow(
     row: PostCommentRow,
     onAvatarTap: () -> Unit,
+    onReply: (() -> Unit)? = null,
+    onToggleLike: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -556,7 +595,7 @@ private fun CommentRow(
                         Modifier
                             .heightIn(min = 48.dp)
                             .testTag("pulsePostDetail-reply-${row.id}")
-                            .clickable(onClick = {})
+                            .clickable(onClick = onReply ?: {})
                             .semantics { contentDescription = "Reply to ${row.authorName}" },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -572,7 +611,7 @@ private fun CommentRow(
                         Modifier
                             .heightIn(min = 48.dp)
                             .testTag("pulsePostDetail-commentHeart-${row.id}")
-                            .clickable(onClick = {})
+                            .clickable(onClick = onToggleLike ?: {})
                             .semantics { contentDescription = "Heart ${row.authorName}'s reply, ${row.reactionCount}" },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -590,6 +629,24 @@ private fun CommentRow(
                             text = "${row.reactionCount}",
                             fontSize = 10.5.sp,
                             color = if (row.userReacted) PantopusColors.error else PantopusColors.appTextSecondary,
+                        )
+                    }
+                }
+                if (onDelete != null) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("pulsePostDetail-commentDelete-${row.id}")
+                                .clickable(onClick = onDelete)
+                                .semantics { contentDescription = "Delete your reply" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Delete",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.error,
                         )
                     }
                 }

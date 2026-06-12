@@ -20,10 +20,13 @@ public struct PulseComposeContentState: Equatable {
     public var identity: PulseComposeIdentity
     public var visibility: PulseComposeVisibility
     public var lostFoundKind: PulseLostFoundKind
+    public var lostFoundContactPref: PulseLostFoundContactPref
     public var announceAudience: PulseAnnounceAudience
     public var safetyAlertKind: PulseSafetyAlertKind
     public var askCategory: PulseAskCategory
     public var recommendRating: Int
+    public var dealExpiresAt: Date
+    public var eligibilityWarning: String?
     public var fields: [PulseComposeField: FormFieldState]
     public var photos: [PulseComposePhoto]
     /// True when the intent picker should render as a non-interactive
@@ -39,10 +42,13 @@ public struct PulseComposeContentState: Equatable {
         identity: PulseComposeIdentity = .personal,
         visibility: PulseComposeVisibility = .neighbors,
         lostFoundKind: PulseLostFoundKind = .lost,
+        lostFoundContactPref: PulseLostFoundContactPref = .dm,
         announceAudience: PulseAnnounceAudience = .neighbors,
         safetyAlertKind: PulseSafetyAlertKind = .theft,
         askCategory: PulseAskCategory = .handyman,
         recommendRating: Int = 5,
+        dealExpiresAt: Date = Date().addingTimeInterval(7 * 86_400),
+        eligibilityWarning: String? = nil,
         fields: [PulseComposeField: FormFieldState] = [:],
         photos: [PulseComposePhoto] = [],
         isIntentLocked: Bool = false,
@@ -54,10 +60,13 @@ public struct PulseComposeContentState: Equatable {
         self.identity = identity
         self.visibility = visibility
         self.lostFoundKind = lostFoundKind
+        self.lostFoundContactPref = lostFoundContactPref
         self.announceAudience = announceAudience
         self.safetyAlertKind = safetyAlertKind
         self.askCategory = askCategory
         self.recommendRating = recommendRating
+        self.dealExpiresAt = dealExpiresAt
+        self.eligibilityWarning = eligibilityWarning
         self.fields = fields
         self.photos = photos
         self.isIntentLocked = isIntentLocked
@@ -73,10 +82,12 @@ public struct PulseComposeContentActions {
     public var onSelectIdentity: (PulseComposeIdentity) -> Void
     public var onSelectVisibility: (PulseComposeVisibility) -> Void
     public var onSelectLostFoundKind: (PulseLostFoundKind) -> Void
+    public var onSelectContactPref: (PulseLostFoundContactPref) -> Void
     public var onSelectAnnounceAudience: (PulseAnnounceAudience) -> Void
     public var onSelectSafetyAlertKind: (PulseSafetyAlertKind) -> Void
     public var onSelectAskCategory: (PulseAskCategory) -> Void
     public var onSelectRecommendRating: (Int) -> Void
+    public var onSelectDealExpires: (Date) -> Void
     public var onUpdateField: (PulseComposeField, String) -> Void
     public var onPickPhotos: () -> Void
     public var onRemovePhoto: (UUID) -> Void
@@ -86,10 +97,12 @@ public struct PulseComposeContentActions {
         onSelectIdentity: @escaping (PulseComposeIdentity) -> Void = { _ in },
         onSelectVisibility: @escaping (PulseComposeVisibility) -> Void = { _ in },
         onSelectLostFoundKind: @escaping (PulseLostFoundKind) -> Void = { _ in },
+        onSelectContactPref: @escaping (PulseLostFoundContactPref) -> Void = { _ in },
         onSelectAnnounceAudience: @escaping (PulseAnnounceAudience) -> Void = { _ in },
         onSelectSafetyAlertKind: @escaping (PulseSafetyAlertKind) -> Void = { _ in },
         onSelectAskCategory: @escaping (PulseAskCategory) -> Void = { _ in },
         onSelectRecommendRating: @escaping (Int) -> Void = { _ in },
+        onSelectDealExpires: @escaping (Date) -> Void = { _ in },
         onUpdateField: @escaping (PulseComposeField, String) -> Void = { _, _ in },
         onPickPhotos: @escaping () -> Void = {},
         onRemovePhoto: @escaping (UUID) -> Void = { _ in }
@@ -98,10 +111,12 @@ public struct PulseComposeContentActions {
         self.onSelectIdentity = onSelectIdentity
         self.onSelectVisibility = onSelectVisibility
         self.onSelectLostFoundKind = onSelectLostFoundKind
+        self.onSelectContactPref = onSelectContactPref
         self.onSelectAnnounceAudience = onSelectAnnounceAudience
         self.onSelectSafetyAlertKind = onSelectSafetyAlertKind
         self.onSelectAskCategory = onSelectAskCategory
         self.onSelectRecommendRating = onSelectRecommendRating
+        self.onSelectDealExpires = onSelectDealExpires
         self.onUpdateField = onUpdateField
         self.onPickPhotos = onPickPhotos
         self.onRemovePhoto = onRemovePhoto
@@ -169,6 +184,21 @@ public struct PulseComposeContent: View {
             }
             .padding(.horizontal, Spacing.s4)
             .accessibilityIdentifier("composePulsePostingBanner")
+        }
+        if let warning = state.eligibilityWarning {
+            HStack(alignment: .top, spacing: Spacing.s2) {
+                Icon(.alertCircle, size: 16, strokeWidth: 2, color: Theme.Color.warning)
+                Text(warning)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.warningBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("composePulseEligibilityWarning")
         }
     }
 
@@ -297,10 +327,10 @@ public struct PulseComposeContent: View {
         case .event: eventSection
         case .lost: lostSection
         case .announce:
-            if state.composePurpose == .headsUp {
-                headsUpSection
-            } else {
-                announceSection
+            switch state.composePurpose {
+            case .headsUp: headsUpSection
+            case .deal: dealSection
+            default: announceSection
             }
         }
     }
@@ -373,9 +403,56 @@ public struct PulseComposeContent: View {
         FormFieldGroup("Event") {
             textField(.title, label: "Title", placeholder: "What's happening?")
             dateField
+            eventEndDateField
             textField(.eventLocation, label: "Location", placeholder: "Where?")
-            textField(.eventCapacity, label: "Capacity (optional)", placeholder: "e.g. 20", keyboardType: .numberPad)
             bodyField(label: "Details", placeholder: "Add anything attendees should know…", minHeight: 96)
+        }
+    }
+
+    @ViewBuilder private var eventEndDateField: some View {
+        let snapshot = state.fields[.eventEndDate] ?? FormFieldState(id: "eventEndDate", originalValue: "")
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            HStack {
+                Text("End time (optional)")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                Spacer()
+                if !snapshot.value.isEmpty {
+                    Button("Clear") { actions.onUpdateField(.eventEndDate, "") }
+                        .font(Theme.Font.role(.caption))
+                        .foregroundStyle(Theme.Color.primary600)
+                        .accessibilityIdentifier("composePulseField_eventEndDate_clear")
+                }
+            }
+            DatePicker(
+                "End time",
+                selection: Binding(
+                    get: { Self.parseDate(snapshot.value) ?? Date() },
+                    set: { actions.onUpdateField(.eventEndDate, Self.formatDate($0)) }
+                ),
+                in: Date()...,
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.s3)
+            .frame(minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(
+                        snapshot.error != nil ? Theme.Color.error : Theme.Color.appBorder,
+                        lineWidth: 1
+                    )
+            )
+            .opacity(snapshot.value.isEmpty ? 0.65 : 1)
+            .accessibilityIdentifier("composePulseField_eventEndDate")
+            if let error = snapshot.error {
+                Text(error)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.error)
+            }
         }
     }
 
@@ -422,6 +499,66 @@ public struct PulseComposeContent: View {
             bodyField(label: "Description", placeholder: "Describe the item…", minHeight: 96)
             textField(.lostLastSeenLocation, label: "Last seen location", placeholder: "Where?")
             lastSeenDateField
+            contactPrefRow
+            if state.lostFoundContactPref == .phone {
+                textField(.contactPhone, label: "Phone number", placeholder: "(555) 555-0123", keyboardType: .phonePad)
+            }
+        }
+    }
+
+    private var contactPrefRow: some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text("How should people contact you?")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            HStack(spacing: Spacing.s2) {
+                ForEach(PulseLostFoundContactPref.allCases, id: \.rawValue) { pref in
+                    chipPill(
+                        label: pref.label,
+                        isActive: state.lostFoundContactPref == pref,
+                        identifier: "composePulseContactPref_\(pref.rawValue)"
+                    ) {
+                        actions.onSelectContactPref(pref)
+                    }
+                }
+            }
+        }
+    }
+
+    private var dealSection: some View {
+        FormFieldGroup("Deal") {
+            textField(.title, label: "Headline", placeholder: "What's the deal?")
+            textField(.dealBusinessName, label: "Business (optional)", placeholder: "Who's offering it?")
+            dealExpiryField
+            bodyField(label: "Details", placeholder: "Describe the deal and where to find it…", minHeight: 96)
+        }
+    }
+
+    private var dealExpiryField: some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text("Deal ends")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            DatePicker(
+                "Deal ends",
+                selection: Binding(
+                    get: { state.dealExpiresAt },
+                    set: { actions.onSelectDealExpires($0) }
+                ),
+                in: Date()...,
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.s3)
+            .frame(minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .accessibilityIdentifier("composePulseField_dealExpires")
         }
     }
 
@@ -495,7 +632,9 @@ public struct PulseComposeContent: View {
         FormFieldGroup("Heads Up") {
             safetyKindChipRow
             textField(.title, label: "Headline", placeholder: "What should people nearby know?")
-            audienceChipRow
+            if !state.isFlowMode {
+                audienceChipRow
+            }
             bodyField(label: "Details", placeholder: "Describe what happened…", minHeight: 96)
         }
     }
@@ -522,11 +661,26 @@ public struct PulseComposeContent: View {
     }
 
     private var announceSection: some View {
-        FormFieldGroup("Announcement") {
+        FormFieldGroup(announceSectionTitle) {
             textField(.title, label: "Headline", placeholder: "What's the news?")
-            audienceChipRow
-            bodyField(label: "Details", placeholder: "Share what your neighbors should know…", minHeight: 96)
+            if !state.isFlowMode {
+                audienceChipRow
+            }
+            bodyField(label: "Details", placeholder: announceBodyPlaceholder, minHeight: 96)
         }
+    }
+
+    private var announceSectionTitle: String {
+        switch state.composePurpose {
+        case .localUpdate: "Local Update"
+        case .neighborhoodWin: "Neighborhood Win"
+        case .visitorGuide: "Visitor Guide"
+        default: "Announcement"
+        }
+    }
+
+    private var announceBodyPlaceholder: String {
+        state.composePurpose?.placeholder ?? "Share what your neighbors should know…"
     }
 
     private var audienceChipRow: some View {
@@ -691,6 +845,7 @@ public struct PulseComposeContent: View {
                     set: { actions.onUpdateField(.body, $0) }
                 ))
                 .focused($isBodyFieldFocused)
+                .scrollContentBackground(.hidden)
                 .frame(minHeight: minHeight)
                 .padding(Spacing.s2)
                 .background(Theme.Color.appSurface)

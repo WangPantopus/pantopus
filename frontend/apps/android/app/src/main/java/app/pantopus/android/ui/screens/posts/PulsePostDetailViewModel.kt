@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "TooGenericExceptionCaught", "TooManyFunctions")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "TooGenericExceptionCaught", "TooManyFunctions", "LargeClass")
 
 package app.pantopus.android.ui.screens.posts
 
@@ -13,10 +13,13 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
+import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.PostCommentRow
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.PostReactionCounts
 import app.pantopus.android.ui.screens.shared.content_detail.headers.PostIntent
+import app.pantopus.android.ui.screens.shared.media.PostMediaItem
+import app.pantopus.android.ui.screens.shared.media.buildPostMediaItems
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +34,15 @@ import javax.inject.Inject
 /** Nav-arg key for the Pulse post ID. */
 const val PULSE_POST_DETAIL_ID_KEY = "postId"
 
+/** Emoji choices surfaced by the heart pill's long-press popover. */
+val pulseReactionEmojis = listOf("👍", "❤️", "🔥", "😂", "💯", "🎉")
+
+/** The comment a reply is being drafted against. */
+data class PulseReplyTarget(
+    val commentId: String,
+    val authorName: String,
+)
+
 /** Render-ready payload for the Pulse post detail screen. */
 data class PulsePostDetailContent(
     val post: PostDetailDto,
@@ -40,7 +52,7 @@ data class PulsePostDetailContent(
     val authorVerified: Boolean,
     val timeAndLocality: String,
     val intent: PostIntent,
-    val mediaUrls: List<String>,
+    val media: List<PostMediaItem>,
     val reactions: PostReactionCounts,
     val comments: List<PostCommentRow>,
     val hiddenReplyCount: Int,
@@ -62,6 +74,7 @@ class PulsePostDetailViewModel
     constructor(
         private val repo: PostsRepository,
         private val authRepo: AuthRepository,
+        private val postsRefresh: PulsePostsRefreshNotifier,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val postId: String =
@@ -84,18 +97,42 @@ class PulsePostDetailViewModel
         private val _showsOverflowMenu = MutableStateFlow(false)
 
         /**
-         * Bound to the screen's overflow modal so the Edit action sheet
-         * pops when the owner taps the top-bar's more-horizontal icon.
+         * Bound to the screen's overflow modal — Save / Repost / Edit /
+         * Delete / Report per ownership.
          */
         val showsOverflowMenu: StateFlow<Boolean> = _showsOverflowMenu.asStateFlow()
+
+        /** True once the post is deleted — the screen pops back. */
+        private val _didDeletePost = MutableStateFlow(false)
+        val didDeletePost: StateFlow<Boolean> = _didDeletePost.asStateFlow()
+
+        /** Bookmark state — seeded from the wire, toggled optimistically. */
+        private val _isSaved = MutableStateFlow(false)
+        val isSaved: StateFlow<Boolean> = _isSaved.asStateFlow()
+
+        /** Repost state — seeded from the wire, toggled optimistically. */
+        private val _isReposted = MutableStateFlow(false)
+        val isReposted: StateFlow<Boolean> = _isReposted.asStateFlow()
+
+        /** Emoji chosen from the long-press popover (session-local). */
+        private val _selectedReactionEmoji = MutableStateFlow<String?>(null)
+        val selectedReactionEmoji: StateFlow<String?> = _selectedReactionEmoji.asStateFlow()
+
+        /** Comment being replied to — drives the composer banner. */
+        private val _replyTarget = MutableStateFlow<PulseReplyTarget?>(null)
+        val replyTarget: StateFlow<PulseReplyTarget?> = _replyTarget.asStateFlow()
 
         private val showingAllReplies = MutableStateFlow(false)
 
         private val maxInitialReplies = 3
 
+        /** Share URL for the system share sheet. */
+        val shareUrl: String
+            get() = "https://www.pantopus.com/posts/$postId"
+
         /**
          * True when the signed-in user authored the post on screen. The
-         * screen uses this to gate the Edit overflow action.
+         * screen uses this to gate the Edit / Delete overflow actions.
          */
         val isOwner: Boolean
             get() {
@@ -103,6 +140,9 @@ class PulsePostDetailViewModel
                 val signedIn = authRepo.state.value as? AuthRepository.State.SignedIn ?: return false
                 return loaded.content.post.userId == signedIn.user.id
             }
+
+        private val signedInUserId: String?
+            get() = (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
 
         fun openOverflowMenu() {
             _showsOverflowMenu.value = true
@@ -124,6 +164,11 @@ class PulsePostDetailViewModel
             viewModelScope.launch { fetch() }
         }
 
+        /** Refetch without dropping to the loading state (pull-to-refresh). */
+        suspend fun refetchInPlace() {
+            fetch()
+        }
+
         fun setComposerText(text: String) {
             _composerText.value = text
         }
@@ -138,17 +183,29 @@ class PulsePostDetailViewModel
             _state.value = PulsePostDetailUiState.Loaded(rebuildContent(loaded.content.post))
         }
 
+        /** Start drafting a reply to [commentId]. */
+        fun beginReply(
+            commentId: String,
+            authorName: String,
+        ) {
+            _replyTarget.value = PulseReplyTarget(commentId = commentId, authorName = authorName)
+        }
+
+        /** Clear the reply banner without losing typed text. */
+        fun cancelReply() {
+            _replyTarget.value = null
+        }
+
         /**
          * Tap one of the reaction pills. Only `.Helpful` is wired to a
-         * backend route today; the `ReactionsBar` view renders the
-         * other kinds as display-only so this method only ever sees
-         * `.Helpful`, but we keep the guard as a safety net.
+         * backend route today; unliking also clears the chosen emoji.
          */
         fun tapReaction(kind: PostReactionKind) {
             val loaded = _state.value as? PulsePostDetailUiState.Loaded ?: return
             if (!kind.isBackendWired) return
             val initialReactions = loaded.content.reactions
             val wasOn = initialReactions.userReaction == PostReactionKind.Helpful
+            if (wasOn) _selectedReactionEmoji.value = null
             val optimistic =
                 initialReactions.copy(
                     helpful = if (wasOn) (initialReactions.helpful - 1).coerceAtLeast(0) else initialReactions.helpful + 1,
@@ -184,16 +241,136 @@ class PulsePostDetailViewModel
             }
         }
 
-        /** Submit the composer's current text as a new top-level comment. */
+        /** Choose an emoji from the popover — records a like when needed. */
+        fun pickReactionEmoji(emoji: String) {
+            _selectedReactionEmoji.value = emoji
+            val loaded = _state.value as? PulsePostDetailUiState.Loaded ?: return
+            if (loaded.content.reactions.userReaction != PostReactionKind.Helpful) {
+                tapReaction(PostReactionKind.Helpful)
+            }
+        }
+
+        /** Toggle the heart on one comment — optimistic with rollback. */
+        fun toggleCommentLike(commentId: String) {
+            val loaded = _state.value as? PulsePostDetailUiState.Loaded ?: return
+            val index = loaded.content.comments.indexOfFirst { it.id == commentId }
+            if (index < 0) return
+            val original = loaded.content.comments[index]
+            val toggled = !original.userReacted
+            val optimisticRow =
+                original.copy(
+                    userReacted = toggled,
+                    reactionCount = (original.reactionCount + if (toggled) 1 else -1).coerceAtLeast(0),
+                )
+            applyCommentRow(index, optimisticRow)
+
+            viewModelScope.launch {
+                when (val result = repo.toggleCommentLike(postId, commentId)) {
+                    is NetworkResult.Success -> {
+                        val current = _state.value as? PulsePostDetailUiState.Loaded ?: return@launch
+                        val rIndex = current.content.comments.indexOfFirst { it.id == commentId }
+                        if (rIndex >= 0) {
+                            applyCommentRow(
+                                rIndex,
+                                current.content.comments[rIndex].copy(
+                                    userReacted = result.data.liked,
+                                    reactionCount = result.data.likeCount,
+                                ),
+                            )
+                        }
+                    }
+                    is NetworkResult.Failure -> {
+                        _toastMessage.value = "Couldn't update the comment"
+                        val current = _state.value as? PulsePostDetailUiState.Loaded ?: return@launch
+                        val rIndex = current.content.comments.indexOfFirst { it.id == commentId }
+                        if (rIndex >= 0) applyCommentRow(rIndex, original)
+                    }
+                }
+            }
+        }
+
+        /** Delete the signed-in user's own comment, then refetch. */
+        fun deleteComment(commentId: String) {
+            viewModelScope.launch {
+                when (repo.deleteComment(postId, commentId)) {
+                    is NetworkResult.Success -> fetch()
+                    is NetworkResult.Failure -> _toastMessage.value = "Couldn't delete the comment"
+                }
+            }
+        }
+
+        /** Author-only post delete — flips [didDeletePost] on success. */
+        fun deletePost() {
+            viewModelScope.launch {
+                when (repo.deletePost(postId)) {
+                    is NetworkResult.Success -> {
+                        postsRefresh.notifyPostsDidChange()
+                        _didDeletePost.value = true
+                    }
+                    is NetworkResult.Failure -> _toastMessage.value = "Couldn't delete the post"
+                }
+            }
+        }
+
+        /** Flag the post with one of the report reasons. */
+        fun reportPost(reason: String) {
+            viewModelScope.launch {
+                when (repo.report(postId, reason)) {
+                    is NetworkResult.Success -> _toastMessage.value = "Report submitted"
+                    is NetworkResult.Failure -> _toastMessage.value = "Couldn't submit the report"
+                }
+            }
+        }
+
+        /** Toggle the bookmark — optimistic with reconcile/rollback. */
+        fun toggleSave() {
+            val before = _isSaved.value
+            _isSaved.value = !before
+            viewModelScope.launch {
+                when (val result = repo.toggleSave(postId)) {
+                    is NetworkResult.Success -> _isSaved.value = result.data.saved
+                    is NetworkResult.Failure -> {
+                        _isSaved.value = before
+                        _toastMessage.value = "Couldn't update the bookmark"
+                    }
+                }
+            }
+        }
+
+        /** Toggle the repost — optimistic with reconcile/rollback. */
+        fun toggleRepost() {
+            val before = _isReposted.value
+            _isReposted.value = !before
+            viewModelScope.launch {
+                when (val result = repo.share(postId, shareType = "repost")) {
+                    is NetworkResult.Success -> {
+                        _isReposted.value = result.data.reposted ?: !before
+                        postsRefresh.notifyPostsDidChange()
+                    }
+                    is NetworkResult.Failure -> {
+                        _isReposted.value = before
+                        _toastMessage.value = "Couldn't update the repost"
+                    }
+                }
+            }
+        }
+
+        /** Fire-and-forget external-share telemetry after the share sheet. */
+        fun recordShare() {
+            viewModelScope.launch { repo.share(postId, shareType = "external") }
+        }
+
+        /** Submit the composer's current text — threaded under the reply target when set. */
         fun sendComment() {
             val body = _composerText.value.trim()
             if (body.isEmpty() || _isSendingComment.value) return
             _isSendingComment.value = true
             viewModelScope.launch {
-                val req = PostCommentRequest(comment = body, parentCommentId = null)
+                val req = PostCommentRequest(comment = body, parentCommentId = _replyTarget.value?.commentId)
                 when (repo.createComment(postId, req)) {
                     is NetworkResult.Success -> {
                         _composerText.value = ""
+                        _replyTarget.value = null
                         fetch()
                     }
                     is NetworkResult.Failure -> {
@@ -206,9 +383,22 @@ class PulsePostDetailViewModel
 
         // MARK: - Internal helpers
 
+        private fun applyCommentRow(
+            index: Int,
+            row: PostCommentRow,
+        ) {
+            _state.update { current ->
+                val loaded = current as? PulsePostDetailUiState.Loaded ?: return@update current
+                val rows = loaded.content.comments.toMutableList().also { it[index] = row }
+                PulsePostDetailUiState.Loaded(loaded.content.copy(comments = rows))
+            }
+        }
+
         private suspend fun fetch() {
             when (val result = repo.detail(postId)) {
                 is NetworkResult.Success -> {
+                    _isSaved.value = result.data.post.userHasSaved
+                    _isReposted.value = result.data.post.userHasReposted
                     _state.value = PulsePostDetailUiState.Loaded(rebuildContent(result.data.post))
                 }
                 is NetworkResult.Failure -> {
@@ -233,10 +423,16 @@ class PulsePostDetailViewModel
                 timeAndLocality =
                     formatTimeAndLocality(
                         createdAt = post.createdAt,
-                        locality = post.creator?.locality ?: post.home?.city,
+                        locality = post.locationName ?: post.creator?.locality ?: post.home?.city,
                     ),
                 intent = PostIntent.from(post.purpose, post.postType),
-                mediaUrls = post.mediaUrls,
+                media =
+                    buildPostMediaItems(
+                        urls = post.mediaUrls,
+                        types = post.mediaTypes,
+                        thumbnails = post.mediaThumbnails,
+                        liveUrls = post.mediaLiveUrls,
+                    ),
                 reactions =
                     PostReactionCounts(
                         helpful = post.likeCount,
@@ -307,6 +503,7 @@ class PulsePostDetailViewModel
                 userReacted = comment.userHasLiked ?: false,
                 indentLevel = indent,
                 authorUserId = comment.author?.id,
+                isOwn = comment.userId == signedInUserId,
             )
 
         private fun formatTimeAndLocality(

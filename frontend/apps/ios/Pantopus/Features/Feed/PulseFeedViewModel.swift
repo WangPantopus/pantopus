@@ -39,6 +39,14 @@ public final class PulseFeedViewModel {
     /// first post or a backend hint.
     public private(set) var scopeLabel: String?
 
+    /// True while a next-page fetch is in flight (footer spinner).
+    public private(set) var isLoadingMore = false
+
+    /// Top-bar search query — filters the loaded rows client-side.
+    public var searchText: String = "" {
+        didSet { if searchText != oldValue { rebuildLoadedState() } }
+    }
+
     private let api: APIClient
     private let locationProvider: any LocationProviding
     /// Optional fixed coordinates (tests / previews). When nil, fetch
@@ -49,6 +57,9 @@ public final class PulseFeedViewModel {
     private var resolvedLongitude: Double?
     private var loadedItems: [FeedPostDTO] = []
     private var isLoading = false
+    private var hasMore = false
+    private var nextCursorCreatedAt: String?
+    private var nextCursorId: String?
 
     init(
         api: APIClient = .shared,
@@ -81,6 +92,13 @@ public final class PulseFeedViewModel {
         guard intent != activeIntent else { return }
         activeIntent = intent
         await fetch()
+    }
+
+    /// Infinite scroll — call from the last visible row's `onAppear`.
+    public func loadMoreIfNeeded(rowId: String) async {
+        guard hasMore, !isLoading, !isLoadingMore else { return }
+        guard case let .loaded(rows) = state, rows.last?.id == rowId else { return }
+        await fetchNextPage()
     }
 
     /// Tap on a post's primary reaction. Optimistically toggles the
@@ -130,16 +148,69 @@ public final class PulseFeedViewModel {
                 )
             )
             loadedItems = response.posts
+            applyPagination(response.pagination)
             scopeLabel = response.posts.first?.locationName ?? scopeLabel
-            if response.posts.isEmpty {
-                state = .empty(surface.emptyContent(scopeLabel: scopeLabel, followCount: 0))
-            } else {
-                state = .loaded(response.posts.map { Self.project($0, surface: surface) })
-            }
+            rebuildLoadedState()
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load posts."
             state = .error(message: message)
         }
+    }
+
+    /// Keyset-paged follow-up fetch — appends below the loaded rows.
+    private func fetchNextPage() async {
+        guard let cursorCreatedAt = nextCursorCreatedAt, let cursorId = nextCursorId else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            let coords = await resolvedCoordinates()
+            let response: FeedResponse = try await api.request(
+                PostsEndpoints.feed(
+                    surface: surface.backendSurface,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    postType: activeIntent.postType,
+                    limit: 20,
+                    cursorCreatedAt: cursorCreatedAt,
+                    cursorId: cursorId
+                )
+            )
+            // Seeded/system cards can repeat across pages — dedupe by id.
+            let known = Set(loadedItems.map(\.id))
+            loadedItems += response.posts.filter { !known.contains($0.id) }
+            applyPagination(response.pagination)
+            rebuildLoadedState()
+        } catch {
+            // Leave the loaded rows alone; the next scroll retries.
+            hasMore = true
+        }
+    }
+
+    private func applyPagination(_ pagination: FeedPagination?) {
+        hasMore = pagination?.hasMore ?? false
+        nextCursorId = pagination?.nextCursor
+        nextCursorCreatedAt = pagination?.nextCursorCreatedAt
+        if nextCursorId == nil || nextCursorCreatedAt == nil { hasMore = false }
+    }
+
+    /// Re-projects `loadedItems` (applying the search filter) into the
+    /// render state. No-op while loading/error.
+    private func rebuildLoadedState() {
+        if loadedItems.isEmpty {
+            if case .error = state { return }
+            state = .empty(surface.emptyContent(scopeLabel: scopeLabel, followCount: 0))
+            return
+        }
+        var rows = loadedItems.map { Self.project($0, surface: surface) }
+        let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !needle.isEmpty {
+            rows = rows.filter {
+                $0.body.lowercased().contains(needle)
+                    || ($0.title?.lowercased().contains(needle) ?? false)
+                    || $0.authorName.lowercased().contains(needle)
+            }
+        }
+        state = .loaded(rows)
     }
 
     private func resolvedCoordinates() async -> (latitude: Double?, longitude: Double?) {
@@ -181,22 +252,31 @@ public final class PulseFeedViewModel {
             authorInitials: initials,
             // Beacons authors are all verified by definition; on Pulse, fall
             // back to account-type until the backend surfaces creator.verified.
-            authorVerified: surface.authorsAlwaysVerified || isBusiness || post.userHasLiked,
+            authorVerified: surface.authorsAlwaysVerified || isBusiness,
             avatarTint: isBusiness ? .violet : .sky,
             meta: Self.metaString(post: post, intent: intent),
             intent: intent,
             title: intent == .event ? post.title : nil,
             body: post.content,
+            // The backend persists a single like counter; the secondary
+            // verb is display-only and has no count source, so it stays 0
+            // (comment count lives on the Reply affordance instead).
             reactions: intent.reactionTemplate(
                 helpfulCount: post.likeCount,
-                secondaryCount: post.commentCount
+                secondaryCount: 0
             ),
             attendees: attendees,
             userHasReacted: post.userHasLiked,
-            mediaURLs: PulsePostCardContent.mediaDisplayURLs(
+            // Image tiles render the full-size stills (thumbnails are
+            // 200×200 and look soft at card width); thumbnails still ride
+            // along because they're the only poster a video tile has.
+            media: PostMediaItem.items(
                 urls: post.mediaURLs,
-                thumbnails: post.mediaThumbnails
-            )
+                types: post.mediaTypes,
+                thumbnails: post.mediaThumbnails,
+                liveURLs: post.mediaLiveURLs
+            ),
+            commentCount: post.commentCount
         )
     }
 
@@ -239,6 +319,7 @@ public final class PulseFeedViewModel {
             authorName: original.authorName,
             authorInitials: original.authorInitials,
             authorVerified: original.authorVerified,
+            avatarTint: original.avatarTint,
             meta: original.meta,
             intent: original.intent,
             title: original.title,
@@ -246,7 +327,8 @@ public final class PulseFeedViewModel {
             reactions: updatedReactions,
             attendees: original.attendees,
             userHasReacted: hasReacted,
-            mediaURLs: original.mediaURLs
+            media: original.media,
+            commentCount: original.commentCount
         )
         state = .loaded(rows)
     }

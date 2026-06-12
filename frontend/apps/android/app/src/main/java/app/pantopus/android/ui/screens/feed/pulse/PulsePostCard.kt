@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.screens.shared.feed.FeedAvatar
 import app.pantopus.android.ui.screens.shared.feed.FeedAvatarTint
+import app.pantopus.android.ui.screens.shared.media.PostMediaGridStyle
+import app.pantopus.android.ui.screens.shared.media.PostMediaGridWithViewer
+import app.pantopus.android.ui.screens.shared.media.PostMediaItem
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -53,8 +56,13 @@ data class PulsePostCardContent(
     val reactions: List<PulseReaction>,
     val attendees: PulseAttendeeStrip?,
     val userHasReacted: Boolean,
-    val mediaUrls: List<String> = emptyList(),
-)
+    val commentCount: Int = 0,
+    val media: List<PostMediaItem> = emptyList(),
+) {
+    /** Thumbnail-preferring URL projection kept for test compatibility. */
+    val mediaUrls: List<String>
+        get() = media.map { it.thumbnailUrl ?: it.url }
+}
 
 /** Event card attendee strip — stacked avatars + going count + RSVP CTA. */
 @Immutable
@@ -110,8 +118,12 @@ fun PulsePostCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (content.mediaUrls.isNotEmpty()) {
-            PulsePostMediaPreview(urls = content.mediaUrls, postId = content.id)
+        if (content.media.isNotEmpty()) {
+            PostMediaGridWithViewer(
+                items = content.media,
+                style = PostMediaGridStyle.Compact,
+                testTag = "pulsePostMedia_${content.id}",
+            )
         }
         content.attendees?.let { attendees ->
             AttendeeStrip(attendees = attendees, onRSVP = onRSVP, postId = content.id)
@@ -259,7 +271,7 @@ private fun ReactionStrip(
                 tint = PantopusColors.appTextSecondary,
             )
             Text(
-                text = "Reply",
+                text = if (content.commentCount > 0) "Reply ${content.commentCount}" else "Reply",
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = PantopusColors.appTextSecondary,

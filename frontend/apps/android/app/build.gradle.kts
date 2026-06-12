@@ -244,6 +244,10 @@ dependencies {
     // Image loading
     implementation(libs.coil.compose)
 
+    // Media playback (Pulse video + Live Photo tiles)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
+
     // Realtime
     implementation(libs.socketio.client)
 

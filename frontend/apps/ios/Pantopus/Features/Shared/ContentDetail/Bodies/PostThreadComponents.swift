@@ -82,6 +82,11 @@ struct CommentComposer: View {
 struct CommentRow: View {
     let comment: PostCommentRow
     let onAvatarTap: @MainActor () -> Void
+    var onReply: (@MainActor () -> Void)?
+    var onToggleLike: (@MainActor () -> Void)?
+    var onDelete: (@MainActor () -> Void)?
+
+    @State private var attachmentViewerIndex: MediaViewerSelection?
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
@@ -103,9 +108,13 @@ struct CommentRow: View {
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
-                        Text(comment.authorName)
-                            .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appText)
+                        Button(action: { onAvatarTap() }) {
+                            Text(comment.authorName)
+                                .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
+                                .foregroundStyle(Theme.Color.appText)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(comment.authorName)'s profile")
                         Text("·")
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.Color.appTextMuted)
@@ -113,10 +122,15 @@ struct CommentRow: View {
                             .font(.system(size: 10, weight: .regular))
                             .foregroundStyle(Theme.Color.appTextMuted)
                     }
-                    Text(comment.body)
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextStrong)
-                        .lineSpacing(3)
+                    if !comment.body.isEmpty {
+                        Text(comment.body)
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                            .lineSpacing(3)
+                    }
+                    if !comment.attachmentURLs.isEmpty {
+                        attachmentStrip
+                    }
                 }
                 .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, Spacing.s2)
@@ -128,7 +142,7 @@ struct CommentRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
 
                 HStack(spacing: Spacing.s3) {
-                    Button("Reply") {}
+                    Button("Reply") { onReply?() }
                         .buttonStyle(.plain)
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Theme.Color.appTextSecondary)
@@ -136,7 +150,7 @@ struct CommentRow: View {
                         .accessibilityIdentifier("pulsePostDetail-reply-\(comment.id)")
                         .accessibilityLabel("Reply to \(comment.authorName)")
 
-                    Button(action: {}) {
+                    Button(action: { onToggleLike?() }) {
                         HStack(spacing: 3) {
                             Icon(
                                 .heart,
@@ -152,12 +166,47 @@ struct CommentRow: View {
                     .frame(minHeight: 44, alignment: .center)
                     .accessibilityIdentifier("pulsePostDetail-commentHeart-\(comment.id)")
                     .accessibilityLabel("Heart \(comment.authorName)'s reply, \(comment.reactionCount)")
+                    .accessibilityAddTraits(comment.userReacted ? [.isButton, .isSelected] : .isButton)
+
+                    if comment.isOwn, let onDelete {
+                        Button("Delete") { onDelete() }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(Theme.Color.error)
+                            .frame(minHeight: 44, alignment: .center)
+                            .accessibilityIdentifier("pulsePostDetail-deleteComment-\(comment.id)")
+                            .accessibilityLabel("Delete your reply")
+                    }
                 }
                 .padding(.leading, Spacing.s1)
             }
             Spacer(minLength: Spacing.s0)
         }
         .padding(.vertical, 2)
+    }
+
+    /// Up to four square image attachments inside the bubble. Tapping
+    /// one opens the shared full-screen viewer over all of them.
+    private var attachmentStrip: some View {
+        HStack(spacing: Spacing.s1) {
+            ForEach(Array(comment.attachmentURLs.prefix(4).enumerated()), id: \.offset) { index, url in
+                MediaStillImage(url: url)
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    .contentShape(Rectangle())
+                    .onTapGesture { attachmentViewerIndex = MediaViewerSelection(index: index) }
+                    .accessibilityLabel("Comment photo \(index + 1)")
+            }
+        }
+        .padding(.top, Spacing.s1)
+        .fullScreenCover(item: $attachmentViewerIndex) { selection in
+            MediaViewerView(
+                items: comment.attachmentURLs.enumerated().map { index, url in
+                    PostMediaItem(id: "\(comment.id)-\(index)", kind: .image, url: url)
+                },
+                startIndex: selection.index
+            )
+        }
     }
 }
 

@@ -121,8 +121,9 @@ fun PulseIntent.reactionTemplate(
                 PulseReaction(PulseReaction.Kind.Shared, PantopusIcon.Share, "shared", secondaryCount, false),
             )
         PulseIntent.Announce, PulseIntent.All ->
+            // A03: announce cards lead with the "seen" eye verb.
             listOf(
-                PulseReaction(PulseReaction.Kind.Helpful, PantopusIcon.Lightbulb, "helpful", helpfulCount, true),
+                PulseReaction(PulseReaction.Kind.Seen, PantopusIcon.Eye, "seen", helpfulCount, true),
                 PulseReaction(PulseReaction.Kind.Heart, PantopusIcon.Heart, "", secondaryCount, false),
             )
     }

@@ -26,6 +26,7 @@ data class FeedPost(
     @Json(name = "media_urls") val mediaUrls: List<String> = emptyList(),
     @Json(name = "media_thumbnails") val mediaThumbnails: List<String> = emptyList(),
     @Json(name = "media_types") val mediaTypes: List<String> = emptyList(),
+    @Json(name = "media_live_urls") val mediaLiveUrls: List<String> = emptyList(),
     val creator: FeedPostCreator? = null,
 )
 
