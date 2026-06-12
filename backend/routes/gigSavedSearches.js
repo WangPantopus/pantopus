@@ -10,9 +10,9 @@ const express = require('express');
 const Joi = require('joi');
 
 const router = express.Router();
-const { supabaseAdmin } = require('../config/supabase');
-const { verifyToken } = require('../middleware/auth');
-const { validate } = require('../middleware/validate');
+const supabaseAdmin = require('../config/supabaseAdmin');
+const verifyToken = require('../middleware/verifyToken');
+const validate = require('../middleware/validate');
 const logger = require('../utils/logger');
 
 const MAX_SAVED_SEARCHES = 20;

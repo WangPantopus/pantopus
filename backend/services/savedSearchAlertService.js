@@ -13,7 +13,7 @@
  * `THROTTLE_MINUTES` via `last_notified_at`.
  */
 
-const { supabaseAdmin } = require('../config/supabase');
+const supabaseAdmin = require('../config/supabaseAdmin');
 const { createBulkNotifications } = require('./notificationService');
 const logger = require('../utils/logger');
 
