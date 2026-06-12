@@ -1,5 +1,13 @@
 # Gigs/Tasks Native Migration — Gap Analysis & Execution Plan
 
+> **STATUS (2026-06-11): ALL PHASES COMPLETE** — Phases 0–6 shipped on
+> `feature/gigs-phase2-map` (PR #246), commits 91250462…136ea95f.
+> Deliberately dropped: counter evidence photos (backend doesn't model
+> bid attachments). Known follow-ups: Live Activity remote pushes (needs
+> APNs token plumbing; current updates are in-app), App Group/widget
+> provisioning for release signing, identity chip hides businesses
+> without a postable user id.
+
 **Scope:** Gigs/Tasks list view, map view, Post Gig V1, Post Task V2 (Magic Task), plus the
 detail/lifecycle surfaces they feed into.
 **Baselines compared:**
