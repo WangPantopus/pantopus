@@ -35,16 +35,29 @@ final class GigComposeViewModelTests: XCTestCase {
         )
     }
 
-    /// Centralised constructor that injects an "always online" stub.
-    private func makeVM(initialState: GigComposeFormState = .empty) -> GigComposeViewModel {
+    /// P6c — fresh draft queue over an ephemeral suite so tests never
+    /// touch (or leak into) the real standard-defaults queue.
+    private func makeQueue() -> GigDraftQueue {
+        GigDraftQueue(defaults: UserDefaults(suiteName: "gig-draft-tests-\(UUID().uuidString)")!)
+    }
+
+    /// Centralised constructor that injects an "always online" stub (or
+    /// a fixed offline one) plus an ephemeral draft queue.
+    private func makeVM(
+        initialState: GigComposeFormState = .empty,
+        queue: GigDraftQueue? = nil,
+        isOnline: @escaping @MainActor () -> Bool = { true }
+    ) -> GigComposeViewModel {
         GigComposeViewModel(
             api: makeAPI(),
             uploader: makeUploader(),
             location: FixedLocationProvider(
                 UserCoordinate(latitude: 40.7484, longitude: -73.9857, accuracyMeters: 100)
             ),
-            initialState: initialState
-        ) { true }
+            initialState: initialState,
+            draftQueue: queue ?? makeQueue(),
+            isOnlineProvider: isOnline
+        )
     }
 
     private static let magicPostJSON = """
@@ -236,7 +249,7 @@ final class GigComposeViewModelTests: XCTestCase {
         XCTAssertEqual(body?.draft.category, "Handyman", "Category rides as the backend's spelled label.")
         XCTAssertEqual(body?.location?.mode, "home")
         XCTAssertEqual(body?.sourceFlow, "magic")
-        XCTAssertNil(body?.beneficiaryUserId, "Persona switching is deferred — always posts as yourself.")
+        XCTAssertNil(body?.beneficiaryUserId, "Personal identity posts with a null beneficiary.")
     }
 
     func testVirtualMapsToRemoteTaskFormat() {
@@ -578,5 +591,146 @@ final class GigComposeViewModelTests: XCTestCase {
             "Re-entering the budget step with the same category doesn't refetch."
         )
         XCTAssertNotNil(vm.priceBenchmark)
+    }
+
+    // MARK: - P6c. Offline draft queue
+
+    func testOfflineSubmitEnqueuesDraftAndStaysOnReview() async {
+        let queue = makeQueue()
+        let vm = makeVM(initialState: filledAtReview(), queue: queue, isOnline: { false })
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .review, "Offline submit must not leave the review step.")
+        XCTAssertNotNil(vm.errorMessage)
+        XCTAssertEqual(queue.drafts.count, 1, "The full form snapshot lands in the pending-drafts queue.")
+        XCTAssertEqual(queue.drafts.first?.form.title, "Hang 3 shelves in the living room")
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.isEmpty,
+            "No network roundtrip happens while offline."
+        )
+    }
+
+    func testRepeatedOfflineSubmitsReplaceTheQueuedDraft() async {
+        let queue = makeQueue()
+        let vm = makeVM(initialState: filledAtReview(), queue: queue, isOnline: { false })
+        await vm.advanceForTesting()
+        vm.setTitle("Hang 4 shelves in the living room")
+        await vm.advanceForTesting()
+        XCTAssertEqual(queue.drafts.count, 1, "Re-submitting offline replaces this wizard's stash.")
+        XCTAssertEqual(queue.drafts.first?.form.title, "Hang 4 shelves in the living room")
+    }
+
+    func testSuccessfulSubmitRemovesEarlierOfflineStash() async {
+        var online = false
+        let queue = makeQueue()
+        let vm = makeVM(initialState: filledAtReview(), queue: queue, isOnline: { online })
+        await vm.advanceForTesting()
+        XCTAssertEqual(queue.drafts.count, 1)
+        online = true
+        SequencedURLProtocol.sequence = [.status(201, body: Self.magicPostJSON)]
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .success)
+        XCTAssertTrue(queue.drafts.isEmpty, "A successful post must clear the wizard's queued stash.")
+    }
+
+    func testSaveDraftConfirmedEnqueuesAndDismisses() {
+        let queue = makeQueue()
+        let vm = makeVM(queue: queue)
+        vm.setComposeMode(.manual)
+        vm.selectCategory(.handyman)
+        vm.saveDraftConfirmed()
+        XCTAssertEqual(queue.drafts.count, 1, "Close-confirm Save draft stashes even an incomplete form.")
+        XCTAssertEqual(queue.drafts.first?.form.category, .handyman)
+        XCTAssertEqual(vm.pendingEvent, .dismiss)
+    }
+
+    func testDraftQueueCapsAtFiveDrafts() {
+        let queue = makeQueue()
+        for index in 0..<(GigDraftQueue.maxDrafts + 2) {
+            queue.enqueue(GigComposeFormState(title: "Draft \(index)"), replacing: nil)
+        }
+        XCTAssertEqual(queue.drafts.count, GigDraftQueue.maxDrafts)
+        XCTAssertEqual(queue.drafts.first?.form.title, "Draft 2", "Oldest drafts fall off past the cap.")
+    }
+
+    func testConnectivityErrorClassification() {
+        XCTAssertTrue(
+            GigComposeViewModel.isConnectivityError(
+                APIError.transport(underlying: URLError(.notConnectedToInternet))
+            )
+        )
+        XCTAssertTrue(GigComposeViewModel.isConnectivityError(URLError(.timedOut)))
+        XCTAssertFalse(
+            GigComposeViewModel.isConnectivityError(APIError.server(status: 500, body: "{}")),
+            "Server-side failures must not be parked as offline drafts."
+        )
+        XCTAssertFalse(GigComposeViewModel.isConnectivityError(APIError.unauthorized))
+    }
+
+    // MARK: - P6c. Persona switching (identity chip)
+
+    private static let myBusinessesJSON = """
+    {"businesses":[
+      {"id":"seat-1","role_base":"owner","title":"Founder","joined_at":null,
+       "business_user_id":"biz-user-1",
+       "business":{"id":"biz-user-1","username":"acme","name":"Acme Plumbing","email":null,
+                   "profile_picture_url":null,"account_type":"business","city":"Portland","state":"OR"},
+       "profile":null},
+      {"id":"seat-2","role_base":"staff","title":null,"joined_at":null,
+       "business_user_id":"",
+       "business":{"id":"","username":null,"name":"Ghost LLC","email":null,
+                   "profile_picture_url":null,"account_type":"business","city":null,"state":null},
+       "profile":null}
+    ]}
+    """
+
+    func testLoadIdentitiesAddsBusinessesAndHidesUnpostableRows() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.myBusinessesJSON)]
+        let vm = makeVM()
+        await vm.loadIdentitiesIfNeeded()
+        XCTAssertEqual(vm.identityOptions.count, 2, "Personal + the one postable business.")
+        XCTAssertEqual(vm.identityOptions.first, .personal)
+        XCTAssertEqual(vm.identityOptions.last?.beneficiaryUserId, "biz-user-1")
+        XCTAssertEqual(vm.identityOptions.last?.label, "Acme Plumbing")
+        XCTAssertEqual(
+            SequencedURLProtocol.capturedRequests.last?.url?.path,
+            "/api/businesses/my-businesses"
+        )
+        await vm.loadIdentitiesIfNeeded()
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1, "Identity fetch is once per wizard.")
+    }
+
+    func testLoadIdentitiesFailureKeepsPersonalOnly() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = makeVM()
+        await vm.loadIdentitiesIfNeeded()
+        XCTAssertEqual(vm.identityOptions, [.personal])
+        XCTAssertNil(vm.errorMessage, "A failed identity fetch never surfaces an error.")
+    }
+
+    func testSelectBusinessIdentityRidesBeneficiaryUserId() async throws {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.myBusinessesJSON)]
+        let vm = makeVM(initialState: filledAtReview())
+        await vm.loadIdentitiesIfNeeded()
+        let business = try XCTUnwrap(vm.identityOptions.last)
+        vm.selectIdentity(business)
+        XCTAssertEqual(vm.form.beneficiaryUserId, "biz-user-1")
+        XCTAssertEqual(vm.form.beneficiaryName, "Acme Plumbing")
+        let body = try XCTUnwrap(vm.buildMagicPostBody())
+        XCTAssertEqual(body.beneficiaryUserId, "biz-user-1", "Business identity posts on the business's behalf.")
+        vm.selectIdentity(.personal)
+        XCTAssertNil(vm.form.beneficiaryUserId)
+        XCTAssertNil(vm.form.beneficiaryName)
+        XCTAssertNil(vm.buildMagicPostBody()?.beneficiaryUserId)
+    }
+
+    func testRestoredStaleBeneficiaryResetsToPersonal() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.myBusinessesJSON)]
+        var seed = filledAtReview()
+        seed.beneficiaryUserId = "biz-user-gone"
+        seed.beneficiaryName = "Old Biz"
+        let vm = makeVM(initialState: seed)
+        await vm.loadIdentitiesIfNeeded()
+        XCTAssertNil(vm.form.beneficiaryUserId, "A beneficiary without a current seat falls back to Personal.")
+        XCTAssertNil(vm.form.beneficiaryName)
     }
 }

@@ -49,6 +49,9 @@ public struct GigsFeedView: View {
                 if let suggestion = viewModel.radiusSuggestion {
                     radiusSuggestionBanner(suggestion)
                 }
+                if viewModel.showsDraftBanner {
+                    draftBanner
+                }
                 content
                     .overlay(alignment: .top) { newTasksBanner }
             }
@@ -122,6 +125,52 @@ public struct GigsFeedView: View {
         .padding(.horizontal, Spacing.s3)
         .padding(.bottom, Spacing.s2)
         .accessibilityIdentifier("gigsFeed.radiusSuggestion")
+    }
+
+    // MARK: - P6c Offline draft banner
+
+    /// Slim "N draft(s) waiting — Post now / Discard" strip shown when
+    /// the user is back online with composer drafts queued offline.
+    private var draftBanner: some View {
+        let count = viewModel.pendingDraftCount
+        return HStack(spacing: Spacing.s2) {
+            Icon(.fileText, size: 13, strokeWidth: 2.2, color: Theme.Color.warning)
+            Text("\(count) draft\(count == 1 ? "" : "s") waiting")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.warning)
+                .lineLimit(1)
+            Spacer(minLength: Spacing.s1)
+            Button {
+                Task { await viewModel.postPendingDraft() }
+            } label: {
+                Text("Post now")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                    .frame(minHeight: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isPostingDraft)
+            .accessibilityIdentifier("gigsFeed.draftBanner.post")
+            Button {
+                viewModel.discardPendingDraft()
+            } label: {
+                Text("Discard")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .frame(minHeight: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigsFeed.draftBanner.discard")
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 6)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .padding(.horizontal, Spacing.s3)
+        .padding(.bottom, Spacing.s2)
+        .accessibilityIdentifier("gigsFeed.draftBanner")
     }
 
     // MARK: - New tasks banner (E)

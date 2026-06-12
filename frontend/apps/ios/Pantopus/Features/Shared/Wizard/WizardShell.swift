@@ -60,7 +60,14 @@ public struct WizardShell<Content: View>: View {
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("wizardShell")
-        .wizardCloseConfirm(isPresented: $showsDiscard) { model.discardConfirmed() }
+        .wizardCloseConfirm(
+            isPresented: $showsDiscard,
+            onDiscard: { model.discardConfirmed() },
+            // P6c — draft-capable wizards also offer "Save draft".
+            onSaveDraft: (model as? any WizardDraftSaving).map { saver in
+                { saver.saveDraftConfirmed() }
+            }
+        )
     }
 
     @ViewBuilder

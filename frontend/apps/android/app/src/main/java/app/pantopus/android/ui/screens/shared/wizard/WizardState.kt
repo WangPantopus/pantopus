@@ -60,4 +60,10 @@ data class WizardChrome(
      * [WizardShellTags.PRIMARY_CTA] tag.
      */
     val primaryCtaTestTag: String? = null,
+    /**
+     * P6c — when non-null, the dirty-close confirm offers a third
+     * "save draft" action (label = this value) that routes to
+     * [WizardModel.onSaveDraft]. `null` keeps the two-button dialog.
+     */
+    val saveDraftLabel: String? = null,
 )

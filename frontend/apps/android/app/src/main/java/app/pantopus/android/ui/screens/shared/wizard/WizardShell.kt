@@ -173,6 +173,12 @@ fun WizardShell(
             model.onDiscard()
         },
         onKeepGoing = { showDiscard = false },
+        // P6c — wizards with a draft store offer "Save draft" too.
+        saveDraftLabel = chrome.saveDraftLabel,
+        onSaveDraft = {
+            showDiscard = false
+            model.onSaveDraft()
+        },
     )
 }
 

@@ -53,7 +53,16 @@ class GigComposeBenchmarkTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm() = GigComposeViewModel(repo, SavedStateHandle(), networkMonitor, filesRepo, transcriptionRepo)
+    private fun makeVm() =
+        GigComposeViewModel(
+            repo,
+            SavedStateHandle(),
+            networkMonitor,
+            filesRepo,
+            transcriptionRepo,
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+        )
 
     private fun benchmark(
         comparableCount: Int = 12,

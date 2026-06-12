@@ -156,6 +156,17 @@ data class GigsFeedToast(
 )
 
 /**
+ * P6c — slim offline-draft banner ("1 draft waiting — Post now /
+ * Discard"). Shown only when online with queued composer drafts.
+ */
+@Immutable
+data class GigsDraftBanner(
+    val count: Int,
+    /** Title of the oldest draft (the one Post now / Discard act on). */
+    val title: String,
+)
+
+/**
  * P6a — one row in the "Saved searches" manage sheet (projected from
  * `GigSavedSearchDto`).
  */

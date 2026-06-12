@@ -73,7 +73,7 @@ enum GigModuleGroup: Equatable {
 
 @Observable
 @MainActor
-final class GigComposeViewModel: WizardModel {
+final class GigComposeViewModel: WizardModel, WizardDraftSaving {
     // MARK: - Public state
 
     /// Live form snapshot — mirrored into `@SceneStorage` so the wizard
@@ -146,11 +146,17 @@ final class GigComposeViewModel: WizardModel {
     /// hint (no category, fetch failed, or `comparable_count == 0`).
     private(set) var priceBenchmark: GigPriceBenchmarkDTO?
 
+    /// P6c — identity-picker rows: Personal plus one row per business
+    /// seat from `GET /api/businesses/my-businesses`. Stays `[.personal]`
+    /// until the fetch lands (or forever, on failure / no businesses).
+    private(set) var identityOptions: [GigComposeIdentityOption] = [.personal]
+
     // MARK: - Private dependencies
 
     private let api: APIClient
     private let uploader: MultipartUploader
     private let location: any LocationProviding
+    private let draftQueue: any GigDraftQueueing
     private let isOnlineProvider: @MainActor () -> Bool
 
     /// B.3 — in-flight debounce for the Magic Task archetype parse.
@@ -169,6 +175,14 @@ final class GigComposeViewModel: WizardModel {
     /// re-entering the budget step doesn't refetch the same category.
     private var benchmarkCategory: GigComposeCategory?
 
+    /// P6c — id of the draft this wizard already stashed in the queue,
+    /// so repeated offline submits replace rather than duplicate, and a
+    /// later successful post removes it.
+    private var queuedDraftId: String?
+
+    /// One-shot guard around the my-businesses identity fetch.
+    private var identitiesLoaded = false
+
     // MARK: - Init
 
     init(
@@ -176,6 +190,9 @@ final class GigComposeViewModel: WizardModel {
         uploader: MultipartUploader = .shared,
         location: any LocationProviding = DeviceLocationProvider.shared,
         initialState: GigComposeFormState = .empty,
+        // P6c — offline draft queue. Tests inject one over an ephemeral
+        // UserDefaults suite.
+        draftQueue: any GigDraftQueueing = GigDraftQueue.shared,
         // Defaults to the live NetworkMonitor in production. Tests inject
         // a closure returning a fixed value so the simulator's
         // NWPathMonitor doesn't gate `submit()` on CI runners.
@@ -184,6 +201,7 @@ final class GigComposeViewModel: WizardModel {
         self.api = api
         self.uploader = uploader
         self.location = location
+        self.draftQueue = draftQueue
         self.isOnlineProvider = isOnlineProvider
         form = initialState
         seedAttachmentsFromPhotoIds()
@@ -412,6 +430,56 @@ extension GigComposeViewModel {
     func applyTemplate(_ template: GigTaskTemplateDTO) {
         guard let title = template.template?.title, !title.isEmpty else { return }
         setDescribeText(title)
+    }
+
+    // MARK: - P6c Identity (persona switching)
+
+    /// Fetch the user's business seats once per wizard
+    /// (`GET /api/businesses/my-businesses`, route
+    /// `backend/routes/businesses.js:682`). Failure is silent — the chip
+    /// stays a static "Personal · You". A business is postable only via
+    /// its own user id (`business_user_id` on the membership row); rows
+    /// without one — or without a display name — are hidden.
+    func loadIdentitiesIfNeeded() async {
+        guard !identitiesLoaded else { return }
+        identitiesLoaded = true
+        do {
+            let response: MyBusinessesResponse = try await api.request(BusinessesEndpoints.myBusinesses())
+            var seen = Set<String>()
+            let businesses: [GigComposeIdentityOption] = response.businesses.compactMap { membership in
+                let businessUserId = membership.businessUserId
+                guard !businessUserId.isEmpty, seen.insert(businessUserId).inserted else { return nil }
+                guard let name = displayName(for: membership) else { return nil }
+                return GigComposeIdentityOption(
+                    id: businessUserId,
+                    beneficiaryUserId: businessUserId,
+                    label: name
+                )
+            }
+            identityOptions = [.personal] + businesses
+            // A restored form may carry a beneficiary the user no longer
+            // has a seat on — fall back to Personal so the post can't
+            // ride a stale id.
+            if let current = form.beneficiaryUserId,
+               !businesses.contains(where: { $0.beneficiaryUserId == current }) {
+                selectIdentity(.personal)
+            }
+        } catch {
+            // Silent — persona switching simply isn't offered.
+        }
+    }
+
+    /// Chip-menu selection. Personal clears the beneficiary; a business
+    /// stamps its user id + display name into the (persisted) form.
+    func selectIdentity(_ option: GigComposeIdentityOption) {
+        form.beneficiaryUserId = option.beneficiaryUserId
+        form.beneficiaryName = option.beneficiaryUserId == nil ? nil : option.label
+    }
+
+    private func displayName(for membership: BusinessMembership) -> String? {
+        let name = membership.business.name ?? membership.business.username
+        guard let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return name
     }
 
     // MARK: - Voice note → transcription
@@ -928,24 +996,11 @@ extension GigComposeViewModel {
 
     /// Which archetype module field group the Fill-gaps step renders.
     /// Derived from the parsed `task_archetype`, falling back to a
-    /// category-based default on the manual path.
+    /// category-based default on the manual path. Logic lives on
+    /// `GigMagicPostBuilder` (P6c) so the draft-queue retry gates the
+    /// module objects identically.
     var activeModuleGroup: GigModuleGroup? {
-        switch form.taskArchetype {
-        case "care_task": return .care
-        case "home_service", "quick_help", "recurring_service": return .logistics
-        case "remote_task": return .remote
-        case "event_shift": return .event
-        case "delivery_errand": return .items
-        case "pro_service_quote", "general": return nil
-        default:
-            break
-        }
-        switch form.category {
-        case .petcare, .childcare: return .care
-        case .handyman, .cleaning, .moving, .tutoring, .tech: return .logistics
-        case .delivery: return .items
-        case .other, nil: return nil
-        }
+        GigMagicPostBuilder.moduleGroup(for: form)
     }
 
     // MARK: - A12.8 Engagement mode
@@ -964,14 +1019,9 @@ extension GigComposeViewModel {
     }
 
     /// The engagement mode the post will carry — user override first,
-    /// inference otherwise.
+    /// inference otherwise (shared with the draft-queue retry).
     var effectiveEngagementMode: GigEngagementMode {
-        if let override = form.engagementOverride { return override }
-        return Self.inferEngagementMode(
-            archetype: form.taskArchetype,
-            scheduleType: form.scheduleType?.wireValue ?? magicDraft?.scheduleType,
-            isUrgent: form.isUrgent
-        )
+        GigMagicPostBuilder.engagementMode(for: form, fallbackScheduleType: magicDraft?.scheduleType)
     }
 
     // MARK: - G. Price benchmark
@@ -1016,7 +1066,8 @@ extension GigComposeViewModel {
     private func submit() async {
         Analytics.track(.ctaComposeGigSubmit)
         if !isOnlineProvider() {
-            errorMessage = "You're offline. Try again when you're back online."
+            stashOfflineDraft()
+            errorMessage = "You're offline — we saved this as a draft. Post it from the Gigs feed when you're back."
             return
         }
         guard let body = buildMagicPostBody() else {
@@ -1027,16 +1078,62 @@ extension GigComposeViewModel {
         defer { isSubmitting = false }
         do {
             let response: MagicPostResponse = try await api.request(GigsEndpoints.magicPost(body: body))
+            // A draft stashed by an earlier offline attempt just shipped.
+            if let queuedDraftId {
+                draftQueue.remove(id: queuedDraftId)
+                self.queuedDraftId = nil
+            }
             createdGigId = response.gig.id
             notifiedCount = response.notifiedCount ?? 0
             nearbyHelpers = response.nearbyHelpers ?? 0
             transition(to: .success)
             startUndoCountdown(windowMs: response.gig.undoWindowMs ?? 10_000)
         } catch {
-            errorMessage = (error as? APIError)?.errorDescription
-                ?? "Couldn't post your task. Please try again."
+            if Self.isConnectivityError(error) {
+                stashOfflineDraft()
+                errorMessage = "No connection — we saved this as a draft. Post it from the Gigs feed when you're back."
+            } else {
+                errorMessage = (error as? APIError)?.errorDescription
+                    ?? "Couldn't post your task. Please try again."
+            }
         }
     }
+
+    // MARK: - P6c Offline draft queue
+
+    /// Persist the live form into the pending-drafts queue, replacing
+    /// this wizard's earlier stash so repeat failures never duplicate.
+    private func stashOfflineDraft() {
+        queuedDraftId = draftQueue.enqueue(form, replacing: queuedDraftId)
+    }
+
+    /// "Save draft" on the close confirm — stash + dismiss. The feed's
+    /// draft banner picks it up from there.
+    func saveDraftConfirmed() {
+        stashOfflineDraft()
+        pendingEvent = .dismiss
+    }
+
+    /// Connectivity taxonomy for the enqueue-on-failure path: the
+    /// client's `.transport` wrapper or a bare network-class `URLError`.
+    static func isConnectivityError(_ error: any Error) -> Bool {
+        if let apiError = error as? APIError {
+            if case let .transport(underlying) = apiError {
+                return connectivityURLErrorCodes.contains(underlying.code)
+            }
+            return false
+        }
+        if let urlError = error as? URLError {
+            return connectivityURLErrorCodes.contains(urlError.code)
+        }
+        return false
+    }
+
+    private static let connectivityURLErrorCodes: Set<URLError.Code> = [
+        .notConnectedToInternet, .networkConnectionLost, .timedOut,
+        .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+        .dataNotAllowed, .internationalRoamingOff
+    ]
 
     /// Tick the success step's "Undo · Ns" pill down once a second.
     private func startUndoCountdown(windowMs: Int) {
@@ -1073,123 +1170,17 @@ extension GigComposeViewModel {
     /// Assemble the `POST /api/gigs/magic-post` body from the form.
     /// Returns nil if any required field is missing —
     /// `primaryEnabled(...)` should have caught it but we double-check
-    /// before sending.
+    /// before sending. Delegates to `GigMagicPostBuilder` (P6c) so the
+    /// feed's offline-draft retry shares the exact assembly.
     func buildMagicPostBody() -> MagicPostBody? {
-        let title = form.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let description = form.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard title.count >= GigComposeLimits.titleMin,
-              title.count <= GigComposeLimits.titleMax,
-              description.count >= GigComposeLimits.descriptionMin
-        else { return nil }
-        guard let budgetType = form.budgetType else { return nil }
-        let budgetMin = Double(form.budgetMin) ?? 0
-        switch budgetType {
-        case .fixed, .hourly:
-            guard budgetMin > 0 else { return nil }
-        case .offers:
-            break
-        }
-        // One-time needs its date; aPlace needs a complete address.
-        if form.scheduleType == .oneTime, form.scheduledStartISO == nil { return nil }
-        if form.locationMode == .aPlace, !form.placeAddress.isComplete { return nil }
-
-        let wireSchedule = form.scheduleType?.wireValue ?? "flexible"
-        let location = form.locationMode.flatMap { composedLocation(for: $0) }
-        let isVirtual = form.locationMode == .virtual
-        let items = form.items.filter { !($0.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        let draft = MagicPostDraft(
-            title: title,
-            description: description,
-            category: form.category?.backendLabel,
-            tags: form.tags.isEmpty ? nil : form.tags,
-            payType: budgetType.wireValue,
-            budgetFixed: budgetType == .fixed ? budgetMin : nil,
-            hourlyRate: budgetType == .hourly ? budgetMin : nil,
-            estimatedHours: Double(form.estimatedHours),
-            scheduleType: wireSchedule,
-            timeWindowStart: form.scheduleType == .oneTime ? form.scheduledStartISO : nil,
-            // E.1's optional deadline rides as the window's end.
-            timeWindowEnd: form.deadlineISO,
-            locationMode: draftLocationMode,
+        GigMagicPostBuilder.body(
+            from: form,
+            coordinate: location.cachedCoordinate(),
+            fallbackScheduleType: magicDraft?.scheduleType,
             privacyLevel: magicDraft?.privacyLevel ?? "exact_after_accept",
-            isUrgent: form.isUrgent,
-            attachments: form.photoIds.isEmpty ? nil : Array(form.photoIds.prefix(10)),
-            items: items.isEmpty ? nil : Array(items.prefix(20)),
-            cancellationPolicy: form.cancellationPolicy?.wireValue,
-            taskArchetype: form.taskArchetype,
-            careDetails: activeModuleGroup == .care ? form.careDetails : nil,
-            logisticsDetails: activeModuleGroup == .logistics ? form.logisticsDetails : nil,
-            remoteDetails: activeModuleGroup == .remote ? form.remoteDetails : nil,
-            urgentDetails: form.isUrgent ? form.urgentDetails : nil,
-            eventDetails: activeModuleGroup == .event ? form.eventDetails : nil
+            aiConfidence: draftConfidence,
+            aiDraft: magicDraft
         )
-        // magic-post requires `text` (min 3 chars) — manual/classic posts
-        // may have an empty describe field, so fall back to the title.
-        let describe = form.describeText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return MagicPostBody(
-            text: describe.count >= 3 ? describe : title,
-            draft: draft,
-            location: location,
-            beneficiaryUserId: nil,
-            sourceFlow: form.composeMode == .magic ? "magic" : "classic",
-            engagementMode: effectiveEngagementMode.rawValue,
-            taskFormat: isVirtual ? "remote" : nil,
-            aiConfidence: form.composeMode == .magic ? draftConfidence : nil,
-            aiDraftJson: form.composeMode == .magic ? magicDraft : nil
-        )
-    }
-
-    /// `draft.location_mode` wire value (home | current | address |
-    /// map_pin). Virtual tasks keep `home` and signal remoteness via
-    /// `task_format`.
-    private var draftLocationMode: String {
-        switch form.locationMode {
-        case .aPlace: "address"
-        case .yourAddress, .virtual, nil: "home"
-        }
-    }
-
-    private func composedLocation(for mode: GigComposeLocationMode) -> CreateGigLocation? {
-        let coord = location.cachedCoordinate()
-        let lat = coord?.latitude ?? 0
-        let lon = coord?.longitude ?? 0
-        switch mode {
-        case .yourAddress:
-            return CreateGigLocation(
-                mode: mode.wireMode,
-                latitude: lat,
-                longitude: lon,
-                address: "Your saved address",
-                city: nil,
-                state: nil,
-                zip: nil,
-                homeId: nil
-            )
-        case .aPlace:
-            let addr = form.placeAddress
-            guard addr.isComplete else { return nil }
-            return CreateGigLocation(
-                mode: mode.wireMode,
-                latitude: lat,
-                longitude: lon,
-                address: addr.line1.trimmingCharacters(in: .whitespacesAndNewlines),
-                city: addr.city.trimmingCharacters(in: .whitespacesAndNewlines),
-                state: addr.state.trimmingCharacters(in: .whitespacesAndNewlines),
-                zip: addr.zip.trimmingCharacters(in: .whitespacesAndNewlines),
-                homeId: nil
-            )
-        case .virtual:
-            return CreateGigLocation(
-                mode: mode.wireMode,
-                latitude: lat,
-                longitude: lon,
-                address: "Remote / Online",
-                city: nil,
-                state: nil,
-                zip: nil,
-                homeId: nil
-            )
-        }
     }
 }
 

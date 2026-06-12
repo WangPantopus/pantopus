@@ -13,15 +13,29 @@ import app.pantopus.android.data.api.models.gigs.GigSavedSearchesResponse
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.models.gigs.GigsBrowseSectionsDto
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.MagicPostBody
+import app.pantopus.android.data.api.models.gigs.MagicPostGigDto
+import app.pantopus.android.data.api.models.gigs.MagicPostResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.gigs.GigDraftQueue
+import app.pantopus.android.data.gigs.GigQueuedDraft
 import app.pantopus.android.data.gigs.GigSavedSearchesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.realtime.SocketManager
+import app.pantopus.android.data.widget.WidgetSnapshotData
+import app.pantopus.android.data.widget.WidgetSnapshotStore
+import app.pantopus.android.data.widget.WidgetTaskSnapshot
+import app.pantopus.android.ui.screens.compose.gig.GigComposeBudgetType
+import app.pantopus.android.ui.screens.compose.gig.GigComposeFormState
+import app.pantopus.android.ui.screens.compose.gig.GigComposeLocationMode
+import app.pantopus.android.ui.screens.compose.gig.GigComposeScheduleType
+import app.pantopus.android.ui.screens.compose.gig.GigComposeViewModel
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -31,6 +45,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -55,11 +70,45 @@ import org.junit.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigsFeedViewModelTest {
+    /** P6c — in-memory [GigDraftQueue] standing in for the prefs store. */
+    private class FakeGigDraftQueue : GigDraftQueue {
+        private val _drafts = MutableStateFlow<List<GigQueuedDraft>>(emptyList())
+        override val drafts: StateFlow<List<GigQueuedDraft>> = _drafts
+
+        override fun enqueue(draft: GigQueuedDraft) {
+            _drafts.value =
+                (_drafts.value.filterNot { it.id == draft.id } + draft)
+                    .takeLast(GigDraftQueue.MAX_DRAFTS)
+        }
+
+        override fun remove(id: String) {
+            _drafts.value = _drafts.value.filterNot { it.id == id }
+        }
+    }
+
+    /** P6c — records the last widget snapshot write. */
+    private class FakeWidgetSnapshotStore : WidgetSnapshotStore {
+        var written: List<WidgetTaskSnapshot>? = null
+
+        override fun write(tasks: List<WidgetTaskSnapshot>) {
+            written = tasks
+        }
+
+        override fun read(): WidgetSnapshotData? = null
+    }
+
     private val repo: GigsRepository = mockk()
     private val socket: SocketManager = mockk()
     private val authRepo: AuthRepository = mockk()
     private val location: LocationProvider = mockk()
     private val savedSearchesRepo: GigSavedSearchesRepository = mockk()
+    private val draftQueue = FakeGigDraftQueue()
+    private val widgetSnapshots = FakeWidgetSnapshotStore()
+    private val isOnline = MutableStateFlow(true)
+    private val networkMonitor: NetworkMonitor =
+        mockk<NetworkMonitor>(relaxed = true).also {
+            every { it.isOnline } returns isOnline
+        }
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -79,7 +128,8 @@ class GigsFeedViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm() = GigsFeedViewModel(repo, socket, authRepo, location, savedSearchesRepo)
+    private fun makeVm() =
+        GigsFeedViewModel(repo, socket, authRepo, location, savedSearchesRepo, draftQueue, widgetSnapshots, networkMonitor)
 
     private fun handymanGig(
         id: String = "g1",
@@ -807,5 +857,127 @@ class GigsFeedViewModelTest {
             val loaded = vm.savedSearches.value as GigSavedSearchesUiState.Loaded
             assertEquals(listOf("s1"), loaded.rows.map { it.id })
             assertTrue(vm.toast.value!!.isError)
+        }
+
+    // MARK: - P6c "Tasks near me" widget snapshot
+
+    @Test fun flat_fetch_writes_widget_snapshot() =
+        runTest {
+            stubFlat(listOf(handymanGig(), cleaningGig()))
+            makeVm().load()
+            val written = widgetSnapshots.written
+            assertNotNull("Every successful fetch refreshes the widget.", written)
+            assertEquals(listOf("g1", "g2"), written!!.map { it.id })
+            assertEquals("Hang 3 floating shelves in living room", written[0].title)
+            assertEquals("$60", written[0].price)
+            assertEquals("0.2mi", written[0].distance)
+            assertEquals("handyman", written[0].categoryKey)
+        }
+
+    @Test fun browse_fetch_writes_flattened_deduped_widget_snapshot() =
+        runTest {
+            stubBrowseLocation()
+            coEvery { repo.browse(40.7, -73.9) } returns NetworkResult.Success(browseResponse())
+            makeVm().load()
+            val written = widgetSnapshots.written
+            assertNotNull(written)
+            // bestMatches + newToday + urgent + highPaying (+ quickJobs), capped at 10.
+            assertEquals(listOf("b1", "b2", "b3", "b4", "n1", "u1", "h1"), written!!.map { it.id })
+            assertTrue(written.size <= WidgetSnapshotStore.MAX_TASKS)
+        }
+
+    @Test fun failed_fetch_leaves_widget_snapshot_untouched() =
+        runTest {
+            coEvery {
+                repo.list(null, "newest", null, null, 1.0, 20, 0)
+            } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            makeVm().load()
+            assertNull(widgetSnapshots.written)
+        }
+
+    // MARK: - P6c offline draft queue banner
+
+    private fun reviewReadyForm(): GigComposeFormState =
+        GigComposeFormState(
+            title = "Hang 3 shelves in the living room",
+            description = "Need three IKEA Lack shelves mounted on drywall.",
+            budgetType = GigComposeBudgetType.Fixed,
+            budgetMin = "60",
+            scheduleType = GigComposeScheduleType.Flexible,
+            locationMode = GigComposeLocationMode.YourAddress,
+        )
+
+    private fun queuedDraft(id: String = "d1") =
+        GigQueuedDraft(
+            id = id,
+            createdAtEpochMs = 0L,
+            title = "Hang 3 shelves in the living room",
+            form = GigComposeViewModel.formSnapshot(reviewReadyForm()),
+        )
+
+    @Test fun draft_banner_appears_when_online_with_pending_drafts() =
+        runTest {
+            draftQueue.enqueue(queuedDraft())
+            val vm = makeVm()
+            val banner = vm.draftBanner.value
+            assertNotNull(banner)
+            assertEquals(1, banner!!.count)
+            assertEquals("Hang 3 shelves in the living room", banner.title)
+        }
+
+    @Test fun draft_banner_hidden_while_offline_and_returns_online() =
+        runTest {
+            isOnline.value = false
+            draftQueue.enqueue(queuedDraft())
+            val vm = makeVm()
+            assertNull("Offline keeps the banner hidden.", vm.draftBanner.value)
+            isOnline.value = true
+            assertNotNull("Reconnecting surfaces the pending draft.", vm.draftBanner.value)
+        }
+
+    @Test fun post_pending_draft_success_removes_it_and_toasts() =
+        runTest {
+            stubFlat(listOf(handymanGig()))
+            draftQueue.enqueue(queuedDraft())
+            coEvery { repo.magicPost(any<MagicPostBody>()) } returns
+                NetworkResult.Success(
+                    MagicPostResponse(
+                        message = "Task posted",
+                        gig = MagicPostGigDto(id = "gig_99", title = "Hang 3 shelves", undoWindowMs = 10_000, canUndo = true),
+                        nearbyHelpers = 3,
+                        notifiedCount = 2,
+                    ),
+                )
+            val vm = makeVm()
+            vm.postPendingDraft()
+            assertTrue("Posted draft leaves the queue.", draftQueue.drafts.value.isEmpty())
+            assertNull(vm.draftBanner.value)
+            assertFalse(vm.toast.value!!.isError)
+            // Same magic-post path the composer uses, with the snapshot's fields.
+            coVerify(exactly = 1) {
+                repo.magicPost(
+                    match<MagicPostBody> { it.draft.title == "Hang 3 shelves in the living room" && it.beneficiaryUserId == null },
+                )
+            }
+        }
+
+    @Test fun post_pending_draft_failure_keeps_it_with_error_toast() =
+        runTest {
+            draftQueue.enqueue(queuedDraft())
+            coEvery { repo.magicPost(any<MagicPostBody>()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.postPendingDraft()
+            assertEquals("Failed retry keeps the draft queued.", 1, draftQueue.drafts.value.size)
+            assertTrue(vm.toast.value!!.isError)
+        }
+
+    @Test fun discard_pending_draft_removes_it() =
+        runTest {
+            draftQueue.enqueue(queuedDraft())
+            val vm = makeVm()
+            vm.discardPendingDraft()
+            assertTrue(draftQueue.drafts.value.isEmpty())
+            assertNull(vm.draftBanner.value)
         }
 }

@@ -32,3 +32,13 @@ public protocol WizardModel: AnyObject {
 public extension WizardModel {
     func secondaryTapped() {}
 }
+
+/// P6c — opt-in refinement for wizards whose work can be parked as a
+/// local draft. When the model conforms, `WizardShell`'s dirty-close
+/// confirm gains a "Save draft" action alongside Discard / Keep going.
+@MainActor
+public protocol WizardDraftSaving: WizardModel {
+    /// User chose "Save draft" on the close confirm. The model persists
+    /// the draft and emits its own dismiss event.
+    func saveDraftConfirmed()
+}

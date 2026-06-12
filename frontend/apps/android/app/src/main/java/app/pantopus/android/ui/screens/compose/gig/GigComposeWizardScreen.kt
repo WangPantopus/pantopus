@@ -217,7 +217,11 @@ fun GigComposeWizardScreen(
     }
 
     // A12.8 — inspiration templates for the empty describe state (silent failure).
-    LaunchedEffect(Unit) { viewModel.loadTemplatesIfNeeded() }
+    // P6c — my-businesses for the identity chip (silent failure, chip stays static).
+    LaunchedEffect(Unit) {
+        viewModel.loadTemplatesIfNeeded()
+        viewModel.loadIdentitiesIfNeeded()
+    }
 
     LaunchedEffect(pendingEvent) {
         when (val event = pendingEvent) {

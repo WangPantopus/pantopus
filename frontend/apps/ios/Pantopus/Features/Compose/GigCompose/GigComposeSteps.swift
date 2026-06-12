@@ -321,6 +321,31 @@ public enum GigComposeLimits {
     public static let describeMax: Int = 500
 }
 
+/// P6c — one row of the composer's identity picker: post as yourself or
+/// on behalf of a business you hold a seat on. `beneficiaryUserId` is
+/// nil for the personal identity; for a business it is the business's
+/// own user id (`business_user_id` on the my-businesses membership row),
+/// forwarded as magic-post's `beneficiary_user_id`.
+public struct GigComposeIdentityOption: Identifiable, Sendable, Equatable, Hashable {
+    public let id: String
+    public let beneficiaryUserId: String?
+    /// Menu label — "Personal · You" or the business name.
+    public let label: String
+
+    public init(id: String, beneficiaryUserId: String?, label: String) {
+        self.id = id
+        self.beneficiaryUserId = beneficiaryUserId
+        self.label = label
+    }
+
+    /// The default post-as-yourself identity.
+    public static let personal = GigComposeIdentityOption(
+        id: "personal",
+        beneficiaryUserId: nil,
+        label: "Personal · You"
+    )
+}
+
 /// Snapshot of all wizard form state. Encoded into `@SceneStorage` so
 /// the in-progress wizard survives process death and config changes.
 public struct GigComposeFormState: Codable, Sendable, Equatable {
@@ -375,6 +400,12 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
     public var remoteDetails: GigRemoteDetails?
     public var urgentDetails: GigUrgentDetails?
     public var eventDetails: GigEventDetails?
+    /// P6c — persona switching. nil posts as yourself; a business user id
+    /// rides magic-post's `beneficiary_user_id`. Optional fields keep old
+    /// `@SceneStorage` snapshots decodable.
+    public var beneficiaryUserId: String?
+    /// Display name backing the identity chip ("ACME PLUMBING").
+    public var beneficiaryName: String?
 
     public init(
         step: Int = GigComposeStep.describe.rawValue,
@@ -405,7 +436,9 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         logisticsDetails: GigLogisticsDetails? = nil,
         remoteDetails: GigRemoteDetails? = nil,
         urgentDetails: GigUrgentDetails? = nil,
-        eventDetails: GigEventDetails? = nil
+        eventDetails: GigEventDetails? = nil,
+        beneficiaryUserId: String? = nil,
+        beneficiaryName: String? = nil
     ) {
         self.step = step
         self.composeMode = composeMode
@@ -436,6 +469,8 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         self.remoteDetails = remoteDetails
         self.urgentDetails = urgentDetails
         self.eventDetails = eventDetails
+        self.beneficiaryUserId = beneficiaryUserId
+        self.beneficiaryName = beneficiaryName
     }
 
     public static let empty = GigComposeFormState()

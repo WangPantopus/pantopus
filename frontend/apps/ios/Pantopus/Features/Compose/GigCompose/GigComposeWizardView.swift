@@ -74,6 +74,9 @@ public struct GigComposeWizardView: View {
         }
         .onChange(of: viewModel.form) { _, _ in persist() }
         .onChange(of: viewModel.pendingEvent) { _, event in handle(event) }
+        // P6c — fetch business seats once so the identity chip can offer
+        // persona switching (silent no-op for business-less users).
+        .task { await viewModel.loadIdentitiesIfNeeded() }
         .accessibilityIdentifier("composeGigWizard")
         .sheet(item: $bindable.activePickerSheet) { sheet in
             GigPickerSheetHost(sheet: sheet, viewModel: viewModel)

@@ -1,9 +1,12 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "LargeClass")
 
 package app.pantopus.android.ui.screens.compose.gig
 
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.ai.AiTranscriptionRepository
+import app.pantopus.android.data.api.models.businesses.BusinessMembership
+import app.pantopus.android.data.api.models.businesses.BusinessUserDto
+import app.pantopus.android.data.api.models.businesses.MyBusinessesResponse
 import app.pantopus.android.data.api.models.gigs.MagicPostBody
 import app.pantopus.android.data.api.models.gigs.MagicPostGigDto
 import app.pantopus.android.data.api.models.gigs.MagicPostResponse
@@ -11,14 +14,19 @@ import app.pantopus.android.data.api.models.gigs.MagicUndoResponse
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.data.files.FilesRepository
+import app.pantopus.android.data.gigs.GigDraftQueue
+import app.pantopus.android.data.gigs.GigQueuedDraft
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,9 +51,27 @@ import java.time.Instant
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigComposeViewModelTest {
+    /** P6c — in-memory [GigDraftQueue] standing in for the prefs store. */
+    private class FakeGigDraftQueue : GigDraftQueue {
+        private val _drafts = MutableStateFlow<List<GigQueuedDraft>>(emptyList())
+        override val drafts: StateFlow<List<GigQueuedDraft>> = _drafts
+
+        override fun enqueue(draft: GigQueuedDraft) {
+            _drafts.value =
+                (_drafts.value.filterNot { it.id == draft.id } + draft)
+                    .takeLast(GigDraftQueue.MAX_DRAFTS)
+        }
+
+        override fun remove(id: String) {
+            _drafts.value = _drafts.value.filterNot { it.id == id }
+        }
+    }
+
     private val repo: GigsRepository = mockk(relaxed = true)
     private val filesRepo: FilesRepository = mockk(relaxed = true)
     private val transcriptionRepo: AiTranscriptionRepository = mockk(relaxed = true)
+    private val draftQueue = FakeGigDraftQueue()
+    private val businessesRepo: BusinessesRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor =
         mockk<NetworkMonitor>(relaxed = true).also {
             every { it.isOnline } returns MutableStateFlow(true)
@@ -62,7 +88,7 @@ class GigComposeViewModelTest {
     }
 
     private fun makeVm(savedStateHandle: SavedStateHandle = SavedStateHandle()) =
-        GigComposeViewModel(repo, savedStateHandle, networkMonitor, filesRepo, transcriptionRepo)
+        GigComposeViewModel(repo, savedStateHandle, networkMonitor, filesRepo, transcriptionRepo, draftQueue, businessesRepo)
 
     private fun pickedPhoto(name: String = "photo.jpg") =
         GigComposePickedPhoto(filename = name, mimeType = "image/jpeg", bytes = byteArrayOf(1, 2, 3))
@@ -109,7 +135,7 @@ class GigComposeViewModelTest {
                     "composeGig2.locationMode" to "YourAddress",
                 ),
             )
-        return GigComposeViewModel(repo, handle, networkMonitor, filesRepo, transcriptionRepo)
+        return GigComposeViewModel(repo, handle, networkMonitor, filesRepo, transcriptionRepo, draftQueue, businessesRepo)
     }
 
     // MARK: - Initial chrome
@@ -516,7 +542,7 @@ class GigComposeViewModelTest {
         assertEquals("classic", body?.sourceFlow)
         // No describe text → title + description carry the required `text`.
         assertTrue((body?.text ?: "").startsWith("Hang 3 shelves"))
-        assertNull("Persona switching deferred — beneficiary stays null.", body?.beneficiaryUserId)
+        assertNull("Default identity is Personal — beneficiary stays null.", body?.beneficiaryUserId)
     }
 
     @Test
@@ -603,7 +629,7 @@ class GigComposeViewModelTest {
                     "composeGig2.engagementMode" to "Quotes",
                 ),
             )
-        val vm = GigComposeViewModel(repo, handle, networkMonitor, filesRepo, transcriptionRepo)
+        val vm = GigComposeViewModel(repo, handle, networkMonitor, filesRepo, transcriptionRepo, draftQueue, businessesRepo)
         assertEquals(GigComposeStep.BudgetMode, vm.state.value.form.currentStep)
         assertEquals(GigComposeCategory.Cleaning, vm.state.value.form.category)
         assertEquals("Deep clean", vm.state.value.form.title)
@@ -622,7 +648,7 @@ class GigComposeViewModelTest {
                     "composeGig.title" to "Old wizard title",
                 ),
             )
-        val vm = GigComposeViewModel(repo, handle, networkMonitor, filesRepo, transcriptionRepo)
+        val vm = GigComposeViewModel(repo, handle, networkMonitor, filesRepo, transcriptionRepo, draftQueue, businessesRepo)
         assertEquals(GigComposeStep.Describe, vm.state.value.form.currentStep)
         assertTrue(vm.state.value.form.title.isEmpty())
     }
@@ -724,5 +750,169 @@ class GigComposeViewModelTest {
         assertEquals("Milk 2%", draftItems?.first()?.name)
         vm.removeItem(0)
         assertEquals(GigComposeLimits.MAX_ITEMS - 1, vm.state.value.form.items.size)
+    }
+
+    // MARK: - P6c offline draft queue
+
+    @Test
+    fun offline_submit_enqueues_draft_and_stays_on_review() =
+        runTest {
+            every { networkMonitor.isOnline } returns MutableStateFlow(false)
+            val vm = makeVmAtReview()
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(GigComposeStep.Review, vm.state.value.form.currentStep)
+            assertNotNull(vm.state.value.errorMessage)
+            val queued = draftQueue.drafts.value.single()
+            assertEquals("Hang 3 shelves in the living room", queued.title)
+            coVerify(exactly = 0) { repo.magicPost(any<MagicPostBody>()) }
+        }
+
+    @Test
+    fun transport_failure_enqueues_draft() =
+        runTest {
+            coEvery { repo.magicPost(any<MagicPostBody>()) } returns
+                NetworkResult.Failure(NetworkError.Transport(java.io.IOException("airplane mode")))
+            val vm = makeVmAtReview()
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(GigComposeStep.Review, vm.state.value.form.currentStep)
+            assertEquals(1, draftQueue.drafts.value.size)
+        }
+
+    @Test
+    fun server_failure_does_not_enqueue() =
+        runTest {
+            coEvery { repo.magicPost(any<MagicPostBody>()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "down"))
+            val vm = makeVmAtReview()
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertTrue("Only connectivity-class failures park a draft.", draftQueue.drafts.value.isEmpty())
+        }
+
+    @Test
+    fun repeated_offline_submits_replace_the_same_draft() =
+        runTest {
+            every { networkMonitor.isOnline } returns MutableStateFlow(false)
+            val vm = makeVmAtReview()
+            vm.onPrimary()
+            advanceTimeBy(50)
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals("Retries must not stack duplicates.", 1, draftQueue.drafts.value.size)
+        }
+
+    @Test
+    fun successful_submit_clears_previously_queued_copy() =
+        runTest {
+            coEvery { repo.magicPost(any<MagicPostBody>()) } returnsMany
+                listOf(
+                    NetworkResult.Failure(NetworkError.Transport(java.io.IOException("blip"))),
+                    NetworkResult.Success(magicPostResponse),
+                )
+            val vm = makeVmAtReview()
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(1, draftQueue.drafts.value.size)
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(GigComposeStep.Success, vm.state.value.form.currentStep)
+            assertTrue("Posted draft leaves the queue.", draftQueue.drafts.value.isEmpty())
+        }
+
+    @Test
+    fun close_confirm_offers_save_draft_and_saves_on_tap() {
+        val vm = makeVm()
+        assertNull("Clean form offers no Save draft.", vm.chrome.saveDraftLabel)
+        vm.setTitle("Hang shelves")
+        assertEquals("Save draft", vm.chrome.saveDraftLabel)
+        vm.onSaveDraft()
+        assertEquals(1, draftQueue.drafts.value.size)
+        assertEquals(GigComposeOutboundEvent.Dismiss, vm.pendingEvent.value)
+    }
+
+    @Test
+    fun queued_draft_round_trips_into_a_magic_post_body() =
+        runTest {
+            every { networkMonitor.isOnline } returns MutableStateFlow(false)
+            val vm = makeVmAtReview()
+            vm.onPrimary()
+            advanceTimeBy(50)
+            val body = GigComposeViewModel.bodyFromQueuedDraft(draftQueue.drafts.value.single())
+            assertNotNull("Snapshot must rebuild the same submit body.", body)
+            assertEquals("Hang 3 shelves in the living room", body?.draft?.title)
+            assertEquals(vm.buildMagicPostBody()?.sourceFlow, body?.sourceFlow)
+            assertEquals("fixed", body?.draft?.payType)
+            assertEquals("scheduled", body?.draft?.scheduleType)
+        }
+
+    // MARK: - P6c persona switching
+
+    private fun membership(
+        businessUserId: String,
+        name: String?,
+    ): BusinessMembership =
+        BusinessMembership(
+            id = "seat-$businessUserId",
+            businessUserId = businessUserId,
+            business = BusinessUserDto(id = businessUserId, name = name, username = "biz"),
+        )
+
+    @Test
+    fun identity_options_load_and_hide_blank_postable_ids() =
+        runTest {
+            coEvery { businessesRepo.myBusinesses() } returns
+                NetworkResult.Success(
+                    MyBusinessesResponse(
+                        businesses =
+                            listOf(
+                                membership("biz1", "Acme Cleaning"),
+                                // No postable user id → hidden from the picker.
+                                membership("", "Ghost LLC"),
+                            ),
+                    ),
+                )
+            val vm = makeVm()
+            vm.loadIdentitiesIfNeeded()
+            advanceTimeBy(50)
+            val options = vm.state.value.identityOptions
+            assertEquals(listOf("biz1"), options.map { it.id })
+            assertEquals("Acme Cleaning", options.single().name)
+        }
+
+    @Test
+    fun identity_load_failure_keeps_chip_static() =
+        runTest {
+            coEvery { businessesRepo.myBusinesses() } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.loadIdentitiesIfNeeded()
+            advanceTimeBy(50)
+            assertTrue(vm.state.value.identityOptions.isEmpty())
+        }
+
+    @Test
+    fun selected_business_rides_magic_post_as_beneficiary() {
+        val vm = makeVm()
+        seedReviewReady(vm)
+        vm.selectIdentity(GigComposeIdentityOption(id = "biz1", name = "Acme Cleaning"))
+        assertEquals("biz1", vm.state.value.form.beneficiaryUserId)
+        assertEquals("Acme Cleaning", vm.state.value.form.beneficiaryLabel)
+        assertEquals("biz1", vm.buildMagicPostBody()?.beneficiaryUserId)
+        // Back to Personal → null beneficiary.
+        vm.selectIdentity(null)
+        assertNull(vm.state.value.form.beneficiaryUserId)
+        assertNull(vm.buildMagicPostBody()?.beneficiaryUserId)
+    }
+
+    @Test
+    fun beneficiary_survives_saved_state_restore() {
+        val handle = SavedStateHandle()
+        val vm = makeVm(handle)
+        seedReviewReady(vm)
+        vm.selectIdentity(GigComposeIdentityOption(id = "biz9", name = "Brick & Mortar"))
+        val restored = GigComposeViewModel(repo, handle, networkMonitor, filesRepo, transcriptionRepo, draftQueue, businessesRepo)
+        assertEquals("biz9", restored.state.value.form.beneficiaryUserId)
+        assertEquals("Brick & Mortar", restored.state.value.form.beneficiaryLabel)
     }
 }

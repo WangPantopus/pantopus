@@ -84,6 +84,7 @@ fun GigsFeedScreen(
     val newTaskCount by viewModel.newTaskCount.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val savedSearches by viewModel.savedSearches.collectAsStateWithLifecycle()
+    val draftBanner by viewModel.draftBanner.collectAsStateWithLifecycle()
     var showFilters by remember { mutableStateOf(false) }
     var showSavedSearches by remember { mutableStateOf(false) }
 
@@ -122,6 +123,14 @@ fun GigsFeedScreen(
                 onSelectSort = viewModel::selectSort,
                 onOpenFilters = { showFilters = true },
             )
+            // P6c — pending offline drafts surface once back online.
+            draftBanner?.let { banner ->
+                GigsDraftBannerRow(
+                    banner = banner,
+                    onPost = viewModel::postPendingDraft,
+                    onDiscard = viewModel::discardPendingDraft,
+                )
+            }
             // P1.B — slim radius-suggestion banner above the list.
             radiusSuggestion?.let { suggestion ->
                 if (state is GigsFeedUiState.Loaded || state is GigsFeedUiState.Empty) {
@@ -990,6 +999,73 @@ internal fun RadiusSuggestionBanner(
 
 private fun milesLabel(miles: Double): String =
     if (miles % 1.0 == 0.0) "${miles.toInt()}" else String.format("%.1f", miles)
+
+/**
+ * P6c — slim offline-draft banner above the list: "N draft(s) waiting"
+ * + Post now / Discard, acting on the oldest queued composer draft.
+ * Only rendered when online with a non-empty [app.pantopus.android.data.gigs.GigDraftQueue].
+ */
+@Composable
+internal fun GigsDraftBannerRow(
+    banner: GigsDraftBanner,
+    onPost: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    val draftWord = if (banner.count == 1) "draft" else "drafts"
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.warningBg)
+                .padding(start = Spacing.s3, end = Spacing.s1)
+                .heightIn(min = 40.dp)
+                .testTag("gigsFeed.draftBanner"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.FileText,
+            contentDescription = null,
+            size = 13.dp,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            text = "${banner.count} $draftWord waiting — “${banner.title}”",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.warning,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "Post now",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.warning,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .clickable(onClick = onPost)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s2)
+                    .testTag("gigsFeed.draftBanner.post"),
+        )
+        Text(
+            text = "Discard",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextSecondary,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .clickable(onClick = onDiscard)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s2)
+                    .testTag("gigsFeed.draftBanner.discard"),
+        )
+    }
+}
 
 /** P1.E — floating "N new tasks — tap to refresh" pill over the feed. */
 @Composable

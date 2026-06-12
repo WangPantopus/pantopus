@@ -359,8 +359,8 @@ public struct MagicPostBody: Encodable, Sendable {
         try container.encode(text, forKey: .text)
         try container.encode(draft, forKey: .draft)
         try container.encodeIfPresent(location, forKey: .location)
-        // Always carried (null) — persona switching is deferred; the
-        // backend treats null as "post as yourself".
+        // Always carried — null means "post as yourself"; P6c persona
+        // switching sends the business's user id here.
         try container.encode(beneficiaryUserId, forKey: .beneficiaryUserId)
         try container.encode(sourceFlow, forKey: .sourceFlow)
         try container.encodeIfPresent(engagementMode, forKey: .engagementMode)

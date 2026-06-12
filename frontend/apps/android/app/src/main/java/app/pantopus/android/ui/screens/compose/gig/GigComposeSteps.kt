@@ -202,7 +202,19 @@ enum class GigCancellationPolicy(
 }
 
 /** E.1 — the composer picker sheets, presented one-at-a-time over the wizard. */
-enum class GigPickerSheet { Attachment, Category, Deadline, Policy, Urgency, Tags }
+enum class GigPickerSheet { Attachment, Category, Deadline, Policy, Urgency, Tags, Identity }
+
+/**
+ * P6c — one business the user can post on behalf of, projected from
+ * `GET /api/businesses/my-businesses` (`backend/routes/businesses.js:680`).
+ * [id] is the membership row's `business_user_id` — the business's
+ * postable User id that rides magic-post as `beneficiary_user_id`.
+ * Personal has no option object (it's the null selection).
+ */
+data class GigComposeIdentityOption(
+    val id: String,
+    val name: String,
+)
 
 /**
  * P0.2 — one in-flight (or failed) photo upload tile. Uploaded photos
@@ -335,6 +347,10 @@ data class GigComposeFormState(
     val tags: List<String> = emptyList(),
     /** A12.8 — user override of the inferred wire `engagement_mode`. */
     val engagementOverride: GigEngagementMode? = null,
+    /** P6c — selected business identity (`beneficiary_user_id`). null = Personal. */
+    val beneficiaryUserId: String? = null,
+    /** P6c — display name of the selected business (chip label). */
+    val beneficiaryLabel: String? = null,
     // Archetype module objects — prefilled from the magic draft, edited
     // in Fill gaps, forwarded verbatim on magic-post. In-memory only.
     val careDetails: CareDetailsDto? = null,

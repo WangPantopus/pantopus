@@ -25,6 +25,17 @@ private final class NoLocationProvider: LocationProviding, @unchecked Sendable {
     }
 }
 
+/// P6c — records Tasks-near-me widget snapshot writes instead of
+/// touching the App Group suite / WidgetCenter.
+@MainActor
+private final class RecordingWidgetStore: WidgetSnapshotStoring {
+    private(set) var snapshots: [GigWidgetSnapshot] = []
+
+    func write(_ snapshot: GigWidgetSnapshot) {
+        snapshots.append(snapshot)
+    }
+}
+
 // swiftlint:disable type_body_length file_length
 
 @MainActor
@@ -42,15 +53,30 @@ final class GigsFeedViewModelTests: XCTestCase {
         )
     }
 
+    /// P6c — fresh draft queue over an ephemeral suite.
+    private func makeQueue() -> GigDraftQueue {
+        GigDraftQueue(defaults: UserDefaults(suiteName: "gigs-feed-draft-tests-\(UUID().uuidString)")!)
+    }
+
     /// Centralised constructor — no device location (flat-list path) and
-    /// an injected current-user id for the realtime tests.
-    private func makeVM(radiusMiles: Double = 1, currentUserId: String? = nil) -> GigsFeedViewModel {
+    /// an injected current-user id for the realtime tests. P6c adds the
+    /// draft queue + widget snapshot recorder seams.
+    private func makeVM(
+        radiusMiles: Double = 1,
+        currentUserId: String? = nil,
+        queue: GigDraftQueue? = nil,
+        widgetStore: RecordingWidgetStore? = nil,
+        isOnline: @escaping @MainActor () -> Bool = { true }
+    ) -> GigsFeedViewModel {
         GigsFeedViewModel(
             api: makeAPI(),
             radiusMiles: radiusMiles,
             location: NoLocationProvider(),
             currentUserId: { currentUserId },
-            gigEventsProvider: { AsyncStream { $0.finish() } }
+            gigEventsProvider: { AsyncStream { $0.finish() } },
+            draftQueue: queue ?? makeQueue(),
+            widgetStore: widgetStore ?? RecordingWidgetStore(),
+            isOnlineProvider: isOnline
         )
     }
 
@@ -610,5 +636,123 @@ final class GigsFeedViewModelTests: XCTestCase {
         await vm.saveSearch(criteria: GigFilterCriteria(budgetUpper: 100))
         XCTAssertTrue(SequencedURLProtocol.capturedRequests.isEmpty, "No coordinate — nothing to POST.")
         XCTAssertEqual(vm.toast?.kind, .error)
+    }
+
+    // MARK: - P6c. Tasks-near-me widget snapshot
+
+    func testLoadWritesWidgetSnapshot() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
+        ]
+        let store = RecordingWidgetStore()
+        let vm = makeVM(widgetStore: store)
+        await vm.load()
+        XCTAssertEqual(store.snapshots.count, 1, "Every successful feed fetch writes one snapshot.")
+        let snapshot = store.snapshots[0]
+        XCTAssertEqual(snapshot.totalNearby, 2)
+        XCTAssertEqual(snapshot.tasks.map(\.id), ["g1", "g2"])
+        XCTAssertEqual(snapshot.tasks[0].categoryKey, "handyman")
+        XCTAssertEqual(snapshot.tasks[0].price, "$60")
+        XCTAssertEqual(snapshot.tasks[0].distance, "0.2mi")
+        XCTAssertTrue(GigWidgetSnapshotContract.isFresh(snapshot))
+    }
+
+    func testFailedLoadWritesNoWidgetSnapshot() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let store = RecordingWidgetStore()
+        let vm = makeVM(widgetStore: store)
+        await vm.load()
+        XCTAssertTrue(store.snapshots.isEmpty, "Error loads must not stomp the last good snapshot.")
+    }
+
+    // MARK: - P6c. Offline draft banner
+
+    /// A complete composer form, mirroring what the wizard stashes when
+    /// a review-step submit hits a connectivity failure.
+    private func completeDraftForm() -> GigComposeFormState {
+        GigComposeFormState(
+            step: GigComposeStep.review.rawValue,
+            category: .handyman,
+            title: "Hang 3 shelves in the living room",
+            description: "Need three IKEA Lack shelves mounted on drywall.",
+            budgetType: .fixed,
+            budgetMin: "60"
+        )
+    }
+
+    private static let magicPostJSON = """
+    {"message":"Task posted","gig":{"id":"gig_77","title":"Hang 3 shelves","undo_window_ms":10000,"can_undo":true}}
+    """
+
+    func testDraftBannerGateNeedsDraftsAndConnectivity() {
+        let queue = makeQueue()
+        var online = false
+        let vm = makeVM(queue: queue, isOnline: { online })
+        XCTAssertFalse(vm.showsDraftBanner, "No drafts → no banner.")
+        queue.enqueue(completeDraftForm(), replacing: nil)
+        XCTAssertFalse(vm.showsDraftBanner, "Offline → banner waits for connectivity.")
+        online = true
+        XCTAssertTrue(vm.showsDraftBanner)
+        XCTAssertEqual(vm.pendingDraftCount, 1)
+    }
+
+    func testPostPendingDraftSuccessRemovesDraftAndRefreshes() async {
+        SequencedURLProtocol.sequence = [
+            .status(201, body: Self.magicPostJSON),
+            .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
+        ]
+        let queue = makeQueue()
+        queue.enqueue(completeDraftForm(), replacing: nil)
+        let vm = makeVM(queue: queue)
+        await vm.postPendingDraft()
+        XCTAssertTrue(queue.drafts.isEmpty, "A posted draft leaves the queue.")
+        XCTAssertEqual(vm.toast?.text, "Draft posted")
+        XCTAssertEqual(vm.toast?.kind, .success)
+        let first = SequencedURLProtocol.capturedRequests.first
+        XCTAssertEqual(first?.httpMethod, "POST")
+        XCTAssertEqual(first?.url?.path, "/api/gigs/magic-post")
+        XCTAssertEqual(
+            SequencedURLProtocol.capturedRequests.count, 2,
+            "Success refreshes the feed so the new task shows."
+        )
+    }
+
+    func testPostPendingDraftFailureKeepsDraft() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let queue = makeQueue()
+        queue.enqueue(completeDraftForm(), replacing: nil)
+        let vm = makeVM(queue: queue)
+        await vm.postPendingDraft()
+        XCTAssertEqual(queue.drafts.count, 1, "Failed retry keeps the draft queued.")
+        XCTAssertEqual(vm.toast?.kind, .error)
+    }
+
+    func testPostPendingDraftWithIncompleteFormKeepsDraftWithoutRequest() async {
+        let queue = makeQueue()
+        queue.enqueue(GigComposeFormState(title: "Too short"), replacing: nil)
+        let vm = makeVM(queue: queue)
+        await vm.postPendingDraft()
+        XCTAssertEqual(queue.drafts.count, 1, "An unfinishable draft stays queued for the composer.")
+        XCTAssertEqual(vm.toast?.kind, .error)
+        XCTAssertTrue(SequencedURLProtocol.capturedRequests.isEmpty, "No body → no magic-post roundtrip.")
+    }
+
+    func testDiscardPendingDraftRemovesOldest() {
+        let queue = makeQueue()
+        queue.enqueue(completeDraftForm(), replacing: nil)
+        queue.enqueue(GigComposeFormState(title: "Second draft"), replacing: nil)
+        let vm = makeVM(queue: queue)
+        vm.discardPendingDraft()
+        XCTAssertEqual(queue.drafts.count, 1)
+        XCTAssertEqual(queue.drafts.first?.form.title, "Second draft", "Discard drops the oldest draft.")
+    }
+
+    func testDraftQueuePersistsAcrossInstances() {
+        let suite = "gigs-feed-draft-tests-persist-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        GigDraftQueue(defaults: defaults).enqueue(completeDraftForm(), replacing: nil)
+        let reloaded = GigDraftQueue(defaults: defaults)
+        XCTAssertEqual(reloaded.drafts.count, 1, "Drafts survive process death via UserDefaults.")
+        XCTAssertEqual(reloaded.drafts.first?.form.title, "Hang 3 shelves in the living room")
     }
 }

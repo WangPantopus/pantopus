@@ -15,6 +15,13 @@ interface WizardModel {
     /** User confirmed the discard sheet. */
     fun onDiscard()
 
+    /**
+     * P6c — user chose the optional "save draft" action on the discard
+     * sheet (shown when [WizardChrome.saveDraftLabel] is set). Default:
+     * no-op for wizards without a draft store.
+     */
+    fun onSaveDraft() {}
+
     /** Tap on the primary CTA in the sticky row. */
     fun onPrimary()
 

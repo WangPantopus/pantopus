@@ -20,8 +20,12 @@ import app.pantopus.android.data.api.models.gigs.MagicTaskItemDto
 import app.pantopus.android.data.api.models.gigs.PriceBenchmarkDto
 import app.pantopus.android.data.api.models.gigs.RemoteDetailsDto
 import app.pantopus.android.data.api.models.gigs.UrgentDetailsDto
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.data.files.FilesRepository
+import app.pantopus.android.data.gigs.GigDraftQueue
+import app.pantopus.android.data.gigs.GigQueuedDraft
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
@@ -74,6 +78,11 @@ data class GigComposeUiState(
     val isTranscribing: Boolean = false,
     /** A12.8 — true right after a successful undo ("Task undone" toast). */
     val showUndoneToast: Boolean = false,
+    /**
+     * P6c — businesses the user can post on behalf of. Empty (no
+     * businesses or fetch failed) keeps the identity chip static.
+     */
+    val identityOptions: List<GigComposeIdentityOption> = emptyList(),
 )
 
 /**
@@ -96,6 +105,8 @@ open class GigComposeViewModel
         private val networkMonitor: NetworkMonitor,
         private val filesRepository: FilesRepository,
         private val transcriptionRepository: AiTranscriptionRepository,
+        private val draftQueue: GigDraftQueue,
+        private val businessesRepository: BusinessesRepository,
     ) : ViewModel(),
         WizardModel {
         private val _state =
@@ -137,6 +148,16 @@ open class GigComposeViewModel
         /** A12.8 — templates fetched once per VM (silent failure). */
         private var templatesLoaded = false
 
+        /** P6c — my-businesses fetched once per VM (silent failure). */
+        private var identitiesLoaded = false
+
+        /**
+         * P6c — id of the draft this session already parked in the
+         * offline queue, so repeated failed submits replace instead of
+         * stacking duplicates.
+         */
+        private var queuedDraftId: String? = null
+
         // MARK: - WizardModel
 
         override val chrome: WizardChrome
@@ -151,6 +172,16 @@ open class GigComposeViewModel
         }
 
         override fun onDiscard() {
+            pendingEvent.value = GigComposeOutboundEvent.Dismiss
+        }
+
+        /**
+         * P6c — "Save draft" on the close confirm: park the scalar form
+         * snapshot in the offline queue, then dismiss. The Gigs feed
+         * surfaces the pending draft with Post now / Discard.
+         */
+        override fun onSaveDraft() {
+            enqueueDraft()
             pendingEvent.value = GigComposeOutboundEvent.Dismiss
         }
 
@@ -691,6 +722,60 @@ open class GigComposeViewModel
             _state.update { it.copy(activeSheet = null) }
         }
 
+        // MARK: - P6c Persona switching (identity chip)
+
+        /**
+         * P6c — fetch the caller's businesses once so the identity chip
+         * can become a picker. `GET /api/businesses/my-businesses`
+         * (`backend/routes/businesses.js:680`) returns membership rows
+         * whose `business_user_id` is the business's postable User id —
+         * rows without one are hidden. Failures are silent: the chip
+         * stays the static "Personal · You".
+         */
+        fun loadIdentitiesIfNeeded() {
+            if (identitiesLoaded) return
+            identitiesLoaded = true
+            viewModelScope.launch {
+                when (val result = businessesRepository.myBusinesses()) {
+                    is NetworkResult.Success ->
+                        _state.update { state ->
+                            state.copy(
+                                identityOptions =
+                                    result.data.businesses
+                                        .mapNotNull { membership ->
+                                            val postableId = membership.businessUserId.takeIf { it.isNotBlank() }
+                                            postableId?.let {
+                                                GigComposeIdentityOption(
+                                                    id = it,
+                                                    name =
+                                                        membership.business.name
+                                                            ?: membership.business.username
+                                                            ?: "Business",
+                                                )
+                                            }
+                                        }.distinctBy { it.id },
+                            )
+                        }
+                    is NetworkResult.Failure -> Unit
+                }
+            }
+        }
+
+        /**
+         * P6c — pick the posting identity. `null` returns to Personal;
+         * a business id rides the submission as `beneficiary_user_id`.
+         * Persisted with the rest of the scalar form state.
+         */
+        fun selectIdentity(option: GigComposeIdentityOption?) {
+            _state.update {
+                it.copy(
+                    form = it.form.copy(beneficiaryUserId = option?.id, beneficiaryLabel = option?.name),
+                    activeSheet = null,
+                )
+            }
+            persist()
+        }
+
         /** E.1 — set (or clear) the optional deadline. null ⇒ flexible. */
         fun setDeadline(iso: String?) {
             _state.update { it.copy(form = it.form.copy(deadlineISO = iso)) }
@@ -816,7 +901,10 @@ open class GigComposeViewModel
         private suspend fun submit() {
             Analytics.track(AnalyticsEvent.CtaComposeGigSubmit)
             if (!networkMonitor.isOnline.value) {
-                _state.update { it.copy(errorMessage = "You're offline. Try again when you're back online.") }
+                // P6c — connectivity-class failure: park the form in the
+                // offline queue instead of just bouncing the user.
+                enqueueDraft()
+                _state.update { it.copy(errorMessage = DRAFT_SAVED_OFFLINE_MESSAGE) }
                 return
             }
             val body =
@@ -828,6 +916,9 @@ open class GigComposeViewModel
             when (val result = repository.magicPost(body)) {
                 is NetworkResult.Success -> {
                     val gig = result.data.gig
+                    // A queued copy of this form is now redundant.
+                    queuedDraftId?.let { draftQueue.remove(it) }
+                    queuedDraftId = null
                     _state.update {
                         it.copy(
                             createdGigId = gig.id,
@@ -846,14 +937,35 @@ open class GigComposeViewModel
                     }
                     persist()
                 }
-                is NetworkResult.Failure ->
+                is NetworkResult.Failure -> {
+                    // P6c — an IO-layer failure (offline mid-flight,
+                    // timeout, DNS) also parks the draft for later.
+                    val isConnectivity = result.error is NetworkError.Transport
+                    if (isConnectivity) enqueueDraft()
                     _state.update {
                         it.copy(
                             isSubmitting = false,
-                            errorMessage = result.error.message ?: "Couldn't post your task. Please try again.",
+                            errorMessage =
+                                if (isConnectivity) {
+                                    DRAFT_SAVED_OFFLINE_MESSAGE
+                                } else {
+                                    result.error.message ?: "Couldn't post your task. Please try again."
+                                },
                         )
                     }
+                }
             }
+        }
+
+        /**
+         * P6c — snapshot the scalar form into the offline queue (same
+         * `composeGig2.*` encoding as [SavedStateHandle]). Re-enqueueing
+         * within one session replaces the earlier copy.
+         */
+        private fun enqueueDraft() {
+            val draft = queuedDraftOf(_state.value.form, id = queuedDraftId)
+            queuedDraftId = draft.id
+            draftQueue.enqueue(draft)
         }
 
         /**
@@ -893,136 +1005,14 @@ open class GigComposeViewModel
         /**
          * Assemble the [MagicPostBody] from the form. Returns null if any
          * required field is missing — [primaryEnabled] should have caught
-         * it but we double-check before sending.
+         * it but we double-check before sending. Delegates to the pure
+         * companion [bodyFromForm] so the Gigs feed can rebuild the same
+         * body when re-submitting a queued offline draft.
          */
-        @Suppress("ReturnCount")
-        fun buildMagicPostBody(): MagicPostBody? {
-            val form = _state.value.form
-            val title = form.title.trim()
-            val description = form.description.trim()
-            val budgetType = form.budgetType ?: return null
-            val scheduleType = form.scheduleType ?: return null
-            val locationMode = form.locationMode ?: return null
-            if (!hasValidTitleAndDescription(title, description)) return null
-            if (!hasValidPrice(budgetType, priceFromBudget(budgetType, form.budgetMin))) return null
-            if (!hasValidScheduledStart(scheduleType, form.scheduledStartISO)) return null
-            val location = composedLocation(locationMode, form.placeAddress) ?: return null
-            val amount = form.budgetMin.toDoubleOrNull()
-            val scheduleWire = scheduleWireValue(form)
-            val urgentDetails = resolvedUrgentDetails(form)
-            val draft =
-                MagicDraftDto(
-                    title = title,
-                    description = description,
-                    category = form.category?.key,
-                    taskArchetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory),
-                    payType = budgetType.wireValue,
-                    budgetFixed = if (budgetType == GigComposeBudgetType.Fixed) amount else null,
-                    hourlyRate = if (budgetType == GigComposeBudgetType.Hourly) amount else null,
-                    estimatedHours = form.estimatedHours.toDoubleOrNull(),
-                    scheduleType = scheduleWire,
-                    timeWindowStart = if (scheduleWire == "scheduled") form.scheduledStartISO else null,
-                    // E.1 deadline sheet → the draft's time-window end (the
-                    // magic-post schema has no standalone `deadline`).
-                    timeWindowEnd = form.deadlineISO,
-                    locationMode = draftLocationMode(locationMode),
-                    isUrgent = form.isUrgent.takeIf { it },
-                    tags = form.tags.ifEmpty { null },
-                    attachments = form.photoIds.ifEmpty { null },
-                    items = form.items.filter { it.name.isNotBlank() }.ifEmpty { null },
-                    cancellationPolicy = form.cancellationPolicy?.wireValue,
-                    startsAsap = urgentDetails?.startsAsap,
-                    responseWindowMinutes = urgentDetails?.responseWindowMinutes,
-                    careDetails = form.careDetails,
-                    logisticsDetails = form.logisticsDetails,
-                    remoteDetails = form.remoteDetails,
-                    urgentDetails = urgentDetails,
-                    eventDetails = form.eventDetails,
-                )
-            return MagicPostBody(
-                text = magicPostText(form, title, description),
-                draft = draft,
-                location =
-                    MagicPostLocation(
-                        mode = location.mode,
-                        latitude = location.latitude,
-                        longitude = location.longitude,
-                        address = location.address,
-                        city = location.city,
-                        state = location.state,
-                        zip = location.zip,
-                    ),
-                // Persona switching deferred — the identity chip is static.
-                beneficiaryUserId = null,
-                sourceFlow = if (form.composeMode == ComposeMode.Magic) "magic" else "classic",
-                engagementMode = resolvedEngagementMode(form),
-                taskFormat = taskFormatFor(locationMode),
-                aiConfidence = lastConfidence,
-                aiDraftJson = lastDraft,
-            )
-        }
+        fun buildMagicPostBody(): MagicPostBody? = bodyFromForm(_state.value.form, aiConfidence = lastConfidence, aiDraft = lastDraft)
 
         /** Wire `engagement_mode` — user override, else the inferred default. */
-        fun resolvedEngagementMode(form: GigComposeFormState = _state.value.form): String =
-            form.engagementOverride?.wireValue
-                ?: inferEngagementMode(
-                    archetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory),
-                    scheduleType = scheduleWireValue(form),
-                    isUrgent = form.isUrgent,
-                )
-
-        /** Urgent module rides along whenever the boost is on. */
-        private fun resolvedUrgentDetails(form: GigComposeFormState): UrgentDetailsDto? =
-            when {
-                !form.isUrgent -> null
-                else -> lastDraft?.urgentDetails ?: UrgentDetailsDto(startsAsap = true)
-            }
-
-        private data class ComposedLocation(
-            val mode: String,
-            val latitude: Double,
-            val longitude: Double,
-            val address: String,
-            val city: String? = null,
-            val state: String? = null,
-            val zip: String? = null,
-        )
-
-        private fun composedLocation(
-            mode: GigComposeLocationMode,
-            place: GigComposePlaceAddress,
-        ): ComposedLocation? =
-            when (mode) {
-                GigComposeLocationMode.YourAddress ->
-                    ComposedLocation(
-                        mode = mode.wireMode,
-                        latitude = 0.0,
-                        longitude = 0.0,
-                        address = "Your saved address",
-                    )
-                GigComposeLocationMode.APlace -> {
-                    if (!place.isComplete) {
-                        null
-                    } else {
-                        ComposedLocation(
-                            mode = mode.wireMode,
-                            latitude = 0.0,
-                            longitude = 0.0,
-                            address = place.line1.trim(),
-                            city = place.city.trim(),
-                            state = place.state.trim(),
-                            zip = place.zip.trim(),
-                        )
-                    }
-                }
-                GigComposeLocationMode.Virtual ->
-                    ComposedLocation(
-                        mode = mode.wireMode,
-                        latitude = 0.0,
-                        longitude = 0.0,
-                        address = "Remote / Online",
-                    )
-            }
+        fun resolvedEngagementMode(form: GigComposeFormState = _state.value.form): String = resolveEngagementMode(form)
 
         // MARK: - Chrome derivation
 
@@ -1040,6 +1030,8 @@ open class GigComposeViewModel
                 dirty = step != GigComposeStep.Success && state.form.hasAnyData,
                 showsProgressBar = step != GigComposeStep.Success,
                 primaryCtaTestTag = primaryCtaTestTag(state.form),
+                // P6c — dirty close also offers "Save draft" → offline queue.
+                saveDraftLabel = "Save draft".takeIf { step != GigComposeStep.Success && state.form.hasAnyData },
             )
         }
 
@@ -1115,22 +1107,10 @@ open class GigComposeViewModel
                 state.form.photoIds.size + state.photoUploads.size <= GigComposeLimits.MAX_PHOTOS &&
                 !hasUploadsInFlight(state)
 
-        private fun hasValidTitleAndDescription(
-            title: String,
-            description: String,
-        ): Boolean =
-            title.length in GigComposeLimits.TITLE_MIN..GigComposeLimits.TITLE_MAX &&
-                description.length in GigComposeLimits.DESCRIPTION_MIN..GigComposeLimits.DESCRIPTION_MAX
-
         private fun hasValidBudget(form: GigComposeFormState): Boolean =
             form.budgetType?.let { type ->
                 hasValidPrice(type, priceFromBudget(type, form.budgetMin))
             } ?: false
-
-        private fun hasValidPrice(
-            type: GigComposeBudgetType,
-            price: Double,
-        ): Boolean = type == GigComposeBudgetType.Offers || price > 0.0
 
         private fun hasValidSchedule(form: GigComposeFormState): Boolean =
             when (form.scheduleType) {
@@ -1139,20 +1119,6 @@ open class GigComposeViewModel
                 GigComposeScheduleType.Recurring, GigComposeScheduleType.Flexible -> true
             }
 
-        private fun hasValidScheduledStart(
-            type: GigComposeScheduleType,
-            scheduledStart: String?,
-        ): Boolean = type != GigComposeScheduleType.OneTime || isFutureInstant(scheduledStart)
-
-        private fun isFutureInstant(iso: String?): Boolean =
-            iso?.let { value ->
-                try {
-                    Instant.parse(value).isAfter(Instant.now())
-                } catch (_: DateTimeParseException) {
-                    false
-                }
-            } ?: false
-
         private fun hasValidLocation(form: GigComposeFormState): Boolean =
             when (form.locationMode) {
                 null -> false
@@ -1160,94 +1126,14 @@ open class GigComposeViewModel
                 GigComposeLocationMode.APlace -> form.placeAddress.isComplete
             }
 
-        private fun taskFormatFor(mode: GigComposeLocationMode): String? =
-            if (mode == GigComposeLocationMode.Virtual) {
-                "remote"
-            } else {
-                null
-            }
-
         // MARK: - Persistence
 
+        /** Mirror the scalar form into [SavedStateHandle] (`composeGig2.*`). */
         private fun persist() {
-            val form = _state.value.form
-            savedStateHandle[KEY_STEP] = form.step
-            savedStateHandle[KEY_COMPOSE_MODE] = form.composeMode.name
-            savedStateHandle[KEY_DESCRIBE] = form.describeText
-            savedStateHandle[KEY_DETECTED] = form.detectedArchetype?.name
-            savedStateHandle[KEY_ARCHETYPE] = form.taskArchetype
-            savedStateHandle[KEY_CATEGORY] = form.category?.name
-            savedStateHandle[KEY_TITLE] = form.title
-            savedStateHandle[KEY_DESCRIPTION] = form.description
-            savedStateHandle[KEY_PHOTOS] = ArrayList(form.photoIds)
-            savedStateHandle[KEY_BUDGET_TYPE] = form.budgetType?.name
-            savedStateHandle[KEY_BUDGET_MIN] = form.budgetMin
-            savedStateHandle[KEY_BUDGET_MAX] = form.budgetMax
-            savedStateHandle[KEY_ESTIMATED_HOURS] = form.estimatedHours
-            savedStateHandle[KEY_SCHEDULE_TYPE] = form.scheduleType?.name
-            savedStateHandle[KEY_SCHEDULED_START] = form.scheduledStartISO
-            savedStateHandle[KEY_LOCATION_MODE] = form.locationMode?.name
-            savedStateHandle[KEY_PLACE_LINE1] = form.placeAddress.line1
-            savedStateHandle[KEY_PLACE_CITY] = form.placeAddress.city
-            savedStateHandle[KEY_PLACE_STATE] = form.placeAddress.state
-            savedStateHandle[KEY_PLACE_ZIP] = form.placeAddress.zip
-            savedStateHandle[KEY_DEADLINE] = form.deadlineISO
-            savedStateHandle[KEY_CANCELLATION] = form.cancellationPolicy?.name
-            savedStateHandle[KEY_IS_URGENT] = form.isUrgent
-            savedStateHandle[KEY_TAGS] = ArrayList(form.tags)
-            savedStateHandle[KEY_ENGAGEMENT] = form.engagementOverride?.name
+            formSnapshot(_state.value.form).forEach { (key, value) -> savedStateHandle[key] = value }
         }
 
-        @Suppress("CyclomaticComplexMethod")
-        private fun restoreFormState(): GigComposeFormState {
-            val step: Int = savedStateHandle[KEY_STEP] ?: GigComposeStep.Describe.ordinal0
-            val composeModeName: String? = savedStateHandle[KEY_COMPOSE_MODE]
-            val detectedName: String? = savedStateHandle[KEY_DETECTED]
-            val categoryName: String? = savedStateHandle[KEY_CATEGORY]
-            val budgetTypeName: String? = savedStateHandle[KEY_BUDGET_TYPE]
-            val scheduleTypeName: String? = savedStateHandle[KEY_SCHEDULE_TYPE]
-            val locationModeName: String? = savedStateHandle[KEY_LOCATION_MODE]
-            val cancellationName: String? = savedStateHandle[KEY_CANCELLATION]
-            val engagementName: String? = savedStateHandle[KEY_ENGAGEMENT]
-            val photos: ArrayList<String> = savedStateHandle[KEY_PHOTOS] ?: arrayListOf()
-            val tags: ArrayList<String> = savedStateHandle[KEY_TAGS] ?: arrayListOf()
-            return GigComposeFormState(
-                step = step,
-                composeMode = composeModeName?.let { name -> ComposeMode.entries.firstOrNull { it.name == name } } ?: ComposeMode.Magic,
-                describeText = savedStateHandle[KEY_DESCRIBE] ?: "",
-                detectedArchetype = detectedName?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
-                taskArchetype = savedStateHandle[KEY_ARCHETYPE],
-                category = categoryName?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
-                title = savedStateHandle[KEY_TITLE] ?: "",
-                description = savedStateHandle[KEY_DESCRIPTION] ?: "",
-                photoIds = photos.toList(),
-                budgetType = budgetTypeName?.let { name -> GigComposeBudgetType.entries.firstOrNull { it.name == name } },
-                budgetMin = savedStateHandle[KEY_BUDGET_MIN] ?: "",
-                budgetMax = savedStateHandle[KEY_BUDGET_MAX] ?: "",
-                estimatedHours = savedStateHandle[KEY_ESTIMATED_HOURS] ?: "",
-                scheduleType = scheduleTypeName?.let { name -> GigComposeScheduleType.entries.firstOrNull { it.name == name } },
-                scheduledStartISO = savedStateHandle[KEY_SCHEDULED_START],
-                locationMode = locationModeName?.let { name -> GigComposeLocationMode.entries.firstOrNull { it.name == name } },
-                placeAddress =
-                    GigComposePlaceAddress(
-                        line1 = savedStateHandle[KEY_PLACE_LINE1] ?: "",
-                        city = savedStateHandle[KEY_PLACE_CITY] ?: "",
-                        state = savedStateHandle[KEY_PLACE_STATE] ?: "",
-                        zip = savedStateHandle[KEY_PLACE_ZIP] ?: "",
-                    ),
-                deadlineISO = savedStateHandle[KEY_DEADLINE],
-                cancellationPolicy =
-                    cancellationName?.let { name ->
-                        GigCancellationPolicy.entries.firstOrNull { it.name == name }
-                    },
-                isUrgent = savedStateHandle[KEY_IS_URGENT] ?: false,
-                tags = tags.toList(),
-                engagementOverride =
-                    engagementName?.let { name ->
-                        GigEngagementMode.entries.firstOrNull { it.name == name }
-                    },
-            )
-        }
+        private fun restoreFormState(): GigComposeFormState = formFromSnapshot { key -> savedStateHandle.get<Any>(key) }
 
         companion object {
             // A12.8 — `composeGig2.*` prefix so stale 6-step snapshots
@@ -1278,6 +1164,10 @@ open class GigComposeViewModel
             private const val KEY_TAGS = "composeGig2.tags"
             private const val KEY_ENGAGEMENT = "composeGig2.engagementMode"
             private const val KEY_TOUCHED = "composeGig2.touchedFields"
+
+            // P6c — persona switching (beneficiary business identity).
+            private const val KEY_BENEFICIARY_ID = "composeGig2.beneficiaryUserId"
+            private const val KEY_BENEFICIARY_LABEL = "composeGig2.beneficiaryLabel"
 
             /** P0.1 — debounce ahead of the backend magic-draft call. */
             private const val DETECTION_DEBOUNCE_MS = 700L
@@ -1479,13 +1369,296 @@ open class GigComposeViewModel
                 return out.toString()
             }
 
-            private fun priceFromBudget(
+            internal fun priceFromBudget(
                 type: GigComposeBudgetType,
                 budgetMin: String,
             ): Double =
                 when (type) {
                     GigComposeBudgetType.Offers -> 0.0
                     GigComposeBudgetType.Fixed, GigComposeBudgetType.Hourly -> budgetMin.toDoubleOrNull() ?: 0.0
+                }
+
+            // MARK: - P6c shared form snapshot + body assembly
+
+            /**
+             * Scalar form → `composeGig2.*` map. Single encoding shared by
+             * [SavedStateHandle] persistence and the offline
+             * [GigDraftQueue] (module objects stay in-memory in both).
+             */
+            internal fun formSnapshot(form: GigComposeFormState): Map<String, Any?> =
+                mapOf(
+                    KEY_STEP to form.step,
+                    KEY_COMPOSE_MODE to form.composeMode.name,
+                    KEY_DESCRIBE to form.describeText,
+                    KEY_DETECTED to form.detectedArchetype?.name,
+                    KEY_ARCHETYPE to form.taskArchetype,
+                    KEY_CATEGORY to form.category?.name,
+                    KEY_TITLE to form.title,
+                    KEY_DESCRIPTION to form.description,
+                    KEY_PHOTOS to ArrayList(form.photoIds),
+                    KEY_BUDGET_TYPE to form.budgetType?.name,
+                    KEY_BUDGET_MIN to form.budgetMin,
+                    KEY_BUDGET_MAX to form.budgetMax,
+                    KEY_ESTIMATED_HOURS to form.estimatedHours,
+                    KEY_SCHEDULE_TYPE to form.scheduleType?.name,
+                    KEY_SCHEDULED_START to form.scheduledStartISO,
+                    KEY_LOCATION_MODE to form.locationMode?.name,
+                    KEY_PLACE_LINE1 to form.placeAddress.line1,
+                    KEY_PLACE_CITY to form.placeAddress.city,
+                    KEY_PLACE_STATE to form.placeAddress.state,
+                    KEY_PLACE_ZIP to form.placeAddress.zip,
+                    KEY_DEADLINE to form.deadlineISO,
+                    KEY_CANCELLATION to form.cancellationPolicy?.name,
+                    KEY_IS_URGENT to form.isUrgent,
+                    KEY_TAGS to ArrayList(form.tags),
+                    KEY_ENGAGEMENT to form.engagementOverride?.name,
+                    KEY_BENEFICIARY_ID to form.beneficiaryUserId,
+                    KEY_BENEFICIARY_LABEL to form.beneficiaryLabel,
+                )
+
+            /** Inverse of [formSnapshot] over any key-value source. */
+            @Suppress("CyclomaticComplexMethod")
+            internal fun formFromSnapshot(read: (String) -> Any?): GigComposeFormState {
+                fun string(key: String): String? = read(key) as? String
+
+                fun stringList(key: String): List<String> = (read(key) as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                return GigComposeFormState(
+                    step = read(KEY_STEP) as? Int ?: GigComposeStep.Describe.ordinal0,
+                    composeMode =
+                        string(KEY_COMPOSE_MODE)?.let { name -> ComposeMode.entries.firstOrNull { it.name == name } }
+                            ?: ComposeMode.Magic,
+                    describeText = string(KEY_DESCRIBE) ?: "",
+                    detectedArchetype =
+                        string(KEY_DETECTED)?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
+                    taskArchetype = string(KEY_ARCHETYPE),
+                    category = string(KEY_CATEGORY)?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
+                    title = string(KEY_TITLE) ?: "",
+                    description = string(KEY_DESCRIPTION) ?: "",
+                    photoIds = stringList(KEY_PHOTOS),
+                    budgetType =
+                        string(KEY_BUDGET_TYPE)?.let { name -> GigComposeBudgetType.entries.firstOrNull { it.name == name } },
+                    budgetMin = string(KEY_BUDGET_MIN) ?: "",
+                    budgetMax = string(KEY_BUDGET_MAX) ?: "",
+                    estimatedHours = string(KEY_ESTIMATED_HOURS) ?: "",
+                    scheduleType =
+                        string(KEY_SCHEDULE_TYPE)?.let { name -> GigComposeScheduleType.entries.firstOrNull { it.name == name } },
+                    scheduledStartISO = string(KEY_SCHEDULED_START),
+                    locationMode =
+                        string(KEY_LOCATION_MODE)?.let { name -> GigComposeLocationMode.entries.firstOrNull { it.name == name } },
+                    placeAddress =
+                        GigComposePlaceAddress(
+                            line1 = string(KEY_PLACE_LINE1) ?: "",
+                            city = string(KEY_PLACE_CITY) ?: "",
+                            state = string(KEY_PLACE_STATE) ?: "",
+                            zip = string(KEY_PLACE_ZIP) ?: "",
+                        ),
+                    deadlineISO = string(KEY_DEADLINE),
+                    cancellationPolicy =
+                        string(KEY_CANCELLATION)?.let { name -> GigCancellationPolicy.entries.firstOrNull { it.name == name } },
+                    isUrgent = read(KEY_IS_URGENT) as? Boolean ?: false,
+                    tags = stringList(KEY_TAGS),
+                    engagementOverride =
+                        string(KEY_ENGAGEMENT)?.let { name -> GigEngagementMode.entries.firstOrNull { it.name == name } },
+                    beneficiaryUserId = string(KEY_BENEFICIARY_ID),
+                    beneficiaryLabel = string(KEY_BENEFICIARY_LABEL),
+                )
+            }
+
+            /** P6c — wrap the form snapshot as an offline-queue entry. */
+            internal fun queuedDraftOf(
+                form: GigComposeFormState,
+                id: String? = null,
+            ): GigQueuedDraft =
+                GigQueuedDraft(
+                    id = id ?: UUID.randomUUID().toString(),
+                    createdAtEpochMs = System.currentTimeMillis(),
+                    title =
+                        form.title.trim().ifEmpty { form.describeText.trim() }.ifEmpty { "Untitled task" }
+                            .take(DRAFT_TITLE_MAX),
+                    form = formSnapshot(form),
+                )
+
+            /** P6c — queued draft → magic-post body (feed retry path). */
+            fun bodyFromQueuedDraft(draft: GigQueuedDraft): MagicPostBody? = bodyFromForm(formFromSnapshot { draft.form[it] })
+
+            private const val DRAFT_TITLE_MAX = 80
+
+            /** P6c — offline / transport-failure submit message. */
+            internal const val DRAFT_SAVED_OFFLINE_MESSAGE =
+                "You're offline — draft saved. Post it from the Gigs feed when you're back online."
+
+            /** Wire `engagement_mode` — user override, else the inferred default. */
+            internal fun resolveEngagementMode(form: GigComposeFormState): String =
+                form.engagementOverride?.wireValue
+                    ?: inferEngagementMode(
+                        archetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory),
+                        scheduleType = scheduleWireValue(form),
+                        isUrgent = form.isUrgent,
+                    )
+
+            /**
+             * Pure [MagicPostBody] assembly. Returns null when a required
+             * field is missing or invalid (e.g. a queued draft whose
+             * scheduled start slipped into the past).
+             */
+            @Suppress("ReturnCount")
+            internal fun bodyFromForm(
+                form: GigComposeFormState,
+                aiConfidence: Double? = null,
+                aiDraft: MagicDraftDto? = null,
+            ): MagicPostBody? {
+                val title = form.title.trim()
+                val description = form.description.trim()
+                val budgetType = form.budgetType ?: return null
+                val scheduleType = form.scheduleType ?: return null
+                val locationMode = form.locationMode ?: return null
+                if (!hasValidTitleAndDescription(title, description)) return null
+                if (!hasValidPrice(budgetType, priceFromBudget(budgetType, form.budgetMin))) return null
+                if (!hasValidScheduledStart(scheduleType, form.scheduledStartISO)) return null
+                val location = composedLocation(locationMode, form.placeAddress) ?: return null
+                val amount = form.budgetMin.toDoubleOrNull()
+                val scheduleWire = scheduleWireValue(form)
+                val urgentDetails = resolvedUrgentDetails(form, aiDraft)
+                val draft =
+                    MagicDraftDto(
+                        title = title,
+                        description = description,
+                        category = form.category?.key,
+                        taskArchetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory),
+                        payType = budgetType.wireValue,
+                        budgetFixed = if (budgetType == GigComposeBudgetType.Fixed) amount else null,
+                        hourlyRate = if (budgetType == GigComposeBudgetType.Hourly) amount else null,
+                        estimatedHours = form.estimatedHours.toDoubleOrNull(),
+                        scheduleType = scheduleWire,
+                        timeWindowStart = if (scheduleWire == "scheduled") form.scheduledStartISO else null,
+                        // E.1 deadline sheet → the draft's time-window end (the
+                        // magic-post schema has no standalone `deadline`).
+                        timeWindowEnd = form.deadlineISO,
+                        locationMode = draftLocationMode(locationMode),
+                        isUrgent = form.isUrgent.takeIf { it },
+                        tags = form.tags.ifEmpty { null },
+                        attachments = form.photoIds.ifEmpty { null },
+                        items = form.items.filter { it.name.isNotBlank() }.ifEmpty { null },
+                        cancellationPolicy = form.cancellationPolicy?.wireValue,
+                        startsAsap = urgentDetails?.startsAsap,
+                        responseWindowMinutes = urgentDetails?.responseWindowMinutes,
+                        careDetails = form.careDetails,
+                        logisticsDetails = form.logisticsDetails,
+                        remoteDetails = form.remoteDetails,
+                        urgentDetails = urgentDetails,
+                        eventDetails = form.eventDetails,
+                    )
+                return MagicPostBody(
+                    text = magicPostText(form, title, description),
+                    draft = draft,
+                    location =
+                        MagicPostLocation(
+                            mode = location.mode,
+                            latitude = location.latitude,
+                            longitude = location.longitude,
+                            address = location.address,
+                            city = location.city,
+                            state = location.state,
+                            zip = location.zip,
+                        ),
+                    // P6c — persona switching: null posts as Personal, a
+                    // business's postable user id posts on its behalf.
+                    beneficiaryUserId = form.beneficiaryUserId,
+                    sourceFlow = if (form.composeMode == ComposeMode.Magic) "magic" else "classic",
+                    engagementMode = resolveEngagementMode(form),
+                    taskFormat = taskFormatFor(locationMode),
+                    aiConfidence = aiConfidence,
+                    aiDraftJson = aiDraft,
+                )
+            }
+
+            internal fun hasValidTitleAndDescription(
+                title: String,
+                description: String,
+            ): Boolean =
+                title.length in GigComposeLimits.TITLE_MIN..GigComposeLimits.TITLE_MAX &&
+                    description.length in GigComposeLimits.DESCRIPTION_MIN..GigComposeLimits.DESCRIPTION_MAX
+
+            internal fun hasValidPrice(
+                type: GigComposeBudgetType,
+                price: Double,
+            ): Boolean = type == GigComposeBudgetType.Offers || price > 0.0
+
+            internal fun hasValidScheduledStart(
+                type: GigComposeScheduleType,
+                scheduledStart: String?,
+            ): Boolean = type != GigComposeScheduleType.OneTime || isFutureInstant(scheduledStart)
+
+            internal fun isFutureInstant(iso: String?): Boolean =
+                iso?.let { value ->
+                    try {
+                        Instant.parse(value).isAfter(Instant.now())
+                    } catch (_: DateTimeParseException) {
+                        false
+                    }
+                } ?: false
+
+            private fun taskFormatFor(mode: GigComposeLocationMode): String? =
+                if (mode == GigComposeLocationMode.Virtual) {
+                    "remote"
+                } else {
+                    null
+                }
+
+            /** Urgent module rides along whenever the boost is on. */
+            private fun resolvedUrgentDetails(
+                form: GigComposeFormState,
+                aiDraft: MagicDraftDto?,
+            ): UrgentDetailsDto? =
+                when {
+                    !form.isUrgent -> null
+                    else -> aiDraft?.urgentDetails ?: UrgentDetailsDto(startsAsap = true)
+                }
+
+            private data class ComposedLocation(
+                val mode: String,
+                val latitude: Double,
+                val longitude: Double,
+                val address: String,
+                val city: String? = null,
+                val state: String? = null,
+                val zip: String? = null,
+            )
+
+            private fun composedLocation(
+                mode: GigComposeLocationMode,
+                place: GigComposePlaceAddress,
+            ): ComposedLocation? =
+                when (mode) {
+                    GigComposeLocationMode.YourAddress ->
+                        ComposedLocation(
+                            mode = mode.wireMode,
+                            latitude = 0.0,
+                            longitude = 0.0,
+                            address = "Your saved address",
+                        )
+                    GigComposeLocationMode.APlace -> {
+                        if (!place.isComplete) {
+                            null
+                        } else {
+                            ComposedLocation(
+                                mode = mode.wireMode,
+                                latitude = 0.0,
+                                longitude = 0.0,
+                                address = place.line1.trim(),
+                                city = place.city.trim(),
+                                state = place.state.trim(),
+                                zip = place.zip.trim(),
+                            )
+                        }
+                    }
+                    GigComposeLocationMode.Virtual ->
+                        ComposedLocation(
+                            mode = mode.wireMode,
+                            latitude = 0.0,
+                            longitude = 0.0,
+                            address = "Remote / Online",
+                        )
                 }
         }
     }

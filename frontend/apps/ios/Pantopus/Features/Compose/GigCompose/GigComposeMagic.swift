@@ -177,22 +177,72 @@ extension GigComposeEngagementMode {
     }
 }
 
-// MARK: - Identity chip
+// MARK: - Identity chip (P6c persona switching)
 
+/// "PERSONAL · YOU" / "ACME PLUMBING · BUSINESS" pill. Static for
+/// business-less users; becomes a picker menu once
+/// `viewModel.identityOptions` carries business seats. Selection updates
+/// the form's `beneficiary_user_id` (nil = personal).
 struct ComposeIdentityChip: View {
+    @Bindable var viewModel: GigComposeViewModel
+
     var body: some View {
-        HStack(spacing: Spacing.s1) {
-            Icon(.user, size: 11, color: Theme.Color.personal)
-            Text("PERSONAL · YOU")
+        Group {
+            if viewModel.identityOptions.count > 1 {
+                Menu {
+                    ForEach(viewModel.identityOptions) { option in
+                        Button {
+                            viewModel.selectIdentity(option)
+                        } label: {
+                            if isSelected(option) {
+                                Label(option.label, systemImage: "checkmark")
+                            } else {
+                                Text(option.label)
+                            }
+                        }
+                        .accessibilityIdentifier("gigCompose.identity.option_\(option.id)")
+                    }
+                } label: {
+                    chipBody(showsChevron: true)
+                }
+                .buttonStyle(.plain)
+            } else {
+                chipBody(showsChevron: false)
+            }
+        }
+        .accessibilityIdentifier("gigCompose.identity")
+        .accessibilityLabel("Posting as \(isBusiness ? (viewModel.form.beneficiaryName ?? "business") : "yourself")")
+    }
+
+    private var isBusiness: Bool {
+        viewModel.form.beneficiaryUserId != nil
+    }
+
+    private func isSelected(_ option: GigComposeIdentityOption) -> Bool {
+        option.beneficiaryUserId == viewModel.form.beneficiaryUserId
+    }
+
+    private func chipBody(showsChevron: Bool) -> some View {
+        let accent = isBusiness ? Theme.Color.business : Theme.Color.personal
+        let background = isBusiness ? Theme.Color.businessBg : Theme.Color.personalBg
+        let text = isBusiness
+            ? "\((viewModel.form.beneficiaryName ?? "Business").uppercased()) · BUSINESS"
+            : "PERSONAL · YOU"
+        return HStack(spacing: Spacing.s1) {
+            Icon(isBusiness ? .building2 : .user, size: 11, color: accent)
+            Text(text)
                 .font(.system(size: 10.5, weight: .bold))
                 .tracking(0.5)
-                .foregroundStyle(Theme.Color.personal)
+                .foregroundStyle(accent)
+                .lineLimit(1)
+            if showsChevron {
+                Icon(.chevronDown, size: 10, strokeWidth: 2.6, color: accent)
+            }
         }
         .padding(.horizontal, Spacing.s2)
         .padding(.vertical, Spacing.s1)
-        .background(Theme.Color.personalBg)
+        .background(background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-        .accessibilityIdentifier("composeGigIdentityChip")
     }
 }
 
@@ -205,7 +255,7 @@ struct MagicDescribeStep: View {
     @State private var showsPhotosPicker = false
 
     var body: some View {
-        ComposeIdentityChip()
+        ComposeIdentityChip(viewModel: viewModel)
         HeadlineBlock("What do you need done?")
         SubcopyBlock("Describe it in your own words. Pantopus figures out the category, fills in the details, and posts it for bids.")
         MagicDescribeCard(
@@ -808,7 +858,7 @@ struct ManualPickerStep: View {
 
     var body: some View {
         TryMagicBanner { viewModel.setComposeMode(.magic) }
-        ComposeIdentityChip()
+        ComposeIdentityChip(viewModel: viewModel)
         HeadlineBlock("Pick a category")
         SubcopyBlock("Skipping the describe step? Pick the archetype directly — we'll ask the questions that matter for it.")
         LazyVGrid(columns: columns, spacing: Spacing.s2) {

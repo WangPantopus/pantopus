@@ -9,15 +9,21 @@ import app.pantopus.android.data.api.models.gigs.GigSavedSearchDto
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.gigs.GigDraftQueue
 import app.pantopus.android.data.gigs.GigSavedSearchesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.realtime.SocketManager
+import app.pantopus.android.data.widget.WidgetSnapshotStore
+import app.pantopus.android.data.widget.WidgetTaskSnapshot
+import app.pantopus.android.ui.screens.compose.gig.GigComposeViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
@@ -45,6 +51,9 @@ class GigsFeedViewModel
         private val authRepo: AuthRepository,
         private val location: LocationProvider,
         private val savedSearchesRepo: GigSavedSearchesRepository,
+        private val draftQueue: GigDraftQueue,
+        private val widgetSnapshots: WidgetSnapshotStore,
+        private val networkMonitor: NetworkMonitor,
     ) : ViewModel() {
         private val _state = MutableStateFlow<GigsFeedUiState>(GigsFeedUiState.Loading)
         val state: StateFlow<GigsFeedUiState> = _state.asStateFlow()
@@ -76,6 +85,24 @@ class GigsFeedViewModel
         /** P6a — render state for the "Saved searches" manage sheet. */
         private val _savedSearches = MutableStateFlow<GigSavedSearchesUiState>(GigSavedSearchesUiState.Loading)
         val savedSearches: StateFlow<GigSavedSearchesUiState> = _savedSearches.asStateFlow()
+
+        /** P6c — slim "N drafts waiting" banner; null while offline / queue empty. */
+        private val _draftBanner = MutableStateFlow<GigsDraftBanner?>(null)
+        val draftBanner: StateFlow<GigsDraftBanner?> = _draftBanner.asStateFlow()
+
+        /** P6c — serialises banner "Post now" taps. */
+        private var draftPosting = false
+
+        init {
+            // P6c — the banner appears only when back online with queued drafts.
+            viewModelScope.launch {
+                combine(draftQueue.drafts, networkMonitor.isOnline) { drafts, online ->
+                    drafts
+                        .takeIf { online && it.isNotEmpty() }
+                        ?.let { GigsDraftBanner(count = it.size, title = it.first().title) }
+                }.collect { _draftBanner.value = it }
+            }
+        }
 
         /** P6a — raw saved-search rows backing optimistic PATCH/DELETE + revert. */
         private var savedSearchDtos: List<GigSavedSearchDto> = emptyList()
@@ -388,6 +415,46 @@ class GigsFeedViewModel
                 }
         }
 
+        // MARK: - P6c Offline draft queue
+
+        /**
+         * Banner "Post now": re-submit the oldest queued draft through
+         * the same magic-post path the composer uses. Success removes it
+         * (+ toast + refetch so the new task shows); failure keeps it.
+         */
+        fun postPendingDraft() {
+            if (draftPosting) return
+            val draft = draftQueue.drafts.value.firstOrNull() ?: return
+            val body = GigComposeViewModel.bodyFromQueuedDraft(draft)
+            if (body == null) {
+                // Stale snapshot (e.g. scheduled start passed) — keep it
+                // so the user can discard deliberately.
+                _toast.value =
+                    GigsFeedToast(text = "Draft can't be posted — its schedule may have passed.", isError = true)
+                return
+            }
+            draftPosting = true
+            viewModelScope.launch {
+                when (val result = repo.magicPost(body)) {
+                    is NetworkResult.Success -> {
+                        draftQueue.remove(draft.id)
+                        _toast.value = GigsFeedToast(text = "Draft posted — helpers nearby were notified.")
+                        fetch()
+                    }
+                    is NetworkResult.Failure -> {
+                        _toast.value = GigsFeedToast(text = result.error.message, isError = true)
+                    }
+                }
+                draftPosting = false
+            }
+        }
+
+        /** Banner "Discard": drop the oldest queued draft. */
+        fun discardPendingDraft() {
+            val draft = draftQueue.drafts.value.firstOrNull() ?: return
+            draftQueue.remove(draft.id)
+        }
+
         private fun restoreDismissedGig(gigId: String) {
             val (index, gig) = pendingDismissals.remove(gigId) ?: return
             loadedGigs =
@@ -490,6 +557,10 @@ class GigsFeedViewModel
                         } else {
                             GigsFeedUiState.BrowseLoaded(content)
                         }
+                    // P6c — refresh the home-screen widget snapshot.
+                    writeWidgetSnapshot(
+                        with(result.data.sections) { bestMatches + newToday + urgent + highPaying + quickJobs },
+                    )
                 }
                 is NetworkResult.Failure -> {
                     _state.value = GigsFeedUiState.Error(result.error.message)
@@ -528,10 +599,37 @@ class GigsFeedViewModel
                     pendingCategoryHides.clear()
                     rebuild()
                     updateRadiusSuggestion()
+                    // P6c — refresh the home-screen widget snapshot.
+                    writeWidgetSnapshot(result.data.gigs)
                 }
                 is NetworkResult.Failure -> {
                     _state.value = GigsFeedUiState.Error(result.error.message)
                 }
+            }
+        }
+
+        /**
+         * P6c — project the fetched gigs into the "Tasks near me" widget
+         * snapshot (max 10, deduped). The store broadcasts the widget
+         * update itself; failures must never break the feed.
+         */
+        private fun writeWidgetSnapshot(gigs: List<GigDto>) {
+            runCatching {
+                widgetSnapshots.write(
+                    gigs
+                        .distinctBy { it.id }
+                        .take(WidgetSnapshotStore.MAX_TASKS)
+                        .map { gig ->
+                            val card = projectCard(gig)
+                            WidgetTaskSnapshot(
+                                id = card.id,
+                                title = card.title,
+                                price = card.price,
+                                distance = card.distanceLabel,
+                                categoryKey = card.category.key,
+                            )
+                        },
+                )
             }
         }
 

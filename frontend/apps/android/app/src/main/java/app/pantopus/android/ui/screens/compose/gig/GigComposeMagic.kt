@@ -358,7 +358,7 @@ internal fun MagicDescribeStep(
     onAttachTap: () -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
-    ComposeIdentityChip()
+    ComposeIdentityChip(state, vm)
     HeadlineBlock("What do you need done?")
     SubcopyBlock("Describe it in your own words. Pantopus figures out the category, fills in the details, and posts it for bids.")
     MagicDescribeCard(
@@ -470,20 +470,61 @@ private fun ClarifyingQuestionHint(question: String) {
     }
 }
 
+/**
+ * P6c — posting-identity chip. Static "PERSONAL · YOU" when the user has
+ * no businesses; with businesses it becomes a picker that opens the
+ * identity sheet ([GigPickerSheet.Identity]). A business selection
+ * repaints the chip in the business identity tokens and rides the
+ * submission as `beneficiary_user_id`.
+ */
 @Composable
-internal fun ComposeIdentityChip() {
+internal fun ComposeIdentityChip(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
+    val isBusiness = state.form.beneficiaryUserId != null
+    val accent = if (isBusiness) PantopusColors.business else PantopusColors.personal
+    val accentBg = if (isBusiness) PantopusColors.businessBg else PantopusColors.personalBg
+    val label =
+        if (isBusiness) {
+            "BUSINESS · ${(state.form.beneficiaryLabel ?: "BUSINESS").uppercase()}"
+        } else {
+            "PERSONAL · YOU"
+        }
+    val isPicker = state.identityOptions.isNotEmpty()
     Row(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
-                .background(PantopusColors.personalBg)
+                .background(accentBg)
+                .let { base ->
+                    if (isPicker) {
+                        base.clickable(role = Role.Button) { vm.presentPicker(GigPickerSheet.Identity) }
+                    } else {
+                        base
+                    }
+                }
                 .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
-                .testTag("composeGigIdentityChip"),
+                .testTag("gigCompose.identity")
+                .semantics { contentDescription = "Posting as $label" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(icon = PantopusIcon.User, contentDescription = null, size = 11.dp, tint = PantopusColors.personal)
-        Text("PERSONAL · YOU", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.personal)
+        PantopusIconImage(
+            icon = if (isBusiness) PantopusIcon.Briefcase else PantopusIcon.User,
+            contentDescription = null,
+            size = 11.dp,
+            tint = accent,
+        )
+        Text(label, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = accent)
+        if (isPicker) {
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronDown,
+                contentDescription = null,
+                size = 11.dp,
+                tint = accent,
+            )
+        }
     }
 }
 
@@ -905,7 +946,7 @@ internal fun ManualPickerStep(
     vm: GigComposeViewModel,
 ) {
     TryMagicBanner(onTap = { vm.setComposeMode(ComposeMode.Magic) })
-    ComposeIdentityChip()
+    ComposeIdentityChip(state, vm)
     HeadlineBlock("Pick a category")
     SubcopyBlock("Skipping the describe step? Pick the archetype directly — we'll ask the questions that matter for it.")
     val rows = gigComposeManualPickerCategories.chunked(2)

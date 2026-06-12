@@ -59,12 +59,19 @@ public final class GigsFeedViewModel {
     /// MyBids). The view clears it after the toast expires.
     public var toast: ToastMessage?
 
+    /// P6c — true while a queued offline draft is being re-posted from
+    /// the banner's "Post now" (disables the button against double-taps).
+    public private(set) var isPostingDraft = false
+
     private let api: APIClient
     private let latitude: Double?
     private let longitude: Double?
     private let location: any LocationProviding
     private let currentUserId: @MainActor () -> String?
     private let gigEventsProvider: @MainActor () -> AsyncStream<GigNewEvent>
+    private let draftQueue: any GigDraftQueueing
+    private let widgetStore: any WidgetSnapshotStoring
+    private let isOnlineProvider: @MainActor () -> Bool
     private var loadedItems: [GigDTO] = []
     private var undoSnapshot: [GigDTO] = []
     private var isLoading = false
@@ -88,7 +95,12 @@ public final class GigsFeedViewModel {
         },
         gigEventsProvider: @escaping @MainActor () -> AsyncStream<GigNewEvent> = {
             SocketClient.shared.events(named: "gig:new", as: GigNewEvent.self)
-        }
+        },
+        // P6c — offline composer drafts surfaced by the feed banner.
+        draftQueue: any GigDraftQueueing = GigDraftQueue.shared,
+        // P6c — Tasks-near-me widget snapshot writer (no-op under tests).
+        widgetStore: any WidgetSnapshotStoring = WidgetSnapshotStore.shared,
+        isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
     ) {
         self.api = api
         self.latitude = latitude
@@ -97,6 +109,9 @@ public final class GigsFeedViewModel {
         self.location = location
         self.currentUserId = currentUserId
         self.gigEventsProvider = gigEventsProvider
+        self.draftQueue = draftQueue
+        self.widgetStore = widgetStore
+        self.isOnlineProvider = isOnlineProvider
     }
 
     /// True when the feed renders the sectioned browse surface: no
@@ -184,6 +199,53 @@ public final class GigsFeedViewModel {
         }
     }
 
+    // MARK: - P6c Offline draft banner
+
+    /// Pending composer drafts saved while offline.
+    public var pendingDraftCount: Int {
+        draftQueue.drafts.count
+    }
+
+    /// Banner gate: drafts exist and we're back online.
+    public var showsDraftBanner: Bool {
+        pendingDraftCount > 0 && isOnlineProvider()
+    }
+
+    /// "Post now" — replay the oldest draft through the same magic-post
+    /// path the composer uses. Success removes it (+ refreshes the feed
+    /// so the new task shows); failure keeps it queued.
+    public func postPendingDraft() async {
+        guard !isPostingDraft, let draft = draftQueue.drafts.first else { return }
+        guard let body = GigMagicPostBuilder.body(
+            from: draft.form,
+            coordinate: resolvedCoordinate()
+        ) else {
+            // A "Save draft" stash can be mid-wizard incomplete — it
+            // can't ride magic-post until the composer finishes it.
+            toast = ToastMessage(
+                text: "That draft is missing details — finish it in Post a task.",
+                kind: .error
+            )
+            return
+        }
+        isPostingDraft = true
+        defer { isPostingDraft = false }
+        do {
+            _ = try await api.request(GigsEndpoints.magicPost(body: body), as: MagicPostResponse.self)
+            draftQueue.remove(id: draft.id)
+            toast = ToastMessage(text: "Draft posted", kind: .success)
+            await fetch()
+        } catch {
+            toast = ToastMessage(text: "Couldn't post your draft — it's still saved.", kind: .error)
+        }
+    }
+
+    /// "Discard" — drop the oldest pending draft.
+    public func discardPendingDraft() {
+        guard let draft = draftQueue.drafts.first else { return }
+        draftQueue.remove(id: draft.id)
+    }
+
     // MARK: - Radius suggestion (B)
 
     /// Suggestion ladder: 1 → 3 → 5 → 10 mi, capped at 10.
@@ -266,6 +328,10 @@ public final class GigsFeedViewModel {
                 ? .empty(GigsFeedEmpty(radiusMiles: radiusMiles))
                 : .browse(content)
             updateRadiusSuggestion(resultCount: response.totalActive ?? 0)
+            writeWidgetSnapshot(
+                tasks: Self.widgetTasks(fromBrowse: content),
+                totalNearby: response.totalActive ?? 0
+            )
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gigs."
             state = .error(message: message)
@@ -291,6 +357,10 @@ public final class GigsFeedViewModel {
             loadedItems = response.gigs
             let visibleCount = rebuildState()
             updateRadiusSuggestion(resultCount: visibleCount)
+            writeWidgetSnapshot(
+                tasks: response.gigs.map { Self.widgetTask(from: Self.project($0)) },
+                totalNearby: response.total ?? response.gigs.count
+            )
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gigs."
             state = .error(message: message)
@@ -514,6 +584,54 @@ extension GigsFeedViewModel {
             distanceLabel: distanceLabel(miles: gig.distanceMeters.map { $0 / metersPerMile }),
             imageUrl: gig.firstImage
         )
+    }
+
+    // MARK: - P6c Tasks-near-me widget snapshot
+
+    /// Persist the latest fetch into the App Group suite so the widget
+    /// timeline can render without an authed call. Capped + timestamped
+    /// by `GigWidgetSnapshot`; the store reloads the widget timeline.
+    private func writeWidgetSnapshot(tasks: [GigWidgetTask], totalNearby: Int) {
+        widgetStore.write(
+            GigWidgetSnapshot(
+                generatedAt: Date(),
+                totalNearby: max(totalNearby, tasks.count),
+                tasks: tasks
+            )
+        )
+    }
+
+    static func widgetTask(from content: GigCardContent) -> GigWidgetTask {
+        GigWidgetTask(
+            id: content.id,
+            title: content.title,
+            price: content.price,
+            distance: content.distanceLabel,
+            categoryKey: content.category.rawValue
+        )
+    }
+
+    /// Flatten the browse sections (vertical rows first, then rails) in
+    /// display order, de-duplicating gigs that appear in two sections.
+    static func widgetTasks(fromBrowse content: GigsBrowseContent) -> [GigWidgetTask] {
+        var seen = Set<String>()
+        var tasks: [GigWidgetTask] = []
+        let rows = content.bestMatches + content.newToday + content.quickJobs
+        for row in rows where seen.insert(row.id).inserted {
+            tasks.append(widgetTask(from: row))
+        }
+        for rail in content.urgentRail + content.highPayingRail where seen.insert(rail.id).inserted {
+            tasks.append(
+                GigWidgetTask(
+                    id: rail.id,
+                    title: rail.title,
+                    price: rail.price,
+                    distance: rail.distanceLabel,
+                    categoryKey: rail.category.rawValue
+                )
+            )
+        }
+        return tasks
     }
 
     /// Cluster → category chip. The id keeps the raw backend key so two
