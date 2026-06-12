@@ -28,12 +28,24 @@ public struct MarketplaceView: View {
         self.onBack = onBack
     }
 
+    /// Cold first load — per the A08 loading frame, the search bar and
+    /// chip row shimmer alongside the grid. Later loads (chip taps,
+    /// search) keep the chrome live and only the grid skeletons.
+    private var isInitialLoading: Bool {
+        if case .loading = viewModel.state { return !viewModel.hasLoadedOnce }
+        return false
+    }
+
     public var body: some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: Spacing.s0) {
                 topBar
-                searchBar
-                categoryChipRow
+                if isInitialLoading {
+                    MarketplaceChromeSkeleton()
+                } else {
+                    searchBar
+                    categoryChipRow
+                }
                 content
             }
             .background(Theme.Color.appBg)
@@ -43,6 +55,11 @@ public struct MarketplaceView: View {
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
+        .onAppear {
+            // Re-fires when a pushed screen (wizard, listing detail)
+            // pops back — refresh so a just-posted listing appears.
+            Task { await viewModel.refreshOnReturn() }
+        }
         .accessibilityIdentifier("marketplace")
     }
 
@@ -95,7 +112,7 @@ public struct MarketplaceView: View {
         .padding(.horizontal, 14)
         .frame(height: 44)
         .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s2)
         .accessibilityIdentifier("marketplaceSearchBar")
@@ -214,33 +231,9 @@ public struct MarketplaceView: View {
     }
 
     private func radiusHint(_ miles: Double) -> some View {
-        HStack(spacing: Spacing.s2) {
-            Icon(.mapPin, size: 13, color: Theme.Color.appTextMuted)
-            Group {
-                Text("Showing within ")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    + Text(Self.radiusLabel(miles))
-                    .font(.system(size: 11.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-                    + Text(" · widen in filter")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
+        MarketplaceRadiusHint(miles: miles, canWiden: viewModel.canWidenRadius) {
+            Task { await viewModel.widenRadius() }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-    }
-
-    private static func radiusLabel(_ miles: Double) -> String {
-        if miles.truncatingRemainder(dividingBy: 1) == 0 { return "\(Int(miles)) mi" }
-        return String(format: "%.1f mi", miles)
     }
 
     private func populatedFrame(_ rows: [MarketplaceCardContent]) -> some View {
@@ -254,6 +247,13 @@ public struct MarketplaceView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("marketplaceCard_\(row.id)")
+                    .onAppear {
+                        Task { await viewModel.loadMoreIfNeeded(currentId: row.id) }
+                    }
+                }
+                if viewModel.isLoadingMore {
+                    ListingSkeletonCard()
+                    ListingSkeletonCard()
                 }
             }
             .padding(.horizontal, Spacing.s4)
@@ -297,6 +297,79 @@ public struct MarketplaceView: View {
         .padding(Spacing.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("marketplaceError")
+    }
+}
+
+// MARK: - Chrome skeleton (A08 loading frame)
+
+/// Cold-load stand-ins for the search bar + chip row — the design's
+/// loading frame shimmers all three bands, not just the grid.
+private struct MarketplaceChromeSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            Shimmer(height: 44, cornerRadius: Radii.lg)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, Spacing.s2)
+            HStack(spacing: Spacing.s2) {
+                ForEach(Array([50, 64, 76, 60, 84].enumerated()), id: \.offset) { _, width in
+                    Shimmer(width: CGFloat(width), height: 28, cornerRadius: Radii.pill)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Empty-state radius pill
+
+/// "Showing within N mi" hint. Tapping widens the search radius to the
+/// next step and refetches; at the widest step it renders inert.
+private struct MarketplaceRadiusHint: View {
+    let miles: Double
+    let canWiden: Bool
+    let onWiden: () -> Void
+
+    var body: some View {
+        Button(action: onWiden) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.mapPin, size: 13, color: Theme.Color.appTextMuted)
+                Group {
+                    Text("Showing within ")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        + Text(Self.radiusLabel(miles))
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                        + Text(canWiden ? " · tap to widen" : " · max radius")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(canWiden ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!canWiden)
+        .accessibilityIdentifier("marketplaceWidenRadius")
+        .accessibilityLabel(
+            canWiden
+                ? "Showing within \(Self.radiusLabel(miles)). Tap to widen the search radius."
+                : "Showing within \(Self.radiusLabel(miles)), the widest radius."
+        )
+    }
+
+    private static func radiusLabel(_ miles: Double) -> String {
+        if miles.truncatingRemainder(dividingBy: 1) == 0 { return "\(Int(miles)) mi" }
+        return String(format: "%.1f mi", miles)
     }
 }
 
