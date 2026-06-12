@@ -15,6 +15,15 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+/// Mutable scroll metrics for the conversation timeline, held by
+/// reference (via @State) so per-frame writes during scrolling don't
+/// invalidate the view tree.
+private final class ChatScrollMetrics {
+    /// How far the user has scrolled below the top of the loaded
+    /// history, in points. Drives the near-top pagination trigger.
+    var distanceFromTop: CGFloat = .greatestFiniteMagnitude
+}
+
 /// Chat conversation screen.
 public struct ChatConversationView: View {
     @State private var viewModel: ChatConversationViewModel
@@ -32,12 +41,22 @@ public struct ChatConversationView: View {
     @State private var selectedMessageIds: Set<String> = []
     @State private var bulkDeleteConfirmPresented = false
     /// Gates the scroll-to-top pagination trigger: armed ~0.5s after the
-    /// populated frame first lays out, so the trigger's first `onAppear`
-    /// (which fires during initial paint, before the bottom anchor
+    /// populated frame first lays out, so the initial layout passes
+    /// (which briefly report near-top geometry before the bottom anchor
     /// settles) can't fetch an older page unprompted.
     @State private var isLoadOlderArmed = false
-    /// Whether the pagination trigger row is currently composed/visible.
-    @State private var isLoadOlderTriggerVisible = false
+    /// True while an older-page fetch + scroll restore is in flight —
+    /// the near-top geometry check fires continuously during a scroll,
+    /// and must not stack requests.
+    @State private var isLoadingOlder = false
+    /// Scroll metrics held by reference: they update on every scrolled
+    /// frame, and a per-frame @State write would re-render the whole
+    /// conversation at scroll rate.
+    @State private var scrollMetrics = ChatScrollMetrics()
+    /// Whether the viewport is at (or within ~120pt of) the newest
+    /// message. Gates stay-pinned-on-new-rows scrolling. Only flips on
+    /// actual boundary crossings, so it stays a cheap @State.
+    @State private var isAtBottom = false
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Presentation mode — drives the AI chrome (avatar, welcome card,
@@ -792,75 +811,199 @@ extension ChatConversationView {
 
     // MARK: - Populated + error
 
+    /// Stable id for the timeline's bottom sentinel — the target of every
+    /// land-at-latest / stay-pinned scroll.
+    private static let bottomAnchorId = "chat_bottom_anchor"
+    /// Named coordinate space of the conversation ScrollView — the frame
+    /// of the content in this space drives the near-top pagination
+    /// trigger and the at-bottom tracking.
+    private static let scrollSpaceName = "chatConversationScroll"
+
     private func populatedFrame(_ rows: [ChatTimelineRow]) -> some View {
         // TODO(ctx-strip): A15's pinned gig context strip needs gig
         // title/price/schedule, which neither room nor person mode loads
         // today (room mode only knows its id). Implement once the thread
         // fetch carries gig context — no new endpoint from the view.
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: Spacing.s0) {
-                    if viewModel.canLoadOlder {
+        GeometryReader { geo in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    // A plain (non-lazy) VStack on purpose: pages are
+                    // bounded (60 rows/fetch) and exact row heights are
+                    // what make `.defaultScrollAnchor(.bottom)` land on
+                    // the newest message. LazyVStack positions by
+                    // *estimated* heights, which left the first frame in
+                    // blank space past the real content and made every
+                    // scrollTo land short.
+                    VStack(spacing: Spacing.s0) {
+                        if mode == .fanThread {
+                            FanAutoWelcomeCard()
+                                .padding(.bottom, Spacing.s3)
+                        }
+                        if mode == .aiAssistant {
+                            // A15.3 — the welcome card stays pinned at the top
+                            // of the populated AI thread.
+                            aiWelcomeCard
+                                .padding(.bottom, 10)
+                        }
+                        ForEach(rows) { row in
+                            // Row width is measured once at the list level
+                            // (viewport minus the 12pt side paddings) — a
+                            // per-row GeometryReader made every bubble lay
+                            // out twice and snap from the fallback width
+                            // while scrolling.
+                            timelineRowView(row, rowWidth: max(0, geo.size.width - 24))
+                        }
                         Color.clear
-                            .frame(height: 1)
-                            .onAppear {
-                                isLoadOlderTriggerVisible = true
-                                guard isLoadOlderArmed else { return }
-                                Task { await viewModel.loadOlder() }
-                            }
-                            .onDisappear { isLoadOlderTriggerVisible = false }
+                            .frame(height: 4)
+                            .id(Self.bottomAnchorId)
                     }
-                    if mode == .fanThread {
-                        FanAutoWelcomeCard()
-                            .padding(.bottom, Spacing.s3)
-                    }
-                    if mode == .aiAssistant {
-                        // A15.3 — the welcome card stays pinned at the top
-                        // of the populated AI thread.
-                        aiWelcomeCard
-                            .padding(.bottom, 10)
-                    }
-                    ForEach(rows) { row in
-                        timelineRowView(row)
-                    }
-                    Color.clear.frame(height: 4)
+                    .padding(.horizontal, 12)
+                    .padding(.top, Spacing.s3)
+                    .background(
+                        // Scroll tracking. `onAppear`/`onDisappear` row
+                        // sentinels only work in lazy stacks, so the
+                        // pagination trigger and at-bottom state read the
+                        // content frame instead.
+                        GeometryReader { contentGeo in
+                            let frame = contentGeo.frame(in: .named(Self.scrollSpaceName))
+                            Color.clear
+                                .onAppear {
+                                    handleScrollGeometry(frame: frame, viewportHeight: geo.size.height, rows: rows, proxy: proxy)
+                                }
+                                .onChange(of: frame) { _, newFrame in
+                                    handleScrollGeometry(frame: newFrame, viewportHeight: geo.size.height, rows: rows, proxy: proxy)
+                                }
+                        }
+                    )
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, Spacing.s3)
-            }
-            // Threads open at the latest message (rows project
-            // oldest-first), and the bottom stays anchored when new
-            // rows land while the user is already at the bottom.
-            .defaultScrollAnchor(.bottom)
-            .refreshable { await viewModel.refresh() }
-            .accessibilityIdentifier("chatConversationContent")
-            .task {
-                guard !isLoadOlderArmed else { return }
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                isLoadOlderArmed = true
-                // A thread short enough to keep the trigger on screen
-                // never re-fires its `onAppear` — kick one fetch now so
-                // backward pagination still works there.
-                if isLoadOlderTriggerVisible, viewModel.canLoadOlder {
-                    await viewModel.loadOlder()
+                .coordinateSpace(name: Self.scrollSpaceName)
+                // Threads open at the latest message (rows project
+                // oldest-first), and the bottom stays anchored when new
+                // rows land while the user is already at the bottom.
+                .defaultScrollAnchor(.bottom)
+                .refreshable { await viewModel.refresh() }
+                .accessibilityIdentifier("chatConversationContent")
+                .task {
+                    guard !isLoadOlderArmed else { return }
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    isLoadOlderArmed = true
+                    // A thread too short to scroll never changes its
+                    // scroll geometry, so the near-top check never
+                    // re-fires — kick one fetch so backward pagination
+                    // still works there.
+                    if scrollMetrics.distanceFromTop < 200, viewModel.canLoadOlder {
+                        loadOlderPreservingPosition(rows: rows, proxy: proxy)
+                    }
                 }
-            }
-            .onChange(of: viewModel.pendingScrollTargetId) { _, target in
-                guard let target else { return }
-                if reduceMotion {
-                    proxy.scrollTo(target, anchor: .center)
-                } else {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                .task { await landAtLatestMessage(proxy) }
+                .onChange(of: rows.last) { oldLast, newLast in
+                    pinToBottomIfNeeded(oldLast: oldLast, newLast: newLast, proxy: proxy)
+                }
+                .onChange(of: viewModel.pendingScrollTargetId) { _, target in
+                    guard let target else { return }
+                    if reduceMotion {
                         proxy.scrollTo(target, anchor: .center)
+                    } else {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo(target, anchor: .center)
+                        }
                     }
+                    viewModel.consumePendingScroll()
                 }
-                viewModel.consumePendingScroll()
             }
         }
     }
 
+    /// React to the content frame moving inside the scroll viewport:
+    /// update the at-bottom flag and fire backward pagination when the
+    /// user nears the top of the loaded history.
+    private func handleScrollGeometry(
+        frame: CGRect,
+        viewportHeight: CGFloat,
+        rows: [ChatTimelineRow],
+        proxy: ScrollViewProxy
+    ) {
+        scrollMetrics.distanceFromTop = -frame.minY
+        let nearBottom = (frame.maxY - viewportHeight) < 120
+        if isAtBottom != nearBottom {
+            isAtBottom = nearBottom
+        }
+        guard isLoadOlderArmed,
+              !isLoadingOlder,
+              viewModel.canLoadOlder,
+              scrollMetrics.distanceFromTop < 200 else { return }
+        loadOlderPreservingPosition(rows: rows, proxy: proxy)
+    }
+
+    /// Force the thread to open at the latest message. The bottom anchor
+    /// positions the first frame, but row content that resolves a beat
+    /// later (remote images, link previews) can still nudge the layout —
+    /// re-pin across a few passes.
+    private func landAtLatestMessage(_ proxy: ScrollViewProxy) async {
+        // Opened from Chat Search → the pendingScrollTargetId path
+        // positions on the matched message instead.
+        guard !viewModel.hasPendingSearchTarget else { return }
+        proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+        for delayMs: UInt64 in [80, 250, 600] {
+            try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
+            guard !Task.isCancelled else { return }
+            proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+        }
+    }
+
+    /// Keep the viewport pinned to the newest message: always follow the
+    /// user's own outgoing send; otherwise only when they're already
+    /// reading the latest messages (never yank them out of history).
+    private func pinToBottomIfNeeded(
+        oldLast: ChatTimelineRow?,
+        newLast: ChatTimelineRow?,
+        proxy: ScrollViewProxy
+    ) {
+        guard let newLast else { return }
+        let isNewRow = oldLast?.id != newLast.id
+        let isOwnSend: Bool = {
+            guard isNewRow, case let .bubble(bubble) = newLast else { return false }
+            return bubble.side == .outgoing
+        }()
+        guard isAtBottom || isOwnSend else { return }
+        if isNewRow, !reduceMotion {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+            }
+        } else {
+            // Same row growing in place (streamed AI reply) — track the
+            // bottom without animating every delta.
+            proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+        }
+    }
+
+    /// Fetch the next older page, then put the row that was at the top of
+    /// the viewport back there — prepending shifts the existing content
+    /// down, which otherwise lands the user on a random older message.
+    /// The anchor is the first BUBBLE row: divider ids (day keys) move to
+    /// the top of the merged day when older same-day messages prepend,
+    /// while a bubble id stays glued to its message.
+    private func loadOlderPreservingPosition(rows: [ChatTimelineRow], proxy: ScrollViewProxy) {
+        guard !isLoadingOlder else { return }
+        isLoadingOlder = true
+        let anchorId = rows.first { row in
+            if case .bubble = row { return true }
+            return false
+        }?.id
+        Task {
+            await viewModel.loadOlder()
+            if let anchorId {
+                proxy.scrollTo(anchorId, anchor: .top)
+                // Second pass once the prepended rows have laid out.
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                proxy.scrollTo(anchorId, anchor: .top)
+            }
+            isLoadingOlder = false
+        }
+    }
+
     @ViewBuilder
-    private func timelineRowView(_ row: ChatTimelineRow) -> some View {
+    private func timelineRowView(_ row: ChatTimelineRow, rowWidth: CGFloat) -> some View {
         switch row {
         case let .dayDivider(divider):
             ChatDayDividerRow(label: divider.label)
@@ -869,7 +1012,7 @@ extension ChatConversationView {
         case let .broadcastReference(reference):
             ChatBroadcastReferenceCard(reference: reference)
         case let .bubble(bubble):
-            bubbleRowView(bubble)
+            bubbleRowView(bubble, rowWidth: rowWidth)
         }
     }
 
@@ -877,7 +1020,7 @@ extension ChatConversationView {
     /// active: a leading check toggle on the user's own persisted
     /// messages, with row taps toggling membership.
     @ViewBuilder
-    private func bubbleRowView(_ bubble: ChatBubbleContent) -> some View {
+    private func bubbleRowView(_ bubble: ChatBubbleContent, rowWidth: CGFloat) -> some View {
         // Excludes in-flight (`client_`) rows and AI-thread local rows
         // (`ai_user_` / `ai_assistant_`) — neither is persisted, so the
         // bulk-delete loop could never delete them server-side.
@@ -893,7 +1036,8 @@ extension ChatConversationView {
                 )
                 .frame(width: 28, height: 28)
                 .opacity(selectable ? 1 : 0)
-                chatBubbleRow(bubble)
+                // 36 = the 28pt check column + the 8pt HStack spacing.
+                chatBubbleRow(bubble, rowWidth: max(0, rowWidth - 36))
                     .allowsHitTesting(false)
             }
             .contentShape(Rectangle())
@@ -908,13 +1052,14 @@ extension ChatConversationView {
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("chatSelectableRow_\(bubble.id)")
         } else {
-            chatBubbleRow(bubble)
+            chatBubbleRow(bubble, rowWidth: rowWidth)
         }
     }
 
-    private func chatBubbleRow(_ bubble: ChatBubbleContent) -> some View {
+    private func chatBubbleRow(_ bubble: ChatBubbleContent, rowWidth: CGFloat) -> some View {
         ChatBubbleRow(
             content: bubble,
+            rowWidth: rowWidth,
             incomingInitials: incomingInitials,
             onLockedAction: { upgradePromptPresented = true },
             onReply: { viewModel.beginReply(to: bubble.id) },
@@ -1980,12 +2125,11 @@ private struct ChatLinkPreviewCard: View {
 // swiftlint:disable:next type_body_length
 private struct ChatBubbleRow: View {
     // A15 `.bubble { max-width: 78% }` (fractional, not fixed) —
-    // `rowWidth` is read from the row's available width below. Until it
-    // resolves, fall back to a sensible fixed cap. AI replies stretch to
-    // 82% per `.bubble.ai`.
+    // `rowWidth` is the available row width, measured once at the list
+    // level and passed in. Until it resolves, fall back to a sensible
+    // fixed cap. AI replies stretch to 82% per `.bubble.ai`.
     private static let fallbackBubbleMaxWidth: CGFloat = 260
     private static let bubbleHorizontalPadding: CGFloat = 12
-    @State private var rowWidth: CGFloat = 0
     private var bubbleMaxWidth: CGFloat {
         let fraction: CGFloat = isAIReplyBody ? 0.82 : 0.78
         return rowWidth > 0 ? rowWidth * fraction : Self.fallbackBubbleMaxWidth
@@ -2000,6 +2144,7 @@ private struct ChatBubbleRow: View {
     }
 
     let content: ChatBubbleContent
+    let rowWidth: CGFloat
     let incomingInitials: String?
     let onLockedAction: @MainActor () -> Void
     let onReply: @MainActor () -> Void
@@ -2031,13 +2176,6 @@ private struct ChatBubbleRow: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: alignmentToFrameAlignment)
-        .background(
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { rowWidth = geo.size.width }
-                    .onChange(of: geo.size.width) { _, newValue in rowWidth = newValue }
-            }
-        )
         // A15 group rhythm — 2pt above a continuation bubble, 4pt above
         // a new same/other-sender group (`.scroll gap: 4` + `.same -2`).
         .padding(.top, content.isContinuation ? 2 : 4)

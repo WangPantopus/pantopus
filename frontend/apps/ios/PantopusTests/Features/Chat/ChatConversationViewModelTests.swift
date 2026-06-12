@@ -448,7 +448,7 @@ final class ChatConversationViewModelTests: XCTestCase {
         XCTAssertTrue(rows.contains { $0.id == "bubble_m_retry" })
     }
 
-    /// Socket events refetch the thread (`fetch(initial: true)`) — a
+    /// Socket events refetch the thread (`fetch(.merge)`) — a
     /// failed optimistic row must survive that, or the user silently
     /// loses the message and its retry CTA.
     func testRefetchKeepsFailedPendingRow() async {
@@ -690,6 +690,51 @@ final class ChatConversationViewModelTests: XCTestCase {
         }
         XCTAssertEqual(bubbles.count, 2, "realtime refresh should incorporate the new message")
         XCTAssertEqual(bubbles.last?.id, "m2")
+    }
+
+    /// A socket-echo refresh() merges the newest page on top of the held
+    /// history — it must not wipe pages the user paginated to (the old
+    /// reload behavior reset the thread to a shimmer and dropped every
+    /// older page, yanking the scroll position on each incoming message).
+    func testRefreshKeepsPaginatedOlderMessages() async {
+        URLProtocolStub.stub(
+            path: "/api/chat/conversations/u_other/messages",
+            responses: [
+                // Initial load: newest message, more history behind it.
+                .json(Self.messagesJSON(
+                    Self.messageJSON(id: "m2", userId: "u_other", text: "newest"),
+                    hasMore: true
+                )),
+                // loadOlder(): the older page.
+                .json(Self.messagesJSON(
+                    Self.messageJSON(id: "m1", userId: "u_other", text: "older", createdAt: "2026-04-20T09:59:00.000Z"),
+                    hasMore: false
+                )),
+                // refresh() (socket echo): newest page again plus a reply.
+                .json(Self.messagesJSON(
+                    Self.messageJSON(id: "m3", userId: "u_other", text: "reply", createdAt: "2026-04-20T10:01:00.000Z"),
+                    Self.messageJSON(id: "m2", userId: "u_other", text: "newest")
+                ))
+            ]
+        )
+        URLProtocolStub.stub(path: "/api/chat/conversations/u_other/read", response: .json("{}"))
+        let vm = ChatConversationViewModel(
+            mode: .person(otherUserId: "u_other"),
+            counterparty: Self.counterpartyPerson,
+            currentUserId: "u_me",
+            api: makeAPI()
+        )
+        await vm.load()
+        await vm.loadOlder()
+        await vm.refresh()
+        guard case let .loaded(rows) = vm.state else {
+            XCTFail("Expected .loaded after refresh")
+            return
+        }
+        let bubbleIds = rows.compactMap { row -> String? in
+            if case let .bubble(content) = row { return content.id } else { return nil }
+        }
+        XCTAssertEqual(bubbleIds, ["m1", "m2", "m3"], "refresh must keep the paginated older page and append the new reply in order")
     }
 
     func testReplySendIncludesReplyToId() async throws {
