@@ -8,7 +8,11 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.CancelGigReason
 import app.pantopus.android.data.api.models.gigs.CancellationPreviewResponse
 import app.pantopus.android.data.api.models.gigs.GigBidDto
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderDto
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderMutationResponse
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderType
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionDto
 import app.pantopus.android.data.api.models.gigs.GigReportReason
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
@@ -51,7 +55,7 @@ data class GigActiveTaskUi(
     val viewerIsWorker: Boolean,
     /** Worker on an `assigned` task that hasn't acknowledged yet. */
     val showWorkerAck: Boolean,
-    /** Worker already acknowledged ("On my way" chip). */
+    /** Worker already acknowledged starting ("On my way" chip). */
     val acked: Boolean,
     /** Worker on an `assigned` task — "Start task" (`/start`). */
     val showStartTask: Boolean,
@@ -59,8 +63,14 @@ data class GigActiveTaskUi(
     val showMarkDelivered: Boolean,
     /** Owner once the worker marked done — "Confirm completion". */
     val showConfirmCompletion: Boolean,
-    /** Owner no-show affordance, gated by `GET /no-show-check`. */
+    /** No-show affordance (either party), gated by `GET /no-show-check`. */
     val showNoShow: Boolean,
+    /** Phase 5b — worker on an `assigned` task may flag `running_late`. */
+    val showRunningLate: Boolean = false,
+    /** Phase 5b — worker flagged `running_late`; both roles see the badge. */
+    val runningLate: Boolean = false,
+    /** Phase 5b — ETA minutes accompanying `running_late`, when given. */
+    val lateEtaMinutes: Int? = null,
 )
 
 @HiltViewModel
@@ -234,6 +244,20 @@ class GigDetailViewModel
 
         private val _cancelPreviewLoading = MutableStateFlow(false)
         val cancelPreviewLoading: StateFlow<Boolean> = _cancelPreviewLoading.asStateFlow()
+
+        // MARK: - Phase 5b lifecycle-completer state
+
+        /** Payment card (owner, assigned+) from `GET /payment`; null hides it. */
+        private val _payment = MutableStateFlow<GigPaymentResponse?>(null)
+        val payment: StateFlow<GigPaymentResponse?> = _payment.asStateFlow()
+
+        /** Change orders for the active task (both roles, assigned/in_progress). */
+        private val _changeOrders = MutableStateFlow<List<GigChangeOrderDto>>(emptyList())
+        val changeOrders: StateFlow<List<GigChangeOrderDto>> = _changeOrders.asStateFlow()
+
+        /** Change-order id whose approve / reject / withdraw is in flight. */
+        private val _changeOrderActionInFlight = MutableStateFlow<String?>(null)
+        val changeOrderActionInFlight: StateFlow<String?> = _changeOrderActionInFlight.asStateFlow()
 
         /** Which checkout the presented PaymentSheet belongs to. */
         private sealed interface PendingCheckout {
@@ -411,6 +435,8 @@ class GigDetailViewModel
             _activeTask.value = deriveActiveTask(gig, uid)
             refreshNoShowEligibility(gig, uid)
             refreshReviewState(gig, uid)
+            refreshPayment(gig, uid)
+            refreshChangeOrders(gig, uid)
             _state.value =
                 ContentDetailUiState.Loaded(
                     Projection.project(
@@ -434,27 +460,42 @@ class GigDetailViewModel
             val isWorker = uid != null && uid == gig.acceptedBy
             if (!isOwner && !isWorker) return null
             val status = gig.status?.lowercase()
+            val runningLate = isLifecycleParticipantLate(gig, status)
             return GigActiveTaskUi(
                 phaseIndex = phase,
                 viewerIsOwner = isOwner,
                 viewerIsWorker = isWorker,
                 showWorkerAck = isWorker && status == "assigned" && gig.workerAckStatus.isNullOrEmpty(),
-                acked = isWorker && !gig.workerAckStatus.isNullOrEmpty(),
+                acked = isWorker && gig.workerAckStatus == "starting_now",
                 showStartTask = isWorker && status == "assigned",
                 showMarkDelivered = canMarkDelivered,
                 showConfirmCompletion = ownerCanConfirmCompletion(gig, uid),
                 showNoShow = noShowEligible,
+                // 5b — secondary "Running late" while assigned, unless already flagged.
+                showRunningLate = isWorker && status == "assigned" && gig.workerAckStatus != "running_late",
+                runningLate = runningLate,
+                lateEtaMinutes = if (runningLate) gig.workerAckEtaMinutes else null,
             )
         }
 
-        /** Owner-only: ask `GET /no-show-check` whether to surface the affordance. */
+        /** 5b — late badge for both roles while the ack is still relevant. */
+        private fun isLifecycleParticipantLate(
+            gig: GigDto,
+            status: String?,
+        ): Boolean = status == "assigned" && gig.workerAckStatus == "running_late"
+
+        /**
+         * Either party (`/report-no-show` gates poster + worker) on an
+         * assigned / in-progress task: ask `GET /no-show-check` whether to
+         * surface the affordance.
+         */
         private fun refreshNoShowEligibility(
             gig: GigDto,
             uid: String?,
         ) {
-            val isOwner = uid != null && uid == gig.userId
+            val participant = uid != null && (uid == gig.userId || uid == gig.acceptedBy)
             val status = gig.status?.lowercase()
-            if (!isOwner || (status != "assigned" && status != "in_progress")) return
+            if (!participant || (status != "assigned" && status != "in_progress")) return
             viewModelScope.launch {
                 when (val result = repo.noShowCheck(gigId)) {
                     is NetworkResult.Success ->
@@ -514,6 +555,124 @@ class GigDetailViewModel
             gig: GigDto,
             uid: String?,
         ): String? = if (uid == gig.userId) gig.acceptedBy else gig.userId
+
+        // MARK: - Phase 5b · payment card (work item 1)
+
+        /**
+         * Owner on an assigned+ task: fetch the payment summary; the card
+         * silently hides on failure / 404 / no linked payment. Re-runs with
+         * every gig refresh (including `gig:*` room events).
+         */
+        private fun refreshPayment(
+            gig: GigDto,
+            uid: String?,
+        ) {
+            val isOwner = uid != null && uid == gig.userId
+            val assignedPlus = gig.status?.lowercase() in listOf("assigned", "in_progress", "completed")
+            if (!isOwner || !assignedPlus) {
+                _payment.value = null
+                return
+            }
+            viewModelScope.launch {
+                when (val result = repo.gigPayment(gigId)) {
+                    is NetworkResult.Success -> _payment.value = result.data.takeIf { it.payment != null }
+                    is NetworkResult.Failure -> _payment.value = null
+                }
+            }
+        }
+
+        // MARK: - Phase 5b · change orders (work item 2)
+
+        /** Both participants while assigned / in progress; cleared otherwise. */
+        private fun refreshChangeOrders(
+            gig: GigDto,
+            uid: String?,
+        ) {
+            val participant = uid != null && (uid == gig.userId || uid == gig.acceptedBy)
+            val status = gig.status?.lowercase()
+            if (!participant || (status != "assigned" && status != "in_progress")) {
+                _changeOrders.value = emptyList()
+                return
+            }
+            viewModelScope.launch {
+                when (val result = repo.changeOrders(gigId)) {
+                    is NetworkResult.Success -> _changeOrders.value = result.data.changeOrders
+                    is NetworkResult.Failure -> Unit
+                }
+            }
+        }
+
+        /** True when the "Changes" card renders (both roles, assigned/in_progress). */
+        fun showChangeOrders(): Boolean {
+            val gig = rawGig ?: return false
+            val uid = currentUserId() ?: return false
+            if (uid != gig.userId && uid != gig.acceptedBy) return false
+            return gig.status?.lowercase() in listOf("assigned", "in_progress")
+        }
+
+        /** Signed-in viewer id — the Changes card gates per-row actions on it. */
+        fun viewerUserId(): String? = currentUserId()
+
+        /** Propose a change order (`POST /change-orders`). */
+        fun proposeChangeOrder(
+            type: GigChangeOrderType,
+            description: String,
+            amountChange: Double?,
+            timeChangeMinutes: Int?,
+            onResult: (Boolean) -> Unit = {},
+        ) {
+            viewModelScope.launch {
+                val result =
+                    repo.createChangeOrder(
+                        gigId = gigId,
+                        type = type.wireValue,
+                        description = description,
+                        amountChange = amountChange?.takeIf { it != 0.0 },
+                        timeChangeMinutes = timeChangeMinutes?.takeIf { it != 0 },
+                    )
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast("Change request sent"))
+                        silentRefetch()
+                        onResult(true)
+                    }
+                    is NetworkResult.Failure -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(result.error.message, isError = true))
+                        onResult(false)
+                    }
+                }
+            }
+        }
+
+        /** Counterparty approves; price deltas land on the gig server-side. */
+        fun approveChangeOrder(orderId: String) = changeOrderAction(orderId, "Change approved") { repo.approveChangeOrder(gigId, orderId) }
+
+        /** Counterparty declines the pending order. */
+        fun rejectChangeOrder(orderId: String) = changeOrderAction(orderId, "Change declined") { repo.rejectChangeOrder(gigId, orderId) }
+
+        /** Requester withdraws their own pending order. */
+        fun withdrawChangeOrder(orderId: String) =
+            changeOrderAction(orderId, "Change request withdrawn") { repo.withdrawChangeOrder(gigId, orderId) }
+
+        private fun changeOrderAction(
+            orderId: String,
+            successToast: String,
+            call: suspend () -> NetworkResult<GigChangeOrderMutationResponse>,
+        ) {
+            if (_changeOrderActionInFlight.value != null) return
+            _changeOrderActionInFlight.value = orderId
+            viewModelScope.launch {
+                when (val result = call()) {
+                    is NetworkResult.Success -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(successToast))
+                        silentRefetch()
+                    }
+                    is NetworkResult.Failure ->
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(result.error.message, isError = true))
+                }
+                _changeOrderActionInFlight.value = null
+            }
+        }
 
         fun placeBid(
             amount: Double,
@@ -792,6 +951,37 @@ class GigDetailViewModel
             }
         }
 
+        /**
+         * Phase 5b — worker "Running late": `POST /worker-ack` with
+         * `running_late` + the optional ETA (1..480 min) and note.
+         */
+        fun workerRunningLate(
+            etaMinutes: Int?,
+            note: String?,
+            onResult: (Boolean) -> Unit = {},
+        ) {
+            viewModelScope.launch {
+                val result =
+                    repo.workerAck(
+                        gigId = gigId,
+                        status = "running_late",
+                        etaMinutes = etaMinutes,
+                        note = note,
+                    )
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast("Owner notified — running late"))
+                        silentRefetch()
+                        onResult(true)
+                    }
+                    is NetworkResult.Failure -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(result.error.message, isError = true))
+                        onResult(false)
+                    }
+                }
+            }
+        }
+
         /** Worker `POST /start` — `assigned → in_progress`. */
         fun startTask() {
             viewModelScope.launch {
@@ -820,7 +1010,7 @@ class GigDetailViewModel
             }
         }
 
-        /** Owner `POST /report-no-show` — cancels the task with an incident. */
+        /** Either party `POST /report-no-show` — cancels the task with an incident. */
         fun reportNoShow(
             description: String?,
             onResult: (Boolean) -> Unit = {},

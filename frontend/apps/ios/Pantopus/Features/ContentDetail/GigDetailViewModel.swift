@@ -63,8 +63,25 @@ public final class GigDetailViewModel {
     /// Lifecycle phase for the active-task strip (assigned → confirmed).
     public private(set) var activePhase: GigActivePhase?
 
-    /// Owner-side no-show affordance, gated by `GET /:gigId/no-show-check`.
+    /// No-show affordance for either party (owner reports the worker,
+    /// worker reports an unresponsive owner), gated by
+    /// `GET /:gigId/no-show-check`.
     public private(set) var noShowEligible: Bool = false
+
+    // MARK: - Phase 5b — lifecycle completers
+
+    /// Owner's payment summary (`GET /:gigId/payment`) — `nil` hides the
+    /// Payment card (no linked payment, 404, or any fetch failure).
+    public private(set) var payment: GigPaymentDTO?
+
+    /// Status chip metadata riding the payment envelope.
+    public private(set) var paymentStateInfo: GigPaymentStateInfo?
+
+    /// Change orders on an assigned / in-progress gig (newest first).
+    public private(set) var changeOrders: [GigChangeOrderDTO] = []
+
+    /// Change-order id with an approve / reject / withdraw in flight.
+    public private(set) var changeOrderActionInFlight: String?
 
     /// Set when `GET /api/reviews/my-pending` says this gig still wants a
     /// review from the viewer. Drives the "Leave a review" CTA.
@@ -192,17 +209,23 @@ public final class GigDetailViewModel {
         }
     }
 
-    /// Conditional follow-up fetches: the owner's no-show eligibility on
-    /// an active task, and the viewer's pending-review row once the gig
-    /// completes. Both are best-effort — failures just hide affordances.
+    /// Conditional follow-up fetches: either party's no-show eligibility
+    /// on an active task, the owner's payment summary once assigned+,
+    /// the change-order list, and the viewer's pending-review row once
+    /// the gig completes. All best-effort — failures just hide
+    /// affordances.
     private func loadLifecycleExtras(gig: GigDTO) async {
         let status = (gig.status ?? "").lowercased()
-        if viewerIsOwner, ["assigned", "in_progress"].contains(status) {
+        // The backend gates `/report-no-show` for both parties: poster →
+        // worker no-show, worker → unresponsive poster (gigs.js:7722).
+        if viewerIsOwner || viewerIsWorker, ["assigned", "in_progress"].contains(status) {
             let check: NoShowCheckResponse? = try? await api.request(GigsEndpoints.noShowCheck(gigId: gigId))
             noShowEligible = check?.canReport ?? false
         } else {
             noShowEligible = false
         }
+        await loadPayment(gig: gig, status: status)
+        await loadChangeOrders(status: status)
         if status == "completed", viewerIsOwner || viewerIsWorker, !reviewSubmitted {
             if let response: MyPendingReviewsResponse = try? await api.request(ReviewsEndpoints.myPending()) {
                 pendingReview = response.pending.first { $0.gigId == gigId }
@@ -211,6 +234,32 @@ public final class GigDetailViewModel {
                 if pendingReview == nil { reviewSubmitted = true }
             }
         }
+    }
+
+    /// Owner's Payment card data — fetched once a bid was accepted /
+    /// the gig is assigned+ (gigs.js:8440). Silent-hide on 404/failure.
+    private func loadPayment(gig: GigDTO, status: String) async {
+        let assignedPlus = ["assigned", "in_progress", "completed"].contains(status)
+            || !(gig.acceptedBy ?? "").isEmpty
+        guard viewerIsOwner, assignedPlus else {
+            payment = nil
+            paymentStateInfo = nil
+            return
+        }
+        let response: GigPaymentResponse? = try? await api.request(GigsEndpoints.payment(gigId: gigId))
+        payment = response?.payment
+        paymentStateInfo = response?.stateInfo
+    }
+
+    /// Change orders — both roles, while the gig is assigned /
+    /// in_progress (the create route's precondition, gigs.js:6691).
+    private func loadChangeOrders(status: String) async {
+        guard viewerIsOwner || viewerIsWorker, ["assigned", "in_progress"].contains(status) else {
+            changeOrders = []
+            return
+        }
+        let response: GigChangeOrdersResponse? = try? await api.request(GigsEndpoints.changeOrders(gigId: gigId))
+        changeOrders = response?.changeOrders ?? []
     }
 
     /// Bookmark toggle (work item C). Optimistic: flip `isSaved`
@@ -288,6 +337,47 @@ public final class GigDetailViewModel {
         return (gig.status ?? "").lowercased() == "assigned"
             && (gig.workerAckStatus ?? "").isEmpty
             && (gig.startedAt ?? "").isEmpty
+    }
+
+    /// "Running late" gate — assigned worker, before start, not already
+    /// flagged late. Unlike `showWorkerAck` it stays available after an
+    /// "I'm on it" (the backend lets the worker re-ack, gigs.js:5838).
+    public var canReportRunningLate: Bool {
+        guard viewerIsWorker, let gig = rawGig else { return false }
+        return (gig.status ?? "").lowercased() == "assigned"
+            && (gig.startedAt ?? "").isEmpty
+            && gig.workerAckStatus != "running_late"
+    }
+
+    /// "Running ~X min late" badge copy for the phase strip — shown to
+    /// both roles while the late ack stands on an active task.
+    public var runningLateLabel: String? {
+        guard let gig = rawGig, gig.workerAckStatus == "running_late" else { return nil }
+        guard ["assigned", "in_progress"].contains((gig.status ?? "").lowercased()) else { return nil }
+        if let eta = gig.workerAckEtaMinutes, eta > 0 {
+            return "Running ~\(eta) min late"
+        }
+        return "Running late"
+    }
+
+    /// Payment card gate — owner only (the worker's payout view lives in
+    /// the wallet); data presence implies the assigned+ fetch succeeded.
+    public var showPaymentCard: Bool {
+        viewerIsOwner && payment != nil
+    }
+
+    /// Changes card gate — either party on an assigned / in-progress
+    /// gig (mirrors the create route's precondition).
+    public var showChangesSection: Bool {
+        guard viewerIsOwner || viewerIsWorker, let gig = rawGig else { return false }
+        return ["assigned", "in_progress"].contains((gig.status ?? "").lowercased())
+    }
+
+    /// True when the signed-in viewer proposed this change order —
+    /// drives Withdraw (proposer) vs Approve / Reject (counterparty).
+    public func isOwnChangeOrder(_ order: GigChangeOrderDTO) -> Bool {
+        guard let me = currentUserId, !me.isEmpty else { return false }
+        return order.requestedBy == me
     }
 
     /// "Start task" gate — the **assigned worker** transitions
@@ -661,6 +751,145 @@ extension GigDetailViewModel {
         }
     }
 
+    /// Worker's "Running late" — `worker-ack` with `running_late` plus
+    /// an ETA (1–480 min) and optional note (gigs.js:5838).
+    @discardableResult
+    public func sendRunningLate(etaMinutes: Int, note: String?) async -> String? {
+        guard canReportRunningLate else { return nil }
+        do {
+            let _: WorkerAckResponse = try await api.request(
+                GigsEndpoints.workerAck(
+                    gigId: gigId,
+                    body: WorkerAckBody(status: "running_late", etaMinutes: etaMinutes, note: note)
+                )
+            )
+            await refreshSilently()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't send the update."
+        }
+    }
+
+    // MARK: - Phase 5b — change orders
+
+    /// Either party proposes a change (gigs.js:6691). Returns an error
+    /// string for the sheet, or `nil` on success (row prepends locally —
+    /// the list is newest-first).
+    @discardableResult
+    public func proposeChangeOrder(
+        type: GigChangeOrderType,
+        description: String,
+        amountChange: Double?,
+        timeChangeMinutes: Int?
+    ) async -> String? {
+        let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 5 else { return "Describe the change in at least 5 characters." }
+        guard changeOrderActionInFlight == nil else { return nil }
+        changeOrderActionInFlight = "new"
+        defer { changeOrderActionInFlight = nil }
+        do {
+            let response: GigChangeOrderMutationResponse = try await api.request(
+                GigsEndpoints.createChangeOrder(
+                    gigId: gigId,
+                    body: CreateChangeOrderBody(
+                        type: type,
+                        description: trimmed,
+                        amountChange: amountChange,
+                        timeChangeMinutes: timeChangeMinutes
+                    )
+                )
+            )
+            if let order = response.changeOrder {
+                changeOrders.insert(order, at: 0)
+            }
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't send the change request."
+        }
+    }
+
+    /// Counterparty approves — price deltas apply server-side, so the
+    /// gig refreshes silently after the row flips.
+    @discardableResult
+    public func approveChangeOrder(orderId: String) async -> String? {
+        await mutateChangeOrder(
+            orderId: orderId,
+            endpoint: GigsEndpoints.approveChangeOrder(gigId: gigId, orderId: orderId),
+            status: "approved",
+            refreshGig: true,
+            failure: "Couldn't approve the change."
+        )
+    }
+
+    /// Counterparty declines the pending change.
+    @discardableResult
+    public func rejectChangeOrder(orderId: String) async -> String? {
+        await mutateChangeOrder(
+            orderId: orderId,
+            endpoint: GigsEndpoints.rejectChangeOrder(gigId: gigId, orderId: orderId),
+            status: "rejected",
+            refreshGig: false,
+            failure: "Couldn't reject the change."
+        )
+    }
+
+    /// Proposer withdraws their own pending change.
+    @discardableResult
+    public func withdrawChangeOrder(orderId: String) async -> String? {
+        await mutateChangeOrder(
+            orderId: orderId,
+            endpoint: GigsEndpoints.withdrawChangeOrder(gigId: gigId, orderId: orderId),
+            status: "withdrawn",
+            refreshGig: false,
+            failure: "Couldn't withdraw the change."
+        )
+    }
+
+    /// Shared approve / reject / withdraw plumbing: POST, flip the local
+    /// row to `status` (the mutation responses drop the requester join),
+    /// optionally refresh the gig (approve may change the price).
+    private func mutateChangeOrder(
+        orderId: String,
+        endpoint: Endpoint,
+        status: String,
+        refreshGig: Bool,
+        failure: String
+    ) async -> String? {
+        guard changeOrderActionInFlight == nil else { return nil }
+        changeOrderActionInFlight = orderId
+        defer { changeOrderActionInFlight = nil }
+        do {
+            _ = try await api.request(endpoint, as: GigChangeOrderMutationResponse.self)
+            if let index = changeOrders.firstIndex(where: { $0.id == orderId }) {
+                changeOrders[index] = Self.changeOrderCopy(of: changeOrders[index], status: status)
+            }
+            if refreshGig { await refreshSilently() }
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? failure
+        }
+    }
+
+    /// Copy a change order with a new status for the optimistic row flip.
+    static func changeOrderCopy(of order: GigChangeOrderDTO, status: String) -> GigChangeOrderDTO {
+        GigChangeOrderDTO(
+            id: order.id,
+            gigId: order.gigId,
+            requestedBy: order.requestedBy,
+            type: order.type,
+            description: order.description,
+            amountChange: order.amountChange,
+            timeChangeMinutes: order.timeChangeMinutes,
+            status: status,
+            reviewedBy: order.reviewedBy,
+            reviewedAt: order.reviewedAt,
+            rejectionReason: order.rejectionReason,
+            createdAt: order.createdAt,
+            requester: order.requester,
+            reviewer: order.reviewer
+        )
+    }
+
     /// Worker starts the task (assigned → in_progress).
     @discardableResult
     public func startTask() async -> String? {
@@ -688,7 +917,8 @@ extension GigDetailViewModel {
         }
     }
 
-    /// Owner reports a worker no-show — cancels the gig server-side.
+    /// Either party reports the other as a no-show (owner → worker,
+    /// worker → unresponsive poster) — cancels the gig server-side.
     @discardableResult
     public func reportNoShow(description: String?) async -> String? {
         do {

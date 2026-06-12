@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CancellationPreviewResponse
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.CounterBidBody
+import app.pantopus.android.data.api.models.gigs.CreateChangeOrderBody
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.DismissGigBody
@@ -14,9 +15,12 @@ import app.pantopus.android.data.api.models.gigs.GigActionSuccessResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderMutationResponse
+import app.pantopus.android.data.api.models.gigs.GigChangeOrdersResponse
 import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigInstantAcceptResponse
+import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -37,6 +41,7 @@ import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
+import app.pantopus.android.data.api.models.gigs.RejectChangeOrderBody
 import app.pantopus.android.data.api.models.gigs.ReportGigBody
 import app.pantopus.android.data.api.models.gigs.ReportGigResponse
 import app.pantopus.android.data.api.models.gigs.ReportNoShowBody
@@ -243,6 +248,52 @@ class GigsRepository
         /** `GET /api/gigs/:gigId/cancellation-preview` — zone + fee preview. */
         suspend fun cancellationPreview(gigId: String): NetworkResult<CancellationPreviewResponse> =
             safeApiCall { api.cancellationPreview(gigId) }
+
+        /** `GET /api/gigs/:gigId/payment` — payment card for poster/worker. */
+        suspend fun gigPayment(gigId: String): NetworkResult<GigPaymentResponse> = safeApiCall { api.gigPayment(gigId) }
+
+        /** `GET /api/gigs/:gigId/change-orders` — list for poster/worker. */
+        suspend fun changeOrders(gigId: String): NetworkResult<GigChangeOrdersResponse> = safeApiCall { api.changeOrders(gigId) }
+
+        /** `POST /api/gigs/:gigId/change-orders` — propose a change. */
+        suspend fun createChangeOrder(
+            gigId: String,
+            type: String,
+            description: String,
+            amountChange: Double? = null,
+            timeChangeMinutes: Int? = null,
+        ): NetworkResult<GigChangeOrderMutationResponse> =
+            safeApiCall {
+                api.createChangeOrder(
+                    gigId,
+                    CreateChangeOrderBody(
+                        type = type,
+                        description = description,
+                        amountChange = amountChange,
+                        timeChangeMinutes = timeChangeMinutes,
+                    ),
+                )
+            }
+
+        /** `POST .../change-orders/:orderId/approve` — counterparty approves. */
+        suspend fun approveChangeOrder(
+            gigId: String,
+            orderId: String,
+        ): NetworkResult<GigChangeOrderMutationResponse> = safeApiCall { api.approveChangeOrder(gigId, orderId) }
+
+        /** `POST .../change-orders/:orderId/reject` — counterparty declines. */
+        suspend fun rejectChangeOrder(
+            gigId: String,
+            orderId: String,
+            reason: String? = null,
+        ): NetworkResult<GigChangeOrderMutationResponse> =
+            safeApiCall { api.rejectChangeOrder(gigId, orderId, RejectChangeOrderBody(reason = reason)) }
+
+        /** `POST .../change-orders/:orderId/withdraw` — requester pulls their own. */
+        suspend fun withdrawChangeOrder(
+            gigId: String,
+            orderId: String,
+        ): NetworkResult<GigChangeOrderMutationResponse> = safeApiCall { api.withdrawChangeOrder(gigId, orderId) }
 
         suspend fun finalizeAcceptBid(
             gigId: String,

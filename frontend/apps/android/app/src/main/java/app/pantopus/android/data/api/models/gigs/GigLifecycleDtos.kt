@@ -139,6 +139,116 @@ enum class GigReportReason(val wireValue: String, val label: String) {
 }
 
 /**
+ * Envelope from `GET /api/gigs/:gigId/payment`
+ * (`backend/routes/gigs.js:8440`). `payment == null` when no payment is
+ * linked to the gig; `stateInfo` is the display descriptor for
+ * `payment.payment_status` (`backend/stripe/paymentStateMachine.js:189`).
+ */
+@JsonClass(generateAdapter = true)
+data class GigPaymentResponse(
+    val payment: GigPaymentDto? = null,
+    val stateInfo: GigPaymentStateInfo? = null,
+)
+
+/**
+ * Poster/worker-visible subset of the `Payment` row. All `amount_*` /
+ * `tip_amount` / `refunded_amount` fields are integer cents.
+ */
+@JsonClass(generateAdapter = true)
+data class GigPaymentDto(
+    val id: String? = null,
+    @Json(name = "payment_status") val paymentStatus: String? = null,
+    @Json(name = "amount_total") val amountTotal: Int? = null,
+    @Json(name = "amount_subtotal") val amountSubtotal: Int? = null,
+    @Json(name = "amount_platform_fee") val amountPlatformFee: Int? = null,
+    @Json(name = "amount_processing_fee") val amountProcessingFee: Int? = null,
+    @Json(name = "amount_to_payee") val amountToPayee: Int? = null,
+    /** Sum of successful tip payments, net of tip refunds (route-computed). */
+    @Json(name = "tip_amount") val tipAmount: Int? = null,
+    @Json(name = "refunded_amount") val refundedAmount: Int? = null,
+    val currency: String? = null,
+)
+
+/** `{ label, color, description }` from `getPaymentStateInfo`. */
+@JsonClass(generateAdapter = true)
+data class GigPaymentStateInfo(
+    val label: String? = null,
+    val color: String? = null,
+    val description: String? = null,
+)
+
+/**
+ * One row from `GET /api/gigs/:gigId/change-orders`
+ * (`backend/routes/gigs.js:6640`). `amount_change` is dollars (positive =
+ * increase, negative = decrease, applied to the gig price on approval);
+ * `status` is `pending / approved / rejected / withdrawn`.
+ */
+@JsonClass(generateAdapter = true)
+data class GigChangeOrderDto(
+    val id: String,
+    @Json(name = "gig_id") val gigId: String? = null,
+    @Json(name = "requested_by") val requestedBy: String? = null,
+    val type: String? = null,
+    val description: String? = null,
+    @Json(name = "amount_change") val amountChange: Double? = null,
+    @Json(name = "time_change_minutes") val timeChangeMinutes: Int? = null,
+    val status: String? = null,
+    @Json(name = "reviewed_by") val reviewedBy: String? = null,
+    @Json(name = "reviewed_at") val reviewedAt: String? = null,
+    @Json(name = "rejection_reason") val rejectionReason: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    val requester: GigCreator? = null,
+    val reviewer: GigCreator? = null,
+) {
+    val isPending: Boolean get() = status == "pending"
+}
+
+/** Envelope from `GET /api/gigs/:gigId/change-orders`. */
+@JsonClass(generateAdapter = true)
+data class GigChangeOrdersResponse(
+    @Json(name = "change_orders") val changeOrders: List<GigChangeOrderDto> = emptyList(),
+)
+
+/** Envelope from the change-order mutations (`{ change_order }`). */
+@JsonClass(generateAdapter = true)
+data class GigChangeOrderMutationResponse(
+    @Json(name = "change_order") val changeOrder: GigChangeOrderDto? = null,
+)
+
+/**
+ * Body for `POST /api/gigs/:gigId/change-orders`
+ * (`backend/routes/gigs.js:6691`). `description` must be 5..2000 chars.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateChangeOrderBody(
+    val type: String,
+    val description: String,
+    @Json(name = "amount_change") val amountChange: Double? = null,
+    @Json(name = "time_change_minutes") val timeChangeMinutes: Int? = null,
+)
+
+/** Body for `POST .../change-orders/:orderId/reject` — optional reason (≤500 chars). */
+@JsonClass(generateAdapter = true)
+data class RejectChangeOrderBody(
+    val reason: String? = null,
+)
+
+/** Valid change-order `type` values (`backend/routes/gigs.js:6698`). */
+enum class GigChangeOrderType(val wireValue: String, val label: String) {
+    PriceIncrease("price_increase", "Price increase"),
+    PriceDecrease("price_decrease", "Price decrease"),
+    ScopeAddition("scope_addition", "Add to the scope"),
+    ScopeReduction("scope_reduction", "Reduce the scope"),
+    TimelineExtension("timeline_extension", "More time"),
+    Other("other", "Something else"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): GigChangeOrderType? = entries.firstOrNull { it.wireValue == value }
+    }
+}
+
+/**
  * Response from `GET /api/gigs/:gigId/cancellation-preview`
  * (`backend/routes/gigs.js:6354`). Mirrors `computeCancellationInfo`
  * (`backend/routes/gigs.js:569`) plus the policy descriptors.

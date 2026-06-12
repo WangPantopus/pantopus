@@ -7,10 +7,18 @@ import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigBidMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderDto
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderMutationResponse
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderType
+import app.pantopus.android.data.api.models.gigs.GigChangeOrdersResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigPaymentDto
+import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
+import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
+import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
@@ -289,5 +297,166 @@ class GigDetailSaveViewModelTest {
             assertEquals("Accept this task", content.dock.primary.label)
             vm.instantAccept()
             coVerify(exactly = 1) { repo.instantAccept("g1") }
+        }
+
+    // MARK: - Phase 5b · lifecycle completers
+
+    private fun assignedGig(
+        acceptedBy: String,
+        ownerId: String = "poster-1",
+    ) = GigDto(
+        id = "g1",
+        title = "Hang shelves",
+        userId = ownerId,
+        status = "assigned",
+        acceptedBy = acceptedBy,
+    )
+
+    private fun lifecycleVm(
+        gig: GigDto,
+        noShowCanReport: Boolean = false,
+        changeOrders: List<GigChangeOrderDto> = emptyList(),
+        payment: NetworkResult<GigPaymentResponse> =
+            NetworkResult.Success(
+                GigPaymentResponse(payment = GigPaymentDto(amountTotal = 5_000, amountSubtotal = 5_000)),
+            ),
+    ): GigDetailViewModel {
+        coEvery { repo.detail("g1") } returns NetworkResult.Success(GigDetailResponse(gig = gig))
+        coEvery { repo.bids("g1") } returns NetworkResult.Success(GigBidsResponse(bids = emptyList()))
+        coEvery { repo.questions("g1") } returns NetworkResult.Success(GigQuestionsResponse(questions = emptyList()))
+        coEvery { repo.noShowCheck("g1") } returns NetworkResult.Success(NoShowCheckResponse(canReport = noShowCanReport))
+        coEvery { repo.changeOrders("g1") } returns
+            NetworkResult.Success(GigChangeOrdersResponse(changeOrders = changeOrders))
+        coEvery { repo.gigPayment("g1") } returns payment
+        val vm =
+            GigDetailViewModel(
+                repo,
+                authRepo,
+                filesRepo,
+                paymentsRepo,
+                reviewsRepo,
+                socket,
+                SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
+            )
+        vm.load()
+        return vm
+    }
+
+    @Test
+    fun worker_running_late_gate_and_endpoint() =
+        runTest {
+            val vm = lifecycleVm(assignedGig(acceptedBy = "viewer-1"))
+            val panel = vm.activeTask.value!!
+            assertTrue("Assigned worker may flag running late", panel.showRunningLate)
+            assertFalse(panel.runningLate)
+
+            coEvery { repo.workerAck("g1", "running_late", 25, "stuck in traffic") } returns
+                NetworkResult.Success(WorkerAckResponse(success = true))
+            var ok = false
+            vm.workerRunningLate(25, "stuck in traffic") { ok = it }
+            assertTrue(ok)
+            coVerify(exactly = 1) { repo.workerAck("g1", "running_late", 25, "stuck in traffic") }
+        }
+
+    @Test
+    fun late_badge_surfaces_for_worker_and_owner() =
+        runTest {
+            val lateWorkerSide =
+                lifecycleVm(
+                    assignedGig(acceptedBy = "viewer-1")
+                        .copy(workerAckStatus = "running_late", workerAckEtaMinutes = 30),
+                ).activeTask.value!!
+            assertTrue(lateWorkerSide.runningLate)
+            assertEquals(30, lateWorkerSide.lateEtaMinutes)
+            assertFalse("Already flagged — hide the secondary", lateWorkerSide.showRunningLate)
+            assertFalse("running_late isn't the started chip", lateWorkerSide.acked)
+
+            val lateOwnerSide =
+                lifecycleVm(
+                    assignedGig(acceptedBy = "worker-9", ownerId = "viewer-1")
+                        .copy(workerAckStatus = "running_late", workerAckEtaMinutes = 45),
+                ).activeTask.value!!
+            assertTrue("Owner sees the late badge too", lateOwnerSide.runningLate)
+            assertEquals(45, lateOwnerSide.lateEtaMinutes)
+            assertFalse("Owner never gets the worker buttons", lateOwnerSide.showRunningLate)
+        }
+
+    @Test
+    fun owner_payment_card_loads_and_silently_hides_on_failure() =
+        runTest {
+            val gig = assignedGig(acceptedBy = "worker-9", ownerId = "viewer-1")
+            val vm =
+                lifecycleVm(
+                    gig,
+                    payment =
+                        NetworkResult.Success(
+                            GigPaymentResponse(
+                                payment = GigPaymentDto(amountTotal = 7_000, amountSubtotal = 7_000, tipAmount = 500),
+                            ),
+                        ),
+                )
+            assertEquals(7_000, vm.payment.value?.payment?.amountTotal)
+
+            val failVm = lifecycleVm(gig, payment = NetworkResult.Failure(NetworkError.Server(500, null)))
+            assertNull("Card hides silently on failure", failVm.payment.value)
+        }
+
+    @Test
+    fun worker_never_fetches_the_payment_card() =
+        runTest {
+            val vm = lifecycleVm(assignedGig(acceptedBy = "viewer-1"))
+            assertNull(vm.payment.value)
+            coVerify(exactly = 0) { repo.gigPayment(any()) }
+        }
+
+    @Test
+    fun change_orders_load_and_actions_hit_endpoints() =
+        runTest {
+            val pending =
+                GigChangeOrderDto(
+                    id = "co1",
+                    requestedBy = "poster-1",
+                    type = "price_increase",
+                    description = "Extra shelf",
+                    amountChange = 15.0,
+                    status = "pending",
+                )
+            val vm = lifecycleVm(assignedGig(acceptedBy = "viewer-1"), changeOrders = listOf(pending))
+            assertTrue(vm.showChangeOrders())
+            assertEquals(listOf("co1"), vm.changeOrders.value.map { it.id })
+
+            coEvery { repo.approveChangeOrder("g1", "co1") } returns
+                NetworkResult.Success(GigChangeOrderMutationResponse())
+            vm.approveChangeOrder("co1")
+            coVerify(exactly = 1) { repo.approveChangeOrder("g1", "co1") }
+
+            coEvery { repo.rejectChangeOrder("g1", "co1") } returns
+                NetworkResult.Success(GigChangeOrderMutationResponse())
+            vm.rejectChangeOrder("co1")
+            coVerify(exactly = 1) { repo.rejectChangeOrder("g1", "co1") }
+
+            coEvery { repo.withdrawChangeOrder("g1", "co1") } returns
+                NetworkResult.Success(GigChangeOrderMutationResponse())
+            vm.withdrawChangeOrder("co1")
+            coVerify(exactly = 1) { repo.withdrawChangeOrder("g1", "co1") }
+
+            coEvery {
+                repo.createChangeOrder("g1", "timeline_extension", "Need one more hour", null, 60)
+            } returns NetworkResult.Success(GigChangeOrderMutationResponse())
+            var proposed = false
+            vm.proposeChangeOrder(GigChangeOrderType.TimelineExtension, "Need one more hour", null, 60) {
+                proposed = it
+            }
+            assertTrue(proposed)
+        }
+
+    @Test
+    fun worker_no_show_affordance_when_check_allows() =
+        runTest {
+            val vm = lifecycleVm(assignedGig(acceptedBy = "viewer-1"), noShowCanReport = true)
+            assertTrue("Worker-side no-show mirrors the owner gating", vm.activeTask.value!!.showNoShow)
+
+            val tooEarly = lifecycleVm(assignedGig(acceptedBy = "viewer-1"), noShowCanReport = false)
+            assertFalse(tooEarly.activeTask.value!!.showNoShow)
         }
 }

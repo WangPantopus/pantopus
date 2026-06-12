@@ -448,6 +448,50 @@ public enum GigsEndpoints {
     public static func cancellationPreview(gigId: String) -> Endpoint {
         Endpoint(method: .get, path: "/api/gigs/\(gigId)/cancellation-preview")
     }
+
+    // MARK: - Phase 5b — payment + change orders
+
+    /// `GET /api/gigs/:gigId/payment` — `{payment, stateInfo}` for the
+    /// poster or worker (403 otherwise; both fields `null` when no
+    /// payment is linked). Amounts are cents. Route
+    /// `backend/routes/gigs.js:8440`.
+    public static func payment(gigId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/\(gigId)/payment")
+    }
+
+    /// `GET /api/gigs/:gigId/change-orders` — `{change_orders: [...]}`
+    /// newest-first, poster or worker only. Route
+    /// `backend/routes/gigs.js:6640`.
+    public static func changeOrders(gigId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/\(gigId)/change-orders")
+    }
+
+    /// `POST /api/gigs/:gigId/change-orders` — either party proposes a
+    /// change on an assigned / in-progress gig (max 5 pending). Route
+    /// `backend/routes/gigs.js:6691`.
+    public static func createChangeOrder(gigId: String, body: CreateChangeOrderBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/change-orders", body: body)
+    }
+
+    /// `POST .../change-orders/:orderId/approve` — the counterparty
+    /// approves; price deltas apply to the gig. Route
+    /// `backend/routes/gigs.js:6828`.
+    public static func approveChangeOrder(gigId: String, orderId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/change-orders/\(orderId)/approve")
+    }
+
+    /// `POST .../change-orders/:orderId/reject` — the counterparty
+    /// declines (optional `{reason}` body omitted here). Route
+    /// `backend/routes/gigs.js:6913`.
+    public static func rejectChangeOrder(gigId: String, orderId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/change-orders/\(orderId)/reject")
+    }
+
+    /// `POST .../change-orders/:orderId/withdraw` — the proposer pulls
+    /// their own pending request. Route `backend/routes/gigs.js:6994`.
+    public static func withdrawChangeOrder(gigId: String, orderId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/change-orders/\(orderId)/withdraw")
+    }
 }
 
 /// Body for `POST /api/gigs/:gigId/dismiss`. Reason is optional
@@ -555,6 +599,57 @@ public struct ReportNoShowBody: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case description
         case evidenceUrls = "evidence_urls"
+    }
+}
+
+/// Change-order types the backend whitelists for
+/// `POST /api/gigs/:gigId/change-orders` (gigs.js:6691).
+public enum GigChangeOrderType: String, Sendable, CaseIterable {
+    case priceIncrease = "price_increase"
+    case priceDecrease = "price_decrease"
+    case scopeAddition = "scope_addition"
+    case scopeReduction = "scope_reduction"
+    case timelineExtension = "timeline_extension"
+    case other
+
+    /// User-facing label rendered in the propose-a-change sheet + rows.
+    public var label: String {
+        switch self {
+        case .priceIncrease: "Price increase"
+        case .priceDecrease: "Price decrease"
+        case .scopeAddition: "Scope addition"
+        case .scopeReduction: "Scope reduction"
+        case .timelineExtension: "More time"
+        case .other: "Other change"
+        }
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/change-orders`. `amountChange` is
+/// signed **dollars** (backend rounds to cents); `timeChangeMinutes`
+/// is a whole-minute delta. Description must be ≥ 5 chars.
+public struct CreateChangeOrderBody: Encodable, Sendable {
+    public let type: String
+    public let description: String
+    public let amountChange: Double?
+    public let timeChangeMinutes: Int?
+
+    public init(
+        type: GigChangeOrderType,
+        description: String,
+        amountChange: Double? = nil,
+        timeChangeMinutes: Int? = nil
+    ) {
+        self.type = type.rawValue
+        self.description = description
+        self.amountChange = amountChange
+        self.timeChangeMinutes = timeChangeMinutes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, description
+        case amountChange = "amount_change"
+        case timeChangeMinutes = "time_change_minutes"
     }
 }
 

@@ -2,11 +2,13 @@
 //  GigLifecycleSections.swift
 //  Pantopus
 //
-//  Phase 5 — gig detail lifecycle chrome: the owner's interactive bids
+//  Phase 5/5b — gig detail lifecycle chrome: the owner's interactive bids
 //  panel (accept / counter / reject), the active-task phase strip with
-//  role-gated actions, the post-completion review CTA, and the counter /
-//  report / cancel / no-show sheets. All sections render inside
-//  `GigDetailView`'s scroll footer; the view-model owns every mutation.
+//  role-gated actions + running-late badge, the change-orders card, the
+//  owner's payment card, the post-completion review CTA, and the counter /
+//  report / cancel / no-show / running-late / change-order sheets. All
+//  sections render inside `GigDetailView`'s scroll footer; the view-model
+//  owns every mutation.
 //
 
 // swiftlint:disable file_length
@@ -285,10 +287,16 @@ struct GigActiveTaskPanel: View {
     let canStartTask: Bool
     let canConfirmCompletion: Bool
     let noShowEligible: Bool
+    /// "Running ~X min late" copy — non-nil renders the late badge for
+    /// both roles (Phase 5b).
+    var runningLateLabel: String?
+    /// Worker-only "Running late" secondary action (Phase 5b).
+    var canReportRunningLate: Bool = false
     let onWorkerAck: @MainActor () -> Void
     let onStartTask: @MainActor () -> Void
     let onConfirmCompletion: @MainActor () -> Void
     let onReportNoShow: @MainActor () -> Void
+    var onRunningLate: @MainActor () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -296,6 +304,9 @@ struct GigActiveTaskPanel: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             phaseStrip
+            if let runningLateLabel {
+                lateBadge(runningLateLabel)
+            }
             actions
         }
         .padding(Spacing.s3)
@@ -343,6 +354,23 @@ struct GigActiveTaskPanel: View {
         .accessibilityLabel("Task phase: \(phase.label)")
     }
 
+    /// Warning pill under the phase strip while the worker's
+    /// `running_late` ack stands — visible to both roles.
+    private func lateBadge(_ label: String) -> some View {
+        HStack(spacing: 6) {
+            Icon(.clock, size: 13, strokeWidth: 2.4, color: Theme.Color.warning)
+            Text(label)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Color.warning)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityIdentifier("gigDetail.lateBadge")
+    }
+
     @ViewBuilder private var actions: some View {
         if showWorkerAck {
             actionButton(
@@ -351,6 +379,22 @@ struct GigActiveTaskPanel: View {
                 identifier: "gigDetail.workerAck",
                 action: onWorkerAck
             )
+        }
+        if canReportRunningLate {
+            Button(action: onRunningLate) {
+                HStack(spacing: 6) {
+                    Icon(.clock, size: 14, strokeWidth: 2.2, color: Theme.Color.warning)
+                    Text("Running late")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.warning)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(Theme.Color.warningBg)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigDetail.runningLate")
         }
         if canStartTask {
             actionButton(
@@ -648,6 +692,9 @@ struct GigCancelSheet: View {
                     Text("Cancel this task?")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
+                    // `preview?.canReschedule` stays unsurfaced: no backend
+                    // reschedule endpoint exists for assigned gigs (PATCH /:id
+                    // is open-only), so the CTA would have nothing to call.
                     if let zoneLabel = preview?.zoneLabel {
                         Text(zoneLabel)
                             .font(.system(size: 12, weight: .semibold))
@@ -720,7 +767,10 @@ struct GigCancelSheet: View {
 // MARK: - No-show sheet
 
 /// Confirmation + optional description → `POST /:gigId/report-no-show`.
+/// Either party can report — `counterpartyLabel` keeps the copy honest
+/// ("worker" for the poster, "poster" for the worker).
 struct GigNoShowSheet: View {
+    var counterpartyLabel: String = "worker"
     let onConfirm: @MainActor (String?) async -> Void
     let onDismiss: @MainActor () -> Void
 
@@ -733,9 +783,12 @@ struct GigNoShowSheet: View {
                 Text("Report a no-show")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
-                Text("This cancels the task and affects the worker's reliability score. Only report if they truly didn't show.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                Text(
+                    "This cancels the task and affects the \(counterpartyLabel)'s reliability score. "
+                        + "Only report if they truly didn't show."
+                )
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appTextSecondary)
             }
             TextField("What happened? (optional)", text: $descriptionText, axis: .vertical)
                 .lineLimit(2...4)
@@ -767,6 +820,597 @@ struct GigNoShowSheet: View {
         .padding(Spacing.s5)
         .presentationDetents([.height(320)])
         .accessibilityIdentifier("gigDetail.noShowSheet")
+    }
+}
+
+// MARK: - Phase 5b — payment card
+
+/// Compact owner-side payment summary from `GET /:gigId/payment`:
+/// status chip + subtotal / fees / tip / total (amounts arrive in cents).
+struct GigPaymentCard: View {
+    let payment: GigPaymentDTO
+    let stateInfo: GigPaymentStateInfo?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.creditCard, size: 16, strokeWidth: 2, color: Theme.Color.appText)
+                Text("Payment")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Spacer()
+                statusChip
+            }
+            VStack(spacing: Spacing.s2) {
+                if let subtotal = payment.amountSubtotal {
+                    row(label: "Subtotal", cents: subtotal)
+                }
+                if let fee = payment.amountPlatformFee, fee > 0 {
+                    row(label: "Service fee", cents: fee)
+                }
+                if let tip = payment.tipAmount, tip > 0 {
+                    row(label: "Tip", cents: tip)
+                }
+                Rectangle()
+                    .fill(Theme.Color.appBorder)
+                    .frame(height: 1)
+                totalRow
+            }
+        }
+        .padding(Spacing.s3)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s5)
+        .padding(.top, 22)
+        .accessibilityIdentifier("gigDetail.payment")
+    }
+
+    /// `stateInfo.label` ("Authorized", "Payment Captured", …) tinted by
+    /// the backend's tone; falls back to a humanized raw status.
+    private var statusChip: some View {
+        let label = stateInfo?.label
+            ?? (payment.paymentStatus ?? "Pending").replacingOccurrences(of: "_", with: " ").capitalized
+        let tone = Self.chipTone(stateInfo?.color)
+        return Text(label)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(tone.fg)
+            .padding(.horizontal, 10)
+            .padding(.vertical, Spacing.s1)
+            .background(tone.bg)
+            .clipShape(Capsule())
+    }
+
+    /// Total = what the poster pays + any net tip (tips ride separate
+    /// Payment rows server-side).
+    private var totalRow: some View {
+        let total = (payment.amountTotal ?? 0) + (payment.tipAmount ?? 0)
+        return HStack {
+            Text("Total")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Spacer()
+            Text(Self.centsLabel(total))
+                .font(.system(size: 15, weight: .heavy).monospacedDigit())
+                .foregroundStyle(Theme.Color.appText)
+        }
+        .accessibilityIdentifier("gigDetail.payment.total")
+    }
+
+    private func row(label: String, cents: Double) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Spacer()
+            Text(Self.centsLabel(cents))
+                .font(.system(size: 12.5, weight: .semibold).monospacedDigit())
+                .foregroundStyle(Theme.Color.appTextStrong)
+        }
+    }
+
+    static func centsLabel(_ cents: Double) -> String {
+        String(format: "$%.2f", cents / 100)
+    }
+
+    /// Map the backend's `stateInfo.color` to theme tones.
+    static func chipTone(_ color: String?) -> (fg: Color, bg: Color) {
+        switch color {
+        case "green": (Theme.Color.success, Theme.Color.successBg)
+        case "yellow", "orange": (Theme.Color.warning, Theme.Color.warningBg)
+        case "blue": (Theme.Color.info, Theme.Color.infoBg)
+        case "red": (Theme.Color.error, Theme.Color.errorBg)
+        default: (Theme.Color.appTextSecondary, Theme.Color.appSurfaceSunken)
+        }
+    }
+}
+
+// MARK: - Phase 5b — change orders
+
+/// "Changes" card under the active-task panel: one row per change order
+/// (type · description · ±$ · status) with role-gated actions, plus the
+/// "Propose a change" footer.
+struct GigChangesCard: View {
+    let orders: [GigChangeOrderDTO]
+    let inFlightOrderId: String?
+    /// `true` when the signed-in viewer proposed the order (→ Withdraw);
+    /// otherwise the viewer is the counterparty (→ Approve / Reject).
+    let isOwnOrder: @MainActor (GigChangeOrderDTO) -> Bool
+    let onApprove: @MainActor (GigChangeOrderDTO) -> Void
+    let onReject: @MainActor (GigChangeOrderDTO) -> Void
+    let onWithdraw: @MainActor (GigChangeOrderDTO) -> Void
+    let onPropose: @MainActor () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.arrowsRepeat, size: 16, strokeWidth: 2, color: Theme.Color.appText)
+                Text("Changes")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Spacer()
+            }
+            if orders.isEmpty {
+                Text("No changes proposed yet. Need a different price or more time? Propose it here.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            } else {
+                ForEach(orders) { order in
+                    orderRow(order)
+                }
+            }
+            proposeButton
+        }
+        .padding(Spacing.s3)
+        .background(Theme.Color.appSurfaceMuted)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s5)
+        .padding(.top, 22)
+        .accessibilityIdentifier("gigDetail.changes")
+    }
+
+    private func orderRow(_ order: GigChangeOrderDTO) -> some View {
+        let status = (order.status ?? "pending").lowercased()
+        let inFlight = inFlightOrderId == order.id
+        return VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s2) {
+                Text(Self.typeLabel(order.type))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                if let delta = Self.deltaLabel(order) {
+                    Text(delta)
+                        .font(.system(size: 13, weight: .heavy).monospacedDigit())
+                        .foregroundStyle((order.amountChange ?? 0) < 0 ? Theme.Color.success : Theme.Color.primary600)
+                }
+                Spacer()
+                statusChip(status)
+            }
+            if let description = order.description, !description.isEmpty {
+                Text(description)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .lineLimit(3)
+            }
+            if status == "pending" {
+                pendingActions(order, inFlight: inFlight)
+            }
+        }
+        .padding(Spacing.s3)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .opacity(["rejected", "withdrawn"].contains(status) ? 0.55 : 1)
+        .accessibilityIdentifier("gigDetail.change_\(order.id)")
+    }
+
+    @ViewBuilder
+    private func pendingActions(_ order: GigChangeOrderDTO, inFlight: Bool) -> some View {
+        HStack(spacing: Spacing.s2) {
+            if isOwnOrder(order) {
+                rowButton(
+                    "Withdraw",
+                    icon: .x,
+                    style: .muted,
+                    identifier: "gigDetail.change_\(order.id).withdraw"
+                ) { onWithdraw(order) }
+            } else {
+                rowButton(
+                    "Approve",
+                    icon: .check,
+                    style: .primary,
+                    identifier: "gigDetail.change_\(order.id).approve"
+                ) { onApprove(order) }
+                rowButton(
+                    "Reject",
+                    icon: .x,
+                    style: .destructive,
+                    identifier: "gigDetail.change_\(order.id).reject"
+                ) { onReject(order) }
+            }
+        }
+        .disabled(inFlight)
+        .opacity(inFlight ? 0.6 : 1)
+    }
+
+    private var proposeButton: some View {
+        Button(action: onPropose) {
+            HStack(spacing: 6) {
+                Icon(.plus, size: 14, strokeWidth: 2.4, color: Theme.Color.primary600)
+                Text("Propose a change")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary600)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .background(Theme.Color.primary50)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("gigDetail.changes.propose")
+    }
+
+    private enum RowButtonStyle {
+        case primary, destructive, muted
+
+        var fg: Color {
+            switch self {
+            case .primary: Theme.Color.appTextInverse
+            case .destructive: Theme.Color.error
+            case .muted: Theme.Color.appTextSecondary
+            }
+        }
+
+        var bg: Color {
+            switch self {
+            case .primary: Theme.Color.primary600
+            case .destructive: Theme.Color.errorBg
+            case .muted: Theme.Color.appSurfaceSunken
+            }
+        }
+    }
+
+    private func rowButton(
+        _ title: String,
+        icon: PantopusIcon,
+        style: RowButtonStyle,
+        identifier: String,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s1) {
+                Icon(icon, size: 12, strokeWidth: 2.4, color: style.fg)
+                Text(title)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(style.fg)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 34)
+            .background(style.bg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func statusChip(_ status: String) -> some View {
+        let label: String = switch status {
+        case "approved": "Approved"
+        case "rejected": "Rejected"
+        case "withdrawn": "Withdrawn"
+        default: "Pending"
+        }
+        let tone: (fg: Color, bg: Color) = switch status {
+        case "approved": (Theme.Color.success, Theme.Color.successBg)
+        case "rejected": (Theme.Color.error, Theme.Color.errorBg)
+        case "withdrawn": (Theme.Color.appTextSecondary, Theme.Color.appSurfaceSunken)
+        default: (Theme.Color.warning, Theme.Color.warningBg)
+        }
+        return Text(label)
+            .font(.system(size: 10.5, weight: .bold))
+            .foregroundStyle(tone.fg)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 3)
+            .background(tone.bg)
+            .clipShape(Capsule())
+    }
+
+    static func typeLabel(_ raw: String?) -> String {
+        guard let raw, let type = GigChangeOrderType(rawValue: raw) else {
+            return (raw ?? "change").replacingOccurrences(of: "_", with: " ").capitalized
+        }
+        return type.label
+    }
+
+    /// "±$X" (+ "·+Ymin" when a time delta rides along).
+    static func deltaLabel(_ order: GigChangeOrderDTO) -> String? {
+        var pieces: [String] = []
+        if let amount = order.amountChange, amount != 0 {
+            let sign = amount < 0 ? "−" : "+"
+            pieces.append("\(sign)\(GigOwnerBidsPanel.amountLabel(abs(amount)))")
+        }
+        if let minutes = order.timeChangeMinutes, minutes != 0 {
+            pieces.append("+\(minutes) min")
+        }
+        return pieces.isEmpty ? nil : pieces.joined(separator: " · ")
+    }
+}
+
+/// Propose-a-change sheet: type chips, description, signed dollar delta,
+/// optional extra minutes → `POST /:gigId/change-orders`.
+struct GigChangeOrderSheet: View {
+    let onSubmit: @MainActor (GigChangeOrderType, String, Double?, Int?) async -> String?
+    let onDismiss: @MainActor () -> Void
+
+    @State private var type: GigChangeOrderType = .priceIncrease
+    @State private var descriptionText = ""
+    @State private var amountText = ""
+    @State private var amountIsDecrease = false
+    @State private var minutesText = ""
+    @State private var submitting = false
+    @State private var errorText: String?
+
+    private let typeColumns = [GridItem(.flexible()), GridItem(.flexible())]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text("Propose a change")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("The other party has to approve before it takes effect.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                typePicker
+                descriptionField
+                amountField
+                minutesField
+                if let errorText {
+                    Text(errorText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.Color.error)
+                }
+                HStack(spacing: Spacing.s2) {
+                    SheetButton(title: "Cancel", style: .ghost, identifier: "gigDetail.changeSheet.cancel") {
+                        onDismiss()
+                    }
+                    SheetButton(
+                        title: submitting ? "Sending…" : "Send request",
+                        style: .primary,
+                        enabled: isValid && !submitting,
+                        identifier: "gigDetail.changeSheet.submit"
+                    ) {
+                        Task { await submit() }
+                    }
+                }
+            }
+            .padding(Spacing.s5)
+        }
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("gigDetail.changeSheet")
+    }
+
+    private var typePicker: some View {
+        LazyVGrid(columns: typeColumns, spacing: Spacing.s2) {
+            ForEach(GigChangeOrderType.allCases, id: \.rawValue) { candidate in
+                let selected = type == candidate
+                Button {
+                    type = candidate
+                    amountIsDecrease = candidate == .priceDecrease || candidate == .scopeReduction
+                } label: {
+                    Text(candidate.label)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(selected ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                        .background(selected ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                                .stroke(selected ? Theme.Color.primary600 : Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("gigDetail.changeSheet.type_\(candidate.rawValue)")
+            }
+        }
+    }
+
+    private var descriptionField: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("What's changing?")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            TextField("Describe the change (at least 5 characters)", text: $descriptionText, axis: .vertical)
+                .lineLimit(2...4)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(Spacing.s3)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .accessibilityIdentifier("gigDetail.changeSheet.description")
+        }
+    }
+
+    private var amountField: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Price change (optional)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            HStack(spacing: Spacing.s2) {
+                Button { amountIsDecrease.toggle() } label: {
+                    Text(amountIsDecrease ? "−" : "+")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(amountIsDecrease ? Theme.Color.success : Theme.Color.primary600)
+                        .frame(width: 44, height: 48)
+                        .background(Theme.Color.appSurfaceSunken)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("gigDetail.changeSheet.amountSign")
+                HStack(spacing: Spacing.s2) {
+                    Text("$")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    TextField("0", text: $amountText)
+                        .keyboardType(.decimalPad)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .accessibilityIdentifier("gigDetail.changeSheet.amount")
+                }
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 48)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+        }
+    }
+
+    private var minutesField: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Extra minutes (optional)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            TextField("0", text: $minutesText)
+                .keyboardType(.numberPad)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 48)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .accessibilityIdentifier("gigDetail.changeSheet.minutes")
+        }
+    }
+
+    private var isValid: Bool {
+        descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 5
+    }
+
+    /// Signed dollars — the +/− toggle applies the sign.
+    private var parsedAmount: Double? {
+        let cleaned = amountText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: ",", with: "")
+        guard let value = Double(cleaned), value > 0 else { return nil }
+        return amountIsDecrease ? -value : value
+    }
+
+    private var parsedMinutes: Int? {
+        guard let value = Int(minutesText.trimmingCharacters(in: .whitespacesAndNewlines)), value > 0 else {
+            return nil
+        }
+        return value
+    }
+
+    private func submit() async {
+        guard isValid, !submitting else { return }
+        submitting = true
+        defer { submitting = false }
+        let trimmed = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error = await onSubmit(type, trimmed, parsedAmount, parsedMinutes) {
+            errorText = error
+        } else {
+            onDismiss()
+        }
+    }
+}
+
+// MARK: - Phase 5b — running late sheet
+
+/// ETA chips (10/20/30/45/60 min) + optional note →
+/// `POST /:gigId/worker-ack` with `running_late`.
+struct GigRunningLateSheet: View {
+    let onSubmit: @MainActor (Int, String?) async -> String?
+    let onDismiss: @MainActor () -> Void
+
+    @State private var etaMinutes = 20
+    @State private var noteText = ""
+    @State private var submitting = false
+    @State private var errorText: String?
+
+    private static let presets = [10, 20, 30, 45, 60]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Text("Running late?")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Let the poster know roughly how late you'll be.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            HStack(spacing: Spacing.s2) {
+                ForEach(Self.presets, id: \.self) { minutes in
+                    let selected = etaMinutes == minutes
+                    Button { etaMinutes = minutes } label: {
+                        Text("\(minutes)m")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(selected ? Theme.Color.appTextInverse : Theme.Color.appText)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(selected ? Theme.Color.warning : Theme.Color.appSurfaceSunken)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gigDetail.runningLateSheet.eta_\(minutes)")
+                }
+            }
+            TextField("Add a note (optional)", text: $noteText, axis: .vertical)
+                .lineLimit(2...3)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(Spacing.s3)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .accessibilityIdentifier("gigDetail.runningLateSheet.note")
+            if let errorText {
+                Text(errorText)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.error)
+            }
+            HStack(spacing: Spacing.s2) {
+                SheetButton(title: "Back", style: .ghost, identifier: "gigDetail.runningLateSheet.cancel") {
+                    onDismiss()
+                }
+                SheetButton(
+                    title: submitting ? "Sending…" : "Send \"~\(etaMinutes) min late\"",
+                    style: .primary,
+                    enabled: !submitting,
+                    identifier: "gigDetail.runningLateSheet.submit"
+                ) {
+                    Task { await submit() }
+                }
+            }
+        }
+        .padding(Spacing.s5)
+        .presentationDetents([.height(340)])
+        .accessibilityIdentifier("gigDetail.runningLateSheet")
+    }
+
+    private func submit() async {
+        guard !submitting else { return }
+        submitting = true
+        defer { submitting = false }
+        let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error = await onSubmit(etaMinutes, trimmed.isEmpty ? nil : trimmed) {
+            errorText = error
+        } else {
+            onDismiss()
+        }
     }
 }
 

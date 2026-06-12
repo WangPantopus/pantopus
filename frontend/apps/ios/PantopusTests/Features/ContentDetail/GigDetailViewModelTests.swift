@@ -540,6 +540,332 @@ final class GigDetailViewModelTests: XCTestCase {
         vm.stopRealtime()
         XCTAssertEqual(recorder.events.last, "gig:leave:g1")
     }
+
+    // MARK: - Phase 5b — payment card
+
+    private static let paymentJSON = #"""
+    {"payment":{"id":"pay-1","payment_status":"captured_hold","payment_type":"gig_payment",
+      "amount_total":10000,"amount_subtotal":10000,"amount_platform_fee":1500,
+      "amount_to_payee":8500,"tip_amount":300,"refunded_amount":0},
+     "stateInfo":{"label":"Payment Captured","color":"green","description":"Payment has been captured."}}
+    """#
+
+    func testOwnerPaymentLoadsOnAssignedGig() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: Self.gigJSON(#""status":"assigned","user_id":"owner-1","accepted_by":"w1""#))],
+            "/api/gigs/g1/bids": [.status(200, body: #"{"bids":[]}"#)],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/payment": [.status(200, body: Self.paymentJSON)],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)]
+        ])
+        let vm = makeOwnerVM()
+        await vm.load()
+        XCTAssertTrue(vm.showPaymentCard)
+        XCTAssertEqual(vm.payment?.amountSubtotal, 10000, "Amounts ride in cents.")
+        XCTAssertEqual(vm.payment?.amountPlatformFee, 1500)
+        XCTAssertEqual(vm.payment?.tipAmount, 300)
+        XCTAssertEqual(vm.payment?.amountTotal, 10000)
+        XCTAssertEqual(vm.paymentStateInfo?.label, "Payment Captured")
+        XCTAssertEqual(vm.paymentStateInfo?.color, "green")
+        XCTAssertTrue(SequencedURLProtocol.capturedRequests.contains { $0.url?.path == "/api/gigs/g1/payment" })
+    }
+
+    func testPaymentSilentlyHiddenOnFailureAndNullPayment() async {
+        // 404 / failure → card hides without surfacing an error.
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: Self.gigJSON(#""status":"assigned","user_id":"owner-1","accepted_by":"w1""#))],
+            "/api/gigs/g1/bids": [.status(200, body: #"{"bids":[]}"#)],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/payment": [.status(404, body: #"{"error":"Gig not found"}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)]
+        ])
+        let vm = makeOwnerVM()
+        await vm.load()
+        XCTAssertNil(vm.payment)
+        XCTAssertFalse(vm.showPaymentCard)
+        guard case .loaded = vm.state else { return XCTFail("Payment failure never degrades the page.") }
+    }
+
+    func testPaymentNotFetchedForWorkerOrOpenGig() async {
+        // Worker on an assigned gig — owner-only card, no fetch.
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: workerGig("assigned"))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertFalse(vm.showPaymentCard)
+        XCTAssertFalse(
+            SequencedURLProtocol.capturedRequests.contains { $0.url?.path == "/api/gigs/g1/payment" },
+            "The worker's payout view lives in the wallet — no owner payment fetch."
+        )
+    }
+
+    // MARK: - Phase 5b — change orders
+
+    private static let pendingChangeOrderJSON = #"""
+    {"change_orders":[{"id":"co1","gig_id":"g1","requested_by":"owner-1","type":"price_increase",
+      "description":"Extra shelf to hang","amount_change":15,"time_change_minutes":30,
+      "status":"pending","created_at":"2026-06-10T00:00:00Z",
+      "requester":{"id":"owner-1","username":"po","name":"Poster"}}]}
+    """#
+
+    func testChangeOrdersLoadForWorkerOnAssignedGig() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: workerGig("assigned"))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: Self.pendingChangeOrderJSON)]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertTrue(vm.showChangesSection)
+        XCTAssertEqual(vm.changeOrders.map(\.id), ["co1"])
+        XCTAssertEqual(vm.changeOrders.first?.amountChange, 15)
+        XCTAssertEqual(vm.changeOrders.first?.timeChangeMinutes, 30)
+        XCTAssertFalse(vm.isOwnChangeOrder(vm.changeOrders[0]), "Proposed by the owner → viewer is the counterparty.")
+    }
+
+    func testProposeChangeOrderPostsBodyAndPrepends() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: workerGig("in_progress"))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/change-orders": [
+                .status(200, body: #"{"change_orders":[]}"#),
+                .status(201, body: #"""
+                {"change_order":{"id":"co2","gig_id":"g1","requested_by":"viewer-1","type":"price_increase",
+                  "description":"Found water damage behind the wall","amount_change":25,"time_change_minutes":0,
+                  "status":"pending","requester":{"id":"viewer-1","name":"Worker"}}}
+                """#)
+            ]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        let error = await vm.proposeChangeOrder(
+            type: .priceIncrease,
+            description: "Found water damage behind the wall",
+            amountChange: 25,
+            timeChangeMinutes: nil
+        )
+        XCTAssertNil(error)
+        XCTAssertEqual(vm.changeOrders.map(\.id), ["co2"], "Created order prepends (list is newest-first).")
+        XCTAssertTrue(vm.isOwnChangeOrder(vm.changeOrders[0]))
+        let request = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(request?.httpMethod, "POST")
+        XCTAssertEqual(request?.url?.path, "/api/gigs/g1/change-orders")
+        let body = String(data: request?.httpBodyData() ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains(#""type":"price_increase""#))
+        XCTAssertTrue(body.contains(#""amount_change":25"#))
+        XCTAssertFalse(body.contains("time_change_minutes"), "Nil deltas stay out of the payload.")
+    }
+
+    func testProposeChangeOrderRequiresDescription() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: workerGig("assigned"))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        let error = await vm.proposeChangeOrder(type: .other, description: "abc", amountChange: nil, timeChangeMinutes: nil)
+        XCTAssertEqual(error, "Describe the change in at least 5 characters.")
+        XCTAssertFalse(
+            SequencedURLProtocol.capturedRequests.contains { $0.httpMethod == "POST" && $0.url?.path == "/api/gigs/g1/change-orders" },
+            "Validation failures never hit the network."
+        )
+    }
+
+    func testApproveChangeOrderFlipsRowAndRefreshesGig() async {
+        stubRoutes([
+            "/api/gigs/g1": [
+                .status(200, body: workerGig("assigned")),
+                .status(200, body: workerGig("assigned", extra: #","price":75"#))
+            ],
+            "/api/gigs/g1/questions": [
+                .status(200, body: Self.questionsJSON),
+                .status(200, body: Self.questionsJSON)
+            ],
+            "/api/gigs/g1/no-show-check": [
+                .status(200, body: #"{"can_report":false}"#),
+                .status(200, body: #"{"can_report":false}"#)
+            ],
+            "/api/gigs/g1/change-orders": [
+                .status(200, body: Self.pendingChangeOrderJSON),
+                .status(200, body: Self.pendingChangeOrderJSON)
+            ],
+            "/api/gigs/g1/change-orders/co1/approve": [
+                .status(200, body: #"{"change_order":{"id":"co1","status":"approved"}}"#)
+            ]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        let error = await vm.approveChangeOrder(orderId: "co1")
+        XCTAssertNil(error)
+        XCTAssertTrue(SequencedURLProtocol.capturedRequests.contains {
+            $0.url?.path == "/api/gigs/g1/change-orders/co1/approve"
+        })
+        XCTAssertTrue(SequencedURLProtocol.capturedRequests.filter { $0.url?.path == "/api/gigs/g1" }.count >= 2,
+                      "Approving a price delta refreshes the gig.")
+        XCTAssertEqual(vm.rawGig?.price, 75)
+    }
+
+    func testRejectAndWithdrawChangeOrderFlipRowsLocally() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: workerGig("assigned"))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: Self.pendingChangeOrderJSON)],
+            "/api/gigs/g1/change-orders/co1/reject": [
+                .status(200, body: #"{"change_order":{"id":"co1","status":"rejected"}}"#)
+            ]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        let rejectError = await vm.rejectChangeOrder(orderId: "co1")
+        XCTAssertNil(rejectError)
+        XCTAssertEqual(vm.changeOrders.first?.status, "rejected")
+        XCTAssertEqual(vm.changeOrders.first?.description, "Extra shelf to hang", "Local flip keeps the row content.")
+        // Withdraw flips a proposer-owned copy the same way.
+        let withdrawn = GigDetailViewModel.changeOrderCopy(of: vm.changeOrders[0], status: "withdrawn")
+        XCTAssertEqual(withdrawn.status, "withdrawn")
+        XCTAssertEqual(withdrawn.requestedBy, "owner-1")
+    }
+
+    func testChangeOrdersNotFetchedOutsideActiveWindow() async {
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: Self.gigJSON(#""status":"open","user_id":"owner-1""#))],
+            "/api/gigs/g1/bids": [.status(200, body: #"{"bids":[]}"#)],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)]
+        ])
+        let vm = makeOwnerVM()
+        await vm.load()
+        XCTAssertFalse(vm.showChangesSection)
+        XCTAssertFalse(
+            SequencedURLProtocol.capturedRequests.contains { $0.url?.path == "/api/gigs/g1/change-orders" },
+            "Open gigs have no change-order surface (create is assigned/in_progress only)."
+        )
+    }
+
+    // MARK: - Phase 5b — running late
+
+    func testRunningLatePostsEtaAndSurfacesBadgeForBothRoles() async {
+        stubRoutes([
+            "/api/gigs/g1": [
+                .status(200, body: workerGig("assigned")),
+                .status(200, body: workerGig("assigned", extra: #","worker_ack_status":"running_late","worker_ack_eta_minutes":20"#))
+            ],
+            "/api/gigs/g1/questions": [
+                .status(200, body: Self.questionsJSON),
+                .status(200, body: Self.questionsJSON)
+            ],
+            "/api/gigs/g1/no-show-check": [
+                .status(200, body: #"{"can_report":false}"#),
+                .status(200, body: #"{"can_report":false}"#)
+            ],
+            "/api/gigs/g1/change-orders": [
+                .status(200, body: #"{"change_orders":[]}"#),
+                .status(200, body: #"{"change_orders":[]}"#)
+            ],
+            "/api/gigs/g1/worker-ack": [
+                .status(200, body: #"{"success":true,"worker_ack_status":"running_late"}"#)
+            ]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertTrue(vm.canReportRunningLate)
+        XCTAssertNil(vm.runningLateLabel)
+        let error = await vm.sendRunningLate(etaMinutes: 20, note: "Stuck in traffic")
+        XCTAssertNil(error)
+        let ackRequest = SequencedURLProtocol.capturedRequests.first { $0.url?.path == "/api/gigs/g1/worker-ack" }
+        XCTAssertEqual(ackRequest?.httpMethod, "POST")
+        let body = String(data: ackRequest?.httpBodyData() ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains(#""status":"running_late""#))
+        XCTAssertTrue(body.contains(#""eta_minutes":20"#))
+        XCTAssertTrue(body.contains("Stuck in traffic"))
+        XCTAssertEqual(vm.runningLateLabel, "Running ~20 min late")
+        XCTAssertFalse(vm.canReportRunningLate, "Already flagged late — the action hides, the badge stays.")
+    }
+
+    func testRunningLateGateClosedForOwnerAndAfterStart() async {
+        let assignedOwnerView = Self.gigJSON(#""status":"assigned","user_id":"owner-1","accepted_by":"w1""#)
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: assignedOwnerView)],
+            "/api/gigs/g1/bids": [.status(200, body: #"{"bids":[]}"#)],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/payment": [.status(200, body: #"{"payment":null,"stateInfo":null}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)]
+        ])
+        let owner = makeOwnerVM()
+        await owner.load()
+        XCTAssertFalse(owner.canReportRunningLate, "Owner never sees the worker's running-late action.")
+        XCTAssertFalse(owner.showPaymentCard, "A null payment row keeps the card hidden.")
+
+        SequencedURLProtocol.reset()
+        stubRoutes([
+            "/api/gigs/g1": [.status(200, body: workerGig("in_progress", extra: #","started_at":"2026-06-10T01:00:00Z""#))],
+            "/api/gigs/g1/questions": [.status(200, body: Self.questionsJSON)],
+            "/api/gigs/g1/no-show-check": [.status(200, body: #"{"can_report":false}"#)],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)]
+        ])
+        let worker = makeVM()
+        await worker.load()
+        XCTAssertFalse(worker.canReportRunningLate, "Worker-ack is pre-start only (gigs.js:5838).")
+    }
+
+    // MARK: - Phase 5b — worker-side no-show
+
+    func testWorkerNoShowEligibilityMirrorsOwnerGating() async {
+        stubRoutes([
+            "/api/gigs/g1": [
+                .status(200, body: workerGig("assigned")),
+                .status(200, body: Self.gigJSON(#""status":"cancelled","user_id":"owner-1","accepted_by":"viewer-1""#))
+            ],
+            "/api/gigs/g1/questions": [
+                .status(200, body: Self.questionsJSON),
+                .status(200, body: Self.questionsJSON)
+            ],
+            "/api/gigs/g1/no-show-check": [
+                .status(200, body: #"{"can_report":true,"hours_since_accept":26,"reason":"Poster unresponsive for 24+ hours"}"#)
+            ],
+            "/api/gigs/g1/change-orders": [.status(200, body: #"{"change_orders":[]}"#)],
+            "/api/gigs/g1/report-no-show": [.status(200, body: #"{"fee":15,"message":"No-show reported successfully."}"#)]
+        ])
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertTrue(vm.noShowEligible, "The worker can report an unresponsive poster (gigs.js:7722).")
+        let error = await vm.reportNoShow(description: "No response for two days")
+        XCTAssertNil(error)
+        XCTAssertTrue(SequencedURLProtocol.capturedRequests.contains { $0.url?.path == "/api/gigs/g1/report-no-show" })
+        XCTAssertNil(vm.activePhase, "Cancelled after the report.")
+    }
+}
+
+private extension URLRequest {
+    /// `URLProtocol`-stubbed sessions strip `httpBody` and expose it as
+    /// `httpBodyStream`; drain the stream so body assertions don't flake.
+    func httpBodyData() -> Data? {
+        if let direct = httpBody { return direct }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
 }
 
 /// Captures `emitRoom` calls (`gig:join` / `gig:leave`).

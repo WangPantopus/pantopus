@@ -65,6 +65,9 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     /// Pre-start acknowledgement from the worker — `starting_now` or
     /// `running_late`. Drives the "I'm on it" affordance (hidden once set).
     public let workerAckStatus: String?
+    /// ETA in minutes riding a `running_late` worker-ack (1–480). Feeds
+    /// the "Running ~X min late" badge on the active-task strip.
+    public let workerAckEtaMinutes: Int?
     public let creator: GigCreator?
 
     enum CodingKeys: String, CodingKey {
@@ -100,6 +103,7 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case attachments
         case startedAt = "started_at"
         case workerAckStatus = "worker_ack_status"
+        case workerAckEtaMinutes = "worker_ack_eta_minutes"
         case creator
         case legacyCreator = "User"
     }
@@ -145,6 +149,7 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         attachments = try? c.decode([String].self, forKey: .attachments)
         startedAt = try c.decodeIfPresent(String.self, forKey: .startedAt)
         workerAckStatus = try c.decodeIfPresent(String.self, forKey: .workerAckStatus)
+        workerAckEtaMinutes = try c.decodeIfPresent(Int.self, forKey: .workerAckEtaMinutes)
         creator = try c.decodeIfPresent(GigCreator.self, forKey: .creator)
             ?? c.decodeIfPresent(GigCreator.self, forKey: .legacyCreator)
     }
@@ -187,7 +192,8 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         exactAddress: String? = nil,
         attachments: [String]? = nil,
         startedAt: String? = nil,
-        workerAckStatus: String? = nil
+        workerAckStatus: String? = nil,
+        workerAckEtaMinutes: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -227,6 +233,7 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         self.attachments = attachments
         self.startedAt = startedAt
         self.workerAckStatus = workerAckStatus
+        self.workerAckEtaMinutes = workerAckEtaMinutes
     }
 }
 
@@ -801,6 +808,169 @@ public struct GigReportResponse: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case message
         case alreadyReported = "already_reported"
+    }
+}
+
+// MARK: - Phase 5b — payment + change orders
+
+/// Envelope from `GET /api/gigs/:gigId/payment`
+/// (`backend/routes/gigs.js:8440`). Both fields are `null` when the gig
+/// has no linked payment — the card silent-hides.
+public struct GigPaymentResponse: Decodable, Sendable {
+    public let payment: GigPaymentDTO?
+    public let stateInfo: GigPaymentStateInfo?
+}
+
+/// The `Payment` row riding the gig payment envelope. All amounts are
+/// **cents**; `tipAmount` is the server-aggregated net of successful
+/// tips. Sensitive Stripe ids are stripped for the worker server-side.
+public struct GigPaymentDTO: Decodable, Sendable, Hashable {
+    public let id: String?
+    public let paymentStatus: String?
+    public let paymentType: String?
+    public let amountTotal: Double?
+    public let amountSubtotal: Double?
+    public let amountPlatformFee: Double?
+    public let amountProcessingFee: Double?
+    public let amountToPayee: Double?
+    public let tipAmount: Double?
+    public let refundedAmount: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case paymentStatus = "payment_status"
+        case paymentType = "payment_type"
+        case amountTotal = "amount_total"
+        case amountSubtotal = "amount_subtotal"
+        case amountPlatformFee = "amount_platform_fee"
+        case amountProcessingFee = "amount_processing_fee"
+        case amountToPayee = "amount_to_payee"
+        case tipAmount = "tip_amount"
+        case refundedAmount = "refunded_amount"
+    }
+
+    public init(
+        id: String? = nil,
+        paymentStatus: String? = nil,
+        paymentType: String? = nil,
+        amountTotal: Double? = nil,
+        amountSubtotal: Double? = nil,
+        amountPlatformFee: Double? = nil,
+        amountProcessingFee: Double? = nil,
+        amountToPayee: Double? = nil,
+        tipAmount: Double? = nil,
+        refundedAmount: Double? = nil
+    ) {
+        self.id = id
+        self.paymentStatus = paymentStatus
+        self.paymentType = paymentType
+        self.amountTotal = amountTotal
+        self.amountSubtotal = amountSubtotal
+        self.amountPlatformFee = amountPlatformFee
+        self.amountProcessingFee = amountProcessingFee
+        self.amountToPayee = amountToPayee
+        self.tipAmount = tipAmount
+        self.refundedAmount = refundedAmount
+    }
+}
+
+/// `getPaymentStateInfo(...)` projection — display label / tone /
+/// description for the payment status chip
+/// (`backend/stripe/paymentStateMachine.js:189`). Keys are camelCase
+/// already, no CodingKeys needed.
+public struct GigPaymentStateInfo: Decodable, Sendable, Hashable {
+    public let label: String?
+    public let color: String?
+    public let description: String?
+
+    public init(label: String? = nil, color: String? = nil, description: String? = nil) {
+        self.label = label
+        self.color = color
+        self.description = description
+    }
+}
+
+/// One row from `GET /api/gigs/:gigId/change-orders`
+/// (`backend/routes/gigs.js:6640`). `amountChange` is **dollars**
+/// (applied to `gig.price` on approval); `status` is
+/// pending / approved / rejected / withdrawn.
+public struct GigChangeOrderDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let gigId: String?
+    public let requestedBy: String?
+    public let type: String?
+    public let description: String?
+    public let amountChange: Double?
+    public let timeChangeMinutes: Int?
+    public let status: String?
+    public let reviewedBy: String?
+    public let reviewedAt: String?
+    public let rejectionReason: String?
+    public let createdAt: String?
+    public let requester: GigCreator?
+    public let reviewer: GigCreator?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, description, status, requester, reviewer
+        case gigId = "gig_id"
+        case requestedBy = "requested_by"
+        case amountChange = "amount_change"
+        case timeChangeMinutes = "time_change_minutes"
+        case reviewedBy = "reviewed_by"
+        case reviewedAt = "reviewed_at"
+        case rejectionReason = "rejection_reason"
+        case createdAt = "created_at"
+    }
+
+    public init(
+        id: String,
+        gigId: String? = nil,
+        requestedBy: String? = nil,
+        type: String? = nil,
+        description: String? = nil,
+        amountChange: Double? = nil,
+        timeChangeMinutes: Int? = nil,
+        status: String? = nil,
+        reviewedBy: String? = nil,
+        reviewedAt: String? = nil,
+        rejectionReason: String? = nil,
+        createdAt: String? = nil,
+        requester: GigCreator? = nil,
+        reviewer: GigCreator? = nil
+    ) {
+        self.id = id
+        self.gigId = gigId
+        self.requestedBy = requestedBy
+        self.type = type
+        self.description = description
+        self.amountChange = amountChange
+        self.timeChangeMinutes = timeChangeMinutes
+        self.status = status
+        self.reviewedBy = reviewedBy
+        self.reviewedAt = reviewedAt
+        self.rejectionReason = rejectionReason
+        self.createdAt = createdAt
+        self.requester = requester
+        self.reviewer = reviewer
+    }
+}
+
+/// Envelope from `GET /api/gigs/:gigId/change-orders`.
+public struct GigChangeOrdersResponse: Decodable, Sendable {
+    public let changeOrders: [GigChangeOrderDTO]
+
+    enum CodingKeys: String, CodingKey {
+        case changeOrders = "change_orders"
+    }
+}
+
+/// Envelope from the change-order create / approve / reject / withdraw
+/// mutations — `{change_order}`.
+public struct GigChangeOrderMutationResponse: Decodable, Sendable {
+    public let changeOrder: GigChangeOrderDTO?
+
+    enum CodingKeys: String, CodingKey {
+        case changeOrder = "change_order"
     }
 }
 

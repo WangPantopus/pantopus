@@ -7,6 +7,7 @@ import app.cash.turbine.test
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
 import app.pantopus.android.data.api.models.payments.TipResponse
@@ -83,6 +84,8 @@ class GigTipViewModelTest {
         coEvery { repo.bids("g1") } returns NetworkResult.Success(GigBidsResponse(bids = emptyList()))
         coEvery { repo.questions("g1") } returns NetworkResult.Success(GigQuestionsResponse(questions = emptyList()))
         coEvery { reviewsRepo.myPending() } returns NetworkResult.Success(MyPendingReviewsResponse(pending = emptyList()))
+        // Phase 5b — the owner of an assigned+ gig fetches the payment card.
+        coEvery { repo.gigPayment("g1") } returns NetworkResult.Success(GigPaymentResponse())
         return GigDetailViewModel(
             repo,
             authRepo,

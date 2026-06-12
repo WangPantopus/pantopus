@@ -70,6 +70,8 @@ data class GigDto(
     @Json(name = "payment_status") val paymentStatus: String? = null,
     // Phase 5 — worker acknowledgement ("I'm on it") while `assigned`.
     @Json(name = "worker_ack_status") val workerAckStatus: String? = null,
+    // Phase 5b — ETA accompanying a `running_late` acknowledgement.
+    @Json(name = "worker_ack_eta_minutes") val workerAckEtaMinutes: Int? = null,
     @Json(name = "engagement_mode") val engagementMode: String? = null,
     @Json(name = "schedule_type") val scheduleType: String? = null,
     @Json(name = "pay_type") val payType: String? = null,

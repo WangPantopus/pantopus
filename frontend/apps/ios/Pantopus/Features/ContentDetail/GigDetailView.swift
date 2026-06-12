@@ -4,9 +4,11 @@
 //
 //  T2.6 gig detail. Wraps `TransactionalDetailShell`. The primary dock
 //  action opens the shared `EditBidSheetView` in place-bid mode (or tips /
-//  delivers / instant-accepts depending on the lifecycle); the Phase 5
-//  scroll footer carries the owner bids panel, active-task strip, and
-//  review CTA, with counter / report / cancel / no-show sheets attached.
+//  delivers / instant-accepts depending on the lifecycle); the Phase 5/5b
+//  scroll footer carries the owner bids panel, active-task strip (with
+//  running-late badge), changes card, payment card, and review CTA, with
+//  counter / report / cancel / no-show / running-late / change-order
+//  sheets attached.
 //
 
 // swiftlint:disable file_length type_body_length
@@ -28,6 +30,9 @@ public struct GigDetailView: View {
     @State private var cancelPreview: GigCancellationPreview?
     @State private var showNoShowSheet = false
     @State private var reviewTarget: LeaveReviewSheetTarget?
+    // Phase 5b — lifecycle completers
+    @State private var showRunningLateSheet = false
+    @State private var showChangeOrderSheet = false
     private let onBack: @MainActor () -> Void
     private let onOpenChat: (@MainActor (InboxConversationDestination) -> Void)?
 
@@ -97,6 +102,8 @@ public struct GigDetailView: View {
             cancelPreview: $cancelPreview,
             showNoShowSheet: $showNoShowSheet,
             reviewTarget: $reviewTarget,
+            showRunningLateSheet: $showRunningLateSheet,
+            showChangeOrderSheet: $showChangeOrderSheet,
             toast: $toast
         ))
         .confirmationDialog(
@@ -117,9 +124,10 @@ public struct GigDetailView: View {
         .onChange(of: viewModel.tipStatus) { _, status in handleTip(status) }
     }
 
-    // MARK: - Lifecycle footer (Phase 5)
+    // MARK: - Lifecycle footer (Phase 5 / 5b)
 
-    /// Owner bids panel → active-task panel → review CTA → Q&A.
+    /// Owner bids panel → active-task panel → changes card → payment
+    /// card → review CTA → Q&A.
     @ViewBuilder private var lifecycleFooter: some View {
         if case .loaded = viewModel.state {
             if viewModel.showOwnerBidsPanel {
@@ -138,6 +146,8 @@ public struct GigDetailView: View {
                     canStartTask: viewModel.canStartTask,
                     canConfirmCompletion: viewModel.canConfirmCompletion,
                     noShowEligible: viewModel.noShowEligible,
+                    runningLateLabel: viewModel.runningLateLabel,
+                    canReportRunningLate: viewModel.canReportRunningLate,
                     onWorkerAck: {
                         Task { await runToasting(success: "Told the poster you're on it.") { await viewModel.sendWorkerAck() } }
                     },
@@ -147,8 +157,29 @@ public struct GigDetailView: View {
                     onConfirmCompletion: {
                         Task { await runToasting(success: "Completion confirmed.") { await viewModel.confirmCompletion() } }
                     },
-                    onReportNoShow: { showNoShowSheet = true }
+                    onReportNoShow: { showNoShowSheet = true },
+                    onRunningLate: { showRunningLateSheet = true }
                 )
+            }
+            if viewModel.showChangesSection {
+                GigChangesCard(
+                    orders: viewModel.changeOrders,
+                    inFlightOrderId: viewModel.changeOrderActionInFlight,
+                    isOwnOrder: { viewModel.isOwnChangeOrder($0) },
+                    onApprove: { order in
+                        Task { await runToasting(success: "Change approved.") { await viewModel.approveChangeOrder(orderId: order.id) } }
+                    },
+                    onReject: { order in
+                        Task { await runToasting(success: "Change rejected.") { await viewModel.rejectChangeOrder(orderId: order.id) } }
+                    },
+                    onWithdraw: { order in
+                        Task { await runToasting(success: "Change withdrawn.") { await viewModel.withdrawChangeOrder(orderId: order.id) } }
+                    },
+                    onPropose: { showChangeOrderSheet = true }
+                )
+            }
+            if viewModel.showPaymentCard, let payment = viewModel.payment {
+                GigPaymentCard(payment: payment, stateInfo: viewModel.paymentStateInfo)
             }
             if viewModel.showReviewSection {
                 GigReviewSection(
@@ -455,9 +486,16 @@ private struct GigLifecycleSheets: ViewModifier {
     @Binding var cancelPreview: GigCancellationPreview?
     @Binding var showNoShowSheet: Bool
     @Binding var reviewTarget: LeaveReviewSheetTarget?
+    @Binding var showRunningLateSheet: Bool
+    @Binding var showChangeOrderSheet: Bool
     @Binding var toast: ToastMessage?
 
     func body(content: Content) -> some View {
+        phase5bSheets(phase5Sheets(content))
+    }
+
+    /// Phase 5 — counter / report / cancel / no-show / review.
+    private func phase5Sheets(_ content: Content) -> some View {
         content
             .sheet(item: $counterTarget) { target in
                 GigCounterSheet(
@@ -502,6 +540,7 @@ private struct GigLifecycleSheets: ViewModifier {
             }
             .sheet(isPresented: $showNoShowSheet) {
                 GigNoShowSheet(
+                    counterpartyLabel: viewModel.viewerIsWorker ? "poster" : "worker",
                     onConfirm: { description in
                         if let error = await viewModel.reportNoShow(description: description) {
                             toast = ToastMessage(text: error, kind: .error)
@@ -528,6 +567,40 @@ private struct GigLifecycleSheets: ViewModifier {
                     onCancel: { reviewTarget = nil }
                 )
                 .presentationDetents([.medium, .large])
+            }
+    }
+
+    /// Phase 5b — running-late + propose-a-change.
+    private func phase5bSheets(_ content: some View) -> some View {
+        content
+            .sheet(isPresented: $showRunningLateSheet) {
+                GigRunningLateSheet(
+                    onSubmit: { etaMinutes, note in
+                        let error = await viewModel.sendRunningLate(etaMinutes: etaMinutes, note: note)
+                        if error == nil {
+                            toast = ToastMessage(text: "Told the poster you're running late.", kind: .success)
+                        }
+                        return error
+                    },
+                    onDismiss: { showRunningLateSheet = false }
+                )
+            }
+            .sheet(isPresented: $showChangeOrderSheet) {
+                GigChangeOrderSheet(
+                    onSubmit: { type, description, amountChange, timeChangeMinutes in
+                        let error = await viewModel.proposeChangeOrder(
+                            type: type,
+                            description: description,
+                            amountChange: amountChange,
+                            timeChangeMinutes: timeChangeMinutes
+                        )
+                        if error == nil {
+                            toast = ToastMessage(text: "Change request sent.", kind: .success)
+                        }
+                        return error
+                    },
+                    onDismiss: { showChangeOrderSheet = false }
+                )
             }
     }
 }

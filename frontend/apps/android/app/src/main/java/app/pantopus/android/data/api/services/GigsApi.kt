@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CancellationPreviewResponse
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.CounterBidBody
+import app.pantopus.android.data.api.models.gigs.CreateChangeOrderBody
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.DismissGigBody
@@ -14,9 +15,12 @@ import app.pantopus.android.data.api.models.gigs.GigActionSuccessResponse
 import app.pantopus.android.data.api.models.gigs.GigBidAcceptResponse
 import app.pantopus.android.data.api.models.gigs.GigBidMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
+import app.pantopus.android.data.api.models.gigs.GigChangeOrderMutationResponse
+import app.pantopus.android.data.api.models.gigs.GigChangeOrdersResponse
 import app.pantopus.android.data.api.models.gigs.GigChatRoomResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigInstantAcceptResponse
+import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionMutationResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -37,6 +41,7 @@ import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import app.pantopus.android.data.api.models.gigs.PriceBenchmarkResponse
+import app.pantopus.android.data.api.models.gigs.RejectChangeOrderBody
 import app.pantopus.android.data.api.models.gigs.ReportGigBody
 import app.pantopus.android.data.api.models.gigs.ReportGigResponse
 import app.pantopus.android.data.api.models.gigs.ReportNoShowBody
@@ -360,6 +365,70 @@ interface GigsApi {
     suspend fun cancellationPreview(
         @Path("gigId") gigId: String,
     ): CancellationPreviewResponse
+
+    /**
+     * `GET /api/gigs/:gigId/payment` — payment details for the gig's
+     * "Payment" card (poster or worker; Stripe ids stripped for the
+     * worker). Route `backend/routes/gigs.js:8440`.
+     */
+    @GET("api/gigs/{gigId}/payment")
+    suspend fun gigPayment(
+        @Path("gigId") gigId: String,
+    ): GigPaymentResponse
+
+    /**
+     * `GET /api/gigs/:gigId/change-orders` — list change orders, newest
+     * first (poster or worker). Route `backend/routes/gigs.js:6640`.
+     */
+    @GET("api/gigs/{gigId}/change-orders")
+    suspend fun changeOrders(
+        @Path("gigId") gigId: String,
+    ): GigChangeOrdersResponse
+
+    /**
+     * `POST /api/gigs/:gigId/change-orders` — propose a change (either
+     * party, gig `assigned` or `in_progress`, ≤5 pending). Route
+     * `backend/routes/gigs.js:6691`.
+     */
+    @POST("api/gigs/{gigId}/change-orders")
+    suspend fun createChangeOrder(
+        @Path("gigId") gigId: String,
+        @Body body: CreateChangeOrderBody,
+    ): GigChangeOrderMutationResponse
+
+    /**
+     * `POST /api/gigs/:gigId/change-orders/:orderId/approve` — the
+     * counterparty approves; price deltas apply to the gig. Route
+     * `backend/routes/gigs.js:6828`.
+     */
+    @POST("api/gigs/{gigId}/change-orders/{orderId}/approve")
+    suspend fun approveChangeOrder(
+        @Path("gigId") gigId: String,
+        @Path("orderId") orderId: String,
+    ): GigChangeOrderMutationResponse
+
+    /**
+     * `POST /api/gigs/:gigId/change-orders/:orderId/reject` — the
+     * counterparty declines with an optional reason. Route
+     * `backend/routes/gigs.js:6913`.
+     */
+    @POST("api/gigs/{gigId}/change-orders/{orderId}/reject")
+    suspend fun rejectChangeOrder(
+        @Path("gigId") gigId: String,
+        @Path("orderId") orderId: String,
+        @Body body: RejectChangeOrderBody,
+    ): GigChangeOrderMutationResponse
+
+    /**
+     * `POST /api/gigs/:gigId/change-orders/:orderId/withdraw` — the
+     * requester pulls their own pending order. Route
+     * `backend/routes/gigs.js:6994`.
+     */
+    @POST("api/gigs/{gigId}/change-orders/{orderId}/withdraw")
+    suspend fun withdrawChangeOrder(
+        @Path("gigId") gigId: String,
+        @Path("orderId") orderId: String,
+    ): GigChangeOrderMutationResponse
 
     /** `POST /api/gigs/:gigId/bids/:bidId/accept` — poster accepts a bid. */
     @POST("api/gigs/{gigId}/bids/{bidId}/accept")
