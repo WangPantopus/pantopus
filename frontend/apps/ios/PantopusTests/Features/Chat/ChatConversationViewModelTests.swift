@@ -227,6 +227,50 @@ final class ChatConversationViewModelTests: XCTestCase {
         }
     }
 
+    /// Regression: `URLSession.AsyncBytes.lines` never yields the blank
+    /// line that terminates an SSE event, so the parser must dispatch on
+    /// the `data:` line itself. Exercises the real `AIChatStreamClient`
+    /// against the exact wire format `backend/routes/ai.js:136` emits —
+    /// with the old blank-line-gated parser this yielded zero events and
+    /// the chat sat on "Thinking…" forever.
+    func testAIChatStreamClientParsesSSEWithoutBlankLines() async throws {
+        URLProtocolStub.stub(
+            path: "/api/ai/chat",
+            response: URLProtocolStub.Response(
+                status: 200,
+                body: Data("""
+                event: conversation
+                data: {"conversationId":"c1","isNew":true}
+
+                event: text_delta
+                data: {"delta":"Hello"}
+
+                event: text_delta
+                data: {"delta":" there"}
+
+                event: done
+                data: {"conversationId":"c1","usage":{"inputTokens":1,"outputTokens":2},"toolCalls":0}
+
+                event: close
+                data: {}
+
+                """.utf8),
+                headers: ["Content-Type": "text/event-stream"]
+            )
+        )
+        let client = AIChatStreamClient(session: TestSession.make())
+        var events: [AIChatStreamEvent] = []
+        for try await event in client.streamChat(AIChatStreamRequest(message: "hi")) {
+            events.append(event)
+        }
+        XCTAssertEqual(events, [
+            .conversation(id: "c1"),
+            .textDelta("Hello"),
+            .textDelta(" there"),
+            .done
+        ])
+    }
+
     func testAIThreadUploadsImagesAndPassesURLs() async {
         URLProtocolStub.stub(
             path: "/api/upload/ai-media",

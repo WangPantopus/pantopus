@@ -93,17 +93,17 @@ final class AIChatStreamClient: AIChatStreaming, @unchecked Sendable {
                         continuation.finish()
                         return
                     }
+                    // AsyncLineSequence never yields the blank line that
+                    // terminates an SSE event, so dispatch as soon as the
+                    // event's data line arrives — the backend writes exactly
+                    // one `data:` line per event (backend/routes/ai.js:136).
                     var eventName: String?
-                    var data: String?
                     for try await line in bytes.lines {
                         if line.hasPrefix("event: ") {
                             eventName = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
-                        } else if line.hasPrefix("data: ") {
-                            data = String(line.dropFirst(6))
-                        } else if line.isEmpty, let name = eventName, let payload = data {
-                            Self.dispatch(eventName: name, data: payload, continuation: continuation)
+                        } else if line.hasPrefix("data: "), let name = eventName {
+                            Self.dispatch(eventName: name, data: String(line.dropFirst(6)), continuation: continuation)
                             eventName = nil
-                            data = nil
                         }
                     }
                     continuation.finish()

@@ -18,6 +18,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.IOException
 import javax.inject.Inject
@@ -39,6 +40,17 @@ class AIChatRepository
         private val tokenStorage: TokenStorage,
         private val api: AIApi,
     ) {
+        // HttpLoggingInterceptor at Level.BODY (debug builds) buffers the
+        // whole response before returning it to the caller, which turns the
+        // SSE stream into a single blob delivered only after generation
+        // finishes — the chat sits on "Thinking…" the entire time.
+        private val streamingClient: OkHttpClient by lazy {
+            client
+                .newBuilder()
+                .apply { interceptors().removeAll { it is HttpLoggingInterceptor } }
+                .build()
+        }
+
         /**
          * List the user's AI conversations (metadata only — newest-updated
          * first). Route `backend/routes/ai.js:358`. Used to restore the
@@ -70,7 +82,7 @@ class AIChatRepository
                         .header("Content-Type", "application/json")
                 tokenStorage.accessToken()?.let { builder.header("Authorization", "Bearer $it") }
                 val request = builder.build()
-                val call = client.newCall(request)
+                val call = streamingClient.newCall(request)
                 // The blocking execute/read below can't observe coroutine
                 // cancellation on its own — tear the HTTP call (and the
                 // server-side generation) down as soon as the collecting
