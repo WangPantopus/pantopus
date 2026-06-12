@@ -16,7 +16,7 @@ extension ListingComposeWizardViewModel {
             progressFraction: progressFraction(for: step),
             leading: leadingControl(for: step),
             primaryCTALabel: primaryCTALabel(for: step),
-            primaryCTAEnabled: primaryEnabled(for: step) && !isSubmitting && !isLoadingExisting,
+            primaryCTAEnabled: primaryEnabled(for: step) && !isSubmitting && !isLoadingExisting && !isAnalyzing,
             secondaryCTA: secondaryCTA(for: step),
             isSubmitting: isSubmitting,
             dirty: dirtyForCloseConfirm,

@@ -154,6 +154,57 @@ public final class MultipartUploader: @unchecked Sendable {
         }
     }
 
+    /// Upload listing photos to `POST /api/upload/listing-media/:listingId`
+    /// (`backend/routes/upload.js:1049`). Each part uses the field name
+    /// `files`, matching the backend multer route. Owner-only — the
+    /// route verifies the listing belongs to the caller.
+    public func uploadListingMedia(
+        listingId: String,
+        files: [MultipartFile]
+    ) async throws -> ListingMediaUploadResponse {
+        guard !files.isEmpty else {
+            throw APIError.clientError(status: 400, message: "No files provided")
+        }
+        let token = await AuthManager.shared.accessToken
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        let url = environment.apiBaseURL.appendingPathComponent("/api/upload/listing-media/\(listingId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let body = Self.buildBody(boundary: boundary, files: files)
+        let (data, response) = try await session.upload(for: request, from: body)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(ListingMediaUploadResponse.self, from: data)
+            } catch {
+                logger.error("Listing media upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            await AuthManager.shared.handleUnauthorized()
+            throw APIError.unauthorized
+        case 413:
+            throw APIError.clientError(status: 413, message: "File is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "Unsupported file type.")
+        case 400..<500:
+            let message = String(data: data, encoding: .utf8)
+            throw APIError.clientError(status: http.statusCode, message: message)
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     /// Upload chat attachments to `POST /api/upload/chat-media/:roomId`.
     /// Each part uses the field name `files`, matching the backend multer route.
     public func uploadChatMedia(

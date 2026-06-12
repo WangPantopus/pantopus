@@ -102,7 +102,11 @@ public struct ListingComposeWizardView: View {
             }
         case .titleCategory:
             if viewModel.isSnapReviewStep {
-                ListingComposeSnapReviewStep(viewModel: viewModel)
+                if viewModel.isAnalyzing {
+                    ListingComposeAnalyzingBlock()
+                } else {
+                    ListingComposeSnapReviewStep(viewModel: viewModel)
+                }
             } else {
                 ListingComposeTitleCategoryStep(viewModel: viewModel)
             }
@@ -155,6 +159,37 @@ public struct ListingComposeWizardView: View {
             }
         }
         viewModel.pendingEvent = nil
+    }
+}
+
+/// Shimmer surface shown while the Snap & Sell vision draft is in
+/// flight — mirrors the loaded review geometry (photo strip, banner,
+/// fields) so layout doesn't jump when suggestions resolve.
+private struct ListingComposeAnalyzingBlock: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s5) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.sparkles, size: 16, color: Theme.Color.business)
+                Text("Analyzing your photos…")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            Text("Pantopus is drafting your title, price, and details.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Shimmer()
+                .frame(height: 168)
+            Shimmer()
+                .frame(height: 52)
+            Shimmer()
+                .frame(height: 44)
+            Shimmer()
+                .frame(height: 44)
+            Shimmer()
+                .frame(height: 96)
+        }
+        .accessibilityIdentifier("listingComposeAnalyzing")
+        .accessibilityLabel("Analyzing your photos")
     }
 }
 

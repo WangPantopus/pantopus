@@ -7,26 +7,70 @@
 //  segmented control, and pickup / delivery toggles.
 //
 
+import PhotosUI
 import SwiftUI
 
 // swiftlint:disable file_length
 
 struct ListingComposeSnapReviewStep: View {
     @Bindable var viewModel: ListingComposeWizardViewModel
+    @State private var showsPhotosPicker = false
+    @State private var photosPickerSelection: [PhotosPickerItem] = []
+
+    private var remainingSlots: Int {
+        max(0, ListingComposeFormState.maxPhotos - viewModel.form.photos.count)
+    }
 
     var body: some View {
         ListingComposeIdentityChip()
         HeadlineBlock("Review your listing")
         SubcopyBlock(
-            "We pulled title, category, and price from your photos. Edit anything that looks off."
+            viewModel.aiDraftApplied
+                ? "We pulled title, category, and price from your photos. Edit anything that looks off."
+                : "Check your photos and fill in the details below."
         )
-        ListingComposePhotoStrip(photos: viewModel.form.photos)
-        SuggestionsBanner()
+        ListingComposePhotoStrip(
+            photos: viewModel.form.photos,
+            canAddMore: remainingSlots > 0
+        ) {
+            showsPhotosPicker = true
+        }
+        .photosPicker(
+            isPresented: $showsPhotosPicker,
+            selection: $photosPickerSelection,
+            maxSelectionCount: max(1, remainingSlots),
+            matching: .images
+        )
+        .onChange(of: photosPickerSelection) { _, newItems in
+            handleLibraryPicks(newItems)
+        }
+        SuggestionsBanner(
+            aiApplied: viewModel.aiDraftApplied,
+            basis: viewModel.form.priceSuggestion?.basis
+        )
         SuggestedTitleField(viewModel: viewModel)
         SuggestedCategoryField(viewModel: viewModel)
         SuggestedPriceField(viewModel: viewModel)
         SuggestedConditionControl(viewModel: viewModel)
         PickupDeliveryPanel(viewModel: viewModel)
+    }
+
+    private func handleLibraryPicks(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            var loaded: [Data] = []
+            for item in items.prefix(remainingSlots) {
+                if let raw = try? await item.loadTransferable(type: Data.self),
+                   let data = ListingPhotoProcessor.uploadData(from: raw) {
+                    loaded.append(data)
+                }
+            }
+            let images = loaded
+            await MainActor.run {
+                viewModel.addLibraryPhotos(images)
+                photosPickerSelection = []
+            }
+        }
     }
 }
 
@@ -49,26 +93,15 @@ private struct ListingComposeIdentityChip: View {
 
 private struct ListingComposePhotoStrip: View {
     let photos: [ListingComposePhoto]
+    let canAddMore: Bool
+    let onAddPhoto: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack {
-                Text("Photos · \(photos.count) of \(ListingComposeFormState.maxPhotos)")
-                    .pantopusTextStyle(.overline)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                Spacer()
-                HStack(spacing: Spacing.s1) {
-                    Icon(.sparkles, size: 11, color: Theme.Color.success)
-                    Text("Good lighting")
-                        .font(.system(size: 10.5, weight: .semibold))
-                }
-                .foregroundStyle(Theme.Color.success)
-                .padding(.horizontal, Spacing.s2)
-                .padding(.vertical, 3)
-                .background(Theme.Color.successLight)
-                .clipShape(Capsule())
-            }
-            PhotoStripGrid(photos: photos)
+            Text("Photos · \(photos.count) of \(ListingComposeFormState.maxPhotos)")
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            PhotoStripGrid(photos: photos, canAddMore: canAddMore, onAddPhoto: onAddPhoto)
         }
         .accessibilityIdentifier("listingComposePhotoStrip")
     }
@@ -76,6 +109,8 @@ private struct ListingComposePhotoStrip: View {
 
 private struct PhotoStripGrid: View {
     let photos: [ListingComposePhoto]
+    let canAddMore: Bool
+    let onAddPhoto: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
@@ -83,16 +118,20 @@ private struct PhotoStripGrid: View {
             let smallWidth = (proxy.size.width - gap * 3) / 4
             let heroWidth = smallWidth * 2 + gap
             HStack(spacing: gap) {
-                PhotoStripTile(index: 0, isFilled: !photos.isEmpty, isHero: true)
+                PhotoStripTile(index: 0, photo: photos.first, isHero: true)
                     .frame(width: heroWidth, height: 168)
                 VStack(spacing: gap) {
                     HStack(spacing: gap) {
-                        PhotoStripTile(index: 1, isFilled: photos.count > 1)
-                        PhotoStripTile(index: 2, isFilled: photos.count > 2)
+                        PhotoStripTile(index: 1, photo: photo(at: 1))
+                        PhotoStripTile(index: 2, photo: photo(at: 2))
                     }
                     HStack(spacing: gap) {
-                        PhotoStripTile(index: 3, isFilled: photos.count > 3)
-                        AddMorePhotoTile()
+                        PhotoStripTile(index: 3, photo: photo(at: 3))
+                        if canAddMore {
+                            AddMorePhotoTile(onTap: onAddPhoto)
+                        } else {
+                            PhotoStripTile(index: 4, photo: photo(at: 4))
+                        }
                     }
                 }
                 .frame(width: heroWidth, height: 168)
@@ -100,41 +139,33 @@ private struct PhotoStripGrid: View {
         }
         .frame(height: 168)
     }
+
+    private func photo(at index: Int) -> ListingComposePhoto? {
+        photos.indices.contains(index) ? photos[index] : nil
+    }
 }
 
 private struct PhotoStripTile: View {
     let index: Int
-    let isFilled: Bool
+    let photo: ListingComposePhoto?
     var isHero = false
 
     var body: some View {
-        RoundedRectangle(cornerRadius: isHero ? Radii.xl : Radii.lg, style: .continuous)
-            .fill(
-                isFilled
-                    ? LinearGradient(
-                        colors: [
-                            Color(red: 0.53, green: 0.66, blue: 0.55),
-                            Color(red: 0.28, green: 0.39, blue: 0.31)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    : LinearGradient(
-                        colors: [Theme.Color.appSurfaceMuted, Theme.Color.appSurfaceMuted],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-            )
+        Color.clear
             .overlay {
-                if isFilled {
-                    SofaThumbMark()
-                        .padding(isHero ? Spacing.s5 : Spacing.s3)
+                if let photo {
+                    ListingPhotoThumbnail(photo: photo)
                 } else {
-                    Icon(.image, size: isHero ? 26 : 20, color: Theme.Color.appTextSecondary)
+                    Rectangle()
+                        .fill(Theme.Color.appSurfaceMuted)
+                        .overlay(
+                            Icon(.image, size: isHero ? 26 : 20, color: Theme.Color.appTextSecondary)
+                        )
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: isHero ? Radii.xl : Radii.lg, style: .continuous))
             .overlay(alignment: .topLeading) {
-                if isHero && isFilled {
+                if isHero && photo != nil {
                     Text("Cover")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white)
@@ -154,53 +185,49 @@ private struct PhotoStripTile: View {
     }
 }
 
-private struct SofaThumbMark: View {
-    var body: some View {
-        VStack(spacing: Spacing.s0) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.white.opacity(0.24))
-                .frame(height: 26)
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.white.opacity(0.18))
-                .frame(height: 44)
-                .offset(y: -6)
-        }
-    }
-}
-
 private struct AddMorePhotoTile: View {
+    let onTap: () -> Void
+
     var body: some View {
-        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-            .fill(Theme.Color.appSurfaceRaised)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-            )
-            .overlay {
-                VStack(spacing: 2) {
-                    Icon(.plus, size: 18, color: Theme.Color.appTextSecondary)
-                    Text("Add photo")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
+        Button(action: onTap) {
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .fill(Theme.Color.appSurfaceRaised)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .stroke(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                )
+                .overlay {
+                    VStack(spacing: 2) {
+                        Icon(.plus, size: 18, color: Theme.Color.appTextSecondary)
+                        Text("Add photo")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                    }
                 }
-            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("listingComposeSnapAddPhoto")
+        .accessibilityLabel("Add photo")
     }
 }
 
 struct SuggestionsBanner: View {
+    let aiApplied: Bool
+    let basis: String?
+
     var body: some View {
         HStack(spacing: Spacing.s3) {
             ZStack {
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(Color(red: 0.49, green: 0.23, blue: 0.93))
+                    .fill(Theme.Color.business)
                     .frame(width: 28, height: 28)
                 Icon(.sparkles, size: 14, strokeWidth: 2.4, color: .white)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Snap-and-sell suggested everything below")
+                Text(aiApplied ? "Snap-and-sell suggested everything below" : "Add the details below")
                     .font(.system(size: 12.5, weight: .bold))
-                    .foregroundStyle(Color(red: 0.49, green: 0.23, blue: 0.93))
-                Text("Tap any field to edit. Based on 47 similar comps within 3 mi.")
+                    .foregroundStyle(Theme.Color.business)
+                Text(subtitle)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
@@ -208,13 +235,20 @@ struct SuggestionsBanner: View {
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, 10)
-        .background(Color(red: 0.96, green: 0.95, blue: 1.0))
+        .background(Theme.Color.businessBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Color(red: 0.87, green: 0.84, blue: 1.0), lineWidth: 1)
+                .stroke(Theme.Color.business.opacity(0.25), lineWidth: 1)
         )
         .accessibilityIdentifier("listingComposeSuggestionsBanner")
+    }
+
+    private var subtitle: String {
+        if let basis, !basis.isEmpty {
+            return "Tap any field to edit. Price based on \(basis)."
+        }
+        return "Tap any field to edit before you post."
     }
 }
 
@@ -224,10 +258,11 @@ private struct SuggestedTitleField: View {
     var body: some View {
         SuggestedFieldShell(
             label: "Title",
-            hint: "Snap-and-sell pulled this from the photos"
+            hint: viewModel.aiDraftApplied ? "Snap-and-sell pulled this from the photos" : nil,
+            showsAIBadge: viewModel.aiDraftApplied
         ) {
             TextField(
-                "Sage green velvet sofa, 3-seater",
+                "What are you listing?",
                 text: Binding(get: { viewModel.form.title }, set: { viewModel.setTitle($0) })
             )
             .font(.system(size: 14, weight: .semibold))
@@ -242,7 +277,7 @@ private struct SuggestedCategoryField: View {
     @Bindable var viewModel: ListingComposeWizardViewModel
 
     var body: some View {
-        SuggestedFieldShell(label: "Category") {
+        SuggestedFieldShell(label: "Category", showsAIBadge: viewModel.aiDraftApplied) {
             HStack(spacing: Spacing.s2) {
                 ForEach(ListingComposeCategory.allCases, id: \.self) { category in
                     CategoryChip(
@@ -267,18 +302,19 @@ private struct CategoryChip: View {
         Button(action: action) {
             Text(category.label)
                 .font(.system(size: 11.5, weight: .bold))
-                .foregroundStyle(isSelected ? Color(red: 0.49, green: 0.23, blue: 0.93) : Theme.Color.appTextSecondary)
+                .foregroundStyle(isSelected ? Theme.Color.business : Theme.Color.appTextSecondary)
                 .padding(.horizontal, Spacing.s2)
                 .padding(.vertical, 7)
-                .background(isSelected ? Color(red: 0.96, green: 0.95, blue: 1.0) : Theme.Color.appSurfaceRaised)
+                .background(isSelected ? Theme.Color.businessBg : Theme.Color.appSurfaceRaised)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(isSelected ? Color(red: 0.49, green: 0.23, blue: 0.93) : Theme.Color.appBorder, lineWidth: 1)
+                        .stroke(isSelected ? Theme.Color.business : Theme.Color.appBorder, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("listingComposeSnapCategory_\(category.rawValue)")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -287,23 +323,28 @@ private struct SuggestedPriceField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            SuggestedLabel(label: "Price")
+            SuggestedLabel(label: "Price", showsAIBadge: viewModel.aiDraftApplied)
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
                     Text("$")
                         .font(.system(size: 22, weight: .bold))
                     TextField(
-                        "280",
+                        "0",
                         text: Binding(get: { viewModel.form.priceAmount }, set: { viewModel.setPriceAmount($0) })
                     )
                     .font(.system(size: 28, weight: .bold))
                     .keyboardType(.decimalPad)
                     Spacer()
-                    Text("USD · firm")
+                    Text("USD")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                PriceCompRangeTrack()
+                if let suggestion = viewModel.form.priceSuggestion {
+                    PriceCompRangeTrack(
+                        suggestion: suggestion,
+                        currentPrice: viewModel.parsedPrice
+                    )
+                }
             }
             .padding(Spacing.s3)
             .background(Theme.Color.appSurface)
@@ -318,40 +359,70 @@ private struct SuggestedPriceField: View {
 }
 
 private struct PriceCompRangeTrack: View {
+    let suggestion: ListingComposePriceSuggestion
+    let currentPrice: Double?
+
+    /// Track domain pads the comp band so the thumb has room either
+    /// side of the p25–p75 range.
+    private var domain: ClosedRange<Double> {
+        let pad = max((suggestion.high - suggestion.low) * 0.3, 1)
+        return (suggestion.low - pad)...(suggestion.high + pad)
+    }
+
+    private func fraction(of value: Double) -> CGFloat {
+        let span = domain.upperBound - domain.lowerBound
+        guard span > 0 else { return 0.5 }
+        let clamped = min(max(value, domain.lowerBound), domain.upperBound)
+        return CGFloat((clamped - domain.lowerBound) / span)
+    }
+
     var body: some View {
         VStack(spacing: Spacing.s2) {
             GeometryReader { proxy in
                 let width = proxy.size.width
+                let bandStart = width * fraction(of: suggestion.low)
+                let bandWidth = max(width * fraction(of: suggestion.high) - bandStart, 6)
+                let thumbX = width * fraction(of: currentPrice ?? suggestion.median)
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Theme.Color.appSurfaceSunken)
                         .frame(height: 6)
                     Capsule()
                         .fill(Theme.Color.successLight)
-                        .frame(width: width * 0.46, height: 6)
-                        .offset(x: width * 0.22)
+                        .frame(width: bandWidth, height: 6)
+                        .offset(x: bandStart)
                     Circle()
                         .fill(Theme.Color.primary600)
                         .frame(width: 12, height: 12)
                         .overlay(Circle().stroke(.white, lineWidth: 2))
                         .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 1)
-                        .offset(x: width * 0.52 - 6)
+                        .offset(x: min(max(thumbX - 6, 0), width - 12))
                 }
             }
             .frame(height: 12)
             HStack {
-                Text("$180 low")
+                Text("$\(Self.amount(suggestion.low)) low")
                 Spacer()
-                Text("$240–$320 typical")
+                Text("$\(Self.amount(suggestion.median)) typical")
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.success)
                 Spacer()
-                Text("$420 high")
+                Text("$\(Self.amount(suggestion.high)) high")
             }
             .font(.system(size: 10.5))
             .foregroundStyle(Theme.Color.appTextSecondary)
         }
         .accessibilityIdentifier("listingComposeCompRange")
+        .accessibilityLabel(rangeAccessibilityLabel)
+    }
+
+    private var rangeAccessibilityLabel: String {
+        "Similar items sell between $\(Self.amount(suggestion.low)) and "
+            + "$\(Self.amount(suggestion.high)), typically $\(Self.amount(suggestion.median))"
+    }
+
+    private static func amount(_ value: Double) -> String {
+        ListingComposeWizardViewModel.formatAmount(value)
     }
 }
 
@@ -387,7 +458,7 @@ private struct SuggestedConditionControl: View {
                     .accessibilityIdentifier("listingComposeSnapCondition_\(condition.rawValue)")
                 }
             }
-            Text("Light wear on one cushion · minor sun fade. Add notes in description.")
+            Text("Add wear notes in the description so buyers know what to expect.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
@@ -413,25 +484,46 @@ private struct PickupDeliveryPanel: View {
                 .pantopusTextStyle(.overline)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             VStack(spacing: Spacing.s0) {
-                HStack(spacing: Spacing.s3) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                            .fill(Theme.Color.primary50)
-                            .frame(width: 28, height: 28)
-                        Icon(.mapPin, size: 14, color: Theme.Color.primary600)
+                Button {
+                    let next: ListingComposeLocationKind =
+                        viewModel.form.locationKind == .meetPoint ? .savedAddress : .meetPoint
+                    viewModel.setLocationKind(next)
+                } label: {
+                    HStack(spacing: Spacing.s3) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                                .fill(Theme.Color.primary50)
+                                .frame(width: 28, height: 28)
+                            Icon(.mapPin, size: 14, color: Theme.Color.primary600)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(locationTitle)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.Color.appText)
+                            Text("Shown as approximate location to buyers")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                        }
+                        Spacer()
+                        Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("412 Elm St · West Loop")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appText)
-                        Text("Shown as approximate location to buyers")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                    }
-                    Spacer()
-                    Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+                    .padding(Spacing.s3)
                 }
-                .padding(Spacing.s3)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("listingComposeSnapLocation")
+                if viewModel.form.locationKind == .meetPoint {
+                    PantopusTextField(
+                        "Meet point name",
+                        text: Binding(
+                            get: { viewModel.form.locationLabel },
+                            set: { viewModel.setLocationLabel($0) }
+                        ),
+                        placeholder: "Lincoln Park bandshell",
+                        identifier: "listingComposeSnapLocationLabel"
+                    )
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.bottom, Spacing.s3)
+                }
                 Divider()
                 VStack(spacing: Spacing.s2) {
                     FulfillmentToggleRow(
@@ -445,7 +537,7 @@ private struct PickupDeliveryPanel: View {
                     FulfillmentToggleRow(
                         icon: .package,
                         title: "Local delivery",
-                        subtitle: "Up to 3 mi · $40 fee",
+                        subtitle: "You drop off nearby",
                         isOn: viewModel.form.deliveryEnabled
                     ) {
                         viewModel.setDeliveryEnabled(!viewModel.form.deliveryEnabled)
@@ -453,7 +545,7 @@ private struct PickupDeliveryPanel: View {
                     FulfillmentToggleRow(
                         icon: .package,
                         title: "Ship nationwide",
-                        subtitle: "Too large to ship",
+                        subtitle: "Coming soon",
                         isOn: false,
                         isDisabled: true
                     ) {}
@@ -468,6 +560,17 @@ private struct PickupDeliveryPanel: View {
             )
         }
         .accessibilityIdentifier("listingComposePickupDelivery")
+    }
+
+    private var locationTitle: String {
+        switch viewModel.form.locationKind {
+        case .meetPoint:
+            return viewModel.form.locationLabel.isEmpty
+                ? "Pick a meet point"
+                : viewModel.form.locationLabel
+        case .savedAddress, nil:
+            return "Your saved address"
+        }
     }
 }
 
@@ -521,11 +624,12 @@ private struct TogglePill: View {
 private struct SuggestedFieldShell<Content: View>: View {
     let label: String
     var hint: String?
+    var showsAIBadge: Bool = true
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            SuggestedLabel(label: label)
+            SuggestedLabel(label: label, showsAIBadge: showsAIBadge)
             HStack(spacing: Spacing.s2) {
                 content
             }
@@ -548,6 +652,7 @@ private struct SuggestedFieldShell<Content: View>: View {
 
 private struct SuggestedLabel: View {
     let label: String
+    var showsAIBadge: Bool = true
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -556,12 +661,14 @@ private struct SuggestedLabel: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .textCase(.uppercase)
             Spacer()
-            HStack(spacing: 3) {
-                Icon(.sparkles, size: 10, color: Color(red: 0.49, green: 0.23, blue: 0.93))
-                Text("AI suggested")
-                    .font(.system(size: 10, weight: .semibold))
+            if showsAIBadge {
+                HStack(spacing: 3) {
+                    Icon(.sparkles, size: 10, color: Theme.Color.business)
+                    Text("AI suggested")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(Theme.Color.business)
             }
-            .foregroundStyle(Color(red: 0.49, green: 0.23, blue: 0.93))
         }
     }
 }

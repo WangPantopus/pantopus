@@ -245,6 +245,9 @@ final class APIClient: @unchecked Sendable {
         guard let url = components.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url, cachePolicy: endpoint.cachePolicy)
+        if let timeout = endpoint.timeout {
+            request.timeoutInterval = timeout
+        }
         request.httpMethod = endpoint.method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -321,6 +324,10 @@ public struct Endpoint: Sendable {
     public let headers: [String: String]
     public let authenticated: Bool
     public let cachePolicy: URLRequest.CachePolicy
+    /// Per-request override of the session's 20s inactivity timeout.
+    /// Use for slow single-shot endpoints (e.g. AI vision drafts allow
+    /// 30s server-side).
+    public let timeout: TimeInterval?
 
     public init(
         method: Method,
@@ -329,7 +336,8 @@ public struct Endpoint: Sendable {
         body: (any Encodable & Sendable)? = nil,
         headers: [String: String] = [:],
         authenticated: Bool = true,
-        cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
+        cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy,
+        timeout: TimeInterval? = nil
     ) {
         self.method = method
         self.path = path
@@ -338,6 +346,7 @@ public struct Endpoint: Sendable {
         self.headers = headers
         self.authenticated = authenticated
         self.cachePolicy = cachePolicy
+        self.timeout = timeout
     }
 }
 

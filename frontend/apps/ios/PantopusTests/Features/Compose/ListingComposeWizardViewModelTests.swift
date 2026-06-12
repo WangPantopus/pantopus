@@ -102,42 +102,95 @@ final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTes
         XCTAssertEqual(vm.chrome.primaryCTALabel, "Continue")
     }
 
-    func testCameraCaptureSeedsSnapSuggestions() async {
+    func testCameraCaptureAnalyzesPhotosAndAppliesAIDraft() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.visionDraftJSON)]
         let vm = makeVM()
-        vm.captureSnapPhoto()
-        vm.captureSnapPhoto()
-        vm.captureSnapPhoto()
+        vm.captureSnapPhoto(Self.fakeJPEG)
+        vm.captureSnapPhoto(Self.fakeJPEG)
+        vm.captureSnapPhoto(Self.fakeJPEG)
         XCTAssertEqual(vm.form.photos.count, 3)
-        XCTAssertEqual(vm.form.title, "Sage green velvet sofa, 3-seater")
-        XCTAssertEqual(vm.form.category, .goods)
-        XCTAssertEqual(vm.form.condition, .good)
-        XCTAssertEqual(vm.form.priceKind, .fixed)
-        XCTAssertEqual(vm.form.priceAmount, "280")
-        XCTAssertEqual(vm.form.locationKind, .savedAddress)
-        XCTAssertTrue(vm.form.deliveryEnabled)
+        XCTAssertEqual(vm.form.title, "", "Suggestions arrive from the vision draft, not capture.")
 
         await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .titleCategory)
         XCTAssertTrue(vm.isSnapReviewStep)
+        XCTAssertTrue(vm.aiDraftApplied)
+        XCTAssertEqual(vm.form.title, "Sage green velvet sofa")
+        XCTAssertEqual(vm.form.category, .goods)
+        XCTAssertEqual(vm.form.backendCategory, "furniture")
+        XCTAssertEqual(vm.form.condition, .good)
+        XCTAssertEqual(vm.form.priceKind, .fixed)
+        XCTAssertEqual(vm.form.priceAmount, "280", "Comp median wins over the draft's point price.")
+        XCTAssertEqual(vm.form.priceSuggestion?.comparableCount, 47)
+        XCTAssertEqual(vm.form.locationKind, .savedAddress)
+        XCTAssertTrue(vm.form.deliveryEnabled)
         XCTAssertEqual(vm.chrome.primaryCTALabel, "Post listing")
         XCTAssertEqual(vm.chrome.secondaryCTA?.identifier, "listingComposeSaveDraft")
         XCTAssertTrue(vm.chrome.primaryCTAEnabled)
     }
 
-    func testSnapReviewPrimarySubmitsListing() async {
-        SequencedURLProtocol.sequence = [.status(201, body: Self.createListingJSON)]
+    func testVisionDraftFailureKeepsReviewEditable() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"AI_UNAVAILABLE\"}")]
         let vm = makeVM()
-        vm.captureSnapPhoto()
+        vm.captureSnapPhoto(Self.fakeJPEG)
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .titleCategory)
+        XCTAssertTrue(vm.isSnapReviewStep)
+        XCTAssertFalse(vm.aiDraftApplied)
+        XCTAssertNotNil(vm.errorMessage, "Failure surfaces a fill-manually notice.")
+        XCTAssertEqual(vm.form.locationKind, .savedAddress, "Review still seeds the location default.")
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled, "Empty fields keep Post disabled until filled.")
+    }
+
+    func testVisionDraftRunsOncePerSession() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.visionDraftJSON)]
+        let vm = makeVM()
+        vm.captureSnapPhoto(Self.fakeJPEG)
+        await vm.advanceForTesting()
+        XCTAssertTrue(vm.aiDraftApplied)
+        vm.leadingTapped() // back to camera
+        XCTAssertEqual(vm.currentStep, .photos)
+        // No second stub queued — a re-run would 404 the sequence.
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .titleCategory)
+        XCTAssertTrue(vm.aiDraftApplied)
+    }
+
+    func testSnapReviewPrimarySubmitsListingAndUploadsPhotos() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.visionDraftJSON),
+            .status(201, body: Self.createListingJSON),
+            .status(200, body: Self.listingMediaUploadJSON)
+        ]
+        let vm = makeVM()
+        vm.captureSnapPhoto(Self.fakeJPEG)
         await vm.advanceForTesting()
         await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .success)
         XCTAssertEqual(vm.createdListingId, "listing_42")
+        XCTAssertNil(vm.errorMessage, "Photo upload succeeded — no notice.")
+    }
+
+    func testSnapReviewPhotoUploadFailureStillSucceedsWithNotice() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.visionDraftJSON),
+            .status(201, body: Self.createListingJSON),
+            .status(500, body: "{\"error\":\"boom\"}")
+        ]
+        let vm = makeVM()
+        vm.captureSnapPhoto(Self.fakeJPEG)
+        await vm.advanceForTesting()
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .success, "Listing exists — upload failure is non-blocking.")
+        XCTAssertNotNil(vm.errorMessage)
     }
 
     func testSnapReviewSaveDraftDismisses() async {
         let vm = makeVM()
-        vm.captureSnapPhoto()
+        // Token-only photo (no bytes) — analysis is skipped, no stub needed.
+        vm.addPhoto(token: "snap_angle_1")
         await vm.advanceForTesting()
+        XCTAssertTrue(vm.isSnapReviewStep)
         vm.secondaryTapped()
         XCTAssertEqual(vm.pendingEvent, .dismiss)
     }
@@ -338,8 +391,20 @@ final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTes
     func testRestoreCopiesSnapshotIntoEmptyForm() {
         let vm = makeVM()
         vm.restore(from: readyToSubmit())
-        XCTAssertEqual(vm.currentStep, .review)
         XCTAssertEqual(vm.form.title, "Moving boxes — bundle of 18")
+        // Local photo bytes never persist to SceneStorage, so the dead
+        // tokens are dropped and the wizard rewinds to capture.
+        XCTAssertTrue(vm.form.photos.isEmpty)
+        XCTAssertEqual(vm.currentStep, .photos)
+    }
+
+    func testRestoreKeepsRemotePhotosAndStep() {
+        var snapshot = readyToSubmit()
+        snapshot.photos = [ListingComposePhoto(token: "https://example.com/a.jpg")]
+        let vm = makeVM()
+        vm.restore(from: snapshot)
+        XCTAssertEqual(vm.currentStep, .review)
+        XCTAssertEqual(vm.form.photos.count, 1)
     }
 
     func testRestoreNoOpsOnceFormIsDirty() {

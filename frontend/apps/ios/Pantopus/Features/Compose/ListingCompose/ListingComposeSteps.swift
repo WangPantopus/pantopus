@@ -104,14 +104,26 @@ public enum ListingComposeCategory: String, CaseIterable, Codable, Sendable, Has
         }
     }
 
-    /// Backend `listing_type`. Drives expiration windows + browse filters.
+    /// Backend `listing_type` (`backend/constants/marketplace.js:27`).
+    /// Drives expiration windows + browse filters.
     public var listingType: String {
         switch self {
         case .goods: "sell_item"
-        case .rentals: "rent_item"
-        case .vehicles: "sell_item"
+        case .rentals: "rent_sublet"
+        case .vehicles: "vehicle_sale"
         case .free: "free_item"
         case .wanted: "wanted_request"
+        }
+    }
+
+    /// Fallback backend `category` when no AI-derived product category
+    /// is available. `category` is a required enum on
+    /// `POST /api/listings` (`backend/constants/marketplace.js:6`).
+    public var fallbackBackendCategory: String {
+        switch self {
+        case .vehicles: "vehicles"
+        case .free: "free_stuff"
+        case .goods, .rentals, .wanted: "other"
         }
     }
 
@@ -207,11 +219,13 @@ public enum ListingComposeFulfillment: String, CaseIterable, Codable, Sendable, 
         }
     }
 
-    /// Maps onto the backend `meetup_preference` enum.
+    /// Maps onto the backend `meetup_preference` enum
+    /// (`porch_pickup` / `public_meetup` / `flexible`). Delivery is not
+    /// a meetup preference — it rides on `deliveryAvailable`.
     public var meetupPreference: String {
         switch self {
         case .pickup: "public_meetup"
-        case .delivery: "delivery"
+        case .delivery: "flexible"
         }
     }
 }
@@ -242,15 +256,50 @@ public enum ListingComposeLocationKind: String, CaseIterable, Codable, Sendable,
 /// drag-reorder and remove operations can identify rows.
 public struct ListingComposePhoto: Codable, Sendable, Equatable, Identifiable, Hashable {
     public let id: UUID
-    /// Local placeholder reference (e.g. "photo_1"). Replaced with a
-    /// hosted URL by the upload step in a real implementation; the
-    /// wizard treats every photo as a string token that gets sent to
-    /// `mediaUrls`.
+    /// Hosted URL for already-uploaded photos (edit-mode hydration) or
+    /// a local capture token (e.g. "snap_angle_1"). Only remote URLs
+    /// are sent in `mediaUrls` — local photos upload as multipart
+    /// after the listing is created.
     public var token: String
+    /// JPEG bytes for locally captured / picked photos. Deliberately
+    /// excluded from Codable so multi-MB images never land in
+    /// `@SceneStorage`; photos that lose their bytes across process
+    /// death are dropped on restore.
+    public var localImageData: Data?
 
-    public init(id: UUID = UUID(), token: String) {
+    public init(id: UUID = UUID(), token: String, localImageData: Data? = nil) {
         self.id = id
         self.token = token
+        self.localImageData = localImageData
+    }
+
+    /// True when the token is a hosted URL the backend already knows.
+    public var isRemote: Bool {
+        token.hasPrefix("http://") || token.hasPrefix("https://")
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case token
+    }
+}
+
+/// Comp-range price suggestion from the Snap & Sell vision draft
+/// (`backend/services/marketplace/priceIntelligenceService.js:42`).
+/// Persisted with the form so the review surface survives restore.
+public struct ListingComposePriceSuggestion: Codable, Sendable, Equatable, Hashable {
+    public let low: Double
+    public let median: Double
+    public let high: Double
+    public let basis: String?
+    public let comparableCount: Int?
+
+    public init(low: Double, median: Double, high: Double, basis: String?, comparableCount: Int?) {
+        self.low = low
+        self.median = median
+        self.high = high
+        self.basis = basis
+        self.comparableCount = comparableCount
     }
 }
 
@@ -269,6 +318,12 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
     public var deliveryEnabled: Bool
     public var locationKind: ListingComposeLocationKind?
     public var locationLabel: String
+    /// Backend product category (`furniture`, `electronics`, …) —
+    /// AI-derived for snap drafts, hydrated from the listing in edit
+    /// mode. Falls back to `category.fallbackBackendCategory` at submit.
+    public var backendCategory: String?
+    /// Comp-range suggestion returned with the AI vision draft.
+    public var priceSuggestion: ListingComposePriceSuggestion?
 
     public init(
         step: Int = ListingComposeStep.photos.rawValue,
@@ -283,7 +338,9 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
         fulfillment: ListingComposeFulfillment = .pickup,
         deliveryEnabled: Bool = false,
         locationKind: ListingComposeLocationKind? = nil,
-        locationLabel: String = ""
+        locationLabel: String = "",
+        backendCategory: String? = nil,
+        priceSuggestion: ListingComposePriceSuggestion? = nil
     ) {
         self.step = step
         self.entryMode = entryMode
@@ -298,6 +355,8 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
         self.deliveryEnabled = deliveryEnabled
         self.locationKind = locationKind
         self.locationLabel = locationLabel
+        self.backendCategory = backendCategory
+        self.priceSuggestion = priceSuggestion
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -314,6 +373,8 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
         case deliveryEnabled
         case locationKind
         case locationLabel
+        case backendCategory
+        case priceSuggestion
     }
 
     public init(from decoder: any Decoder) throws {
@@ -331,6 +392,8 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
         deliveryEnabled = try container.decodeIfPresent(Bool.self, forKey: .deliveryEnabled) ?? false
         locationKind = try container.decodeIfPresent(ListingComposeLocationKind.self, forKey: .locationKind)
         locationLabel = try container.decodeIfPresent(String.self, forKey: .locationLabel) ?? ""
+        backendCategory = try container.decodeIfPresent(String.self, forKey: .backendCategory)
+        priceSuggestion = try container.decodeIfPresent(ListingComposePriceSuggestion.self, forKey: .priceSuggestion)
     }
 
     public static let empty = ListingComposeFormState()
@@ -340,6 +403,10 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
 
     /// A12.9 camera coaching target before the user reviews suggestions.
     public static let targetCaptureAngles: Int = 4
+
+    /// Max images sent to `POST /api/ai/draft/listing-vision`
+    /// (`backend/routes/ai.js:74` caps the array at 5).
+    public static let maxVisionImages: Int = 5
 
     /// Min / max bounds enforced on step transitions.
     public static let titleMinLength = 5

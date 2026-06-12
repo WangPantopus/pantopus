@@ -23,8 +23,19 @@ class ListingComposeWizardViewModelTestCase: XCTestCase {
         )
     }
 
+    func makeUploader() -> MultipartUploader {
+        MultipartUploader(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession()
+        )
+    }
+
     func makeVM(initialState: ListingComposeFormState = .empty) -> ListingComposeWizardViewModel {
-        ListingComposeWizardViewModel(api: makeAPI(), initialState: initialState) { true }
+        ListingComposeWizardViewModel(
+            api: makeAPI(),
+            uploader: makeUploader(),
+            initialState: initialState
+        ) { true }
     }
 
     func makeEditVM(
@@ -35,9 +46,14 @@ class ListingComposeWizardViewModelTestCase: XCTestCase {
         ListingComposeWizardViewModel(
             mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
             api: makeAPI(),
+            uploader: makeUploader(),
             initialState: initialState
         ) { true }
     }
+
+    /// Tiny stand-in for processed JPEG bytes — the VM only base64s
+    /// whatever the photo step hands it.
+    static let fakeJPEG = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x01, 0x02, 0x03])
 
     /// Detail-fetch payload used by the edit-prefill tests. Mirrors the
     /// `GET /api/listings/:id` envelope returned by
@@ -80,11 +96,37 @@ class ListingComposeWizardViewModelTestCase: XCTestCase {
       "title":"Moving boxes — bundle of 18",
       "is_free":false,
       "price":25,
-      "category":"goods",
+      "category":"other",
       "layer":"goods",
       "listing_type":"sell_item",
       "status":"active"
     }}
+    """
+
+    /// `POST /api/ai/draft/listing-vision` envelope
+    /// (`backend/routes/ai.js:199`) — the Snap & Sell draft + comp
+    /// range used by the camera-entry tests.
+    static let visionDraftJSON = """
+    {"draft":{
+      "title":"Sage green velvet sofa",
+      "description":"Comfortable three-seat velvet sofa with light wear on one cushion and minor sun fade.",
+      "price":260,
+      "isFree":false,
+      "category":"furniture",
+      "condition":"good",
+      "tags":["sofa","velvet"],
+      "listingType":"sell_item",
+      "deliveryAvailable":true,
+      "meetupPreference":"public_meetup"
+    },
+    "confidence":0.85,
+    "priceSuggestion":{"low":180,"median":280,"high":420,"basis":"47 similar items in your area","comparable_count":47}}
+    """
+
+    /// `POST /api/upload/listing-media/:id` envelope
+    /// (`backend/routes/upload.js:1049`).
+    static let listingMediaUploadJSON = """
+    {"message":"Media uploaded","media_urls":["https://example.com/u1.jpg"],"media_types":["image"]}
     """
 
     func readyToSubmit() -> ListingComposeFormState {
