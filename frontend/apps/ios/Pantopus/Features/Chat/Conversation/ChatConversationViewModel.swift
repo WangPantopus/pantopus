@@ -207,6 +207,13 @@ public final class ChatConversationViewModel {
     /// `consumePendingScroll()` after scrolling.
     public private(set) var pendingScrollTargetId: String?
 
+    /// True while the screen was opened from Chat Search and the matched
+    /// message hasn't been scrolled to yet — the view skips its
+    /// land-at-latest pass so the two don't fight over the position.
+    public var hasPendingSearchTarget: Bool {
+        scrollToMessageId != nil && !didResolveScrollTarget
+    }
+
     /// Header counterparty data (drives the top-bar variant).
     public private(set) var counterparty: ChatCounterparty
 
@@ -497,7 +504,7 @@ public final class ChatConversationViewModel {
         if case .loaded = state { return }
         await restoreAIConversationIfNeeded()
         await loadTopicsIfNeeded()
-        await fetch(initial: true)
+        await fetch(.reload)
         subscribeToSockets()
         prefetchDirectRoomIfNeeded()
         loadGigContextIfNeeded()
@@ -567,13 +574,22 @@ public final class ChatConversationViewModel {
 
     public func refresh() async {
         await loadTopicsIfNeeded()
-        await fetch(initial: true)
+        // Merge, don't reload: refresh() fires on every socket echo, the
+        // offline poll, and pull-to-refresh. A reload would tear the
+        // thread down to the shimmer, wipe any older pages the user had
+        // scrolled to, and reset the scroll position on each of those.
+        // Reload only out of an error state, where nothing is on screen.
+        if case .error = state {
+            await fetch(.reload)
+        } else {
+            await fetch(.merge)
+        }
     }
 
     public func selectTopic(_ topicId: String?) async {
         selectedTopicId = selectedTopicId == topicId ? nil : topicId
         sendLimitNotice = nil
-        await fetch(initial: true)
+        await fetch(.reload)
     }
 
     /// Dismiss the pre-bid send-limit banner.
@@ -584,7 +600,7 @@ public final class ChatConversationViewModel {
     /// Scroll-to-top trigger — fetch the next older page.
     public func loadOlder() async {
         guard hasMore, let cursor = oldestCursor else { return }
-        await fetch(initial: false, before: cursor)
+        await fetch(.older(cursor: cursor))
     }
 
     /// Send the current composer text. Optimistic — prepends a row
@@ -1309,7 +1325,20 @@ public final class ChatConversationViewModel {
 
     // MARK: - Fetch
 
-    private func fetch(initial: Bool, before: String? = nil) async {
+    /// How a fetch treats the state already on screen.
+    private enum FetchKind {
+        /// Full reload — shimmer + wiped pagination. First load, topic
+        /// switch, and error-retry only.
+        case reload
+        /// Silent newest-page merge — keeps the rendered rows, scroll
+        /// position, and loaded older pages. Socket echoes,
+        /// pull-to-refresh, and the offline poll.
+        case merge
+        /// Older-page prepend (scroll-to-top pagination).
+        case older(cursor: String)
+    }
+
+    private func fetch(_ kind: FetchKind) async {
         // AI thread messages are local-only — there is no persisted
         // history to refetch, so refresh/pull-to-refresh must be a
         // no-op BEFORE any clearing or the gesture would wipe the
@@ -1321,25 +1350,26 @@ public final class ChatConversationViewModel {
             }
             return
         }
-        if initial {
+        if case .reload = kind {
             state = .loading
             messages = []
             // Pending / failed optimistic rows survive refetches —
-            // socket events trigger `fetch(initial: true)`, and eating
-            // an in-flight or failed send here would lose the message
-            // and its retry CTA. Confirmed rows are retired in
-            // `apply(response:)` by `client_message_id` match.
+            // eating an in-flight or failed send here would lose the
+            // message and its retry CTA. Confirmed rows are retired in
+            // `apply(response:kind:)` by `client_message_id` match.
             oldestCursor = nil
             hasMore = false
         }
+        let before: String? =
+            if case let .older(cursor) = kind { cursor } else { nil }
         switch mode {
         case .ai:
             // Handled by the early return above.
             return
         case let .room(roomId):
-            await fetchRoom(roomId: roomId, before: before, initial: initial)
+            await fetchRoom(roomId: roomId, before: before, kind: kind)
         case let .person(otherUserId):
-            await fetchPerson(otherUserId: otherUserId, before: before, initial: initial)
+            await fetchPerson(otherUserId: otherUserId, before: before, kind: kind)
         }
     }
 
@@ -1372,39 +1402,65 @@ public final class ChatConversationViewModel {
         }
     }
 
-    private func fetchRoom(roomId: String, before: String?, initial: Bool) async {
+    private func fetchRoom(roomId: String, before: String?, kind: FetchKind) async {
         do {
             let response: ChatMessagesResponse = try await api.request(
                 ChatEndpoints.roomMessages(roomId: roomId, before: before)
             )
-            apply(response: response)
+            apply(response: response, kind: kind)
             scheduleMarkRead(for: roomId)
         } catch {
-            handleFetchFailure(error, initial: initial)
+            handleFetchFailure(error, kind: kind)
         }
     }
 
-    private func fetchPerson(otherUserId: String, before: String?, initial: Bool) async {
+    private func fetchPerson(otherUserId: String, before: String?, kind: FetchKind) async {
         do {
             let response: ChatMessagesResponse = try await api.request(
                 ChatEndpoints.conversationMessages(otherUserId: otherUserId, before: before, topicId: selectedTopicId)
             )
-            apply(response: response)
+            apply(response: response, kind: kind)
             scheduleMarkRead(for: otherUserId)
         } catch {
-            handleFetchFailure(error, initial: initial)
+            handleFetchFailure(error, kind: kind)
         }
     }
 
-    private func handleFetchFailure(_ error: any Error, initial: Bool) {
-        if initial {
+    private func handleFetchFailure(_ error: any Error, kind: FetchKind) {
+        if case .reload = kind {
             state = .error(message: friendlyMessage(error))
         } else {
-            logger.warning("chat pagination failed: \(error)")
+            logger.warning("chat refetch failed: \(error)")
         }
     }
 
-    private func apply(response: ChatMessagesResponse) {
+    private func apply(response: ChatMessagesResponse, kind: FetchKind) {
+        if case .merge = kind, !messages.isEmpty {
+            // Newest-page refetch while older pages may be loaded —
+            // replace held copies (edits/reactions land) and append rows
+            // we don't hold yet. Never touches the pagination cursors, so
+            // a socket echo can't wipe the history the user scrolled to.
+            var didChange = false
+            for fetched in response.messages.reversed() {
+                if let index = messages.firstIndex(where: { $0.id == fetched.id }) {
+                    if messages[index] != fetched {
+                        messages[index] = fetched
+                        didChange = true
+                    }
+                } else {
+                    messages.append(fetched)
+                    didChange = true
+                }
+            }
+            if didChange {
+                messages.sort { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
+            }
+            retireConfirmedClientIds(in: response)
+            updateActiveRooms(response: response)
+            rebuild()
+            joinActiveRoomsIfPossible()
+            return
+        }
         // Backend returns newest-first; we keep an oldest-first array
         // for stable projection. Drop ids we already hold — a send
         // completing while this fetch was in flight may have upserted
@@ -1412,10 +1468,19 @@ public final class ChatConversationViewModel {
         let existingIds = Set(messages.map(\.id))
         let ordered = response.messages.reversed().filter { !existingIds.contains($0.id) }
         messages.insert(contentsOf: ordered, at: 0)
-        // A fetched row carrying one of our client ids means that send
-        // landed server-side (e.g. the POST response was lost, then a
-        // socket refetch ran) — retire every trace of the optimistic
-        // copy so a delivered message can never linger as "failed".
+        retireConfirmedClientIds(in: response)
+        updateActiveRooms(response: response)
+        hasMore = response.hasMore ?? false
+        oldestCursor = response.nextCursor ?? Self.paginationCursor(for: messages.first)
+        rebuild()
+        joinActiveRoomsIfPossible()
+    }
+
+    /// A fetched row carrying one of our client ids means that send
+    /// landed server-side (e.g. the POST response was lost, then a
+    /// socket refetch ran) — retire every trace of the optimistic
+    /// copy so a delivered message can never linger as "failed".
+    private func retireConfirmedClientIds(in response: ChatMessagesResponse) {
         for clientId in response.messages.compactMap(\.clientMessageId)
         where pendingByClientId[clientId] != nil
             || sendContextsByClientId[clientId] != nil
@@ -1424,11 +1489,6 @@ public final class ChatConversationViewModel {
             sendContextsByClientId[clientId] = nil
             failedClientIds.remove(clientId)
         }
-        updateActiveRooms(response: response)
-        hasMore = response.hasMore ?? false
-        oldestCursor = response.nextCursor ?? Self.paginationCursor(for: messages.first)
-        rebuild()
-        joinActiveRoomsIfPossible()
     }
 
     /// Stable `(created_at|id)` cursor for keyset pagination. Avoids raw
