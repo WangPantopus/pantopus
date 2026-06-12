@@ -190,6 +190,8 @@ const GIG_TYPES = new Set([
   'gig_cancelled', 'gig_auto_cancelled', 'gig_reminder',
   'gig_question', 'gig_question_answered',
   'no_show_reported', 'urgent_status_update',
+  // P6 — saved-search alerts ("new task matches your saved search").
+  'gig_saved_search_match',
   // Change orders
   'change_order', 'change_order_approved', 'change_order_rejected',
   // Payments

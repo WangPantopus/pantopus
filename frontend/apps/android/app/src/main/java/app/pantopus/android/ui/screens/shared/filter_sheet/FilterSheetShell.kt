@@ -86,6 +86,9 @@ const val FILTER_SHEET_APPLY_BUTTON_TAG = "filterSheetApplyButton"
  * @param title Sheet header label — typically `"Filters"` or `"Sort"`.
  * @param applyLabel Primary button label.
  * @param resetLabel Ghost button label.
+ * @param footerAccessory Optional row rendered inside the footer above
+ *     the Reset/Apply pair, fed the live working sections (P6a — the
+ *     Gigs "Save this search" affordance). `null` keeps the stock footer.
  */
 @Composable
 fun FilterSheetShell(
@@ -96,6 +99,7 @@ fun FilterSheetShell(
     applyLabel: String = "Apply",
     resetLabel: String = "Reset",
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+    footerAccessory: (@Composable (List<FilterSection>) -> Unit)? = null,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -110,6 +114,7 @@ fun FilterSheetShell(
             resetLabel = resetLabel,
             onApply = onApply,
             onClose = onDismiss,
+            footerAccessory = footerAccessory,
         )
     }
 }
@@ -126,6 +131,7 @@ fun FilterSheetBody(
     title: String = "Filters",
     applyLabel: String = "Apply",
     resetLabel: String = "Reset",
+    footerAccessory: (@Composable (List<FilterSection>) -> Unit)? = null,
 ) {
     var working by remember(sections) { mutableStateOf(sections) }
 
@@ -158,6 +164,7 @@ fun FilterSheetBody(
         FilterSheetFooter(
             applyLabel = applyLabel,
             resetLabel = resetLabel,
+            accessory = footerAccessory?.let { accessory -> { accessory(working) } },
             onReset = { working = working.cleared() },
             onApply = {
                 onApply(working)
@@ -224,9 +231,11 @@ private fun FilterSheetFooter(
     resetLabel: String,
     onReset: () -> Unit,
     onApply: () -> Unit,
+    accessory: (@Composable () -> Unit)? = null,
 ) {
     Column {
         HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+        accessory?.invoke()
         Row(
             modifier =
                 Modifier

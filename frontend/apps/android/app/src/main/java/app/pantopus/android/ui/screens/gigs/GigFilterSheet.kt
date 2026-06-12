@@ -3,15 +3,37 @@
 
 package app.pantopus.android.ui.screens.gigs
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.pantopus.android.data.api.models.gigs.CreateGigSavedSearchBody
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.ui.components.GhostButton
 import app.pantopus.android.ui.screens.shared.filter_sheet.FilterControl
 import app.pantopus.android.ui.screens.shared.filter_sheet.FilterOption
 import app.pantopus.android.ui.screens.shared.filter_sheet.FilterRange
 import app.pantopus.android.ui.screens.shared.filter_sheet.FilterSection
 import app.pantopus.android.ui.screens.shared.filter_sheet.FilterSheetShell
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 import java.time.Instant
+import java.util.Locale
 
 /**
  * P5.3 — Gig filter bottom sheet. A thin projection over the shared
@@ -212,6 +234,56 @@ data class GigFilterCriteria(
             matchesPostedWithin(createdAt, nowEpochSeconds)
     }
 
+    /**
+     * P6a — the current selection as a `POST /api/gigs/saved-searches`
+     * body. Server-expressible dimensions only: budget extremes are
+     * omitted, exactly-one schedule rides as `schedule_type` (when the
+     * create schema accepts its wire value — `recurring` stays
+     * client-side), and open-to-bids maps to `pay_type=offers`. The
+     * derived [savedSearchLabel] doubles as the default `name`.
+     */
+    @Suppress("LongParameterList")
+    fun toSavedSearchBody(
+        category: GigsCategory?,
+        search: String?,
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Double,
+    ): CreateGigSavedSearchBody {
+        val categoryLabel = category?.takeIf { it != GigsCategory.All }?.label
+        val schedule = schedules.singleOrNull()
+        val cleanSearch = search?.trim()?.takeIf { it.isNotEmpty() }
+        return CreateGigSavedSearchBody(
+            name =
+                savedSearchLabel(
+                    categoryLabel = categoryLabel,
+                    search = cleanSearch,
+                    minPrice = savedSearchMinPrice,
+                    maxPrice = savedSearchMaxPrice,
+                    scheduleLabel = schedule?.label,
+                    openToBids = openToBids,
+                    radiusMiles = radiusMiles,
+                ),
+            category = category?.takeIf { it != GigsCategory.All }?.key,
+            search = cleanSearch,
+            minPrice = savedSearchMinPrice,
+            maxPrice = savedSearchMaxPrice,
+            scheduleType = schedule?.backendValue?.takeIf { it in SAVED_SEARCH_SCHEDULE_TYPES },
+            payType = if (openToBids) "offers" else null,
+            latitude = latitude,
+            longitude = longitude,
+            radiusMiles = radiusMiles,
+        )
+    }
+
+    /** P6a — `min_price` wire value; `null` at the slider floor. */
+    val savedSearchMinPrice: Double?
+        get() = budgetLower.toDouble().takeIf { budgetLower > BUDGET_MIN }
+
+    /** P6a — `max_price` wire value; `null` at the "$500+" ceiling handle. */
+    val savedSearchMaxPrice: Double?
+        get() = budgetUpper.toDouble().takeIf { budgetUpper < BUDGET_MAX }
+
     private fun matchesSchedule(scheduleType: String?): Boolean {
         if (schedules.isEmpty()) return true
         val bucket = GigScheduleFilter.fromBackendKey(scheduleType) ?: return false
@@ -237,6 +309,14 @@ data class GigFilterCriteria(
 
         /** Concrete categories the chip group offers (`All` is a sentinel). */
         val categoryOptions: List<GigsCategory> = GigsCategory.entries.filter { it != GigsCategory.All }
+
+        /**
+         * P6a — `schedule_type` values the saved-search create schema
+         * accepts (`backend/routes/gigSavedSearches.js:27`). The feed's
+         * `recurring` bucket isn't storable, so it's filtered client-side
+         * only and never rides the POST.
+         */
+        val SAVED_SEARCH_SCHEDULE_TYPES: Set<String> = setOf("asap", "today", "scheduled", "flexible")
 
         fun fromSections(sections: List<FilterSection>): GigFilterCriteria {
             var categories = emptySet<GigsCategory>()
@@ -285,19 +365,134 @@ data class GigFilterCriteria(
 }
 
 /**
+ * P6a — derived saved-search display label and default `name`
+ * ("Cleaning · under $100 · 5 mi"). Pure and shared by the POST body
+ * builder and the manage-sheet row fallback so the two never drift.
+ * Mirrors iOS `savedSearchLabel`.
+ */
+@Suppress("LongParameterList")
+fun savedSearchLabel(
+    categoryLabel: String? = null,
+    search: String? = null,
+    minPrice: Double? = null,
+    maxPrice: Double? = null,
+    scheduleLabel: String? = null,
+    openToBids: Boolean = false,
+    radiusMiles: Double? = null,
+): String {
+    val budget =
+        when {
+            minPrice != null && maxPrice != null -> "${dollars(minPrice)}–${dollars(maxPrice)}"
+            maxPrice != null -> "under ${dollars(maxPrice)}"
+            minPrice != null -> "over ${dollars(minPrice)}"
+            else -> null
+        }
+    val criteriaParts =
+        listOfNotNull(
+            categoryLabel?.takeIf { it.isNotBlank() },
+            search?.trim()?.takeIf { it.isNotEmpty() }?.let { "“$it”" },
+            budget,
+            scheduleLabel?.takeIf { it.isNotBlank() },
+            "open to bids".takeIf { openToBids },
+        ).ifEmpty { listOf("All tasks") }
+    val radiusPart = radiusMiles?.let { listOf("${wholeMiles(it)} mi") } ?: emptyList()
+    return (criteriaParts + radiusPart).joinToString(" · ")
+}
+
+/** "$100" for whole dollars, "$87.50" otherwise. */
+private fun dollars(amount: Double): String = if (amount % 1.0 == 0.0) "$${amount.toInt()}" else String.format(Locale.US, "$%.2f", amount)
+
+/** "5" for whole miles, "2.5" otherwise. */
+private fun wholeMiles(miles: Double): String = if (miles % 1.0 == 0.0) "${miles.toInt()}" else String.format(Locale.US, "%.1f", miles)
+
+/**
  * Gig filter bottom sheet. Host renders it conditionally; [onApply]
  * fires with the parsed criteria and the shell dismisses via [onDismiss].
+ *
+ * P6a — when [onSaveSearch] / [onManageSearches] are wired (the Gigs
+ * feed host), the footer grows a "Save this search" button acting on the
+ * live working sections plus a "Saved searches" link to the manage
+ * sheet. The Tasks map host passes neither and keeps the stock footer.
+ *
+ * @param hasExternalCriteria `true` when a dimension outside the sheet
+ *     (the feed's active category chip or search text) is active, so the
+ *     save button enables even with a pristine sheet.
  */
 @Composable
 fun GigFilterSheet(
     criteria: GigFilterCriteria,
     onApply: (GigFilterCriteria) -> Unit,
     onDismiss: () -> Unit,
+    hasExternalCriteria: Boolean = false,
+    onSaveSearch: ((GigFilterCriteria) -> Unit)? = null,
+    onManageSearches: (() -> Unit)? = null,
 ) {
     FilterSheetShell(
         sections = criteria.toSections(),
         onApply = { sections -> onApply(GigFilterCriteria.fromSections(sections)) },
         onDismiss = onDismiss,
         title = "Filters",
+        footerAccessory =
+            if (onSaveSearch == null && onManageSearches == null) {
+                null
+            } else {
+                { sections ->
+                    GigSaveSearchFooter(
+                        criteria = GigFilterCriteria.fromSections(sections),
+                        hasExternalCriteria = hasExternalCriteria,
+                        onSaveSearch = onSaveSearch,
+                        onManageSearches = onManageSearches,
+                    )
+                }
+            },
     )
+}
+
+/**
+ * P6a — footer accessory: "Save this search" (enabled when any criteria
+ * dimension is active, in the sheet or outside it) + "Saved searches".
+ */
+@Composable
+private fun GigSaveSearchFooter(
+    criteria: GigFilterCriteria,
+    hasExternalCriteria: Boolean,
+    onSaveSearch: ((GigFilterCriteria) -> Unit)?,
+    onManageSearches: (() -> Unit)?,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        if (onSaveSearch != null) {
+            GhostButton(
+                title = "Save this search",
+                onClick = { onSaveSearch(criteria) },
+                isEnabled = hasExternalCriteria || criteria.activeCount > 0,
+                modifier = Modifier.weight(1f).testTag("gigFilters.saveSearch"),
+            )
+        }
+        if (onManageSearches != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .clickable(onClick = onManageSearches)
+                        .heightIn(min = 44.dp)
+                        .padding(horizontal = Spacing.s2)
+                        .testTag("gigFilters.manageSearches"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Saved searches",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.primary600,
+                )
+            }
+        }
+    }
 }

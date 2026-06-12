@@ -260,4 +260,248 @@ final class GigFilterSheetTests: XCTestCase {
         XCTAssertEqual(rows.count, 2)
         XCTAssertEqual(vm.activeFilterCount, 0)
     }
+
+    // MARK: - P6a saved-search mapping (pure)
+
+    func testSavedSearchNameMatchesSpecExample() {
+        let criteria = GigFilterCriteria(categories: [.cleaning], budgetUpper: 100)
+        XCTAssertEqual(
+            criteria.savedSearchName(feedCategory: .all, searchText: "", radiusMiles: 5),
+            "Cleaning · under $100 · 5 mi"
+        )
+    }
+
+    func testSavedSearchNameCoversEveryDimension() {
+        let criteria = GigFilterCriteria(
+            budgetLower: 50,
+            budgetUpper: 300,
+            schedules: [.oneTime],
+            openToBids: true
+        )
+        XCTAssertEqual(
+            criteria.savedSearchName(feedCategory: .handyman, searchText: " mount tv ", radiusMiles: 2.5),
+            "Handyman · \u{201C}mount tv\u{201D} · $50–$300 · One-time · open to bids · 2.5 mi"
+        )
+        XCTAssertEqual(
+            GigFilterCriteria().savedSearchName(feedCategory: .all, searchText: "", radiusMiles: 5),
+            "All tasks · 5 mi"
+        )
+        XCTAssertEqual(
+            GigFilterCriteria(budgetLower: 100).savedSearchName(feedCategory: .all, searchText: "", radiusMiles: 5),
+            "All tasks · over $100 · 5 mi"
+        )
+    }
+
+    func testSavedSearchNameSkipsUnmappableSchedule() {
+        // `recurring` has no backend schedule_type — it never rides the
+        // body, so the name omits it too.
+        let criteria = GigFilterCriteria(schedules: [.recurring])
+        XCTAssertEqual(
+            criteria.savedSearchName(feedCategory: .all, searchText: "", radiusMiles: 5),
+            "All tasks · 5 mi"
+        )
+    }
+
+    func testSavedSearchCategoryPrecedence() {
+        XCTAssertEqual(
+            GigFilterCriteria(categories: [.moving]).savedSearchCategory(feedCategory: .cleaning),
+            .moving,
+            "Exactly one sheet chip wins over the feed chip."
+        )
+        XCTAssertEqual(
+            GigFilterCriteria().savedSearchCategory(feedCategory: .cleaning),
+            .cleaning,
+            "No sheet chips — the feed's active chip applies."
+        )
+        XCTAssertNil(GigFilterCriteria().savedSearchCategory(feedCategory: .all), "All is omitted.")
+        XCTAssertNil(
+            GigFilterCriteria(categories: [.moving, .tech]).savedSearchCategory(feedCategory: .cleaning),
+            "Multi-select saves category-less — the backend stores one value."
+        )
+    }
+
+    func testSavedSearchBodyMapsServerDimensions() {
+        let criteria = GigFilterCriteria(
+            budgetLower: 50,
+            budgetUpper: 300,
+            schedules: [.oneTime],
+            openToBids: true
+        )
+        let body = criteria.savedSearchBody(
+            feedCategory: .cleaning,
+            searchText: " mount tv ",
+            latitude: 40.7,
+            longitude: -73.9,
+            radiusMiles: 5
+        )
+        XCTAssertEqual(body.category, "cleaning")
+        XCTAssertEqual(body.search, "mount tv", "Search text rides trimmed.")
+        XCTAssertEqual(body.minPrice, 50)
+        XCTAssertEqual(body.maxPrice, 300)
+        XCTAssertEqual(body.scheduleType, "scheduled")
+        XCTAssertEqual(body.payType, "offers")
+        XCTAssertEqual(body.latitude, 40.7)
+        XCTAssertEqual(body.longitude, -73.9)
+        XCTAssertEqual(body.radiusMiles, 5)
+        XCTAssertTrue(body.notify)
+        XCTAssertFalse(body.name?.isEmpty ?? true, "A derived name always rides the body.")
+    }
+
+    func testSavedSearchBodyOmitsInactiveDimensions() {
+        let body = GigFilterCriteria().savedSearchBody(
+            feedCategory: .all,
+            searchText: "",
+            latitude: 40.7,
+            longitude: -73.9,
+            radiusMiles: 5
+        )
+        XCTAssertNil(body.category)
+        XCTAssertNil(body.search)
+        XCTAssertNil(body.minPrice, "Untouched lower handle sends no min_price.")
+        XCTAssertNil(body.maxPrice, "The $500+ ceiling sends no max_price.")
+        XCTAssertNil(body.scheduleType)
+        XCTAssertNil(body.payType)
+    }
+
+    func testCanSaveSearchRequiresCriteriaOrSearchText() {
+        XCTAssertFalse(GigFilterCriteria().canSaveSearch(searchText: ""))
+        XCTAssertFalse(GigFilterCriteria().canSaveSearch(searchText: "   "))
+        XCTAssertTrue(GigFilterCriteria().canSaveSearch(searchText: "tv"))
+        XCTAssertTrue(GigFilterCriteria(openToBids: true).canSaveSearch(searchText: ""))
+        XCTAssertTrue(GigFilterCriteria(postedWithin: .week).canSaveSearch(searchText: ""))
+    }
+
+    // MARK: - P6a manage sheet view-model
+
+    private static func savedSearchJSON(
+        id: String,
+        name: String? = nil,
+        notify: Bool = true
+    ) -> String {
+        let nameField = name.map { "\"\($0)\"" } ?? "null"
+        return """
+        {
+          "id": "\(id)", "user_id": "me", "name": \(nameField),
+          "category": "cleaning", "search": null,
+          "min_price": null, "max_price": 100,
+          "schedule_type": null, "pay_type": null,
+          "latitude": 40.7, "longitude": -73.9, "radius_miles": 5,
+          "notify": \(notify), "created_at": "2026-06-09T08:00:00.123456+00:00",
+          "last_notified_at": null
+        }
+        """
+    }
+
+    private static func searchesJSON(_ rows: String...) -> String {
+        "{\"searches\":[\(rows.joined(separator: ","))]}"
+    }
+
+    func testManageSheetLoadProjectsRows() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.searchesJSON(
+                Self.savedSearchJSON(id: "ss1", name: "Cleaning · under $100 · 5 mi"),
+                Self.savedSearchJSON(id: "ss2", notify: false)
+            ))
+        ]
+        let vm = GigSavedSearchesViewModel(api: makeAPI())
+        await vm.load()
+        guard case let .loaded(rows) = vm.state else { return XCTFail("Expected .loaded, got \(vm.state)") }
+        XCTAssertEqual(rows.map(\.id), ["ss1", "ss2"])
+        XCTAssertEqual(rows[0].name, "Cleaning · under $100 · 5 mi", "Stored name wins.")
+        XCTAssertEqual(rows[1].name, "Cleaning", "Nameless rows derive one from criteria.")
+        XCTAssertEqual(rows[1].summary, "under $100 · within 5 mi")
+        XCTAssertTrue(rows[0].notify)
+        XCTAssertFalse(rows[1].notify)
+        XCTAssertNotNil(rows[0].createdLabel, "Supabase microsecond timestamps still parse.")
+    }
+
+    func testManageSheetEmptyAndErrorStates() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [.status(200, body: "{\"searches\":[]}")]
+        let emptyVM = GigSavedSearchesViewModel(api: makeAPI())
+        await emptyVM.load()
+        guard case .empty = emptyVM.state else { return XCTFail("Expected .empty, got \(emptyVM.state)") }
+
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let errorVM = GigSavedSearchesViewModel(api: makeAPI())
+        await errorVM.load()
+        guard case .error = errorVM.state else { return XCTFail("Expected .error, got \(errorVM.state)") }
+    }
+
+    func testManageSheetNotifyTogglePatchesOptimistically() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.searchesJSON(Self.savedSearchJSON(id: "ss1"))),
+            .status(200, body: "{\"search\":\(Self.savedSearchJSON(id: "ss1", notify: false))}")
+        ]
+        let vm = GigSavedSearchesViewModel(api: makeAPI())
+        await vm.load()
+        await vm.setNotify(id: "ss1", to: false)
+        guard case let .loaded(rows) = vm.state else { return XCTFail("Expected .loaded, got \(vm.state)") }
+        XCTAssertFalse(rows[0].notify)
+        let last = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(last?.httpMethod, "PATCH")
+        XCTAssertEqual(last?.url?.path, "/api/gigs/saved-searches/ss1")
+    }
+
+    func testManageSheetNotifyToggleRevertsOnFailure() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.searchesJSON(Self.savedSearchJSON(id: "ss1"))),
+            .status(500, body: "{}")
+        ]
+        let vm = GigSavedSearchesViewModel(api: makeAPI())
+        await vm.load()
+        await vm.setNotify(id: "ss1", to: false)
+        guard case let .loaded(rows) = vm.state else { return XCTFail("Expected .loaded, got \(vm.state)") }
+        XCTAssertTrue(rows[0].notify, "Failed PATCH reverts the optimistic flip.")
+        XCTAssertNotNil(vm.toast)
+    }
+
+    func testManageSheetDeleteRemovesRowAndFallsToEmpty() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.searchesJSON(Self.savedSearchJSON(id: "ss1"))),
+            .status(200, body: "{\"message\":\"Saved search deleted\"}")
+        ]
+        let vm = GigSavedSearchesViewModel(api: makeAPI())
+        await vm.load()
+        await vm.deleteSearch(id: "ss1")
+        guard case .empty = vm.state else { return XCTFail("Expected .empty, got \(vm.state)") }
+        let last = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(last?.httpMethod, "DELETE")
+        XCTAssertEqual(last?.url?.path, "/api/gigs/saved-searches/ss1")
+    }
+
+    func testManageSheetDeleteRevertsOnFailure() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.searchesJSON(Self.savedSearchJSON(id: "ss1"))),
+            .status(500, body: "{}")
+        ]
+        let vm = GigSavedSearchesViewModel(api: makeAPI())
+        await vm.load()
+        await vm.deleteSearch(id: "ss1")
+        guard case let .loaded(rows) = vm.state else { return XCTFail("Expected restored .loaded, got \(vm.state)") }
+        XCTAssertEqual(rows.map(\.id), ["ss1"], "Failed DELETE restores the optimistic removal.")
+        XCTAssertNotNil(vm.toast)
+    }
+
+    func testManageSheetRowLabels() {
+        XCTAssertEqual(GigSavedSearchesViewModel.scheduleLabel("scheduled"), "One-time")
+        XCTAssertEqual(GigSavedSearchesViewModel.scheduleLabel("asap"), "ASAP")
+        XCTAssertNil(GigSavedSearchesViewModel.scheduleLabel(nil))
+        XCTAssertEqual(GigSavedSearchesViewModel.payLabel("offers"), "open to bids")
+        let now = Date(timeIntervalSince1970: 1_700_172_800)
+        XCTAssertEqual(
+            GigSavedSearchesViewModel.createdLabel(
+                ISO8601DateFormatter().string(from: now.addingTimeInterval(-172_800)),
+                now: now
+            ),
+            "Saved 2d ago"
+        )
+        XCTAssertNil(GigSavedSearchesViewModel.createdLabel(nil, now: now))
+    }
 }

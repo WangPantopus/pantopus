@@ -28,6 +28,7 @@ public struct FilterSheetShell: View {
     private let sections: [FilterSection]
     private let applyLabel: String
     private let resetLabel: String
+    private let footerAccessory: (@MainActor ([FilterSection]) -> AnyView)?
     private let onApply: @MainActor ([FilterSection]) -> Void
     private let onClose: @MainActor () -> Void
 
@@ -40,6 +41,10 @@ public struct FilterSheetShell: View {
     ///     copies these into its working state on init.
     ///   - applyLabel: Bottom primary button label. Defaults to `"Apply"`.
     ///   - resetLabel: Bottom ghost button label. Defaults to `"Reset"`.
+    ///   - footerAccessory: Optional extra footer row rendered under the
+    ///     Reset/Apply buttons. Receives the **live working sections**
+    ///     so the accessory can react to unapplied edits (e.g. the Gigs
+    ///     "Save this search" enablement). `nil` hides the row.
     ///   - onApply: Called with the working sections when the user
     ///     taps the primary button. The shell calls `onClose()` after.
     ///   - onClose: Called whenever the shell wants to dismiss. The
@@ -49,6 +54,7 @@ public struct FilterSheetShell: View {
         sections: [FilterSection],
         applyLabel: String = "Apply",
         resetLabel: String = "Reset",
+        footerAccessory: (@MainActor ([FilterSection]) -> AnyView)? = nil,
         onApply: @escaping @MainActor ([FilterSection]) -> Void,
         onClose: @escaping @MainActor () -> Void
     ) {
@@ -56,6 +62,7 @@ public struct FilterSheetShell: View {
         self.sections = sections
         self.applyLabel = applyLabel
         self.resetLabel = resetLabel
+        self.footerAccessory = footerAccessory
         self.onApply = onApply
         self.onClose = onClose
         _working = State(initialValue: sections)
@@ -115,15 +122,20 @@ public struct FilterSheetShell: View {
     }
 
     private var footer: some View {
-        HStack(spacing: Spacing.s3) {
-            GhostButton(title: resetLabel) {
-                await reset()
+        VStack(spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s3) {
+                GhostButton(title: resetLabel) {
+                    await reset()
+                }
+                .accessibilityIdentifier("filterSheetResetButton")
+                PrimaryButton(title: applyLabel) {
+                    await apply()
+                }
+                .accessibilityIdentifier("filterSheetApplyButton")
             }
-            .accessibilityIdentifier("filterSheetResetButton")
-            PrimaryButton(title: applyLabel) {
-                await apply()
+            if let footerAccessory {
+                footerAccessory(working)
             }
-            .accessibilityIdentifier("filterSheetApplyButton")
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.vertical, Spacing.s3)

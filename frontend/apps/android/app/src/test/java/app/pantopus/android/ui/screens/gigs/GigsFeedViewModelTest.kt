@@ -2,9 +2,14 @@
 
 package app.pantopus.android.ui.screens.gigs
 
+import app.pantopus.android.data.api.models.gigs.CreateGigSavedSearchBody
 import app.pantopus.android.data.api.models.gigs.GigActionSuccessResponse
 import app.pantopus.android.data.api.models.gigs.GigBrowseClusterDto
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigSavedSearchDeleteResponse
+import app.pantopus.android.data.api.models.gigs.GigSavedSearchDto
+import app.pantopus.android.data.api.models.gigs.GigSavedSearchMutationResponse
+import app.pantopus.android.data.api.models.gigs.GigSavedSearchesResponse
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.models.gigs.GigsBrowseSectionsDto
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
@@ -12,6 +17,7 @@ import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.gigs.GigSavedSearchesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
@@ -20,6 +26,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -52,6 +59,7 @@ class GigsFeedViewModelTest {
     private val socket: SocketManager = mockk()
     private val authRepo: AuthRepository = mockk()
     private val location: LocationProvider = mockk()
+    private val savedSearchesRepo: GigSavedSearchesRepository = mockk()
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -71,7 +79,7 @@ class GigsFeedViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm() = GigsFeedViewModel(repo, socket, authRepo, location)
+    private fun makeVm() = GigsFeedViewModel(repo, socket, authRepo, location, savedSearchesRepo)
 
     private fun handymanGig(
         id: String = "g1",
@@ -607,5 +615,197 @@ class GigsFeedViewModelTest {
             val vm = makeVm()
             vm.load()
             assertTrue(vm.state.value is GigsFeedUiState.Error)
+        }
+
+    // MARK: - P6a saved searches + alerts
+
+    private fun savedSearch(
+        id: String = "s1",
+        name: String? = null,
+        notify: Boolean = true,
+    ): GigSavedSearchDto =
+        GigSavedSearchDto(
+            id = id,
+            userId = "me",
+            name = name,
+            category = "cleaning",
+            maxPrice = 100.0,
+            latitude = 40.7,
+            longitude = -73.9,
+            radiusMiles = 5.0,
+            notify = notify,
+            createdAt = "2026-05-14T08:00:00Z",
+        )
+
+    @Test fun save_search_posts_live_state_and_toasts() =
+        runTest {
+            // The save applies the sheet's working criteria → flat refetch.
+            coEvery {
+                repo.list(null, "newest", 40.7, -73.9, 1.0, 20, 0, maxPrice = 100.0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig()), 1))
+            val body = slot<CreateGigSavedSearchBody>()
+            coEvery { savedSearchesRepo.create(capture(body)) } returns
+                NetworkResult.Success(GigSavedSearchMutationResponse(search = savedSearch()))
+            val vm = makeVm()
+            vm.configureLocation(latitude = 40.7, longitude = -73.9)
+            vm.saveSearch(GigFilterCriteria(budgetUpper = 100f))
+            assertEquals("Search saved — we'll alert you", vm.toast.value!!.text)
+            assertEquals("under $100 · 1 mi", body.captured.name)
+            assertNull(body.captured.category)
+            assertNull(body.captured.minPrice)
+            assertEquals(100.0, body.captured.maxPrice!!, 0.0)
+            assertNull(body.captured.scheduleType)
+            assertNull(body.captured.payType)
+            assertEquals(40.7, body.captured.latitude, 0.0)
+            assertEquals(-73.9, body.captured.longitude, 0.0)
+            assertEquals(1.0, body.captured.radiusMiles, 0.0)
+            assertTrue(body.captured.notify)
+        }
+
+    @Test fun save_search_carries_the_active_category_chip() =
+        runTest {
+            coEvery {
+                repo.list("cleaning", "newest", 40.7, -73.9, 1.0, 20, 0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(cleaningGig()), 1))
+            val body = slot<CreateGigSavedSearchBody>()
+            coEvery { savedSearchesRepo.create(capture(body)) } returns
+                NetworkResult.Success(GigSavedSearchMutationResponse(search = savedSearch()))
+            val vm = makeVm()
+            vm.configureLocation(latitude = 40.7, longitude = -73.9)
+            vm.selectCategory(GigsCategory.Cleaning)
+            vm.saveSearch(GigFilterCriteria())
+            assertEquals("cleaning", body.captured.category)
+            assertEquals("Cleaning · 1 mi", body.captured.name)
+        }
+
+    @Test fun deduped_save_flips_the_toast_copy() =
+        runTest {
+            coEvery {
+                repo.list(null, "newest", 40.7, -73.9, 1.0, 20, 0, maxPrice = 100.0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig()), 1))
+            coEvery { savedSearchesRepo.create(any()) } returns
+                NetworkResult.Success(GigSavedSearchMutationResponse(search = savedSearch(), deduped = true))
+            val vm = makeVm()
+            vm.configureLocation(latitude = 40.7, longitude = -73.9)
+            vm.saveSearch(GigFilterCriteria(budgetUpper = 100f))
+            assertEquals("Already saved — alerts re-enabled", vm.toast.value!!.text)
+        }
+
+    @Test fun save_search_without_location_errors_without_posting() =
+        runTest {
+            val vm = makeVm()
+            vm.saveSearch(GigFilterCriteria())
+            assertTrue(vm.toast.value!!.isError)
+            coVerify(exactly = 0) { savedSearchesRepo.create(any()) }
+        }
+
+    @Test fun failed_save_surfaces_error_toast() =
+        runTest {
+            coEvery {
+                repo.list(null, "newest", 40.7, -73.9, 1.0, 20, 0, maxPrice = 100.0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig()), 1))
+            coEvery { savedSearchesRepo.create(any()) } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.configureLocation(latitude = 40.7, longitude = -73.9)
+            vm.saveSearch(GigFilterCriteria(budgetUpper = 100f))
+            assertTrue(vm.toast.value!!.isError)
+        }
+
+    @Test fun load_saved_searches_projects_rows() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns
+                NetworkResult.Success(GigSavedSearchesResponse(listOf(savedSearch())))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            val loaded = vm.savedSearches.value as GigSavedSearchesUiState.Loaded
+            val row = loaded.rows.single()
+            assertEquals("s1", row.id)
+            // No stored name → the derived label is the title; the summary
+            // is suppressed because it would just repeat it.
+            assertEquals("Cleaning · under $100 · 5 mi", row.title)
+            assertNull(row.summary)
+            assertNotNull(row.savedAgo)
+            assertTrue(row.notify)
+        }
+
+    @Test fun custom_name_keeps_the_derived_summary() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns
+                NetworkResult.Success(GigSavedSearchesResponse(listOf(savedSearch(name = "My cleaning alerts"))))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            val row = (vm.savedSearches.value as GigSavedSearchesUiState.Loaded).rows.single()
+            assertEquals("My cleaning alerts", row.title)
+            assertEquals("Cleaning · under $100 · 5 mi", row.summary)
+        }
+
+    @Test fun empty_saved_searches_fall_to_empty_state() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns NetworkResult.Success(GigSavedSearchesResponse(emptyList()))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            assertTrue(vm.savedSearches.value is GigSavedSearchesUiState.Empty)
+        }
+
+    @Test fun saved_searches_failure_transitions_error() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            assertTrue(vm.savedSearches.value is GigSavedSearchesUiState.Error)
+        }
+
+    @Test fun notify_toggle_is_optimistic_and_patches() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns
+                NetworkResult.Success(GigSavedSearchesResponse(listOf(savedSearch())))
+            coEvery { savedSearchesRepo.update("s1", notify = false) } returns
+                NetworkResult.Success(GigSavedSearchMutationResponse(search = savedSearch(notify = false)))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            vm.setSavedSearchNotify("s1", false)
+            val row = (vm.savedSearches.value as GigSavedSearchesUiState.Loaded).rows.single()
+            assertFalse(row.notify)
+            coVerify(exactly = 1) { savedSearchesRepo.update("s1", notify = false) }
+        }
+
+    @Test fun failed_notify_toggle_reverts_with_error_toast() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns
+                NetworkResult.Success(GigSavedSearchesResponse(listOf(savedSearch())))
+            coEvery { savedSearchesRepo.update("s1", notify = false) } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            vm.setSavedSearchNotify("s1", false)
+            val row = (vm.savedSearches.value as GigSavedSearchesUiState.Loaded).rows.single()
+            assertTrue(row.notify)
+            assertTrue(vm.toast.value!!.isError)
+        }
+
+    @Test fun delete_is_optimistic_and_falls_to_empty() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns
+                NetworkResult.Success(GigSavedSearchesResponse(listOf(savedSearch())))
+            coEvery { savedSearchesRepo.delete("s1") } returns
+                NetworkResult.Success(GigSavedSearchDeleteResponse(message = "Saved search deleted"))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            vm.deleteSavedSearch("s1")
+            assertTrue(vm.savedSearches.value is GigSavedSearchesUiState.Empty)
+            coVerify(exactly = 1) { savedSearchesRepo.delete("s1") }
+        }
+
+    @Test fun failed_delete_restores_the_row_with_error_toast() =
+        runTest {
+            coEvery { savedSearchesRepo.list() } returns
+                NetworkResult.Success(GigSavedSearchesResponse(listOf(savedSearch())))
+            coEvery { savedSearchesRepo.delete("s1") } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.loadSavedSearches()
+            vm.deleteSavedSearch("s1")
+            val loaded = vm.savedSearches.value as GigSavedSearchesUiState.Loaded
+            assertEquals(listOf("s1"), loaded.rows.map { it.id })
+            assertTrue(vm.toast.value!!.isError)
         }
 }

@@ -151,6 +151,39 @@ public final class GigsFeedViewModel {
         await fetch()
     }
 
+    // MARK: - Saved searches (P6a)
+
+    /// "Save this search" from the filter sheet footer — `POST
+    /// /api/gigs/saved-searches` (route
+    /// `backend/routes/gigSavedSearches.js:64`) with the sheet's live
+    /// criteria plus the feed's scope (active chip, search text, viewing
+    /// location + radius). Duplicate criteria dedupe server-side and
+    /// come back `deduped: true` with alerts re-enabled — surfaced with
+    /// distinct toast copy.
+    public func saveSearch(criteria: GigFilterCriteria, searchText: String = "") async {
+        guard let coordinate = resolvedCoordinate() else {
+            toast = ToastMessage(text: "Turn on location to save searches.", kind: .error)
+            return
+        }
+        let body = criteria.savedSearchBody(
+            feedCategory: activeCategory,
+            searchText: searchText,
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            radiusMiles: radiusMiles
+        )
+        do {
+            let response: GigSavedSearchSaveResponse = try await api.request(
+                GigSavedSearchesEndpoints.create(body)
+            )
+            toast = response.deduped == true
+                ? ToastMessage(text: "Already saved — alerts re-enabled", kind: .success)
+                : ToastMessage(text: "Search saved — we'll alert you", kind: .success)
+        } catch {
+            toast = ToastMessage(text: "Couldn't save this search.", kind: .error)
+        }
+    }
+
     // MARK: - Radius suggestion (B)
 
     /// Suggestion ladder: 1 → 3 → 5 → 10 mi, capped at 10.

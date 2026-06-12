@@ -32,6 +32,7 @@ const affinityService = require('../services/gig/affinityService');
 const rankingService = require('../services/gig/rankingService');
 const optionalAuth = require('../middleware/optionalAuth');
 const gigPricingService = require('../services/gig/gigPricingService');
+const { alertMatchingSavedSearches } = require('../services/savedSearchAlertService');
 const { haversineMiles } = require('../utils/geo');
 const {
   serializeGigAuthorForViewer,
@@ -1092,6 +1093,9 @@ router.post('/', verifyToken, validate(createGigSchema), async (req, res) => {
     // Invalidate browse cache near this gig's location
     if (location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
       browseCache.invalidateNear(location.latitude, location.longitude);
+      // P6 — saved-search alerts. Fire-and-forget: a fan-out failure
+      // must never fail the post.
+      alertMatchingSavedSearches(gig, location).catch(() => {});
     }
 
     res.status(201).json({

@@ -83,9 +83,16 @@ fun GigsFeedScreen(
     val radiusSuggestion by viewModel.radiusSuggestion.collectAsStateWithLifecycle()
     val newTaskCount by viewModel.newTaskCount.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val savedSearches by viewModel.savedSearches.collectAsStateWithLifecycle()
     var showFilters by remember { mutableStateOf(false) }
+    var showSavedSearches by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
+
+    // P6a — refetch the saved-search list each time the manage sheet opens.
+    LaunchedEffect(showSavedSearches) {
+        if (showSavedSearches) viewModel.loadSavedSearches()
+    }
 
     // P1.D — undo window: the toast auto-dismisses after ~5s.
     LaunchedEffect(toast) {
@@ -179,6 +186,27 @@ fun GigsFeedScreen(
             criteria = filters,
             onApply = viewModel::applyFilters,
             onDismiss = { showFilters = false },
+            // P6a — the category chip row lives outside the sheet but is a
+            // savable dimension, so it alone enables "Save this search".
+            hasExternalCriteria = activeCategory != GigsCategory.All,
+            onSaveSearch = { criteria ->
+                showFilters = false
+                viewModel.saveSearch(criteria)
+            },
+            onManageSearches = {
+                showFilters = false
+                showSavedSearches = true
+            },
+        )
+    }
+
+    if (showSavedSearches) {
+        GigSavedSearchesSheet(
+            state = savedSearches,
+            onToggleNotify = viewModel::setSavedSearchNotify,
+            onDelete = viewModel::deleteSavedSearch,
+            onRetry = viewModel::loadSavedSearches,
+            onDismiss = { showSavedSearches = false },
         )
     }
 }

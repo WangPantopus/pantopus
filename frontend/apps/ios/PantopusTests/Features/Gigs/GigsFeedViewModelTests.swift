@@ -545,4 +545,70 @@ final class GigsFeedViewModelTests: XCTestCase {
         }
         XCTAssertEqual(rows.count, 2, "Banner tap refetched the feed.")
     }
+
+    // MARK: - P6a. Save this search
+
+    /// Feed VM with an injected viewing location, mirroring how the
+    /// host passes a fixed coordinate.
+    private func makeLocatedVM(radiusMiles: Double = 5) -> GigsFeedViewModel {
+        GigsFeedViewModel(
+            api: makeAPI(),
+            latitude: 40.7,
+            longitude: -73.9,
+            radiusMiles: radiusMiles,
+            location: NoLocationProvider(),
+            currentUserId: { nil },
+            gigEventsProvider: { AsyncStream { $0.finish() } }
+        )
+    }
+
+    private static let savedSearchResponseJSON = """
+    {
+      "search": {
+        "id": "ss1", "user_id": "me", "name": "Cleaning · under $100 · 5 mi",
+        "category": "cleaning", "search": null, "min_price": null, "max_price": 100,
+        "schedule_type": null, "pay_type": null, "latitude": 40.7, "longitude": -73.9,
+        "radius_miles": 5, "notify": true,
+        "created_at": "2026-06-10T08:00:00Z", "last_notified_at": null
+      }
+    }
+    """
+
+    func testSaveSearchPostsAndToastsSuccess() async {
+        SequencedURLProtocol.sequence = [.status(201, body: Self.savedSearchResponseJSON)]
+        let vm = makeLocatedVM()
+        await vm.saveSearch(criteria: GigFilterCriteria(budgetUpper: 100))
+        let last = SequencedURLProtocol.capturedRequests.last
+        XCTAssertEqual(last?.httpMethod, "POST")
+        XCTAssertEqual(last?.url?.path, "/api/gigs/saved-searches")
+        XCTAssertEqual(vm.toast?.text, "Search saved — we'll alert you")
+        XCTAssertEqual(vm.toast?.kind, .success)
+    }
+
+    func testSaveSearchDedupedToastsReenabled() async {
+        let deduped = Self.savedSearchResponseJSON.replacingOccurrences(
+            of: "\"search\": {",
+            with: "\"deduped\": true, \"search\": {"
+        )
+        SequencedURLProtocol.sequence = [.status(200, body: deduped)]
+        let vm = makeLocatedVM()
+        await vm.saveSearch(criteria: GigFilterCriteria(budgetUpper: 100))
+        XCTAssertEqual(vm.toast?.text, "Already saved — alerts re-enabled")
+        XCTAssertEqual(vm.toast?.kind, .success)
+    }
+
+    func testSaveSearchFailureToastsError() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = makeLocatedVM()
+        await vm.saveSearch(criteria: GigFilterCriteria(budgetUpper: 100))
+        XCTAssertEqual(vm.toast?.text, "Couldn't save this search.")
+        XCTAssertEqual(vm.toast?.kind, .error)
+    }
+
+    func testSaveSearchWithoutLocationSkipsRequest() async {
+        let vm = makeVM() // no injected coordinate + NoLocationProvider
+        await vm.saveSearch(criteria: GigFilterCriteria(budgetUpper: 100))
+        XCTAssertTrue(SequencedURLProtocol.capturedRequests.isEmpty, "No coordinate — nothing to POST.")
+        XCTAssertEqual(vm.toast?.kind, .error)
+    }
 }

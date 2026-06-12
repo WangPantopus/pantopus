@@ -305,6 +305,7 @@ app.use('/api/public', previewLimiter, require('./routes/public'));
 app.use('/api/users', blockRoutes);    // Block routes (must be before userRoutes for /blocked static path)
 app.use('/api/users', userRoutes);
 app.use('/api/gigs', magicTaskRoutes);  // Magic Task routes (must be before gigRoutes for static paths)
+app.use('/api/gigs', require('./routes/gigSavedSearches')); // P6 saved searches (static paths before /:id)
 app.use('/api/gigs', gigRoutes);
 app.use('/api/gigs', require('./routes/gigsV2'));     // Gigs MVP v2 endpoints (instant-accept, share-status, etc.)
 app.use('/api/v2', require('./routes/offersV2'));      // Offers v2 with scoring & trust capsules

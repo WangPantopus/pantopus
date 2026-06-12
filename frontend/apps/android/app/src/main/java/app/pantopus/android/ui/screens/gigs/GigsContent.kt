@@ -156,6 +156,37 @@ data class GigsFeedToast(
 )
 
 /**
+ * P6a — one row in the "Saved searches" manage sheet (projected from
+ * `GigSavedSearchDto`).
+ */
+@Immutable
+data class GigSavedSearchRowContent(
+    val id: String,
+    /** Stored name, falling back to the derived criteria label. */
+    val title: String,
+    /** Derived criteria summary; `null` when identical to [title]. */
+    val summary: String?,
+    /** "Saved 2d ago" relative caption; `null` without a timestamp. */
+    val savedAgo: String?,
+    val notify: Boolean,
+)
+
+/** P6a — render state for the "Saved searches" manage sheet. */
+sealed interface GigSavedSearchesUiState {
+    data object Loading : GigSavedSearchesUiState
+
+    data object Empty : GigSavedSearchesUiState
+
+    data class Loaded(
+        val rows: List<GigSavedSearchRowContent>,
+    ) : GigSavedSearchesUiState
+
+    data class Error(
+        val message: String,
+    ) : GigSavedSearchesUiState
+}
+
+/**
  * Render state for the Gigs feed screen. The browse pair (P1.F) joins
  * the four base states: `BrowseLoading` renders stacked section
  * skeletons, `BrowseLoaded` the sectioned discovery feed.

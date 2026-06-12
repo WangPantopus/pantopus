@@ -69,7 +69,12 @@ public struct GigsFeedView: View {
             GigFilterSheet(
                 criteria: viewModel.filters,
                 onApply: { criteria in Task { await viewModel.applyFilters(criteria) } },
-                onClose: { showFilterSheet = false }
+                onClose: { showFilterSheet = false },
+                onSaveSearch: { criteria in
+                    // Close first so the feed's toast overlay is visible.
+                    showFilterSheet = false
+                    Task { await viewModel.saveSearch(criteria: criteria) }
+                }
             )
         }
         .overlay(alignment: .bottom) { undoOverlay }

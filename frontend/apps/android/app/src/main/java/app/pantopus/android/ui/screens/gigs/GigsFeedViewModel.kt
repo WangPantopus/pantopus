@@ -5,9 +5,11 @@ package app.pantopus.android.ui.screens.gigs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigSavedSearchDto
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.gigs.GigSavedSearchesRepository
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.realtime.SocketManager
@@ -42,6 +44,7 @@ class GigsFeedViewModel
         private val socket: SocketManager,
         private val authRepo: AuthRepository,
         private val location: LocationProvider,
+        private val savedSearchesRepo: GigSavedSearchesRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<GigsFeedUiState>(GigsFeedUiState.Loading)
         val state: StateFlow<GigsFeedUiState> = _state.asStateFlow()
@@ -69,6 +72,13 @@ class GigsFeedViewModel
         /** P1.D — transient toast (auto-dismissed by the screen after ~5s). */
         private val _toast = MutableStateFlow<GigsFeedToast?>(null)
         val toast: StateFlow<GigsFeedToast?> = _toast.asStateFlow()
+
+        /** P6a — render state for the "Saved searches" manage sheet. */
+        private val _savedSearches = MutableStateFlow<GigSavedSearchesUiState>(GigSavedSearchesUiState.Loading)
+        val savedSearches: StateFlow<GigSavedSearchesUiState> = _savedSearches.asStateFlow()
+
+        /** P6a — raw saved-search rows backing optimistic PATCH/DELETE + revert. */
+        private var savedSearchDtos: List<GigSavedSearchDto> = emptyList()
 
         private var latitude: Double? = null
         private var longitude: Double? = null
@@ -262,6 +272,120 @@ class GigsFeedViewModel
 
         fun dismissToast() {
             _toast.value = null
+        }
+
+        // MARK: - P6a Saved searches + alerts
+
+        /**
+         * "Save this search": apply [criteria] (the sheet's working state)
+         * and POST it with the active category chip, the viewing
+         * coordinate, and the current radius. The backend dedupes
+         * identical criteria onto the existing row (re-enabling notify) —
+         * both outcomes surface through the feed toast.
+         */
+        fun saveSearch(criteria: GigFilterCriteria) {
+            if (criteria != _filters.value) applyFilters(criteria)
+            val lat = latitude
+            val lng = longitude
+            if (lat == null || lng == null) {
+                _toast.value = GigsFeedToast(text = "Turn on location to save searches.", isError = true)
+                return
+            }
+            val body =
+                criteria.toSavedSearchBody(
+                    category = _activeCategory.value,
+                    // The feed's search field opens the separate Gig Search
+                    // surface, so there is no inline query to carry here.
+                    search = null,
+                    latitude = lat,
+                    longitude = lng,
+                    radiusMiles = radiusMiles,
+                )
+            viewModelScope.launch {
+                when (val result = savedSearchesRepo.create(body)) {
+                    is NetworkResult.Success -> {
+                        _toast.value =
+                            GigsFeedToast(
+                                text =
+                                    if (result.data.deduped == true) {
+                                        "Already saved — alerts re-enabled"
+                                    } else {
+                                        "Search saved — we'll alert you"
+                                    },
+                            )
+                    }
+                    is NetworkResult.Failure -> {
+                        _toast.value = GigsFeedToast(text = result.error.message, isError = true)
+                    }
+                }
+            }
+        }
+
+        /** Manage sheet open / retry: fetch the caller's saved searches. */
+        fun loadSavedSearches() {
+            _savedSearches.value = GigSavedSearchesUiState.Loading
+            viewModelScope.launch {
+                when (val result = savedSearchesRepo.list()) {
+                    is NetworkResult.Success -> {
+                        savedSearchDtos = result.data.searches
+                        rebuildSavedSearches()
+                    }
+                    is NetworkResult.Failure -> {
+                        _savedSearches.value = GigSavedSearchesUiState.Error(result.error.message)
+                    }
+                }
+            }
+        }
+
+        /** Notify switch: optimistic flip, PATCH, revert on failure. */
+        fun setSavedSearchNotify(
+            id: String,
+            notify: Boolean,
+        ) {
+            val previous = savedSearchDtos
+            if (previous.none { it.id == id }) return
+            savedSearchDtos = previous.map { if (it.id == id) it.copy(notify = notify) else it }
+            rebuildSavedSearches()
+            viewModelScope.launch {
+                when (val result = savedSearchesRepo.update(id, notify = notify)) {
+                    is NetworkResult.Success -> {
+                        savedSearchDtos = savedSearchDtos.map { if (it.id == id) result.data.search else it }
+                        rebuildSavedSearches()
+                    }
+                    is NetworkResult.Failure -> {
+                        savedSearchDtos = previous
+                        rebuildSavedSearches()
+                        _toast.value = GigsFeedToast(text = result.error.message, isError = true)
+                    }
+                }
+            }
+        }
+
+        /** Trash tap: optimistic removal, DELETE, reinsert on failure. */
+        fun deleteSavedSearch(id: String) {
+            val previous = savedSearchDtos
+            if (previous.none { it.id == id }) return
+            savedSearchDtos = previous.filterNot { it.id == id }
+            rebuildSavedSearches()
+            viewModelScope.launch {
+                when (val result = savedSearchesRepo.delete(id)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure -> {
+                        savedSearchDtos = previous
+                        rebuildSavedSearches()
+                        _toast.value = GigsFeedToast(text = result.error.message, isError = true)
+                    }
+                }
+            }
+        }
+
+        private fun rebuildSavedSearches() {
+            _savedSearches.value =
+                if (savedSearchDtos.isEmpty()) {
+                    GigSavedSearchesUiState.Empty
+                } else {
+                    GigSavedSearchesUiState.Loaded(savedSearchDtos.map { projectSavedSearch(it) })
+                }
         }
 
         private fun restoreDismissedGig(gigId: String) {
@@ -527,6 +651,46 @@ class GigsFeedViewModel
             /** P1.F — Quick jobs section budget ceiling (matches the
              * backend's quick-jobs banding). */
             const val QUICK_JOBS_BUDGET_CAP = 100f
+
+            /**
+             * P6a — `GigSavedSearchDto` → manage-sheet row. The stored
+             * name wins; the derived [savedSearchLabel] is the fallback
+             * title and the summary when it adds information.
+             */
+            fun projectSavedSearch(dto: GigSavedSearchDto): GigSavedSearchRowContent {
+                val derived =
+                    savedSearchLabel(
+                        categoryLabel =
+                            dto.category
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { GigsCategory.fromBackendKey(it).label },
+                        search = dto.search,
+                        minPrice = dto.minPrice,
+                        maxPrice = dto.maxPrice,
+                        scheduleLabel = savedScheduleLabel(dto.scheduleType),
+                        openToBids = dto.payType == OFFERS_PAY_TYPE,
+                        radiusMiles = dto.radiusMiles,
+                    )
+                val title = dto.name?.takeIf { it.isNotBlank() } ?: derived
+                return GigSavedSearchRowContent(
+                    id = dto.id,
+                    title = title,
+                    summary = derived.takeIf { it != title },
+                    savedAgo = ageLabel(dto.createdAt)?.let { if (it == "now") "Saved just now" else "Saved $it ago" },
+                    notify = dto.notify != false,
+                )
+            }
+
+            /** Stored `schedule_type` → display label ("asap" / "today" have no feed bucket). */
+            private fun savedScheduleLabel(raw: String?): String? {
+                if (raw.isNullOrBlank()) return null
+                return when (raw.lowercase(Locale.US)) {
+                    "asap" -> "ASAP"
+                    else ->
+                        GigScheduleFilter.fromBackendKey(raw)?.label
+                            ?: raw.replaceFirstChar { it.uppercase(Locale.US) }
+                }
+            }
 
             /** P1.F — `GigDto` → horizontal rail card (urgent / high paying). */
             fun projectRailCard(gig: GigDto): GigRailCardContent =
