@@ -18,9 +18,13 @@
  *   WALKSCORE_API_KEY — Walk Score API key (free, walkscore.com/professional)
  */
 const supabaseAdmin = require('../../config/supabaseAdmin');
+const { encodeGeohash } = require('../../utils/geohash');
+const { readThrough } = require('../placeSectionCache');
 const logger = require('../../utils/logger');
 
 const CACHE_TTL_DAYS = 90;
+// Profiles missing census or flood retry on a short budget (see getProfile).
+const PARTIAL_TTL_DAYS = 1;
 const FETCH_TIMEOUT_MS = 8000;
 
 // ── Flood zone descriptions ──────────────────────────────────────────────
@@ -128,6 +132,13 @@ async function fetchCensusACS(stateCode, countyCode, tractCode) {
     logger.warn('Census ACS fetch failed', { stateCode, countyCode, tractCode, status: res?.status });
     return null;
   }
+  // api.census.gov now REQUIRES a key: keyless calls 302-redirect to an HTML
+  // "missing key" page instead of failing. Surface that clearly rather than
+  // letting it die downstream as a JSON parse error.
+  if (String(res.url || '').includes('missing_key')) {
+    logger.warn('Census ACS requires an API key — set CENSUS_API_KEY (free: api.census.gov/data/key_signup.html)');
+    return null;
+  }
 
   try {
     const data = await res.json();
@@ -210,6 +221,30 @@ async function fetchWalkScore(lat, lng, address) {
 // ── FEMA Flood Zone Fetch ────────────────────────────────────────────────
 
 /**
+ * geocodeToTract with a persistent cache. A point's tract assignment
+ * changes only at the decennial census, so the lookup is effectively
+ * permanent data — cached 365 days per ~150 m cell, with the expired
+ * row served if the geocoder is down (database-first).
+ */
+async function geocodeToTractCached(lat, lng) {
+  try {
+    const gh7 = encodeGeohash(lat, lng, 7);
+    const { payload } = await readThrough({
+      cacheKey: `geo:${gh7}`,
+      sectionId: '_tract',
+      ttlMs: 365 * 24 * 60 * 60 * 1000,
+      fetch: () => geocodeToTract(lat, lng),
+    });
+    return payload || null;
+  } catch (err) {
+    // The cache layer must never make geocoding WORSE than uncached —
+    // any cache-side failure degrades to the direct lookup.
+    logger.warn('geocodeToTractCached cache layer failed — direct lookup', { error: err.message });
+    return geocodeToTract(lat, lng);
+  }
+}
+
+/**
  * Query FEMA NFHL for the flood zone at a point.
  * @param {number} lat
  * @param {number} lng
@@ -225,7 +260,8 @@ async function fetchFloodZone(lat, lng) {
     returnGeometry: 'false',
     f: 'json',
   });
-  const url = `https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query?${params}`;
+  // FEMA retired the old /gis/nfhl/rest host path; /arcgis/rest is current.
+  const url = `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query?${params}`;
 
   const res = await timedFetch(url);
   if (!res || !res.ok) {
@@ -256,14 +292,14 @@ async function fetchFloodZone(lat, lng) {
  * @param {string} tractId
  * @returns {Promise<object|null>}
  */
-async function getCachedProfile(tractId) {
+async function getCachedProfile(tractId, { allowExpired = false } = {}) {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('NeighborhoodProfileCache')
-      .select('profile, fetched_at')
-      .eq('tract_id', tractId)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
+      .select('profile, fetched_at, expires_at')
+      .eq('tract_id', tractId);
+    if (!allowExpired) query = query.gt('expires_at', new Date().toISOString());
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       logger.warn('NeighborhoodProfileCache read error', { tractId, error: error.message });
@@ -282,10 +318,10 @@ async function getCachedProfile(tractId) {
  * @param {string} tractId
  * @param {object} profile
  */
-async function setCachedProfile(tractId, profile) {
+async function setCachedProfile(tractId, profile, ttlDays = CACHE_TTL_DAYS) {
   try {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + ttlDays * 24 * 60 * 60 * 1000);
 
     const { error } = await supabaseAdmin
       .from('NeighborhoodProfileCache')
@@ -320,8 +356,8 @@ async function setCachedProfile(tractId, profile) {
  * @returns {Promise<{ profile: object|null, source: 'cache'|'live'|'error' }>}
  */
 async function getProfile({ latitude, longitude, address }) {
-  // 1. Geocode to Census tract
-  const geo = await geocodeToTract(latitude, longitude);
+  // 1. Geocode to Census tract (persistently cached — effectively permanent)
+  const geo = await geocodeToTractCached(latitude, longitude);
   if (!geo) {
     return { profile: null, source: 'error' };
   }
@@ -357,8 +393,14 @@ async function getProfile({ latitude, longitude, address }) {
     logger.error('FEMA flood fetch rejected', { error: floodResult.reason?.message });
   }
 
-  // If all three sources failed, return null gracefully
+  // If all three sources failed: database first — an expired profile
+  // beats nothing. Left in place so the next request retries the APIs.
   if (!census && !walkScore && !flood) {
+    const expired = await getCachedProfile(tractId, { allowExpired: true });
+    if (expired && expired.profile) {
+      logger.info('NeighborhoodProfile serving expired cache (providers unavailable)', { tractId });
+      return { profile: expired.profile, source: 'cache_stale' };
+    }
     logger.warn('All neighborhood sources failed', { tractId });
     return { profile: null, source: 'error' };
   }
@@ -386,8 +428,13 @@ async function getProfile({ latitude, longitude, address }) {
     source: sources.join('+'),
   };
 
-  // 5. Cache the result
-  await setCachedProfile(tractId, profile);
+  // 5. Cache the result. A profile missing census or flood is PARTIAL
+  // (Walk Score is key-gated by design and never blocks freshness) —
+  // cache it briefly so the missing source retries tomorrow instead of
+  // shadowing the full 90-day budget (e.g. a census outage, or the
+  // CENSUS_API_KEY landing after a flood-only profile was stored).
+  const isComplete = Boolean(census) && Boolean(flood);
+  await setCachedProfile(tractId, profile, isComplete ? CACHE_TTL_DAYS : PARTIAL_TTL_DAYS);
 
   return { profile, source: 'live' };
 }
@@ -397,6 +444,7 @@ module.exports = {
   CACHE_TTL_DAYS,
   // Exported for testing
   geocodeToTract,
+  geocodeToTractCached,
   fetchCensusACS,
   fetchWalkScore,
   fetchFloodZone,

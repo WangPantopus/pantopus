@@ -22,13 +22,17 @@ import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
 import PlaceDashboardView from './PlaceDashboardView';
 import PlaceDashboardSkeleton from './PlaceDashboardSkeleton';
+import PlaceShell from './PlaceShell';
 
 const REDIRECT_TO = encodeURIComponent('/app/place');
 
-// Comfortable reading column: full-width on mobile, capped on desktop.
+// Comfortable reading column on mobile; at lg+ the shared PlaceShell
+// adds the persistent section rail beside a wider content column.
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[640px] px-4 sm:px-5 py-5 sm:py-6">{children}</div>
+    <PlaceShell active="overview">
+      <div className="px-4 sm:px-5 py-5 sm:py-6">{children}</div>
+    </PlaceShell>
   );
 }
 

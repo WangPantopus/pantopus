@@ -279,6 +279,15 @@ export type {
   PlacePreviewLockedSection,
 } from './endpoints/place';
 
+// Place — server-attested residency letters (Phase 1, #11)
+export * as residencyLetters from './endpoints/residencyLetters';
+export type {
+  ResidencyLetter,
+  ResidencyLetterStatus,
+  ResidencyLetterAddress,
+  ResidencyLetterVerification,
+} from './endpoints/residencyLetters';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {

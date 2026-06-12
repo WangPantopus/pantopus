@@ -20,6 +20,8 @@ const META: Record<PlaceSectionId, { group: PlaceSection['group']; band: PlaceSe
   sunrise_sunset: { group: 'today', band: 'A', source: 'Open-Meteo' },
   your_home: { group: 'your_home', band: 'B', source: 'County records · ATTOM' },
   flood: { group: 'risk_readiness', band: 'A', source: 'FEMA National Flood Hazard Layer' },
+  seismic: { group: 'risk_readiness', band: 'A', source: 'USGS seismic design values (ASCE 7-22)' },
+  wildfire: { group: 'risk_readiness', band: 'A', source: 'USFS Wildfire Hazard Potential' },
   lead_radon: { group: 'health_environment', band: 'A', source: 'EPA radon zones · HUD lead-paint rules' },
   drinking_water: { group: 'health_environment', band: 'A', source: 'EPA SDWIS' },
   environmental_hazards: { group: 'health_environment', band: 'A', source: 'EPA ECHO' },

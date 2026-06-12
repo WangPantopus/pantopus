@@ -50,6 +50,9 @@ const PLACE_SECTION_META = {
   // Band B (W0.2) — exact property facts + valuation (ATTOM).
   your_home: { group: 'your_home', band: 'B', source: 'County records · ATTOM', layer: null },
   flood: { group: 'risk_readiness', band: 'A', source: 'FEMA National Flood Hazard Layer', layer: 3 },
+  // Phase 4 — the deferred half of risk & readiness.
+  seismic: { group: 'risk_readiness', band: 'A', source: 'USGS seismic design values (ASCE 7-22)', layer: null },
+  wildfire: { group: 'risk_readiness', band: 'A', source: 'USFS Wildfire Hazard Potential', layer: null },
   lead_radon: { group: 'health_environment', band: 'A', source: 'EPA radon zones · HUD lead-paint rules', layer: 6 },
   drinking_water: { group: 'health_environment', band: 'A', source: 'EPA SDWIS', layer: 7 },
   environmental_hazards: { group: 'health_environment', band: 'A', source: 'EPA ECHO', layer: 5 },

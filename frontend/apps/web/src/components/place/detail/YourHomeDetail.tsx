@@ -116,19 +116,51 @@ function ValueCard({ data }: { data: PlaceYourHomeData }) {
   );
 }
 
+// Assessment + the tax-appeal INFORMATIONAL layer (#2). Strictly
+// educational by design (legal gate): it compares the county's
+// assessment with the market estimate and explains that appeals
+// exist — never a savings figure, never advice.
 function AssessmentCard({ data }: { data: PlaceYourHomeData }) {
   const assessed = usd(data.assessed_value);
   if (!assessed) return null;
+
+  const hasBoth =
+    data.assessed_value != null &&
+    data.estimated_value != null &&
+    data.estimated_value > 0;
+  const diffPct = hasBoth
+    ? Math.round(((data.assessed_value! - data.estimated_value!) / data.estimated_value!) * 100)
+    : 0;
+  const comparison = !hasBoth
+    ? null
+    : Math.abs(diffPct) <= 5
+      ? 'Your assessment is in line with the market estimate above.'
+      : diffPct > 0
+        ? `Your assessment runs about ${diffPct}% above the market estimate — assessments above market are the usual basis for an appeal.`
+        : `Your assessment runs about ${Math.abs(diffPct)}% below the market estimate.`;
+
   return (
-    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm px-4 py-3.5 flex items-center gap-3">
-      <span className="w-[34px] h-[34px] rounded-[9px] bg-app-home-bg flex items-center justify-center shrink-0">
-        <Landmark size={18} strokeWidth={2} className="text-app-home" />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[15px] font-semibold text-app-text">Assessed value</div>
-        <div className="text-[12.5px] text-app-text-muted mt-0.5">Latest county tax roll</div>
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm px-4 py-3.5">
+      <div className="flex items-center gap-3">
+        <span className="w-[34px] h-[34px] rounded-[9px] bg-app-home-bg flex items-center justify-center shrink-0">
+          <Landmark size={18} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[15px] font-semibold text-app-text">Assessed value</div>
+          <div className="text-[12.5px] text-app-text-muted mt-0.5">Latest county tax roll</div>
+        </div>
+        <div className="text-base font-semibold text-app-text">{assessed}</div>
       </div>
-      <div className="text-base font-semibold text-app-text">{assessed}</div>
+      {comparison ? (
+        <div className="text-[13px] text-app-text-strong leading-[19px] mt-3 pt-3 border-t border-app-border-subtle">
+          {comparison}
+        </div>
+      ) : null}
+      <div className="text-[12px] text-app-text-muted leading-[17px] mt-2.5">
+        Every county lets homeowners appeal an assessment they believe is too high — usually a form and an
+        evidence window each year. Search &ldquo;{'assessment appeal'}&rdquo; with your county&apos;s name for the process.
+        Informational only, not tax advice.
+      </div>
     </div>
   );
 }

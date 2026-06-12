@@ -103,15 +103,22 @@ export default function PlaceDashboardView({
       </div>
 
       <div className="mt-6">
-        {intelligence.groups.map((group) => {
+        {intelligence.groups.map((group, gi) => {
           const slug = GROUP_TO_SLUG[group.group];
           const onOpen = slug && onOpenSection ? () => onOpenSection(slug) : undefined;
           return (
-            <Group key={group.group} label={group.label}>
-              {group.sections.map((section) => (
-                <Fragment key={section.id}>{renderSection(section, { onOpen, onVerify: openVerify, onClaim })}</Fragment>
-              ))}
-            </Group>
+            // Staggered entrance — decorative; reduced-motion gets it static.
+            <div
+              key={group.group}
+              className="motion-safe:animate-[fadeInUp_0.35s_ease-out_both]"
+              style={{ animationDelay: `${Math.min(gi, 6) * 55}ms` }}
+            >
+              <Group label={group.label}>
+                {group.sections.map((section) => (
+                  <Fragment key={section.id}>{renderSection(section, { onOpen, onVerify: openVerify, onClaim })}</Fragment>
+                ))}
+              </Group>
+            </div>
           );
         })}
 

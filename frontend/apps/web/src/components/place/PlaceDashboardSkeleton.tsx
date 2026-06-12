@@ -44,7 +44,9 @@ function HeroSkeleton() {
 
 export default function PlaceDashboardSkeleton() {
   return (
-    <div className="flex flex-col" aria-hidden="true">
+    <div className="flex flex-col" role="status">
+      <span className="sr-only">Loading your place…</span>
+      <div aria-hidden="true" className="contents">
       {/* header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-2">
@@ -67,6 +69,7 @@ export default function PlaceDashboardSkeleton() {
         <Group label="Your home">
           <CardSkeleton />
         </Group>
+      </div>
       </div>
     </div>
   );

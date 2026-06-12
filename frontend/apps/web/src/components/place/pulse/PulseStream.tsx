@@ -28,11 +28,12 @@ import { ShimmerBlock } from '@/components/ui/Shimmer';
 import { DetailHeader } from '@/components/archetypes/place';
 import { detailAddress } from '@/components/place/detail/sections';
 import PulseStreamView from './PulseStreamView';
+import PlaceShell from '../PlaceShell';
 
 const REDIRECT_TO = encodeURIComponent('/app/place/pulse');
 
 function StreamShell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto w-full max-w-[640px]">{children}</div>;
+  return <PlaceShell active="pulse">{children}</PlaceShell>;
 }
 
 function StreamSkeleton() {

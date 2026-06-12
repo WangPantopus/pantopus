@@ -13,7 +13,13 @@
 // ============================================================
 
 import { get } from '../client';
-import type { PlaceIntelligence, PlaceDensityBucket, PlaceGroup, PlaceBand } from '@pantopus/types';
+import type {
+  PlaceIntelligence,
+  PlaceDensityBucket,
+  PlaceGroup,
+  PlaceBand,
+  PlaceSectionId,
+} from '@pantopus/types';
 
 // ─── Public preview (T0) — the anonymous one-shot demonstration ───
 // NOTE: the preview endpoint does NOT return the full PlaceIntelligence
@@ -87,10 +93,18 @@ export interface PlacePreview {
  * (T1–T4) and per-section access / gating are resolved server-side and
  * carried in each section envelope.
  *
- * GET /api/homes/:id/intelligence
+ * Pass `sections` to lazy-load a subset (e.g. a detail page refreshing
+ * only its own group): the response then carries just those envelopes,
+ * in canonical order. Omitted ⇒ the full launch set.
+ *
+ * GET /api/homes/:id/intelligence[?sections=a,b,c]
  */
-export async function getPlaceIntelligence(homeId: string): Promise<PlaceIntelligence> {
-  return get<PlaceIntelligence>(`/api/homes/${homeId}/intelligence`);
+export async function getPlaceIntelligence(
+  homeId: string,
+  sections?: PlaceSectionId[],
+): Promise<PlaceIntelligence> {
+  const params = sections && sections.length ? { sections: sections.join(',') } : undefined;
+  return get<PlaceIntelligence>(`/api/homes/${homeId}/intelligence`, params);
 }
 
 /**

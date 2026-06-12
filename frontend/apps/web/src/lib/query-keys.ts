@@ -75,6 +75,8 @@ export const queryKeys = {
     ['place', 'neighbor-messages', 'templates'] as const,
   neighborMessage: (id: string) =>
     ['place', 'neighbor-messages', id] as const,
+  residencyLetters: (homeId: string) =>
+    ['place', 'residency-letters', homeId] as const,
 
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>

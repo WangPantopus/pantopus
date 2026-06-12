@@ -32,21 +32,25 @@ export interface DetailHeaderProps {
 export function DetailHeader({ title, address, onBack, backHref = '/app/place' }: DetailHeaderProps) {
   const router = useRouter();
   const handleBack = onBack ?? (() => router.push(backHref));
+  // At lg+ the PlaceShell nav rail handles section navigation, so the back
+  // chevron only renders below lg — EXCEPT for in-page leaves (onBack),
+  // which still need a way back to their parent screen on any viewport.
+  const backVisibility = onBack ? '' : 'lg:hidden';
   return (
-    <div className="sticky top-14 z-30 px-4 sm:px-5 bg-app-bg/80 supports-[backdrop-filter]:bg-app-bg/70 backdrop-blur-md border-b border-app-border">
+    <div className="sticky top-14 z-30 px-4 sm:px-5 bg-app-bg/80 supports-[backdrop-filter]:bg-app-bg/70 backdrop-blur-md border-b border-app-border lg:rounded-b-xl">
       <div className="flex items-center gap-2.5 py-2.5">
         <button
           type="button"
           onClick={handleBack}
           aria-label="Back"
-          className="w-9 h-9 rounded-full bg-app-surface border border-app-border shadow-sm flex items-center justify-center shrink-0 text-app-text-strong hover:bg-app-hover transition"
+          className={`w-9 h-9 rounded-full bg-app-surface border border-app-border shadow-sm flex items-center justify-center shrink-0 text-app-text-strong hover:bg-app-hover transition ${backVisibility}`}
         >
           <ChevronLeft size={20} strokeWidth={2.5} />
         </button>
         <div className="min-w-0">
           <h1 className="text-[20px] leading-6 font-bold -tracking-[0.02em] text-app-text truncate">{title}</h1>
           {address ? (
-            <p className="text-[12.5px] font-medium text-app-text-muted truncate mt-0.5">{address}</p>
+            <p className="text-[12.5px] font-medium text-app-text-muted truncate mt-0.5" title={address}>{address}</p>
           ) : null}
         </div>
       </div>

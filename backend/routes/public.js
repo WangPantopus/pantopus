@@ -3,10 +3,11 @@ const router = express.Router();
 const supabaseAdmin = require('../config/supabaseAdmin');
 const geo = require('../services/geo');
 const {
-  geocodeToTract,
+  geocodeToTractCached,
   fetchCensusACS,
   fetchFloodZone,
 } = require('../services/ai/neighborhoodProfileService');
+const { readThrough } = require('../services/placeSectionCache');
 const { encodeGeohash, encodeGeohash6 } = require('../utils/geohash');
 const { GeoCache } = require('../utils/geoCache');
 
@@ -149,14 +150,14 @@ router.get('/posts/:id', async (req, res) => {
 //   • The PREVIEW persists nothing: no saved place, no per-user / per-address
 //     row, NO DB writes at all — close + reopen still hits the wall.
 //
-// Caching (in-memory only, location-keyed, anonymous — never the user's
-// preview, never the database):
-//   • geocode → keyed by the typed address. Mapbox is the only billed
-//     dependency, so this is the highest-value cache; the TTL is kept short to
-//     respect Mapbox's "temporary result" terms.
-//   • flood → keyed by a fine (~38m) geohash, fetched independently so it never
-//     depends on the Census tract lookup.
-//   • census teaser → keyed by a coarse (~1.2km) geohash (area-level by nature).
+// Caching (anonymous + location-keyed; the typed ADDRESS never persists):
+//   • geocode → in-memory ONLY, keyed by the typed address, short TTL —
+//     both the §4 anti-leak rule (no per-address trail in the database)
+//     and Mapbox's "temporary result" terms forbid persisting it.
+//   • flood / census teaser → facts about LAND, not about a search:
+//     in-memory L1 (24 h) over the shared PlaceSectionCache L2 (90 d,
+//     geohash-keyed DB rows — the same store the authed dashboard uses),
+//     with the expired row served when the provider is down.
 //   • density → read live (its own job refreshes it every 15 min).
 // Each source degrades on its own; only positive results are cached. We call
 // the stateless fetchers directly (not getProfile) so the preview neither
@@ -287,42 +288,70 @@ async function geocodeUsAddress(address) {
   return place;
 }
 
-// Flood — FEMA zone for a point, fetched independently (only needs lat/lng, so
-// it never depends on the Census tract lookup) and cached by a fine geohash.
-// Only positive results are cached; a null could be a transient error.
+// Flood — FEMA zone for a point. Two cache layers, both anonymous and
+// location-keyed (a fact about LAND, never about a search):
+//   L1 in-memory (24 h)  → hot path, per instance
+//   L2 PlaceSectionCache (90 d, DB) → shared across instances/restarts,
+//      with the expired row served if FEMA is down (database-first).
+// The typed ADDRESS and its geocode still never touch the database
+// (§4 anti-leak + Mapbox temporary-result terms).
 async function fetchFloodCached(lat, lng) {
-  const key = `flood:${encodeGeohash(lat, lng, FLOOD_GEOHASH_PRECISION)}`;
+  const gh = encodeGeohash(lat, lng, FLOOD_GEOHASH_PRECISION);
+  const key = `flood:${gh}`;
   const cached = previewCache.get(key);
   if (cached) return cached;
 
-  const flood = await fetchFloodZone(lat, lng);
-  if (flood && flood.flood_zone) previewCache.set(key, flood, AREA_TTL_MS);
-  return flood;
+  try {
+    const { payload } = await readThrough({
+      cacheKey: `geo:${gh}`,
+      sectionId: '_flood_zone',
+      ttlMs: 90 * 24 * 60 * 60 * 1000,
+      fetch: async () => {
+        const flood = await fetchFloodZone(lat, lng);
+        return flood && flood.flood_zone ? flood : null;
+      },
+    });
+    if (payload) previewCache.set(key, payload, AREA_TTL_MS);
+    return payload;
+  } catch (err) {
+    console.warn('[public/place] flood lookup failed:', err.message);
+    return null;
+  }
 }
 
 // Census tract teaser — area-level medians only (NOT an exact home record,
-// NOT ATTOM). Resolves the tract, then the ACS medians; cached by a coarse
-// (area-level) geohash so the whole sub-pipeline is skipped on repeat.
+// NOT ATTOM). Same two-layer caching as flood; the tract resolution itself
+// is persistently cached too (geocodeToTractCached — effectively permanent).
 async function fetchCensusTeaserCached(lat, lng) {
   const key = `census:${encodeGeohash6(lat, lng)}`;
   const cached = previewCache.get(key);
   if (cached) return cached;
 
-  const tract = await geocodeToTract(lat, lng);
-  if (!tract) return null;
-  const { tractId, stateCode, countyCode } = tract;
-  const tractCode = tractId.slice(stateCode.length + countyCode.length);
-  const acs = await fetchCensusACS(stateCode, countyCode, tractCode);
-  if (!acs) return null;
-
-  const teaser = {
-    median_year_built: acs.median_year_built ?? null,
-    median_home_value: acs.median_home_value ?? null,
-  };
-  if (teaser.median_year_built != null || teaser.median_home_value != null) {
-    previewCache.set(key, teaser, AREA_TTL_MS);
+  try {
+    const { payload } = await readThrough({
+      cacheKey: `geo:${encodeGeohash6(lat, lng)}`,
+      sectionId: '_census_teaser',
+      ttlMs: 90 * 24 * 60 * 60 * 1000,
+      fetch: async () => {
+        const tract = await geocodeToTractCached(lat, lng);
+        if (!tract) return null;
+        const { tractId, stateCode, countyCode } = tract;
+        const tractCode = tractId.slice(stateCode.length + countyCode.length);
+        const acs = await fetchCensusACS(stateCode, countyCode, tractCode);
+        if (!acs) return null;
+        const teaser = {
+          median_year_built: acs.median_year_built ?? null,
+          median_home_value: acs.median_home_value ?? null,
+        };
+        return teaser.median_year_built != null || teaser.median_home_value != null ? teaser : null;
+      },
+    });
+    if (payload) previewCache.set(key, payload, AREA_TTL_MS);
+    return payload;
+  } catch (err) {
+    console.warn('[public/place] census teaser failed:', err.message);
+    return null;
   }
-  return teaser;
 }
 
 // Read the verified-homes count for the area and return ONLY its bucket.
@@ -435,6 +464,26 @@ router.get('/place', async (req, res) => {
   } catch (err) {
     console.error('[public/place] Error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================================
+// GET /api/public/residency-letters/:code — third-party letter check
+//
+// Anyone holding a residency letter can confirm it is genuine and not
+// revoked. Returns exactly what is printed on the paper — never more.
+// The mount-level previewLimiter (60/min/IP) plus the ~78-bit letter
+// code keep enumeration impractical. Unknown/malformed codes are a
+// uniform { valid: false } (no existence oracle).
+// ============================================================
+router.get('/residency-letters/:code', async (req, res) => {
+  try {
+    const residencyLetterService = require('../services/residencyLetterService');
+    const result = await residencyLetterService.verifyByCode(req.params.code);
+    return res.json(result);
+  } catch (err) {
+    console.error('[public/residency-letters] Error:', err.message);
+    return res.status(500).json({ error: 'Verification failed. Try again.' });
   }
 });
 

@@ -15,6 +15,8 @@ import {
   Bell,
   Sunrise,
   Waves,
+  Activity,
+  Flame,
   House,
   TestTube,
   Droplets,
@@ -49,6 +51,8 @@ import type {
   PlaceSunriseSunsetData,
   PlaceFloodData,
   FloodRiskLevel,
+  PlaceSeismicData,
+  PlaceWildfireData,
   PlaceLeadRadonData,
   PlaceDrinkingWaterData,
   PlaceEnvironmentalHazardsData,
@@ -200,6 +204,31 @@ const SECTION_CONFIG: Record<PlaceSectionId, SectionConfig> = {
     format: (data) => {
       const d = data as PlaceFloodData;
       return { chip: FLOOD_CHIP[d.risk_level] ?? { label: d.zone_label, variant: 'neutral' } };
+    },
+  },
+  seismic: {
+    icon: Activity,
+    title: 'Earthquake',
+    inline: true,
+    format: (data) => {
+      const d = data as PlaceSeismicData;
+      const high = d.design_category === 'D' || d.design_category === 'E';
+      return { chip: { label: `Design category ${d.design_category}`, variant: high ? 'warning' : 'success' } };
+    },
+  },
+  wildfire: {
+    icon: Flame,
+    title: 'Wildfire',
+    inline: true,
+    format: (data) => {
+      const d = data as PlaceWildfireData;
+      const high = d.hazard_class != null && d.hazard_class >= 4;
+      return {
+        chip: {
+          label: d.hazard_label,
+          variant: high ? 'warning' : d.burnable ? 'success' : 'neutral',
+        },
+      };
     },
   },
   lead_radon: {

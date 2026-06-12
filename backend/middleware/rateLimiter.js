@@ -250,6 +250,20 @@ const broadcastPublishLimiter = rateLimit({
   message: { error: 'Too many broadcast messages. Please try again shortly.' },
 });
 
+/**
+ * Limiter for residency-letter issuance.
+ * 10 letters per day per user — letters are durable artifacts; normal use
+ * is a handful per year, so this only stops runaway/scripted issuance.
+ */
+const residencyLetterIssueLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many letters issued today. Please try again tomorrow.' },
+});
+
 module.exports = {
   globalWriteLimiter,
   financialWriteLimiter,
@@ -269,4 +283,5 @@ module.exports = {
   supportTrainDraftLimiter,
   personaFollowLimiter,
   broadcastPublishLimiter,
+  residencyLetterIssueLimiter,
 };
