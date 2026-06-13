@@ -531,11 +531,15 @@ router.post('/poll/:id/vote', bookingWriteLimiter, optionalAuth, validate(pollVo
   const voterKey = (req.user && req.user.id) || (req.body.email ? normalizeEmail(req.body.email) : null);
   if (!voterKey) return res.status(400).json({ error: 'VOTER_REQUIRED', message: 'Sign in or provide an email to vote.' });
   const voterName = req.body.name || null;
-  // Validate options belong to this poll.
+  // Validate every option belongs to this poll BEFORE recording anything.
   const { data: validOpts } = await supabaseAdmin.from('SchedulingPollOption').select('id').eq('poll_id', poll.id);
   const validIds = new Set((validOpts || []).map((o) => o.id));
   for (const v of req.body.votes) {
-    if (!validIds.has(v.option_id)) continue;
+    if (!validIds.has(v.option_id)) {
+      return res.status(400).json({ error: 'INVALID_OPTION', message: 'One or more options do not belong to this poll.' });
+    }
+  }
+  for (const v of req.body.votes) {
     // Upsert one vote per (option, voter).
     const { data: existing } = await supabaseAdmin.from('SchedulingPollVote').select('id').eq('option_id', v.option_id).eq('voter_key', voterKey).maybeSingle();
     if (existing) {
