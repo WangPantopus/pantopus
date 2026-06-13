@@ -220,6 +220,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     // existing icon menu. Fallbacks are documented inline in
     // `sfSymbolName` for icons SF Symbols doesn't ship 1:1.
     case fan
+    case cloudOff = "cloud-off"
     case cloudRain = "cloud-rain"
     case refrigerator
     case bug
@@ -536,6 +537,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // — only `paint-roller` and `bell-ring` lack 1:1 glyphs, fall back
         // to `paintbrush.pointed` and `bell.badge` respectively.
         case .fan: "fan"
+        case .cloudOff: "cloud.slash"
         case .cloudRain: "cloud.rain"
         case .refrigerator: "refrigerator"
         case .bug: "ant"
