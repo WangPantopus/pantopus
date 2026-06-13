@@ -54,12 +54,21 @@ async function createPaymentForBooking({ booking, eventType }) {
     return { success: false, error: 'PAYMENT_INTENT_FAILED', message: (res && res.error) || 'Could not start payment.' };
   }
 
-  // Tag the Payment as a booking payment and link both directions.
-  await supabaseAdmin
+  // Tag the Payment as a booking payment and link both directions. Surface (don't swallow) link
+  // failures: the PaymentIntent already exists, so an unlinked Payment must be visible for repair.
+  const { error: pErr } = await supabaseAdmin
     .from('Payment')
     .update({ payment_type: 'booking_payment', booking_id: booking.id })
     .eq('id', res.paymentId);
-  await supabaseAdmin.from('Booking').update({ payment_id: res.paymentId }).eq('id', booking.id);
+  const { error: bErr } = await supabaseAdmin.from('Booking').update({ payment_id: res.paymentId }).eq('id', booking.id);
+  if (pErr || bErr) {
+    logger.error('[schedulingPaymentsService] failed to link payment<->booking (PaymentIntent created)', {
+      paymentId: res.paymentId,
+      bookingId: booking.id,
+      paymentErr: pErr && pErr.message,
+      bookingErr: bErr && bErr.message,
+    });
+  }
 
   return { success: true, clientSecret: res.clientSecret, paymentId: res.paymentId };
 }

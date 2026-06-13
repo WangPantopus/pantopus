@@ -115,6 +115,12 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
   const endMs = startMs + duration * MIN_MS;
   const endIso = new Date(endMs).toISOString();
 
+  // Paid bookings require a signed-in invitee (a Stripe customer can't be created for an
+  // anonymous email). Reject up front — before any DB writes — so we never create a phantom row.
+  if (payments.isPriced(eventType) && !invitee.user_id) {
+    throw new BookingError('Paid bookings require you to sign in first.', 403, 'PAYMENT_REQUIRES_SIGNIN');
+  }
+
   const oc = ownerColumns(eventType.owner_type, eventType.owner_id);
 
   // Fast pre-check against the engine (the DB constraint is the atomic source of truth).
@@ -150,18 +156,9 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
     hostUserId = oc.owner_user_id || avail.eligibleHosts[0] || null;
   }
 
-  // Group capacity check (the exclusion constraint does not apply to group bookings).
-  if (mode === 'group' && eventType.seat_cap > 1) {
-    const { count } = await supabaseAdmin
-      .from('Booking')
-      .select('id', { count: 'exact', head: true })
-      .eq('event_type_id', eventType.id)
-      .eq('start_at', startIso)
-      .in('status', ['pending', 'confirmed']);
-    if ((count || 0) >= eventType.seat_cap) {
-      throw new BookingError('This time is fully booked.', 409, 'SLOT_FULL');
-    }
-  }
+  // Group seat-cap is enforced atomically by the booking_enforce_group_cap DB trigger
+  // (a non-atomic app-level pre-check here would give false confidence and races); a full
+  // slot surfaces as GROUP_SLOT_FULL on insert below, mapped to 409 SLOT_FULL.
 
   const priced = payments.isPriced(eventType);
   // Paid bookings always start pending (hold until captured); free bookings honor requires_approval.
@@ -212,21 +209,31 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
     if (attErr) logger.warn('[bookingService] attendee insert failed (booking still created)', { bookingId: booking.id, error: attErr.message });
   }
 
-  // Manage token for the invitee (raw token returned once).
+  // Manage token for the invitee (raw token returned once). Expires a generous window after the
+  // booking so a leaked link can't manage the booking indefinitely (covers reasonable reschedules).
   const { token, hash } = generateToken();
+  const tokenExpiresMs = Math.max(startMs, Date.now()) + 90 * 24 * 60 * 60 * 1000;
   await supabaseAdmin.from('BookingToken').insert({
     booking_id: booking.id,
     token_hash: hash,
     kind: 'manage',
     single_use: false,
+    expires_at: new Date(tokenExpiresMs).toISOString(),
   });
 
-  // Payment (priced only).
+  // Payment (priced only). Roll back the booking on any failure so a doomed booking never leaves
+  // a phantom hold on the slot.
   let clientSecret = null;
   if (priced) {
-    const pay = await payments.createPaymentForBooking({ booking, eventType });
+    let pay;
+    try {
+      pay = await payments.createPaymentForBooking({ booking, eventType });
+    } catch (payErr) {
+      await supabaseAdmin.from('Booking').delete().eq('id', booking.id);
+      logger.error('[bookingService] payment setup threw; booking rolled back', { bookingId: booking.id, error: payErr.message });
+      throw new BookingError('Payment could not be started.', 400, 'PAYMENT_FAILED');
+    }
     if (!pay.success) {
-      // Roll back the booking so a failed payment doesn't leave a phantom hold on the slot.
       await supabaseAdmin.from('Booking').delete().eq('id', booking.id);
       throw new BookingError(pay.message || 'Payment could not be started.', 400, pay.error || 'PAYMENT_FAILED');
     }
@@ -302,7 +309,14 @@ async function approveBooking(bookingId, actorUserId) {
   const ctx = await getBookingContext(bookingId);
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
   assertTransition(ctx.booking, ['pending'], 'approve');
-  if (ctx.booking.payment_id) await payments.captureForBooking(ctx.booking.payment_id);
+  // Capture the held payment FIRST; if capture fails, leave the booking pending rather than
+  // confirming a booking we couldn't charge for.
+  if (ctx.booking.payment_id) {
+    const cap = await payments.captureForBooking(ctx.booking.payment_id);
+    if (cap && cap.success === false) {
+      throw new BookingError('Could not capture payment; booking left pending.', 402, 'CAPTURE_FAILED');
+    }
+  }
   const { data: updated } = await supabaseAdmin
     .from('Booking')
     .update({ status: 'confirmed', updated_at: new Date().toISOString() })
@@ -378,6 +392,7 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
     endIso: newEndIso,
     hostUserId: booking.host_user_id,
     viewerTimezone: booking.invitee_timezone,
+    excludeBookingId: booking.id, // don't let the booking block its own new (possibly overlapping) time
   });
   if (!avail.available && (eventType.assignment_mode || 'one_on_one') !== 'round_robin') {
     // For round-robin we may switch hosts below; for others the slot must be free.
@@ -406,6 +421,10 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
     if (/GROUP_SLOT_FULL/.test(error.message || '')) throw new BookingError('This time is fully booked.', 409, 'SLOT_FULL');
     if (isOverlapViolation(error)) throw new BookingError('That time was just taken.', 409, 'SLOT_TAKEN');
     throw new BookingError('Could not reschedule.', 500, 'RESCHEDULE_FAILED');
+  }
+  // Round-robin fairness: count the rotation against the newly-assigned host.
+  if ((eventType.assignment_mode || 'one_on_one') === 'round_robin' && nextHost && nextHost !== booking.host_user_id) {
+    await bumpAssigneeRotation(eventType.id, nextHost);
   }
   await notify.notifyBookingEvent({ booking: updated, eventType, page, kind: 'rescheduled' });
   return updated;
