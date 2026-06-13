@@ -1,5 +1,6 @@
 package app.pantopus.android.data.place
 
+import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
 import app.pantopus.android.data.api.models.place.IssueResidencyLetterRequest
 import app.pantopus.android.data.api.models.place.NeighborMessageAck
 import app.pantopus.android.data.api.models.place.NeighborMessageTemplates
@@ -19,6 +20,7 @@ import app.pantopus.android.data.api.models.place.SentNeighborMessage
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.AIApi
+import app.pantopus.android.data.api.services.GeoApi
 import app.pantopus.android.data.api.services.NeighborMessagesApi
 import app.pantopus.android.data.api.services.PlaceApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
@@ -40,7 +42,11 @@ class PlaceRepository
         private val neighborMessagesApi: NeighborMessagesApi,
         private val residencyLettersApi: ResidencyLettersApi,
         private val aiApi: AIApi,
+        private val geoApi: GeoApi,
     ) {
+        /** Address typeahead for the signed-out funnel (keyless). */
+        suspend fun geoAutocomplete(query: String): NetworkResult<GeoAutocompleteResponse> = safeApiCall { geoApi.autocomplete(query) }
+
         /**
          * The grouped section envelopes for a home. Pass [sections] to
          * lazy-load a subset (detail pages); null ⇒ the full launch set.

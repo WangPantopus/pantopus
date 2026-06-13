@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -37,9 +40,28 @@ fun PantopusNavHost(viewModel: RootViewModel = hiltViewModel()) {
     ) { state ->
         when (state) {
             AuthRepository.State.Unknown -> SplashScreen()
-            AuthRepository.State.SignedOut -> AuthNavHost()
+            AuthRepository.State.SignedOut -> PlaceLaunchHost()
             is AuthRepository.State.SignedIn -> RootTabScreen()
         }
+    }
+}
+
+/**
+ * The signed-out front door: the Place launch funnel, with the existing
+ * auth flow shown over it for sign-in / account creation (W6). Once the
+ * session flips to signed-in, the parent swaps in [RootTabScreen] and the
+ * stashed place is saved by [HomeTabHostViewModel].
+ */
+@Composable
+private fun PlaceLaunchHost() {
+    var showAuth by remember { mutableStateOf(false) }
+    if (showAuth) {
+        AuthNavHost()
+    } else {
+        app.pantopus.android.ui.screens.place.launch.PlaceLaunchScreen(
+            onSignIn = { showAuth = true },
+            onCreateAccount = { showAuth = true },
+        )
     }
 }
 
