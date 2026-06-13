@@ -145,6 +145,16 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SchedulingPollVote_option_id_fkey') THEN
     ALTER TABLE "public"."SchedulingPollVote" ADD CONSTRAINT "SchedulingPollVote_option_id_fkey" FOREIGN KEY ("option_id") REFERENCES "public"."SchedulingPollOption"("id") ON DELETE CASCADE;
   END IF;
+  -- created_by / finalized_booking_id integrity (match the pattern used by other tables).
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'MessageTemplate_created_by_fkey') THEN
+    ALTER TABLE "public"."MessageTemplate" ADD CONSTRAINT "MessageTemplate_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."User"("id") ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SchedulingPoll_created_by_fkey') THEN
+    ALTER TABLE "public"."SchedulingPoll" ADD CONSTRAINT "SchedulingPoll_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."User"("id") ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SchedulingPoll_finalized_booking_id_fkey') THEN
+    ALTER TABLE "public"."SchedulingPoll" ADD CONSTRAINT "SchedulingPoll_finalized_booking_id_fkey" FOREIGN KEY ("finalized_booking_id") REFERENCES "public"."Booking"("id") ON DELETE SET NULL;
+  END IF;
 END $$;
 
 -- ============================================================

@@ -68,7 +68,12 @@ async function redeemForBooking({ bookingId, creditId, userId }) {
     .eq('remaining', credit.remaining)
     .select('id');
   if (!dec || !dec.length) return { success: false, error: 'REDEEM_CONFLICT', message: 'Please try again.' };
-  await supabaseAdmin.from('Booking').update({ package_credit_id: creditId }).eq('id', bookingId);
+  const { data: linked, error: bErr } = await supabaseAdmin.from('Booking').update({ package_credit_id: creditId }).eq('id', bookingId).select('id');
+  if (bErr || !linked || !linked.length) {
+    // Booking gone/modified — restore the credit we just decremented so it isn't lost.
+    await supabaseAdmin.from('PackageCredit').update({ remaining: credit.remaining }).eq('id', creditId);
+    return { success: false, error: 'BOOKING_UPDATE_FAILED', message: 'Could not apply the credit.' };
+  }
   return { success: true, remaining: credit.remaining - 1 };
 }
 
