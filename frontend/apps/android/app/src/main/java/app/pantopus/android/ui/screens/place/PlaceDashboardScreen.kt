@@ -45,6 +45,7 @@ import app.pantopus.android.ui.screens.place.components.PlaceGroupLabel
 import app.pantopus.android.ui.screens.place.components.PlaceHeroCard
 import app.pantopus.android.ui.screens.place.components.PlaceLockedCard
 import app.pantopus.android.ui.screens.place.components.PlaceVerifiedAvatar
+import app.pantopus.android.ui.screens.place.messaging.PlaceMessagesActionRow
 import app.pantopus.android.ui.screens.place.verify.PlaceVerifyMethod
 import app.pantopus.android.ui.screens.place.verify.PlaceVerifySheet
 import app.pantopus.android.ui.theme.PantopusColors
@@ -63,6 +64,7 @@ const val PLACE_DASHBOARD_HOME_ID_KEY = "homeId"
  * Parity twin of iOS `PlaceDashboardView`.
  */
 @Composable
+@Suppress("LongParameterList")
 fun PlaceDashboardScreen(
     homeId: String,
     onOpenSection: (homeId: String, slug: String) -> Unit,
@@ -70,6 +72,8 @@ fun PlaceDashboardScreen(
     onAddPlace: () -> Unit,
     onStartVerify: (method: PlaceVerifyMethod, address: String) -> Unit,
     onOpenPulse: () -> Unit,
+    onComposeMessage: (address: String) -> Unit,
+    onOpenInbox: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PlaceDashboardViewModel = hiltViewModel(key = "place-$homeId"),
 ) {
@@ -91,6 +95,8 @@ fun PlaceDashboardScreen(
                     onVerify = { showVerify = true },
                     onOpenDetail = { group -> onOpenSection(homeId, group.slug) },
                     onOpenPulse = onOpenPulse,
+                    onComposeMessage = onComposeMessage,
+                    onOpenInbox = onOpenInbox,
                 )
         }
     }
@@ -123,6 +129,7 @@ fun PlaceDashboardScreen(
 }
 
 @Composable
+@Suppress("LongParameterList")
 internal fun PlaceDashboardContent(
     intel: PlaceIntelligence,
     onOpenAvatar: () -> Unit,
@@ -130,6 +137,8 @@ internal fun PlaceDashboardContent(
     onOpenDetail: (PlaceDetailGroup) -> Unit,
     modifier: Modifier = Modifier,
     onOpenPulse: () -> Unit = {},
+    onComposeMessage: (address: String) -> Unit = {},
+    onOpenInbox: () -> Unit = {},
 ) {
     val isVerified = intel.tier == PlaceTier.T4
     val isClaimed = intel.tier == PlaceTier.T3
@@ -168,6 +177,16 @@ internal fun PlaceDashboardContent(
             )
         }
         item { Spacer(modifier = Modifier.height(20.dp)) }
+        if (isVerified) {
+            item {
+                PlaceMessagesEntry(
+                    address = intel.place.label,
+                    onComposeMessage = onComposeMessage,
+                    onOpenInbox = onOpenInbox,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp),
+                )
+            }
+        }
         items(items = intel.groups, key = { it.group }) { group ->
             PlaceGroupBlockView(
                 group = group,
@@ -207,6 +226,33 @@ private fun PlaceGroupBlockView(
                     onClaim = onVerify,
                 )
             }
+        }
+    }
+}
+
+// W7 — verified-neighbor messaging entry (verified residents only).
+@Composable
+private fun PlaceMessagesEntry(
+    address: String,
+    onComposeMessage: (address: String) -> Unit,
+    onOpenInbox: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        PlaceGroupLabel(text = "Verified neighbors")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PlaceMessagesActionRow(
+                icon = PantopusIcon.MessageSquarePlus,
+                title = "Message a neighbor",
+                subtitle = "Send a verified heads-up to a home on your block.",
+                onTap = { onComposeMessage(address) },
+            )
+            PlaceMessagesActionRow(
+                icon = PantopusIcon.Inbox,
+                title = "Your inbox",
+                subtitle = "Heads-ups from verified neighbors nearby.",
+                onTap = onOpenInbox,
+            )
         }
     }
 }

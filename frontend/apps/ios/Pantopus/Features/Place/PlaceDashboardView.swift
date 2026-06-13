@@ -108,6 +108,9 @@ struct PlaceDashboardView: View {
                 .padding(.top, isClaimed ? 12 : 14)
 
                 VStack(spacing: 24) {
+                    if isVerified {
+                        messagesEntry(address: intel.place.label)
+                    }
                     ForEach(intel.groups, id: \.group) { group in
                         groupBlock(group)
                     }
@@ -169,6 +172,27 @@ struct PlaceDashboardView: View {
                         onClaim: { showVerify = true }
                     )
                 }
+            }
+        }
+    }
+
+    // W7 — verified-neighbor messaging entry (verified residents only).
+    private func messagesEntry(address: String) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            PlaceGroupLabel(text: "Verified neighbors")
+            VStack(spacing: 8) {
+                PlaceMessagesActionRow(
+                    icon: .messageSquarePlus,
+                    title: "Message a neighbor",
+                    subtitle: "Send a verified heads-up to a home on your block.",
+                    onTap: { viewModel.onComposeMessage(address) }
+                )
+                PlaceMessagesActionRow(
+                    icon: .inbox,
+                    title: "Your inbox",
+                    subtitle: "Heads-ups from verified neighbors nearby.",
+                    onTap: { viewModel.onOpenInbox() }
+                )
             }
         }
     }

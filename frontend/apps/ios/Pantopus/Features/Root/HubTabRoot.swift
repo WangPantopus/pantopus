@@ -282,6 +282,14 @@ public enum HubRoute: Hashable {
     /// W5 — the verify status screen (B2 pending → B3 success / B4 failed)
     /// after a method is chosen in the verify sheet.
     case placeVerifyStatus(homeId: String, method: PlaceVerifyMethod, address: String)
+    /// W7 D1 — compose a template-only heads-up to a verified neighbor on
+    /// your block. `recipient` is nil when opened without a chosen home
+    /// (the "choose a neighbor" empty state).
+    case neighborCompose(homeId: String, address: String, recipient: ComposeRecipient?)
+    /// W7 — the verified-neighbor inbox list (received heads-ups).
+    case neighborInbox
+    /// W7 D2 — a single received verified-neighbor message.
+    case neighborMessage(messageId: String)
     /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
     /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
@@ -2226,6 +2234,10 @@ public struct HubTabRoot: View {
                     onStartVerify: { method, address in
                         push(.placeVerifyStatus(homeId: homeId, method: method, address: address))
                     },
+                    onComposeMessage: { address in
+                        push(.neighborCompose(homeId: homeId, address: address, recipient: nil))
+                    },
+                    onOpenInbox: { push(.neighborInbox) },
                     onOpenHubHome: {}
                 )
             )
@@ -2252,6 +2264,28 @@ public struct HubTabRoot: View {
                 }
             )
             .id(homeId)
+        case let .neighborCompose(homeId, address, recipient):
+            NeighborMessageComposeView(
+                viewModel: NeighborMessageComposeViewModel(
+                    senderHomeId: homeId,
+                    address: address,
+                    recipient: recipient
+                ),
+                onBack: { pop() },
+                onChangeRecipient: { pop() },
+                onDone: { pop() }
+            )
+        case .neighborInbox:
+            NeighborMessageInboxView(
+                viewModel: NeighborMessageInboxViewModel(),
+                onBack: { pop() },
+                onOpenMessage: { messageId in push(.neighborMessage(messageId: messageId)) }
+            )
+        case let .neighborMessage(messageId):
+            NeighborMessageReceivedView(
+                viewModel: NeighborMessageReceivedViewModel(messageId: messageId),
+                onBack: { pop() }
+            )
         #if DEBUG
         case .tokenGallery: TokenGalleryView()
         case .iconGallery: IconGalleryView()
