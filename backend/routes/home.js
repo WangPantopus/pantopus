@@ -5022,7 +5022,58 @@ router.get('/:id/events', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch events' });
     }
 
-    res.json({ events: data || [] });
+    const events = data || [];
+
+    // Calendarly: union confirmed/pending home bookings onto the household calendar.
+    // Query-time union — bookings are never copied into HomeCalendarEvent — so the calendar
+    // always reflects the live booking state. Degrades gracefully if scheduling tables are absent.
+    try {
+      let bq = supabaseAdmin
+        .from('Booking')
+        .select('id, home_id, event_type_id, resource_id, host_user_id, invitee_name, start_at, end_at, status, location_detail, created_by')
+        .eq('owner_type', 'home')
+        .eq('owner_id', homeId)
+        .in('status', ['pending', 'confirmed']);
+      if (start_after) bq = bq.gte('start_at', start_after);
+      if (start_before) bq = bq.lte('start_at', start_before);
+      const { data: bookings } = await bq;
+
+      if (bookings && bookings.length) {
+        const etIds = [...new Set(bookings.map((b) => b.event_type_id).filter(Boolean))];
+        const etNames = {};
+        if (etIds.length) {
+          const { data: ets } = await supabaseAdmin.from('EventType').select('id, name').in('id', etIds);
+          for (const et of ets || []) etNames[et.id] = et.name;
+        }
+        for (const b of bookings) {
+          const baseTitle = b.event_type_id ? etNames[b.event_type_id] || 'Appointment' : 'Resource booking';
+          events.push({
+            id: b.id,
+            home_id: b.home_id,
+            event_type: b.resource_id ? 'resource_booking' : 'appointment',
+            title: b.invitee_name ? `${baseTitle} — ${b.invitee_name}` : baseTitle,
+            description: null,
+            start_at: b.start_at,
+            end_at: b.end_at,
+            location_notes: b.location_detail || null,
+            recurrence_rule: null,
+            assigned_to: b.host_user_id ? [b.host_user_id] : null,
+            alerts_enabled: true,
+            created_by: b.created_by,
+            visibility: 'members',
+            // Calendarly markers (extra fields; clients that don't read them ignore these):
+            source: 'booking',
+            booking_id: b.id,
+            booking_status: b.status,
+          });
+        }
+        events.sort((a, b2) => new Date(a.start_at) - new Date(b2.start_at));
+      }
+    } catch (unionErr) {
+      logger.warn('[home events] booking union skipped', { error: unionErr.message, homeId });
+    }
+
+    res.json({ events });
   } catch (err) {
     logger.error('Events fetch error', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch events' });

@@ -118,6 +118,25 @@ describe('bookingService.pickRoundRobinHost (fair rotation)', () => {
   });
 });
 
+describe('bookingService.createResourceBooking guards', () => {
+  const bookingService = require('../../services/scheduling/bookingService');
+  beforeEach(() => resetTables());
+
+  it('rejects a duration exceeding the resource max', async () => {
+    const resource = { id: 'r1', home_id: 'h1', max_duration_min: 30, buffer_min: 0, requires_approval: false };
+    await expect(
+      bookingService.createResourceBooking({ resource, startIso: '2026-07-02T10:00:00Z', durationMin: 60, booker: { id: 'u1' } })
+    ).rejects.toMatchObject({ code: 'DURATION_TOO_LONG', statusCode: 400 });
+  });
+
+  it('rejects an invalid start time', async () => {
+    const resource = { id: 'r1', home_id: 'h1', buffer_min: 0 };
+    await expect(
+      bookingService.createResourceBooking({ resource, startIso: 'not-a-date', booker: { id: 'u1' } })
+    ).rejects.toMatchObject({ code: 'BAD_START' });
+  });
+});
+
 describe('bookingService.isOverlapViolation', () => {
   const bookingService = require('../../services/scheduling/bookingService');
   it('detects the exclusion-constraint SQLSTATE and constraint name', () => {

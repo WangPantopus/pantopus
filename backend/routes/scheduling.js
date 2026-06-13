@@ -601,6 +601,26 @@ router.post('/bookings/:id/reschedule', validate(actionSchema), asyncHandler((re
 router.post('/bookings/:id/no-show', asyncHandler((req, res) => lifecycleHandler(req, res, (b) => bookingService.markNoShow(b.id, req.user.id))));
 router.post('/bookings/:id/reassign', validate(actionSchema), asyncHandler((req, res) => lifecycleHandler(req, res, (b) => bookingService.reassignBooking(b.id, req.user.id, req.body.host_user_id))));
 
+// RSVP — attendee self-service (not owner-gated): the signed-in user updates their own response.
+const rsvpSchema = Joi.object({ status: Joi.string().valid('going', 'maybe', 'declined', 'pending').required() });
+router.post('/bookings/:id/rsvp', validate(rsvpSchema), asyncHandler(async (req, res) => {
+  const { data: attendee } = await supabaseAdmin
+    .from('BookingAttendee')
+    .select('id')
+    .eq('booking_id', req.params.id)
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (!attendee) return res.status(403).json({ error: 'NOT_AN_ATTENDEE', message: 'You are not an attendee of this booking.' });
+  const { data, error } = await supabaseAdmin
+    .from('BookingAttendee')
+    .update({ rsvp_status: req.body.status })
+    .eq('id', attendee.id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  res.json({ attendee: data });
+}));
+
 // ============================================================
 // HOME — find-a-time, who's-free, resources (home owner_type only)
 // ============================================================
@@ -748,6 +768,40 @@ router.delete('/resources/:rid', withOwner('edit'), asyncHandler(async (req, res
   requireHome(req);
   await supabaseAdmin.from('HomeResource').update({ is_active: false }).eq('id', req.params.rid).eq('home_id', req.scheduling.ownerId);
   res.json({ ok: true });
+}));
+
+const resourceBookSchema = Joi.object({
+  owner_type: Joi.string().valid('home'),
+  owner_id: Joi.string(),
+  start_at: Joi.string().isoDate().required(),
+  duration_min: Joi.number().integer().min(5).max(1440),
+  name: Joi.string().max(200).allow('', null),
+});
+
+// Book a resource. withOwner('view') gates on an active home member (who_can_book='members').
+// NOTE: 'specific'/'guests' policies are a follow-up; v1 allows active members.
+router.post('/resources/:rid/book', withOwner('view'), validate(resourceBookSchema), asyncHandler(async (req, res) => {
+  requireHome(req);
+  const { data: resource } = await supabaseAdmin
+    .from('HomeResource')
+    .select('*')
+    .eq('id', req.params.rid)
+    .eq('home_id', req.scheduling.ownerId)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (!resource) return res.status(404).json({ error: 'RESOURCE_NOT_FOUND' });
+  try {
+    const booking = await bookingService.createResourceBooking({
+      resource,
+      startIso: req.body.start_at,
+      durationMin: req.body.duration_min,
+      booker: { id: req.user.id, name: req.body.name || null, email: req.user.email },
+    });
+    res.status(201).json({ booking });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.code || 'ERROR', message: err.message });
+    throw err;
+  }
 }));
 
 module.exports = router;
