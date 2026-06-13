@@ -29,6 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -71,6 +76,7 @@ import coil.compose.AsyncImage
  * suppressed for Rentals / Free per design. Compose FAB is identity-
  * business violet.
  */
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun MarketplaceScreen(
     onOpenListing: (String) -> Unit = {},
@@ -81,8 +87,17 @@ fun MarketplaceScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeCategory by viewModel.activeCategory.collectAsStateWithLifecycle()
     val searchText by viewModel.searchText.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
+    // Re-fires when popping back from the compose wizard or a listing
+    // detail — refresh so a just-posted listing appears (iOS onAppear).
     LaunchedEffect(Unit) { viewModel.load() }
+
+    val pullState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = viewModel::refresh)
+    // Cold first load shimmers the whole chrome (A08 loading frame);
+    // later loads keep the search bar + chips live.
+    val isInitialLoading = state is MarketplaceUiState.Loading && !viewModel.hasLoadedOnce
 
     Box(
         modifier =
@@ -93,17 +108,40 @@ fun MarketplaceScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             MarketTopBar(onBack = onBack)
-            MarketSearchBar(
-                text = searchText,
-                onTextChange = viewModel::setSearchText,
-                onSubmit = viewModel::submitSearch,
-            )
-            MarketCategoryChips(active = activeCategory, onSelect = viewModel::selectCategory)
-            when (val s = state) {
-                is MarketplaceUiState.Loading -> LoadingFrame()
-                is MarketplaceUiState.Empty -> EmptyFrame(radiusMiles = s.radiusMiles, onCompose = onCompose)
-                is MarketplaceUiState.Loaded -> PopulatedFrame(rows = s.rows, onOpen = onOpenListing)
-                is MarketplaceUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
+            if (isInitialLoading) {
+                MarketplaceChromeSkeleton()
+            } else {
+                MarketSearchBar(
+                    text = searchText,
+                    onTextChange = viewModel::setSearchText,
+                    onSubmit = viewModel::submitSearch,
+                )
+                MarketCategoryChips(active = activeCategory, onSelect = viewModel::selectCategory)
+            }
+            Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
+                when (val s = state) {
+                    is MarketplaceUiState.Loading -> LoadingFrame()
+                    is MarketplaceUiState.Empty ->
+                        EmptyFrame(
+                            radiusMiles = s.radiusMiles,
+                            canWiden = viewModel.canWidenRadius,
+                            onWiden = viewModel::widenRadius,
+                            onCompose = onCompose,
+                        )
+                    is MarketplaceUiState.Loaded ->
+                        PopulatedFrame(
+                            rows = s.rows,
+                            isLoadingMore = isLoadingMore,
+                            onOpen = onOpenListing,
+                            onItemVisible = viewModel::loadMoreIfNeeded,
+                        )
+                    is MarketplaceUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
+                }
+                PullRefreshIndicator(
+                    refreshing = isRefreshing,
+                    state = pullState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
             }
         }
         ComposeFab(
@@ -301,6 +339,33 @@ private fun ComposeFab(
 
 // MARK: - Frames
 
+/**
+ * A08 cold-load frame — the search bar and chip row shimmer together
+ * with the grid until the first fetch completes. Mirrors iOS
+ * `MarketplaceChromeSkeleton`.
+ */
+@Composable
+internal fun MarketplaceChromeSkeleton() {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Shimmer(
+            height = 44.dp,
+            cornerRadius = Radii.lg,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            listOf(50, 64, 76, 60, 84).forEach { width ->
+                Shimmer(width = width.dp, height = 28.dp, cornerRadius = Radii.pill)
+            }
+        }
+    }
+}
+
 @Composable
 internal fun LoadingFrame() {
     LazyVerticalGrid(
@@ -317,6 +382,8 @@ internal fun LoadingFrame() {
 @Composable
 internal fun EmptyFrame(
     radiusMiles: Double,
+    canWiden: Boolean,
+    onWiden: () -> Unit,
     onCompose: () -> Unit,
 ) {
     Column(
@@ -389,12 +456,21 @@ internal fun EmptyFrame(
             )
         }
         Spacer(modifier = Modifier.size(Spacing.s4))
-        RadiusHintPill(radiusMiles = radiusMiles)
+        WidenRadiusPill(radiusMiles = radiusMiles, canWiden = canWiden, onWiden = onWiden)
     }
 }
 
+/**
+ * Tappable radius pill — widens 2 → 5 → 10 → 25 mi and refetches.
+ * Inert with a "max radius" caption at the 25 mi ceiling. Mirrors the
+ * iOS `marketplaceWidenRadius` control.
+ */
 @Composable
-private fun RadiusHintPill(radiusMiles: Double) {
+private fun WidenRadiusPill(
+    radiusMiles: Double,
+    canWiden: Boolean,
+    onWiden: () -> Unit,
+) {
     val label =
         if (radiusMiles % 1.0 == 0.0) {
             "${radiusMiles.toInt()} mi"
@@ -407,8 +483,9 @@ private fun RadiusHintPill(radiusMiles: Double) {
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                .clickable(enabled = canWiden, onClick = onWiden)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
-                .testTag("marketplaceEmptyRadiusPill"),
+                .testTag("marketplaceWidenRadius"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -430,9 +507,9 @@ private fun RadiusHintPill(radiusMiles: Double) {
             color = PantopusColors.appTextStrong,
         )
         Text(
-            text = " · widen in filter",
+            text = if (canWiden) " · tap to widen" else " · max radius",
             fontSize = 11.5.sp,
-            color = PantopusColors.appTextSecondary,
+            color = if (canWiden) PantopusColors.primary600 else PantopusColors.appTextSecondary,
         )
     }
 }
@@ -440,7 +517,9 @@ private fun RadiusHintPill(radiusMiles: Double) {
 @Composable
 internal fun PopulatedFrame(
     rows: List<MarketplaceCardContent>,
+    isLoadingMore: Boolean,
     onOpen: (String) -> Unit,
+    onItemVisible: (String) -> Unit = {},
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -451,6 +530,12 @@ internal fun PopulatedFrame(
     ) {
         items(items = rows, key = { it.id }) { row ->
             ListingCard(content = row, onClick = { onOpen(row.id) })
+            // Composes when the card nears the viewport — load-more
+            // trigger for the last few rows (iOS onAppear parity).
+            LaunchedEffect(row.id) { onItemVisible(row.id) }
+        }
+        if (isLoadingMore) {
+            items(2) { ListingSkeletonCard() }
         }
     }
 }

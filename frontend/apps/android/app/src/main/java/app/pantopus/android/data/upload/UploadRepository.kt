@@ -1,7 +1,8 @@
 package app.pantopus.android.data.upload
 
-import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.AIMediaUploadResponse
+import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
+import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
 import app.pantopus.android.data.api.models.posts.PostMediaUploadResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
@@ -63,6 +64,23 @@ class UploadRepository
                         )
                     }
                 uploadApi.uploadAIMedia(parts)
+            }
+
+        /** Snap & Sell — attach local photos to a just-created/edited listing. */
+        suspend fun uploadListingMedia(
+            listingId: String,
+            files: List<UploadFile>,
+        ): NetworkResult<ListingMediaUploadResponse> =
+            safeApiCall {
+                val parts =
+                    files.map { file ->
+                        MultipartBody.Part.createFormData(
+                            name = "files",
+                            filename = file.filename,
+                            body = file.bytes.toRequestBody(file.mimeType.toMediaTypeOrNull()),
+                        )
+                    }
+                uploadApi.uploadListingMedia(listingId, parts)
             }
     }
 

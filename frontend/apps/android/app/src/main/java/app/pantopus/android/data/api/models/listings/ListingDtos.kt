@@ -184,6 +184,17 @@ data class UpdateListingResponse(
     val listing: ListingDto,
 )
 
+/**
+ * Envelope from `POST /api/upload/listing-media/:listingId` — hosted
+ * URLs for the photos just attached. Route `backend/routes/upload.js:1049`.
+ */
+@JsonClass(generateAdapter = true)
+data class ListingMediaUploadResponse(
+    val message: String? = null,
+    @Json(name = "media_urls") val mediaUrls: List<String> = emptyList(),
+    @Json(name = "media_types") val mediaTypes: List<String>? = null,
+)
+
 /** `POST /api/listings/:id/message` body. */
 @JsonClass(generateAdapter = true)
 data class MessageListingBody(

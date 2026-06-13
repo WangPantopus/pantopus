@@ -45,14 +45,14 @@ class MarketplaceSnapshotTest {
     @Test
     fun marketplace_populated_grid_with_free_and_rental_and_condition_badge() {
         paparazzi.snapshot {
-            Frame { PopulatedFrame(rows = populatedRows(), onOpen = {}) }
+            Frame { PopulatedFrame(rows = populatedRows(), isLoadingMore = false, onOpen = {}) }
         }
     }
 
     @Test
     fun marketplace_empty_with_radius_hint() {
         paparazzi.snapshot {
-            Frame { EmptyFrame(radiusMiles = 2.0, onCompose = {}) }
+            Frame { EmptyFrame(radiusMiles = 2.0, canWiden = true, onWiden = {}, onCompose = {}) }
         }
     }
 

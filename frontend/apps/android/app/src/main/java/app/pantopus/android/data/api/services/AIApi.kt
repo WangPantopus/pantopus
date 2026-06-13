@@ -1,8 +1,11 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.ai.AIConversationsResponse
+import app.pantopus.android.data.api.models.ai.AIDraftListingVisionRequest
+import app.pantopus.android.data.api.models.ai.AIListingVisionResponse
 import app.pantopus.android.data.api.models.ai.TranscriptionResponse
 import okhttp3.MultipartBody
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -30,4 +33,13 @@ interface AIApi {
     suspend fun transcribe(
         @Part audio: MultipartBody.Part,
     ): TranscriptionResponse
+
+    /**
+     * A12.9 Snap & Sell — draft listing fields from up to five base64
+     * data-URL photos. Route `backend/routes/ai.js:199`.
+     */
+    @POST("api/ai/draft/listing-vision")
+    suspend fun draftListingVision(
+        @Body body: AIDraftListingVisionRequest,
+    ): AIListingVisionResponse
 }
