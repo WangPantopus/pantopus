@@ -460,6 +460,9 @@ public struct HubTabRoot: View {
             // stays the stack root (reachable via back-swipe) and the
             // no-home fallback.
             guard path.isEmpty, router.pending == nil, !didAutoLandPlace else { return }
+            // W6 — save the place a stranger looked up before signing up
+            // (one-shot), then land on it.
+            await Self.savePendingPlaceIfNeeded()
             if let homeId = await Self.primaryHomeId() {
                 didAutoLandPlace = true
                 path.append(.placeDashboard(homeId: homeId))
@@ -2255,6 +2258,23 @@ public struct HubTabRoot: View {
         case .componentGallery: ComponentGalleryView()
         #endif
         }
+    }
+
+    /// W6 — create the home a stranger looked up in the signed-out funnel
+    /// (stashed in `PlacePendingStore`) once they have an account. Best
+    /// effort: DPV validation may reject it; the resident can re-add it.
+    private static func savePendingPlaceIfNeeded() async {
+        guard let pending = PlacePendingStore.take(), !pending.street.isEmpty else { return }
+        let request = CreateHomeRequest(
+            address: pending.street,
+            city: pending.city,
+            state: pending.state,
+            zipCode: pending.zip,
+            latitude: pending.latitude,
+            longitude: pending.longitude,
+            homeType: "house"
+        )
+        _ = try? await APIClient.shared.request(HomesEndpoints.create(request)) as CreateHomeResponse
     }
 
     /// W3 — the primary home id used to auto-land the Home tab on Place.

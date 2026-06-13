@@ -86,7 +86,7 @@ struct RootView: View {
             case .unknown:
                 SplashView()
             case .signedOut:
-                LoginView()
+                PlaceLaunchHost()
             case .signedIn:
                 RootTabView()
             }
