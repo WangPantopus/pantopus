@@ -5026,8 +5026,11 @@ router.get('/:id/events', verifyToken, async (req, res) => {
 
     // Calendarly: union confirmed/pending home bookings onto the household calendar.
     // Query-time union — bookings are never copied into HomeCalendarEvent — so the calendar
-    // always reflects the live booking state. Degrades gracefully if scheduling tables are absent.
+    // always reflects the live booking state. Gated on calendar.view (matching the Booking RLS)
+    // so the booking layer is not exposed more broadly than the existing event access.
+    // Degrades gracefully if scheduling tables are absent.
     try {
+      const calAccess = await checkHomePermission(homeId, userId, 'calendar.view');
       let bq = supabaseAdmin
         .from('Booking')
         .select('id, home_id, event_type_id, resource_id, host_user_id, invitee_name, start_at, end_at, status, location_detail, created_by')
@@ -5036,7 +5039,7 @@ router.get('/:id/events', verifyToken, async (req, res) => {
         .in('status', ['pending', 'confirmed']);
       if (start_after) bq = bq.gte('start_at', start_after);
       if (start_before) bq = bq.lte('start_at', start_before);
-      const { data: bookings } = await bq;
+      const { data: bookings } = calAccess.hasAccess ? await bq : { data: [] };
 
       if (bookings && bookings.length) {
         const etIds = [...new Set(bookings.map((b) => b.event_type_id).filter(Boolean))];

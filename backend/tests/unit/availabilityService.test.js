@@ -119,6 +119,23 @@ describe('memberFreeIntervals — buffer math', () => {
     expect(DateTime.fromMillis(first.end, { zone: 'utc' }).toFormat('HH:mm')).toBe('11:45');
     expect(DateTime.fromMillis(second.start, { zone: 'utc' }).toFormat('HH:mm')).toBe('13:15');
   });
+
+  it('buffer padding is ASYMMETRIC and correct (before=30/after=0) — guards against re-introducing the swap', () => {
+    // A candidate placed BEFORE busy needs its AFTER buffer (0) to clear -> free runs to busy.start (12:00).
+    // A candidate placed AFTER busy needs its BEFORE buffer (30) to clear -> free resumes at busy.end+30 (13:30).
+    const schedule = {
+      timezone: 'UTC',
+      rules: [{ weekday: 1, start_time: '09:00:00', end_time: '17:00:00' }],
+      overrides: [],
+    };
+    const busy = [{ start: utc('2026-07-06T12:00:00Z'), end: utc('2026-07-06T13:00:00Z') }];
+    const eventType = { buffer_before_min: 30, buffer_after_min: 0, default_duration: 30 };
+    const free = memberFreeIntervals({ schedule, busy, eventType }, utc('2026-07-06T00:00:00Z'), utc('2026-07-07T00:00:00Z'));
+    const first = free.find((iv) => DateTime.fromMillis(iv.start, { zone: 'utc' }).hour === 9);
+    const second = free.find((iv) => DateTime.fromMillis(iv.start, { zone: 'utc' }).hour >= 12);
+    expect(DateTime.fromMillis(first.end, { zone: 'utc' }).toFormat('HH:mm')).toBe('12:00'); // after-buffer = 0
+    expect(DateTime.fromMillis(second.start, { zone: 'utc' }).toFormat('HH:mm')).toBe('13:30'); // before-buffer = 30
+  });
 });
 
 describe('expandRecurrence', () => {
