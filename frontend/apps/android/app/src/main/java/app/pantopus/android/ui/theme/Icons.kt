@@ -125,6 +125,7 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MarkAsUnread
 import androidx.compose.material.icons.filled.MarkEmailRead
@@ -434,6 +435,7 @@ enum class PantopusIcon(
     CloudOff("cloud-off"),
     Cloud("cloud"),
     Sunset("sunset"),
+    FileSearch("file-search"),
     Flower2("flower-2"),
     Trash("trash"),
     ZapOff("zap-off"),
@@ -813,6 +815,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.CloudOff -> IconSource.Material(Icons.Filled.CloudOff)
         PantopusIcon.Cloud -> IconSource.Material(Icons.Filled.Cloud)
         PantopusIcon.Sunset -> IconSource.Material(Icons.Filled.WbTwilight)
+        PantopusIcon.FileSearch -> IconSource.Material(Icons.Filled.ManageSearch)
         PantopusIcon.Flower2 -> IconSource.Material(Icons.Filled.LocalFlorist)
         PantopusIcon.Trash -> IconSource.Material(Icons.Filled.Delete)
         PantopusIcon.ZapOff -> IconSource.Material(Icons.Filled.FlashOff)

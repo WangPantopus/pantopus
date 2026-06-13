@@ -16,9 +16,15 @@ import SwiftUI
 struct PlaceDashboardView: View {
     @State private var viewModel: PlaceDashboardViewModel
     @State private var showSwitcher = false
+    @State private var showVerify = false
 
     init(viewModel: PlaceDashboardViewModel) {
         _viewModel = State(initialValue: viewModel)
+    }
+
+    private var verifyAddress: String {
+        if case let .loaded(intel) = viewModel.state { return intel.place.label }
+        return ""
     }
 
     var body: some View {
@@ -57,6 +63,18 @@ struct PlaceDashboardView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.hidden)
         }
+        .sheet(isPresented: $showVerify) {
+            PlaceVerifySheet(
+                address: verifyAddress,
+                onStart: { method in
+                    showVerify = false
+                    viewModel.onStartVerify(method, verifyAddress)
+                },
+                onClose: { showVerify = false }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.hidden)
+        }
     }
 
     // MARK: - Loaded
@@ -72,7 +90,7 @@ struct PlaceDashboardView: View {
                     .padding(.top, Spacing.s2)
 
                 if isClaimed {
-                    PlaceVerifyBanner { viewModel.onVerify() }
+                    PlaceVerifyBanner { showVerify = true }
                         .padding(.horizontal, 16)
                         .padding(.top, Spacing.s4)
                 }
@@ -147,8 +165,8 @@ struct PlaceDashboardView: View {
                     PlaceSectionView(
                         env: section,
                         onOpen: detail.map { d in { viewModel.onOpenDetail(d) } },
-                        onVerify: { viewModel.onVerify() },
-                        onClaim: { viewModel.onVerify() }
+                        onVerify: { showVerify = true },
+                        onClaim: { showVerify = true }
                     )
                 }
             }
@@ -165,7 +183,7 @@ struct PlaceDashboardView: View {
                         title: item.title,
                         reason: item.reason,
                         cta: "Verify address",
-                        onTap: { viewModel.onVerify() }
+                        onTap: { showVerify = true }
                     )
                 }
             }

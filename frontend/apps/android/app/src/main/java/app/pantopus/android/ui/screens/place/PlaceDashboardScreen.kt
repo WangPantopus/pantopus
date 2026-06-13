@@ -45,6 +45,8 @@ import app.pantopus.android.ui.screens.place.components.PlaceGroupLabel
 import app.pantopus.android.ui.screens.place.components.PlaceHeroCard
 import app.pantopus.android.ui.screens.place.components.PlaceLockedCard
 import app.pantopus.android.ui.screens.place.components.PlaceVerifiedAvatar
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifyMethod
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifySheet
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -66,7 +68,7 @@ fun PlaceDashboardScreen(
     onOpenSection: (homeId: String, slug: String) -> Unit,
     onSwitchHome: (homeId: String) -> Unit,
     onAddPlace: () -> Unit,
-    onVerify: (homeId: String) -> Unit,
+    onStartVerify: (method: PlaceVerifyMethod, address: String) -> Unit,
     onOpenPulse: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PlaceDashboardViewModel = hiltViewModel(key = "place-$homeId"),
@@ -75,6 +77,8 @@ fun PlaceDashboardScreen(
     LaunchedEffect(homeId) { viewModel.load(homeId) }
 
     var showSwitcher by remember { mutableStateOf(false) }
+    var showVerify by remember { mutableStateOf(false) }
+    val verifyAddress = (state as? PlaceDashboardUiState.Loaded)?.intelligence?.place?.label.orEmpty()
 
     Box(modifier = modifier.fillMaxSize().background(PantopusColors.appBg)) {
         when (val current = state) {
@@ -84,11 +88,22 @@ fun PlaceDashboardScreen(
                 PlaceDashboardContent(
                     intel = current.intelligence,
                     onOpenAvatar = { showSwitcher = true },
-                    onVerify = { onVerify(homeId) },
+                    onVerify = { showVerify = true },
                     onOpenDetail = { group -> onOpenSection(homeId, group.slug) },
                     onOpenPulse = onOpenPulse,
                 )
         }
+    }
+
+    if (showVerify) {
+        PlaceVerifySheet(
+            address = verifyAddress,
+            onStart = { method ->
+                showVerify = false
+                onStartVerify(method, verifyAddress)
+            },
+            onDismiss = { showVerify = false },
+        )
     }
 
     if (showSwitcher) {

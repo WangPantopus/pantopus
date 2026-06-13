@@ -31,7 +31,8 @@ final class PlaceDashboardViewModel {
     let onSelectHome: (String) -> Void
     /// Claim/verify another address (the switcher's "Add a place").
     let onAddPlace: () -> Void
-    let onVerify: () -> Void
+    /// Begin verification with the chosen method + address (pushes B2).
+    let onStartVerify: (PlaceVerifyMethod, String) -> Void
     let onOpenHubHome: () -> Void
 
     init(
@@ -41,7 +42,7 @@ final class PlaceDashboardViewModel {
         onOpenPulse: @escaping () -> Void = {},
         onSelectHome: @escaping (String) -> Void = { _ in },
         onAddPlace: @escaping () -> Void = {},
-        onVerify: @escaping () -> Void = {},
+        onStartVerify: @escaping (PlaceVerifyMethod, String) -> Void = { _, _ in },
         onOpenHubHome: @escaping () -> Void = {}
     ) {
         self.homeId = homeId
@@ -50,7 +51,7 @@ final class PlaceDashboardViewModel {
         self.onOpenPulse = onOpenPulse
         self.onSelectHome = onSelectHome
         self.onAddPlace = onAddPlace
-        self.onVerify = onVerify
+        self.onStartVerify = onStartVerify
         self.onOpenHubHome = onOpenHubHome
     }
 
