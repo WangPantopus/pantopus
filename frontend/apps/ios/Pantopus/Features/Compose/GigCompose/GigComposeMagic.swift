@@ -260,18 +260,17 @@ struct MagicDescribeStep: View {
         SubcopyBlock("Describe it in your own words. Pantopus figures out the category, fills in the details, and posts it for bids.")
         MagicDescribeCard(
             viewModel: viewModel,
-            isFocused: $isDescribeFocused,
-            onPickPhotos: { showsPhotosPicker = true }
-        )
-        .photosPicker(
-            isPresented: $showsPhotosPicker,
-            selection: $pickerItems,
-            maxSelectionCount: max(1, GigComposeLimits.maxPhotos - viewModel.attachments.count),
-            matching: .images
-        )
-        .onChange(of: pickerItems) { _, newItems in
-            handlePicked(newItems)
-        }
+            isFocused: $isDescribeFocused
+        ) { showsPhotosPicker = true }
+            .photosPicker(
+                isPresented: $showsPhotosPicker,
+                selection: $pickerItems,
+                maxSelectionCount: max(1, GigComposeLimits.maxPhotos - viewModel.attachments.count),
+                matching: .images
+            )
+            .onChange(of: pickerItems) { _, newItems in
+                handlePicked(newItems)
+            }
         if viewModel.form.describeText.isEmpty, !viewModel.templates.isEmpty {
             MagicTemplatesRow(templates: viewModel.templates) { template in
                 viewModel.applyTemplate(template)
@@ -539,7 +538,7 @@ private struct MagicDescribeCard: View {
                 .appendingPathComponent("gig-describe-\(UUID().uuidString).m4a")
             let settings: [String: Any] = [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 44_100,
+                AVSampleRateKey: 44100,
                 AVNumberOfChannelsKey: 1,
                 AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue
             ]
@@ -763,7 +762,7 @@ private struct ModulePromptRow: View {
                     color: prompt.isFilled ? Theme.Color.success : Theme.Color.warning
                 )
                 .frame(width: 28, height: 28)
-                .background((prompt.isFilled ? Theme.Color.successBg : Theme.Color.warningBg))
+                .background(prompt.isFilled ? Theme.Color.successBg : Theme.Color.warningBg)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(prompt.label)

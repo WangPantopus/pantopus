@@ -15,7 +15,7 @@ import Observation
 
 /// Parsed Open Graph metadata for one URL. A card is only rendered
 /// when at least a `title` resolved.
-struct LinkPreviewMetadata: Sendable, Equatable {
+struct LinkPreviewMetadata: Equatable {
     let url: URL
     let host: String
     let title: String
@@ -28,7 +28,7 @@ struct LinkPreviewMetadata: Sendable, Equatable {
 final class LinkPreviewStore {
     static let shared = LinkPreviewStore()
 
-    enum Entry: Sendable, Equatable {
+    enum Entry: Equatable {
         /// Metadata resolved — render the card.
         case loaded(LinkPreviewMetadata)
         /// Fetch or parse failed — cached so we never retry; no card.
@@ -86,6 +86,9 @@ final class LinkPreviewStore {
                     data.append(byte)
                     if data.count >= Self.maxBytes { break }
                 }
+                // Lossy UTF-8 decode by design — malformed bytes shouldn't
+                // abort og: parsing, so keep the non-failable initializer.
+                // swiftlint:disable:next optional_data_string_conversion
                 let html = String(decoding: data, as: UTF8.self)
                 if let meta = Self.parse(html: html, url: url) {
                     entry = .loaded(meta)

@@ -26,16 +26,20 @@ struct PlaceHomeDetailContent: View {
                 if let data = home {
                     PlaceDetailSectionLabel(text: "Property")
                     FactsCard(data: data)
-                    PlaceSourceNote(name: "County public records · estimate model",
-                                    asOf: PlacePresentation.fmtMonthYear(env.asOf))
+                    PlaceSourceNote(
+                        name: "County public records · estimate model",
+                        asOf: PlacePresentation.fmtMonthYear(env.asOf)
+                    )
 
                     PlaceDetailSectionLabel(text: "Value")
                     ValueCard(data: data)
                     if let assessed = data.assessedValue {
                         AssessmentCard(assessed: assessed)
                     }
-                    PlaceSourceNote(name: "County public records · estimate model",
-                                    asOf: PlacePresentation.fmtMonthYear(env.asOf))
+                    PlaceSourceNote(
+                        name: "County public records · estimate model",
+                        asOf: PlacePresentation.fmtMonthYear(env.asOf)
+                    )
 
                     PlaceDetailSectionLabel(text: "Equity")
                     EquityCalculator(estimatedValue: data.estimatedValue)
@@ -58,13 +62,19 @@ private struct FactsCard: View {
             VStack(spacing: 16) {
                 HStack(spacing: 16) {
                     PlaceFactCell(icon: .home, label: "Year built", value: data.yearBuilt.map(String.init) ?? "—")
-                    PlaceFactCell(icon: .building2, label: "Living area",
-                                  value: data.sqft.map { "\(PlacePresentation.grouped($0)) sqft" } ?? "—")
+                    PlaceFactCell(
+                        icon: .building2,
+                        label: "Living area",
+                        value: data.sqft.map { "\(PlacePresentation.grouped($0)) sqft" } ?? "—"
+                    )
                 }
                 HStack(spacing: 16) {
                     PlaceFactCell(icon: .users, label: "Bed / bath", value: bedBath)
-                    PlaceFactCell(icon: .mapPin, label: "Lot size",
-                                  value: data.lotSqft.map { "\(PlacePresentation.grouped($0)) sqft" } ?? "—")
+                    PlaceFactCell(
+                        icon: .mapPin,
+                        label: "Lot size",
+                        value: data.lotSqft.map { "\(PlacePresentation.grouped($0)) sqft" } ?? "—"
+                    )
                 }
             }
         }
@@ -105,8 +115,10 @@ private struct ValueCard: View {
                     PlaceSparkline()
                 }
                 HStack(spacing: 6) {
-                    legendDot(solid: true); Text("Your home")
-                    legendDot(solid: false); Text("Block median")
+                    legendDot(solid: true)
+                    Text("Your home")
+                    legendDot(solid: false)
+                    Text("Block median")
                 }
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextMuted)

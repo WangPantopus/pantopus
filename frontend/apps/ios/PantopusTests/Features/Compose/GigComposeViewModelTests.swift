@@ -11,6 +11,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable force_unwrapping
+
 // swiftlint:disable type_body_length file_length
 
 @MainActor
@@ -597,7 +599,7 @@ final class GigComposeViewModelTests: XCTestCase {
 
     func testOfflineSubmitEnqueuesDraftAndStaysOnReview() async {
         let queue = makeQueue()
-        let vm = makeVM(initialState: filledAtReview(), queue: queue, isOnline: { false })
+        let vm = makeVM(initialState: filledAtReview(), queue: queue) { false }
         await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .review, "Offline submit must not leave the review step.")
         XCTAssertNotNil(vm.errorMessage)
@@ -611,7 +613,7 @@ final class GigComposeViewModelTests: XCTestCase {
 
     func testRepeatedOfflineSubmitsReplaceTheQueuedDraft() async {
         let queue = makeQueue()
-        let vm = makeVM(initialState: filledAtReview(), queue: queue, isOnline: { false })
+        let vm = makeVM(initialState: filledAtReview(), queue: queue) { false }
         await vm.advanceForTesting()
         vm.setTitle("Hang 4 shelves in the living room")
         await vm.advanceForTesting()
@@ -622,7 +624,7 @@ final class GigComposeViewModelTests: XCTestCase {
     func testSuccessfulSubmitRemovesEarlierOfflineStash() async {
         var online = false
         let queue = makeQueue()
-        let vm = makeVM(initialState: filledAtReview(), queue: queue, isOnline: { online })
+        let vm = makeVM(initialState: filledAtReview(), queue: queue) { online }
         await vm.advanceForTesting()
         XCTAssertEqual(queue.drafts.count, 1)
         online = true

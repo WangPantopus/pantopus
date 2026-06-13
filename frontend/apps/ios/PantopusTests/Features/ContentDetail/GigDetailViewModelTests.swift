@@ -10,6 +10,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable line_length multiline_literal_brackets
+
 // swiftlint:disable file_length type_body_length
 
 @MainActor
@@ -260,7 +262,13 @@ final class GigDetailViewModelTests: XCTestCase {
         stubRoutes([
             "/api/gigs/g1": [
                 .status(200, body: Self.gigJSON(#""status":"open","user_id":"owner-1","engagement_mode":"instant_accept","is_v2":true"#)),
-                .status(200, body: Self.gigJSON(#""status":"assigned","user_id":"owner-1","accepted_by":"viewer-1","engagement_mode":"instant_accept","is_v2":true"#))
+                .status(
+                    200,
+                    body: Self
+                        .gigJSON(
+                            #""status":"assigned","user_id":"owner-1","accepted_by":"viewer-1","engagement_mode":"instant_accept","is_v2":true"#
+                        )
+                )
             ],
             "/api/gigs/g1/questions": [
                 .status(200, body: Self.questionsJSON),
@@ -710,8 +718,10 @@ final class GigDetailViewModelTests: XCTestCase {
         XCTAssertTrue(SequencedURLProtocol.capturedRequests.contains {
             $0.url?.path == "/api/gigs/g1/change-orders/co1/approve"
         })
-        XCTAssertTrue(SequencedURLProtocol.capturedRequests.filter { $0.url?.path == "/api/gigs/g1" }.count >= 2,
-                      "Approving a price delta refreshes the gig.")
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.filter { $0.url?.path == "/api/gigs/g1" }.count >= 2,
+            "Approving a price delta refreshes the gig."
+        )
         XCTAssertEqual(vm.rawGig?.price, 75)
     }
 

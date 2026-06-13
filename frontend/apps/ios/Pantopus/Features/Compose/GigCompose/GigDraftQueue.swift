@@ -112,7 +112,6 @@ public final class GigDraftQueue: GigDraftQueueing {
 enum GigMagicPostBuilder {
     /// Returns nil when a required field is missing (mirrors the wizard's
     /// per-step validation gates).
-    // swiftlint:disable:next function_body_length cyclomatic_complexity
     static func body(
         from form: GigComposeFormState,
         coordinate: UserCoordinate?,

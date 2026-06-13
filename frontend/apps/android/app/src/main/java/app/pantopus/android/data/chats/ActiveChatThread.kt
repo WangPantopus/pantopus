@@ -28,8 +28,7 @@ class ActiveChatThread
         var isForeground: Boolean = false
 
         /** True when a chat push for [roomId] should be suppressed. */
-        fun isViewing(roomId: String?): Boolean =
-            isForeground && roomId != null && viewedRoomIds.contains(roomId)
+        fun isViewing(roomId: String?): Boolean = isForeground && roomId != null && viewedRoomIds.contains(roomId)
 
         /** Conversation screen teardown — nothing is "viewed" anymore. */
         fun clear() {

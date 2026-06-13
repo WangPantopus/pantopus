@@ -803,8 +803,7 @@ class GigsFeedViewModel
                 )
 
             /** Spatial-RPC rows carry `distance_meters`; list rows `distance_miles`. */
-            private fun resolvedDistanceMiles(gig: GigDto): Double? =
-                gig.distanceMiles ?: gig.distanceMeters?.let { it / METERS_PER_MILE }
+            private fun resolvedDistanceMiles(gig: GigDto): Double? = gig.distanceMiles ?: gig.distanceMeters?.let { it / METERS_PER_MILE }
 
             private fun priceLabel(
                 price: Double?,

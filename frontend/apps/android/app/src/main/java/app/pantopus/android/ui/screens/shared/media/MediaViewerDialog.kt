@@ -142,6 +142,9 @@ fun MediaViewerDialog(
 }
 
 /** Video page — ExoPlayer with controls; plays while its page is active. */
+// media3 PlayerView / AspectRatioFrameLayout are @UnstableApi; the opt-in is
+// consumed here so it doesn't propagate to callers. Behaviour is unchanged.
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun ViewerVideoSlide(
     url: String,

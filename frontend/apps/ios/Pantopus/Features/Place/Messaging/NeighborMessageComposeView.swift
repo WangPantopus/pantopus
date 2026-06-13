@@ -11,6 +11,8 @@
 
 import SwiftUI
 
+// swiftlint:disable multiline_arguments
+
 struct NeighborMessageComposeView: View {
     @State var viewModel: NeighborMessageComposeViewModel
     var onBack: () -> Void
@@ -65,9 +67,8 @@ struct NeighborMessageComposeView: View {
                         ForEach(viewModel.templates) { template in
                             TemplateRow(
                                 template: template,
-                                selected: template.id == viewModel.selectedTemplateId,
-                                onSelect: { viewModel.selectedTemplateId = $0 }
-                            )
+                                selected: template.id == viewModel.selectedTemplateId
+                            ) { viewModel.selectedTemplateId = $0 }
                         }
                     }
                     TemplateNote()
@@ -91,9 +92,8 @@ struct NeighborMessageComposeView: View {
             }
             SendBar(
                 sending: viewModel.sending,
-                enabled: viewModel.canSend,
-                onSend: { Task { await viewModel.send() } }
-            )
+                enabled: viewModel.canSend
+            ) { Task { await viewModel.send() } }
         }
     }
 }
@@ -344,12 +344,21 @@ private struct SafetyCard: View {
     }
 
     private let rows: [Row] = [
-        Row(icon: .hand, title: "Keep it neighborly",
-            sub: "For genuine heads-ups — not complaints, sales, or anything targeted."),
-        Row(icon: .clock, title: "A few messages a week",
-            sub: "There's a gentle limit, so the channel stays low-volume and calm."),
-        Row(icon: .ban, title: "Always blockable",
-            sub: "Anyone can block messages from verified neighbors at any time."),
+        Row(
+            icon: .hand,
+            title: "Keep it neighborly",
+            sub: "For genuine heads-ups — not complaints, sales, or anything targeted."
+        ),
+        Row(
+            icon: .clock,
+            title: "A few messages a week",
+            sub: "There's a gentle limit, so the channel stays low-volume and calm."
+        ),
+        Row(
+            icon: .ban,
+            title: "Always blockable",
+            sub: "Anyone can block messages from verified neighbors at any time."
+        )
     ]
 
     var body: some View {

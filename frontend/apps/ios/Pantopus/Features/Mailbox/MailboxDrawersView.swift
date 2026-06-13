@@ -15,8 +15,15 @@ import SwiftUI
 struct MailboxDrawersView: View {
     @State private var viewModel: MailboxDrawersViewModel
 
-    init(viewModel: MailboxDrawersViewModel = MailboxDrawersViewModel()) {
+    /// Split init (see GigsFeedView): avoids a Swift 6.1.2 / Xcode 16.4 SILGen
+    /// crash in the defaulted-view-model argument generator. Behaviour is
+    /// unchanged.
+    init(viewModel: MailboxDrawersViewModel) {
         _viewModel = State(initialValue: viewModel)
+    }
+
+    init() {
+        self.init(viewModel: MailboxDrawersViewModel())
     }
 
     var body: some View {

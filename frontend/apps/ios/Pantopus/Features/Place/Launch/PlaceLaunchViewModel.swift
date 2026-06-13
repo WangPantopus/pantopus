@@ -14,7 +14,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class PlaceLaunchViewModel {
-    enum Step: Sendable, Equatable {
+    enum Step: Equatable {
         case hero
         case preview(PlacePreview)
         case region(message: String)
@@ -35,18 +35,22 @@ final class PlaceLaunchViewModel {
         self.api = api
     }
 
-    var isTyping: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
+    var isTyping: Bool {
+        !query.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     // MARK: - Autocomplete (debounced)
 
     private func scheduleAutocomplete() {
         autocompleteTask?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)
-        guard q.count >= 3 else { suggestions = []; return }
+        guard q.count >= 3 else { suggestions = []
+            return
+        }
         autocompleteTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(220))
             guard !Task.isCancelled, let self else { return }
-            await self.fetchSuggestions(q)
+            await fetchSuggestions(q)
         }
     }
 
@@ -74,12 +78,12 @@ final class PlaceLaunchViewModel {
             guard let self else { return }
             defer { self.isLoadingPreview = false }
             do {
-                let preview: PlacePreview = try await self.api.request(PlaceEndpoints.publicPreview(address: address))
+                let preview: PlacePreview = try await api.request(PlaceEndpoints.publicPreview(address: address))
                 guard !Task.isCancelled else { return }
                 if preview.status == .unsupportedRegion {
-                    self.step = .region(message: preview.message ?? "Home features are coming to your region.")
+                    step = .region(message: preview.message ?? "Home features are coming to your region.")
                 } else {
-                    self.step = .preview(preview)
+                    step = .preview(preview)
                 }
             } catch {
                 // Stay on the hero; the field keeps the typed address.
@@ -101,7 +105,7 @@ final class PlaceLaunchViewModel {
 enum PlacePendingStore {
     private static let key = "pantopus_pending_place"
 
-    struct Pending: Codable, Sendable {
+    struct Pending: Codable {
         let street: String
         let city: String
         let state: String

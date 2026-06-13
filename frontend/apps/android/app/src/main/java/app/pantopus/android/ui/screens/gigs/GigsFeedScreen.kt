@@ -997,8 +997,7 @@ internal fun RadiusSuggestionBanner(
     }
 }
 
-private fun milesLabel(miles: Double): String =
-    if (miles % 1.0 == 0.0) "${miles.toInt()}" else String.format("%.1f", miles)
+private fun milesLabel(miles: Double): String = if (miles % 1.0 == 0.0) "${miles.toInt()}" else String.format("%.1f", miles)
 
 /**
  * P6c — slim offline-draft banner above the list: "N draft(s) waiting"

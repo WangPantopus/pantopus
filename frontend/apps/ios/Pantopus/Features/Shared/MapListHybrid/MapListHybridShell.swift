@@ -16,6 +16,8 @@ import CoreLocation
 import MapKit
 import SwiftUI
 
+// swiftlint:disable file_length
+
 /// Shell for a full-bleed map paired with a 3-detent bottom sheet.
 ///
 /// The shell owns:

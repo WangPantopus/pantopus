@@ -82,8 +82,7 @@ data class MapListHybridRegion(
 
     /** Same center, span multiplied — the "Widen search" ×2.5 zoom-out
      * and the cluster-tap ÷2 zoom-in both go through here. */
-    fun scaled(factor: Double): MapListHybridRegion =
-        copy(latitudeSpan = latitudeSpan * factor, longitudeSpan = longitudeSpan * factor)
+    fun scaled(factor: Double): MapListHybridRegion = copy(latitudeSpan = latitudeSpan * factor, longitudeSpan = longitudeSpan * factor)
 
     /** Same span, new center — rail-page → pan-to-pin sync. */
     fun recentered(

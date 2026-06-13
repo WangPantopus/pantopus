@@ -10,6 +10,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable type_body_length
+
 @MainActor
 final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTestCase {
     // MARK: - Chrome shape

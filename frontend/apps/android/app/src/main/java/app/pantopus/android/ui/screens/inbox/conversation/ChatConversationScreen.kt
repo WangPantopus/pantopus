@@ -6,6 +6,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.util.Patterns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
@@ -48,7 +49,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import android.util.Patterns
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -1245,7 +1245,7 @@ private fun PersonAvatar(
                     Modifier
                         .size(badgeSize)
                         .clip(CircleShape)
-                        // Design `.vb` is success-green (#059669), not brand blue.
+                        // Design `.vb` is success-green (PantopusColors.success), not brand blue.
                         .background(PantopusColors.success)
                         .border(2.dp, PantopusColors.appSurface, CircleShape),
                 contentAlignment = Alignment.Center,
@@ -2321,17 +2321,38 @@ private fun BubbleRow(
             // Reactions float as pills overlapping the bubble's bottom
             // corner (design `.reaction { bottom: -10; left/right: 8 }`).
             Box {
-            when (val body = content.body) {
-                is ChatBubbleBody.Text ->
-                    if (isEmojiOnly(body.text)) {
-                        // Emoji-only messages render large with no bubble (RN).
-                        Text(
-                            text = body.text,
-                            fontSize = 48.sp,
-                            lineHeight = 56.sp,
-                            color = textColor,
-                        )
-                    } else {
+                when (val body = content.body) {
+                    is ChatBubbleBody.Text ->
+                        if (isEmojiOnly(body.text)) {
+                            // Emoji-only messages render large with no bubble (RN).
+                            Text(
+                                text = body.text,
+                                fontSize = 48.sp,
+                                lineHeight = 56.sp,
+                                color = textColor,
+                            )
+                        } else {
+                            BubbleContainer(
+                                isOut = isOut,
+                                hasTail = content.hasTail,
+                                isContinuation = content.isContinuation,
+                                bubbleColor = bubbleColor,
+                                lockedTier = content.lockedTier?.takeIf { !isOut },
+                                onLockedAction = onLockedAction,
+                                contentId = content.id,
+                            ) {
+                                Column(modifier = Modifier.widthIn(max = bubbleMaxWidth)) {
+                                    ReplyPreview(preview = content.replyPreview, isOut = isOut)
+                                    LinkifiedBubbleText(
+                                        text = body.text,
+                                        isOut = isOut,
+                                        textColor = textColor,
+                                        onOpenUrl = onOpenUrl,
+                                    )
+                                }
+                            }
+                        }
+                    is ChatBubbleBody.TextWithImages ->
                         BubbleContainer(
                             isOut = isOut,
                             hasTail = content.hasTail,
@@ -2341,118 +2362,100 @@ private fun BubbleRow(
                             onLockedAction = onLockedAction,
                             contentId = content.id,
                         ) {
-                            Column(modifier = Modifier.widthIn(max = bubbleMaxWidth)) {
-                                ReplyPreview(preview = content.replyPreview, isOut = isOut)
-                                LinkifiedBubbleText(
-                                    text = body.text,
-                                    isOut = isOut,
-                                    textColor = textColor,
-                                    onOpenUrl = onOpenUrl,
-                                )
-                            }
-                        }
-                    }
-                is ChatBubbleBody.TextWithImages ->
-                    BubbleContainer(
-                        isOut = isOut,
-                        hasTail = content.hasTail,
-                        isContinuation = content.isContinuation,
-                        bubbleColor = bubbleColor,
-                        lockedTier = content.lockedTier?.takeIf { !isOut },
-                        onLockedAction = onLockedAction,
-                        contentId = content.id,
-                    ) {
-                        Column(modifier = Modifier.widthIn(max = bubbleMaxWidth), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                            if (body.text.isNotBlank()) {
-                                LinkifiedBubbleText(
-                                    text = body.text,
-                                    isOut = isOut,
-                                    textColor = textColor,
-                                    onOpenUrl = onOpenUrl,
-                                )
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                body.imageUrls.take(3).forEach { url ->
-                                    AsyncImage(
-                                        model = url,
-                                        contentDescription = "AI prompt image",
-                                        contentScale = ContentScale.Crop,
-                                        modifier =
-                                            Modifier
-                                                .size(72.dp)
-                                                .clip(RoundedCornerShape(Radii.md)),
+                            Column(
+                                modifier = Modifier.widthIn(max = bubbleMaxWidth),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+                            ) {
+                                if (body.text.isNotBlank()) {
+                                    LinkifiedBubbleText(
+                                        text = body.text,
+                                        isOut = isOut,
+                                        textColor = textColor,
+                                        onOpenUrl = onOpenUrl,
                                     )
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    body.imageUrls.take(3).forEach { url ->
+                                        AsyncImage(
+                                            model = url,
+                                            contentDescription = "AI prompt image",
+                                            contentScale = ContentScale.Crop,
+                                            modifier =
+                                                Modifier
+                                                    .size(72.dp)
+                                                    .clip(RoundedCornerShape(Radii.md)),
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                is ChatBubbleBody.Image ->
-                    PhotoBubble(
-                        url = body.url,
-                        isOut = isOut,
-                        hasTail = content.hasTail,
-                        isContinuation = content.isContinuation,
-                        lockedTier = content.lockedTier?.takeIf { !isOut },
-                        onLockedAction = onLockedAction,
-                        contentId = content.id,
-                    )
-                is ChatBubbleBody.Attachment ->
-                    BubbleContainer(
-                        isOut = isOut,
-                        hasTail = content.hasTail,
-                        isContinuation = content.isContinuation,
-                        bubbleColor = bubbleColor,
-                        lockedTier = content.lockedTier?.takeIf { !isOut },
-                        onLockedAction = onLockedAction,
-                        contentId = content.id,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                            PantopusIconImage(
-                                icon = PantopusIcon.File,
-                                contentDescription = null,
-                                size = 18.dp,
-                                tint = if (isOut) PantopusColors.appTextInverse else PantopusColors.primary600,
-                            )
-                            Text(
-                                text = body.filename,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textColor,
-                            )
+                    is ChatBubbleBody.Image ->
+                        PhotoBubble(
+                            url = body.url,
+                            isOut = isOut,
+                            hasTail = content.hasTail,
+                            isContinuation = content.isContinuation,
+                            lockedTier = content.lockedTier?.takeIf { !isOut },
+                            onLockedAction = onLockedAction,
+                            contentId = content.id,
+                        )
+                    is ChatBubbleBody.Attachment ->
+                        BubbleContainer(
+                            isOut = isOut,
+                            hasTail = content.hasTail,
+                            isContinuation = content.isContinuation,
+                            bubbleColor = bubbleColor,
+                            lockedTier = content.lockedTier?.takeIf { !isOut },
+                            onLockedAction = onLockedAction,
+                            contentId = content.id,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                                PantopusIconImage(
+                                    icon = PantopusIcon.File,
+                                    contentDescription = null,
+                                    size = 18.dp,
+                                    tint = if (isOut) PantopusColors.appTextInverse else PantopusColors.primary600,
+                                )
+                                Text(
+                                    text = body.filename,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = textColor,
+                                )
+                            }
                         }
-                    }
-                is ChatBubbleBody.SystemLink -> SystemLinkPill(body)
-                is ChatBubbleBody.LocationCard ->
-                    ChatLocationCardView(
-                        card = body.card,
-                        isOutgoing = isOut,
-                        onOpen = { onOpenLocation(body.card.latitude, body.card.longitude) },
+                    is ChatBubbleBody.SystemLink -> SystemLinkPill(body)
+                    is ChatBubbleBody.LocationCard ->
+                        ChatLocationCardView(
+                            card = body.card,
+                            isOutgoing = isOut,
+                            onOpen = { onOpenLocation(body.card.latitude, body.card.longitude) },
+                        )
+                    is ChatBubbleBody.GigOfferCard ->
+                        ChatGigOfferCardView(
+                            card = body.card,
+                            isOutgoing = isOut,
+                            onOpen = { body.card.gigId.takeIf { it.isNotBlank() }?.let(onOpenGig) },
+                        )
+                    is ChatBubbleBody.ListingOfferCard ->
+                        ChatListingOfferCardView(
+                            card = body.card,
+                            isOutgoing = isOut,
+                            onOpen = { body.card.listingId.takeIf { it.isNotBlank() }?.let(onOpenListing) },
+                        )
+                    is ChatBubbleBody.AiReply -> AiReplyBubble(body = body, hasTail = content.hasTail, onUseDraft = onUseAIDraft)
+                }
+                if (content.reactions.isNotEmpty()) {
+                    // Tapping a pill toggles the reaction (iOS parity).
+                    ReactionRow(
+                        reactions = content.reactions,
+                        onReact = onReact,
+                        modifier =
+                            Modifier
+                                .align(if (isOut) Alignment.BottomStart else Alignment.BottomEnd)
+                                .offset(x = if (isOut) Spacing.s2 else -Spacing.s2, y = 10.dp),
                     )
-                is ChatBubbleBody.GigOfferCard ->
-                    ChatGigOfferCardView(
-                        card = body.card,
-                        isOutgoing = isOut,
-                        onOpen = { body.card.gigId.takeIf { it.isNotBlank() }?.let(onOpenGig) },
-                    )
-                is ChatBubbleBody.ListingOfferCard ->
-                    ChatListingOfferCardView(
-                        card = body.card,
-                        isOutgoing = isOut,
-                        onOpen = { body.card.listingId.takeIf { it.isNotBlank() }?.let(onOpenListing) },
-                    )
-                is ChatBubbleBody.AiReply -> AiReplyBubble(body = body, hasTail = content.hasTail, onUseDraft = onUseAIDraft)
-            }
-            if (content.reactions.isNotEmpty()) {
-                // Tapping a pill toggles the reaction (iOS parity).
-                ReactionRow(
-                    reactions = content.reactions,
-                    onReact = onReact,
-                    modifier =
-                        Modifier
-                            .align(if (isOut) Alignment.BottomStart else Alignment.BottomEnd)
-                            .offset(x = if (isOut) Spacing.s2 else -Spacing.s2, y = 10.dp),
-                )
-            }
+                }
             }
             if (content.reactions.isNotEmpty()) {
                 // Clearance for the reaction pill overhanging the bubble so

@@ -47,11 +47,10 @@ struct PlaceLaunchView: View {
                 PlacePreviewBody(
                     preview: preview,
                     onSignIn: onSignIn,
-                    onCreateAccount: onCreateAccount,
-                    onBack: { viewModel.backToHero() }
-                )
+                    onCreateAccount: onCreateAccount
+                ) { viewModel.backToHero() }
             case let .region(message):
-                PlaceComingRegionBody(message: message, onBrowse: onCreateAccount, onBack: { viewModel.backToHero() })
+                PlaceComingRegionBody(message: message, onBrowse: onCreateAccount) { viewModel.backToHero() }
             }
         }
     }

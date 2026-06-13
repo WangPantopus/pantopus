@@ -12,6 +12,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable line_length multiline_function_chains
+
 // swiftlint:disable type_body_length
 @MainActor
 final class ChatConversationViewModelTests: XCTestCase {
@@ -420,7 +422,7 @@ final class ChatConversationViewModelTests: XCTestCase {
 
         guard case let .loaded(rowsAfterFailure) = vm.state,
               case let .bubble(failedBubble)? = rowsAfterFailure.last(where: {
-                  if case .bubble = $0 { return true } else { return false }
+                  if case .bubble = $0 { true } else { false }
               }) else {
             XCTFail("Expected failed bubble after 500")
             return
@@ -737,7 +739,7 @@ final class ChatConversationViewModelTests: XCTestCase {
         XCTAssertEqual(bubbleIds, ["m1", "m2", "m3"], "refresh must keep the paginated older page and append the new reply in order")
     }
 
-    func testReplySendIncludesReplyToId() async throws {
+    func testReplySendIncludesReplyToId() async {
         URLProtocolStub.stub(
             path: "/api/chat/conversations/u_other/messages",
             response: .json(Self.messagesJSON(Self.messageJSON(id: "m1", userId: "u_other", text: "hi")))
@@ -890,10 +892,13 @@ final class ChatConversationViewModelTests: XCTestCase {
                 $0.url?.path == "/api/chat/conversations/u_other/messages"
             }
         )
-        XCTAssertEqual(URLComponents(url: try XCTUnwrap(messageRequest.url), resolvingAgainstBaseURL: false)?
-            .queryItems?
-            .first(where: { $0.name == "topicId" })?
-            .value, "t1")
+        XCTAssertEqual(
+            try URLComponents(url: XCTUnwrap(messageRequest.url), resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first { $0.name == "topicId" }?
+                .value,
+            "t1"
+        )
     }
 
     func testRealtimeBadgePayloadDecodesCurrentAndLegacyShapes() throws {
@@ -1038,7 +1043,7 @@ final class ChatConversationViewModelTests: XCTestCase {
         // day divider, bubble m1, topic divider, bubble m2
         XCTAssertEqual(rows.count, 4)
         guard case let .topicDivider(divider)? = rows.first(where: {
-            if case .topicDivider = $0 { return true } else { return false }
+            if case .topicDivider = $0 { true } else { false }
         }) else {
             XCTFail("Expected a topic divider row")
             return

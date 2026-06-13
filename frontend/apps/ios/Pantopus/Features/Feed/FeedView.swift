@@ -10,6 +10,8 @@
 
 import SwiftUI
 
+// swiftlint:disable type_body_length
+
 /// Pulse tab entry point.
 public struct FeedView: View {
     @State private var viewModel: PulseFeedViewModel

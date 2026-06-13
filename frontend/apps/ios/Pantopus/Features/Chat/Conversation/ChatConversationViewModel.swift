@@ -15,6 +15,8 @@ import Foundation
 import Logging
 import Observation
 
+// swiftlint:disable cyclomatic_complexity large_tuple
+
 /// Source-of-truth identifier for the thread, mirroring backend dual
 /// mode. `.room` hits `/rooms/:id/messages`; `.person` hits
 /// `/conversations/:otherUserId/messages`. `.ai` is a synthetic mode
@@ -783,7 +785,7 @@ public final class ChatConversationViewModel {
     }
 
     private func sendAIMessage(_ text: String) async {
-        let imageURLs = (try? await uploadQueuedAIImagesIfNeeded()) ?? []
+        let imageURLs = await (try? uploadQueuedAIImagesIfNeeded()) ?? []
         let userMessage = localMessage(
             id: "ai_user_\(UUID().uuidString)",
             text: text,
@@ -815,16 +817,16 @@ public final class ChatConversationViewModel {
                     guard let self else { return }
                     switch event {
                     case let .conversation(id):
-                        self.aiConversationId = id
-                        self.aiConversationStore.setConversationId(id, forUserId: self.currentUserId)
+                        aiConversationId = id
+                        aiConversationStore.setConversationId(id, forUserId: currentUserId)
                     case let .textDelta(delta):
                         streamedText += delta
-                        self.replaceLocalMessage(id: assistantId, text: streamedText, type: "ai_reply", userId: "ai")
+                        replaceLocalMessage(id: assistantId, text: streamedText, type: "ai_reply", userId: "ai")
                     case let .draft(draft):
-                        self.aiDraftsByMessageId[assistantId, default: []].append(draft)
-                        self.rebuild()
+                        aiDraftsByMessageId[assistantId, default: []].append(draft)
+                        rebuild()
                     case let .error(message):
-                        self.replaceLocalMessage(id: assistantId, text: message, type: "ai_reply", userId: "ai")
+                        replaceLocalMessage(id: assistantId, text: message, type: "ai_reply", userId: "ai")
                     case .done:
                         break
                     }
@@ -1482,7 +1484,7 @@ public final class ChatConversationViewModel {
     /// copy so a delivered message can never linger as "failed".
     private func retireConfirmedClientIds(in response: ChatMessagesResponse) {
         for clientId in response.messages.compactMap(\.clientMessageId)
-        where pendingByClientId[clientId] != nil
+            where pendingByClientId[clientId] != nil
             || sendContextsByClientId[clientId] != nil
             || failedClientIds.contains(clientId) {
             pendingByClientId[clientId] = nil
@@ -1591,9 +1593,9 @@ public final class ChatConversationViewModel {
     /// authoritative id is resolved by `ensureRoomId()` at send time).
     private func knownRoomIdHint() -> String {
         switch mode {
-        case let .room(id): return id
-        case .person: return directRoomId ?? ""
-        case .ai: return ""
+        case let .room(id): id
+        case .person: directRoomId ?? ""
+        case .ai: ""
         }
     }
 
@@ -1686,7 +1688,7 @@ public final class ChatConversationViewModel {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
                 guard !Task.isCancelled else { return }
                 guard let self else { return }
-                await self.refresh()
+                await refresh()
             }
         }
     }
@@ -1719,7 +1721,7 @@ public final class ChatConversationViewModel {
         // to its own "Failed — Retry" twin.
         var retiredPending = false
         for clientId in backfill.compactMap(\.clientMessageId)
-        where pendingByClientId[clientId] != nil
+            where pendingByClientId[clientId] != nil
             || sendContextsByClientId[clientId] != nil
             || failedClientIds.contains(clientId) {
             pendingByClientId[clientId] = nil
@@ -1968,9 +1970,9 @@ public final class ChatConversationViewModel {
 
     private static func bodyForMessage(_ message: ChatMessageDTO) -> ChatBubbleContent.Body {
         if let urls = message.metadata?.dictValue?["image_urls"]?.arrayValue?
-            .compactMap({ $0.stringValue })
+            .compactMap(\.stringValue)
             .compactMap({ Self.resolvedMediaURL($0) }),
-           !urls.isEmpty {
+            !urls.isEmpty {
             return .textWithImages(text: message.messageText ?? "", imageURLs: urls)
         }
         if let firstAttachment = message.attachments.first {
@@ -2089,8 +2091,8 @@ public final class ChatConversationViewModel {
         if bytes >= 1_000_000 {
             return String(format: "%.1f MB", Double(bytes) / 1_000_000)
         }
-        if bytes >= 1_000 {
-            return "\(bytes / 1_000) KB"
+        if bytes >= 1000 {
+            return "\(bytes / 1000) KB"
         }
         return "\(bytes) B"
     }

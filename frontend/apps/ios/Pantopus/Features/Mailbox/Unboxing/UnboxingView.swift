@@ -30,14 +30,29 @@ public struct UnboxingView: View {
     private let accentDark = Theme.Color.categoryUnboxingDark
     private let accentBg = Theme.Color.categoryUnboxingBg
 
+    /// Split init (see GigsFeedView): a defaulted `= UnboxingViewModel()`
+    /// tripped a Swift 6.1.2 / Xcode 16.4 SILGen crash in the default-argument
+    /// generator. Constructing the view-model in the convenience init's body
+    /// avoids that path; behaviour is unchanged.
     public init(
-        viewModel: UnboxingViewModel = UnboxingViewModel(),
+        viewModel: UnboxingViewModel,
         reduceMotionOverride: Bool? = nil,
         onBack: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.reduceMotionOverride = reduceMotionOverride
         self.onBack = onBack
+    }
+
+    public init(
+        reduceMotionOverride: Bool? = nil,
+        onBack: @escaping @MainActor () -> Void = {}
+    ) {
+        self.init(
+            viewModel: UnboxingViewModel(),
+            reduceMotionOverride: reduceMotionOverride,
+            onBack: onBack
+        )
     }
 
     public var body: some View {

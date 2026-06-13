@@ -10,6 +10,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable force_unwrapping
+
 @MainActor
 final class ChatListViewModelTests: XCTestCase {
     override func setUp() {
@@ -239,7 +241,7 @@ final class ChatListViewModelTests: XCTestCase {
             path: "/api/chat/unified-conversations",
             responses: [
                 .json(Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON)),
-                .json(Self.listJSON(hiddenDirect, Self.businessConversationJSON, Self.groupRoomJSON)),
+                .json(Self.listJSON(hiddenDirect, Self.businessConversationJSON, Self.groupRoomJSON))
             ]
         )
         URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))

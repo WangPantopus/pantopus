@@ -369,32 +369,32 @@ private final class CameraScannerController: UIViewController, AVCapturePhotoCap
         guard token != lastToken, token != 0 else { return }
         lastToken = token
         sessionQueue.async { [weak self] in
-            guard let self, self.session.isRunning else { return }
-            self.photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+            guard let self, session.isRunning else { return }
+            photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
         }
     }
 
     private func startSessionIfNeeded() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            if self.isConfigured {
-                if !self.session.isRunning {
-                    self.session.startRunning()
+            if isConfigured {
+                if !session.isRunning {
+                    session.startRunning()
                 }
                 return
             }
-            self.session.beginConfiguration()
-            self.session.sessionPreset = .photo
+            session.beginConfiguration()
+            session.sessionPreset = .photo
             defer { self.session.commitConfiguration() }
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
                   let input = try? AVCaptureDeviceInput(device: device),
-                  self.session.canAddInput(input),
-                  self.session.canAddOutput(self.photoOutput)
+                  session.canAddInput(input),
+                  session.canAddOutput(self.photoOutput)
             else { return }
-            self.session.addInput(input)
-            self.session.addOutput(self.photoOutput)
-            self.isConfigured = true
-            self.session.startRunning()
+            session.addInput(input)
+            session.addOutput(photoOutput)
+            isConfigured = true
+            session.startRunning()
         }
     }
 

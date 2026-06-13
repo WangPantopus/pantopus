@@ -129,7 +129,9 @@ struct PlaceHeroCard: View {
     var onNudgeTap: (() -> Void)?
     var onTap: (() -> Void)?
 
-    private var isAlert: Bool { variant == .alert }
+    private var isAlert: Bool {
+        variant == .alert
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

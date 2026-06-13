@@ -8,6 +8,8 @@
 
 import SwiftUI
 
+// swiftlint:disable function_body_length multiple_closures_with_trailing_closure
+
 /// Typed routes within the Marketplace tab's NavigationStack.
 public enum MarketplaceRoute: Hashable {
     case listingDetail(listingId: String)

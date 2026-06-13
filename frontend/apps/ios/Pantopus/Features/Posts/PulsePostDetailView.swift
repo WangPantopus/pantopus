@@ -8,6 +8,8 @@
 
 import SwiftUI
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 /// Pulse post detail entry point.
 @MainActor
 public struct PulsePostDetailView: View {

@@ -64,7 +64,7 @@ struct PlaceSectionCard: View {
         .accessibilityIdentifier("place.section.\(title)")
     }
 
-    // ── INLINE: compact single-line reading ──
+    /// ── INLINE: compact single-line reading ──
     private var inlineBody: some View {
         HStack(spacing: 11) {
             PlaceIconTile(icon: icon, tone: tileTone, size: 32)
@@ -101,7 +101,7 @@ struct PlaceSectionCard: View {
         .placeCard()
     }
 
-    // ── STACKED: header + state body ──
+    /// ── STACKED: header + state body ──
     private var stackedBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             header

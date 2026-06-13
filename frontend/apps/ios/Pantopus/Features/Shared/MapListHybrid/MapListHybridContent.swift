@@ -117,10 +117,21 @@ public struct MapListHybridRegion: Sendable, Equatable {
         self.longitudeSpan = longitudeSpan
     }
 
-    public var minLatitude: Double { centerLatitude - latitudeSpan / 2 }
-    public var maxLatitude: Double { centerLatitude + latitudeSpan / 2 }
-    public var minLongitude: Double { centerLongitude - longitudeSpan / 2 }
-    public var maxLongitude: Double { centerLongitude + longitudeSpan / 2 }
+    public var minLatitude: Double {
+        centerLatitude - latitudeSpan / 2
+    }
+
+    public var maxLatitude: Double {
+        centerLatitude + latitudeSpan / 2
+    }
+
+    public var minLongitude: Double {
+        centerLongitude - longitudeSpan / 2
+    }
+
+    public var maxLongitude: Double {
+        centerLongitude + longitudeSpan / 2
+    }
 
     /// Same center, span multiplied — the "Widen search" ×2.5 zoom-out
     /// and the cluster-tap ÷2 zoom-in both go through here.

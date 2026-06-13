@@ -63,7 +63,9 @@ struct NeighborMessageInboxView: View {
 private struct InboxRow: View {
     let message: ReceivedNeighborMessage
 
-    private var unread: Bool { message.readAt == nil }
+    private var unread: Bool {
+        message.readAt == nil
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {

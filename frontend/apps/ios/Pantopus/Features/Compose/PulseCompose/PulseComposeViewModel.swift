@@ -267,7 +267,7 @@ public final class PulseComposeViewModel {
     public var lostFoundContactPref: PulseLostFoundContactPref = .dm
 
     /// Deal expiry — required by the backend for `postType == deal`.
-    public var dealExpiresAt: Date = Date().addingTimeInterval(7 * 86_400)
+    public var dealExpiresAt = Date().addingTimeInterval(7 * 86400)
 
     /// Place-eligibility warning surfaced as a banner on the draft step.
     public private(set) var eligibilityWarning: String?

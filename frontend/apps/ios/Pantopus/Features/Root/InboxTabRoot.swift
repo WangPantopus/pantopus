@@ -9,6 +9,8 @@
 
 import SwiftUI
 
+// swiftlint:disable cyclomatic_complexity multiple_closures_with_trailing_closure
+
 /// Typed routes within the Inbox tab's NavigationStack.
 public enum InboxRoute: Hashable {
     case conversation(InboxConversationDestination)

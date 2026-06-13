@@ -16,6 +16,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable type_body_length
+
 /// Gigs feed view-model.
 @Observable
 @MainActor

@@ -14,7 +14,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class PlacePulseViewModel {
-    enum State: Sendable {
+    enum State {
         case loading
         case loaded(PulsePayload)
         case error(message: String)
@@ -34,7 +34,9 @@ final class PlacePulseViewModel {
         await fetch()
     }
 
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         do {
@@ -126,7 +128,7 @@ struct PlacePulseView: View {
             ("Urgent", sorted.filter { $0.priority >= 80 }),
             ("Worth a look", sorted.filter { $0.priority >= 50 && $0.priority < 80 }),
             ("Around you", sorted.filter { $0.priority >= 25 && $0.priority < 50 }),
-            ("When you have a minute", sorted.filter { $0.priority < 25 }),
+            ("When you have a minute", sorted.filter { $0.priority < 25 })
         ]
         return VStack(alignment: .leading, spacing: 0) {
             ForEach(buckets, id: \.0) { title, signals in
@@ -180,11 +182,11 @@ private struct SignalCard: View {
 
     private var tone: (bg: Color, fg: Color) {
         switch signal.color.lowercased() {
-        case "green", "home", "success": return (Theme.Color.homeBg, Theme.Color.home)
-        case "amber", "warning", "yellow", "orange": return (Theme.Color.warningBg, Theme.Color.warning)
-        case "red", "error": return (Theme.Color.errorBg, Theme.Color.error)
-        case "sky", "blue", "primary": return (Theme.Color.primary100, Theme.Color.primary600)
-        default: return (Theme.Color.appSurfaceSunken, Theme.Color.appTextSecondary)
+        case "green", "home", "success": (Theme.Color.homeBg, Theme.Color.home)
+        case "amber", "warning", "yellow", "orange": (Theme.Color.warningBg, Theme.Color.warning)
+        case "red", "error": (Theme.Color.errorBg, Theme.Color.error)
+        case "sky", "blue", "primary": (Theme.Color.primary100, Theme.Color.primary600)
+        default: (Theme.Color.appSurfaceSunken, Theme.Color.appTextSecondary)
         }
     }
 }

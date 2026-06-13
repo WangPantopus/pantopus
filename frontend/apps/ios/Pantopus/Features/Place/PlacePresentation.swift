@@ -13,6 +13,8 @@
 
 import SwiftUI
 
+// swiftlint:disable cyclomatic_complexity
+
 // MARK: - Section display config (icon / title / layout, per id)
 
 struct PlaceSectionDisplayConfig {
@@ -110,19 +112,19 @@ enum PlacePresentation {
 
     static func aqiDot(_ category: AirQualityCategory) -> Color {
         switch category {
-        case .good: return Theme.Color.home
-        case .moderate, .unhealthySensitive: return Theme.Color.warning
-        case .unhealthy, .veryUnhealthy, .hazardous: return Theme.Color.error
-        case .unknown: return Theme.Color.appTextMuted
+        case .good: Theme.Color.home
+        case .moderate, .unhealthySensitive: Theme.Color.warning
+        case .unhealthy, .veryUnhealthy, .hazardous: Theme.Color.error
+        case .unknown: Theme.Color.appTextMuted
         }
     }
 
     static func floodChip(_ level: FloodRiskLevel, zoneLabel: String) -> PlaceChipModel {
         switch level {
-        case .minimal: return PlaceChipModel(tone: .success, text: "Minimal risk")
-        case .moderate: return PlaceChipModel(tone: .warning, text: "Moderate risk")
-        case .high: return PlaceChipModel(tone: .error, text: "High risk")
-        case .unknown: return PlaceChipModel(tone: .neutral, text: zoneLabel)
+        case .minimal: PlaceChipModel(tone: .success, text: "Minimal risk")
+        case .moderate: PlaceChipModel(tone: .warning, text: "Moderate risk")
+        case .high: PlaceChipModel(tone: .error, text: "High risk")
+        case .unknown: PlaceChipModel(tone: .neutral, text: zoneLabel)
         }
     }
 
@@ -130,34 +132,34 @@ enum PlacePresentation {
 
     static func config(for id: PlaceSectionID) -> PlaceSectionDisplayConfig {
         switch id {
-        case .weather: return .init(icon: .cloudSun, title: "Weather", inline: true)
-        case .airQuality: return .init(icon: .wind, title: "Air quality", inline: true)
-        case .alerts: return .init(icon: .bell, title: "Alerts", inline: true)
-        case .sunriseSunset: return .init(icon: .sunrise, title: "Sunrise & sunset", inline: true)
-        case .yourHome: return .init(icon: .home, title: "Your home", sparkline: true)
-        case .flood: return .init(icon: .waves, title: "Flood", inline: true)
-        case .seismic: return .init(icon: .activity, title: "Earthquake", inline: true)
-        case .wildfire: return .init(icon: .flame, title: "Wildfire", inline: true)
-        case .leadRadon: return .init(icon: .testTube, title: "Lead & radon")
-        case .drinkingWater: return .init(icon: .droplets, title: "Water")
-        case .environmentalHazards: return .init(icon: .factory, title: "Environment")
-        case .blockDensity: return .init(icon: .users, title: "Verified homes nearby")
-        case .censusContext: return .init(icon: .home, title: "Homes here")
-        case .billBenchmark: return .init(icon: .zap, title: "Bill benchmark")
-        case .incentives: return .init(icon: .badgePercent, title: "Incentives")
-        case .rentBand: return .init(icon: .building2, title: "Rent band")
-        case .civicDistricts: return .init(icon: .landmark, title: "Your districts")
-        case .civicElection: return .init(icon: .vote, title: "Next election", inline: true)
-        case .unknown: return .init(icon: .mapPin, title: "Place")
+        case .weather: .init(icon: .cloudSun, title: "Weather", inline: true)
+        case .airQuality: .init(icon: .wind, title: "Air quality", inline: true)
+        case .alerts: .init(icon: .bell, title: "Alerts", inline: true)
+        case .sunriseSunset: .init(icon: .sunrise, title: "Sunrise & sunset", inline: true)
+        case .yourHome: .init(icon: .home, title: "Your home", sparkline: true)
+        case .flood: .init(icon: .waves, title: "Flood", inline: true)
+        case .seismic: .init(icon: .activity, title: "Earthquake", inline: true)
+        case .wildfire: .init(icon: .flame, title: "Wildfire", inline: true)
+        case .leadRadon: .init(icon: .testTube, title: "Lead & radon")
+        case .drinkingWater: .init(icon: .droplets, title: "Water")
+        case .environmentalHazards: .init(icon: .factory, title: "Environment")
+        case .blockDensity: .init(icon: .users, title: "Verified homes nearby")
+        case .censusContext: .init(icon: .home, title: "Homes here")
+        case .billBenchmark: .init(icon: .zap, title: "Bill benchmark")
+        case .incentives: .init(icon: .badgePercent, title: "Incentives")
+        case .rentBand: .init(icon: .building2, title: "Rent band")
+        case .civicDistricts: .init(icon: .landmark, title: "Your districts")
+        case .civicElection: .init(icon: .vote, title: "Next election", inline: true)
+        case .unknown: .init(icon: .mapPin, title: "Place")
         }
     }
 
     /// The freshness stamp for a section (only weather + your_home show one).
     static func asOf(for env: PlaceSectionEnvelope) -> String? {
         switch env.id {
-        case .weather: return fmtTime(env.asOf)
-        case .yourHome, .censusContext: return fmtMonthYear(env.asOf)
-        default: return nil
+        case .weather: fmtTime(env.asOf)
+        case .yourHome, .censusContext: fmtMonthYear(env.asOf)
+        default: nil
         }
     }
 
@@ -212,7 +214,7 @@ enum PlacePresentation {
             guard let d = env.environmentalHazards else { return .init() }
             return .init(value: d.summary, caption: d.disclaimer)
         case .blockDensity:
-            return .init()  // handled specially as DensityCard
+            return .init() // handled specially as DensityCard
         case .censusContext:
             guard let d = env.censusContext else { return .init() }
             let value = !d.summary.isEmpty
@@ -253,10 +255,10 @@ enum PlacePresentation {
 
     static func cardState(_ env: PlaceSectionEnvelope) -> PlaceSectionCardState {
         switch env.status {
-        case .ready, .partial: return .loaded
-        case .stale: return .stale
-        case .error: return .error
-        case .unavailable: return .unavailable
+        case .ready, .partial: .loaded
+        case .stale: .stale
+        case .error: .error
+        case .unavailable: .unavailable
         }
     }
 
@@ -264,9 +266,9 @@ enum PlacePresentation {
 
     static func lockCta(_ band: PlaceBand) -> String {
         switch band {
-        case .d: return "Verify address"
-        case .b, .c: return "Claim home"
-        case .a: return "Create account"
+        case .d: "Verify address"
+        case .b, .c: "Claim home"
+        case .a: "Create account"
         }
     }
 
@@ -282,19 +284,30 @@ struct PlaceVerifyLockedItem: Identifiable {
     let icon: PantopusIcon
     let title: String
     let reason: String
-    var id: String { title }
+    var id: String {
+        title
+    }
 }
 
 extension PlacePresentation {
     /// Trust/identity tools shown locked on the claimed (T3) dashboard,
     /// routing to address verification. Port of VERIFY_LOCKED_SECTIONS.
     static let verifyLockedItems: [PlaceVerifyLockedItem] = [
-        .init(icon: .messageCircle, title: "Neighbor messaging",
-              reason: "Verify your address to message neighbors."),
-        .init(icon: .badgeCheck, title: "Verified badge",
-              reason: "Verify your address to get your verified badge."),
-        .init(icon: .mailbox, title: "Your mailbox",
-              reason: "Verify your address for your mailbox — packages, civic notices, and permits."),
+        .init(
+            icon: .messageCircle,
+            title: "Neighbor messaging",
+            reason: "Verify your address to message neighbors."
+        ),
+        .init(
+            icon: .badgeCheck,
+            title: "Verified badge",
+            reason: "Verify your address to get your verified badge."
+        ),
+        .init(
+            icon: .mailbox,
+            title: "Your mailbox",
+            reason: "Verify your address for your mailbox — packages, civic notices, and permits."
+        )
     ]
 }
 
@@ -312,13 +325,15 @@ struct PlaceDerivedPulse {
 extension PlacePresentation {
     private static func findSection(_ intel: PlaceIntelligence, _ id: PlaceSectionID) -> PlaceSectionEnvelope? {
         for g in intel.groups {
-            for s in g.sections where s.id == id { return s }
+            for s in g.sections where s.id == id {
+                return s
+            }
         }
         return nil
     }
 
     private static let badAqi: Set<AirQualityCategory> = [
-        .unhealthySensitive, .unhealthy, .veryUnhealthy, .hazardous,
+        .unhealthySensitive, .unhealthy, .veryUnhealthy, .hazardous
     ]
 
     /// Port of `derivePulse` — alert > unhealthy air > all-clear.

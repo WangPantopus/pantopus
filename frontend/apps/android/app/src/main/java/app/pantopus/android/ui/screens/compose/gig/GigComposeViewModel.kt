@@ -1287,8 +1287,7 @@ open class GigComposeViewModel
                 )
             }
 
-            private fun moneyLabel(value: Double): String =
-                if (value % 1.0 == 0.0) "$${value.toInt()}" else String.format("$%.2f", value)
+            private fun moneyLabel(value: Double): String = if (value % 1.0 == 0.0) "$${value.toInt()}" else String.format("$%.2f", value)
 
             /** P0.1 — draft budget → (min, max) field strings. */
             internal fun draftBudgetBounds(draft: MagicDraftDto): Pair<String?, String?> {

@@ -365,22 +365,20 @@ public struct SwipeableConversationRow: View {
                 icon: content.isMuted ? .bell : .bellOff,
                 label: content.isMuted ? "Unmute" : "Mute",
                 tint: Color(red: 0.42, green: 0.45, blue: 0.50),
-                id: "conversationRow.swipeMute_\(content.id)",
-                action: {
-                    reset()
-                    onMute()
-                }
-            )
+                id: "conversationRow.swipeMute_\(content.id)"
+            ) {
+                reset()
+                onMute()
+            }
             swipeButton(
                 icon: .archive,
                 label: "Hide",
                 tint: Color(red: 0.22, green: 0.25, blue: 0.32),
-                id: "conversationRow.swipeHide_\(content.id)",
-                action: {
-                    reset()
-                    onHide()
-                }
-            )
+                id: "conversationRow.swipeHide_\(content.id)"
+            ) {
+                reset()
+                onHide()
+            }
         }
         .frame(width: revealWidth)
         .opacity(clampedOffset < -2 ? 1 : 0)

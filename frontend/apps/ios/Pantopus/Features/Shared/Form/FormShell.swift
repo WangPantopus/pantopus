@@ -121,12 +121,11 @@ public struct FormShell<Content: View>: View {
                 rightActionLabel: showsTopRightAction ? rightActionLabel : nil,
                 rightActionEnabled: isValid && isDirty && !isSaving,
                 isSaving: isSaving && bottomActionLabel == nil && stickyBottom == nil,
-                onClose: handleClose,
-                onCommit: {
-                    dismissKeyboard()
-                    onCommit()
-                }
-            )
+                onClose: handleClose
+            ) {
+                dismissKeyboard()
+                onCommit()
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s5) {
                     content

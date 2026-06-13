@@ -98,16 +98,16 @@ public final class GigLiveActivityController: GigLiveActivityControlling {
         switch (gig.status ?? "").lowercased() {
         case "assigned":
             switch gig.workerAckStatus {
-            case "starting_now": return .onMyWay
-            case "running_late": return .runningLate
-            default: return .assigned
+            case "starting_now": .onMyWay
+            case "running_late": .runningLate
+            default: .assigned
             }
         case "in_progress":
-            return .inProgress
+            .inProgress
         case "completed":
-            return (gig.ownerConfirmedAt ?? "").isEmpty ? .markedDone : .confirmed
+            (gig.ownerConfirmedAt ?? "").isEmpty ? .markedDone : .confirmed
         default:
-            return nil
+            nil
         }
     }
 }

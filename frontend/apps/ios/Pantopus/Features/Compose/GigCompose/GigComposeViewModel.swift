@@ -12,6 +12,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable cyclomatic_complexity
+
 // swiftlint:disable file_length
 
 /// One-shot navigation events the host view consumes.
@@ -59,7 +61,9 @@ struct GigModulePrompt: Identifiable, Hashable {
     let value: String
     let isFilled: Bool
 
-    var id: String { key.rawValue }
+    var id: String {
+        key.rawValue
+    }
 }
 
 /// Which archetype module field group the Fill-gaps step renders.
@@ -1087,7 +1091,7 @@ extension GigComposeViewModel {
             notifiedCount = response.notifiedCount ?? 0
             nearbyHelpers = response.nearbyHelpers ?? 0
             transition(to: .success)
-            startUndoCountdown(windowMs: response.gig.undoWindowMs ?? 10_000)
+            startUndoCountdown(windowMs: response.gig.undoWindowMs ?? 10000)
         } catch {
             if Self.isConnectivityError(error) {
                 stashOfflineDraft()

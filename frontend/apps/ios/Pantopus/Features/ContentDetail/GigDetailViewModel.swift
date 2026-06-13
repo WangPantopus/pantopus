@@ -328,11 +328,11 @@ public final class GigDetailViewModel {
     /// assigned → confirmed window (open / cancelled gigs).
     static func activePhase(for gig: GigDTO) -> GigActivePhase? {
         switch (gig.status ?? "").lowercased() {
-        case "assigned": return .assigned
-        case "in_progress": return .inProgress
+        case "assigned": .assigned
+        case "in_progress": .inProgress
         case "completed":
-            return (gig.ownerConfirmedAt ?? "").isEmpty ? .markedDone : .confirmed
-        default: return nil
+            (gig.ownerConfirmedAt ?? "").isEmpty ? .markedDone : .confirmed
+        default: nil
         }
     }
 
@@ -646,10 +646,10 @@ public enum GigActivePhase: Int, Sendable, Comparable, CaseIterable {
 
 // MARK: - Phase 5 — lifecycle actions
 
-extension GigDetailViewModel {
+public extension GigDetailViewModel {
     /// Outcome of the owner accepting a bid (PaymentSheet path for paid
     /// gigs). Mirrors the Mailbox A17.6 accept flow.
-    public enum BidAcceptOutcome: Sendable, Equatable {
+    enum BidAcceptOutcome: Sendable, Equatable {
         case accepted
         case canceled
         case failed(message: String)
@@ -658,7 +658,7 @@ extension GigDetailViewModel {
     /// Poster accepts a bid: `POST .../bids/:bidId/accept`; paid gigs
     /// return PaymentSheet params → present → `finalize-accept` (or
     /// `abort-accept` on cancel/decline). Refreshes the gig on success.
-    public func acceptBid(bidId: String) async -> BidAcceptOutcome {
+    func acceptBid(bidId: String) async -> BidAcceptOutcome {
         guard bidActionInFlight == nil else { return .canceled }
         bidActionInFlight = bidId
         defer { bidActionInFlight = nil }
@@ -699,7 +699,7 @@ extension GigDetailViewModel {
     /// Poster counters a pending bid. Returns an error string for the
     /// sheet, or `nil` on success (row flips to "Countered $X" locally).
     @discardableResult
-    public func counterBid(bidId: String, amount: Double, message: String?) async -> String? {
+    func counterBid(bidId: String, amount: Double, message: String?) async -> String? {
         guard amount > 0 else { return "Enter a counter amount." }
         guard bidActionInFlight == nil else { return nil }
         bidActionInFlight = bidId
@@ -719,7 +719,7 @@ extension GigDetailViewModel {
 
     /// Poster rejects a bid — the row dims in place.
     @discardableResult
-    public func rejectBid(bidId: String) async -> String? {
+    func rejectBid(bidId: String) async -> String? {
         guard bidActionInFlight == nil else { return nil }
         bidActionInFlight = bidId
         defer { bidActionInFlight = nil }
@@ -738,7 +738,7 @@ extension GigDetailViewModel {
     /// assigns atomically; any payment authorization happens on the
     /// poster's side, so we just refresh to the assigned state.
     @discardableResult
-    public func instantAccept() async -> String? {
+    func instantAccept() async -> String? {
         guard canInstantAccept else { return "This task can't be instantly accepted." }
         do {
             let _: GigInstantAcceptResponse = try await api.request(GigsEndpoints.instantAccept(gigId: gigId))
@@ -751,7 +751,7 @@ extension GigDetailViewModel {
 
     /// Worker's "I'm on it" — `worker-ack` with `starting_now`.
     @discardableResult
-    public func sendWorkerAck() async -> String? {
+    func sendWorkerAck() async -> String? {
         guard showWorkerAck else { return nil }
         do {
             let _: WorkerAckResponse = try await api.request(
@@ -767,7 +767,7 @@ extension GigDetailViewModel {
     /// Worker's "Running late" — `worker-ack` with `running_late` plus
     /// an ETA (1–480 min) and optional note (gigs.js:5838).
     @discardableResult
-    public func sendRunningLate(etaMinutes: Int, note: String?) async -> String? {
+    func sendRunningLate(etaMinutes: Int, note: String?) async -> String? {
         guard canReportRunningLate else { return nil }
         do {
             let _: WorkerAckResponse = try await api.request(
@@ -789,7 +789,7 @@ extension GigDetailViewModel {
     /// string for the sheet, or `nil` on success (row prepends locally —
     /// the list is newest-first).
     @discardableResult
-    public func proposeChangeOrder(
+    func proposeChangeOrder(
         type: GigChangeOrderType,
         description: String,
         amountChange: Double?,
@@ -824,7 +824,7 @@ extension GigDetailViewModel {
     /// Counterparty approves — price deltas apply server-side, so the
     /// gig refreshes silently after the row flips.
     @discardableResult
-    public func approveChangeOrder(orderId: String) async -> String? {
+    func approveChangeOrder(orderId: String) async -> String? {
         await mutateChangeOrder(
             orderId: orderId,
             endpoint: GigsEndpoints.approveChangeOrder(gigId: gigId, orderId: orderId),
@@ -836,7 +836,7 @@ extension GigDetailViewModel {
 
     /// Counterparty declines the pending change.
     @discardableResult
-    public func rejectChangeOrder(orderId: String) async -> String? {
+    func rejectChangeOrder(orderId: String) async -> String? {
         await mutateChangeOrder(
             orderId: orderId,
             endpoint: GigsEndpoints.rejectChangeOrder(gigId: gigId, orderId: orderId),
@@ -848,7 +848,7 @@ extension GigDetailViewModel {
 
     /// Proposer withdraws their own pending change.
     @discardableResult
-    public func withdrawChangeOrder(orderId: String) async -> String? {
+    func withdrawChangeOrder(orderId: String) async -> String? {
         await mutateChangeOrder(
             orderId: orderId,
             endpoint: GigsEndpoints.withdrawChangeOrder(gigId: gigId, orderId: orderId),
@@ -884,7 +884,7 @@ extension GigDetailViewModel {
     }
 
     /// Copy a change order with a new status for the optimistic row flip.
-    static func changeOrderCopy(of order: GigChangeOrderDTO, status: String) -> GigChangeOrderDTO {
+    internal static func changeOrderCopy(of order: GigChangeOrderDTO, status: String) -> GigChangeOrderDTO {
         GigChangeOrderDTO(
             id: order.id,
             gigId: order.gigId,
@@ -905,7 +905,7 @@ extension GigDetailViewModel {
 
     /// Worker starts the task (assigned → in_progress).
     @discardableResult
-    public func startTask() async -> String? {
+    func startTask() async -> String? {
         guard canStartTask else { return nil }
         do {
             _ = try await api.request(GigsEndpoints.startGig(gigId: gigId), as: EmptyResponse.self)
@@ -919,7 +919,7 @@ extension GigDetailViewModel {
     /// Poster confirms completion (`/complete`) — releases payment and
     /// unlocks the tip affordance on refresh.
     @discardableResult
-    public func confirmCompletion() async -> String? {
+    func confirmCompletion() async -> String? {
         guard canConfirmCompletion else { return nil }
         do {
             _ = try await api.request(GigsEndpoints.completeGigAsPoster(gigId: gigId), as: EmptyResponse.self)
@@ -933,7 +933,7 @@ extension GigDetailViewModel {
     /// Either party reports the other as a no-show (owner → worker,
     /// worker → unresponsive poster) — cancels the gig server-side.
     @discardableResult
-    public func reportNoShow(description: String?) async -> String? {
+    func reportNoShow(description: String?) async -> String? {
         do {
             _ = try await api.request(
                 GigsEndpoints.reportNoShow(gigId: gigId, body: ReportNoShowBody(description: description)),
@@ -950,7 +950,7 @@ extension GigDetailViewModel {
     /// reviewed this gig — treat it as success so the CTA settles into
     /// "Reviewed ✓".
     @discardableResult
-    public func submitReview(rating: Int, comment: String?) async -> String? {
+    func submitReview(rating: Int, comment: String?) async -> String? {
         guard let revieweeId = pendingReview?.revieweeId ?? fallbackRevieweeId() else {
             return "Couldn't work out who to review."
         }
@@ -985,7 +985,7 @@ extension GigDetailViewModel {
 
     /// Report the gig for moderation. Both arms carry a toastable
     /// message; `success` picks the toast kind.
-    public func reportGig(reason: GigReportReason, details: String?) async -> (success: Bool, message: String) {
+    func reportGig(reason: GigReportReason, details: String?) async -> (success: Bool, message: String) {
         do {
             let response: GigReportResponse = try await api.request(
                 GigsEndpoints.reportGig(gigId: gigId, body: ReportGigBody(reason: reason, details: details))
@@ -997,13 +997,13 @@ extension GigDetailViewModel {
     }
 
     /// Fetch the zone / fee preview shown in the cancel sheet.
-    public func loadCancellationPreview() async -> GigCancellationPreview? {
+    func loadCancellationPreview() async -> GigCancellationPreview? {
         try? await api.request(GigsEndpoints.cancellationPreview(gigId: gigId))
     }
 
     /// Cancel the gig with a structured reason.
     @discardableResult
-    public func cancelTask(reason: CancelGigReason?) async -> String? {
+    func cancelTask(reason: CancelGigReason?) async -> String? {
         do {
             _ = try await api.request(GigsEndpoints.cancelGig(gigId: gigId, reason: reason), as: EmptyResponse.self)
             await refreshSilently()
@@ -1019,7 +1019,7 @@ extension GigDetailViewModel {
     /// route's preconditions, gigs.js:6405). The cancel sheet additionally
     /// requires the preview's `can_reschedule` (zone <= 1) before showing
     /// the affordance.
-    public var canRescheduleTask: Bool {
+    var canRescheduleTask: Bool {
         guard viewerIsOwner, let gig = rawGig else { return false }
         return (gig.status ?? "").lowercased() == "assigned"
     }
@@ -1029,7 +1029,7 @@ extension GigDetailViewModel {
     /// them, and fires `gig:rescheduled`; we refresh silently for the new
     /// `scheduled_start`.
     @discardableResult
-    public func rescheduleTask(scheduledStart: Date, note: String?) async -> String? {
+    func rescheduleTask(scheduledStart: Date, note: String?) async -> String? {
         guard canRescheduleTask else { return nil }
         do {
             let _: GigRescheduleResponse = try await api.request(
@@ -1052,7 +1052,7 @@ extension GigDetailViewModel {
 
     /// Room event suffixes `emitGigUpdate` fires (gigs.js / gigsV2.js):
     /// any of them just triggers a silent refetch.
-    static let roomEventNames = [
+    internal static let roomEventNames = [
         "gig:bid-update",
         "gig:status-change",
         "gig:worker-ack",
@@ -1063,7 +1063,7 @@ extension GigDetailViewModel {
 
     /// Join the `gig:<id>` room and refetch on any room event for this
     /// gig. Call from the view's `.task`; paired with `stopRealtime()`.
-    public func startRealtime() {
+    func startRealtime() {
         guard realtimeTasks.isEmpty else { return }
         emitRoom("gig:join", gigId)
         for name in Self.roomEventNames {
@@ -1071,24 +1071,26 @@ extension GigDetailViewModel {
             realtimeTasks.append(Task { [weak self] in
                 for await event in stream {
                     guard let self, !Task.isCancelled else { return }
-                    guard event.gigId == nil || event.gigId == self.gigId else { continue }
-                    await self.refreshSilently()
+                    guard event.gigId == nil || event.gigId == gigId else { continue }
+                    await refreshSilently()
                 }
             })
         }
     }
 
     /// Leave the room and tear down the listeners.
-    public func stopRealtime() {
+    func stopRealtime() {
         guard !realtimeTasks.isEmpty else { return }
-        for task in realtimeTasks { task.cancel() }
+        for task in realtimeTasks {
+            task.cancel()
+        }
         realtimeTasks = []
         emitRoom("gig:leave", gigId)
     }
 
     /// Copy a bid with a new status (+ optional counter amount) for the
     /// optimistic owner-panel updates.
-    static func bidCopy(of bid: GigBidDTO, status: String, counterAmount: Double? = nil) -> GigBidDTO {
+    internal static func bidCopy(of bid: GigBidDTO, status: String, counterAmount: Double? = nil) -> GigBidDTO {
         GigBidDTO(
             id: bid.id,
             userId: bid.userId,

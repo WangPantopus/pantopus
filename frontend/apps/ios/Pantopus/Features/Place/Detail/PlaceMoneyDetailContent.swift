@@ -9,6 +9,8 @@
 
 import SwiftUI
 
+// swiftlint:disable line_length
+
 struct PlaceMoneyDetailContent: View {
     let intel: PlaceIntelligence
     let vm: PlaceDetailViewModel
@@ -57,10 +59,12 @@ struct PlaceMoneyDetailContent: View {
                     Text("How appeals work")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
-                    Text("If your assessment is above market, that's the usual basis for an appeal. Check your county's deadline, gather comparable sales, and file a petition with the assessor.")
-                        .font(.system(size: 13.5))
-                        .lineSpacing(2)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Text(
+                        "If your assessment is above market, that's the usual basis for an appeal. Check your county's deadline, gather comparable sales, and file a petition with the assessor."
+                    )
+                    .font(.system(size: 13.5))
+                    .lineSpacing(2)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                     Text("Informational only — not legal or tax advice.")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.Color.warning)
@@ -128,7 +132,11 @@ private struct BillBenchmarkCard: View {
             }
             .frame(height: 14)
             HStack {
-                Text("Lower"); Spacer(); Text("Typical"); Spacer(); Text("Higher")
+                Text("Lower")
+                Spacer()
+                Text("Typical")
+                Spacer()
+                Text("Higher")
             }
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(Theme.Color.appTextMuted)

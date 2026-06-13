@@ -8,8 +8,8 @@ import XCTest
 
 @MainActor
 final class ChatMediaURLTests: XCTestCase {
-    func testResolveChatFileProxyAddsToken() {
-        let base = URL(string: "http://192.168.0.176:8000")!
+    func testResolveChatFileProxyAddsToken() throws {
+        let base = try XCTUnwrap(URL(string: "http://192.168.0.176:8000"))
         let resolved = ChatMediaURL.resolve(
             raw: "/api/chat/files/abc-123",
             baseURL: base,
@@ -21,10 +21,10 @@ final class ChatMediaURLTests: XCTestCase {
         )
     }
 
-    func testResolveHttpsPassthroughWithoutToken() {
-        let resolved = ChatMediaURL.resolve(
+    func testResolveHttpsPassthroughWithoutToken() throws {
+        let resolved = try ChatMediaURL.resolve(
             raw: "https://cdn.example.com/photo.jpg",
-            baseURL: URL(string: "http://192.168.0.176:8000")!,
+            baseURL: XCTUnwrap(URL(string: "http://192.168.0.176:8000")),
             accessToken: "tok"
         )
         XCTAssertEqual(resolved?.absoluteString, "https://cdn.example.com/photo.jpg")

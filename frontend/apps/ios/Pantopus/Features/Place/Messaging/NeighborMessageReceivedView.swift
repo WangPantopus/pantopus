@@ -39,7 +39,7 @@ struct NeighborMessageReceivedView: View {
                 icon: .helpCircle,
                 headline: "Message not found",
                 subcopy: "This message may have been removed, or it isn't addressed to you.",
-                cta: EmptyState.CTA(title: "Back to Place", action: { onBack() })
+                cta: EmptyState.CTA(title: "Back to Place") { onBack() }
             )
         case let .error(message):
             ErrorState(message: message) { await viewModel.load() }
@@ -86,13 +86,12 @@ struct NeighborMessageReceivedView: View {
         let hasReply = message.reply != nil && !viewModel.editingReply
         let canReply = message.canReply && !viewModel.flags.blocked
         if hasReply, let reply = message.reply {
-            ReplySent(messageBody: reply.body, onChange: { viewModel.startEditingReply() })
+            ReplySent(messageBody: reply.body) { viewModel.startEditingReply() }
         } else if canReply {
             QuickReplyBar(
                 replies: viewModel.replies,
-                replying: viewModel.replying,
-                onReply: { id in Task { await viewModel.reply(id) } }
-            )
+                replying: viewModel.replying
+            ) { id in Task { await viewModel.reply(id) } }
         } else {
             RepliesOffNote()
         }
@@ -278,21 +277,33 @@ private struct ManageCard: View {
 
     private var rows: [Row] {
         [
-            Row(icon: .circleSlash, tone: .neutral,
+            Row(
+                icon: .circleSlash,
+                tone: .neutral,
                 title: "This isn't helpful",
                 sub: "Tell us this note wasn't useful. The sender won't be told.",
                 doneTitle: "Thanks for the feedback",
-                done: flags.notHelpful, action: onNotHelpful),
-            Row(icon: .ban, tone: .neutral,
+                done: flags.notHelpful,
+                action: onNotHelpful
+            ),
+            Row(
+                icon: .ban,
+                tone: .neutral,
                 title: "Block this neighbor",
                 sub: "Stop messages from this verified home. They won't be notified.",
                 doneTitle: "Neighbor blocked",
-                done: flags.blocked, action: onBlock),
-            Row(icon: .flag, tone: .danger,
+                done: flags.blocked,
+                action: onBlock
+            ),
+            Row(
+                icon: .flag,
+                tone: .danger,
                 title: "Report this message",
                 sub: "Flag it for the Pantopus trust team to review.",
                 doneTitle: "Reported to the trust team",
-                done: flags.reported, action: onReport),
+                done: flags.reported,
+                action: onReport
+            )
         ]
     }
 
@@ -324,8 +335,12 @@ private struct ManageCard: View {
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
                                 .strokeBorder(tileBorder, lineWidth: 1)
                         )
-                    Icon(row.done ? .check : row.icon, size: 18, strokeWidth: 2.25,
-                         color: row.done ? Theme.Color.home : tileFg)
+                    Icon(
+                        row.done ? .check : row.icon,
+                        size: 18,
+                        strokeWidth: 2.25,
+                        color: row.done ? Theme.Color.home : tileFg
+                    )
                 }
                 .frame(width: 34, height: 34)
                 VStack(alignment: .leading, spacing: 1) {

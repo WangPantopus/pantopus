@@ -182,9 +182,18 @@ fun PulseComposeScreen(
         // Post action could never enable. `state` covers isSubmitting.
         @Suppress("UNUSED_EXPRESSION")
         run {
-            fields; photos; identity; visibility; lostFoundKind
-            lostFoundContactPref; announceAudience; askCategory
-            recommendRating; activeIntent; dealExpiresAt; state
+            fields
+            photos
+            identity
+            visibility
+            lostFoundKind
+            lostFoundContactPref
+            announceAudience
+            askCategory
+            recommendRating
+            activeIntent
+            dealExpiresAt
+            state
         }
         FormShell(
             title = viewModel.displayTitle,

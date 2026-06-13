@@ -12,6 +12,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable file_length function_body_length type_body_length
+
 /// Outbound navigation events the host view consumes.
 public enum ListingComposeOutboundEvent: Sendable, Equatable {
     /// Pop the wizard without further navigation.

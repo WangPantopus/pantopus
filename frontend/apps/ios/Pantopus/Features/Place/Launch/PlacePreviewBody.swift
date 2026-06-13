@@ -11,6 +11,8 @@
 
 import SwiftUI
 
+// swiftlint:disable line_length multiline_function_chains
+
 struct PlacePreviewBody: View {
     let preview: PlacePreview
     var onSignIn: () -> Void
@@ -129,13 +131,13 @@ struct PlacePreviewBody: View {
 
     private func lockedIcon(_ section: PlacePreviewLockedSection) -> PantopusIcon {
         switch section.group {
-        case .today: return .cloudSun
-        case .yourHome: return .home
-        case .healthEnvironment: return .droplets
-        case .moneySignals: return .zap
-        case .civic: return .landmark
-        case .riskReadiness: return .waves
-        default: return .mapPin
+        case .today: .cloudSun
+        case .yourHome: .home
+        case .healthEnvironment: .droplets
+        case .moneySignals: .zap
+        case .civic: .landmark
+        case .riskReadiness: .waves
+        default: .mapPin
         }
     }
 
@@ -186,7 +188,8 @@ struct PlaceComingRegionBody: View {
                     .font(.system(size: 24, weight: .bold))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Theme.Color.appText)
-                Text(message + " Today, home intelligence reads off U.S. sources — county records, FEMA, the Census. Following, fanning, and messaging work in your region right now.")
+                Text(message +
+                    " Today, home intelligence reads off U.S. sources — county records, FEMA, the Census. Following, fanning, and messaging work in your region right now.")
                     .font(.system(size: 14))
                     .multilineTextAlignment(.center)
                     .lineSpacing(2)

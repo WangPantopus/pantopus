@@ -72,6 +72,10 @@ final class GigTipTests: XCTestCase {
     private static let questionsJSON = #"{"questions":[]}"#
     /// Phase 5 — completed gigs also fetch `/api/reviews/my-pending`.
     private static let pendingJSON = #"{"pending":[]}"#
+    /// Phase 5b — the owner's payment summary (`GET /:gigId/payment`) fires on
+    /// every load for an assigned+ gig; `loadPayment` swallows the body via
+    /// `try?`, so a benign null envelope keeps the FIFO aligned.
+    private static let paymentJSON = #"{"payment":null}"#
     private static let tipJSON =
         #"{"success":true,"clientSecret":"pi_tip","paymentId":"pay-tip-1","customer":"cus","ephemeralKey":"ek","publishableKey":"pk"}"#
     private static let refreshJSON =
@@ -91,11 +95,13 @@ final class GigTipTests: XCTestCase {
     func testSendTipSucceedsAndReconciles() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON), .status(200, body: Self.pendingJSON), // load
+            .status(200, body: Self.questionsJSON), .status(200, body: Self.paymentJSON),
+            .status(200, body: Self.pendingJSON), // load
             .status(200, body: Self.tipJSON), // POST /tip
             .status(200, body: Self.refreshJSON), // refresh-status
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON) // reload (my-pending settled on load)
+            .status(200, body: Self.questionsJSON), .status(200, body: Self.paymentJSON)
+            // reload (my-pending settled on load)
         ]
         let presenter = StubTipPresenter()
         presenter.outcome = .completed
@@ -112,7 +118,8 @@ final class GigTipTests: XCTestCase {
     func testSendTipDeclined() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON), .status(200, body: Self.pendingJSON), // load
+            .status(200, body: Self.questionsJSON), .status(200, body: Self.paymentJSON),
+            .status(200, body: Self.pendingJSON), // load
             .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()
@@ -127,7 +134,8 @@ final class GigTipTests: XCTestCase {
     func testSendTipCanceled() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.gigEnvelope), .status(200, body: Self.bidsJSON),
-            .status(200, body: Self.questionsJSON), .status(200, body: Self.pendingJSON), // load
+            .status(200, body: Self.questionsJSON), .status(200, body: Self.paymentJSON),
+            .status(200, body: Self.pendingJSON), // load
             .status(200, body: Self.tipJSON) // POST /tip
         ]
         let presenter = StubTipPresenter()

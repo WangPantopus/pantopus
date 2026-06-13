@@ -13,6 +13,8 @@ import UIKit
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length type_body_length
+
 @MainActor
 final class GigFilterSheetTests: XCTestCase {
     // MARK: - Criteria ↔ sections
@@ -190,6 +192,19 @@ final class GigFilterSheetTests: XCTestCase {
         APIClient(environment: .current, session: SequencedURLProtocol.makeSession(), retryPolicy: .none)
     }
 
+    /// Location stub that never has a coordinate — keeps the feed VM off
+    /// the location-resolve path so it issues no request the sequenced
+    /// mock hasn't stubbed, regardless of the host sim's cached location.
+    private final class NoLocationProvider: LocationProviding, @unchecked Sendable {
+        func cachedCoordinate() -> UserCoordinate? {
+            nil
+        }
+
+        func requestCurrent(timeoutSeconds _: TimeInterval) async -> UserCoordinate? {
+            nil
+        }
+    }
+
     private static let handymanGigJSON = """
     {
       "id": "g1", "title": "Hang shelves", "description": "Mount shelves.",
@@ -220,7 +235,7 @@ final class GigFilterSheetTests: XCTestCase {
             // already-narrowed page.
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = GigsFeedViewModel(api: makeAPI(), location: NoLocationProvider())
         await vm.load()
         await vm.applyFilters(GigFilterCriteria(budgetLower: 0, budgetUpper: 100))
         guard case let .loaded(rows) = vm.state else { return XCTFail("Expected .loaded, got \(vm.state)") }
@@ -238,7 +253,7 @@ final class GigFilterSheetTests: XCTestCase {
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = GigsFeedViewModel(api: makeAPI(), location: NoLocationProvider())
         await vm.load()
         // Multi-category is client-side — both fetched rows fall out.
         await vm.applyFilters(GigFilterCriteria(categories: [.tech]))
@@ -252,7 +267,7 @@ final class GigFilterSheetTests: XCTestCase {
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON)),
             .status(200, body: Self.gigsJSON(Self.handymanGigJSON, Self.cleaningGigJSON))
         ]
-        let vm = GigsFeedViewModel(api: makeAPI())
+        let vm = GigsFeedViewModel(api: makeAPI(), location: NoLocationProvider())
         await vm.load()
         await vm.applyFilters(GigFilterCriteria(categories: [.tech]))
         await vm.applyFilters(GigFilterCriteria())

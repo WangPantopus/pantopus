@@ -18,7 +18,7 @@ final class PlacePresentationTests: XCTestCase {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .appendingPathComponent("Fixtures/intelligence-full.json")
-        return try decoder.decode(PlaceIntelligence.self, from: try Data(contentsOf: url))
+        return try decoder.decode(PlaceIntelligence.self, from: Data(contentsOf: url))
     }
 
     private func section(_ intel: PlaceIntelligence, _ id: PlaceSectionID) throws -> PlaceSectionEnvelope {
@@ -30,21 +30,21 @@ final class PlacePresentationTests: XCTestCase {
 
     func testFloodReadingIsMinimalRiskChip() throws {
         let intel = try intelligence()
-        let reading = PlacePresentation.reading(for: try section(intel, .flood))
+        let reading = try PlacePresentation.reading(for: section(intel, .flood))
         XCTAssertEqual(reading.chip?.text, "Minimal risk")
         XCTAssertEqual(reading.chip?.tone, .success)
     }
 
     func testCivicDistrictsReadingCountsDistricts() throws {
         let intel = try intelligence()
-        let reading = PlacePresentation.reading(for: try section(intel, .civicDistricts))
+        let reading = try PlacePresentation.reading(for: section(intel, .civicDistricts))
         XCTAssertNotNil(reading.value)
         XCTAssertTrue(reading.value?.contains("districts on record") ?? false)
     }
 
     func testYourHomeReadingComposesBuiltSqftValue() throws {
         let intel = try intelligence()
-        let reading = PlacePresentation.reading(for: try section(intel, .yourHome))
+        let reading = try PlacePresentation.reading(for: section(intel, .yourHome))
         // The fixture's your_home is ready; the reading is non-empty.
         XCTAssertNotNil(reading.value)
     }
@@ -52,7 +52,7 @@ final class PlacePresentationTests: XCTestCase {
     func testSunriseSunsetFormatsLocalWallClock() throws {
         // Sunrise/sunset arrive as zone-less local times ("…T05:19").
         let intel = try intelligence()
-        let reading = PlacePresentation.reading(for: try section(intel, .sunriseSunset))
+        let reading = try PlacePresentation.reading(for: section(intel, .sunriseSunset))
         XCTAssertEqual(reading.value, "5:19a · 8:59p")
     }
 

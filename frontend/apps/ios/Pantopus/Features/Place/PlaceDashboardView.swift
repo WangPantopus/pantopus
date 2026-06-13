@@ -101,11 +101,10 @@ struct PlaceDashboardView: View {
                     heroIcon: pulse.heroIcon,
                     headline: pulse.title,
                     nudgeIcon: pulse.nudgeIcon,
-                    nudgeText: pulse.nudgeText ?? "",
-                    onTap: { viewModel.onOpenPulse() }
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, isClaimed ? 12 : 14)
+                    nudgeText: pulse.nudgeText ?? ""
+                ) { viewModel.onOpenPulse() }
+                    .padding(.horizontal, 16)
+                    .padding(.top, isClaimed ? 12 : 14)
 
                 VStack(spacing: 24) {
                     if isVerified {
@@ -127,7 +126,6 @@ struct PlaceDashboardView: View {
 
     // MARK: - Header
 
-    @ViewBuilder
     private func header(intel: PlaceIntelligence, isVerified: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
@@ -176,7 +174,7 @@ struct PlaceDashboardView: View {
         }
     }
 
-    // W7 — verified-neighbor messaging entry (verified residents only).
+    /// W7 — verified-neighbor messaging entry (verified residents only).
     private func messagesEntry(address: String) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             PlaceGroupLabel(text: "Verified neighbors")
@@ -184,15 +182,13 @@ struct PlaceDashboardView: View {
                 PlaceMessagesActionRow(
                     icon: .messageSquarePlus,
                     title: "Message a neighbor",
-                    subtitle: "Send a verified heads-up to a home on your block.",
-                    onTap: { viewModel.onComposeMessage(address) }
-                )
+                    subtitle: "Send a verified heads-up to a home on your block."
+                ) { viewModel.onComposeMessage(address) }
                 PlaceMessagesActionRow(
                     icon: .inbox,
                     title: "Your inbox",
-                    subtitle: "Heads-ups from verified neighbors nearby.",
-                    onTap: { viewModel.onOpenInbox() }
-                )
+                    subtitle: "Heads-ups from verified neighbors nearby."
+                ) { viewModel.onOpenInbox() }
             }
         }
     }
@@ -206,9 +202,8 @@ struct PlaceDashboardView: View {
                         icon: item.icon,
                         title: item.title,
                         reason: item.reason,
-                        cta: "Verify address",
-                        onTap: { showVerify = true }
-                    )
+                        cta: "Verify address"
+                    ) { showVerify = true }
                 }
             }
         }
@@ -216,9 +211,9 @@ struct PlaceDashboardView: View {
 
     private func initials(_ label: String) -> String {
         // Derive a 2-char monogram from the address's street name words.
-        let words = label.split(whereSeparator: { $0 == " " || $0 == "," })
+        let words = label.split { $0 == " " || $0 == "," }
             .filter { $0.first?.isLetter ?? false }
-        let letters = words.prefix(2).compactMap { $0.first }.map(String.init)
+        let letters = words.prefix(2).compactMap(\.first).map(String.init)
         return letters.isEmpty ? "PL" : letters.joined().uppercased()
     }
 }

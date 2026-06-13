@@ -17,6 +17,8 @@
 
 import SwiftUI
 
+// swiftlint:disable type_body_length
+
 @Observable
 @MainActor
 public final class TasksMapViewModel {

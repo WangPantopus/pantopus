@@ -6,11 +6,11 @@
 //  `reference/address-anchored/place-components.jsx` (+ the `.pl-*`
 //  CSS in the compiled screens). Home-green accent, sky CTAs.
 //
-//  Design-token mapping (design hex → app token):
-//    INK #111827 → appText · INK2 #374151 → appTextStrong
-//    MUTE #6b7280 → appTextSecondary · FAINT #9ca3af → appTextMuted
-//    BORDER #e5e7eb → appBorder · HOME_GREEN #16A34A → home
-//    HOME_GREEN_BG #DCFCE7 → homeBg · SKY #0284C7 → primary600
+//  Design-token mapping (design constant → app token):
+//    INK → appText · INK2 → appTextStrong
+//    MUTE → appTextSecondary · FAINT → appTextMuted
+//    BORDER → appBorder · HOME_GREEN → home
+//    HOME_GREEN_BG → homeBg · SKY → primary600
 //
 
 import SwiftUI
@@ -33,7 +33,9 @@ struct PlaceCardStyle: ViewModifier {
 
 extension View {
     /// `.pl-card` — the Place card surface.
-    func placeCard() -> some View { modifier(PlaceCardStyle()) }
+    func placeCard() -> some View {
+        modifier(PlaceCardStyle())
+    }
 }
 
 // MARK: - Icon tile (`IconTile`)
@@ -296,7 +298,7 @@ struct PlaceSparkline: View {
         CGPoint(x: 0, y: 26), CGPoint(x: 14, y: 24), CGPoint(x: 28, y: 25),
         CGPoint(x: 42, y: 20), CGPoint(x: 56, y: 21), CGPoint(x: 70, y: 15),
         CGPoint(x: 84, y: 13), CGPoint(x: 98, y: 8), CGPoint(x: 112, y: 9),
-        CGPoint(x: 126, y: 4),
+        CGPoint(x: 126, y: 4)
     ]
 
     var body: some View {

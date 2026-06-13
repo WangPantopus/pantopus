@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.compose.pulse
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.posts.PlaceEligibilityResponse
 import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCreateResponsePost
@@ -275,6 +276,8 @@ class PulseComposeViewModelTest {
     }
 
     @Test fun headsUpRequestCarriesSafetyAlertKind() {
+        coEvery { repo.placeEligibility(any(), any(), any(), any(), any()) } returns
+            NetworkResult.Success(PlaceEligibilityResponse(eligible = true))
         val vm = viewModel(PulseComposeIntent.Announce)
         vm.applyFlowContext(
             target = PulsePostingTarget.CurrentLocation(45.5, -122.4, "Camas, WA"),

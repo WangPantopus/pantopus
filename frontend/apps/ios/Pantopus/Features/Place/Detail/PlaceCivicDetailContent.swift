@@ -111,7 +111,7 @@ private struct RepRow: View {
                 }
                 Spacer(minLength: 0)
                 HStack(spacing: 8) {
-                    if let phone = rep.phone, let url = URL(string: "tel:\(phone.filter { $0.isNumber })") {
+                    if let phone = rep.phone, let url = URL(string: "tel:\(phone.filter(\.isNumber))") {
                         contactButton(.bell, url: url)
                     }
                     if let email = rep.email, let url = URL(string: "mailto:\(email)") {
@@ -135,7 +135,7 @@ private struct RepRow: View {
     }
 
     private var initials: String {
-        let parts = rep.name.split(separator: " ").prefix(2).compactMap { $0.first }.map(String.init)
+        let parts = rep.name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init)
         return parts.isEmpty ? "?" : parts.joined().uppercased()
     }
 }
@@ -181,7 +181,9 @@ private struct ElectionCard: View {
 
     private var monthAbbrev: String {
         guard let d = PlacePresentation.parseISO(data.date) else { return "" }
-        let f = DateFormatter(); f.dateFormat = "MMM"; return f.string(from: d).uppercased()
+        let f = DateFormatter()
+        f.dateFormat = "MMM"
+        return f.string(from: d).uppercased()
     }
 
     private var dayNumber: String {
@@ -208,11 +210,11 @@ private struct NoElectionCard: View {
 
 private func levelLabel(_ level: CivicLevel) -> String {
     switch level {
-    case .federal: return "Federal"
-    case .state: return "State"
-    case .county: return "County"
-    case .city: return "City"
-    case .school: return "School"
-    case .unknown: return "Other"
+    case .federal: "Federal"
+    case .state: "State"
+    case .county: "County"
+    case .city: "City"
+    case .school: "School"
+    case .unknown: "Other"
     }
 }

@@ -116,10 +116,14 @@ class SocketManager
             val s = socket ?: return null
             return withTimeoutOrNull(timeoutMs) {
                 suspendCancellableCoroutine { continuation ->
-                    s.emit(event, payload, Ack { args ->
-                        val response = args.firstOrNull() as? JSONObject
-                        if (continuation.isActive) continuation.resume(response)
-                    })
+                    s.emit(
+                        event,
+                        payload,
+                        Ack { args ->
+                            val response = args.firstOrNull() as? JSONObject
+                            if (continuation.isActive) continuation.resume(response)
+                        },
+                    )
                 }
             }
         }

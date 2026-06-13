@@ -59,6 +59,7 @@ enum class GigsSort(
     Newest("newest", "Newest"),
     Closest("closest", "Closest"),
     HighestPay("highest_pay", "Highest pay"),
+
     /** P1.F — "Urgent nearby" see-all sort. Backend proxies it to newest + deadline filter. */
     Urgency("urgency", "Most urgent"),
     FewestBids("fewest_bids", "Fewest bids"),

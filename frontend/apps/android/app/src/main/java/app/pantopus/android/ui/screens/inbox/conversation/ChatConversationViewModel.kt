@@ -14,6 +14,7 @@ import app.pantopus.android.data.api.models.chats.FindOrCreateTopicBody
 import app.pantopus.android.data.api.models.chats.SendChatMessageBody
 import app.pantopus.android.data.api.models.chats.resolvedText
 import app.pantopus.android.data.api.models.chats.resolvedType
+import app.pantopus.android.data.api.models.profile.UserReportRequest
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.services.GeoApi
@@ -21,10 +22,9 @@ import app.pantopus.android.data.blocks.BlocksRepository
 import app.pantopus.android.data.chats.ActiveChatThread
 import app.pantopus.android.data.chats.ChatRepository
 import app.pantopus.android.data.gigs.GigsRepository
-import app.pantopus.android.data.listings.ListingsRepository
-import app.pantopus.android.data.api.models.profile.UserReportRequest
 import app.pantopus.android.data.links.LinkPreview
 import app.pantopus.android.data.links.LinkPreviewRepository
+import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.profile.UserReportsRepository
 import app.pantopus.android.data.realtime.SocketManager

@@ -26,7 +26,7 @@ struct PlaceSwitcherRow: Identifiable, Hashable {
 @Observable
 @MainActor
 final class PlaceSwitcherViewModel {
-    enum State: Sendable {
+    enum State {
         case loading
         case loaded([PlaceSwitcherRow])
         case error(message: String)
@@ -79,9 +79,9 @@ final class PlaceSwitcherViewModel {
     }
 
     private static func initials(_ label: String) -> String {
-        let words = label.split(whereSeparator: { $0 == " " || $0 == "," })
+        let words = label.split { $0 == " " || $0 == "," }
             .filter { $0.first?.isLetter ?? false }
-        let letters = words.prefix(2).compactMap { $0.first }.map(String.init)
+        let letters = words.prefix(2).compactMap(\.first).map(String.init)
         return letters.isEmpty ? "PL" : letters.joined().uppercased()
     }
 }
@@ -210,8 +210,12 @@ struct PlaceSwitcherRowView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .fill(isActive ? Theme.Color.primary100 : Theme.Color.appSurfaceSunken)
-                    Icon(.home, size: 21, strokeWidth: 2,
-                         color: isActive ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                    Icon(
+                        .home,
+                        size: 21,
+                        strokeWidth: 2,
+                        color: isActive ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                    )
                 }
                 .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {

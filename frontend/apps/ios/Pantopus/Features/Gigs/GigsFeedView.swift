@@ -23,8 +23,15 @@ public struct GigsFeedView: View {
     private let onOpenSearch: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
 
+    /// Two inits instead of a single `viewModel: GigsFeedViewModel =
+    /// GigsFeedViewModel()` default: the Xcode 16.4 / Swift 6.1.2 compiler
+    /// crashes in SILGen when emitting the default-argument generator for a
+    /// defaulted `@MainActor` view-model whose own initializer carries
+    /// `@MainActor` closure defaults (rdar-class SILGen bug). Constructing the
+    /// view-model in the convenience init's body avoids that code path while
+    /// keeping `GigsFeedView()` behaviourally identical.
     init(
-        viewModel: GigsFeedViewModel = GigsFeedViewModel(),
+        viewModel: GigsFeedViewModel,
         onOpenGig: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
@@ -37,6 +44,23 @@ public struct GigsFeedView: View {
         self.onOpenMap = onOpenMap
         self.onOpenSearch = onOpenSearch
         self.onBack = onBack
+    }
+
+    init(
+        onOpenGig: @escaping @MainActor (String) -> Void = { _ in },
+        onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
+        onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
+        onOpenSearch: @escaping @MainActor () -> Void = {},
+        onBack: (@MainActor () -> Void)? = nil
+    ) {
+        self.init(
+            viewModel: GigsFeedViewModel(),
+            onOpenGig: onOpenGig,
+            onCompose: onCompose,
+            onOpenMap: onOpenMap,
+            onOpenSearch: onOpenSearch,
+            onBack: onBack
+        )
     }
 
     public var body: some View {
