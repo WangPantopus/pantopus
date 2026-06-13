@@ -377,9 +377,37 @@ const assigneesSchema = Joi.object({
     .required(),
 });
 
+// Returns the subset of subjectIds that are NOT legitimate assignees for this owner.
+// (Prevents pulling a non-member's personal availability into an owner's slots — identity firewall —
+// and round-robin assigning bookings to people outside the home/team.)
+async function invalidAssignees(et, subjectIds) {
+  const ids = [...new Set(subjectIds)];
+  if (!ids.length) return [];
+  if (et.owner_type === 'user') {
+    return ids.filter((id) => id !== et.owner_id); // personal event types: only the owner
+  }
+  if (et.owner_type === 'home') {
+    const { data } = await supabaseAdmin.from('HomeOccupancy').select('user_id').eq('home_id', et.owner_id).eq('is_active', true).in('user_id', ids);
+    const ok = new Set((data || []).map((r) => r.user_id));
+    return ids.filter((id) => !ok.has(id));
+  }
+  if (et.owner_type === 'business') {
+    const { data } = await supabaseAdmin.from('BusinessTeam').select('user_id').eq('business_user_id', et.owner_id).eq('is_active', true).in('user_id', ids);
+    const ok = new Set((data || []).map((r) => r.user_id));
+    ok.add(et.owner_id); // the business owner may serve too
+    return ids.filter((id) => !ok.has(id));
+  }
+  return ids;
+}
+
 router.put('/event-types/:id/assignees', validate(assigneesSchema), asyncHandler(async (req, res) => {
   const et = await loadOwnedEventType(req);
   await assertCanManageOwner(et.owner_type, et.owner_id, req.user.id, 'edit');
+  // Every assignee must be a member of this owner (active home occupant / business team member / the owner).
+  const invalid = await invalidAssignees(et, req.body.assignees.map((a) => a.subject_id));
+  if (invalid.length) {
+    return res.status(400).json({ error: 'INVALID_ASSIGNEE', message: 'Assignees must be members of this home or team.', invalid });
+  }
   // Replace the assignee set.
   await supabaseAdmin.from('EventTypeAssignee').delete().eq('event_type_id', et.id);
   const rows = req.body.assignees.map((a) => ({ ...a, event_type_id: et.id }));
