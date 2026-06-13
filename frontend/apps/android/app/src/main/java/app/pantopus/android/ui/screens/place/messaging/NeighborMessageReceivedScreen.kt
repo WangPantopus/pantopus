@@ -90,13 +90,44 @@ private fun Loaded(
     val editingReply by viewModel.editingReply.collectAsStateWithLifecycle()
     val replying by viewModel.replying.collectAsStateWithLifecycle()
 
+    NeighborReceivedContent(
+        message = message,
+        replies = replies,
+        flags = flags,
+        editingReply = editingReply,
+        replying = replying,
+        onReply = viewModel::reply,
+        onChangeReply = viewModel::startEditingReply,
+        onNotHelpful = viewModel::markNotHelpful,
+        onBlock = viewModel::block,
+        onReport = viewModel::report,
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+/** Stateless presentation — container owns the fetch + mutations (parity
+ * with the web pure/presentational split, and Paparazzi-snapshottable). */
+@Composable
+@Suppress("LongParameterList")
+internal fun NeighborReceivedContent(
+    message: ReceivedNeighborMessage,
+    replies: List<app.pantopus.android.data.api.models.place.NeighborReplyTemplate>,
+    flags: NeighborManageFlags,
+    editingReply: Boolean,
+    replying: Boolean,
+    onReply: (String) -> Unit,
+    onChangeReply: () -> Unit,
+    onNotHelpful: () -> Unit,
+    onBlock: () -> Unit,
+    onReport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val hasReply = message.reply != null && !editingReply
     val canReply = message.canReply && !flags.blocked
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
+            modifier
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(top = 8.dp, bottom = 40.dp),
@@ -106,12 +137,12 @@ private fun Loaded(
         PlaceDetailSectionLabel(text = "Reply")
         when {
             hasReply && message.reply != null ->
-                ReplySent(messageBody = message.reply!!.body, onChange = viewModel::startEditingReply)
+                ReplySent(messageBody = message.reply!!.body, onChange = onChangeReply)
             canReply ->
                 QuickReplyBar(
                     replies = replies,
                     replying = replying,
-                    onReply = viewModel::reply,
+                    onReply = onReply,
                 )
             else -> RepliesOffNote()
         }
@@ -119,9 +150,9 @@ private fun Loaded(
         PlaceDetailSectionLabel(text = "Manage this message")
         ManageCard(
             flags = flags,
-            onNotHelpful = viewModel::markNotHelpful,
-            onBlock = viewModel::block,
-            onReport = viewModel::report,
+            onNotHelpful = onNotHelpful,
+            onBlock = onBlock,
+            onReport = onReport,
         )
 
         Row(
