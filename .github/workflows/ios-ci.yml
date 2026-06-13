@@ -32,8 +32,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install SwiftLint & SwiftFormat
-        run: brew install swiftlint swiftformat
+      - name: Install pinned SwiftLint & SwiftFormat
+        # `brew install` is unpinned: the hosted runners flip between bottles
+        # (e.g. 0.63.2 flags `URL(string:)!` force-unwraps while 0.63.3 does
+        # not), which broke this job in BOTH directions on successive runs.
+        # Pin exact versions from the GitHub release binaries for determinism.
+        # Keep these in sync with the versions used locally.
+        env:
+          SWIFTLINT_VERSION: "0.63.3"
+          SWIFTFORMAT_VERSION: "0.61.1"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pinned-tools"
+          curl -fsSL "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o "$RUNNER_TEMP/swiftlint.zip"
+          unzip -o -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint-bin"
+          install "$RUNNER_TEMP/swiftlint-bin/swiftlint" "$RUNNER_TEMP/pinned-tools/swiftlint"
+          curl -fsSL "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip" -o "$RUNNER_TEMP/swiftformat.zip"
+          unzip -o -q "$RUNNER_TEMP/swiftformat.zip" -d "$RUNNER_TEMP/swiftformat-bin"
+          install "$RUNNER_TEMP/swiftformat-bin/swiftformat" "$RUNNER_TEMP/pinned-tools/swiftformat"
+          # Put the pinned tools FIRST on PATH for the SwiftLint/SwiftFormat
+          # steps so any swiftlint preinstalled on the runner can't shadow them.
+          echo "$RUNNER_TEMP/pinned-tools" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/pinned-tools/swiftlint" version
+          "$RUNNER_TEMP/pinned-tools/swiftformat" --version
 
       - name: SwiftLint
         run: swiftlint lint --strict
