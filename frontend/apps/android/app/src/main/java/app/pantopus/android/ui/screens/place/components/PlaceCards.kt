@@ -97,7 +97,8 @@ fun PlaceLockedCard(
 fun PlaceDensityCard(
     bucket: PlaceDensityBucket,
     label: String? = null,
-    ctaTitle: String = "Be one of the first to verify on your block",
+    // Pass null to hide the CTA (dashboard cards tap through to Block).
+    ctaTitle: String? = "Be one of the first to verify on your block",
     onTap: (() -> Unit)? = null,
 ) {
     val dots =
@@ -154,8 +155,10 @@ fun PlaceDensityCard(
                 color = if (dots == 0) PantopusColors.appTextSecondary else PantopusColors.appText,
             )
         }
-        Spacer(modifier = Modifier.height(11.dp))
-        PlaceTextButton(title = ctaTitle)
+        if (ctaTitle != null) {
+            Spacer(modifier = Modifier.height(11.dp))
+            PlaceTextButton(title = ctaTitle)
+        }
     }
 }
 
@@ -169,19 +172,20 @@ enum class PlaceHeroVariant { ALL_CLEAR, ALERT }
  */
 @Composable
 fun PlaceHeroCard(
-    variant: PlaceHeroVariant = PlaceHeroVariant.ALL_CLEAR,
     chip: PlaceChipModel,
     heroIcon: PantopusIcon,
     headline: String,
     nudgeIcon: PantopusIcon,
     nudgeText: String,
+    modifier: Modifier = Modifier,
+    variant: PlaceHeroVariant = PlaceHeroVariant.ALL_CLEAR,
     onNudgeTap: (() -> Unit)? = null,
     onTap: (() -> Unit)? = null,
 ) {
     val isAlert = variant == PlaceHeroVariant.ALERT
     Column(
         modifier =
-            Modifier
+            modifier
                 .placeCard()
                 .let { m -> onTap?.let { m.clickable(onClick = it) } ?: m }
                 .fillMaxWidth()
@@ -236,46 +240,48 @@ fun PlaceHeroCard(
                 modifier = Modifier.weight(1f),
             )
         }
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Inset nudge — a clearly tappable secondary item.
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (isAlert) PantopusColors.warningBg else PantopusColors.appBg)
-                    .border(
-                        1.dp,
-                        if (isAlert) PantopusColors.warningLight else PantopusColors.appBorderSubtle,
-                        RoundedCornerShape(12.dp),
-                    )
-                    .let { m -> onNudgeTap?.let { m.clickable(onClick = it) } ?: m }
-                    .padding(vertical = 11.dp, horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            PantopusIconImage(
-                icon = nudgeIcon,
-                contentDescription = null,
-                size = 17.dp,
-                strokeWidth = 2f,
-                tint = if (isAlert) PantopusColors.warning else PantopusColors.home,
-            )
-            Text(
-                text = nudgeText,
-                fontSize = 13.5.sp,
-                lineHeight = 19.sp,
-                color = PantopusColors.appTextStrong,
-                modifier = Modifier.weight(1f),
-            )
-            PantopusIconImage(
-                icon = PantopusIcon.ChevronRight,
-                contentDescription = null,
-                size = 17.dp,
-                strokeWidth = 2.25f,
-                tint = PantopusColors.appTextMuted,
-            )
+        // The inset nudge is optional — all-clear with nothing to flag
+        // renders just the overline + headline (parity with the web hero).
+        if (nudgeText.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isAlert) PantopusColors.warningBg else PantopusColors.appBg)
+                        .border(
+                            1.dp,
+                            if (isAlert) PantopusColors.warningLight else PantopusColors.appBorderSubtle,
+                            RoundedCornerShape(12.dp),
+                        )
+                        .let { m -> onNudgeTap?.let { m.clickable(onClick = it) } ?: m }
+                        .padding(vertical = 11.dp, horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = nudgeIcon,
+                    contentDescription = null,
+                    size = 17.dp,
+                    strokeWidth = 2f,
+                    tint = if (isAlert) PantopusColors.warning else PantopusColors.home,
+                )
+                Text(
+                    text = nudgeText,
+                    fontSize = 13.5.sp,
+                    lineHeight = 19.sp,
+                    color = PantopusColors.appTextStrong,
+                    modifier = Modifier.weight(1f),
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronRight,
+                    contentDescription = null,
+                    size = 17.dp,
+                    strokeWidth = 2.25f,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
         }
     }
 }

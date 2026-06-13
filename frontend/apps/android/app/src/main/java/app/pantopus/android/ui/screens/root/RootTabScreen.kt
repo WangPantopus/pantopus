@@ -15,7 +15,10 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -93,6 +96,10 @@ import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
+import app.pantopus.android.ui.screens.place.HomeLanding
+import app.pantopus.android.ui.screens.place.HomeTabHostViewModel
+import app.pantopus.android.ui.screens.place.PLACE_DASHBOARD_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.PlaceDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
@@ -308,6 +315,15 @@ private object ChildRoutes {
     /** T6.5e (P19.5) — Mailbox Vault list. Personal pillar. */
     const val MAILBOX_VAULT = "mailbox/vault"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
+
+    /**
+     * W3 — Place Intelligence dashboard for a home. The Home tab
+     * auto-navigates here when the user has a primary home; the switcher
+     * re-pushes it for another home.
+     */
+    const val PLACE_DASHBOARD = "place/{$PLACE_DASHBOARD_HOME_ID_KEY}"
+
+    fun placeDashboard(homeId: String): String = "place/$homeId"
 
     /** Bills list (T5.2.2 / P13). */
     const val HOME_BILLS = "homes/{$BILLS_HOME_ID_KEY}/bills"
@@ -1052,8 +1068,7 @@ private object ChildRoutes {
         "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
     /** P4 — open the quick-post V1 screen as the owner's gig editor. */
-    fun editGig(gigId: String): String =
-        "gigs/quick-post?$QUICK_POST_GIG_EDIT_ID_KEY=${java.net.URLEncoder.encode(gigId, "UTF-8")}"
+    fun editGig(gigId: String): String = "gigs/quick-post?$QUICK_POST_GIG_EDIT_ID_KEY=${java.net.URLEncoder.encode(gigId, "UTF-8")}"
 
     /** @deprecated Legacy path — resolves to [tasksMap]. */
     fun nearbyMapForGigs(category: String): String = tasksMap(category)
@@ -1664,6 +1679,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 modifier = Modifier.padding(padding),
             ) {
                 composable(PantopusRoute.Home.path) {
+                    // W3 — land the Home tab on the Place dashboard when the
+                    // user has a primary home. One-shot push over Hub so Hub
+                    // stays reachable (back) and is the no-home fallback;
+                    // parity with the iOS HubTabRoot auto-land.
+                    val placeHostVm: HomeTabHostViewModel = hiltViewModel()
+                    val placeLanding by placeHostVm.landing.collectAsStateWithLifecycle()
+                    var didLandPlace by rememberSaveable { mutableStateOf(false) }
+                    LaunchedEffect(placeLanding) {
+                        val landing = placeLanding
+                        if (!didLandPlace && landing is HomeLanding.PlaceDashboard) {
+                            didLandPlace = true
+                            navController.navigate(ChildRoutes.placeDashboard(landing.homeId))
+                        }
+                    }
                     HubWithDebugFiveTap(navController = navController) {
                         HubScreen(onIntent = { intent ->
                             when (intent) {
@@ -1837,6 +1866,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.popBackStack(ChildRoutes.CREATE_BUSINESS, inclusive = true)
                             navController.navigate(ChildRoutes.placeholder("Business dashboard"))
                         },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PLACE_DASHBOARD,
+                    arguments = listOf(navArgument(PLACE_DASHBOARD_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(PLACE_DASHBOARD_HOME_ID_KEY).orEmpty()
+                    PlaceDashboardScreen(
+                        homeId = homeId,
+                        // W4 swaps these placeholders for the real detail
+                        // pages; W5 swaps the verify placeholder for B1.
+                        onOpenSection = { _, slug -> navController.navigate(ChildRoutes.placeholder("Place · $slug")) },
+                        onSwitchHome = { id -> navController.navigate(ChildRoutes.placeDashboard(id)) },
+                        onAddPlace = { navController.navigate(ChildRoutes.ADD_HOME) },
+                        onVerify = { navController.navigate(ChildRoutes.placeholder("Verify address")) },
                     )
                 }
                 composable(

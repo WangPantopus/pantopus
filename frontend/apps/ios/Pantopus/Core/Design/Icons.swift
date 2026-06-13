@@ -228,6 +228,19 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case paintRoller = "paint-roller"
     case bellRing = "bell-ring"
 
+    // Place Intelligence dashboard section glyphs (W3). Lucide tokens
+    // from the design kit + web presentation.tsx SECTION_CONFIG.
+    case sunrise
+    case waves
+    case activity
+    case testTube = "test-tube"
+    case factory
+    case badgePercent = "badge-percent"
+    case vote
+    case lifeBuoy = "life-buoy"
+    case hardHat = "hard-hat"
+    case triangleAlert = "triangle-alert"
+
     // T6.5e Mailbox Vault — folder palette + mail-type tile glyphs + FAB
     // glyph. Distinct from existing `mailbox` (mail.stack) so the new
     // Mailbox surfaces can render the closed-envelope and open-envelope
@@ -544,6 +557,19 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trees: "tree"
         case .paintRoller: "paintbrush.pointed"
         case .bellRing: "bell.badge"
+        // Place Intelligence dashboard glyphs. SF Symbols lacks 1:1 for
+        // `test-tube` / `life-buoy` / `hard-hat` / `radio-tower`; fall back
+        // to the closest system glyphs.
+        case .sunrise: "sunrise"
+        case .waves: "water.waves"
+        case .activity: "waveform.path.ecg"
+        case .testTube: "testtube.2"
+        case .factory: "building.2"
+        case .badgePercent: "percent"
+        case .vote: "checkmark.seal"
+        case .lifeBuoy: "lifepreserver"
+        case .hardHat: "shield.lefthalf.filled"
+        case .triangleAlert: "exclamationmark.triangle"
         // T6.5e Mailbox Vault. SF Symbols has direct envelope glyphs;
         // `piggy-bank` and `arrow-down-up` lack 1:1 equivalents so fall
         // back to `dollarsign.circle` and `arrow.up.arrow.down` glyphs.
