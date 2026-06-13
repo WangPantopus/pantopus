@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
@@ -420,6 +421,7 @@ enum class PantopusIcon(
     Stamp("stamp"),
     IdCard("id-card"),
     FolderLock("folder-lock"),
+    CloudOff("cloud-off"),
     UploadCloud("upload-cloud"),
     CalendarClock("calendar-clock"),
     Download("download"),
@@ -783,6 +785,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Stamp -> IconSource.Material(Icons.Filled.Approval)
         PantopusIcon.IdCard -> IconSource.Material(Icons.Filled.Badge)
         PantopusIcon.FolderLock -> IconSource.Material(Icons.Filled.FolderShared)
+        PantopusIcon.CloudOff -> IconSource.Material(Icons.Filled.CloudOff)
         PantopusIcon.UploadCloud -> IconSource.Material(Icons.Filled.CloudUpload)
         PantopusIcon.CalendarClock -> IconSource.Material(Icons.Filled.EditCalendar)
         PantopusIcon.Download -> IconSource.Material(Icons.Filled.Download)
