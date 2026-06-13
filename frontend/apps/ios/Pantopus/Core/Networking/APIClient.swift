@@ -125,6 +125,12 @@ final class APIClient: @unchecked Sendable {
         try await request(endpoint, as: EmptyResponse.self)
     }
 
+    /// Perform a request and return the raw response body — for binary
+    /// artifacts (e.g. the residency-letter PDF), not JSON.
+    func requestData(_ endpoint: Endpoint) async throws -> Data {
+        try await executeWithRetry(endpoint)
+    }
+
     /// `Result`-returning variant for call sites that prefer explicit
     /// handling over `try`.
     func perform<Response: Decodable>(

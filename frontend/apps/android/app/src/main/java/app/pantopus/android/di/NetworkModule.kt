@@ -5,9 +5,9 @@ import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapter
 import app.pantopus.android.data.api.net.RetryInterceptor
+import app.pantopus.android.data.api.services.AIApi
 import app.pantopus.android.data.api.services.AdminApi
 import app.pantopus.android.data.api.services.AudienceProfileApi
-import app.pantopus.android.data.api.services.AIApi
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.BlocksApi
 import app.pantopus.android.data.api.services.BusinessDiscoveryApi
@@ -38,14 +38,17 @@ import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
 import app.pantopus.android.data.api.services.MailboxVaultApi
 import app.pantopus.android.data.api.services.MembershipApi
+import app.pantopus.android.data.api.services.NeighborMessagesApi
 import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.OffersApi
 import app.pantopus.android.data.api.services.PaymentsApi
+import app.pantopus.android.data.api.services.PlaceApi
 import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.RelationshipsApi
+import app.pantopus.android.data.api.services.ResidencyLettersApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SavedPlacesApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
@@ -97,6 +100,11 @@ object NetworkModule {
             .add(app.pantopus.android.data.api.models.businesses.BusinessServiceAreaJsonAdapter())
             .add(app.pantopus.android.data.api.models.homes.BillDecimalAdapter())
             .add(app.pantopus.android.data.api.models.homes.PollOptionAdapter())
+            // Place Intelligence: the envelope's payload type depends on
+            // the sibling `id` field (hand-written adapter), and the Place
+            // display vocabularies decode unknown values to UNKNOWN.
+            .add(app.pantopus.android.data.api.models.place.PlaceSectionEnvelopeAdapterFactory())
+            .add(app.pantopus.android.data.api.models.place.PlaceEnumAdapterFactory)
             .add(Instant::class.java, Rfc3339DateJsonAdapter().nullSafe())
             .addLast(KotlinJsonAdapterFactory())
             .build()
@@ -253,6 +261,18 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideGeoApi(retrofit: Retrofit): GeoApi = retrofit.create(GeoApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePlaceApi(retrofit: Retrofit): PlaceApi = retrofit.create(PlaceApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideNeighborMessagesApi(retrofit: Retrofit): NeighborMessagesApi = retrofit.create(NeighborMessagesApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideResidencyLettersApi(retrofit: Retrofit): ResidencyLettersApi = retrofit.create(ResidencyLettersApi::class.java)
 
     @Provides
     @Singleton
