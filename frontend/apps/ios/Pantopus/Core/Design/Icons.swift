@@ -240,6 +240,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case lifeBuoy = "life-buoy"
     case hardHat = "hard-hat"
     case triangleAlert = "triangle-alert"
+    case cloud
+    case sunset
+    case flower2 = "flower-2"
+    case trash
+    case zapOff = "zap-off"
 
     // T6.5e Mailbox Vault — folder palette + mail-type tile glyphs + FAB
     // glyph. Distinct from existing `mailbox` (mail.stack) so the new
@@ -570,6 +575,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .lifeBuoy: "lifepreserver"
         case .hardHat: "shield.lefthalf.filled"
         case .triangleAlert: "exclamationmark.triangle"
+        case .cloud: "cloud"
+        case .sunset: "sunset"
+        case .flower2: "leaf"
+        case .trash: "trash"
+        case .zapOff: "bolt.slash"
         // T6.5e Mailbox Vault. SF Symbols has direct envelope glyphs;
         // `piggy-bank` and `arrow-down-up` lack 1:1 equivalents so fall
         // back to `dollarsign.circle` and `arrow.up.arrow.down` glyphs.

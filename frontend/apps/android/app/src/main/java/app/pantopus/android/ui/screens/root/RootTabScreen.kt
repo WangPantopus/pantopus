@@ -100,6 +100,11 @@ import app.pantopus.android.ui.screens.place.HomeLanding
 import app.pantopus.android.ui.screens.place.HomeTabHostViewModel
 import app.pantopus.android.ui.screens.place.PLACE_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.place.PlaceDashboardScreen
+import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_SLUG_KEY
+import app.pantopus.android.ui.screens.place.detail.PlaceDetailScreen
+import app.pantopus.android.ui.screens.place.pulse.PLACE_PULSE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.pulse.PlacePulseScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
@@ -324,6 +329,19 @@ private object ChildRoutes {
     const val PLACE_DASHBOARD = "place/{$PLACE_DASHBOARD_HOME_ID_KEY}"
 
     fun placeDashboard(homeId: String): String = "place/$homeId"
+
+    /** W4 — a Place group-detail page (today / your-home / risk / …). */
+    const val PLACE_DETAIL = "place/{$PLACE_DETAIL_HOME_ID_KEY}/detail/{$PLACE_DETAIL_SLUG_KEY}"
+
+    fun placeDetail(
+        homeId: String,
+        slug: String,
+    ): String = "place/$homeId/detail/$slug"
+
+    /** W4 — the full Today's Pulse signal stream. */
+    const val PLACE_PULSE = "place/{$PLACE_PULSE_HOME_ID_KEY}/pulse"
+
+    fun placePulse(homeId: String): String = "place/$homeId/pulse"
 
     /** Bills list (T5.2.2 / P13). */
     const val HOME_BILLS = "homes/{$BILLS_HOME_ID_KEY}/bills"
@@ -1875,13 +1893,29 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     val homeId = entry.arguments?.getString(PLACE_DASHBOARD_HOME_ID_KEY).orEmpty()
                     PlaceDashboardScreen(
                         homeId = homeId,
-                        // W4 swaps these placeholders for the real detail
-                        // pages; W5 swaps the verify placeholder for B1.
-                        onOpenSection = { _, slug -> navController.navigate(ChildRoutes.placeholder("Place · $slug")) },
+                        // W5 swaps the verify placeholder for the B1 sheet.
+                        onOpenSection = { hid, slug -> navController.navigate(ChildRoutes.placeDetail(hid, slug)) },
                         onSwitchHome = { id -> navController.navigate(ChildRoutes.placeDashboard(id)) },
                         onAddPlace = { navController.navigate(ChildRoutes.ADD_HOME) },
                         onVerify = { navController.navigate(ChildRoutes.placeholder("Verify address")) },
+                        onOpenPulse = { navController.navigate(ChildRoutes.placePulse(homeId)) },
                     )
+                }
+                composable(
+                    route = ChildRoutes.PLACE_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument(PLACE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(PLACE_DETAIL_SLUG_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    PlaceDetailScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.PLACE_PULSE,
+                    arguments = listOf(navArgument(PLACE_PULSE_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    PlacePulseScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.HOME_DASHBOARD,
