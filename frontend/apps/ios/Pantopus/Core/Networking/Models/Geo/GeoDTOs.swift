@@ -53,10 +53,17 @@ public struct GeoSuggestion: Decodable, Sendable, Hashable, Identifiable {
     public let center: [Double]
     public let kind: String
 
-    public var id: String { suggestionId }
+    public var id: String {
+        suggestionId
+    }
 
-    public var longitude: Double? { center.count >= 2 ? center[0] : nil }
-    public var latitude: Double? { center.count >= 2 ? center[1] : nil }
+    public var longitude: Double? {
+        center.count >= 2 ? center[0] : nil
+    }
+
+    public var latitude: Double? {
+        center.count >= 2 ? center[1] : nil
+    }
 
     private enum CodingKeys: String, CodingKey {
         case label, center, kind, text

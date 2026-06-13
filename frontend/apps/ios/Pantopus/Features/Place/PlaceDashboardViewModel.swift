@@ -14,7 +14,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class PlaceDashboardViewModel {
-    enum State: Sendable {
+    enum State {
         case loading
         case loaded(PlaceIntelligence)
         case error(message: String)

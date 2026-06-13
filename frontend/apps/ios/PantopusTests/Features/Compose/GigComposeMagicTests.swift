@@ -14,7 +14,7 @@ import SwiftUI
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length file_length
+// swiftlint:disable type_body_length
 
 @MainActor
 final class GigComposeMagicTests: XCTestCase {

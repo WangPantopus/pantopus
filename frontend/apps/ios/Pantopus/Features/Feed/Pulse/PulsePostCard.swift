@@ -30,7 +30,9 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
 
     /// Still-image URLs — kept for call sites (and tests) that only care
     /// about what the card displays, not the attachment kinds.
-    public var mediaURLs: [URL] { media.map(\.url) }
+    public var mediaURLs: [URL] {
+        media.map(\.url)
+    }
 
     public init(
         id: String,

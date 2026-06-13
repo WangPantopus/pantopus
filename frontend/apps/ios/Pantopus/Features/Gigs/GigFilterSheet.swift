@@ -340,12 +340,12 @@ public struct GigFilterCriteria: Sendable, Hashable {
 /// `POST /api/gigs/saved-searches` projection — pure functions so the
 /// derived name + body are testable without a view. Route
 /// `backend/routes/gigSavedSearches.js:64`.
-extension GigFilterCriteria {
+public extension GigFilterCriteria {
     /// The single category a saved search stores (the backend keeps one
     /// value). Exactly one sheet chip wins; with no sheet chips the
     /// feed's active chip applies (omitting "All"); a multi-select
     /// saves category-less so alerts span every selected category.
-    public func savedSearchCategory(feedCategory: GigsCategory) -> GigsCategory? {
+    func savedSearchCategory(feedCategory: GigsCategory) -> GigsCategory? {
         if categories.count == 1 { return categories.first }
         if categories.isEmpty, feedCategory != .all { return feedCategory }
         return nil
@@ -353,7 +353,7 @@ extension GigFilterCriteria {
 
     /// Client-derived display name, e.g. "Cleaning · under $100 · 5 mi".
     /// Mirrors exactly the criteria that ride the POST body.
-    public func savedSearchName(
+    func savedSearchName(
         feedCategory: GigsCategory,
         searchText: String,
         radiusMiles: Double
@@ -383,7 +383,7 @@ extension GigFilterCriteria {
     /// the existing `GET /api/gigs` mappings (`serverMinPrice` /
     /// `serverMaxPrice` / `serverScheduleType` / `serverPayType`);
     /// slider extremes and unmappable selections are omitted.
-    public func savedSearchBody(
+    func savedSearchBody(
         feedCategory: GigsCategory,
         searchText: String,
         latitude: Double,
@@ -412,7 +412,7 @@ extension GigFilterCriteria {
 
     /// "Save this search" enablement: any active criteria dimension or
     /// a non-empty feed search text.
-    public func canSaveSearch(searchText: String) -> Bool {
+    func canSaveSearch(searchText: String) -> Bool {
         activeCount > 0 || !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

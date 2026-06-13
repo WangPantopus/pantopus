@@ -13,6 +13,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable force_unwrapping multiline_arguments
+
 /// Location stub that never has a coordinate — keeps the feed VM on the
 /// flat-list path regardless of the simulator's location state.
 private final class NoLocationProvider: LocationProviding, @unchecked Sendable {
@@ -687,7 +689,7 @@ final class GigsFeedViewModelTests: XCTestCase {
     func testDraftBannerGateNeedsDraftsAndConnectivity() {
         let queue = makeQueue()
         var online = false
-        let vm = makeVM(queue: queue, isOnline: { online })
+        let vm = makeVM(queue: queue) { online }
         XCTAssertFalse(vm.showsDraftBanner, "No drafts → no banner.")
         queue.enqueue(completeDraftForm(), replacing: nil)
         XCTAssertFalse(vm.showsDraftBanner, "Offline → banner waits for connectivity.")
@@ -747,9 +749,9 @@ final class GigsFeedViewModelTests: XCTestCase {
         XCTAssertEqual(queue.drafts.first?.form.title, "Second draft", "Discard drops the oldest draft.")
     }
 
-    func testDraftQueuePersistsAcrossInstances() {
+    func testDraftQueuePersistsAcrossInstances() throws {
         let suite = "gigs-feed-draft-tests-persist-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         GigDraftQueue(defaults: defaults).enqueue(completeDraftForm(), replacing: nil)
         let reloaded = GigDraftQueue(defaults: defaults)
         XCTAssertEqual(reloaded.drafts.count, 1, "Drafts survive process death via UserDefaults.")

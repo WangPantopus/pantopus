@@ -12,6 +12,8 @@ import Foundation
 import Logging
 import Observation
 
+// swiftlint:disable file_length type_body_length
+
 /// View-model state for the Pulse post detail screen.
 public enum PulsePostDetailState: Sendable, Equatable {
     case loading

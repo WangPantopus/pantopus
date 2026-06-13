@@ -204,10 +204,9 @@ public final class ChatConversationPreferences {
     }
 
     private func decodeSet(_ raw: String?) -> Set<String> {
-        guard
-            let raw,
-            let data = raw.data(using: .utf8),
-            let array = try? JSONDecoder().decode([String].self, from: data)
+        guard let raw,
+              let data = raw.data(using: .utf8),
+              let array = try? JSONDecoder().decode([String].self, from: data)
         else {
             return []
         }
@@ -215,10 +214,9 @@ public final class ChatConversationPreferences {
     }
 
     private func hiddenUnreadBaselines() -> [String: Int] {
-        guard
-            let raw = defaults.string(forKey: Self.hiddenUnreadBaselineKey),
-            let data = raw.data(using: .utf8),
-            let map = try? JSONDecoder().decode([String: Int].self, from: data)
+        guard let raw = defaults.string(forKey: Self.hiddenUnreadBaselineKey),
+              let data = raw.data(using: .utf8),
+              let map = try? JSONDecoder().decode([String: Int].self, from: data)
         else {
             return [:]
         }

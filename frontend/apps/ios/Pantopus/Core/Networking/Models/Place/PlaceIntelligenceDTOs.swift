@@ -22,6 +22,8 @@
 
 import Foundation
 
+// swiftlint:disable cyclomatic_complexity
+
 // MARK: - Trust ladder / gating axes
 
 /// Trust ladder T0–T4 (product design doc §3).
@@ -121,22 +123,22 @@ public enum PlaceGroup: Sendable, Hashable {
 
     public var rawValue: String {
         switch self {
-        case .today: return "today"
-        case .yourHome: return "your_home"
-        case .riskReadiness: return "risk_readiness"
-        case .healthEnvironment: return "health_environment"
-        case .yourBlock: return "your_block"
-        case .moneySignals: return "money_signals"
-        case .civic: return "civic"
-        case .identity: return "identity"
-        case let .unknown(raw): return raw
+        case .today: "today"
+        case .yourHome: "your_home"
+        case .riskReadiness: "risk_readiness"
+        case .healthEnvironment: "health_environment"
+        case .yourBlock: "your_block"
+        case .moneySignals: "money_signals"
+        case .civic: "civic"
+        case .identity: "identity"
+        case let .unknown(raw): raw
         }
     }
 }
 
 extension PlaceGroup: Decodable {
     public init(from decoder: Decoder) throws {
-        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+        try self.init(rawValue: decoder.singleValueContainer().decode(String.self))
     }
 }
 
@@ -191,32 +193,32 @@ public enum PlaceSectionID: Sendable, Hashable {
 
     public var rawValue: String {
         switch self {
-        case .weather: return "weather"
-        case .airQuality: return "air_quality"
-        case .alerts: return "alerts"
-        case .sunriseSunset: return "sunrise_sunset"
-        case .yourHome: return "your_home"
-        case .flood: return "flood"
-        case .seismic: return "seismic"
-        case .wildfire: return "wildfire"
-        case .leadRadon: return "lead_radon"
-        case .drinkingWater: return "drinking_water"
-        case .environmentalHazards: return "environmental_hazards"
-        case .blockDensity: return "block_density"
-        case .censusContext: return "census_context"
-        case .billBenchmark: return "bill_benchmark"
-        case .incentives: return "incentives"
-        case .rentBand: return "rent_band"
-        case .civicDistricts: return "civic_districts"
-        case .civicElection: return "civic_election"
-        case let .unknown(raw): return raw
+        case .weather: "weather"
+        case .airQuality: "air_quality"
+        case .alerts: "alerts"
+        case .sunriseSunset: "sunrise_sunset"
+        case .yourHome: "your_home"
+        case .flood: "flood"
+        case .seismic: "seismic"
+        case .wildfire: "wildfire"
+        case .leadRadon: "lead_radon"
+        case .drinkingWater: "drinking_water"
+        case .environmentalHazards: "environmental_hazards"
+        case .blockDensity: "block_density"
+        case .censusContext: "census_context"
+        case .billBenchmark: "bill_benchmark"
+        case .incentives: "incentives"
+        case .rentBand: "rent_band"
+        case .civicDistricts: "civic_districts"
+        case .civicElection: "civic_election"
+        case let .unknown(raw): raw
         }
     }
 }
 
 extension PlaceSectionID: Decodable {
     public init(from decoder: Decoder) throws {
-        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+        try self.init(rawValue: decoder.singleValueContainer().decode(String.self))
     }
 }
 
@@ -931,7 +933,7 @@ public struct PlaceSectionEnvelope: Decodable, Sendable, Hashable {
         from container: KeyedDecodingContainer<CodingKeys>
     ) -> PlaceSectionData? {
         func payload<T: Decodable>(_: T.Type) -> T? {
-            (try? container.decodeIfPresent(T.self, forKey: .data)) ?? nil
+            (try? container.decodeIfPresent(T.self, forKey: .data))
         }
         switch id {
         case .weather: return payload(PlaceWeatherData.self).map(PlaceSectionData.weather)
@@ -961,26 +963,95 @@ public struct PlaceSectionEnvelope: Decodable, Sendable, Hashable {
 // MARK: - Typed payload accessors
 
 public extension PlaceSectionEnvelope {
-    var weather: PlaceWeatherData? { if case let .weather(d) = data { return d }; return nil }
-    var airQuality: PlaceAirQualityData? { if case let .airQuality(d) = data { return d }; return nil }
-    var alerts: PlaceAlertsData? { if case let .alerts(d) = data { return d }; return nil }
-    var sunriseSunset: PlaceSunriseSunsetData? { if case let .sunriseSunset(d) = data { return d }; return nil }
-    var yourHome: PlaceYourHomeData? { if case let .yourHome(d) = data { return d }; return nil }
-    var flood: PlaceFloodData? { if case let .flood(d) = data { return d }; return nil }
-    var seismic: PlaceSeismicData? { if case let .seismic(d) = data { return d }; return nil }
-    var wildfire: PlaceWildfireData? { if case let .wildfire(d) = data { return d }; return nil }
-    var leadRadon: PlaceLeadRadonData? { if case let .leadRadon(d) = data { return d }; return nil }
-    var drinkingWater: PlaceDrinkingWaterData? { if case let .drinkingWater(d) = data { return d }; return nil }
-    var environmentalHazards: PlaceEnvironmentalHazardsData? {
-        if case let .environmentalHazards(d) = data { return d }; return nil
+    var weather: PlaceWeatherData? {
+        if case let .weather(d) = data { return d }
+        return nil
     }
-    var blockDensity: PlaceBlockDensityData? { if case let .blockDensity(d) = data { return d }; return nil }
-    var censusContext: PlaceCensusContextData? { if case let .censusContext(d) = data { return d }; return nil }
-    var billBenchmark: PlaceBillBenchmarkData? { if case let .billBenchmark(d) = data { return d }; return nil }
-    var incentives: PlaceIncentivesData? { if case let .incentives(d) = data { return d }; return nil }
-    var rentBand: PlaceRentBandData? { if case let .rentBand(d) = data { return d }; return nil }
-    var civicDistricts: PlaceCivicDistrictsData? { if case let .civicDistricts(d) = data { return d }; return nil }
-    var civicElection: PlaceCivicElectionData? { if case let .civicElection(d) = data { return d }; return nil }
+
+    var airQuality: PlaceAirQualityData? {
+        if case let .airQuality(d) = data { return d }
+        return nil
+    }
+
+    var alerts: PlaceAlertsData? {
+        if case let .alerts(d) = data { return d }
+        return nil
+    }
+
+    var sunriseSunset: PlaceSunriseSunsetData? {
+        if case let .sunriseSunset(d) = data { return d }
+        return nil
+    }
+
+    var yourHome: PlaceYourHomeData? {
+        if case let .yourHome(d) = data { return d }
+        return nil
+    }
+
+    var flood: PlaceFloodData? {
+        if case let .flood(d) = data { return d }
+        return nil
+    }
+
+    var seismic: PlaceSeismicData? {
+        if case let .seismic(d) = data { return d }
+        return nil
+    }
+
+    var wildfire: PlaceWildfireData? {
+        if case let .wildfire(d) = data { return d }
+        return nil
+    }
+
+    var leadRadon: PlaceLeadRadonData? {
+        if case let .leadRadon(d) = data { return d }
+        return nil
+    }
+
+    var drinkingWater: PlaceDrinkingWaterData? {
+        if case let .drinkingWater(d) = data { return d }
+        return nil
+    }
+
+    var environmentalHazards: PlaceEnvironmentalHazardsData? {
+        if case let .environmentalHazards(d) = data { return d }
+        return nil
+    }
+
+    var blockDensity: PlaceBlockDensityData? {
+        if case let .blockDensity(d) = data { return d }
+        return nil
+    }
+
+    var censusContext: PlaceCensusContextData? {
+        if case let .censusContext(d) = data { return d }
+        return nil
+    }
+
+    var billBenchmark: PlaceBillBenchmarkData? {
+        if case let .billBenchmark(d) = data { return d }
+        return nil
+    }
+
+    var incentives: PlaceIncentivesData? {
+        if case let .incentives(d) = data { return d }
+        return nil
+    }
+
+    var rentBand: PlaceRentBandData? {
+        if case let .rentBand(d) = data { return d }
+        return nil
+    }
+
+    var civicDistricts: PlaceCivicDistrictsData? {
+        if case let .civicDistricts(d) = data { return d }
+        return nil
+    }
+
+    var civicElection: PlaceCivicElectionData? {
+        if case let .civicElection(d) = data { return d }
+        return nil
+    }
 }
 
 // MARK: - Response root

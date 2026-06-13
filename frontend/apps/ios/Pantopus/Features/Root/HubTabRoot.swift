@@ -2243,14 +2243,12 @@ public struct HubTabRoot: View {
             )
         case let .placeDetail(homeId, group):
             PlaceDetailView(
-                viewModel: PlaceDetailViewModel(homeId: homeId, group: group),
-                onBack: { pop() }
-            )
+                viewModel: PlaceDetailViewModel(homeId: homeId, group: group)
+            ) { pop() }
         case let .placePulse(homeId):
             PlacePulseView(
-                viewModel: PlacePulseViewModel(homeId: homeId),
-                onBack: { pop() }
-            )
+                viewModel: PlacePulseViewModel(homeId: homeId)
+            ) { pop() }
         case let .placeVerifyStatus(homeId, method, address):
             PlaceVerifyStatusView(
                 address: address,
@@ -2283,9 +2281,8 @@ public struct HubTabRoot: View {
             )
         case let .neighborMessage(messageId):
             NeighborMessageReceivedView(
-                viewModel: NeighborMessageReceivedViewModel(messageId: messageId),
-                onBack: { pop() }
-            )
+                viewModel: NeighborMessageReceivedViewModel(messageId: messageId)
+            ) { pop() }
         #if DEBUG
         case .tokenGallery: TokenGalleryView()
         case .iconGallery: IconGalleryView()
@@ -2318,7 +2315,7 @@ public struct HubTabRoot: View {
         guard let response: MyHomesResponse = try? await APIClient.shared.request(
             HomesEndpoints.myHomes()
         ) else { return nil }
-        return response.homes.first(where: { $0.isPrimaryOwner == true })?.id
+        return response.homes.first { $0.isPrimaryOwner == true }?.id
             ?? response.homes.first?.id
     }
 

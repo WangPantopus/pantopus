@@ -565,11 +565,11 @@ private struct PickupDeliveryPanel: View {
     private var locationTitle: String {
         switch viewModel.form.locationKind {
         case .meetPoint:
-            return viewModel.form.locationLabel.isEmpty
+            viewModel.form.locationLabel.isEmpty
                 ? "Pick a meet point"
                 : viewModel.form.locationLabel
         case .savedAddress, nil:
-            return "Your saved address"
+            "Your saved address"
         }
     }
 }

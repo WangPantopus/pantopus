@@ -13,6 +13,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length
+
 @MainActor
 final class PulseComposeViewModelTests: XCTestCase {
     override func setUp() {

@@ -59,8 +59,13 @@ struct PlayerLayerView: UIViewRepresentable {
     let gravity: AVLayerVideoGravity
 
     final class PlayerContainerView: UIView {
-        override static var layerClass: AnyClass { AVPlayerLayer.self }
-        var playerLayer: AVPlayerLayer? { layer as? AVPlayerLayer }
+        override static var layerClass: AnyClass {
+            AVPlayerLayer.self
+        }
+
+        var playerLayer: AVPlayerLayer? {
+            layer as? AVPlayerLayer
+        }
     }
 
     func makeUIView(context _: Context) -> PlayerContainerView {
@@ -150,7 +155,7 @@ struct LivePhotoTileView: View {
         .accessibilityIdentifier("livePhotoTile")
     }
 
-    @ViewBuilder private var mediaLayers: some View {
+    private var mediaLayers: some View {
         ZStack {
             MediaStillImage(
                 url: contentMode == .fill ? (thumbnailURL ?? stillURL) : stillURL,
@@ -302,8 +307,13 @@ public struct PostMediaGridView: View {
         case compact // feed card
         case regular // post detail
 
-        var twoUpHeight: CGFloat { self == .compact ? 140 : 160 }
-        var threeUpHeight: CGFloat { self == .compact ? 160 : 200 }
+        var twoUpHeight: CGFloat {
+            self == .compact ? 140 : 160
+        }
+
+        var threeUpHeight: CGFloat {
+            self == .compact ? 160 : 200
+        }
     }
 
     private let items: [PostMediaItem]
@@ -371,7 +381,7 @@ public struct PostMediaGridView: View {
                 ],
                 spacing: Spacing.s2
             ) {
-                ForEach(0 ..< 4, id: \.self) { index in
+                ForEach(0..<4, id: \.self) { index in
                     ZStack {
                         tile(index)
                         if index == 3, overflow > 0 {
@@ -440,5 +450,7 @@ public struct PostMediaGridView: View {
 /// `fullScreenCover(item:)` payload — which tile launched the viewer.
 struct MediaViewerSelection: Identifiable {
     let index: Int
-    var id: Int { index }
+    var id: Int {
+        index
+    }
 }

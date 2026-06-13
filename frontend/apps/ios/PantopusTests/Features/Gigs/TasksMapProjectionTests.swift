@@ -13,6 +13,8 @@ import SwiftUI
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable force_unwrapping
+
 @MainActor
 final class TasksMapProjectionTests: XCTestCase {
     // MARK: - Helpers
@@ -140,7 +142,7 @@ final class TasksMapProjectionTests: XCTestCase {
 
     // MARK: - fittingRegion (focus-on-pins)
 
-    func testFittingRegionCoversAllPinsWithPadding() {
+    func testFittingRegionCoversAllPinsWithPadding() throws {
         let pins = TasksMapSampleData.items.map(\.pin)
         let region = TasksMapGeometry.fittingRegion(pins: pins)
         XCTAssertNotNil(region)
@@ -151,7 +153,7 @@ final class TasksMapProjectionTests: XCTestCase {
             XCTAssertLessThanOrEqual(p.longitude, region?.maxLongitude ?? -.infinity)
         }
         // Padding factor 1.4 over the raw bounding box.
-        let latExtent = pins.map(\.latitude).max()! - pins.map(\.latitude).min()!
+        let latExtent = try XCTUnwrap(pins.map(\.latitude).max()) - pins.map(\.latitude).min()!
         XCTAssertEqual(region?.latitudeSpan ?? 0, latExtent * 1.4, accuracy: 1e-9)
     }
 

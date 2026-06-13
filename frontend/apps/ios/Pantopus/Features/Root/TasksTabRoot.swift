@@ -8,6 +8,8 @@
 
 import SwiftUI
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 /// Typed routes within the Tasks tab's NavigationStack.
 public enum TasksRoute: Hashable {
     case gigDetail(gigId: String)

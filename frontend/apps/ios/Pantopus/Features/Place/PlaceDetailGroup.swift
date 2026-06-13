@@ -24,40 +24,40 @@ public enum PlaceDetailGroup: String, Hashable, CaseIterable, Sendable {
     /// Page title in the detail header.
     public var title: String {
         switch self {
-        case .today: return "Today"
-        case .yourHome: return "Your home"
-        case .risk: return "Risk & readiness"
-        case .block: return "Your block"
-        case .money: return "Money signals"
-        case .civic: return "Civic"
-        case .identity: return "Identity"
+        case .today: "Today"
+        case .yourHome: "Your home"
+        case .risk: "Risk & readiness"
+        case .block: "Your block"
+        case .money: "Money signals"
+        case .civic: "Civic"
+        case .identity: "Identity"
         }
     }
 
     /// The contract groups whose sections this detail page renders.
     public var groups: [PlaceGroup] {
         switch self {
-        case .today: return [.today]
-        case .yourHome: return [.yourHome]
-        case .risk: return [.riskReadiness, .healthEnvironment]
-        case .block: return [.yourBlock]
-        case .money: return [.moneySignals]
-        case .civic: return [.civic]
-        case .identity: return [.identity]
+        case .today: [.today]
+        case .yourHome: [.yourHome]
+        case .risk: [.riskReadiness, .healthEnvironment]
+        case .block: [.yourBlock]
+        case .money: [.moneySignals]
+        case .civic: [.civic]
+        case .identity: [.identity]
         }
     }
 
     /// The detail page a dashboard card in `group` taps through to.
     public static func forGroup(_ group: PlaceGroup) -> PlaceDetailGroup? {
         switch group {
-        case .today: return .today
-        case .yourHome: return .yourHome
-        case .riskReadiness, .healthEnvironment: return .risk
-        case .yourBlock: return .block
-        case .moneySignals: return .money
-        case .civic: return .civic
-        case .identity: return .identity
-        case .unknown: return nil
+        case .today: .today
+        case .yourHome: .yourHome
+        case .riskReadiness, .healthEnvironment: .risk
+        case .yourBlock: .block
+        case .moneySignals: .money
+        case .civic: .civic
+        case .identity: .identity
+        case .unknown: nil
         }
     }
 }

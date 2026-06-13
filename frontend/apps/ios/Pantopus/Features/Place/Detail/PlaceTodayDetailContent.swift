@@ -10,6 +10,8 @@
 
 import SwiftUI
 
+// swiftlint:disable multiline_arguments
+
 struct PlaceTodayDetailContent: View {
     let intel: PlaceIntelligence
     let vm: PlaceDetailViewModel
@@ -167,10 +169,10 @@ private struct AqiCard: View {
 
     private var categoryColor: Color {
         switch data.category {
-        case .good: return Theme.Color.home
-        case .moderate, .unhealthySensitive: return Theme.Color.warning
-        case .unhealthy, .veryUnhealthy, .hazardous: return Theme.Color.error
-        case .unknown: return Theme.Color.appTextSecondary
+        case .good: Theme.Color.home
+        case .moderate, .unhealthySensitive: Theme.Color.warning
+        case .unhealthy, .veryUnhealthy, .hazardous: Theme.Color.error
+        case .unknown: Theme.Color.appTextSecondary
         }
     }
 }
@@ -242,8 +244,8 @@ private struct AlertRow: View {
 
     private var tone: (bg: Color, fg: Color) {
         switch alert.severity {
-        case .warning: return (Theme.Color.errorBg, Theme.Color.error)
-        case .watch, .advisory, .unknown: return (Theme.Color.warningBg, Theme.Color.warning)
+        case .warning: (Theme.Color.errorBg, Theme.Color.error)
+        case .watch, .advisory, .unknown: (Theme.Color.warningBg, Theme.Color.warning)
         }
     }
 }
@@ -295,22 +297,22 @@ private struct SunCard: View {
 
 private func weatherGlyph(_ code: WeatherConditionCode) -> PantopusIcon {
     switch code {
-    case .clear: return .sun
-    case .partlyCloudy: return .cloudSun
-    case .cloudy, .fog: return .cloud
-    case .rain, .sleet: return .cloudRain
-    case .snow: return .cloudRain
-    case .thunderstorm: return .cloudRain
-    case .wind: return .wind
-    case .unknown: return .cloud
+    case .clear: .sun
+    case .partlyCloudy: .cloudSun
+    case .cloudy, .fog: .cloud
+    case .rain, .sleet: .cloudRain
+    case .snow: .cloudRain
+    case .thunderstorm: .cloudRain
+    case .wind: .wind
+    case .unknown: .cloud
     }
 }
 
 private func weatherTint(_ code: WeatherConditionCode) -> Color {
     switch code {
-    case .clear: return Theme.Color.warning
-    case .rain, .sleet, .snow: return Theme.Color.primary600
-    case .thunderstorm: return Theme.Color.warning
-    default: return Theme.Color.appTextSecondary
+    case .clear: Theme.Color.warning
+    case .rain, .sleet, .snow: Theme.Color.primary600
+    case .thunderstorm: Theme.Color.warning
+    default: Theme.Color.appTextSecondary
     }
 }

@@ -504,8 +504,13 @@ struct GigCounterSheetTarget: Identifiable {
     let id: String
     let bid: GigBidDTO
 
-    var bidderName: String { bid.bidder?.resolvedDisplayName ?? "this bidder" }
-    var bidAmount: Double { bid.bidAmount ?? bid.amount ?? 0 }
+    var bidderName: String {
+        bid.bidder?.resolvedDisplayName ?? "this bidder"
+    }
+
+    var bidAmount: Double {
+        bid.bidAmount ?? bid.amount ?? 0
+    }
 }
 
 /// Amount + optional message → `POST .../bids/:bidId/counter`.
@@ -1117,7 +1122,6 @@ struct GigChangesCard: View {
         .accessibilityIdentifier("gigDetail.change_\(order.id)")
     }
 
-    @ViewBuilder
     private func pendingActions(_ order: GigChangeOrderDTO, inFlight: Bool) -> some View {
         HStack(spacing: Spacing.s2) {
             if isOwnOrder(order) {

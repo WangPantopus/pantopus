@@ -22,13 +22,12 @@ enum ChatMediaURL {
             return nil
         }
 
-        let absolute: URL?
-        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
-            absolute = URL(string: trimmed)
+        let absolute: URL? = if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            URL(string: trimmed)
         } else if trimmed.hasPrefix("/") {
-            absolute = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL
+            URL(string: trimmed, relativeTo: baseURL)?.absoluteURL
         } else {
-            absolute = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL
+            URL(string: trimmed, relativeTo: baseURL)?.absoluteURL
         }
         guard let absolute else { return nil }
 

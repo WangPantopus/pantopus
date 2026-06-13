@@ -151,11 +151,13 @@ private struct VideoSlideView: View {
             PostMediaItem(
                 id: "0",
                 kind: .image,
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://picsum.photos/900/1200")!
             ),
             PostMediaItem(
                 id: "1",
                 kind: .livePhoto,
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://picsum.photos/901/1200")!,
                 liveVideoURL: URL(string: "https://example.com/clip.mov")
             )

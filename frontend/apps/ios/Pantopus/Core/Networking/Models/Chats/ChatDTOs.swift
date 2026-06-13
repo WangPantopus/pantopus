@@ -14,6 +14,8 @@
 
 import Foundation
 
+// swiftlint:disable file_length
+
 // MARK: - Unified conversations
 
 /// One entry in the unified conversations list. The backend tags rows
@@ -302,11 +304,11 @@ public struct ChatMessageDTO: Decodable, Sendable, Hashable, Identifiable {
         userId = try c.decodeIfPresent(String.self, forKey: .userId)
         messageText =
             try c.decodeIfPresent(String.self, forKey: .messageText)
-            ?? c.decodeIfPresent(String.self, forKey: .message)
+                ?? c.decodeIfPresent(String.self, forKey: .message)
         messageType =
             try c.decodeIfPresent(String.self, forKey: .messageType)
-            ?? c.decodeIfPresent(String.self, forKey: .type)
-            ?? "text"
+                ?? c.decodeIfPresent(String.self, forKey: .type)
+                ?? "text"
         metadata = try c.decodeIfPresent(JSONValue.self, forKey: .metadata)
         replyToId = try c.decodeIfPresent(String.self, forKey: .replyToId)
         topicId = try c.decodeIfPresent(String.self, forKey: .topicId)
@@ -424,7 +426,10 @@ public struct AIMediaUploadResponse: Decodable, Sendable, Hashable {
 }
 
 public struct ChatReactionSummary: Decodable, Sendable, Hashable, Identifiable {
-    public var id: String { reaction }
+    public var id: String {
+        reaction
+    }
+
     public let reaction: String
     public let count: Int
     public let reactedByMe: Bool

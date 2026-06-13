@@ -9,6 +9,8 @@
 
 import SwiftUI
 
+// swiftlint:disable function_parameter_count multiple_closures_with_trailing_closure type_body_length
+
 public struct PulsePostTargetPickerView: View {
     @State private var viewModel = PulsePostTargetPickerViewModel()
     @State private var expandedHomeList = false
@@ -274,9 +276,12 @@ public struct PulsePostTargetPickerView: View {
             .fill(Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(Theme.Color.appBorder, style: muted
-                        ? StrokeStyle(lineWidth: 1, dash: [4, 3])
-                        : StrokeStyle(lineWidth: 1))
+                    .stroke(
+                        Theme.Color.appBorder,
+                        style: muted
+                            ? StrokeStyle(lineWidth: 1, dash: [4, 3])
+                            : StrokeStyle(lineWidth: 1)
+                    )
             )
     }
 
@@ -311,14 +316,14 @@ public struct PulsePostTargetPickerView: View {
     }
 
     /// Card that expands in place to reveal one row per home/business.
-    private func expandableCard<Rows: View>(
+    private func expandableCard(
         iconStyle: TargetCardIconStyle,
         title: String,
         subtitle: String,
         isExpanded: Bool,
         identifier: String,
         toggle: @escaping @MainActor () -> Void,
-        @ViewBuilder rows: () -> Rows
+        @ViewBuilder rows: () -> some View
     ) -> some View {
         VStack(spacing: Spacing.s0) {
             Button(action: toggle) {

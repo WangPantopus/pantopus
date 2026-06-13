@@ -15,6 +15,8 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+// swiftlint:disable multiline_arguments multiple_closures_with_trailing_closure type_body_length
+
 /// Mutable scroll metrics for the conversation timeline, held by
 /// reference (via @State) so per-frame writes during scrolling don't
 /// invalidate the view tree.
@@ -128,11 +130,10 @@ public struct ChatConversationView: View {
             if !viewModel.topics.isEmpty {
                 ChatTopicStrip(
                     topics: viewModel.topics,
-                    selectedTopicId: viewModel.selectedTopicId,
-                    onSelect: { topicId in
-                        Task { await viewModel.selectTopic(topicId) }
-                    }
-                )
+                    selectedTopicId: viewModel.selectedTopicId
+                ) { topicId in
+                    Task { await viewModel.selectTopic(topicId) }
+                }
             }
             content
             if viewModel.isCounterpartyTyping {
@@ -379,16 +380,14 @@ public struct ChatConversationView: View {
             ChatComposerContextBanner(
                 title: "Replying to \(reply.senderName)",
                 subtitle: reply.text,
-                style: .reply,
-                onCancel: { viewModel.cancelMessageAction() }
-            )
+                style: .reply
+            ) { viewModel.cancelMessageAction() }
         } else if viewModel.editingMessageId != nil {
             ChatComposerContextBanner(
                 title: "Editing message",
                 subtitle: "Make your changes, then send.",
-                style: .edit,
-                onCancel: { viewModel.cancelMessageAction() }
-            )
+                style: .edit
+            ) { viewModel.cancelMessageAction() }
         }
     }
 
@@ -1073,13 +1072,12 @@ extension ChatConversationView {
             onUseAIDraft: onUseAIDraft,
             onOpenGig: openGigDetail,
             onOpenListing: openListingDetail,
-            onOpenLocation: openLocationInMaps,
-            onRetry: {
-                if bubble.id.hasPrefix("client_") {
-                    Task { await viewModel.retry(clientId: bubble.id) }
-                }
+            onOpenLocation: openLocationInMaps
+        ) {
+            if bubble.id.hasPrefix("client_") {
+                Task { await viewModel.retry(clientId: bubble.id) }
             }
-        )
+        }
     }
 
     private func errorFrame(_ message: String) -> some View {
@@ -1883,7 +1881,7 @@ private struct ChatPersonAvatar: View {
                 }
             }
             if verified {
-                // A15 `.vb` — verified badge is SUCCESS green (#059669),
+                // A15 `.vb` — verified badge is SUCCESS green (Theme.Color.success),
                 // 14pt on the 36 header avatar, capped at 24pt on the
                 // 88 empty-state avatar.
                 Icon(.check, size: min(12, max(6, size * 0.22)), strokeWidth: 3.5, color: Theme.Color.appTextInverse)
@@ -2134,6 +2132,7 @@ private struct ChatBubbleRow: View {
         let fraction: CGFloat = isAIReplyBody ? 0.82 : 0.78
         return rowWidth > 0 ? rowWidth * fraction : Self.fallbackBubbleMaxWidth
     }
+
     private var bubbleTextMaxWidth: CGFloat {
         bubbleMaxWidth - (Self.bubbleHorizontalPadding * 2)
     }
@@ -2217,13 +2216,13 @@ private struct ChatBubbleRow: View {
     private var copyText: String? {
         switch content.body {
         case let .text(text):
-            return text.isEmpty ? nil : text
+            text.isEmpty ? nil : text
         case let .textWithImages(text, _):
-            return text.isEmpty ? nil : text
+            text.isEmpty ? nil : text
         case let .aiReply(text, _, _):
-            return text.isEmpty ? nil : text
+            text.isEmpty ? nil : text
         case .attachment, .image, .systemLink, .locationCard, .gigOfferCard, .listingOfferCard:
-            return nil
+            nil
         }
     }
 
@@ -2274,11 +2273,11 @@ private struct ChatBubbleRow: View {
     private var linkPreviewURL: URL? {
         switch content.body {
         case let .text(text):
-            return ChatLinkDetection.firstURL(in: text)
+            ChatLinkDetection.firstURL(in: text)
         case let .textWithImages(text, _):
-            return ChatLinkDetection.firstURL(in: text)
+            ChatLinkDetection.firstURL(in: text)
         default:
-            return nil
+            nil
         }
     }
 
@@ -2299,19 +2298,17 @@ private struct ChatBubbleRow: View {
         case let .systemLink(label, sub, accent):
             systemLinkPill(label: label, sub: sub, accent: accent)
         case let .locationCard(card):
-            ChatLocationCardView(card: card, isOutgoing: content.side == .outgoing, onOpen: { onOpenLocation(card) })
+            ChatLocationCardView(card: card, isOutgoing: content.side == .outgoing) { onOpenLocation(card) }
         case let .gigOfferCard(card):
             ChatGigOfferCardView(
                 card: card,
-                isOutgoing: content.side == .outgoing,
-                onOpen: { if !card.gigId.isEmpty { onOpenGig(card.gigId) } }
-            )
+                isOutgoing: content.side == .outgoing
+            ) { if !card.gigId.isEmpty { onOpenGig(card.gigId) } }
         case let .listingOfferCard(card):
             ChatListingOfferCardView(
                 card: card,
-                isOutgoing: content.side == .outgoing,
-                onOpen: { if !card.listingId.isEmpty { onOpenListing(card.listingId) } }
-            )
+                isOutgoing: content.side == .outgoing
+            ) { if !card.listingId.isEmpty { onOpenListing(card.listingId) } }
         case let .aiReply(text, estimate, drafts):
             aiReplyBubble(text: text, estimate: estimate, drafts: drafts)
         }
@@ -2442,9 +2439,9 @@ private struct ChatBubbleRow: View {
              0x2300...0x23FF, // misc technical (⌚ ⏰ …)
              0x2B50, 0x2B55, // star, hollow circle
              0x2190...0x21FF: // arrows
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 

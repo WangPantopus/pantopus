@@ -18,8 +18,12 @@ struct PlaceBlockDetailContent: View {
             if let density = vm.section(.blockDensity, in: intel) {
                 PlaceDetailSectionLabel(text: "Verified homes nearby")
                 if let data = density.blockDensity {
-                    PlaceDensityCard(bucket: data.bucket, label: data.label,
-                                     ctaTitle: "Be one of the first to verify on your block", onTap: nil)
+                    PlaceDensityCard(
+                        bucket: data.bucket,
+                        label: data.label,
+                        ctaTitle: "Be one of the first to verify on your block",
+                        onTap: nil
+                    )
                 } else {
                     vm.fallbackCard(density)
                 }
@@ -33,8 +37,10 @@ struct PlaceBlockDetailContent: View {
                 } else {
                     vm.fallbackCard(census)
                 }
-                PlaceSourceNote(name: "U.S. Census · American Community Survey",
-                                asOf: PlacePresentation.fmtMonthYear(census.asOf))
+                PlaceSourceNote(
+                    name: "U.S. Census · American Community Survey",
+                    asOf: PlacePresentation.fmtMonthYear(census.asOf)
+                )
             }
 
             PlaceDetailSectionLabel(text: "Recent permits nearby")

@@ -12,6 +12,8 @@ import Foundation
 import Logging
 import Observation
 
+// swiftlint:disable type_body_length
+
 /// View-model for the Chat List (Inbox tab) screen.
 @Observable
 @MainActor

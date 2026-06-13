@@ -13,6 +13,8 @@ import UIKit
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length type_body_length
+
 @MainActor
 final class GigFilterSheetTests: XCTestCase {
     // MARK: - Criteria ↔ sections

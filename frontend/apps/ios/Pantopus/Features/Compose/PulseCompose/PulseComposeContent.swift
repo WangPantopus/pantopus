@@ -47,7 +47,7 @@ public struct PulseComposeContentState: Equatable {
         safetyAlertKind: PulseSafetyAlertKind = .theft,
         askCategory: PulseAskCategory = .handyman,
         recommendRating: Int = 5,
-        dealExpiresAt: Date = Date().addingTimeInterval(7 * 86_400),
+        dealExpiresAt: Date = Date().addingTimeInterval(7 * 86400),
         eligibilityWarning: String? = nil,
         fields: [PulseComposeField: FormFieldState] = [:],
         photos: [PulseComposePhoto] = [],

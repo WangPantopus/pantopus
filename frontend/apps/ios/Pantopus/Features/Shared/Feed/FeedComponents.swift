@@ -135,26 +135,26 @@ public struct FeedChipRow: View {
 
     private var chipButtons: some View {
         Group {
-                ForEach(chips) { chip in
-                    let active = chip.id == activeId
-                    Button { onSelect(chip.id) } label: {
-                        Text(chip.label)
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
-                            .padding(.horizontal, 14)
-                            .frame(height: 28)
-                            .background(active ? Theme.Color.primary600 : Theme.Color.appSurface)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                                    .stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(chip.label)
-                    .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
-                    .accessibilityIdentifier("feedChip_\(chip.id)")
+            ForEach(chips) { chip in
+                let active = chip.id == activeId
+                Button { onSelect(chip.id) } label: {
+                    Text(chip.label)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+                        .padding(.horizontal, 14)
+                        .frame(height: 28)
+                        .background(active ? Theme.Color.primary600 : Theme.Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                                .stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(chip.label)
+                .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("feedChip_\(chip.id)")
+            }
         }
     }
 }

@@ -10,12 +10,14 @@
 
 import SwiftUI
 
+// swiftlint:disable line_length
+
 // MARK: - Residency letter VM
 
 @Observable
 @MainActor
 final class PlaceResidencyLetterViewModel {
-    enum State: Sendable {
+    enum State {
         case loading
         case loaded([ResidencyLetter])
         case error(message: String)
@@ -89,7 +91,9 @@ struct PlaceIdentityDetailContent: View {
         _letters = State(initialValue: PlaceResidencyLetterViewModel(homeId: vm.homeId))
     }
 
-    private var isVerified: Bool { intel.tier == .t4 }
+    private var isVerified: Bool {
+        intel.tier == .t4
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -111,8 +115,11 @@ struct PlaceIdentityDetailContent: View {
             }
 
             PlaceDetailSectionLabel(text: "Portable ID")
-            PlaceComingSoonRow(icon: .shieldCheck, title: "Portable ID",
-                               subtitle: "Carry your verified status to other apps")
+            PlaceComingSoonRow(
+                icon: .shieldCheck,
+                title: "Portable ID",
+                subtitle: "Carry your verified status to other apps"
+            )
         }
     }
 }
@@ -127,8 +134,12 @@ private struct VerifiedStatusCard: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(isVerified ? Theme.Color.homeBg : Theme.Color.warningBg)
-                    Icon(.badgeCheck, size: 24, strokeWidth: 2,
-                         color: isVerified ? Theme.Color.home : Theme.Color.warning)
+                    Icon(
+                        .badgeCheck,
+                        size: 24,
+                        strokeWidth: 2,
+                        color: isVerified ? Theme.Color.home : Theme.Color.warning
+                    )
                 }
                 .frame(width: 48, height: 48)
                 VStack(alignment: .leading, spacing: 2) {

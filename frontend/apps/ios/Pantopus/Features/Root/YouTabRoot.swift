@@ -12,6 +12,8 @@
 
 import SwiftUI
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 /// Typed routes within the You tab's NavigationStack.
 public enum YouRoute: Hashable {
     case signOutConfirm

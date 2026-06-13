@@ -11,6 +11,8 @@
 
 import Foundation
 
+// swiftlint:disable file_length
+
 /// One-of-nine category the user can pick in step 1. Mirrors the chip
 /// palette in `gigs-frames.jsx` CATS plus an `other` bucket the
 /// composer surfaces but the feed filter does not (we route `other` to

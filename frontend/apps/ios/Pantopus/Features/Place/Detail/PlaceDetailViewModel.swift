@@ -13,7 +13,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class PlaceDetailViewModel {
-    enum State: Sendable {
+    enum State {
         case loading
         case loaded(PlaceIntelligence)
         case error(message: String)
@@ -64,7 +64,9 @@ final class PlaceDetailViewModel {
     /// Find a single section across the payload (for bespoke detail cards).
     func section(_ id: PlaceSectionID, in intel: PlaceIntelligence) -> PlaceSectionEnvelope? {
         for g in intel.groups {
-            for s in g.sections where s.id == id { return s }
+            for s in g.sections where s.id == id {
+                return s
+            }
         }
         return nil
     }

@@ -42,12 +42,12 @@ struct NeighborManageFlags: Equatable {
 /// Pantopus glyph — substituted with the nearest in-set match.)
 func neighborTemplateIcon(_ name: String) -> PantopusIcon {
     switch name {
-    case "volume-2": return .bell
-    case "package": return .package
-    case "car": return .car
-    case "dog": return .dog
-    case "door-open": return .doorOpen
-    default: return .messageSquare
+    case "volume-2": .bell
+    case "package": .package
+    case "car": .car
+    case "dog": .dog
+    case "door-open": .doorOpen
+    default: .messageSquare
     }
 }
 

@@ -21,25 +21,25 @@ public enum PlaceVerifyMethod: String, CaseIterable, Hashable, Sendable {
 
     var icon: PantopusIcon {
         switch self {
-        case .mail: return .send
-        case .records: return .fileSearch
-        case .document: return .upload
+        case .mail: .send
+        case .records: .fileSearch
+        case .document: .upload
         }
     }
 
     var label: String {
         switch self {
-        case .mail: return "Mail a code to my address"
-        case .records: return "Match property records"
-        case .document: return "Upload a document"
+        case .mail: "Mail a code to my address"
+        case .records: "Match property records"
+        case .document: "Upload a document"
         }
     }
 
     var sub: String {
         switch self {
-        case .mail: return "We send a postcard with a code. Most common."
-        case .records: return "Instant if your name is on the deed or lease"
-        case .document: return "A utility bill, lease, or bank statement"
+        case .mail: "We send a postcard with a code. Most common."
+        case .records: "Instant if your name is on the deed or lease"
+        case .document: "A utility bill, lease, or bank statement"
         }
     }
 }
@@ -48,13 +48,15 @@ struct PlaceVerifyBenefit: Identifiable {
     let icon: PantopusIcon
     let label: String
     let sub: String
-    var id: String { label }
+    var id: String {
+        label
+    }
 }
 
 let placeVerifyBenefits: [PlaceVerifyBenefit] = [
     .init(icon: .messageCircle, label: "Message your verified neighbors", sub: "Direct messages with the people on your block"),
     .init(icon: .badgeCheck, label: "Your verified badge", sub: "The address-proven check on your profile"),
-    .init(icon: .mailbox, label: "Your digital mailbox", sub: "Packages, civic notices, and permits in one place"),
+    .init(icon: .mailbox, label: "Your digital mailbox", sub: "Packages, civic notices, and permits in one place")
 ]
 
 // MARK: - B1 — the verify sheet
@@ -134,8 +136,13 @@ struct PlaceVerifySheet: View {
             VStack(spacing: 0) {
                 ForEach(Array(PlaceVerifyMethod.allCases.enumerated()), id: \.offset) { index, m in
                     Button { selected = m } label: {
-                        row(icon: m.icon, label: m.label, sub: m.sub, tone: .sky,
-                            trailing: AnyView(radio(selected: selected == m)))
+                        row(
+                            icon: m.icon,
+                            label: m.label,
+                            sub: m.sub,
+                            tone: .sky,
+                            trailing: AnyView(radio(selected: selected == m))
+                        )
                     }
                     .buttonStyle(.plain)
                     if index < PlaceVerifyMethod.allCases.count - 1 { divider }
@@ -222,7 +229,7 @@ struct PlaceVerifyStatusView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    // B2
+    /// B2
     private var pending: some View {
         VStack(spacing: 16) {
             statusMark(icon: method == .mail ? .clock : .refreshCw, tone: .home)
@@ -251,7 +258,7 @@ struct PlaceVerifyStatusView: View {
         }
     }
 
-    // B3
+    /// B3
     private var success: some View {
         VStack(spacing: 18) {
             seal
@@ -281,7 +288,7 @@ struct PlaceVerifyStatusView: View {
         .onAppear { revealed = true }
     }
 
-    // B4
+    /// B4
     private var failed: some View {
         VStack(spacing: 16) {
             statusMark(icon: .triangleAlert, tone: .muted)
@@ -369,9 +376,9 @@ struct PlaceVerifyStatusView: View {
 
     private var pendingCopy: String {
         switch method {
-        case .mail: return "We've mailed a postcard to your address. Enter the code when it arrives — usually within a few days."
-        case .records: return "We're matching your name against the deed and lease records on file. This is usually instant."
-        case .document: return "We're reviewing the document you uploaded. We'll let you know shortly."
+        case .mail: "We've mailed a postcard to your address. Enter the code when it arrives — usually within a few days."
+        case .records: "We're matching your name against the deed and lease records on file. This is usually instant."
+        case .document: "We're reviewing the document you uploaded. We'll let you know shortly."
         }
     }
 }

@@ -17,6 +17,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable file_length
+
 public enum PostGigV1PriceType: String, CaseIterable, Identifiable, Sendable {
     case flat
     case hourly
@@ -397,13 +399,12 @@ public final class PostGigV1ViewModel {
         state.isSubmitting = true
         defer { state.isSubmitting = false }
         do {
-            let response: CreateGigResponse
-            if let editGigId {
-                response = try await api.request(
+            let response: CreateGigResponse = if let editGigId {
+                try await api.request(
                     GigsEndpoints.update(id: editGigId, body: buildUpdateBody(from: state.form))
                 )
             } else {
-                response = try await api.request(
+                try await api.request(
                     GigsEndpoints.create(buildCreateBody(from: state.form))
                 )
             }

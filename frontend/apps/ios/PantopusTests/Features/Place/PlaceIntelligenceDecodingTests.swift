@@ -13,6 +13,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable line_length
+
 @MainActor
 final class PlaceIntelligenceDecodingTests: XCTestCase {
     private let decoder = JSONDecoder()
@@ -29,7 +31,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testDecodesFullIntelligencePayload() throws {
         let intelligence = try decoder.decode(
             PlaceIntelligence.self,
-            from: try fixture("intelligence-full.json")
+            from: fixture("intelligence-full.json")
         )
 
         XCTAssertEqual(intelligence.tier, .t3)
@@ -52,7 +54,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testDecodesReadySectionPayloads() throws {
         let intelligence = try decoder.decode(
             PlaceIntelligence.self,
-            from: try fixture("intelligence-full.json")
+            from: fixture("intelligence-full.json")
         )
         let sections = intelligence.groups.flatMap(\.sections)
 
@@ -92,7 +94,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testUnavailableSectionsCarryNilDataAndOptionalReason() throws {
         let intelligence = try decoder.decode(
             PlaceIntelligence.self,
-            from: try fixture("intelligence-full.json")
+            from: fixture("intelligence-full.json")
         )
         let sections = intelligence.groups.flatMap(\.sections)
 
@@ -112,7 +114,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testDecodesSectionsSubsetPayload() throws {
         let intelligence = try decoder.decode(
             PlaceIntelligence.self,
-            from: try fixture("intelligence-subset.json")
+            from: fixture("intelligence-subset.json")
         )
         let ids = intelligence.groups.flatMap(\.sections).map(\.id)
         XCTAssertEqual(ids, [.weather, .flood, .civicDistricts])
@@ -123,7 +125,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testDecodesPublicPreviewPayload() throws {
         let preview = try decoder.decode(
             PlacePreview.self,
-            from: try fixture("public-place-preview.json")
+            from: fixture("public-place-preview.json")
         )
 
         XCTAssertEqual(preview.status, .partial)
@@ -151,7 +153,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testDecodesNeighborMessageTemplates() throws {
         let catalog = try decoder.decode(
             NeighborMessageTemplates.self,
-            from: try fixture("neighbor-templates.json")
+            from: fixture("neighbor-templates.json")
         )
         XCTAssertFalse(catalog.templates.isEmpty)
         XCTAssertFalse(catalog.replies.isEmpty)
@@ -165,7 +167,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testDecodesUnknownResidencyVerification() throws {
         let verification = try decoder.decode(
             ResidencyLetterVerification.self,
-            from: try fixture("residency-verify-unknown.json")
+            from: fixture("residency-verify-unknown.json")
         )
         XCTAssertFalse(verification.valid)
         XCTAssertNil(verification.status)
@@ -176,7 +178,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     func testDecodesGeoAutocompleteSuggestions() throws {
         let response = try decoder.decode(
             GeoAutocompleteResponse.self,
-            from: try fixture("geo-autocomplete.json")
+            from: fixture("geo-autocomplete.json")
         )
         let first = try XCTUnwrap(response.suggestions.first)
         XCTAssertEqual(first.primaryText, "4008 Northeast Tacoma Court")
@@ -301,6 +303,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     }
 
     // MARK: - Residency letter issuer shape (hand-authored from
+
     // `backend/services/residencyLetterService.js:185` serializeLetter)
 
     func testDecodesResidencyLetterEnvelope() throws {
@@ -328,6 +331,7 @@ final class PlaceIntelligenceDecodingTests: XCTestCase {
     }
 
     // MARK: - Pulse envelope (hand-authored from
+
     // `frontend/packages/types/src/ai.ts` NeighborhoodPulse; live capture
     // pending a home with the `home.view` grant — see Phase 4)
 

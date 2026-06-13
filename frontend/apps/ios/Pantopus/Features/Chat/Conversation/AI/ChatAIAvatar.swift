@@ -3,10 +3,9 @@
 //  Pantopus
 //
 //  A15.3 — the Pantopus AI mark. A circle filled with the design's
-//  `.ai-grad` primary-blue gradient (#0284c7 → #075985 ≈ primary600 →
-//  primary800) carrying a white `sparkles` glyph. Used wherever the AI
-//  assistant appears (chat-list row, conversation header, welcome card,
-//  empty state).
+//  `.ai-grad` primary-blue gradient (primary600 → primary800) carrying a
+//  white `sparkles` glyph. Used wherever the AI assistant appears
+//  (chat-list row, conversation header, welcome card, empty state).
 //
 
 import SwiftUI

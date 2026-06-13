@@ -11,6 +11,8 @@
 
 import Foundation
 
+// swiftlint:disable file_length
+
 /// Body for `POST /api/gigs/magic-draft`. `text` is the user's
 /// plain-English describe input (3–2000 chars, validated server-side);
 /// `context` carries optional hints the parser can fold in.
@@ -290,7 +292,9 @@ public struct GigTaskItemDraft: Codable, Sendable, Hashable, Equatable, Identifi
     public var budgetCap: Double?
     public var preferredStore: String?
 
-    public var id: String { "\(name ?? "")|\(notes ?? "")" }
+    public var id: String {
+        "\(name ?? "")|\(notes ?? "")"
+    }
 
     public init(
         name: String? = nil,

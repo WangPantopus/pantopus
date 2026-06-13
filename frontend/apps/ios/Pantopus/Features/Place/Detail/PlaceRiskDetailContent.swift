@@ -76,18 +76,18 @@ struct PlaceRiskDetailContent: View {
 
     private func riskSummary(_ env: PlaceSectionEnvelope) -> String? {
         switch env.id {
-        case .flood: return env.flood?.plainMeaning
-        case .seismic: return env.seismic?.summary
-        case .wildfire: return env.wildfire?.summary
-        default: return nil
+        case .flood: env.flood?.plainMeaning
+        case .seismic: env.seismic?.summary
+        case .wildfire: env.wildfire?.summary
+        default: nil
         }
     }
 
     private func riskDisclaimer(_ env: PlaceSectionEnvelope) -> String? {
         switch env.id {
-        case .seismic: return env.seismic?.disclaimer
-        case .wildfire: return env.wildfire?.disclaimer
-        default: return nil
+        case .seismic: env.seismic?.disclaimer
+        case .wildfire: env.wildfire?.disclaimer
+        default: nil
         }
     }
 
@@ -135,18 +135,18 @@ struct PlaceRiskDetailContent: View {
 
     private func healthSummary(_ env: PlaceSectionEnvelope) -> String? {
         switch env.id {
-        case .leadRadon: return env.leadRadon?.summary
-        case .drinkingWater: return env.drinkingWater?.summary
-        case .environmentalHazards: return env.environmentalHazards?.summary
-        default: return nil
+        case .leadRadon: env.leadRadon?.summary
+        case .drinkingWater: env.drinkingWater?.summary
+        case .environmentalHazards: env.environmentalHazards?.summary
+        default: nil
         }
     }
 
     private func healthDisclaimer(_ env: PlaceSectionEnvelope) -> String? {
         switch env.id {
-        case .leadRadon: return env.leadRadon?.disclaimer
-        case .environmentalHazards: return env.environmentalHazards?.disclaimer
-        default: return nil
+        case .leadRadon: env.leadRadon?.disclaimer
+        case .environmentalHazards: env.environmentalHazards?.disclaimer
+        default: nil
         }
     }
 }
@@ -154,20 +154,37 @@ struct PlaceRiskDetailContent: View {
 // MARK: - Emergency checklist (local state)
 
 private struct EmergencyChecklist: View {
-    private struct Group { let title: String; let items: [String] }
+    private struct Group { let title: String
+        let items: [String]
+    }
+
     private static let groups: [Group] = [
-        Group(title: "Go-bag essentials",
-              items: ["Water (1 gal/person/day)", "Three days of food", "Flashlight + batteries",
-                      "First-aid kit", "Medications", "Phone charger / power bank"]),
-        Group(title: "Key contacts",
-              items: ["Out-of-area contact", "Local emergency numbers", "Utility shut-off info"]),
-        Group(title: "Meeting point",
-              items: ["Neighborhood spot", "Out-of-town spot", "Reunification plan"]),
+        Group(
+            title: "Go-bag essentials",
+            items: [
+                "Water (1 gal/person/day)",
+                "Three days of food",
+                "Flashlight + batteries",
+                "First-aid kit",
+                "Medications",
+                "Phone charger / power bank"
+            ]
+        ),
+        Group(
+            title: "Key contacts",
+            items: ["Out-of-area contact", "Local emergency numbers", "Utility shut-off info"]
+        ),
+        Group(
+            title: "Meeting point",
+            items: ["Neighborhood spot", "Out-of-town spot", "Reunification plan"]
+        )
     ]
 
     @State private var checked: Set<String> = []
 
-    private var total: Int { Self.groups.reduce(0) { $0 + $1.items.count } }
+    private var total: Int {
+        Self.groups.reduce(0) { $0 + $1.items.count }
+    }
 
     var body: some View {
         PlaceDetailCard {
