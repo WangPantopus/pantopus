@@ -5094,7 +5094,7 @@ router.post('/:id/events', verifyToken, async (req, res) => {
     const access = await checkHomePermission(homeId, userId);
     if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
 
-    const { event_type, title, description, start_at, end_at, location_notes, recurrence_rule, assigned_to, alerts_enabled } = req.body;
+    const { event_type, title, description, start_at, end_at, location_notes, recurrence_rule, assigned_to, alerts_enabled, request_rsvp, reminders } = req.body;
 
     if (!event_type || !title || !start_at) {
       return res.status(400).json({ error: 'event_type, title, and start_at are required' });
@@ -5113,6 +5113,8 @@ router.post('/:id/events', verifyToken, async (req, res) => {
         recurrence_rule: recurrence_rule || null,
         assigned_to: assigned_to || null,
         alerts_enabled: alerts_enabled !== false,
+        request_rsvp: request_rsvp === true,
+        reminders: Array.isArray(reminders) ? reminders : [],
         created_by: userId,
       })
       .select()
@@ -5141,7 +5143,7 @@ router.put('/:id/events/:eventId', verifyToken, async (req, res) => {
     const access = await checkHomePermission(homeId, userId);
     if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
 
-    const allowed = ['title', 'description', 'event_type', 'start_at', 'end_at', 'location_notes', 'recurrence_rule', 'assigned_to', 'alerts_enabled'];
+    const allowed = ['title', 'description', 'event_type', 'start_at', 'end_at', 'location_notes', 'recurrence_rule', 'assigned_to', 'alerts_enabled', 'request_rsvp', 'reminders'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -5194,6 +5196,82 @@ router.delete('/:id/events/:eventId', verifyToken, async (req, res) => {
   } catch (err) {
     logger.error('Event delete error', { error: err.message });
     res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+/**
+ * GET /api/homes/:id/events/:eventId — event detail incl. attendee RSVPs.
+ */
+router.get('/:id/events/:eventId', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId, eventId } = req.params;
+    const access = await checkHomePermission(homeId, req.user.id);
+    if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
+    const { data: event } = await supabaseAdmin
+      .from('HomeCalendarEvent')
+      .select('*')
+      .eq('id', eventId)
+      .eq('home_id', homeId)
+      .maybeSingle();
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    const { data: attendees } = await supabaseAdmin
+      .from('HomeCalendarEventAttendee')
+      .select('user_id, rsvp_status, updated_at')
+      .eq('event_id', eventId);
+    res.json({ event, attendees: attendees || [] });
+  } catch (err) {
+    logger.error('Event detail error', { error: err.message });
+    res.status(500).json({ error: 'Failed to load event' });
+  }
+});
+
+/**
+ * POST /api/homes/:id/events/:eventId/rsvp — a member records their RSVP for a home event.
+ */
+router.post('/:id/events/:eventId/rsvp', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId, eventId } = req.params;
+    const userId = req.user.id;
+    const status = req.body && req.body.status;
+    if (!['going', 'maybe', 'declined', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'status must be going | maybe | declined | pending' });
+    }
+    const access = await checkHomePermission(homeId, userId);
+    if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
+    // Confirm the event belongs to this home.
+    const { data: event } = await supabaseAdmin
+      .from('HomeCalendarEvent')
+      .select('id')
+      .eq('id', eventId)
+      .eq('home_id', homeId)
+      .maybeSingle();
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    const { data: existing } = await supabaseAdmin
+      .from('HomeCalendarEventAttendee')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    let row;
+    if (existing) {
+      ({ data: row } = await supabaseAdmin
+        .from('HomeCalendarEventAttendee')
+        .update({ rsvp_status: status, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select('user_id, rsvp_status')
+        .single());
+    } else {
+      ({ data: row } = await supabaseAdmin
+        .from('HomeCalendarEventAttendee')
+        .insert({ event_id: eventId, user_id: userId, rsvp_status: status })
+        .select('user_id, rsvp_status')
+        .single());
+    }
+    res.json({ attendee: row });
+  } catch (err) {
+    logger.error('Event RSVP error', { error: err.message });
+    res.status(500).json({ error: 'Failed to record RSVP' });
   }
 });
 
