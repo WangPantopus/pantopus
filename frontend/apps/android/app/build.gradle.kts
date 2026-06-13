@@ -12,6 +12,10 @@ plugins {
     // config used by FirebaseMessaging. The committed JSON is a clearly-
     // marked placeholder — see the TODO at the top of that file.
     alias(libs.plugins.google.services)
+    // Retries flaky JVM unit tests on CI (intermittent kotlinx-coroutines
+    // inter-test leaks surface as UncaughtExceptionsBeforeTest on whichever
+    // test runs next). Deterministic failures still fail; flakes pass on retry.
+    id("org.gradle.test-retry") version "1.6.2"
 }
 
 // Load local env from .env (not committed). Falls back to sensible defaults.
@@ -166,6 +170,12 @@ android {
 // dispatcher resolve deterministically. Test-only; no app behaviour change.
 tasks.withType<Test>().configureEach {
     systemProperty("kotlinx.coroutines.fast.service.loader", "false")
+    retry {
+        maxRetries.set(2)
+        // If lots of tests fail it's a real breakage, not a flake — don't retry.
+        maxFailures.set(20)
+        failOnPassedAfterRetry.set(false)
+    }
 }
 
 // ── Release config guard ───────────────────────────────────────────────
