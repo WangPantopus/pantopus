@@ -233,8 +233,9 @@ CREATE OR REPLACE FUNCTION "public"."booking_set_guard_range"() RETURNS "trigger
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
-  NEW.guard_start := NEW.start_at - "make_interval"("mins" => COALESCE(NEW.buffer_after_min, 0));
-  NEW.guard_end   := NEW.end_at   + "make_interval"("mins" => COALESCE(NEW.buffer_before_min, 0));
+  -- Occupied range = prep (buffer_before) before the start, wind-down (buffer_after) after the end.
+  NEW.guard_start := NEW.start_at - "make_interval"("mins" => COALESCE(NEW.buffer_before_min, 0));
+  NEW.guard_end   := NEW.end_at   + "make_interval"("mins" => COALESCE(NEW.buffer_after_min, 0));
   RETURN NEW;
 END;
 $$;
