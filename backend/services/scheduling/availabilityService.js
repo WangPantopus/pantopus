@@ -372,42 +372,63 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs }
   const toIso = new Date(toMs).toISOString();
 
   // 1. Bookings where these members are host (active statuses), overlapping the window.
+  //    Expand each by the booking's OWN buffers so the engine's offered slots match the DB
+  //    exclusion constraint (which guards each booking's buffer-padded occupied range).
   const { data: bookings } = await supabaseAdmin
     .from('Booking')
-    .select('host_user_id, start_at, end_at, status')
+    .select('host_user_id, start_at, end_at, buffer_before_min, buffer_after_min')
     .in('host_user_id', memberIds)
     .in('status', ['pending', 'confirmed'])
     .lt('start_at', toIso)
     .gt('end_at', fromIso);
   for (const b of bookings || []) {
-    if (busy[b.host_user_id]) busy[b.host_user_id].push({ start: Date.parse(b.start_at), end: Date.parse(b.end_at) });
+    if (!busy[b.host_user_id]) continue;
+    busy[b.host_user_id].push({
+      start: Date.parse(b.start_at) - (b.buffer_before_min || 0) * MIN_MS,
+      end: Date.parse(b.end_at) + (b.buffer_after_min || 0) * MIN_MS,
+    });
   }
 
-  // 2. Availability blocks (non-recurring overlap + recurring fetched separately, expanded).
-  const { data: blocks } = await supabaseAdmin
+  // 2. Availability blocks. Split into two queries (avoids a fragile nested .or() and the NULL
+  //    three-valued-logic trap): non-recurring rows overlapping the window + all recurring rows.
+  const { data: blocksOnce } = await supabaseAdmin
+    .from('AvailabilityBlock')
+    .select('user_id, start_at, end_at')
+    .in('user_id', memberIds)
+    .is('recurrence_rule', null)
+    .lt('start_at', toIso)
+    .gt('end_at', fromIso);
+  for (const blk of blocksOnce || []) {
+    if (busy[blk.user_id]) busy[blk.user_id].push({ start: Date.parse(blk.start_at), end: Date.parse(blk.end_at) });
+  }
+  const { data: blocksRec } = await supabaseAdmin
     .from('AvailabilityBlock')
     .select('user_id, start_at, end_at, recurrence_rule')
     .in('user_id', memberIds)
-    .or(`and(start_at.lt.${toIso},end_at.gt.${fromIso}),recurrence_rule.not.is.null`);
-  for (const blk of blocks || []) {
+    .not('recurrence_rule', 'is', null);
+  for (const blk of blocksRec || []) {
     if (!busy[blk.user_id]) continue;
     const startMs = Date.parse(blk.start_at);
-    const endMs = Date.parse(blk.end_at);
-    if (blk.recurrence_rule) {
-      busy[blk.user_id].push(...expandRecurrence(blk.recurrence_rule, startMs, endMs - startMs, fromMs, toMs));
-    } else {
-      busy[blk.user_id].push({ start: startMs, end: endMs });
-    }
+    busy[blk.user_id].push(...expandRecurrence(blk.recurrence_rule, startMs, Date.parse(blk.end_at) - startMs, fromMs, toMs));
   }
 
-  // 3. Home shared calendar — counts as busy for whole-home (assigned_to null) or assigned members.
+  // 3. Home shared calendar — busy for whole-home (assigned_to null) or assigned members.
+  //    Non-recurring query INCLUDES open-ended events (end_at IS NULL), which a single
+  //    `end_at.gt` filter would silently drop via NULL three-valued logic.
   if (ownerType === 'home') {
-    const { data: events } = await supabaseAdmin
+    const { data: eventsOnce } = await supabaseAdmin
+      .from('HomeCalendarEvent')
+      .select('start_at, end_at, assigned_to')
+      .eq('home_id', ownerId)
+      .is('recurrence_rule', null)
+      .lt('start_at', toIso)
+      .or(`end_at.gt.${fromIso},end_at.is.null`);
+    const { data: eventsRec } = await supabaseAdmin
       .from('HomeCalendarEvent')
       .select('start_at, end_at, recurrence_rule, assigned_to')
       .eq('home_id', ownerId)
-      .or(`and(start_at.lt.${toIso},end_at.gt.${fromIso}),recurrence_rule.not.is.null`);
-    for (const ev of events || []) {
+      .not('recurrence_rule', 'is', null);
+    for (const ev of [...(eventsOnce || []), ...(eventsRec || [])]) {
       const startMs = Date.parse(ev.start_at);
       const endMs = ev.end_at ? Date.parse(ev.end_at) : startMs + 60 * MIN_MS; // null end -> 1h default
       const duration = endMs - startMs;

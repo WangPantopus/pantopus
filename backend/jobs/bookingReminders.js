@@ -66,7 +66,9 @@ async function runBookingReminders() {
       if (!(await logSent(booking.id, w.kind))) continue;
 
       try {
-        if (!etCache.has(booking.event_type_id)) {
+        // Resource bookings have a null event_type_id — skip the lookup (sendBookingReminder
+        // falls back to a generic title) rather than querying EventType with a null id.
+        if (booking.event_type_id && !etCache.has(booking.event_type_id)) {
           const { data: et } = await supabaseAdmin.from('EventType').select('*').eq('id', booking.event_type_id).maybeSingle();
           etCache.set(booking.event_type_id, et || null);
         }
@@ -76,7 +78,7 @@ async function runBookingReminders() {
         }
         await notify.sendBookingReminder({
           booking,
-          eventType: etCache.get(booking.event_type_id),
+          eventType: booking.event_type_id ? etCache.get(booking.event_type_id) : null,
           page: booking.page_id ? pageCache.get(booking.page_id) : null,
           kind: w.kind,
         });
