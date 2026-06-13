@@ -511,11 +511,12 @@ async function acceptProposedReschedule(bookingId, actorUserId) {
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
   if (!ctx.booking.proposed_start_at) throw new BookingError('No pending reschedule proposal.', 409, 'NO_PROPOSAL');
   const updated = await rescheduleBooking(bookingId, actorUserId, ctx.booking.proposed_start_at, 'system', ctx.booking.proposed_host_id);
-  await supabaseAdmin
+  const { error: clearErr } = await supabaseAdmin
     .from('Booking')
     .update({ proposed_start_at: null, proposed_host_id: null, proposed_by: null })
     .eq('id', bookingId);
-  return updated;
+  if (clearErr) logger.warn('[bookingService] failed to clear reschedule proposal after accept', { bookingId, error: clearErr.message });
+  return { ...updated, proposed_start_at: null, proposed_host_id: null, proposed_by: null };
 }
 
 /** Clear a pending reschedule proposal (host cancels, or invitee declines). */
