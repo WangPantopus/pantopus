@@ -29,3 +29,44 @@ data class NormalizedAddress(
 data class GeoReverseResponse(
     val normalized: NormalizedAddress,
 )
+
+/**
+ * One address-typeahead suggestion from `GET /api/geo/autocomplete`.
+ *
+ * NOTE the wire shape (verified against the live backend): `center` is
+ * a GeoJSON-style `[lng, lat]` ARRAY, not a `{lat, lng}` object (the
+ * web `GeoSuggestion` TS type claims an object — the wire wins).
+ */
+@JsonClass(generateAdapter = true)
+data class GeoSuggestion(
+    @Json(name = "suggestion_id") val suggestionId: String,
+    @Json(name = "place_id") val placeId: String? = null,
+    @Json(name = "primary_text") val primaryText: String,
+    @Json(name = "secondary_text") val secondaryText: String? = null,
+    val label: String,
+    val text: String? = null,
+    /** GeoJSON order: `[longitude, latitude]`. */
+    val center: List<Double> = emptyList(),
+    val kind: String,
+) {
+    val longitude: Double? get() = center.getOrNull(0)
+    val latitude: Double? get() = center.getOrNull(1)
+}
+
+/** `GET /api/geo/autocomplete` envelope. */
+@JsonClass(generateAdapter = true)
+data class GeoAutocompleteResponse(
+    val suggestions: List<GeoSuggestion> = emptyList(),
+)
+
+/** `POST /api/geo/resolve` body. */
+@JsonClass(generateAdapter = true)
+data class GeoResolveRequest(
+    @Json(name = "suggestion_id") val suggestionId: String,
+)
+
+/** `POST /api/geo/resolve` envelope. */
+@JsonClass(generateAdapter = true)
+data class GeoResolveResponse(
+    val normalized: NormalizedAddress,
+)

@@ -26,6 +26,19 @@ public enum AIEndpoints {
         Endpoint(method: .delete, path: "/api/ai/conversations/\(id)")
     }
 
+    /// `GET /api/ai/pulse?homeId=` — the Neighborhood Pulse for a home
+    /// (the priority-ranked signal stream behind the Place "Today's
+    /// Pulse" surface). NOTE: the query param is camelCase `homeId`
+    /// (Joi `pulseSchema`, `backend/routes/ai.js:102`).
+    /// Route `backend/routes/ai.js:332`.
+    public static func pulse(homeId: String) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/ai/pulse",
+            query: ["homeId": homeId]
+        )
+    }
+
     /// `POST /api/ai/draft/listing-vision` — Snap & Sell: draft a
     /// listing (title, description, category, condition, price) from
     /// item photos, with an optional comp-range price suggestion.

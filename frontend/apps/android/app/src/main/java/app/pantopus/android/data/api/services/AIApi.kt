@@ -4,12 +4,14 @@ import app.pantopus.android.data.api.models.ai.AIConversationsResponse
 import app.pantopus.android.data.api.models.ai.AIDraftListingVisionRequest
 import app.pantopus.android.data.api.models.ai.AIListingVisionResponse
 import app.pantopus.android.data.api.models.ai.TranscriptionResponse
+import app.pantopus.android.data.api.models.place.NeighborhoodPulse
 import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
+import retrofit2.http.Query
 
 /**
  * AI assistant endpoints under `/api/ai/[*]` from `backend/routes/ai.js`.
@@ -23,6 +25,17 @@ interface AIApi {
      */
     @GET("api/ai/conversations")
     suspend fun conversations(): AIConversationsResponse
+
+    /**
+     * The Neighborhood Pulse for a home — the priority-ranked signal
+     * stream behind the Place "Today's Pulse" surface. NOTE: the query
+     * param is camelCase `homeId` (Joi `pulseSchema`,
+     * `backend/routes/ai.js:102`). Route `backend/routes/ai.js:332`.
+     */
+    @GET("api/ai/pulse")
+    suspend fun pulse(
+        @Query("homeId") homeId: String,
+    ): NeighborhoodPulse
 
     /**
      * A12.8 — Whisper transcription of a recorded voice note (m4a/AAC,
