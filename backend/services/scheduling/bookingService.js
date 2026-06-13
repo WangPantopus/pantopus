@@ -84,18 +84,10 @@ async function pickRoundRobinHost(eventTypeId, eligibleHosts) {
 }
 
 async function bumpAssigneeRotation(eventTypeId, hostId) {
-  if (!hostId) return;
-  const { data: row } = await supabaseAdmin
-    .from('EventTypeAssignee')
-    .select('id, assigned_count')
-    .eq('event_type_id', eventTypeId)
-    .eq('subject_id', hostId)
-    .maybeSingle();
-  if (!row) return;
-  await supabaseAdmin
-    .from('EventTypeAssignee')
-    .update({ assigned_count: (row.assigned_count || 0) + 1, last_assigned_at: new Date().toISOString() })
-    .eq('id', row.id);
+  if (!hostId || !eventTypeId) return;
+  // Atomic single-statement increment (no read-then-write race).
+  const { error } = await supabaseAdmin.rpc('bump_assignee_rotation', { p_event_type_id: eventTypeId, p_subject_id: hostId });
+  if (error) logger.warn('[bookingService] bump_assignee_rotation failed', { eventTypeId, hostId, error: error.message });
 }
 
 /**
@@ -204,16 +196,20 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
     if (isOverlapViolation(error)) {
       throw new BookingError('That time was just taken. Please pick another.', 409, 'SLOT_TAKEN');
     }
+    if (/GROUP_SLOT_FULL/.test(error.message || '')) {
+      throw new BookingError('This time is fully booked.', 409, 'SLOT_FULL');
+    }
     logger.error('[bookingService] insert failed', { error: error.message, code: error.code });
     throw new BookingError('Could not create the booking.', 500, 'CREATE_FAILED');
   }
 
-  // Post-insert side effects.
+  // Post-insert side effects (best-effort — never undo a committed booking).
   if (mode === 'round_robin') await bumpAssigneeRotation(eventType.id, hostUserId);
   if (attendees.length) {
-    await supabaseAdmin.from('BookingAttendee').insert(
+    const { error: attErr } = await supabaseAdmin.from('BookingAttendee').insert(
       attendees.map((uid) => ({ booking_id: booking.id, user_id: uid, is_required: true, rsvp_status: 'pending' }))
     );
+    if (attErr) logger.warn('[bookingService] attendee insert failed (booking still created)', { bookingId: booking.id, error: attErr.message });
   }
 
   // Manage token for the invitee (raw token returned once).

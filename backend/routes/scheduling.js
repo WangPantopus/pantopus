@@ -804,4 +804,44 @@ router.post('/resources/:rid/book', withOwner('view'), validate(resourceBookSche
   }
 }));
 
+// Schedule a vendor/guest visit. Modeled as a HomeCalendarEvent (event_type vendor/guest) so it
+// lands on the household calendar and counts as busy in availability. who_is_home tags the members
+// expected to be present (stored in assigned_to, which the engine treats as that member's busy).
+const visitSchema = Joi.object({
+  owner_type: Joi.string().valid('home'),
+  owner_id: Joi.string(),
+  visit_type: Joi.string().valid('vendor', 'guest').default('vendor'),
+  title: Joi.string().trim().min(1).max(200).required(),
+  description: Joi.string().allow('', null).max(2000),
+  start_at: Joi.string().isoDate().required(),
+  end_at: Joi.string().isoDate().required(),
+  who_is_home: Joi.array().items(Joi.string().uuid()).default([]),
+  location_notes: Joi.string().allow('', null).max(500),
+});
+
+router.post('/visits', withOwner('edit'), validate(visitSchema), asyncHandler(async (req, res) => {
+  requireHome(req);
+  const { start_at, end_at } = req.body;
+  if (new Date(end_at).getTime() <= new Date(start_at).getTime()) {
+    return res.status(400).json({ error: 'BAD_RANGE', message: 'end_at must be after start_at.' });
+  }
+  const { data, error } = await supabaseAdmin
+    .from('HomeCalendarEvent')
+    .insert({
+      home_id: req.scheduling.ownerId,
+      event_type: req.body.visit_type,
+      title: req.body.title,
+      description: req.body.description || null,
+      start_at,
+      end_at,
+      location_notes: req.body.location_notes || null,
+      assigned_to: req.body.who_is_home && req.body.who_is_home.length ? req.body.who_is_home : null,
+      created_by: req.user.id,
+    })
+    .select('*')
+    .single();
+  if (error) throw error;
+  res.status(201).json({ visit: data });
+}));
+
 module.exports = router;
