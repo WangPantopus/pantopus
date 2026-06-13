@@ -105,6 +105,11 @@ import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_SLUG_KEY
 import app.pantopus.android.ui.screens.place.detail.PlaceDetailScreen
 import app.pantopus.android.ui.screens.place.pulse.PLACE_PULSE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.place.pulse.PlacePulseScreen
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_ADDRESS_KEY
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_METHOD_KEY
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifyMethod
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifyStatusScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
@@ -342,6 +347,17 @@ private object ChildRoutes {
     const val PLACE_PULSE = "place/{$PLACE_PULSE_HOME_ID_KEY}/pulse"
 
     fun placePulse(homeId: String): String = "place/$homeId/pulse"
+
+    /** W5 — the verify status screen (B2 → B3/B4) after a method choice. */
+    const val PLACE_VERIFY_STATUS =
+        "place/{$PLACE_VERIFY_HOME_ID_KEY}/verify/{$PLACE_VERIFY_METHOD_KEY}" +
+            "?$PLACE_VERIFY_ADDRESS_KEY={$PLACE_VERIFY_ADDRESS_KEY}"
+
+    fun placeVerifyStatus(
+        homeId: String,
+        method: String,
+        address: String,
+    ): String = "place/$homeId/verify/$method?$PLACE_VERIFY_ADDRESS_KEY=${java.net.URLEncoder.encode(address, "UTF-8")}"
 
     /** Bills list (T5.2.2 / P13). */
     const val HOME_BILLS = "homes/{$BILLS_HOME_ID_KEY}/bills"
@@ -1893,11 +1909,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     val homeId = entry.arguments?.getString(PLACE_DASHBOARD_HOME_ID_KEY).orEmpty()
                     PlaceDashboardScreen(
                         homeId = homeId,
-                        // W5 swaps the verify placeholder for the B1 sheet.
                         onOpenSection = { hid, slug -> navController.navigate(ChildRoutes.placeDetail(hid, slug)) },
                         onSwitchHome = { id -> navController.navigate(ChildRoutes.placeDashboard(id)) },
                         onAddPlace = { navController.navigate(ChildRoutes.ADD_HOME) },
-                        onVerify = { navController.navigate(ChildRoutes.placeholder("Verify address")) },
+                        onStartVerify = { method, address ->
+                            navController.navigate(ChildRoutes.placeVerifyStatus(homeId, method.slug, address))
+                        },
                         onOpenPulse = { navController.navigate(ChildRoutes.placePulse(homeId)) },
                     )
                 }
@@ -1916,6 +1933,25 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     arguments = listOf(navArgument(PLACE_PULSE_HOME_ID_KEY) { type = NavType.StringType }),
                 ) {
                     PlacePulseScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.PLACE_VERIFY_STATUS,
+                    arguments =
+                        listOf(
+                            navArgument(PLACE_VERIFY_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(PLACE_VERIFY_METHOD_KEY) { type = NavType.StringType },
+                            navArgument(PLACE_VERIFY_ADDRESS_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) { entry ->
+                    PlaceVerifyStatusScreen(
+                        address = entry.arguments?.getString(PLACE_VERIFY_ADDRESS_KEY).orEmpty(),
+                        method = PlaceVerifyMethod.fromSlug(entry.arguments?.getString(PLACE_VERIFY_METHOD_KEY)),
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                    )
                 }
                 composable(
                     route = ChildRoutes.HOME_DASHBOARD,
