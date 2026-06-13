@@ -262,6 +262,30 @@ class IconTest {
             // A18.4 Waiting room — more-info halo glyph + Update-evidence action.
             "file-plus-2",
             "file-warning",
+            // Place dashboard/detail/verify — Place Intelligence (W3) glyphs.
+            "cloud",
+            "cloud-off",
+            "sunrise",
+            "sunset",
+            "file-search",
+            "flower-2",
+            "trash",
+            "zap-off",
+            "waves",
+            "activity",
+            "test-tube",
+            "factory",
+            "badge-percent",
+            "vote",
+            "life-buoy",
+            "hard-hat",
+            "triangle-alert",
+            // Gigs Tasks map — fit-to-pins control + zero-results empty state.
+            "maximize",
+            "map-pin-off",
+            // Magic Task wizard — voice-note describe card + One-time engagement tile.
+            "mic",
+            "circle-dot",
         )
 
     @Test

@@ -31,7 +31,7 @@ final class PulsePostDetailViewModelTests: XCTestCase {
         "user_id": "u1",
         "title": null,
         "content": "Anyone know a good handyman?",
-        "post_type": "general",
+        "post_type": "ask",
         "post_format": "standard",
         "purpose": "ask",
         "media_urls": [],

@@ -556,7 +556,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // — only `paint-roller` and `bell-ring` lack 1:1 glyphs, fall back
         // to `paintbrush.pointed` and `bell.badge` respectively.
         case .fan: "fan"
-        case .cloudOff: "cloud.slash"
+        case .cloudOff: "icloud.slash"
         case .cloudRain: "cloud.rain"
         case .refrigerator: "refrigerator"
         case .bug: "ant"

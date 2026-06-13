@@ -95,7 +95,13 @@ final class IconTests: XCTestCase {
         // A17.11 Stamps — Elf rate gauge + Forever-postage validity badge.
         "gauge", "infinity",
         // A18.4 Waiting room — more-info halo glyph + Update-evidence action.
-        "file-plus-2", "file-warning"
+        "file-plus-2", "file-warning",
+        // Place Intelligence — dashboard, detail, verify, and funnel glyphs.
+        "activity", "badge-percent", "circle-dot", "cloud", "cloud-off",
+        "factory", "file-search", "flower-2", "hard-hat", "layers",
+        "layout-grid", "life-buoy", "locate-fixed", "map-pin-off", "maximize",
+        "mic", "repeat-2", "square-pen", "sunrise", "sunset", "test-tube",
+        "trash", "triangle-alert", "vote", "waves", "zap-off"
     ]
 
     func testInventoryMatches() {
