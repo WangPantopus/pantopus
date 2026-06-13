@@ -270,6 +270,10 @@ public enum HubRoute: Hashable {
     /// BLOCK 2E — "Saved places". Reached from the Explore map header's
     /// "Saved" affordance.
     case savedPlaces
+    /// W3 — the Place Intelligence dashboard (address-led home
+    /// intelligence). The Home tab auto-lands here when the user has a
+    /// primary home; the switcher re-pushes it for another home.
+    case placeDashboard(homeId: String)
     /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
     /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
@@ -321,6 +325,8 @@ public struct HubTabRoot: View {
     @Environment(RootTabModel.self) private var rootTabs
     @State private var path = RouteStack<HubRoute>()
     @State private var router = DeepLinkRouter.shared
+    /// W3 — guards the one-shot Place auto-land so it fires at most once.
+    @State private var didAutoLandPlace = false
     /// P6.6 — share / mail system sheet driven by "Share listing",
     /// "Share train", and "Invite a business".
     @State private var systemSheet: SystemSheetRequest?
@@ -438,6 +444,18 @@ public struct HubTabRoot: View {
         }
         .task {
             consumeDeepLinkIfNeeded(pending: router.pending)
+        }
+        .task {
+            // W3 — land the Home tab on the Place dashboard when the user
+            // has a primary home. One-shot at an empty stack so we never
+            // fight the user's navigation or an inbound deep link; Hub
+            // stays the stack root (reachable via back-swipe) and the
+            // no-home fallback.
+            guard path.isEmpty, router.pending == nil, !didAutoLandPlace else { return }
+            if let homeId = await Self.primaryHomeId() {
+                didAutoLandPlace = true
+                path.append(.placeDashboard(homeId: homeId))
+            }
         }
         .fullScreenCover(item: $modalRoute) { item in
             destination(for: item.route) { path.append($0) }
@@ -2186,12 +2204,34 @@ public struct HubTabRoot: View {
                 path.removeAll { $0 == .addHome }
                 path.append(.homeDashboard(homeId: homeId))
             }
+        case let .placeDashboard(homeId):
+            PlaceDashboardView(
+                viewModel: PlaceDashboardViewModel(
+                    homeId: homeId,
+                    onOpenDetail: { group in push(.placeholder(label: group.title)) },
+                    onSelectHome: { id in push(.placeDashboard(homeId: id)) },
+                    onAddPlace: { push(.addHome) },
+                    onVerify: { push(.placeholder(label: "Verify address")) },
+                    onOpenHubHome: {}
+                )
+            )
         #if DEBUG
         case .tokenGallery: TokenGalleryView()
         case .iconGallery: IconGalleryView()
         case .componentGallery: ComponentGalleryView()
         #endif
         }
+    }
+
+    /// W3 — the primary home id used to auto-land the Home tab on Place.
+    /// Prefers the verified primary owner, else the first home; nil when
+    /// the user has no home (Hub stays the landing).
+    private static func primaryHomeId() async -> String? {
+        guard let response: MyHomesResponse = try? await APIClient.shared.request(
+            HomesEndpoints.myHomes()
+        ) else { return nil }
+        return response.homes.first(where: { $0.isPrimaryOwner == true })?.id
+            ?? response.homes.first?.id
     }
 
     private static func billsListViewModel(

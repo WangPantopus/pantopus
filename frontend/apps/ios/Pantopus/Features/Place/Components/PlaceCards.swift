@@ -33,8 +33,7 @@ struct PlaceLockedCard: View {
             }
             .padding(.bottom, 11)
             Text(reason)
-                .font(.system(size: 14))
-                .lineSpacing(3)
+                .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .padding(.bottom, 10)
             PlaceTextButton(title: cta) { onTap?() }
@@ -55,7 +54,9 @@ struct PlaceDensityCard: View {
     let bucket: PlaceDensityBucket
     /// Server-rendered bucket label; falls back to the design copy.
     var label: String?
-    var ctaTitle: String = "Be one of the first to verify on your block"
+    /// The sky CTA under the bucket. Pass nil to hide it (dashboard cards
+    /// tap through to the Block detail, so they omit the inline CTA).
+    var ctaTitle: String? = "Be one of the first to verify on your block"
     var onTap: (() -> Void)?
 
     private var dots: Int {
@@ -95,8 +96,10 @@ struct PlaceDensityCard: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(dots == 0 ? Theme.Color.appTextSecondary : Theme.Color.appText)
             }
-            .padding(.bottom, 11)
-            PlaceTextButton(title: ctaTitle) { onTap?() }
+            if let ctaTitle {
+                Spacer().frame(height: 11)
+                PlaceTextButton(title: ctaTitle) { onTap?() }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -156,31 +159,35 @@ struct PlaceHeroCard: View {
                     .foregroundStyle(Theme.Color.appText)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.bottom, 14)
+            .padding(.bottom, nudgeText.isEmpty ? 0 : 14)
 
-            Button {
-                onNudgeTap?()
-            } label: {
-                HStack(spacing: 10) {
-                    Icon(nudgeIcon, size: 17, strokeWidth: 2, color: isAlert ? Theme.Color.warning : Theme.Color.home)
-                    Text(nudgeText)
-                        .font(.system(size: 13.5))
-                        .lineSpacing(2.5)
-                        .foregroundStyle(Theme.Color.appTextStrong)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Icon(.chevronRight, size: 17, strokeWidth: 2.25, color: Theme.Color.appTextMuted)
+            // The inset nudge is optional — all-clear with nothing to flag
+            // renders just the overline + headline (parity with the web hero).
+            if !nudgeText.isEmpty {
+                Button {
+                    onNudgeTap?()
+                } label: {
+                    HStack(spacing: 10) {
+                        Icon(nudgeIcon, size: 17, strokeWidth: 2, color: isAlert ? Theme.Color.warning : Theme.Color.home)
+                        Text(nudgeText)
+                            .font(.system(size: 13.5))
+                            .lineSpacing(2.5)
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Icon(.chevronRight, size: 17, strokeWidth: 2.25, color: Theme.Color.appTextMuted)
+                    }
+                    .padding(.vertical, 11)
+                    .padding(.horizontal, 12)
+                    .background(isAlert ? Theme.Color.warningBg : Theme.Color.appBg)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(isAlert ? Theme.Color.warningLight : Theme.Color.appBorderSubtle, lineWidth: 1)
+                    )
                 }
-                .padding(.vertical, 11)
-                .padding(.horizontal, 12)
-                .background(isAlert ? Theme.Color.warningBg : Theme.Color.appBg)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(isAlert ? Theme.Color.warningLight : Theme.Color.appBorderSubtle, lineWidth: 1)
-                )
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 16)
