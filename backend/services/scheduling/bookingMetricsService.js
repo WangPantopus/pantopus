@@ -75,4 +75,52 @@ async function getSummary({ ownerType, ownerId, now }) {
   };
 }
 
-module.exports = { getSummary };
+/** No-show & cancellation report over a window. */
+async function getNoShowReport({ ownerType, ownerId, days = 90 }) {
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+  const { data: rows } = await supabaseAdmin
+    .from('Booking')
+    .select('id, start_at, status, invitee_name, event_type_id')
+    .eq('owner_type', ownerType)
+    .eq('owner_id', ownerId)
+    .gte('start_at', since)
+    .in('status', ['completed', 'no_show', 'cancelled'])
+    .order('start_at', { ascending: false })
+    .limit(500);
+  const list = rows || [];
+  const completed = list.filter((r) => r.status === 'completed').length;
+  const noShow = list.filter((r) => r.status === 'no_show').length;
+  const cancelled = list.filter((r) => r.status === 'cancelled').length;
+  const denom = completed + noShow;
+  return {
+    window_days: days,
+    completed,
+    no_show: noShow,
+    cancelled,
+    no_show_rate: denom > 0 ? Math.round((noShow / denom) * 100) : 0,
+    recent_no_shows: list.filter((r) => r.status === 'no_show').slice(0, 20),
+  };
+}
+
+/** Per-host performance for a business round-robin pool over a window. */
+async function getTeamPerformance({ businessUserId, days = 90 }) {
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+  const { data: rows } = await supabaseAdmin
+    .from('Booking')
+    .select('host_user_id, status')
+    .eq('owner_type', 'business')
+    .eq('owner_id', businessUserId)
+    .gte('start_at', since)
+    .limit(2000);
+  const byHost = new Map();
+  for (const r of rows || []) {
+    if (!r.host_user_id) continue;
+    const h = byHost.get(r.host_user_id) || { host_user_id: r.host_user_id, total: 0, confirmed: 0, completed: 0, no_show: 0, cancelled: 0 };
+    h.total += 1;
+    if (h[r.status] !== undefined) h[r.status] += 1;
+    byHost.set(r.host_user_id, h);
+  }
+  return { window_days: days, hosts: [...byHost.values()].sort((a, b) => b.total - a.total) };
+}
+
+module.exports = { getSummary, getNoShowReport, getTeamPerformance };

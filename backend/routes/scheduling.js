@@ -18,6 +18,9 @@ const availabilityService = require('../services/scheduling/availabilityService'
 const bookingService = require('../services/scheduling/bookingService');
 const bookingMetrics = require('../services/scheduling/bookingMetricsService');
 const schedulingNotifyPrefs = require('../services/scheduling/schedulingNotifyPrefs');
+const packages = require('../services/scheduling/packageService');
+const notificationService = require('../services/notificationService');
+const emailService = require('../services/emailService');
 const { resolveOwner, assertCanManageOwner, ownerColumns, normalizeEmail, generateToken } = require('../services/scheduling/schedulingShared');
 
 router.use(verifyToken);
@@ -564,6 +567,11 @@ router.get('/bookings', withOwner('view'), asyncHandler(async (req, res) => {
   else if (status === 'past') q = q.in('status', ['confirmed', 'completed', 'no_show']).lt('start_at', nowIso).order('start_at', { ascending: false });
   else if (status === 'cancelled') q = q.in('status', ['cancelled', 'declined']).order('start_at', { ascending: false });
   else q = q.order('start_at', { ascending: false });
+  // Optional filters (Booking Search & Filter screen).
+  if (req.query.event_type_id) q = q.eq('event_type_id', req.query.event_type_id);
+  if (req.query.from) q = q.gte('start_at', req.query.from);
+  if (req.query.to) q = q.lte('start_at', req.query.to);
+  if (req.query.q) q = q.ilike('invitee_name', `%${String(req.query.q).replace(/[%_]/g, '')}%`);
   const { data, error } = await q.limit(200);
   if (error) throw error;
   res.json({ bookings: data || [] });
@@ -987,6 +995,339 @@ router.post('/booking-page/one-off-links', withOwner('edit'), validate(oneOffSch
   if (error) throw error;
   // Raw token returned once; the public flow is GET/POST /api/public/book/o/:token.
   res.status(201).json({ token, path: `/book/o/${token}`, expires_at: data.expires_at, single_use: data.single_use });
+}));
+
+// ============================================================
+// WORKFLOWS (automations) — owner-scoped CRUD over SchedulingWorkflow
+// ============================================================
+const workflowSchema = Joi.object({
+  owner_type: Joi.string().valid('user', 'home', 'business'),
+  owner_id: Joi.string(),
+  event_type_id: Joi.string().uuid().allow(null),
+  name: Joi.string().trim().min(1).max(200).required(),
+  trigger: Joi.string().valid('booking_created', 'cancelled', 'rescheduled', 'before_start', 'after_end').required(),
+  offset_minutes: Joi.number().integer().min(0).max(525600).default(0),
+  action: Joi.string().valid('email', 'push', 'in_app', 'sms').required(),
+  message_template: Joi.string().allow('', null).max(5000),
+  is_active: Joi.boolean().default(true),
+});
+
+router.get('/workflows', withOwner('view'), asyncHandler(async (req, res) => {
+  const { data } = await supabaseAdmin.from('SchedulingWorkflow').select('*')
+    .eq('owner_type', req.scheduling.ownerType).eq('owner_id', req.scheduling.ownerId).order('created_at', { ascending: false });
+  res.json({ workflows: data || [] });
+}));
+router.post('/workflows', withOwner('edit'), validate(workflowSchema), asyncHandler(async (req, res) => {
+  const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
+  const { data, error } = await supabaseAdmin.from('SchedulingWorkflow').insert({ ...req.scheduling.oc, ...body }).select('*').single();
+  if (error) throw error;
+  res.status(201).json({ workflow: data });
+}));
+async function loadOwnedRow(req, table) {
+  const { data } = await supabaseAdmin.from(table).select('*').eq('id', req.params.id).maybeSingle();
+  if (!data) { const e = new Error('Not found.'); e.statusCode = 404; throw e; }
+  await assertCanManageOwner(data.owner_type, data.owner_id, req.user.id, 'edit');
+  return data;
+}
+router.put('/workflows/:id', validate(workflowSchema.fork(['name', 'trigger', 'action'], (s) => s.optional())), asyncHandler(async (req, res) => {
+  const row = await loadOwnedRow(req, 'SchedulingWorkflow');
+  const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
+  const { data, error } = await supabaseAdmin.from('SchedulingWorkflow').update({ ...body, updated_at: new Date().toISOString() }).eq('id', row.id).select('*').single();
+  if (error) throw error;
+  res.json({ workflow: data });
+}));
+router.delete('/workflows/:id', asyncHandler(async (req, res) => {
+  const row = await loadOwnedRow(req, 'SchedulingWorkflow');
+  await supabaseAdmin.from('SchedulingWorkflow').delete().eq('id', row.id);
+  res.json({ ok: true });
+}));
+
+// ============================================================
+// MESSAGE TEMPLATES — owner-scoped CRUD + preview
+// ============================================================
+const templateSchema = Joi.object({
+  owner_type: Joi.string().valid('user', 'home', 'business'),
+  owner_id: Joi.string(),
+  name: Joi.string().trim().min(1).max(200).required(),
+  channel: Joi.string().valid('email', 'push', 'in_app', 'sms').default('email'),
+  subject: Joi.string().allow('', null).max(300),
+  body: Joi.string().trim().min(1).max(5000).required(),
+  is_active: Joi.boolean().default(true),
+});
+router.get('/message-templates', withOwner('view'), asyncHandler(async (req, res) => {
+  const { data } = await supabaseAdmin.from('MessageTemplate').select('*')
+    .eq('owner_type', req.scheduling.ownerType).eq('owner_id', req.scheduling.ownerId).order('created_at', { ascending: false });
+  res.json({ templates: data || [] });
+}));
+router.post('/message-templates', withOwner('edit'), validate(templateSchema), asyncHandler(async (req, res) => {
+  const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
+  const { data, error } = await supabaseAdmin.from('MessageTemplate').insert({ ...req.scheduling.oc, ...body, created_by: req.user.id }).select('*').single();
+  if (error) throw error;
+  res.status(201).json({ template: data });
+}));
+router.post('/message-templates/preview', validate(Joi.object({ subject: Joi.string().allow('', null), body: Joi.string().required(), variables: Joi.object().unknown(true).default({}) })), asyncHandler(async (req, res) => {
+  const fill = (str) => String(str || '').replace(/\{\{?\s*([\w.]+)\s*\}?\}/g, (m, k) => (req.body.variables[k] != null ? String(req.body.variables[k]) : m));
+  res.json({ subject: fill(req.body.subject), body: fill(req.body.body) });
+}));
+router.put('/message-templates/:id', validate(templateSchema.fork(['name', 'body'], (s) => s.optional())), asyncHandler(async (req, res) => {
+  const row = await loadOwnedRow(req, 'MessageTemplate');
+  const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
+  const { data, error } = await supabaseAdmin.from('MessageTemplate').update({ ...body, updated_at: new Date().toISOString() }).eq('id', row.id).select('*').single();
+  if (error) throw error;
+  res.json({ template: data });
+}));
+router.delete('/message-templates/:id', asyncHandler(async (req, res) => {
+  const row = await loadOwnedRow(req, 'MessageTemplate');
+  await supabaseAdmin.from('MessageTemplate').delete().eq('id', row.id);
+  res.json({ ok: true });
+}));
+
+// ============================================================
+// INSIGHTS (no-show report + team performance; overall = /bookings/summary)
+// ============================================================
+router.get('/insights/no-shows', withOwner('view'), asyncHandler(async (req, res) => {
+  const days = Math.min(parseInt(req.query.days, 10) || 90, 365);
+  res.json(await bookingMetrics.getNoShowReport({ ownerType: req.scheduling.ownerType, ownerId: req.scheduling.ownerId, days }));
+}));
+router.get('/insights/team', withOwner('view'), asyncHandler(async (req, res) => {
+  if (req.scheduling.ownerType !== 'business') return res.status(400).json({ error: 'BUSINESS_ONLY' });
+  const days = Math.min(parseInt(req.query.days, 10) || 90, 365);
+  res.json(await bookingMetrics.getTeamPerformance({ businessUserId: req.scheduling.ownerId, days }));
+}));
+
+// ============================================================
+// INVOICES (reuse BusinessInvoice — business owner only)
+// ============================================================
+router.get('/invoices', withOwner('view'), asyncHandler(async (req, res) => {
+  if (req.scheduling.ownerType !== 'business') return res.json({ invoices: [] });
+  const { data } = await supabaseAdmin.from('BusinessInvoice').select('*').eq('business_user_id', req.scheduling.ownerId).order('created_at', { ascending: false }).limit(200);
+  res.json({ invoices: data || [] });
+}));
+router.get('/invoices/:id', withOwner('view'), asyncHandler(async (req, res) => {
+  const { data } = await supabaseAdmin.from('BusinessInvoice').select('*').eq('id', req.params.id).maybeSingle();
+  if (!data || data.business_user_id !== req.scheduling.ownerId) return res.status(404).json({ error: 'NOT_FOUND' });
+  res.json({ invoice: data });
+}));
+router.post('/invoices/:id/send', withOwner('edit'), asyncHandler(async (req, res) => {
+  const { data: inv } = await supabaseAdmin.from('BusinessInvoice').select('*').eq('id', req.params.id).maybeSingle();
+  if (!inv || inv.business_user_id !== req.scheduling.ownerId) return res.status(404).json({ error: 'NOT_FOUND' });
+  // Notify the recipient in-app (no status mutation — avoid touching the gig invoice state machine).
+  if (inv.recipient_user_id) {
+    await notificationService.createNotification({
+      userId: inv.recipient_user_id, type: 'invoice_sent', title: 'You have a new invoice',
+      body: `Invoice for ${(inv.total_cents / 100).toFixed(2)} ${inv.currency || 'USD'}`, icon: '🧾',
+      link: `/app/invoices/${inv.id}`, metadata: { invoice_id: inv.id }, context: 'personal',
+    });
+  }
+  res.json({ ok: true });
+}));
+
+// ============================================================
+// PACKAGES (owner CRUD) + buy/credits/apply (customer)
+// ============================================================
+const packageSchema = Joi.object({
+  owner_type: Joi.string().valid('user', 'home', 'business'),
+  owner_id: Joi.string(),
+  name: Joi.string().trim().min(1).max(200).required(),
+  sessions_count: Joi.number().integer().min(1).max(1000).required(),
+  price_cents: Joi.number().integer().min(0).default(0),
+  currency: Joi.string().length(3).uppercase().default('USD'),
+  event_type_id: Joi.string().uuid().allow(null),
+  is_active: Joi.boolean().default(true),
+});
+router.get('/packages', withOwner('view'), asyncHandler(async (req, res) => {
+  const { data } = await supabaseAdmin.from('BookingPackage').select('*')
+    .eq('owner_type', req.scheduling.ownerType).eq('owner_id', req.scheduling.ownerId).order('created_at', { ascending: false });
+  res.json({ packages: data || [] });
+}));
+router.post('/packages', withOwner('edit'), validate(packageSchema), asyncHandler(async (req, res) => {
+  const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
+  const { data, error } = await supabaseAdmin.from('BookingPackage').insert({ ...req.scheduling.oc, ...body }).select('*').single();
+  if (error) throw error;
+  res.status(201).json({ package: data });
+}));
+router.put('/packages/:id', validate(packageSchema.fork(['name', 'sessions_count'], (s) => s.optional())), asyncHandler(async (req, res) => {
+  const row = await loadOwnedRow(req, 'BookingPackage');
+  const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
+  const { data, error } = await supabaseAdmin.from('BookingPackage').update({ ...body, updated_at: new Date().toISOString() }).eq('id', row.id).select('*').single();
+  if (error) throw error;
+  res.json({ package: data });
+}));
+router.delete('/packages/:id', asyncHandler(async (req, res) => {
+  const row = await loadOwnedRow(req, 'BookingPackage');
+  await supabaseAdmin.from('BookingPackage').update({ is_active: false }).eq('id', row.id);
+  res.json({ ok: true });
+}));
+// Customer buys a package (authed; not owner-gated).
+router.post('/packages/:id/buy', asyncHandler(async (req, res) => {
+  const { data: pkg } = await supabaseAdmin.from('BookingPackage').select('*').eq('id', req.params.id).eq('is_active', true).maybeSingle();
+  if (!pkg) return res.status(404).json({ error: 'PACKAGE_NOT_FOUND' });
+  const result = await packages.purchasePackage({ pkg, buyerUserId: req.user.id });
+  if (!result.success) return res.status(400).json({ error: result.error, message: result.message });
+  res.status(201).json({ credit: result.credit, clientSecret: result.clientSecret || null });
+}));
+// Customer's remaining credits.
+router.get('/my-packages', asyncHandler(async (req, res) => {
+  const { data } = await supabaseAdmin.from('PackageCredit')
+    .select('*, BookingPackage:package_id ( name, sessions_count, owner_type, owner_id, event_type_id )')
+    .eq('buyer_user_id', req.user.id).order('purchased_at', { ascending: false });
+  res.json({ credits: data || [] });
+}));
+
+// ============================================================
+// MY BOOKINGS (invitee/customer list across owners)
+// ============================================================
+router.get('/my-bookings', asyncHandler(async (req, res) => {
+  const email = req.user.email ? normalizeEmail(req.user.email) : null;
+  let q = supabaseAdmin.from('Booking').select('*').order('start_at', { ascending: false }).limit(200);
+  // Match by linked user id OR (case-insensitive) invitee email.
+  q = email ? q.or(`invitee_user_id.eq.${req.user.id},invitee_email.ilike.${email}`) : q.eq('invitee_user_id', req.user.id);
+  const { data, error } = await q;
+  if (error) throw error;
+  res.json({ bookings: data || [] });
+}));
+
+// ============================================================
+// BOOKING extras: nudge, propose-reschedule, apply-credit, recurring
+// ============================================================
+router.post('/bookings/:id/nudge', validate(Joi.object({ message: Joi.string().max(1000).allow('', null) })), asyncHandler(async (req, res) => {
+  const booking = await loadOwnedBooking(req);
+  await assertCanManageOwner(booking.owner_type, booking.owner_id, req.user.id, 'edit');
+  const msg = req.body.message || 'A reminder about your upcoming booking.';
+  if (booking.invitee_user_id) {
+    await notificationService.createNotification({ userId: booking.invitee_user_id, type: 'booking_nudge', title: 'A note about your booking', body: msg, icon: '📅', link: `/app/profile/schedule/bookings/${booking.id}`, metadata: { booking_id: booking.id }, context: 'personal' });
+  } else if (booking.invitee_email) {
+    await emailService.sendEmail({ to: booking.invitee_email, subject: 'A note about your booking', html: `<p>${msg.replace(/</g, '&lt;')}</p>` });
+  }
+  res.json({ ok: true });
+}));
+router.post('/bookings/:id/propose-reschedule', validate(Joi.object({ start_at: Joi.string().isoDate().required(), host_user_id: Joi.string().uuid() })), asyncHandler((req, res) => lifecycleHandler(req, res, (b) => bookingService.proposeReschedule(b.id, req.user.id, req.body.start_at, req.body.host_user_id))));
+// Customer applies a package credit to their own booking (not owner-gated).
+router.post('/bookings/:id/apply-credit', validate(Joi.object({ credit_id: Joi.string().uuid().required() })), asyncHandler(async (req, res) => {
+  const { data: booking } = await supabaseAdmin.from('Booking').select('id, invitee_user_id, payment_id, package_credit_id').eq('id', req.params.id).maybeSingle();
+  if (!booking) return res.status(404).json({ error: 'NOT_FOUND' });
+  if (booking.invitee_user_id !== req.user.id) return res.status(403).json({ error: 'NOT_YOUR_BOOKING' });
+  if (booking.package_credit_id) return res.status(409).json({ error: 'ALREADY_APPLIED' });
+  const result = await packages.redeemForBooking({ bookingId: booking.id, creditId: req.body.credit_id, userId: req.user.id });
+  if (!result.success) return res.status(409).json({ error: result.error, message: result.message });
+  res.json({ ok: true, remaining: result.remaining });
+}));
+const recurringSchema = Joi.object({
+  owner_type: Joi.string().valid('user', 'home', 'business'),
+  owner_id: Joi.string(),
+  event_type_id: Joi.string().uuid().required(),
+  sessions: Joi.array().items(Joi.string().isoDate()).min(1).max(52).required(),
+  invitee_name: Joi.string().max(200).allow('', null),
+  invitee_email: Joi.string().email().max(320).allow('', null),
+  invitee_timezone: Joi.string().max(64).allow('', null),
+});
+router.post('/bookings/recurring', withOwner('edit'), validate(recurringSchema), asyncHandler(async (req, res) => {
+  const et = await bookingService.getEventTypeById(req.body.event_type_id);
+  if (!et || et.owner_type !== req.scheduling.ownerType || et.owner_id !== req.scheduling.ownerId) return res.status(404).json({ error: 'EVENT_TYPE_NOT_FOUND' });
+  try {
+    const result = await bookingService.createRecurringBookings({
+      eventType: et, sessions: req.body.sessions,
+      invitee: { name: req.body.invitee_name, email: req.body.invitee_email ? normalizeEmail(req.body.invitee_email) : null, timezone: req.body.invitee_timezone },
+      createdVia: 'manual', actorUserId: req.user.id,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.code || 'ERROR', message: err.message });
+    throw err;
+  }
+}));
+
+// ============================================================
+// PAYMENTS STATUS + CONNECTED CALENDARS (read; OAuth sync deferred)
+// ============================================================
+router.get('/payments/status', withOwner('view'), asyncHandler(async (req, res) => {
+  const userId = req.scheduling.oc.owner_user_id; // null for home
+  if (!userId) return res.json({ connected: false, applicable: false });
+  const { data: acct } = await supabaseAdmin.from('StripeAccount').select('charges_enabled, payouts_enabled, stripe_account_id').eq('user_id', userId).maybeSingle();
+  res.json({ applicable: true, connected: !!acct, charges_enabled: !!(acct && acct.charges_enabled), payouts_enabled: !!(acct && acct.payouts_enabled) });
+}));
+router.get('/connected-calendars', asyncHandler(async (req, res) => {
+  const { data } = await supabaseAdmin.from('ConnectedCalendar').select('id, provider, external_account, check_conflicts, write_target, status, last_synced_at').eq('user_id', req.user.id);
+  res.json({ calendars: data || [] });
+}));
+router.post('/connected-calendars/connect', asyncHandler(async (req, res) => {
+  // External calendar OAuth/sync is deferred (Tier C). Surface a clear not-yet-available signal.
+  res.status(501).json({ error: 'NOT_AVAILABLE', message: 'External calendar sync is coming soon.' });
+}));
+
+// ============================================================
+// WAITLIST (host side) + MEETING POLLS
+// ============================================================
+router.get('/event-types/:id/waitlist', asyncHandler(async (req, res) => {
+  const et = await loadOwnedEventType(req);
+  const { data } = await supabaseAdmin.from('SchedulingWaitlist').select('*').eq('event_type_id', et.id).eq('status', 'waiting').order('created_at');
+  res.json({ waitlist: data || [] });
+}));
+router.post('/waitlist/:id/promote', asyncHandler(async (req, res) => {
+  const { data: entry } = await supabaseAdmin.from('SchedulingWaitlist').select('*').eq('id', req.params.id).maybeSingle();
+  if (!entry) return res.status(404).json({ error: 'NOT_FOUND' });
+  await assertCanManageOwner(entry.owner_type, entry.owner_id, req.user.id, 'edit');
+  await supabaseAdmin.from('SchedulingWaitlist').update({ status: 'promoted', notified_at: new Date().toISOString() }).eq('id', entry.id);
+  if (entry.invitee_user_id) {
+    await notificationService.createNotification({ userId: entry.invitee_user_id, type: 'waitlist_promoted', title: 'A slot opened up', body: 'A spot is now available — book it before it fills.', icon: '🎟️', metadata: { event_type_id: entry.event_type_id }, context: 'personal' });
+  } else if (entry.invitee_email) {
+    await emailService.sendEmail({ to: entry.invitee_email, subject: 'A slot opened up', html: '<p>A spot is now available — book it before it fills.</p>' });
+  }
+  res.json({ ok: true });
+}));
+
+const pollSchema = Joi.object({
+  owner_type: Joi.string().valid('user', 'home', 'business'),
+  owner_id: Joi.string(),
+  title: Joi.string().trim().min(1).max(200).required(),
+  description: Joi.string().allow('', null).max(2000),
+  duration_min: Joi.number().integer().min(5).max(1440).default(30),
+  options: Joi.array().items(Joi.object({ start: Joi.string().isoDate().required(), end: Joi.string().isoDate().required() })).min(1).max(20).required(),
+});
+router.post('/polls', withOwner('edit'), validate(pollSchema), asyncHandler(async (req, res) => {
+  const { data: poll, error } = await supabaseAdmin.from('SchedulingPoll').insert({ ...req.scheduling.oc, title: req.body.title, description: req.body.description || null, duration_min: req.body.duration_min, created_by: req.user.id }).select('*').single();
+  if (error) throw error;
+  const options = req.body.options.map((o) => ({ poll_id: poll.id, start_at: o.start, end_at: o.end }));
+  const { data: opts } = await supabaseAdmin.from('SchedulingPollOption').insert(options).select('*');
+  res.status(201).json({ poll, options: opts || [] });
+}));
+router.get('/polls', withOwner('view'), asyncHandler(async (req, res) => {
+  const { data } = await supabaseAdmin.from('SchedulingPoll').select('*').eq('owner_type', req.scheduling.ownerType).eq('owner_id', req.scheduling.ownerId).order('created_at', { ascending: false });
+  res.json({ polls: data || [] });
+}));
+router.get('/polls/:id', asyncHandler(async (req, res) => {
+  const { data: poll } = await supabaseAdmin.from('SchedulingPoll').select('*').eq('id', req.params.id).maybeSingle();
+  if (!poll) return res.status(404).json({ error: 'NOT_FOUND' });
+  await assertCanManageOwner(poll.owner_type, poll.owner_id, req.user.id, 'view');
+  const [{ data: options }, { data: votes }] = await Promise.all([
+    supabaseAdmin.from('SchedulingPollOption').select('*').eq('poll_id', poll.id).order('start_at'),
+    supabaseAdmin.from('SchedulingPollVote').select('option_id, voter_name, value').eq('poll_id', poll.id),
+  ]);
+  res.json({ poll, options: options || [], votes: votes || [] });
+}));
+// Team availability (business round-robin pool) — per-member free grids.
+router.get('/team-availability', withOwner('view'), asyncHandler(async (req, res) => {
+  if (req.scheduling.ownerType !== 'business') return res.status(400).json({ error: 'BUSINESS_ONLY' });
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'MISSING_RANGE', message: 'from and to are required.' });
+  const { data: team } = await supabaseAdmin.from('BusinessTeam').select('user_id').eq('business_user_id', req.scheduling.ownerId).eq('is_active', true);
+  const memberIds = [...new Set((team || []).map((m) => m.user_id))];
+  const probe = { default_duration: 30, slot_interval_min: 30, buffer_before_min: 0, buffer_after_min: 0, min_notice_min: 0, max_horizon_days: 365, assignment_mode: 'one_on_one', schedule_id: null };
+  const freeByMember = {};
+  for (const id of memberIds) {
+    freeByMember[id] = await availabilityService.computeSlots({ ownerType: 'user', ownerId: id, eventType: probe, from, to, viewerTimezone: req.query.tz });
+  }
+  res.json({ members: memberIds, freeByMember });
+}));
+
+router.post('/polls/:id/finalize', validate(Joi.object({ option_id: Joi.string().uuid().required() })), asyncHandler(async (req, res) => {
+  const { data: poll } = await supabaseAdmin.from('SchedulingPoll').select('*').eq('id', req.params.id).maybeSingle();
+  if (!poll) return res.status(404).json({ error: 'NOT_FOUND' });
+  await assertCanManageOwner(poll.owner_type, poll.owner_id, req.user.id, 'edit');
+  const { data: opt } = await supabaseAdmin.from('SchedulingPollOption').select('*').eq('id', req.body.option_id).eq('poll_id', poll.id).maybeSingle();
+  if (!opt) return res.status(404).json({ error: 'OPTION_NOT_FOUND' });
+  const { data: updated } = await supabaseAdmin.from('SchedulingPoll').update({ status: 'closed', finalized_start_at: opt.start_at, updated_at: new Date().toISOString() }).eq('id', poll.id).select('*').single();
+  res.json({ poll: updated, finalized_start_at: opt.start_at });
 }));
 
 module.exports = router;

@@ -172,6 +172,15 @@ async function notifyBookingEvent({ booking, eventType, page, kind, manageToken 
         invType: 'booking_declined',
         attachIcs: false,
       },
+      reschedule_proposed: {
+        hostTitle: `Reschedule proposed: ${eventName}`,
+        hostBody: 'Waiting on the guest to accept the new time.',
+        invSubject: `A new time was proposed: ${eventName}`,
+        invHeading: 'A new time was proposed',
+        invIntro: `The host proposed a new time for <strong>${escapeHtml(eventName)}</strong>. Open your booking to accept or pick another time.`,
+        invType: 'booking_rescheduled',
+        attachIcs: false,
+      },
     }[kind];
 
     if (!copy) return;
