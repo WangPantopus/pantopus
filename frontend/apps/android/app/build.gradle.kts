@@ -158,6 +158,16 @@ android {
     }
 }
 
+// kotlinx-coroutines' "fast" Main-dispatcher service loader has a lazy-init
+// race that intermittently throws "Module with the Main dispatcher had failed
+// to initialize" in large JVM unit-test runs — it flaked
+// MeViewModelTest in :app:testReleaseUnitTest on CI even though every VM test
+// uses Dispatchers.setMain. Forcing the standard ServiceLoader makes the Main
+// dispatcher resolve deterministically. Test-only; no app behaviour change.
+tasks.withType<Test>().configureEach {
+    systemProperty("kotlinx.coroutines.fast.service.loader", "false")
+}
+
 // ── Release config guard ───────────────────────────────────────────────
 // A release build must point at a real https:// production backend and ship
 // a LIVE Stripe key. By default we only warn (so `./gradlew assembleRelease`
