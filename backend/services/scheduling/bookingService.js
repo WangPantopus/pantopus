@@ -249,6 +249,53 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
   return { booking, manageToken: token, clientSecret };
 }
 
+/**
+ * Book a household resource (room/vehicle/tool). Resource bookings have no event type; the
+ * resource overlap is guarded atomically by the Booking_resource_no_overlap exclusion constraint.
+ * @param {Object} args
+ * @param {Object} args.resource   HomeResource row
+ * @param {string} args.startIso
+ * @param {number} [args.durationMin]
+ * @param {Object} args.booker     { id, name, email }
+ */
+async function createResourceBooking({ resource, startIso, durationMin, booker = {} }) {
+  const startMs = new Date(startIso).getTime();
+  if (!Number.isFinite(startMs)) throw new BookingError('Invalid start time.', 400, 'BAD_START');
+  const duration = durationMin || resource.max_duration_min || 60;
+  if (resource.max_duration_min && duration > resource.max_duration_min) {
+    throw new BookingError(`This resource can be booked for at most ${resource.max_duration_min} minutes.`, 400, 'DURATION_TOO_LONG');
+  }
+  const endIso = new Date(startMs + duration * MIN_MS).toISOString();
+  const oc = ownerColumns('home', resource.home_id);
+  const status = resource.requires_approval ? 'pending' : 'confirmed';
+
+  const row = {
+    event_type_id: null,
+    ...oc,
+    resource_id: resource.id,
+    host_user_id: null, // resources block the resource, not a person; guarded by resource exclusion
+    invitee_user_id: booker.id || null,
+    invitee_name: booker.name || null,
+    invitee_email: booker.email || null,
+    start_at: startIso,
+    end_at: endIso,
+    status,
+    buffer_before_min: resource.buffer_min || 0,
+    buffer_after_min: resource.buffer_min || 0,
+    enforce_exclusive: false,
+    created_via: 'in_app',
+    created_by: booker.id || null,
+  };
+
+  const { data, error } = await supabaseAdmin.from('Booking').insert(row).select('*').single();
+  if (error) {
+    if (isOverlapViolation(error)) throw new BookingError('That resource is already booked for an overlapping time.', 409, 'RESOURCE_TAKEN');
+    logger.error('[bookingService] resource booking insert failed', { error: error.message, code: error.code });
+    throw new BookingError('Could not book the resource.', 500, 'CREATE_FAILED');
+  }
+  return data;
+}
+
 function assertTransition(booking, allowedFrom, action) {
   if (!allowedFrom.includes(booking.status)) {
     throw new BookingError(`Cannot ${action} a booking that is ${booking.status}.`, 409, 'BAD_STATE');
@@ -401,6 +448,7 @@ async function reassignBooking(bookingId, actorUserId, newHostId) {
 module.exports = {
   BookingError,
   createBooking,
+  createResourceBooking,
   approveBooking,
   declineBooking,
   cancelBooking,
