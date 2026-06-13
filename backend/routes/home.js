@@ -5067,12 +5067,12 @@ router.get('/:id/events', verifyToken, async (req, res) => {
             booking_status: b.status,
           });
         }
-        events.sort((a, b2) => new Date(a.start_at) - new Date(b2.start_at));
       }
     } catch (unionErr) {
       logger.warn('[home events] booking union skipped', { error: unionErr.message, homeId });
     }
 
+    events.sort((a, b2) => new Date(a.start_at) - new Date(b2.start_at));
     res.json({ events });
   } catch (err) {
     logger.error('Events fetch error', { error: err.message });
