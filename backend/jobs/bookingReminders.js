@@ -1,8 +1,8 @@
 // ============================================================
 // JOB: Calendarly booking reminders — runs every 15 minutes (registered in jobs/index.js).
-// Sends T-24h and T-1h reminders for confirmed bookings to host + invitee (app or email),
-// deduped via BookingReminderLog UNIQUE(booking_id, kind). Cron scaffolding mirrors
-// jobs/supportTrainReminders.js; the worker body is booking-specific.
+// Sends reminders for confirmed bookings at each lead offset configured on the booking's page
+// (BookingPage.reminder_minutes, default [1440, 60] = 1 day + 1 hour). Recipients: host (subject
+// to their notify prefs) + invitee (app or email). Deduped via BookingReminderLog UNIQUE(booking_id, kind).
 // ============================================================
 
 const supabaseAdmin = require('../config/supabaseAdmin');
@@ -10,12 +10,9 @@ const logger = require('../utils/logger');
 const notify = require('../services/scheduling/bookingNotifyService');
 
 const MIN = 60 * 1000;
-
-// Reminder windows (wider than the 15-min cron so every booking is caught; the unique log dedupes).
-const WINDOWS = [
-  { kind: 'reminder_24h', minBefore: 24 * 60 - 8, maxBefore: 24 * 60 + 8 }, // ~24h out
-  { kind: 'reminder_1h', minBefore: 60 - 8, maxBefore: 60 + 8 }, // ~1h out
-];
+const DEFAULT_REMINDER_MINUTES = [1440, 60];
+const SCAN_AHEAD_MIN = 7 * 24 * 60 + 15; // scan confirmed bookings starting within the next 7 days
+const MAX_OFFSET_MIN = 7 * 24 * 60; // honor configured offsets up to 7 days
 
 async function alreadySent(bookingId, kind) {
   const { data } = await supabaseAdmin
@@ -30,14 +27,13 @@ async function alreadySent(bookingId, kind) {
 async function logSent(bookingId, kind) {
   // Insert-first dedupe: the UNIQUE(booking_id, kind) index makes a concurrent duplicate fail.
   const { error } = await supabaseAdmin.from('BookingReminderLog').insert({ booking_id: bookingId, kind });
-  return !error; // false if a concurrent worker already logged it
+  return !error;
 }
 
 async function runBookingReminders() {
   const now = Date.now();
-  // Fetch confirmed bookings starting within the next ~24h15m (covers both windows).
-  const fromIso = new Date(now + (60 - 10) * MIN).toISOString();
-  const toIso = new Date(now + (24 * 60 + 10) * MIN).toISOString();
+  const fromIso = new Date(now + MIN).toISOString();
+  const toIso = new Date(now + SCAN_AHEAD_MIN * MIN).toISOString();
 
   const { data: bookings, error } = await supabaseAdmin
     .from('Booking')
@@ -52,39 +48,44 @@ async function runBookingReminders() {
   }
   if (!bookings || !bookings.length) return;
 
-  // Cache event types + pages to avoid refetching per booking.
   const etCache = new Map();
   const pageCache = new Map();
   let sent = 0;
 
   for (const booking of bookings) {
+    if (booking.page_id && !pageCache.has(booking.page_id)) {
+      const { data: page } = await supabaseAdmin.from('BookingPage').select('*').eq('id', booking.page_id).maybeSingle();
+      pageCache.set(booking.page_id, page || null);
+    }
+    const page = booking.page_id ? pageCache.get(booking.page_id) : null;
+    const offsets = (page && Array.isArray(page.reminder_minutes) && page.reminder_minutes.length
+      ? page.reminder_minutes
+      : DEFAULT_REMINDER_MINUTES
+    ).filter((m) => m > 0 && m <= MAX_OFFSET_MIN);
+
     const minutesUntil = (Date.parse(booking.start_at) - now) / MIN;
-    for (const w of WINDOWS) {
-      if (minutesUntil < w.minBefore || minutesUntil > w.maxBefore) continue;
-      if (await alreadySent(booking.id, w.kind)) continue;
-      // Reserve the log row first so a retry/concurrent tick won't double-send.
-      if (!(await logSent(booking.id, w.kind))) continue;
+    for (const offset of offsets) {
+      // ~15-minute window per offset (matches the cron cadence); the unique log dedupes overlaps.
+      if (minutesUntil < offset - 7 || minutesUntil > offset + 8) continue;
+      const kind = `reminder_${offset}m`;
+      if (await alreadySent(booking.id, kind)) continue;
+      if (!(await logSent(booking.id, kind))) continue;
 
       try {
-        // Resource bookings have a null event_type_id — skip the lookup (sendBookingReminder
-        // falls back to a generic title) rather than querying EventType with a null id.
         if (booking.event_type_id && !etCache.has(booking.event_type_id)) {
           const { data: et } = await supabaseAdmin.from('EventType').select('*').eq('id', booking.event_type_id).maybeSingle();
           etCache.set(booking.event_type_id, et || null);
         }
-        if (booking.page_id && !pageCache.has(booking.page_id)) {
-          const { data: page } = await supabaseAdmin.from('BookingPage').select('*').eq('id', booking.page_id).maybeSingle();
-          pageCache.set(booking.page_id, page || null);
-        }
         await notify.sendBookingReminder({
           booking,
           eventType: booking.event_type_id ? etCache.get(booking.event_type_id) : null,
-          page: booking.page_id ? pageCache.get(booking.page_id) : null,
-          kind: w.kind,
+          page,
+          kind,
+          offsetMinutes: offset,
         });
         sent += 1;
       } catch (err) {
-        logger.error('[bookingReminders] send failed', { bookingId: booking.id, kind: w.kind, error: err.message });
+        logger.error('[bookingReminders] send failed', { bookingId: booking.id, kind, error: err.message });
       }
     }
   }

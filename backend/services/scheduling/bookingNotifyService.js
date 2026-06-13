@@ -12,6 +12,7 @@ const notificationService = require('../notificationService');
 const emailService = require('../emailService');
 const { buildIcs } = require('./icsService');
 const { isEmailSuppressed } = require('./schedulingShared');
+const notifyPrefs = require('./schedulingNotifyPrefs');
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
@@ -177,8 +178,8 @@ async function notifyBookingEvent({ booking, eventType, page, kind, manageToken 
 
     const link = `/app/profile/schedule/bookings/${booking.id}`;
 
-    // --- Host (always an app user, when assigned) ---
-    if (booking.host_user_id) {
+    // --- Host (always an app user, when assigned) — respect the host's notification prefs ---
+    if (booking.host_user_id && (await notifyPrefs.hostWants(booking.host_user_id, kind))) {
       await notifyAppUser(booking.host_user_id, {
         type: copy.invType === 'booking_request' ? 'booking_request' : copy.invType,
         title: copy.hostTitle,
@@ -187,8 +188,8 @@ async function notifyBookingEvent({ booking, eventType, page, kind, manageToken 
         metadata: { booking_id: booking.id, event_type_id: booking.event_type_id, kind },
       });
     }
-    // Owner (personal pages where owner != host) — notify if distinct.
-    if (booking.owner_user_id && booking.owner_user_id !== booking.host_user_id) {
+    // Owner (personal pages where owner != host) — notify if distinct, respecting their prefs.
+    if (booking.owner_user_id && booking.owner_user_id !== booking.host_user_id && (await notifyPrefs.hostWants(booking.owner_user_id, kind))) {
       await notifyAppUser(booking.owner_user_id, {
         type: copy.invType === 'booking_request' ? 'booking_request' : copy.invType,
         title: copy.hostTitle,
@@ -258,16 +259,30 @@ async function notifyBookingEvent({ booking, eventType, page, kind, manageToken 
  * Reminder fan-out (called by the bookingReminders cron). Sends to host (app) and invitee
  * (app or email), respecting the email suppression list for non-user invitees.
  */
-async function sendBookingReminder({ booking, eventType, page, kind }) {
+/** Human lead label for a reminder offset in minutes. */
+function formatLead(min) {
+  if (min >= 1440) {
+    const d = Math.round(min / 1440);
+    return d === 1 ? 'tomorrow' : `in ${d} days`;
+  }
+  if (min >= 60) {
+    const h = Math.round(min / 60);
+    return h === 1 ? 'in about an hour' : `in ${h} hours`;
+  }
+  return `in ${min} minutes`;
+}
+
+async function sendBookingReminder({ booking, eventType, page, kind, offsetMinutes }) {
   const eventName = (eventType && eventType.name) || 'Appointment';
   const inviteeTz = booking.invitee_timezone || (page && page.timezone) || 'UTC';
   const whenInvitee = formatWhen(booking.start_at, booking.end_at, inviteeTz);
-  const label = kind === 'reminder_1h' ? 'in about an hour' : 'tomorrow';
+  const label = Number.isFinite(offsetMinutes) ? formatLead(offsetMinutes) : (kind === 'reminder_1h' ? 'in about an hour' : 'tomorrow');
   const link = `/app/profile/schedule/bookings/${booking.id}`;
 
-  if (booking.host_user_id) {
+  // Host reminder respects the host's 'reminder' notify-me toggle.
+  if (booking.host_user_id && (await notifyPrefs.hostWantsKey(booking.host_user_id, 'reminder'))) {
     await notifyAppUser(booking.host_user_id, {
-      type: kind,
+      type: 'booking_reminder',
       title: `Reminder: ${eventName} ${label}`,
       body: whenInvitee,
       link,
@@ -277,7 +292,7 @@ async function sendBookingReminder({ booking, eventType, page, kind }) {
 
   if (booking.invitee_user_id) {
     await notifyAppUser(booking.invitee_user_id, {
-      type: kind,
+      type: 'booking_reminder',
       title: `Reminder: ${eventName} ${label}`,
       body: whenInvitee,
       link,
