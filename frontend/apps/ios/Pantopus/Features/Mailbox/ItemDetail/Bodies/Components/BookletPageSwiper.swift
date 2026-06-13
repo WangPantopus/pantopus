@@ -7,7 +7,6 @@
 //  snapping and accessibility actions for free; per-page magnification
 //  uses a `MagnificationGesture`.
 //
-// swiftlint:disable force_unwrapping
 
 import SwiftUI
 

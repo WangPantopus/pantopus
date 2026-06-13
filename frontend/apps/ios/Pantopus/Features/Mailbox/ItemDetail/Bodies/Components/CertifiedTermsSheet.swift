@@ -9,7 +9,7 @@
 //  in-line markdown if backend returns markdown" but no fetch endpoint
 //  exists today.
 //
-// swiftlint:disable force_unwrapping multiple_closures_with_trailing_closure
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
