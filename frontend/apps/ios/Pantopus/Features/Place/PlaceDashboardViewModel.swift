@@ -33,6 +33,11 @@ final class PlaceDashboardViewModel {
     let onAddPlace: () -> Void
     /// Begin verification with the chosen method + address (pushes B2).
     let onStartVerify: (PlaceVerifyMethod, String) -> Void
+    /// W7 — compose a verified-neighbor heads-up (carries the address for
+    /// the composer header). Surfaced only for verified (T4) residents.
+    let onComposeMessage: (String) -> Void
+    /// W7 — open the verified-neighbor inbox.
+    let onOpenInbox: () -> Void
     let onOpenHubHome: () -> Void
 
     init(
@@ -43,6 +48,8 @@ final class PlaceDashboardViewModel {
         onSelectHome: @escaping (String) -> Void = { _ in },
         onAddPlace: @escaping () -> Void = {},
         onStartVerify: @escaping (PlaceVerifyMethod, String) -> Void = { _, _ in },
+        onComposeMessage: @escaping (String) -> Void = { _ in },
+        onOpenInbox: @escaping () -> Void = {},
         onOpenHubHome: @escaping () -> Void = {}
     ) {
         self.homeId = homeId
@@ -52,6 +59,8 @@ final class PlaceDashboardViewModel {
         self.onSelectHome = onSelectHome
         self.onAddPlace = onAddPlace
         self.onStartVerify = onStartVerify
+        self.onComposeMessage = onComposeMessage
+        self.onOpenInbox = onOpenInbox
         self.onOpenHubHome = onOpenHubHome
     }
 

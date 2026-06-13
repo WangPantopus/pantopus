@@ -103,6 +103,12 @@ import app.pantopus.android.ui.screens.place.PlaceDashboardScreen
 import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_SLUG_KEY
 import app.pantopus.android.ui.screens.place.detail.PlaceDetailScreen
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_ADDRESS_KEY
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_MESSAGE_ID_KEY
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageComposeScreen
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageInboxScreen
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageReceivedScreen
 import app.pantopus.android.ui.screens.place.pulse.PLACE_PULSE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.place.pulse.PlacePulseScreen
 import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_ADDRESS_KEY
@@ -358,6 +364,23 @@ private object ChildRoutes {
         method: String,
         address: String,
     ): String = "place/$homeId/verify/$method?$PLACE_VERIFY_ADDRESS_KEY=${java.net.URLEncoder.encode(address, "UTF-8")}"
+
+    /** W7 D1 — compose a verified-neighbor heads-up (carries the address). */
+    const val NEIGHBOR_COMPOSE =
+        "place/{$NEIGHBOR_COMPOSE_HOME_ID_KEY}/message?$NEIGHBOR_COMPOSE_ADDRESS_KEY={$NEIGHBOR_COMPOSE_ADDRESS_KEY}"
+
+    fun neighborCompose(
+        homeId: String,
+        address: String,
+    ): String = "place/$homeId/message?$NEIGHBOR_COMPOSE_ADDRESS_KEY=${java.net.URLEncoder.encode(address, "UTF-8")}"
+
+    /** W7 — the verified-neighbor inbox list. */
+    const val NEIGHBOR_INBOX = "place/neighbor-inbox"
+
+    /** W7 D2 — a single received verified-neighbor message. */
+    const val NEIGHBOR_MESSAGE = "place/neighbor-message/{$NEIGHBOR_MESSAGE_ID_KEY}"
+
+    fun neighborMessage(messageId: String): String = "place/neighbor-message/$messageId"
 
     /** Bills list (T5.2.2 / P13). */
     const val HOME_BILLS = "homes/{$BILLS_HOME_ID_KEY}/bills"
@@ -1916,6 +1939,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.placeVerifyStatus(homeId, method.slug, address))
                         },
                         onOpenPulse = { navController.navigate(ChildRoutes.placePulse(homeId)) },
+                        onComposeMessage = { address ->
+                            navController.navigate(ChildRoutes.neighborCompose(homeId, address))
+                        },
+                        onOpenInbox = { navController.navigate(ChildRoutes.NEIGHBOR_INBOX) },
                     )
                 }
                 composable(
@@ -1952,6 +1979,35 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onBack = { navController.popBackStack() },
                         onDone = { navController.popBackStack() },
                     )
+                }
+                composable(
+                    route = ChildRoutes.NEIGHBOR_COMPOSE,
+                    arguments =
+                        listOf(
+                            navArgument(NEIGHBOR_COMPOSE_HOME_ID_KEY) { type = NavType.StringType },
+                            navArgument(NEIGHBOR_COMPOSE_ADDRESS_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) {
+                    NeighborMessageComposeScreen(
+                        onBack = { navController.popBackStack() },
+                        onChangeRecipient = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                    )
+                }
+                composable(route = ChildRoutes.NEIGHBOR_INBOX) {
+                    NeighborMessageInboxScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMessage = { messageId -> navController.navigate(ChildRoutes.neighborMessage(messageId)) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.NEIGHBOR_MESSAGE,
+                    arguments = listOf(navArgument(NEIGHBOR_MESSAGE_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    NeighborMessageReceivedScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.HOME_DASHBOARD,
