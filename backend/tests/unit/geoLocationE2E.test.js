@@ -157,6 +157,7 @@ jest.mock('../../services/feedService', () => ({
   invalidateUserFeedCache: jest.fn(),
   normalizeFeedPostRow: jest.fn((row) => row),
   normalizeMediaUrls: jest.fn((urls) => urls || []),
+  normalizeAlignedMediaUrls: jest.fn((urls) => urls || []),
   getMuteAndHideFilters: jest.fn().mockReturnValue({ muteFilter: () => true, hideFilter: () => true }),
   applyMuteHideFilters: jest.fn((posts) => posts),
   enrichWithUserStatus: jest.fn((posts) => posts),
