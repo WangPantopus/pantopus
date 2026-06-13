@@ -84,7 +84,7 @@ struct PlaceDashboardView: View {
                     headline: pulse.title,
                     nudgeIcon: pulse.nudgeIcon,
                     nudgeText: pulse.nudgeText ?? "",
-                    onTap: { viewModel.onOpenDetail(.today) }
+                    onTap: { viewModel.onOpenPulse() }
                 )
                 .padding(.horizontal, 16)
                 .padding(.top, isClaimed ? 12 : 14)

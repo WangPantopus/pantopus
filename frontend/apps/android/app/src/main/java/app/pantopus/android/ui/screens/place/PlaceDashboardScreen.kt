@@ -67,6 +67,7 @@ fun PlaceDashboardScreen(
     onSwitchHome: (homeId: String) -> Unit,
     onAddPlace: () -> Unit,
     onVerify: (homeId: String) -> Unit,
+    onOpenPulse: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PlaceDashboardViewModel = hiltViewModel(key = "place-$homeId"),
 ) {
@@ -85,6 +86,7 @@ fun PlaceDashboardScreen(
                     onOpenAvatar = { showSwitcher = true },
                     onVerify = { onVerify(homeId) },
                     onOpenDetail = { group -> onOpenSection(homeId, group.slug) },
+                    onOpenPulse = onOpenPulse,
                 )
         }
     }
@@ -112,6 +114,7 @@ internal fun PlaceDashboardContent(
     onVerify: () -> Unit,
     onOpenDetail: (PlaceDetailGroup) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenPulse: () -> Unit = {},
 ) {
     val isVerified = intel.tier == PlaceTier.T4
     val isClaimed = intel.tier == PlaceTier.T3
@@ -142,7 +145,7 @@ internal fun PlaceDashboardContent(
                 headline = pulse.title,
                 nudgeIcon = pulse.nudgeIcon,
                 nudgeText = pulse.nudgeText.orEmpty(),
-                onTap = { onOpenDetail(PlaceDetailGroup.TODAY) },
+                onTap = onOpenPulse,
                 modifier =
                     Modifier
                         .padding(horizontal = 16.dp)

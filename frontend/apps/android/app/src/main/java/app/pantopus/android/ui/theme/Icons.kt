@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
@@ -92,6 +93,7 @@ import androidx.compose.material.icons.filled.Factory
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.FormatPaint
@@ -430,6 +432,11 @@ enum class PantopusIcon(
     IdCard("id-card"),
     FolderLock("folder-lock"),
     CloudOff("cloud-off"),
+    Cloud("cloud"),
+    Sunset("sunset"),
+    Flower2("flower-2"),
+    Trash("trash"),
+    ZapOff("zap-off"),
     Sunrise("sunrise"),
     Waves("waves"),
     Activity("activity"),
@@ -804,6 +811,11 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.IdCard -> IconSource.Material(Icons.Filled.Badge)
         PantopusIcon.FolderLock -> IconSource.Material(Icons.Filled.FolderShared)
         PantopusIcon.CloudOff -> IconSource.Material(Icons.Filled.CloudOff)
+        PantopusIcon.Cloud -> IconSource.Material(Icons.Filled.Cloud)
+        PantopusIcon.Sunset -> IconSource.Material(Icons.Filled.WbTwilight)
+        PantopusIcon.Flower2 -> IconSource.Material(Icons.Filled.LocalFlorist)
+        PantopusIcon.Trash -> IconSource.Material(Icons.Filled.Delete)
+        PantopusIcon.ZapOff -> IconSource.Material(Icons.Filled.FlashOff)
         // Place Intelligence dashboard glyphs (W3) — Material extended set,
         // mapped to the closest equivalents of the Lucide design tokens.
         PantopusIcon.Sunrise -> IconSource.Material(Icons.Filled.WbTwilight)
