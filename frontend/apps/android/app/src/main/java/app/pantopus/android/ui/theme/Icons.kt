@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
@@ -79,6 +80,7 @@ import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmergencyShare
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
+import androidx.compose.material.icons.filled.Engineering
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.EventNote
@@ -86,6 +88,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Factory
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Flag
@@ -103,6 +106,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.HowToReg
+import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
@@ -144,6 +148,7 @@ import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonPin
@@ -182,10 +187,12 @@ import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Support
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
@@ -198,7 +205,9 @@ import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
@@ -420,6 +429,17 @@ enum class PantopusIcon(
     Stamp("stamp"),
     IdCard("id-card"),
     FolderLock("folder-lock"),
+    CloudOff("cloud-off"),
+    Sunrise("sunrise"),
+    Waves("waves"),
+    Activity("activity"),
+    TestTube("test-tube"),
+    Factory("factory"),
+    BadgePercent("badge-percent"),
+    Vote("vote"),
+    LifeBuoy("life-buoy"),
+    HardHat("hard-hat"),
+    TriangleAlert("triangle-alert"),
     UploadCloud("upload-cloud"),
     CalendarClock("calendar-clock"),
     Download("download"),
@@ -783,6 +803,19 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Stamp -> IconSource.Material(Icons.Filled.Approval)
         PantopusIcon.IdCard -> IconSource.Material(Icons.Filled.Badge)
         PantopusIcon.FolderLock -> IconSource.Material(Icons.Filled.FolderShared)
+        PantopusIcon.CloudOff -> IconSource.Material(Icons.Filled.CloudOff)
+        // Place Intelligence dashboard glyphs (W3) — Material extended set,
+        // mapped to the closest equivalents of the Lucide design tokens.
+        PantopusIcon.Sunrise -> IconSource.Material(Icons.Filled.WbTwilight)
+        PantopusIcon.Waves -> IconSource.Material(Icons.Filled.Waves)
+        PantopusIcon.Activity -> IconSource.Material(Icons.Filled.Timeline)
+        PantopusIcon.TestTube -> IconSource.Material(Icons.Filled.Science)
+        PantopusIcon.Factory -> IconSource.Material(Icons.Filled.Factory)
+        PantopusIcon.BadgePercent -> IconSource.Material(Icons.Filled.Percent)
+        PantopusIcon.Vote -> IconSource.Material(Icons.Filled.HowToVote)
+        PantopusIcon.LifeBuoy -> IconSource.Material(Icons.Filled.Support)
+        PantopusIcon.HardHat -> IconSource.Material(Icons.Filled.Engineering)
+        PantopusIcon.TriangleAlert -> IconSource.Material(Icons.Filled.Warning)
         PantopusIcon.UploadCloud -> IconSource.Material(Icons.Filled.CloudUpload)
         PantopusIcon.CalendarClock -> IconSource.Material(Icons.Filled.EditCalendar)
         PantopusIcon.Download -> IconSource.Material(Icons.Filled.Download)

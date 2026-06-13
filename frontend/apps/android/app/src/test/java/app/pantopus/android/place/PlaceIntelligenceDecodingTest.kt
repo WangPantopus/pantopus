@@ -57,8 +57,7 @@ class PlaceIntelligenceDecodingTest {
             "missing fixture place/$name"
         }.readText()
 
-    private inline fun <reified T> decode(json: String): T =
-        checkNotNull(moshi.adapter(T::class.java).fromJson(json)) { "decoded null" }
+    private inline fun <reified T> decode(json: String): T = checkNotNull(moshi.adapter(T::class.java).fromJson(json)) { "decoded null" }
 
     // ── Full dashboard payload (captured, T3) ────────────────
 
