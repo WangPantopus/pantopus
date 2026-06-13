@@ -279,6 +279,9 @@ public enum HubRoute: Hashable {
     case placeDetail(homeId: String, group: PlaceDetailGroup)
     /// W4 — the full Today's Pulse signal stream (from the dashboard hero).
     case placePulse(homeId: String)
+    /// W5 — the verify status screen (B2 pending → B3 success / B4 failed)
+    /// after a method is chosen in the verify sheet.
+    case placeVerifyStatus(homeId: String, method: PlaceVerifyMethod, address: String)
     /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
     /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
@@ -2217,7 +2220,9 @@ public struct HubTabRoot: View {
                     onOpenPulse: { push(.placePulse(homeId: homeId)) },
                     onSelectHome: { id in push(.placeDashboard(homeId: id)) },
                     onAddPlace: { push(.addHome) },
-                    onVerify: { push(.placeholder(label: "Verify address")) },
+                    onStartVerify: { method, address in
+                        push(.placeVerifyStatus(homeId: homeId, method: method, address: address))
+                    },
                     onOpenHubHome: {}
                 )
             )
@@ -2231,6 +2236,19 @@ public struct HubTabRoot: View {
                 viewModel: PlacePulseViewModel(homeId: homeId),
                 onBack: { pop() }
             )
+        case let .placeVerifyStatus(homeId, method, address):
+            PlaceVerifyStatusView(
+                address: address,
+                method: method,
+                onBack: { pop() },
+                onDone: {
+                    path.removeAll { route in
+                        if case .placeVerifyStatus = route { return true }
+                        return false
+                    }
+                }
+            )
+            .id(homeId)
         #if DEBUG
         case .tokenGallery: TokenGalleryView()
         case .iconGallery: IconGalleryView()

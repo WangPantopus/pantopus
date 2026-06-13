@@ -245,6 +245,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case flower2 = "flower-2"
     case trash
     case zapOff = "zap-off"
+    case fileSearch = "file-search"
 
     // T6.5e Mailbox Vault — folder palette + mail-type tile glyphs + FAB
     // glyph. Distinct from existing `mailbox` (mail.stack) so the new
@@ -580,6 +581,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .flower2: "leaf"
         case .trash: "trash"
         case .zapOff: "bolt.slash"
+        case .fileSearch: "doc.text.magnifyingglass"
         // T6.5e Mailbox Vault. SF Symbols has direct envelope glyphs;
         // `piggy-bank` and `arrow-down-up` lack 1:1 equivalents so fall
         // back to `dollarsign.circle` and `arrow.up.arrow.down` glyphs.
