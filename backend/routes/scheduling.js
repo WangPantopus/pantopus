@@ -1179,12 +1179,20 @@ router.get('/my-packages', asyncHandler(async (req, res) => {
 // ============================================================
 router.get('/my-bookings', asyncHandler(async (req, res) => {
   const email = req.user.email ? normalizeEmail(req.user.email) : null;
-  let q = supabaseAdmin.from('Booking').select('*').order('start_at', { ascending: false }).limit(200);
-  // Match by linked user id OR (case-insensitive) invitee email.
-  q = email ? q.or(`invitee_user_id.eq.${req.user.id},invitee_email.ilike.${email}`) : q.eq('invitee_user_id', req.user.id);
-  const { data, error } = await q;
-  if (error) throw error;
-  res.json({ bookings: data || [] });
+  // Two parameterized queries (no filter-string interpolation), merged + deduped — matches by
+  // linked user id OR exact invitee_email (stored normalized at booking time).
+  const byUser = supabaseAdmin.from('Booking').select('*').eq('invitee_user_id', req.user.id).order('start_at', { ascending: false }).limit(200);
+  const byEmail = email
+    ? supabaseAdmin.from('Booking').select('*').eq('invitee_email', email).order('start_at', { ascending: false }).limit(200)
+    : Promise.resolve({ data: [] });
+  const [r1, r2] = await Promise.all([byUser, byEmail]);
+  if (r1.error) throw r1.error;
+  const seen = new Set();
+  const merged = [...(r1.data || []), ...(r2.data || [])]
+    .filter((b) => (seen.has(b.id) ? false : seen.add(b.id)))
+    .sort((a, b) => new Date(b.start_at) - new Date(a.start_at))
+    .slice(0, 200);
+  res.json({ bookings: merged });
 }));
 
 // ============================================================
