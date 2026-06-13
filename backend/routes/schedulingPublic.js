@@ -459,4 +459,92 @@ router.post('/booking/:token/unsubscribe', bookingWriteLimiter, asyncHandler(asy
   res.json({ ok: true });
 }));
 
+// ---------- waitlist join (public) ----------
+const waitlistSchema = Joi.object({
+  name: Joi.string().trim().max(200).allow('', null),
+  email: Joi.string().email().max(320).required(),
+  desired_from: Joi.string().isoDate().allow(null),
+  desired_to: Joi.string().isoDate().allow(null),
+});
+router.post('/book/:slug/:eventTypeSlug/waitlist', bookingWriteLimiter, optionalAuth, validate(waitlistSchema), asyncHandler(async (req, res) => {
+  const { page, eventType } = await loadPageEventType(req.params.slug, req.params.eventTypeSlug);
+  if (!page || !eventType) return res.status(404).json({ error: 'NOT_FOUND' });
+  const email = normalizeEmail(req.body.email);
+  const inviteeUserId = req.user && req.user.id && normalizeEmail(req.user.email) === email ? req.user.id : null;
+  const { data, error } = await supabaseAdmin
+    .from('SchedulingWaitlist')
+    .insert({
+      event_type_id: eventType.id,
+      owner_type: eventType.owner_type,
+      owner_id: eventType.owner_id,
+      invitee_user_id: inviteeUserId,
+      invitee_name: req.body.name || null,
+      invitee_email: email,
+      desired_from: req.body.desired_from || null,
+      desired_to: req.body.desired_to || null,
+    })
+    .select('id, status')
+    .single();
+  if (error) throw error;
+  res.status(201).json({ waitlist: data });
+}));
+
+// ---------- proposed-reschedule accept / decline (invitee, via manage token) ----------
+router.post('/booking/:token/accept-reschedule', bookingWriteLimiter, asyncHandler(async (req, res) => {
+  const ctx = await loadByManageToken(req.params.token);
+  if (!ctx) return res.status(404).json({ error: 'NOT_FOUND' });
+  try {
+    const updated = await bookingService.acceptProposedReschedule(ctx.booking.id, ctx.booking.invitee_user_id);
+    res.json({ booking: { id: updated.id, status: updated.status, start_at: updated.start_at, end_at: updated.end_at } });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.code || 'ERROR', message: err.message });
+    throw err;
+  }
+}));
+router.post('/booking/:token/decline-reschedule', bookingWriteLimiter, asyncHandler(async (req, res) => {
+  const ctx = await loadByManageToken(req.params.token);
+  if (!ctx) return res.status(404).json({ error: 'NOT_FOUND' });
+  const updated = await bookingService.declineProposedReschedule(ctx.booking.id);
+  res.json({ booking: { id: updated.id, status: updated.status } });
+}));
+
+// ---------- meeting polls (public view + vote) ----------
+router.get('/poll/:id', previewLimiter, asyncHandler(async (req, res) => {
+  const { data: poll } = await supabaseAdmin.from('SchedulingPoll').select('id, title, description, duration_min, status, finalized_start_at').eq('id', req.params.id).maybeSingle();
+  if (!poll) return res.status(404).json({ error: 'NOT_FOUND' });
+  const [{ data: options }, { data: votes }] = await Promise.all([
+    supabaseAdmin.from('SchedulingPollOption').select('id, start_at, end_at').eq('poll_id', poll.id).order('start_at'),
+    supabaseAdmin.from('SchedulingPollVote').select('option_id, voter_name, value').eq('poll_id', poll.id),
+  ]);
+  res.json({ poll, options: options || [], votes: votes || [] });
+}));
+
+const pollVoteSchema = Joi.object({
+  name: Joi.string().trim().max(200).allow('', null),
+  email: Joi.string().email().max(320).allow('', null),
+  votes: Joi.array().items(Joi.object({ option_id: Joi.string().uuid().required(), value: Joi.string().valid('yes', 'maybe', 'no').default('yes') })).min(1).required(),
+});
+router.post('/poll/:id/vote', bookingWriteLimiter, optionalAuth, validate(pollVoteSchema), asyncHandler(async (req, res) => {
+  const { data: poll } = await supabaseAdmin.from('SchedulingPoll').select('id, status').eq('id', req.params.id).maybeSingle();
+  if (!poll) return res.status(404).json({ error: 'NOT_FOUND' });
+  if (poll.status !== 'open') return res.status(409).json({ error: 'POLL_CLOSED' });
+  const voterKey = (req.user && req.user.id) || (req.body.email ? normalizeEmail(req.body.email) : null);
+  if (!voterKey) return res.status(400).json({ error: 'VOTER_REQUIRED', message: 'Sign in or provide an email to vote.' });
+  const voterName = req.body.name || null;
+  // Validate options belong to this poll.
+  const { data: validOpts } = await supabaseAdmin.from('SchedulingPollOption').select('id').eq('poll_id', poll.id);
+  const validIds = new Set((validOpts || []).map((o) => o.id));
+  for (const v of req.body.votes) {
+    if (!validIds.has(v.option_id)) continue;
+    // Upsert one vote per (option, voter).
+    const { data: existing } = await supabaseAdmin.from('SchedulingPollVote').select('id').eq('option_id', v.option_id).eq('voter_key', voterKey).maybeSingle();
+    if (existing) {
+      await supabaseAdmin.from('SchedulingPollVote').update({ value: v.value, voter_name: voterName }).eq('id', existing.id);
+    } else {
+      await supabaseAdmin.from('SchedulingPollVote').insert({ poll_id: poll.id, option_id: v.option_id, voter_user_id: req.user ? req.user.id : null, voter_name: voterName, voter_key: voterKey, value: v.value });
+    }
+  }
+  res.json({ ok: true });
+}));
+
 module.exports = router;

@@ -8,9 +8,11 @@
 
 const supabaseAdmin = require('../../config/supabaseAdmin');
 const logger = require('../../utils/logger');
+const crypto = require('crypto');
 const availabilityService = require('./availabilityService');
 const notify = require('./bookingNotifyService');
 const payments = require('./schedulingPaymentsService');
+const packages = require('./packageService');
 const { ownerColumns, generateToken } = require('./schedulingShared');
 
 const MIN_MS = 60 * 1000;
@@ -104,7 +106,7 @@ async function bumpAssigneeRotation(eventTypeId, hostId) {
  * @param {string} [args.requestedHostId]  (round-robin: a specific eligible host)
  * @returns {Promise<{ booking, manageToken, clientSecret }>}
  */
-async function createBooking({ eventType, page, startIso, durationMin, invitee = {}, intakeAnswers = {}, createdVia = 'public_link', actorUserId = null, requestedHostId = null }) {
+async function createBooking({ eventType, page, startIso, durationMin, invitee = {}, intakeAnswers = {}, createdVia = 'public_link', actorUserId = null, requestedHostId = null, recurrenceGroupId = null }) {
   if (!eventType || !eventType.is_active) throw new BookingError('Event type is not available.', 404, 'EVENT_TYPE_UNAVAILABLE');
   const duration = durationMin || eventType.default_duration;
   if (!(eventType.durations || [eventType.default_duration]).includes(duration)) {
@@ -184,6 +186,7 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
     buffer_before_min: eventType.buffer_before_min || 0,
     buffer_after_min: eventType.buffer_after_min || 0,
     enforce_exclusive: enforceExclusive,
+    recurrence_group_id: recurrenceGroupId,
     created_via: createdVia,
     created_by: actorUserId,
   };
@@ -332,6 +335,7 @@ async function declineBooking(bookingId, actorUserId, reason) {
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
   assertTransition(ctx.booking, ['pending'], 'decline');
   if (ctx.booking.payment_id) await payments.refundForBooking({ booking: ctx.booking, initiatedBy: actorUserId, reason: 'booking_declined' });
+  if (ctx.booking.package_credit_id) await packages.restoreForBooking(ctx.booking);
   const { data: updated } = await supabaseAdmin
     .from('Booking')
     .update({ status: 'declined', cancel_reason: reason || null, cancelled_by: actorUserId || null, updated_at: new Date().toISOString() })
@@ -354,6 +358,7 @@ async function cancelBooking(bookingId, actorUserId, reason, actorRole = 'host')
     throw new BookingError('This booking cannot be cancelled by the guest.', 403, 'INVITEE_CANCEL_DISABLED');
   }
   if (ctx.booking.payment_id) await payments.refundForBooking({ booking: ctx.booking, initiatedBy: actorUserId, reason: 'booking_cancelled' });
+  if (ctx.booking.package_credit_id) await packages.restoreForBooking(ctx.booking);
   const { data: updated } = await supabaseAdmin
     .from('Booking')
     .update({ status: 'cancelled', cancel_reason: reason || null, cancelled_by: actorUserId || null, updated_at: new Date().toISOString() })
@@ -461,14 +466,81 @@ async function reassignBooking(bookingId, actorUserId, newHostId) {
   return updated;
 }
 
+/**
+ * Create a recurring / multi-session series — one booking per session, linked by a shared
+ * recurrence_group_id. Sessions that conflict are skipped (returned in `failed`).
+ * @returns {Promise<{ recurrenceGroupId, created: object[], failed: Array<{start, error}> }>}
+ */
+async function createRecurringBookings({ eventType, page, sessions, invitee = {}, intakeAnswers = {}, createdVia = 'in_app', actorUserId = null }) {
+  if (!Array.isArray(sessions) || !sessions.length) throw new BookingError('No sessions provided.', 400, 'NO_SESSIONS');
+  if (sessions.length > 52) throw new BookingError('Too many sessions (max 52).', 400, 'TOO_MANY_SESSIONS');
+  const recurrenceGroupId = crypto.randomUUID();
+  const created = [];
+  const failed = [];
+  for (const startIso of sessions) {
+    try {
+      const result = await createBooking({ eventType, page, startIso, invitee, intakeAnswers, createdVia, actorUserId, recurrenceGroupId });
+      created.push(result.booking);
+    } catch (err) {
+      failed.push({ start: startIso, error: err.code || 'ERROR', message: err.message });
+    }
+  }
+  if (!created.length) throw new BookingError('None of the requested times were available.', 409, 'ALL_SESSIONS_UNAVAILABLE');
+  return { recurrenceGroupId, created, failed };
+}
+
+/** Host proposes a new time (invitee must accept). Stores the proposal without moving the booking. */
+async function proposeReschedule(bookingId, actorUserId, newStartIso, hostId) {
+  const ctx = await getBookingContext(bookingId);
+  if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
+  assertTransition(ctx.booking, ['pending', 'confirmed'], 'propose reschedule');
+  if (!Number.isFinite(new Date(newStartIso).getTime())) throw new BookingError('Invalid start time.', 400, 'BAD_START');
+  const { data: updated } = await supabaseAdmin
+    .from('Booking')
+    .update({ proposed_start_at: newStartIso, proposed_host_id: hostId || null, proposed_by: actorUserId || null, updated_at: new Date().toISOString() })
+    .eq('id', bookingId)
+    .select('*')
+    .single();
+  await notify.notifyBookingEvent({ booking: updated, eventType: ctx.eventType, page: ctx.page, kind: 'reschedule_proposed' });
+  return updated;
+}
+
+/** Invitee accepts a pending proposal — applies it as a reschedule and clears the proposal. */
+async function acceptProposedReschedule(bookingId, actorUserId) {
+  const ctx = await getBookingContext(bookingId);
+  if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
+  if (!ctx.booking.proposed_start_at) throw new BookingError('No pending reschedule proposal.', 409, 'NO_PROPOSAL');
+  const updated = await rescheduleBooking(bookingId, actorUserId, ctx.booking.proposed_start_at, 'system', ctx.booking.proposed_host_id);
+  await supabaseAdmin
+    .from('Booking')
+    .update({ proposed_start_at: null, proposed_host_id: null, proposed_by: null })
+    .eq('id', bookingId);
+  return updated;
+}
+
+/** Clear a pending reschedule proposal (host cancels, or invitee declines). */
+async function declineProposedReschedule(bookingId) {
+  const { data: updated } = await supabaseAdmin
+    .from('Booking')
+    .update({ proposed_start_at: null, proposed_host_id: null, proposed_by: null, updated_at: new Date().toISOString() })
+    .eq('id', bookingId)
+    .select('*')
+    .single();
+  return updated;
+}
+
 module.exports = {
   BookingError,
   createBooking,
+  createRecurringBookings,
   createResourceBooking,
   approveBooking,
   declineBooking,
   cancelBooking,
   rescheduleBooking,
+  proposeReschedule,
+  acceptProposedReschedule,
+  declineProposedReschedule,
   markNoShow,
   reassignBooking,
   getBookingContext,
