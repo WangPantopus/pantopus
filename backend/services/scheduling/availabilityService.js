@@ -363,7 +363,7 @@ async function resolveMembers(ownerType, ownerId, eventType, memberOverride) {
   return { memberIds, schedules, requiredMemberIds: memberIds };
 }
 
-async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs }) {
+async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, excludeBookingId }) {
   const busy = {};
   for (const id of memberIds) busy[id] = [];
   if (!memberIds.length) return busy;
@@ -374,13 +374,16 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs }
   // 1. Bookings where these members are host (active statuses), overlapping the window.
   //    Expand each by the booking's OWN buffers so the engine's offered slots match the DB
   //    exclusion constraint (which guards each booking's buffer-padded occupied range).
-  const { data: bookings } = await supabaseAdmin
+  let bookingsQuery = supabaseAdmin
     .from('Booking')
-    .select('host_user_id, start_at, end_at, buffer_before_min, buffer_after_min')
+    .select('id, host_user_id, start_at, end_at, buffer_before_min, buffer_after_min')
     .in('host_user_id', memberIds)
     .in('status', ['pending', 'confirmed'])
     .lt('start_at', toIso)
     .gt('end_at', fromIso);
+  // When rescheduling, ignore the booking being moved so it doesn't block its own new time.
+  if (excludeBookingId) bookingsQuery = bookingsQuery.neq('id', excludeBookingId);
+  const { data: bookings } = await bookingsQuery;
   for (const b of bookings || []) {
     if (!busy[b.host_user_id]) continue;
     busy[b.host_user_id].push({
@@ -430,7 +433,7 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs }
       .not('recurrence_rule', 'is', null);
     for (const ev of [...(eventsOnce || []), ...(eventsRec || [])]) {
       const startMs = Date.parse(ev.start_at);
-      const endMs = ev.end_at ? Date.parse(ev.end_at) : startMs + 60 * MIN_MS; // null end -> 1h default
+      const endMs = ev.end_at ? Date.parse(ev.end_at) : startMs + DAY_MS; // open-ended event -> all-day (24h) busy
       const duration = endMs - startMs;
       const instances = ev.recurrence_rule
         ? expandRecurrence(ev.recurrence_rule, startMs, duration, fromMs, toMs)
@@ -449,7 +452,7 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs }
  * Main entry. Returns slots in the viewer's timezone plus UTC instants.
  * @returns {Promise<Array<{ start: string, end: string, startLocal: string, eligibleHosts: string[] }>>}
  */
-async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTimezone, now, memberOverride }) {
+async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTimezone, now, memberOverride, excludeBookingId }) {
   const nowMs = now ? new Date(now).getTime() : Date.now();
   const fromMs = new Date(from).getTime();
   // Hard server-side clamp on the horizon so an unauthenticated caller can't request years.
@@ -461,7 +464,7 @@ async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTim
   const activeMemberIds = memberIds.filter((id) => schedules[id]); // members without a schedule contribute nothing
   if (!activeMemberIds.length) return [];
 
-  const busy = await fetchBusyByMember({ memberIds: activeMemberIds, ownerType, ownerId, fromMs, toMs });
+  const busy = await fetchBusyByMember({ memberIds: activeMemberIds, ownerType, ownerId, fromMs, toMs, excludeBookingId });
 
   const membersFree = {};
   for (const id of activeMemberIds) {
@@ -496,7 +499,7 @@ async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTim
  * Is a specific [startIso, endIso] still bookable for this event type/host? Used as a
  * cheap pre-check by bookingService before relying on the DB exclusion constraint.
  */
-async function isSlotAvailable({ ownerType, ownerId, eventType, startIso, endIso, hostUserId, viewerTimezone }) {
+async function isSlotAvailable({ ownerType, ownerId, eventType, startIso, endIso, hostUserId, viewerTimezone, excludeBookingId }) {
   const startMs = new Date(startIso).getTime();
   const endMs = new Date(endIso).getTime();
   const slots = await computeSlots({
@@ -506,6 +509,7 @@ async function isSlotAvailable({ ownerType, ownerId, eventType, startIso, endIso
     from: new Date(startMs - 1).toISOString(),
     to: new Date(endMs + 1).toISOString(),
     viewerTimezone,
+    excludeBookingId,
   });
   const match = slots.find((s) => new Date(s.start).getTime() === startMs && new Date(s.end).getTime() === endMs);
   if (!match) return { available: false, eligibleHosts: [] };

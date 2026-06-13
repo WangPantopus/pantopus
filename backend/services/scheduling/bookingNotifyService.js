@@ -229,6 +229,25 @@ async function notifyBookingEvent({ booking, eventType, page, kind, manageToken 
         attachments,
       });
     }
+
+    // --- Required attendees (collective/group members) — notify those not already notified ---
+    const alreadyNotified = new Set([booking.host_user_id, booking.owner_user_id, booking.invitee_user_id].filter(Boolean));
+    const { data: attendees } = await supabaseAdmin
+      .from('BookingAttendee')
+      .select('user_id')
+      .eq('booking_id', booking.id)
+      .not('user_id', 'is', null);
+    for (const att of attendees || []) {
+      if (alreadyNotified.has(att.user_id)) continue;
+      alreadyNotified.add(att.user_id);
+      await notifyAppUser(att.user_id, {
+        type: copy.invType,
+        title: copy.invSubject,
+        body: whenInvitee,
+        link,
+        metadata: { booking_id: booking.id, kind, role: 'attendee' },
+      });
+    }
   } catch (err) {
     // Notifications are best-effort; never fail the booking transition because of them.
     logger.error('[bookingNotifyService] notifyBookingEvent failed', { error: err.message, kind, bookingId: booking && booking.id });
@@ -266,6 +285,8 @@ async function sendBookingReminder({ booking, eventType, page, kind }) {
     });
   } else if (booking.invitee_email) {
     if (await isEmailSuppressed(booking.invitee_email)) return;
+    const organizer = await getUserContact(booking.host_user_id || booking.owner_user_id);
+    const attachments = [await buildBookingIcs({ booking, eventType, method: 'REQUEST', organizer })];
     const html = bookingEmailHtml({
       heading: `Reminder: ${eventName}`,
       intro: `This is a reminder for your upcoming <strong>${escapeHtml(eventName)}</strong>, ${label}.`,
@@ -274,7 +295,7 @@ async function sendBookingReminder({ booking, eventType, page, kind }) {
       manageUrl: null,
       footerNote: 'You are receiving this because you have an upcoming booking.',
     });
-    await emailService.sendEmail({ to: booking.invitee_email, subject: `Reminder: ${eventName} ${label}`, html });
+    await emailService.sendEmail({ to: booking.invitee_email, subject: `Reminder: ${eventName} ${label}`, html, attachments });
   }
 }
 
