@@ -60,6 +60,7 @@ object TasksMapGeometry {
     ): ClusteredPins {
         if (span <= 0 || pins.size <= 1) return ClusteredPins(singles = pins, clusters = emptyList())
         val cellDegrees = span * thresholdDp / mapWidthDp
+
         data class Cell(val x: Int, val y: Int)
 
         val buckets = LinkedHashMap<Cell, MutableList<MapPin>>()

@@ -2,48 +2,48 @@
 
 package app.pantopus.android.ui.screens.inbox.conversation
 
+import app.pantopus.android.data.ai.AIChatRepository
+import app.pantopus.android.data.ai.AIChatStreamEvent
+import app.pantopus.android.data.ai.AIConversationSession
+import app.pantopus.android.data.api.models.ai.AIConversationsResponse
+import app.pantopus.android.data.api.models.chats.ChatAttachmentDto
+import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.ChatMessageDto
-import app.pantopus.android.data.api.models.chats.resolvedText
 import app.pantopus.android.data.api.models.chats.ChatMessageSender
 import app.pantopus.android.data.api.models.chats.ChatMessagesResponse
-import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
-import app.pantopus.android.data.api.models.chats.ChatAttachmentDto
 import app.pantopus.android.data.api.models.chats.ChatTopic
 import app.pantopus.android.data.api.models.chats.ConversationTopicsResponse
 import app.pantopus.android.data.api.models.chats.CreateDirectChatResponse
 import app.pantopus.android.data.api.models.chats.FindOrCreateTopicResponse
 import app.pantopus.android.data.api.models.chats.SendChatMessageBody
 import app.pantopus.android.data.api.models.chats.SendChatMessageResponse
-import app.pantopus.android.data.ai.AIChatRepository
-import app.pantopus.android.data.ai.AIChatStreamEvent
-import app.pantopus.android.data.ai.AIConversationSession
-import app.pantopus.android.data.api.models.ai.AIConversationsResponse
-import app.pantopus.android.data.chats.ActiveChatThread
+import app.pantopus.android.data.api.models.chats.resolvedText
+import app.pantopus.android.data.api.models.profile.UserReportRequest
+import app.pantopus.android.data.api.models.profile.UserReportResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.services.GeoApi
-import app.pantopus.android.data.api.models.profile.UserReportRequest
-import app.pantopus.android.data.api.models.profile.UserReportResponse
 import app.pantopus.android.data.blocks.BlocksRepository
-import app.pantopus.android.data.links.LinkPreviewRepository
-import app.pantopus.android.data.profile.UserReportsRepository
+import app.pantopus.android.data.chats.ActiveChatThread
 import app.pantopus.android.data.chats.ChatRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.links.LinkPreviewRepository
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.location.LocationProvider
+import app.pantopus.android.data.profile.UserReportsRepository
 import app.pantopus.android.data.realtime.SocketManager
 import app.pantopus.android.data.upload.UploadRepository
 import app.pantopus.android.ui.theme.PantopusIcon
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.slot
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -1043,7 +1043,8 @@ class ChatConversationViewModelTest {
                 NetworkResult.Failure(
                     NetworkError.ClientError(
                         429,
-                        """{"error":"You can send up to 3 messages before placing a bid.","code":"PRE_BID_LIMIT","messages_sent":3,"messages_limit":3}""",
+                        """{"error":"You can send up to 3 messages before placing a bid.",""" +
+                            """"code":"PRE_BID_LIMIT","messages_sent":3,"messages_limit":3}""",
                     ),
                 )
             val vm = makeViewModel()

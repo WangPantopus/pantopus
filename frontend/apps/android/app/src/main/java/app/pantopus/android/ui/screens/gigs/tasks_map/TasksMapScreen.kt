@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.pantopus.android.ui.screens.gigs.GigFilterCriteria
 import app.pantopus.android.ui.screens.gigs.GigFilterSheet
 import app.pantopus.android.ui.screens.gigs.GigRow
 import app.pantopus.android.ui.screens.gigs.GigsCategory

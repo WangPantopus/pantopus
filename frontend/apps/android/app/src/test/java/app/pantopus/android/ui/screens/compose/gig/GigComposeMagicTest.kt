@@ -213,6 +213,7 @@ class GigComposeMagicTest {
     fun highlightRangesFindMoneyDayAndKeywords() {
         val text = "Assemble an IKEA desk Saturday morning for $80"
         val ranges = magicHighlightRanges(text, GigComposeCategory.Handyman)
+
         fun covered(word: String): Boolean {
             val start = text.indexOf(word)
             return ranges.any { it.first <= start && it.last >= start + word.length - 1 }

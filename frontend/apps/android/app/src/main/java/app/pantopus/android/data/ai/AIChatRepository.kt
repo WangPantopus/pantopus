@@ -26,9 +26,13 @@ import javax.inject.Singleton
 
 sealed interface AIChatStreamEvent {
     data class Conversation(val id: String) : AIChatStreamEvent
+
     data class TextDelta(val delta: String) : AIChatStreamEvent
+
     data class Draft(val draft: ChatAIDraftCard) : AIChatStreamEvent
+
     data class Error(val message: String) : AIChatStreamEvent
+
     data object Done : AIChatStreamEvent
 }
 

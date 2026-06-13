@@ -385,6 +385,9 @@ private fun PlayDisc() {
  * scale). Mirrors iOS `LivePhotoTileView`. With [showsReplayButton] the
  * clip plays once per LIVE-pill tap instead (viewer mode).
  */
+// media3 PlayerView / AspectRatioFrameLayout are @UnstableApi; the opt-in is
+// consumed here so it doesn't propagate to callers. Behaviour is unchanged.
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun LivePhotoTile(
     item: PostMediaItem,

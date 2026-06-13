@@ -42,10 +42,11 @@ class ChatBadgeViewModel
             viewModelScope.launch {
                 val statsResult = repo.stats()
                 val conversationsResult = repo.unifiedConversations()
-                val stats = (statsResult as? NetworkResult.Success)?.data?.stats ?: run {
-                    Timber.w("Chat badge refresh failed: stats unavailable")
-                    return@launch
-                }
+                val stats =
+                    (statsResult as? NetworkResult.Success)?.data?.stats ?: run {
+                        Timber.w("Chat badge refresh failed: stats unavailable")
+                        return@launch
+                    }
                 serverTotalUnread = stats.totalUnread
                 val conversations =
                     (conversationsResult as? NetworkResult.Success)?.data?.conversations.orEmpty()
@@ -118,9 +119,7 @@ class ChatBadgeViewModel
             }
         }
 
-        private fun applyAdjustedUnread(
-            rows: List<app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent>,
-        ) {
+        private fun applyAdjustedUnread(rows: List<app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent>) {
             _unreadMessages.value =
                 ChatUnreadBadgeMath.adjustedTotal(
                     serverTotal = serverTotalUnread,
