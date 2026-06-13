@@ -403,6 +403,7 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
     .select('*')
     .single();
   if (error) {
+    if (/GROUP_SLOT_FULL/.test(error.message || '')) throw new BookingError('This time is fully booked.', 409, 'SLOT_FULL');
     if (isOverlapViolation(error)) throw new BookingError('That time was just taken.', 409, 'SLOT_TAKEN');
     throw new BookingError('Could not reschedule.', 500, 'RESCHEDULE_FAILED');
   }

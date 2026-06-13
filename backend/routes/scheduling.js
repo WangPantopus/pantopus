@@ -822,8 +822,12 @@ const visitSchema = Joi.object({
 router.post('/visits', withOwner('edit'), validate(visitSchema), asyncHandler(async (req, res) => {
   requireHome(req);
   const { start_at, end_at } = req.body;
-  if (new Date(end_at).getTime() <= new Date(start_at).getTime()) {
+  const spanMs = new Date(end_at).getTime() - new Date(start_at).getTime();
+  if (spanMs <= 0) {
     return res.status(400).json({ error: 'BAD_RANGE', message: 'end_at must be after start_at.' });
+  }
+  if (spanMs > 30 * 24 * 60 * 60 * 1000) {
+    return res.status(400).json({ error: 'BAD_RANGE', message: 'A visit cannot span more than 30 days.' });
   }
   const { data, error } = await supabaseAdmin
     .from('HomeCalendarEvent')
