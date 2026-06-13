@@ -25,6 +25,8 @@ final class PlaceDashboardViewModel {
 
     private let api: APIClient
     let onOpenDetail: (PlaceDetailGroup) -> Void
+    /// Open the full Today's Pulse stream (the hero taps here).
+    let onOpenPulse: () -> Void
     /// Switch the dashboard to another of the user's homes.
     let onSelectHome: (String) -> Void
     /// Claim/verify another address (the switcher's "Add a place").
@@ -36,6 +38,7 @@ final class PlaceDashboardViewModel {
         homeId: String,
         api: APIClient = .shared,
         onOpenDetail: @escaping (PlaceDetailGroup) -> Void = { _ in },
+        onOpenPulse: @escaping () -> Void = {},
         onSelectHome: @escaping (String) -> Void = { _ in },
         onAddPlace: @escaping () -> Void = {},
         onVerify: @escaping () -> Void = {},
@@ -44,6 +47,7 @@ final class PlaceDashboardViewModel {
         self.homeId = homeId
         self.api = api
         self.onOpenDetail = onOpenDetail
+        self.onOpenPulse = onOpenPulse
         self.onSelectHome = onSelectHome
         self.onAddPlace = onAddPlace
         self.onVerify = onVerify

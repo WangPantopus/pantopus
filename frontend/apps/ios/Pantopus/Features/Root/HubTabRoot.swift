@@ -274,6 +274,11 @@ public enum HubRoute: Hashable {
     /// intelligence). The Home tab auto-lands here when the user has a
     /// primary home; the switcher re-pushes it for another home.
     case placeDashboard(homeId: String)
+    /// W4 — a Place group-detail page (Today / Your home / Risk / Block /
+    /// Money / Civic / Identity), tapped through from a dashboard card.
+    case placeDetail(homeId: String, group: PlaceDetailGroup)
+    /// W4 — the full Today's Pulse signal stream (from the dashboard hero).
+    case placePulse(homeId: String)
     /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
     /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
@@ -2208,12 +2213,23 @@ public struct HubTabRoot: View {
             PlaceDashboardView(
                 viewModel: PlaceDashboardViewModel(
                     homeId: homeId,
-                    onOpenDetail: { group in push(.placeholder(label: group.title)) },
+                    onOpenDetail: { group in push(.placeDetail(homeId: homeId, group: group)) },
+                    onOpenPulse: { push(.placePulse(homeId: homeId)) },
                     onSelectHome: { id in push(.placeDashboard(homeId: id)) },
                     onAddPlace: { push(.addHome) },
                     onVerify: { push(.placeholder(label: "Verify address")) },
                     onOpenHubHome: {}
                 )
+            )
+        case let .placeDetail(homeId, group):
+            PlaceDetailView(
+                viewModel: PlaceDetailViewModel(homeId: homeId, group: group),
+                onBack: { pop() }
+            )
+        case let .placePulse(homeId):
+            PlacePulseView(
+                viewModel: PlacePulseViewModel(homeId: homeId),
+                onBack: { pop() }
             )
         #if DEBUG
         case .tokenGallery: TokenGalleryView()
