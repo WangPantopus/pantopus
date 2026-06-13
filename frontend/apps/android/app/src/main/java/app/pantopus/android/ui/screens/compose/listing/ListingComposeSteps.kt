@@ -71,15 +71,28 @@ enum class ListingComposeCategory(
                 Vehicles -> "vehicles"
             }
 
-    /** Backend `listing_type`. */
+    /** Backend `listing_type` (`backend/constants/marketplace.js` LISTING_TYPES). */
     val listingType: String
         get() =
             when (this) {
                 Goods -> "sell_item"
-                Rentals -> "rent_item"
-                Vehicles -> "sell_item"
+                Rentals -> "rent_sublet"
+                Vehicles -> "vehicle_sale"
                 Free -> "free_item"
                 Wanted -> "wanted_request"
+            }
+
+    /**
+     * Backend `category` used when the AI draft didn't supply one.
+     * Must be a member of LISTING_CATEGORIES — the wizard chip keys
+     * themselves are not valid backend categories.
+     */
+    val fallbackBackendCategory: String
+        get() =
+            when (this) {
+                Vehicles -> "vehicles"
+                Free -> "free_stuff"
+                Goods, Rentals, Wanted -> "other"
             }
 
     val isFreeDefault: Boolean get() = this == Free
@@ -128,12 +141,14 @@ enum class ListingComposeFulfillment(
     Delivery("delivery", "Delivery", "You drop off within the neighborhood."),
     ;
 
-    /** Maps onto the backend `meetup_preference` enum. */
+    /** Maps onto the backend `meetup_preference` enum — only
+     *  `porch_pickup` / `public_meetup` / `flexible` are accepted, so
+     *  delivery rides on `flexible` + `deliveryAvailable=true`. */
     val meetupPreference: String
         get() =
             when (this) {
                 Pickup -> "public_meetup"
-                Delivery -> "delivery"
+                Delivery -> "flexible"
             }
 }
 
@@ -157,11 +172,47 @@ enum class ListingComposeLocationKind(
 
 /**
  * One photo in the wizard's photo grid. The id is stable so reorder
- * and remove operations can identify rows.
+ * and remove operations can identify rows. `localImageData` carries
+ * the processed JPEG for camera/library picks; it is deliberately not
+ * persisted (mirrors iOS excluding it from Codable) — remote photos
+ * carry their hosted URL in `token` instead.
  */
 data class ListingComposePhoto(
     val id: String = UUID.randomUUID().toString(),
     val token: String,
+    val localImageData: ByteArray? = null,
+) {
+    /** Hosted media URL → goes into `mediaUrls`; local bytes upload separately. */
+    val isRemote: Boolean
+        get() = token.startsWith("http://") || token.startsWith("https://")
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            (
+                other is ListingComposePhoto &&
+                    id == other.id &&
+                    token == other.token &&
+                    (
+                        localImageData === other.localImageData ||
+                            (localImageData != null && other.localImageData != null && localImageData.contentEquals(other.localImageData))
+                    )
+            )
+
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        result = 31 * result + token.hashCode()
+        result = 31 * result + (localImageData?.contentHashCode() ?: 0)
+        return result
+    }
+}
+
+/** Comp-range band from the vision draft's `priceSuggestion`. */
+data class ListingComposePriceSuggestion(
+    val low: Double,
+    val median: Double,
+    val high: Double,
+    val basis: String? = null,
+    val comparableCount: Int? = null,
 )
 
 /** Persistable form state for the wizard. */
@@ -179,6 +230,11 @@ data class ListingComposeFormState(
     val deliveryEnabled: Boolean = false,
     val locationKind: ListingComposeLocationKind? = null,
     val locationLabel: String = "",
+    /** Backend category from the AI draft (LISTING_CATEGORIES member).
+     *  Falls back to the wizard chip's `fallbackBackendCategory` at submit. */
+    val backendCategory: String? = null,
+    /** Comp band from the vision draft; drives the snap-review price track. */
+    val priceSuggestion: ListingComposePriceSuggestion? = null,
 ) {
     val currentStep: ListingComposeStep get() = ListingComposeStep.fromOrdinal(step)
 
@@ -187,6 +243,9 @@ data class ListingComposeFormState(
 
         /** Max photos in the grid. */
         const val MAX_PHOTOS = 8
+
+        /** Max photos sent to the vision draft endpoint. */
+        const val MAX_VISION_IMAGES = 5
 
         /** A12.9 camera coaching target before review. */
         const val TARGET_CAPTURE_ANGLES = 4

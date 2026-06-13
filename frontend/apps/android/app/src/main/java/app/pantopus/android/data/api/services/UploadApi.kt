@@ -1,7 +1,8 @@
 package app.pantopus.android.data.api.services
 
-import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.AIMediaUploadResponse
+import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
+import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
 import app.pantopus.android.data.api.models.posts.PostMediaUploadResponse
 import okhttp3.MultipartBody
 import retrofit2.http.Multipart
@@ -37,4 +38,15 @@ interface UploadApi {
     suspend fun uploadAIMedia(
         @Part files: @JvmSuppressWildcards List<MultipartBody.Part>,
     ): AIMediaUploadResponse
+
+    /**
+     * Attach photos to an existing listing (Snap & Sell post-create
+     * upload). Route `backend/routes/upload.js:1049`.
+     */
+    @Multipart
+    @POST("api/upload/listing-media/{listingId}")
+    suspend fun uploadListingMedia(
+        @Path("listingId") listingId: String,
+        @Part files: @JvmSuppressWildcards List<MultipartBody.Part>,
+    ): ListingMediaUploadResponse
 }

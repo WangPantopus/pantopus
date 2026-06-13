@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.compose.listing
 
+import app.pantopus.android.data.api.models.ai.AIDraftListingVisionRequest
 import app.pantopus.android.data.api.models.listings.CreateListingRequest
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
@@ -106,54 +107,206 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
     }
 
     @Test
-    fun camera_capture_seeds_snap_suggestions() =
-        runTest {
-            val vm = makeVm()
-            vm.captureSnapPhoto()
-            vm.captureSnapPhoto()
-            vm.captureSnapPhoto()
-            assertEquals(3, vm.state.value.form.photos.size)
-            assertEquals("Sage green velvet sofa, 3-seater", vm.state.value.form.title)
-            assertEquals(ListingComposeCategory.Goods, vm.state.value.form.category)
-            assertEquals(ListingComposeCondition.Good, vm.state.value.form.condition)
-            assertEquals(ListingComposePriceKind.Fixed, vm.state.value.form.priceKind)
-            assertEquals("280", vm.state.value.form.priceAmount)
-            assertEquals(ListingComposeLocationKind.SavedAddress, vm.state.value.form.locationKind)
-            assertTrue(vm.state.value.form.deliveryEnabled)
+    fun camera_capture_appends_real_photo_bytes_with_angle_tokens() {
+        val vm = makeVm()
+        vm.captureSnapPhoto(byteArrayOf(1))
+        vm.captureSnapPhoto(byteArrayOf(2))
+        vm.captureSnapPhoto(byteArrayOf(3))
+        val photos = vm.state.value.form.photos
+        assertEquals(listOf("snap_angle_1", "snap_angle_2", "snap_angle_3"), photos.map { it.token })
+        assertNotNull(photos.first().localImageData)
+        assertFalse(photos.first().isRemote)
+        // No hardcoded suggestions — fields stay empty until the vision draft.
+        assertEquals("", vm.state.value.form.title)
+        assertNull(vm.state.value.form.category)
+    }
 
+    @Test
+    fun library_picks_append_with_library_tokens() {
+        val vm = makeVm()
+        vm.addLibraryPhotos(listOf(byteArrayOf(1), byteArrayOf(2)))
+        assertEquals(
+            listOf("library_photo_1", "library_photo_2"),
+            vm.state.value.form.photos.map { it.token },
+        )
+    }
+
+    @Test
+    fun snap_review_requests_vision_draft_and_fills_empty_fields() =
+        runTest {
+            coEvery { aiRepo.draftListingVision(any()) } returns NetworkResult.Success(visionResponse())
+            val vm = makeVm()
+            vm.captureSnapPhoto(byteArrayOf(1))
             vm.onPrimary()
-            advanceTimeBy(10)
+            advanceTimeBy(50)
             assertEquals(ListingComposeStep.TitleCategory, vm.state.value.form.currentStep)
             assertTrue(vm.isSnapReviewStep)
+            assertFalse(vm.state.value.isAnalyzing)
+            val form = vm.state.value.form
+            assertEquals("Sage green velvet sofa, 3-seater", form.title)
+            assertEquals(ListingComposeCategory.Goods, form.category)
+            assertEquals("furniture", form.backendCategory)
+            assertEquals(ListingComposeCondition.Good, form.condition)
+            assertEquals(ListingComposePriceKind.Fixed, form.priceKind)
+            // Median wins over the draft's flat price.
+            assertEquals("280", form.priceAmount)
+            assertEquals(280.0, form.priceSuggestion?.median)
+            assertEquals(ListingComposeLocationKind.SavedAddress, form.locationKind)
+            assertTrue(form.deliveryEnabled)
             assertEquals("Post listing", vm.chrome.primaryCtaLabel)
             assertEquals("listingComposeSaveDraft", vm.chrome.secondaryCta?.testTag)
             assertTrue(vm.chrome.primaryCtaEnabled)
         }
 
     @Test
-    fun snap_review_primary_submits_listing() =
+    fun vision_draft_never_overwrites_user_entered_fields() =
         runTest {
-            coEvery { repo.create(any<CreateListingRequest>()) } returns NetworkResult.Success(createResponse)
+            coEvery { aiRepo.draftListingVision(any()) } returns NetworkResult.Success(visionResponse())
             val vm = makeVm()
-            vm.captureSnapPhoto()
+            vm.captureSnapPhoto(byteArrayOf(1))
+            vm.setTitle("My own title here")
             vm.onPrimary()
-            advanceTimeBy(10)
+            advanceTimeBy(50)
+            assertEquals("My own title here", vm.state.value.form.title)
+        }
+
+    @Test
+    fun vision_request_caps_images_at_five() =
+        runTest {
+            val captured = slot<AIDraftListingVisionRequest>()
+            coEvery { aiRepo.draftListingVision(capture(captured)) } returns NetworkResult.Success(visionResponse())
+            val vm = makeVm()
+            repeat(6) { vm.captureSnapPhoto(byteArrayOf(it.toByte())) }
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(5, captured.captured.images.size)
+            assertTrue(captured.captured.images.first().startsWith("data:image/jpeg;base64,"))
+        }
+
+    @Test
+    fun vision_failure_degrades_to_manual_entry() =
+        runTest {
+            // Test-case default: vision returns a 500.
+            val vm = makeVm()
+            vm.captureSnapPhoto(byteArrayOf(1))
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertFalse(vm.state.value.isAnalyzing)
+            assertEquals(
+                "Couldn't generate suggestions from your photos. Fill in the details below.",
+                vm.state.value.errorMessage,
+            )
+            // Fields stay empty for manual entry; typing a price implies Fixed.
+            assertEquals("", vm.state.value.form.title)
+            vm.setPriceAmount("45")
+            assertEquals(ListingComposePriceKind.Fixed, vm.state.value.form.priceKind)
+        }
+
+    @Test
+    fun vision_request_fires_once_per_session() =
+        runTest {
+            coEvery { aiRepo.draftListingVision(any()) } returns NetworkResult.Success(visionResponse())
+            val vm = makeVm()
+            vm.captureSnapPhoto(byteArrayOf(1))
+            vm.onPrimary()
+            advanceTimeBy(50)
+            vm.onLeading() // back to camera
+            vm.onPrimary() // forward again
+            advanceTimeBy(50)
+            coVerify(exactly = 1) { aiRepo.draftListingVision(any()) }
+        }
+
+    @Test
+    fun snap_review_primary_submits_listing_with_mapped_enums() =
+        runTest {
+            coEvery { aiRepo.draftListingVision(any()) } returns NetworkResult.Success(visionResponse())
+            val captured = slot<CreateListingRequest>()
+            coEvery { repo.create(capture(captured)) } returns NetworkResult.Success(createResponse)
+            val vm = makeVm()
+            vm.captureSnapPhoto(byteArrayOf(1))
+            vm.onPrimary()
+            advanceTimeBy(50)
             vm.onPrimary()
             advanceTimeBy(50)
             assertEquals(ListingComposeStep.Success, vm.state.value.form.currentStep)
             assertEquals("listing_42", vm.state.value.createdListingId)
+            // AI category flows through; local photos stay out of mediaUrls.
+            assertEquals("furniture", captured.captured.category)
+            assertEquals("sell_item", captured.captured.listingType)
+            assertEquals("public_meetup", captured.captured.meetupPreference)
+            assertTrue(captured.captured.mediaUrls.isEmpty())
+            coVerify { uploadRepo.uploadListingMedia("listing_42", match { it.size == 1 }) }
+        }
+
+    @Test
+    fun upload_failure_is_non_blocking_with_notice() =
+        runTest {
+            coEvery { aiRepo.draftListingVision(any()) } returns NetworkResult.Success(visionResponse())
+            coEvery { repo.create(any<CreateListingRequest>()) } returns NetworkResult.Success(createResponse)
+            coEvery { uploadRepo.uploadListingMedia(any(), any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "upload down"))
+            val vm = makeVm()
+            vm.captureSnapPhoto(byteArrayOf(1))
+            vm.onPrimary()
+            advanceTimeBy(50)
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(ListingComposeStep.Success, vm.state.value.form.currentStep)
+            assertEquals(
+                "Your listing is live, but some photos didn't upload. Edit the listing to add them.",
+                vm.state.value.errorMessage,
+            )
         }
 
     @Test
     fun snap_review_save_draft_dismisses() =
         runTest {
             val vm = makeVm()
-            vm.captureSnapPhoto()
+            vm.captureSnapPhoto(byteArrayOf(1))
             vm.onPrimary()
             advanceTimeBy(10)
             vm.onSecondary()
             assertEquals(ListingComposeOutboundEvent.Dismiss, vm.pendingEvent.value)
         }
+
+    // MARK: - Backend enum contracts
+
+    @Test
+    fun listing_types_match_backend_constants() {
+        assertEquals("sell_item", ListingComposeCategory.Goods.listingType)
+        assertEquals("rent_sublet", ListingComposeCategory.Rentals.listingType)
+        assertEquals("vehicle_sale", ListingComposeCategory.Vehicles.listingType)
+        assertEquals("free_item", ListingComposeCategory.Free.listingType)
+        assertEquals("wanted_request", ListingComposeCategory.Wanted.listingType)
+    }
+
+    @Test
+    fun meetup_preference_uses_backend_enum_values() {
+        assertEquals("public_meetup", ListingComposeFulfillment.Pickup.meetupPreference)
+        assertEquals("flexible", ListingComposeFulfillment.Delivery.meetupPreference)
+    }
+
+    @Test
+    fun ai_categories_map_onto_backend_listing_categories() {
+        assertEquals("sports_outdoors", ListingComposeVisionMapping.backendCategoryFromAI("sports"))
+        assertEquals("books_media", ListingComposeVisionMapping.backendCategoryFromAI("books"))
+        assertEquals("books_media", ListingComposeVisionMapping.backendCategoryFromAI("music"))
+        assertEquals("kids_baby", ListingComposeVisionMapping.backendCategoryFromAI("toys"))
+        assertEquals("kids_baby", ListingComposeVisionMapping.backendCategoryFromAI("baby_kids"))
+        assertEquals("vehicles", ListingComposeVisionMapping.backendCategoryFromAI("automotive"))
+        assertEquals("furniture", ListingComposeVisionMapping.backendCategoryFromAI("furniture"))
+        assertEquals("other", ListingComposeVisionMapping.backendCategoryFromAI("spaceships"))
+        assertNull(ListingComposeVisionMapping.backendCategoryFromAI(null))
+    }
+
+    @Test
+    fun fallback_backend_categories_by_wizard_chip() {
+        assertEquals("vehicles", ListingComposeCategory.Vehicles.fallbackBackendCategory)
+        assertEquals("free_stuff", ListingComposeCategory.Free.fallbackBackendCategory)
+        assertEquals("other", ListingComposeCategory.Goods.fallbackBackendCategory)
+        assertEquals("other", ListingComposeCategory.Rentals.fallbackBackendCategory)
+        assertEquals("other", ListingComposeCategory.Wanted.fallbackBackendCategory)
+    }
 
     // MARK: - Title + category
 
@@ -316,7 +469,9 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
             assertFalse("Success step hides progress bar", vm.chrome.showsProgressBar)
             coVerify { repo.create(any()) }
             assertEquals("Moving boxes — bundle of 18", captured.captured.title)
-            assertEquals("goods", captured.captured.category)
+            // No AI draft in the manual flow → the Goods chip falls
+            // back to the valid backend category "other".
+            assertEquals("other", captured.captured.category)
             assertEquals("goods", captured.captured.layer)
             assertEquals("sell_item", captured.captured.listingType)
             assertEquals(25.0, captured.captured.price)

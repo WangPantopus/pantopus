@@ -81,8 +81,10 @@ private struct ListingComposeCameraStep: View {
         }
         .accessibilityIdentifier("listingComposeCameraStep")
         .fullScreenCover(isPresented: $showsCamera) {
-            SystemCameraPicker(isPresented: $showsCamera) { _ in
-                viewModel.captureSnapPhoto()
+            SystemCameraPicker(isPresented: $showsCamera) { image in
+                if let data = ListingPhotoProcessor.uploadData(from: image) {
+                    viewModel.captureSnapPhoto(data)
+                }
                 let remaining = max(
                     0,
                     ListingComposeFormState.targetCaptureAngles - viewModel.form.photos.count
@@ -136,11 +138,16 @@ private struct ListingComposeCameraStep: View {
     private func handleLibraryPicks(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty else { return }
         Task {
-            let slots = min(items.count, remainingCaptureSlots)
-            await MainActor.run {
-                for _ in 0..<slots {
-                    viewModel.addLibraryPhoto()
+            var loaded: [Data] = []
+            for item in items.prefix(remainingCaptureSlots) {
+                if let raw = try? await item.loadTransferable(type: Data.self),
+                   let data = ListingPhotoProcessor.uploadData(from: raw) {
+                    loaded.append(data)
                 }
+            }
+            let images = loaded
+            await MainActor.run {
+                viewModel.addLibraryPhotos(images)
                 photosPickerSelection = []
             }
         }
@@ -182,11 +189,17 @@ private struct CameraAccessDeniedBanner: View {
 private struct ListingComposePhotoGridEditor: View {
     @Bindable var viewModel: ListingComposeWizardViewModel
     let onRequestRemove: (ListingComposePhoto) -> Void
+    @State private var showsPhotosPicker = false
+    @State private var photosPickerSelection: [PhotosPickerItem] = []
 
     private let columns: [GridItem] = [
         GridItem(.flexible(), spacing: Spacing.s3),
         GridItem(.flexible(), spacing: Spacing.s3)
     ]
+
+    private var remainingSlots: Int {
+        max(0, ListingComposeFormState.maxPhotos - viewModel.form.photos.count)
+    }
 
     var body: some View {
         HeadlineBlock("Add photos")
@@ -206,11 +219,74 @@ private struct ListingComposePhotoGridEditor: View {
                     onMakeHero: index > 0 ? { viewModel.makeHero(id: photo.id) } : nil
                 )
             }
-            if viewModel.form.photos.count < ListingComposeFormState.maxPhotos {
-                AddPhotoTile { viewModel.addPhoto() }
+            if remainingSlots > 0 {
+                AddPhotoTile { showsPhotosPicker = true }
             }
         }
+        .photosPicker(
+            isPresented: $showsPhotosPicker,
+            selection: $photosPickerSelection,
+            maxSelectionCount: max(1, remainingSlots),
+            matching: .images
+        )
+        .onChange(of: photosPickerSelection) { _, newItems in
+            handleLibraryPicks(newItems)
+        }
         PhotoCountLabel(count: viewModel.form.photos.count)
+    }
+
+    private func handleLibraryPicks(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            var loaded: [Data] = []
+            for item in items.prefix(remainingSlots) {
+                if let raw = try? await item.loadTransferable(type: Data.self),
+                   let data = ListingPhotoProcessor.uploadData(from: raw) {
+                    loaded.append(data)
+                }
+            }
+            let images = loaded
+            await MainActor.run {
+                viewModel.addLibraryPhotos(images)
+                photosPickerSelection = []
+            }
+        }
+    }
+}
+
+/// Renders a wizard photo: local bytes first, remote URL fallback
+/// (edit-mode hydration), neutral placeholder otherwise. Shared by the
+/// grid editor, the capture tray, and the snap-review strip.
+struct ListingPhotoThumbnail: View {
+    let photo: ListingComposePhoto
+
+    var body: some View {
+        if let data = photo.localImageData, let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else if photo.isRemote, let url = URL(string: photo.token) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                default:
+                    placeholder
+                }
+            }
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
+        Rectangle()
+            .fill(Theme.Color.appSurfaceMuted)
+            .overlay(
+                Icon(.image, size: 24, color: Theme.Color.appTextSecondary)
+            )
     }
 }
 
@@ -229,7 +305,7 @@ private struct CapturedAnglesTray: View {
             HStack(spacing: Spacing.s2) {
                 ForEach(0..<ListingComposeFormState.targetCaptureAngles, id: \.self) { index in
                     AngleSlot(
-                        isFilled: index < photos.count,
+                        photo: index < photos.count ? photos[index] : nil,
                         label: labels[index]
                     )
                 }
@@ -239,21 +315,19 @@ private struct CapturedAnglesTray: View {
 }
 
 private struct AngleSlot: View {
-    let isFilled: Bool
+    let photo: ListingComposePhoto?
     let label: String
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .fill(isFilled ? Theme.Color.success.opacity(0.16) : Theme.Color.appSurfaceMuted)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .stroke(
-                            isFilled ? Theme.Color.success : Theme.Color.appBorder,
-                            style: StrokeStyle(lineWidth: 1.5, dash: isFilled ? [] : [4, 4])
-                        )
-                )
-            if isFilled {
+            if let photo {
+                Color.clear
+                    .overlay(ListingPhotoThumbnail(photo: photo))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                            .stroke(Theme.Color.success, lineWidth: 1.5)
+                    )
                 Circle()
                     .fill(Theme.Color.success)
                     .frame(width: 16, height: 16)
@@ -261,6 +335,15 @@ private struct AngleSlot: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(Spacing.s1)
             } else {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(Theme.Color.appSurfaceMuted)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                            .stroke(
+                                Theme.Color.appBorder,
+                                style: StrokeStyle(lineWidth: 1.5, dash: [4, 4])
+                            )
+                    )
                 Text(label)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextSecondary)
@@ -282,11 +365,13 @@ private struct PhotoTile: View {
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .fill(Theme.Color.appSurfaceMuted)
+                Color.clear
                     .aspectRatio(1, contentMode: .fit)
+                    .overlay(ListingPhotoThumbnail(photo: photo))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                     .overlay(
-                        Icon(.image, size: 32, color: Theme.Color.appTextSecondary)
+                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
                 if index == 0 {
                     HeroChip()

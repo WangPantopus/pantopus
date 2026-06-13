@@ -3,11 +3,20 @@
 package app.pantopus.android.ui.screens.compose.listing
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.ai.AIDraftRepository
+import app.pantopus.android.data.api.models.ai.AIListingDraftDto
+import app.pantopus.android.data.api.models.ai.AIListingVisionResponse
+import app.pantopus.android.data.api.models.ai.AIPriceSuggestionDto
 import app.pantopus.android.data.api.models.listings.CreateListingResponse
 import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
 import app.pantopus.android.data.api.models.listings.UpdateListingResponse
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.upload.UploadRepository
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +31,8 @@ import org.junit.Before
 @OptIn(ExperimentalCoroutinesApi::class)
 abstract class ListingComposeWizardViewModelTestCase {
     protected val repo: ListingsRepository = mockk(relaxed = true)
+    protected val aiRepo: AIDraftRepository = mockk()
+    protected val uploadRepo: UploadRepository = mockk()
     protected val isOnlineFlow = MutableStateFlow(true)
     protected val networkMonitor: NetworkMonitor =
         mockk<NetworkMonitor>(relaxed = true).also {
@@ -32,6 +43,12 @@ abstract class ListingComposeWizardViewModelTestCase {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         isOnlineFlow.value = true
+        // Vision draft fails by default — tests opt into a draft; the
+        // wizard must degrade to manual entry either way.
+        coEvery { aiRepo.draftListingVision(any()) } returns
+            NetworkResult.Failure(NetworkError.Server(500, "vision down"))
+        coEvery { uploadRepo.uploadListingMedia(any(), any()) } returns
+            NetworkResult.Success(ListingMediaUploadResponse(mediaUrls = listOf("https://cdn.example.com/1.jpg")))
     }
 
     @After
@@ -40,7 +57,7 @@ abstract class ListingComposeWizardViewModelTestCase {
     }
 
     protected fun makeVm(savedStateHandle: SavedStateHandle = SavedStateHandle()) =
-        ListingComposeWizardViewModel(repo, savedStateHandle, networkMonitor)
+        ListingComposeWizardViewModel(repo, savedStateHandle, networkMonitor, aiRepo, uploadRepo)
 
     protected fun makeEditVm(
         listingId: String = "listing_42",
@@ -53,8 +70,33 @@ abstract class ListingComposeWizardViewModelTestCase {
         if (jumpToStep != null) {
             map[ListingComposeWizardViewModel.EDIT_JUMP_TO_STEP_KEY] = jumpToStep.name
         }
-        return ListingComposeWizardViewModel(repo, SavedStateHandle(map), networkMonitor)
+        return ListingComposeWizardViewModel(repo, SavedStateHandle(map), networkMonitor, aiRepo, uploadRepo)
     }
+
+    /** Mirrors the iOS fixture: full draft + comp band from the vision route. */
+    protected fun visionResponse(): AIListingVisionResponse =
+        AIListingVisionResponse(
+            draft =
+                AIListingDraftDto(
+                    title = "Sage green velvet sofa, 3-seater",
+                    description = "Comfortable three-seat velvet sofa with light wear on one cushion.",
+                    price = 260.0,
+                    isFree = false,
+                    category = "furniture",
+                    condition = "good",
+                    listingType = "sell_item",
+                    deliveryAvailable = true,
+                ),
+            confidence = 0.91,
+            priceSuggestion =
+                AIPriceSuggestionDto(
+                    low = 180.0,
+                    median = 280.0,
+                    high = 420.0,
+                    basis = "similar listings",
+                    comparableCount = 47,
+                ),
+        )
 
     protected fun editListingDto(): ListingDto =
         ListingDto(

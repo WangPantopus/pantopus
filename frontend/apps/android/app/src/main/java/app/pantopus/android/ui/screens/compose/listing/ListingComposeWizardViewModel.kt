@@ -5,14 +5,18 @@ package app.pantopus.android.ui.screens.compose.listing
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.ai.AIDraftRepository
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.data.api.models.ai.AIDraftListingVisionRequest
 import app.pantopus.android.data.api.models.listings.CreateListingRequest
 import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.data.api.models.listings.UpdateListingRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.upload.UploadFile
+import app.pantopus.android.data.upload.UploadRepository
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardModel
@@ -24,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Base64
 import javax.inject.Inject
 
 private const val PHOTO_TOKEN_SUFFIX_LENGTH = 6
@@ -38,6 +43,9 @@ data class ListingComposeUiState(
      *  shimmer in the wizard body so the user can't tap through stale
      *  fields. Always false in create mode. */
     val isLoadingExisting: Boolean = false,
+    /** True while the Snap & Sell vision draft is in flight. Drives
+     *  the `listingComposeAnalyzing` shimmer on the snap-review step. */
+    val isAnalyzing: Boolean = false,
 )
 
 /**
@@ -57,6 +65,8 @@ open class ListingComposeWizardViewModel
         private val repository: ListingsRepository,
         private val savedStateHandle: SavedStateHandle,
         private val networkMonitor: NetworkMonitor,
+        private val aiDraftRepository: AIDraftRepository,
+        private val uploadRepository: UploadRepository,
     ) : ViewModel(),
         WizardModel {
         /** Whether the wizard is creating or editing. Derived once from
@@ -106,8 +116,10 @@ open class ListingComposeWizardViewModel
                     else -> "Looks great — capture now"
                 }
 
+        private val formPersistence = ListingComposeFormPersistence(savedStateHandle)
+
         private val _state =
-            MutableStateFlow(restoreFormState().let { ListingComposeUiState(form = it) })
+            MutableStateFlow(formPersistence.restore().let { ListingComposeUiState(form = it) })
 
         /** Combined UI state consumed by [ListingComposeWizardScreen]. */
         val state: StateFlow<ListingComposeUiState> = _state.asStateFlow()
@@ -188,11 +200,10 @@ open class ListingComposeWizardViewModel
 
         // MARK: - Photo step
 
-        /** A12.9 camera capture placeholder. Real upload is still deferred. */
-        fun captureSnapPhoto() {
+        /** Append a processed camera capture (1600px JPEG, EXIF stripped). */
+        fun captureSnapPhoto(imageData: ByteArray) {
             val next = (_state.value.form.photos.size + 1).coerceAtMost(ListingComposeFormState.MAX_PHOTOS)
-            addPhoto("snap_angle_$next")
-            applySnapSuggestionsIfNeeded()
+            addPhoto(token = "snap_angle_$next", localImageData = imageData)
         }
 
         /** Escape hatch from camera-first entry into the original photo-grid editor. */
@@ -201,42 +212,68 @@ open class ListingComposeWizardViewModel
             persist()
         }
 
-        fun addLibraryPhoto() {
-            val next = (_state.value.form.photos.size + 1).coerceAtMost(ListingComposeFormState.MAX_PHOTOS)
-            addPhoto("library_photo_$next")
-            applySnapSuggestionsIfNeeded()
+        /** Append a batch of processed photo-library picks. */
+        fun addLibraryPhotos(images: List<ByteArray>) {
+            images.forEach { bytes ->
+                val next = (_state.value.form.photos.size + 1).coerceAtMost(ListingComposeFormState.MAX_PHOTOS)
+                addPhoto(token = "library_photo_$next", localImageData = bytes)
+            }
         }
 
         /** Append a new photo to the grid. Captures up to [MAX_PHOTOS]. */
-        fun addPhoto(token: String = "photo_${java.util.UUID.randomUUID().toString().take(PHOTO_TOKEN_SUFFIX_LENGTH)}") {
+        fun addPhoto(
+            token: String = "photo_${java.util.UUID.randomUUID().toString().take(PHOTO_TOKEN_SUFFIX_LENGTH)}",
+            localImageData: ByteArray? = null,
+        ) {
             _state.update { current ->
                 if (current.form.photos.size >= ListingComposeFormState.MAX_PHOTOS) return@update current
-                current.copy(form = current.form.copy(photos = current.form.photos + ListingComposePhoto(token = token)))
+                current.copy(
+                    form =
+                        current.form.copy(
+                            photos = current.form.photos + ListingComposePhoto(token = token, localImageData = localImageData),
+                        ),
+                )
             }
             persist()
         }
 
-        private fun applySnapSuggestionsIfNeeded() {
-            _state.update { current ->
-                var form = current.form
-                if (form.title.trim().isEmpty()) form = form.copy(title = "Sage green velvet sofa, 3-seater")
-                if (form.category == null) form = form.copy(category = ListingComposeCategory.Goods)
-                if (form.condition == null) form = form.copy(condition = ListingComposeCondition.Good)
-                if (form.bodyText.trim().isEmpty()) {
-                    form =
-                        form.copy(
-                            bodyText = "Comfortable three-seat velvet sofa with light wear on one cushion and minor sun fade.",
+        // MARK: - Vision draft (A12.9)
+
+        /** One-shot guard — bouncing between capture and review doesn't re-bill. */
+        private var hasRequestedAnalysis = false
+
+        /**
+         * `POST /api/ai/draft/listing-vision` with up to
+         * [ListingComposeFormState.MAX_VISION_IMAGES] base64 data URLs.
+         * Fills empty fields only; failure degrades to manual entry
+         * with an inline notice.
+         */
+        suspend fun requestVisionAnalysisIfNeeded() {
+            if (hasRequestedAnalysis) return
+            val images =
+                _state.value.form.photos
+                    .mapNotNull { it.localImageData }
+                    .take(ListingComposeFormState.MAX_VISION_IMAGES)
+                    .map { "data:image/jpeg;base64,${Base64.getEncoder().encodeToString(it)}" }
+            if (images.isEmpty()) return
+            hasRequestedAnalysis = true
+            _state.update { it.copy(isAnalyzing = true) }
+            val result = aiDraftRepository.draftListingVision(AIDraftListingVisionRequest(images = images))
+            when (result) {
+                is NetworkResult.Success ->
+                    _state.update {
+                        it.copy(
+                            form = ListingComposeVisionMapping.applyVision(it.form, result.data),
+                            isAnalyzing = false,
                         )
-                }
-                if (form.priceKind == null) form = form.copy(priceKind = ListingComposePriceKind.Fixed)
-                if (form.priceAmount.isEmpty()) form = form.copy(priceAmount = "280")
-                form =
-                    form.copy(
-                        fulfillment = ListingComposeFulfillment.Pickup,
-                        deliveryEnabled = true,
-                        locationKind = form.locationKind ?: ListingComposeLocationKind.SavedAddress,
-                    )
-                current.copy(form = form)
+                    }
+                is NetworkResult.Failure ->
+                    _state.update {
+                        it.copy(
+                            isAnalyzing = false,
+                            errorMessage = "Couldn't generate suggestions from your photos. Fill in the details below.",
+                        )
+                    }
             }
             persist()
         }
@@ -298,17 +335,7 @@ open class ListingComposeWizardViewModel
 
         fun setCategory(category: ListingComposeCategory) {
             _state.update { current ->
-                var form = current.form.copy(category = category)
-                // Category implies price kind for Free; clear stale state when switching out of Free.
-                if (category == ListingComposeCategory.Free) {
-                    form = form.copy(priceKind = ListingComposePriceKind.Free, priceAmount = "")
-                } else if (form.priceKind == ListingComposePriceKind.Free) {
-                    form = form.copy(priceKind = null)
-                }
-                if (!category.requiresCondition) {
-                    form = form.copy(condition = null)
-                }
-                current.copy(form = form)
+                current.copy(form = ListingComposeVisionMapping.formWithCategory(current.form, category))
             }
             persist()
         }
@@ -336,7 +363,15 @@ open class ListingComposeWizardViewModel
             val parts = filtered.split('.')
             // Reject input with more than one decimal separator.
             if (parts.size > 2) return
-            _state.update { it.copy(form = it.form.copy(priceAmount = filtered)) }
+            _state.update { current ->
+                var form = current.form.copy(priceAmount = filtered)
+                // Typing an amount with no kind picked (vision-draft
+                // failure path on the snap-review step) implies Fixed.
+                if (form.priceKind == null && filtered.isNotEmpty()) {
+                    form = form.copy(priceKind = ListingComposePriceKind.Fixed)
+                }
+                current.copy(form = form)
+            }
             persist()
         }
 
@@ -365,7 +400,19 @@ open class ListingComposeWizardViewModel
         private suspend fun advance() {
             val current = _state.value.form.currentStep
             when (current) {
-                ListingComposeStep.Photos -> transitionTo(ListingComposeStep.TitleCategory)
+                ListingComposeStep.Photos -> {
+                    val snapEntry = isCameraCaptureStep
+                    if (snapEntry) {
+                        // The snap-review panel has no location picker —
+                        // default to the saved address like the iOS flow.
+                        _state.update { state ->
+                            val kind = state.form.locationKind ?: ListingComposeLocationKind.SavedAddress
+                            state.copy(form = state.form.copy(locationKind = kind))
+                        }
+                    }
+                    transitionTo(ListingComposeStep.TitleCategory)
+                    if (snapEntry) requestVisionAnalysisIfNeeded()
+                }
                 ListingComposeStep.TitleCategory ->
                     if (isSnapReviewStep) {
                         submit()
@@ -427,7 +474,10 @@ open class ListingComposeWizardViewModel
 
             val isFree = priceKind == ListingComposePriceKind.Free || category == ListingComposeCategory.Free
             val price: Double? = if (isFree) null else form.priceAmount.toDoubleOrNull()
-            val mediaUrls = form.photos.map { it.token }
+            // Only hosted URLs belong in the create/update body — local
+            // captures upload as multipart after the listing exists.
+            val mediaUrls = form.photos.filter { it.isRemote }.map { it.token }
+            val backendCategory = form.backendCategory ?: category.fallbackBackendCategory
             val locationName = form.locationLabel.takeIf { it.isNotEmpty() }
             val deliveryAvailable = form.deliveryEnabled || form.fulfillment == ListingComposeFulfillment.Delivery
 
@@ -439,7 +489,7 @@ open class ListingComposeWizardViewModel
                             description = form.bodyText.trim(),
                             price = price,
                             isFree = isFree,
-                            category = category.key,
+                            category = backendCategory,
                             condition = form.condition?.key,
                             mediaUrls = mediaUrls,
                             layer = category.layer,
@@ -450,8 +500,7 @@ open class ListingComposeWizardViewModel
                             isWanted = category.isWanted,
                         )
                     when (val result = repository.create(request)) {
-                        is NetworkResult.Success ->
-                            applySuccess(result.data.listing.id)
+                        is NetworkResult.Success -> finishSubmit(result.data.listing.id)
                         is NetworkResult.Failure ->
                             applyFailure(
                                 result.error.message
@@ -466,7 +515,7 @@ open class ListingComposeWizardViewModel
                             description = form.bodyText.trim(),
                             price = price,
                             isFree = isFree,
-                            category = category.key,
+                            category = backendCategory,
                             condition = form.condition?.key,
                             mediaUrls = mediaUrls,
                             layer = category.layer,
@@ -477,8 +526,7 @@ open class ListingComposeWizardViewModel
                             isWanted = category.isWanted,
                         )
                     when (val result = repository.update(m.listingId, request)) {
-                        is NetworkResult.Success ->
-                            applySuccess(result.data.listing.id)
+                        is NetworkResult.Success -> finishSubmit(result.data.listing.id)
                         is NetworkResult.Failure ->
                             applyFailure(
                                 result.error.message
@@ -489,12 +537,50 @@ open class ListingComposeWizardViewModel
             }
         }
 
-        private fun applySuccess(listingId: String) {
+        /** Shared create/PATCH success tail — upload local photos, then land on Success. */
+        private suspend fun finishSubmit(listingId: String) {
+            val photosUploaded = uploadLocalPhotos(listingId)
+            applySuccess(listingId, photosUploaded)
+        }
+
+        /**
+         * Multipart `POST /api/upload/listing-media/:listingId`, field
+         * `files`. Returns false on failure — non-blocking, the listing
+         * is already live.
+         */
+        private suspend fun uploadLocalPhotos(listingId: String): Boolean {
+            val files =
+                _state.value.form.photos.mapIndexedNotNull { index, photo ->
+                    photo.localImageData?.let { bytes ->
+                        UploadFile(
+                            filename = "listing-${index + 1}.jpg",
+                            mimeType = "image/jpeg",
+                            bytes = bytes,
+                        )
+                    }
+                }
+            if (files.isEmpty()) return true
+            return when (uploadRepository.uploadListingMedia(listingId, files)) {
+                is NetworkResult.Success -> true
+                is NetworkResult.Failure -> false
+            }
+        }
+
+        private fun applySuccess(
+            listingId: String,
+            photosUploaded: Boolean = true,
+        ) {
             _state.update {
                 it.copy(
                     createdListingId = listingId,
                     isSubmitting = false,
                     form = it.form.copy(step = ListingComposeStep.Success.ordinal0),
+                    errorMessage =
+                        if (photosUploaded) {
+                            null
+                        } else {
+                            "Your listing is live, but some photos didn't upload. Edit the listing to add them."
+                        },
                 )
             }
             persist()
@@ -538,76 +624,7 @@ open class ListingComposeWizardViewModel
 
         // MARK: - Persistence
 
-        private fun persist() {
-            val form = _state.value.form
-            savedStateHandle[KEY_STEP] = form.step
-            savedStateHandle[KEY_ENTRY_MODE] = form.entryMode.name
-            savedStateHandle[KEY_PHOTOS_IDS] = form.photos.map { it.id }
-            savedStateHandle[KEY_PHOTOS_TOKENS] = form.photos.map { it.token }
-            savedStateHandle[KEY_TITLE] = form.title
-            savedStateHandle[KEY_CATEGORY] = form.category?.name
-            savedStateHandle[KEY_CONDITION] = form.condition?.name
-            savedStateHandle[KEY_BODY] = form.bodyText
-            savedStateHandle[KEY_PRICE_KIND] = form.priceKind?.name
-            savedStateHandle[KEY_PRICE_AMOUNT] = form.priceAmount
-            savedStateHandle[KEY_FULFILLMENT] = form.fulfillment.name
-            savedStateHandle[KEY_DELIVERY_ENABLED] = form.deliveryEnabled
-            savedStateHandle[KEY_LOCATION_KIND] = form.locationKind?.name
-            savedStateHandle[KEY_LOCATION_LABEL] = form.locationLabel
-        }
-
-        private fun restoreFormState(): ListingComposeFormState {
-            val step: Int = savedStateHandle[KEY_STEP] ?: ListingComposeStep.Photos.ordinal0
-            val entryModeName: String? = savedStateHandle[KEY_ENTRY_MODE]
-            val entryMode =
-                entryModeName?.let { name -> ListingComposeEntryMode.entries.firstOrNull { it.name == name } }
-                    ?: ListingComposeEntryMode.Snap
-            val ids: List<String> = savedStateHandle[KEY_PHOTOS_IDS] ?: emptyList()
-            val tokens: List<String> = savedStateHandle[KEY_PHOTOS_TOKENS] ?: emptyList()
-            val photos =
-                ids.zip(tokens).map { (id, token) ->
-                    ListingComposePhoto(id = id, token = token)
-                }
-            val title: String = savedStateHandle[KEY_TITLE] ?: ""
-            val categoryName: String? = savedStateHandle[KEY_CATEGORY]
-            val category = categoryName?.let { name -> ListingComposeCategory.entries.firstOrNull { it.name == name } }
-            val conditionName: String? = savedStateHandle[KEY_CONDITION]
-            val condition =
-                conditionName?.let { name ->
-                    ListingComposeCondition.entries.firstOrNull { it.name == name }
-                }
-            val body: String = savedStateHandle[KEY_BODY] ?: ""
-            val priceKindName: String? = savedStateHandle[KEY_PRICE_KIND]
-            val priceKind = priceKindName?.let { name -> ListingComposePriceKind.entries.firstOrNull { it.name == name } }
-            val priceAmount: String = savedStateHandle[KEY_PRICE_AMOUNT] ?: ""
-            val fulfillmentName: String? = savedStateHandle[KEY_FULFILLMENT]
-            val fulfillment =
-                fulfillmentName?.let { name ->
-                    ListingComposeFulfillment.entries.firstOrNull { it.name == name }
-                } ?: ListingComposeFulfillment.Pickup
-            val deliveryEnabled: Boolean = savedStateHandle[KEY_DELIVERY_ENABLED] ?: false
-            val locationKindName: String? = savedStateHandle[KEY_LOCATION_KIND]
-            val locationKind =
-                locationKindName?.let { name ->
-                    ListingComposeLocationKind.entries.firstOrNull { it.name == name }
-                }
-            val locationLabel: String = savedStateHandle[KEY_LOCATION_LABEL] ?: ""
-            return ListingComposeFormState(
-                step = step,
-                entryMode = entryMode,
-                photos = photos,
-                title = title,
-                category = category,
-                condition = condition,
-                bodyText = body,
-                priceKind = priceKind,
-                priceAmount = priceAmount,
-                fulfillment = fulfillment,
-                deliveryEnabled = deliveryEnabled,
-                locationKind = locationKind,
-                locationLabel = locationLabel,
-            )
-        }
+        private fun persist() = formPersistence.persist(_state.value.form)
 
         // MARK: - Chrome derivation
 
@@ -620,7 +637,7 @@ open class ListingComposeWizardViewModel
                 leading = leadingControl(step),
                 primaryCtaLabel = primaryCtaLabel(step),
                 primaryCtaEnabled =
-                    primaryEnabled(state) && !state.isSubmitting && !state.isLoadingExisting,
+                    primaryEnabled(state) && !state.isSubmitting && !state.isLoadingExisting && !state.isAnalyzing,
                 secondaryCta = secondaryCta(step),
                 isSubmitting = state.isSubmitting,
                 dirty = dirtyForCloseConfirm(state),
@@ -725,20 +742,6 @@ open class ListingComposeWizardViewModel
         }
 
         companion object {
-            private const val KEY_STEP = "listingCompose.step"
-            private const val KEY_ENTRY_MODE = "listingCompose.entryMode"
-            private const val KEY_PHOTOS_IDS = "listingCompose.photoIds"
-            private const val KEY_PHOTOS_TOKENS = "listingCompose.photoTokens"
-            private const val KEY_TITLE = "listingCompose.title"
-            private const val KEY_CATEGORY = "listingCompose.category"
-            private const val KEY_CONDITION = "listingCompose.condition"
-            private const val KEY_BODY = "listingCompose.body"
-            private const val KEY_PRICE_KIND = "listingCompose.priceKind"
-            private const val KEY_PRICE_AMOUNT = "listingCompose.priceAmount"
-            private const val KEY_FULFILLMENT = "listingCompose.fulfillment"
-            private const val KEY_DELIVERY_ENABLED = "listingCompose.deliveryEnabled"
-            private const val KEY_LOCATION_KIND = "listingCompose.locationKind"
-            private const val KEY_LOCATION_LABEL = "listingCompose.locationLabel"
             private const val SNAP_PROGRESS_TOTAL = 3
 
             /** Nav-arg key for the listing being edited. Present when the
@@ -814,6 +817,9 @@ open class ListingComposeWizardViewModel
                     fulfillment = ListingComposeFulfillment.Pickup,
                     locationKind = locationKind,
                     locationLabel = locationLabel,
+                    // Preserve the real backend category so a PATCH
+                    // doesn't downgrade e.g. `furniture` to `other`.
+                    backendCategory = listing.category,
                 )
             }
 
@@ -823,7 +829,8 @@ open class ListingComposeWizardViewModel
                 when (listing.listingType) {
                     "wanted_request" -> ListingComposeCategory.Wanted
                     "free_item" -> ListingComposeCategory.Free
-                    "rent_item" -> ListingComposeCategory.Rentals
+                    "rent_sublet", "vehicle_rent" -> ListingComposeCategory.Rentals
+                    "vehicle_sale" -> ListingComposeCategory.Vehicles
                     "sell_item" -> mapSellItemCategory(listing)
                     else -> mapLayerCategory(listing)
                 }

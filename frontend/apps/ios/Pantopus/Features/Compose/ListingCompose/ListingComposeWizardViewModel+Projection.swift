@@ -53,7 +53,10 @@ extension ListingComposeWizardViewModel {
             priceAmount: priceAmount,
             fulfillment: .pickup,
             locationKind: locationKind,
-            locationLabel: locationLabel
+            locationLabel: locationLabel,
+            // Preserve the listing's real product category so a PATCH
+            // round-trips it instead of degrading to `other`.
+            backendCategory: listing.category
         )
     }
 

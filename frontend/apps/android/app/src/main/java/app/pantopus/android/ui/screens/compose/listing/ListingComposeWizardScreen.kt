@@ -5,13 +5,19 @@ package app.pantopus.android.ui.screens.compose.listing
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +62,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -88,6 +97,10 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Test tag applied to the Snap & Sell wizard container. */
 const val LISTING_COMPOSE_SCREEN_TAG = "listingComposeWizard"
@@ -236,14 +249,15 @@ private fun ListingComposeStepContent(
     viewModel: ListingComposeWizardViewModel,
     onRequestRemove: (ListingComposePhoto) -> Unit,
 ) {
+    val openPhotoPicker = rememberListingPhotoPicker(viewModel)
     when (state.form.currentStep) {
         ListingComposeStep.Photos ->
             if (viewModel.isCameraCaptureStep) {
-                CameraCaptureStep(state = state, vm = viewModel)
+                CameraCaptureStep(state = state, vm = viewModel, onOpenLibrary = openPhotoPicker)
             } else {
                 PhotosStep(
                     state = state,
-                    onAdd = { viewModel.addPhoto() },
+                    onAdd = openPhotoPicker,
                     onRequestRemove = onRequestRemove,
                     onMoveUp = { index ->
                         viewModel.movePhoto(from = index, to = index - 1)
@@ -256,7 +270,7 @@ private fun ListingComposeStepContent(
             }
         ListingComposeStep.TitleCategory ->
             if (viewModel.isSnapReviewStep) {
-                SnapReviewStep(state, viewModel)
+                SnapReviewStep(state, viewModel, onOpenLibrary = openPhotoPicker)
             } else {
                 TitleCategoryStep(state, viewModel)
             }
@@ -293,13 +307,74 @@ private fun PhotoRemovalDialog(
     }
 }
 
+/**
+ * System photo-picker launcher shared by the camera rail, the manual
+ * grid's "Add photo" tile, and the snap-review strip. Picks are
+ * normalized off the main thread (1600px JPEG, EXIF stripped) before
+ * they reach the view model.
+ */
+@Composable
+private fun rememberListingPhotoPicker(vm: ListingComposeWizardViewModel): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = ListingComposeFormState.MAX_PHOTOS),
+        ) { uris ->
+            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            scope.launch {
+                val processed =
+                    withContext(Dispatchers.IO) {
+                        uris.mapNotNull { uri ->
+                            runCatching {
+                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            }.getOrNull()?.let { ListingPhotoProcessor.uploadData(it) }
+                        }
+                    }
+                if (processed.isNotEmpty()) vm.addLibraryPhotos(processed)
+            }
+        }
+    return {
+        launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+}
+
 // MARK: - Step 1A: Camera capture
 
 @Composable
 private fun CameraCaptureStep(
     state: ListingComposeUiState,
     vm: ListingComposeWizardViewModel,
+    onOpenLibrary: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val imageCapture = remember { ImageCapture.Builder().build() }
+    val onShutter = {
+        imageCapture.takePicture(
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    val rotation = image.imageInfo.rotationDegrees
+                    val buffer = image.planes[0].buffer
+                    val bytes = ByteArray(buffer.remaining()).also(buffer::get)
+                    image.close()
+                    scope.launch {
+                        val processed =
+                            withContext(Dispatchers.Default) {
+                                ListingPhotoProcessor.uploadData(bytes, rotation)
+                            }
+                        processed?.let(vm::captureSnapPhoto)
+                    }
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    // Capture failures (camera busy, permission revoked
+                    // mid-session) keep the viewfinder live for a retry.
+                }
+            },
+        )
+    }
     Box(
         modifier =
             Modifier
@@ -309,7 +384,7 @@ private fun CameraCaptureStep(
                 .background(Color(0xFF0A0B0D))
                 .testTag("listingComposeCameraStep"),
     ) {
-        CameraPreviewSurface()
+        CameraPreviewSurface(imageCapture = imageCapture)
         CameraSceneOverlay()
         RuleOfThirdsGrid(modifier = Modifier.padding(horizontal = 28.dp, vertical = 96.dp))
         FramingBrackets(modifier = Modifier.padding(horizontal = 28.dp, vertical = 96.dp))
@@ -358,10 +433,10 @@ private fun CameraCaptureStep(
                     icon = PantopusIcon.Image,
                     label = "Library",
                     testTag = "listingComposeLibraryPhoto",
-                    onClick = vm::addLibraryPhoto,
+                    onClick = onOpenLibrary,
                 )
                 Box(modifier = Modifier.weight(1f))
-                ShutterButton(onClick = vm::captureSnapPhoto)
+                ShutterButton(onClick = onShutter)
                 Box(modifier = Modifier.weight(1f))
                 CameraRailButton(
                     icon = PantopusIcon.Zap,
@@ -379,7 +454,7 @@ private fun listingComposeCameraGranted(context: Context): Boolean =
         PackageManager.PERMISSION_GRANTED
 
 @Composable
-private fun CameraPreviewSurface() {
+private fun CameraPreviewSurface(imageCapture: ImageCapture) {
     val inspectionMode = LocalInspectionMode.current
     if (inspectionMode) {
         Box(modifier = Modifier.fillMaxWidth().fillMaxHeight().background(Color(0xFF0A0B0D)))
@@ -410,6 +485,7 @@ private fun CameraPreviewSurface() {
                                 lifecycleOwner,
                                 CameraSelector.DEFAULT_BACK_CAMERA,
                                 preview,
+                                imageCapture,
                             )
                         }
                     },
@@ -720,6 +796,7 @@ private fun PhotosStep(
         itemsIndexed(state.form.photos, key = { _, p -> p.id }) { index, photo ->
             PhotoTile(
                 index = index,
+                photo = photo,
                 onTap = { onRequestRemove(photo) },
                 onMoveUp = if (index > 0) ({ onMoveUp(index) }) else null,
                 onMoveDown = if (index < state.form.photos.lastIndex) ({ onMoveDown(index) }) else null,
@@ -743,6 +820,7 @@ private fun PhotosStep(
 @Composable
 private fun PhotoTile(
     index: Int,
+    photo: ListingComposePhoto,
     onTap: () -> Unit,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,
@@ -766,11 +844,16 @@ private fun PhotoTile(
                 },
         contentAlignment = Alignment.Center,
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Image,
-            contentDescription = null,
-            size = 32.dp,
-            tint = PantopusColors.appTextSecondary,
+        ListingPhotoImage(
+            photo = photo,
+            placeholder = {
+                PantopusIconImage(
+                    icon = PantopusIcon.Image,
+                    contentDescription = null,
+                    size = 32.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            },
         )
         if (index == 0) {
             HeroChip(
@@ -882,17 +965,56 @@ private fun AddPhotoTile(onTap: () -> Unit) {
 private fun SnapReviewStep(
     state: ListingComposeUiState,
     vm: ListingComposeWizardViewModel,
+    onOpenLibrary: () -> Unit,
 ) {
+    if (state.isAnalyzing) {
+        AnalyzingBlock()
+        return
+    }
     IdentityChip()
     HeadlineBlock("Review your listing")
     SubcopyBlock("We pulled title, category, and price from your photos. Edit anything that looks off.")
-    SnapPhotoStrip(photos = state.form.photos)
-    SuggestionsBanner()
+    SnapPhotoStrip(photos = state.form.photos, onAddPhoto = onOpenLibrary)
+    SuggestionsBanner(suggestion = state.form.priceSuggestion)
     SuggestedTitleField(state = state, vm = vm)
     SuggestedCategoryField(state = state, vm = vm)
     SuggestedPriceField(state = state, vm = vm)
     SuggestedConditionControl(state = state, vm = vm)
     PickupDeliveryPanel(state = state, vm = vm)
+}
+
+/**
+ * Shimmer surface shown while the vision draft is in flight — mirrors
+ * the loaded snap-review geometry (photo strip, banner, fields) so the
+ * layout doesn't jump when suggestions resolve. iOS state:
+ * `listingComposeAnalyzing`.
+ */
+@Composable
+private fun AnalyzingBlock() {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("listingComposeAnalyzing"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 16.dp, tint = PantopusColors.business)
+            Text(
+                text = "Analyzing your photos…",
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+        }
+        Text(
+            text = "Pantopus is drafting your title, price, and details.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+        Shimmer(height = 168.dp, modifier = Modifier.fillMaxWidth())
+        Shimmer(height = 52.dp, modifier = Modifier.fillMaxWidth())
+        Shimmer(height = 44.dp, modifier = Modifier.fillMaxWidth())
+        Shimmer(height = 44.dp, modifier = Modifier.fillMaxWidth())
+        Shimmer(height = 96.dp, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 @Composable
@@ -917,7 +1039,10 @@ private fun IdentityChip() {
 }
 
 @Composable
-private fun SnapPhotoStrip(photos: List<ListingComposePhoto>) {
+private fun SnapPhotoStrip(
+    photos: List<ListingComposePhoto>,
+    onAddPhoto: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposePhotoStrip")) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -942,18 +1067,18 @@ private fun SnapPhotoStrip(photos: List<ListingComposePhoto>) {
         Row(modifier = Modifier.fillMaxWidth().height(168.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             SnapPhotoTile(
                 index = 0,
-                isFilled = photos.isNotEmpty(),
+                photo = photos.getOrNull(0),
                 isHero = true,
                 modifier = Modifier.weight(2f).fillMaxHeight(),
             )
             Column(modifier = Modifier.weight(2f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SnapPhotoTile(1, photos.size > 1, modifier = Modifier.weight(1f).fillMaxHeight())
-                    SnapPhotoTile(2, photos.size > 2, modifier = Modifier.weight(1f).fillMaxHeight())
+                    SnapPhotoTile(1, photos.getOrNull(1), modifier = Modifier.weight(1f).fillMaxHeight())
+                    SnapPhotoTile(2, photos.getOrNull(2), modifier = Modifier.weight(1f).fillMaxHeight())
                 }
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SnapPhotoTile(3, photos.size > 3, modifier = Modifier.weight(1f).fillMaxHeight())
-                    AddMoreSnapPhotoTile(modifier = Modifier.weight(1f).fillMaxHeight())
+                    SnapPhotoTile(3, photos.getOrNull(3), modifier = Modifier.weight(1f).fillMaxHeight())
+                    AddMoreSnapPhotoTile(onTap = onAddPhoto, modifier = Modifier.weight(1f).fillMaxHeight())
                 }
             }
         }
@@ -963,10 +1088,11 @@ private fun SnapPhotoStrip(photos: List<ListingComposePhoto>) {
 @Composable
 private fun SnapPhotoTile(
     index: Int,
-    isFilled: Boolean,
+    photo: ListingComposePhoto?,
     modifier: Modifier = Modifier,
     isHero: Boolean = false,
 ) {
+    val isFilled = photo != null
     Box(
         modifier =
             modifier
@@ -982,8 +1108,8 @@ private fun SnapPhotoTile(
                 .testTag("listingComposeSnapPhoto_$index"),
         contentAlignment = Alignment.Center,
     ) {
-        if (isFilled) {
-            SofaThumbMark()
+        if (photo != null) {
+            ListingPhotoImage(photo = photo, placeholder = { SofaThumbMark() })
         } else {
             PantopusIconImage(icon = PantopusIcon.Image, contentDescription = null, size = if (isHero) 26.dp else 20.dp)
         }
@@ -1022,14 +1148,54 @@ private fun SofaThumbMark() {
     }
 }
 
+/**
+ * Renders the real photo for a tile — local processed bytes for
+ * camera/library picks, the hosted URL for remote photos, otherwise
+ * the caller's placeholder.
+ */
 @Composable
-private fun AddMoreSnapPhotoTile(modifier: Modifier = Modifier) {
+private fun ListingPhotoImage(
+    photo: ListingComposePhoto,
+    placeholder: @Composable () -> Unit,
+) {
+    val localBitmap =
+        remember(photo.id) {
+            photo.localImageData?.let { bytes ->
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }
+        }
+    when {
+        localBitmap != null ->
+            Image(
+                bitmap = localBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+            )
+        photo.isRemote ->
+            AsyncImage(
+                model = photo.token,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+            )
+        else -> placeholder()
+    }
+}
+
+@Composable
+private fun AddMoreSnapPhotoTile(
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceRaised)
-                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg)),
+                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
+                .clickable(role = Role.Button, onClick = onTap)
+                .testTag("listingComposeSnapAddPhoto"),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1040,7 +1206,7 @@ private fun AddMoreSnapPhotoTile(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SuggestionsBanner() {
+private fun SuggestionsBanner(suggestion: ListingComposePriceSuggestion? = null) {
     Row(
         modifier =
             Modifier
@@ -1066,8 +1232,13 @@ private fun SuggestionsBanner() {
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.magic,
             )
+            val comparableCount = suggestion?.comparableCount
             Text(
-                "Tap any field to edit. Based on 47 similar comps within 3 mi.",
+                if (comparableCount != null && comparableCount > 0) {
+                    "Tap any field to edit. Based on $comparableCount similar comps nearby."
+                } else {
+                    "Tap any field to edit."
+                },
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextSecondary,
             )
@@ -1165,13 +1336,36 @@ private fun SuggestedPriceField(
                 )
                 Text("USD · firm", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             }
-            PriceCompRangeTrack()
+            state.form.priceSuggestion?.let { suggestion ->
+                PriceCompRangeTrack(
+                    suggestion = suggestion,
+                    currentPrice = state.form.priceAmount.toDoubleOrNull(),
+                )
+            }
         }
     }
 }
 
+/**
+ * Low–high comp band with a thumb at the current price (or median).
+ * Domain pads the band by 30% on either side so the thumb has room —
+ * mirrors iOS `PriceCompRangeTrack`.
+ */
 @Composable
-private fun PriceCompRangeTrack() {
+private fun PriceCompRangeTrack(
+    suggestion: ListingComposePriceSuggestion,
+    currentPrice: Double?,
+) {
+    val pad = maxOf((suggestion.high - suggestion.low) * 0.3, 1.0)
+    val domainStart = suggestion.low - pad
+    val domainSpan = (suggestion.high + pad) - domainStart
+    val fraction = { value: Double ->
+        if (domainSpan <= 0) {
+            0.5f
+        } else {
+            ((value.coerceIn(domainStart, domainStart + domainSpan) - domainStart) / domainSpan).toFloat()
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposeCompRange")) {
         Canvas(modifier = Modifier.fillMaxWidth().height(12.dp)) {
             val y = size.height / 2f
@@ -1184,20 +1378,29 @@ private fun PriceCompRangeTrack() {
             )
             drawLine(
                 color = PantopusColors.successLight,
-                start = Offset(size.width * 0.22f, y),
-                end = Offset(size.width * 0.68f, y),
+                start = Offset(size.width * fraction(suggestion.low), y),
+                end = Offset(size.width * fraction(suggestion.high), y),
                 strokeWidth = 6f,
                 cap = StrokeCap.Round,
             )
-            drawCircle(color = Color.White, radius = 8f, center = Offset(size.width * 0.52f, y))
-            drawCircle(color = PantopusColors.primary600, radius = 6f, center = Offset(size.width * 0.52f, y))
+            val thumbX = size.width * fraction(currentPrice ?: suggestion.median)
+            drawCircle(color = Color.White, radius = 8f, center = Offset(thumbX, y))
+            drawCircle(color = PantopusColors.primary600, radius = 6f, center = Offset(thumbX, y))
         }
+        val low = ListingComposeVisionMapping.formatAmount(suggestion.low)
+        val median = ListingComposeVisionMapping.formatAmount(suggestion.median)
+        val high = ListingComposeVisionMapping.formatAmount(suggestion.high)
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("$180 low", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            Text("\$$low low", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             Box(modifier = Modifier.weight(1f))
-            Text("$240–$320 typical", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.success)
+            Text(
+                "\$$median typical",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.success,
+            )
             Box(modifier = Modifier.weight(1f))
-            Text("$420 high", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            Text("\$$high high", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
         }
     }
 }
@@ -1938,14 +2141,21 @@ private fun SnapReviewStepPreview(state: ListingComposeUiState) {
     IdentityChip()
     HeadlineBlock("Review your listing")
     SubcopyBlock("We pulled title, category, and price from your photos. Edit anything that looks off.")
-    SnapPhotoStrip(photos = state.form.photos)
-    SuggestionsBanner()
+    SnapPhotoStrip(photos = state.form.photos, onAddPhoto = {})
+    SuggestionsBanner(suggestion = state.form.priceSuggestion ?: previewPriceSuggestion)
     ReadOnlySuggestedField("Title", state.form.title, "Snap-and-sell pulled this from the photos")
     ReadOnlySuggestedField("Category", state.form.category?.label ?: "Goods")
-    SuggestedPriceReadOnly(state.form.priceAmount.ifEmpty { "280" })
+    SuggestedPriceReadOnly(
+        amount = state.form.priceAmount.ifEmpty { "280" },
+        suggestion = state.form.priceSuggestion ?: previewPriceSuggestion,
+    )
     StaticConditionControl(state.form.condition ?: ListingComposeCondition.Good)
     StaticPickupDeliveryPanel(state.form.deliveryEnabled)
 }
+
+/** Fixed comp band for Paparazzi previews of the snap-review step. */
+private val previewPriceSuggestion =
+    ListingComposePriceSuggestion(low = 180.0, median = 280.0, high = 420.0, basis = null, comparableCount = 47)
 
 @Composable
 private fun ReadOnlySuggestedField(
@@ -1966,7 +2176,10 @@ private fun ReadOnlySuggestedField(
 }
 
 @Composable
-private fun SuggestedPriceReadOnly(amount: String) {
+private fun SuggestedPriceReadOnly(
+    amount: String,
+    suggestion: ListingComposePriceSuggestion,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposeSnapPrice")) {
         SuggestedLabel("Price")
         Column(
@@ -1985,7 +2198,7 @@ private fun SuggestedPriceReadOnly(amount: String) {
                 Box(modifier = Modifier.weight(1f))
                 Text("USD · firm", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             }
-            PriceCompRangeTrack()
+            PriceCompRangeTrack(suggestion = suggestion, currentPrice = amount.toDoubleOrNull())
         }
     }
 }

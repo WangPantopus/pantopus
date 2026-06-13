@@ -25,4 +25,15 @@ public enum AIEndpoints {
     public static func deleteConversation(id: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/ai/conversations/\(id)")
     }
+
+    /// `POST /api/ai/draft/listing-vision` — Snap & Sell: draft a
+    /// listing (title, description, category, condition, price) from
+    /// item photos, with an optional comp-range price suggestion.
+    /// Route `backend/routes/ai.js:199`.
+    public static func draftListingVision(_ body: AIDraftListingVisionRequest) -> Endpoint {
+        // 45s: the backend gives the vision model 30s
+        // (`DRAFT_TIMEOUT_MS`, `backend/services/ai/agentService.js:30`)
+        // and the multi-image upload itself takes a few seconds.
+        Endpoint(method: .post, path: "/api/ai/draft/listing-vision", body: body, timeout: 45)
+    }
 }
