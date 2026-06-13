@@ -299,8 +299,15 @@ app.use('/api/users/register', authEndpointLimiter);
 
 // ============ API ROUTES ============
 
+// Calendarly public booking flow (own per-route limiters) — mounted before the generic public
+// router so /book and /booking paths use bookingWriteLimiter, not the read previewLimiter.
+app.use('/api/public', require('./routes/schedulingPublic'));
+
 // Public preview endpoints (no auth, rate-limited by IP)
 app.use('/api/public', previewLimiter, require('./routes/public'));
+
+// Calendarly host APIs — personal/business via owner_type (home alias under /api/homes/:id/scheduling).
+app.use('/api/scheduling', require('./routes/scheduling'));
 
 app.use('/api/users', blockRoutes);    // Block routes (must be before userRoutes for /blocked static path)
 app.use('/api/users', userRoutes);
@@ -323,6 +330,7 @@ app.use('/api/homes', require('./routes/homeOwnership'));
 app.use('/api/homes', require('./routes/homePrivacy'));   // Per-home privacy/security toggles (/:id/privacy)
 app.use('/api/homes', require('./routes/placeIntelligence')); // Place dashboard contract (/:id/intelligence)
 app.use('/api/homes', require('./routes/residencyLetters')); // Server-attested residency letters (/:id/residency-letters)
+app.use('/api/homes/:homeId/scheduling', require('./routes/scheduling')); // Calendarly home-scoped (before catch-all /:id)
 app.use('/api/homes', homeRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/sports', require('./routes/sports'));  // Sports topic lane (active events)

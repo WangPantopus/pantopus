@@ -49,10 +49,11 @@ if (missingSmtpVars.length === 0) {
 
 /**
  * Send an email. In dev mode, logs to console instead.
- * @param {Object} opts - { to, subject, html, text }
+ * @param {Object} opts - { to, subject, html, text, attachments? }
+ *   attachments: optional nodemailer attachment array (e.g. an .ics calendar invite).
  * @returns {Promise<{ success: boolean, messageId?: string }>}
  */
-async function sendEmail({ to, subject, html, text }) {
+async function sendEmail({ to, subject, html, text, attachments }) {
   const mailOptions = {
     from: SMTP_FROM,
     to,
@@ -60,6 +61,9 @@ async function sendEmail({ to, subject, html, text }) {
     html,
     text: text || stripHtml(html),
   };
+  if (attachments && attachments.length) {
+    mailOptions.attachments = attachments;
+  }
 
   if (devMode) {
     logger.info('📧 [DEV EMAIL] Would send email:', {
