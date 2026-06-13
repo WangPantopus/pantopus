@@ -16,7 +16,9 @@ const { asyncHandler } = require('../errorHandler');
 const logger = require('../utils/logger');
 const availabilityService = require('../services/scheduling/availabilityService');
 const bookingService = require('../services/scheduling/bookingService');
-const { resolveOwner, assertCanManageOwner, ownerColumns, normalizeEmail } = require('../services/scheduling/schedulingShared');
+const bookingMetrics = require('../services/scheduling/bookingMetricsService');
+const schedulingNotifyPrefs = require('../services/scheduling/schedulingNotifyPrefs');
+const { resolveOwner, assertCanManageOwner, ownerColumns, normalizeEmail, generateToken } = require('../services/scheduling/schedulingShared');
 
 router.use(verifyToken);
 
@@ -99,6 +101,9 @@ const pageUpdateSchema = Joi.object({
   confirmation_message: Joi.string().allow('', null).max(2000),
   timezone: Joi.string().max(64),
   is_live: Joi.boolean(),
+  is_paused: Joi.boolean(),
+  reminder_minutes: Joi.array().items(Joi.number().integer().min(0).max(43200)).max(5),
+  cancellation_policy: Joi.string().allow('', null).max(1000),
   visibility: Joi.string().valid('listed', 'unlisted'),
   branding: Joi.object().unknown(true),
 });
@@ -128,6 +133,55 @@ router.put('/booking-page/slug', withOwner('edit'), validate(slugSchema), asyncH
     .select('*')
     .single();
   if (uniqueViolation(error)) return res.status(409).json({ error: 'SLUG_TAKEN', message: 'That link is already taken.' });
+  if (error) throw error;
+  res.json({ page: data });
+}));
+
+// Inline slug availability check (first-run wizard) — no side effects.
+router.get('/booking-page/check-slug', withOwner('view'), asyncHandler(async (req, res) => {
+  const slug = String(req.query.slug || '').trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(slug)) {
+    return res.status(400).json({ available: false, error: 'INVALID_SLUG', message: 'Use 3–50 letters, numbers, or hyphens.' });
+  }
+  const { ownerType, ownerId } = req.scheduling;
+  const [{ data: existing }, { data: ownPage }] = await Promise.all([
+    supabaseAdmin.from('BookingPage').select('id').ilike('slug', slug).maybeSingle(),
+    supabaseAdmin.from('BookingPage').select('id').eq('owner_type', ownerType).eq('owner_id', ownerId).maybeSingle(),
+  ]);
+  const available = !existing || (ownPage && existing.id === ownPage.id);
+  const suggestions = available ? [] : [`${slug}-1`, `${slug}-2`, `${slug}${Math.floor(Math.random() * 90 + 10)}`];
+  res.json({ available, suggestions });
+}));
+
+// Danger zone — regenerate the public slug (invalidates the old link).
+router.post('/booking-page/reset-slug', withOwner('edit'), asyncHandler(async (req, res) => {
+  const page = await ensurePage(req.scheduling, req.user.id);
+  let newSlug;
+  let updated;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    newSlug = `${req.scheduling.ownerType}-${Math.random().toString(36).slice(2, 10)}`;
+    const { data, error } = await supabaseAdmin
+      .from('BookingPage')
+      .update({ slug: newSlug, updated_at: new Date().toISOString() })
+      .eq('id', page.id)
+      .select('*')
+      .single();
+    if (!error) { updated = data; break; }
+    if (!uniqueViolation(error)) throw error;
+  }
+  if (!updated) return res.status(500).json({ error: 'RESET_FAILED', message: 'Could not generate a new link.' });
+  res.json({ page: updated });
+}));
+
+// Disable scheduling — take the public page offline (reversible via PUT is_live=true).
+router.post('/booking-page/disable', withOwner('edit'), asyncHandler(async (req, res) => {
+  const page = await ensurePage(req.scheduling, req.user.id);
+  const { data, error } = await supabaseAdmin
+    .from('BookingPage')
+    .update({ is_live: false, updated_at: new Date().toISOString() })
+    .eq('id', page.id)
+    .select('*')
+    .single();
   if (error) throw error;
   res.json({ page: data });
 }));
@@ -515,6 +569,13 @@ router.get('/bookings', withOwner('view'), asyncHandler(async (req, res) => {
   res.json({ bookings: data || [] });
 }));
 
+// Stats card for the Scheduling Hub / Summary Card. Registered BEFORE /bookings/:id so 'summary'
+// isn't captured as an id.
+router.get('/bookings/summary', withOwner('view'), asyncHandler(async (req, res) => {
+  const summary = await bookingMetrics.getSummary({ ownerType: req.scheduling.ownerType, ownerId: req.scheduling.ownerId });
+  res.json(summary);
+}));
+
 async function loadOwnedBooking(req) {
   const { data } = await supabaseAdmin.from('Booking').select('*').eq('id', req.params.id).maybeSingle();
   if (!data) {
@@ -533,6 +594,25 @@ router.get('/bookings/:id', asyncHandler(async (req, res) => {
     supabaseAdmin.from('EventType').select('id, name, location_mode').eq('id', booking.event_type_id).maybeSingle(),
   ]);
   res.json({ booking, attendees: attendees || [], eventType: et || null });
+}));
+
+// Slot grid for the host Reschedule/Reassign sheet — composed availability excluding this booking.
+router.get('/bookings/:id/available-slots', asyncHandler(async (req, res) => {
+  const booking = await loadOwnedBooking(req);
+  if (!req.query.from || !req.query.to) return res.status(400).json({ error: 'MISSING_RANGE', message: 'from and to are required.' });
+  if (!booking.event_type_id) return res.json({ slots: [] }); // resource bookings have no event-type grid
+  const et = await bookingService.getEventTypeById(booking.event_type_id);
+  if (!et) return res.json({ slots: [] });
+  const slots = await availabilityService.computeSlots({
+    ownerType: booking.owner_type,
+    ownerId: booking.owner_id,
+    eventType: et,
+    from: req.query.from,
+    to: req.query.to,
+    viewerTimezone: req.query.tz || booking.invitee_timezone,
+    excludeBookingId: booking.id,
+  });
+  res.json({ slots: slots.map((s) => ({ start: s.start, end: s.end, startLocal: s.startLocal, eligibleHosts: s.eligibleHosts })) });
 }));
 
 const manualBookingSchema = Joi.object({
@@ -846,6 +926,67 @@ router.post('/visits', withOwner('edit'), validate(visitSchema), asyncHandler(as
     .single();
   if (error) throw error;
   res.status(201).json({ visit: data });
+}));
+
+// ============================================================
+// SCHEDULING NOTIFICATION PREFERENCES (per host user)
+// ============================================================
+router.get('/notification-preferences', asyncHandler(async (req, res) => {
+  res.json({ prefs: await schedulingNotifyPrefs.getPrefs(req.user.id) });
+}));
+
+router.put('/notification-preferences', validate(Joi.object({ prefs: Joi.object().unknown(true).required() })), asyncHandler(async (req, res) => {
+  const { data: existing } = await supabaseAdmin
+    .from('SchedulingNotificationPreference')
+    .select('id')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (existing) {
+    await supabaseAdmin
+      .from('SchedulingNotificationPreference')
+      .update({ prefs: req.body.prefs, updated_at: new Date().toISOString() })
+      .eq('user_id', req.user.id);
+  } else {
+    await supabaseAdmin.from('SchedulingNotificationPreference').insert({ user_id: req.user.id, prefs: req.body.prefs });
+  }
+  res.json({ prefs: await schedulingNotifyPrefs.getPrefs(req.user.id) });
+}));
+
+// ============================================================
+// ONE-OFF / SINGLE-USE LINKS
+// ============================================================
+const oneOffSchema = Joi.object({
+  owner_type: Joi.string().valid('user', 'home', 'business'),
+  owner_id: Joi.string(),
+  event_type_id: Joi.string().uuid().required(),
+  expires_in_min: Joi.number().integer().min(5).max(525600).default(10080), // default 7 days
+  single_use: Joi.boolean().default(true),
+  offered_slots: Joi.array()
+    .items(Joi.object({ start: Joi.string().isoDate().required(), end: Joi.string().isoDate().required() }))
+    .max(50),
+});
+
+router.post('/booking-page/one-off-links', withOwner('edit'), validate(oneOffSchema), asyncHandler(async (req, res) => {
+  const et = await bookingService.getEventTypeById(req.body.event_type_id);
+  if (!et || et.owner_type !== req.scheduling.ownerType || et.owner_id !== req.scheduling.ownerId) {
+    return res.status(404).json({ error: 'EVENT_TYPE_NOT_FOUND' });
+  }
+  const { token, hash } = generateToken();
+  const { data, error } = await supabaseAdmin
+    .from('BookingToken')
+    .insert({
+      event_type_id: et.id,
+      token_hash: hash,
+      kind: 'one_off',
+      single_use: req.body.single_use,
+      expires_at: new Date(Date.now() + req.body.expires_in_min * 60 * 1000).toISOString(),
+      offered_slots: req.body.offered_slots && req.body.offered_slots.length ? req.body.offered_slots : null,
+    })
+    .select('id, expires_at, single_use')
+    .single();
+  if (error) throw error;
+  // Raw token returned once; the public flow is GET/POST /api/public/book/o/:token.
+  res.status(201).json({ token, path: `/book/o/${token}`, expires_at: data.expires_at, single_use: data.single_use });
 }));
 
 module.exports = router;

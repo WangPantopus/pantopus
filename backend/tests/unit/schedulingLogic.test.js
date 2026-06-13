@@ -30,6 +30,8 @@ describe('module wiring (require without error)', () => {
     expect(typeof require('../../services/scheduling/bookingNotifyService').notifyBookingEvent).toBe('function');
     expect(typeof require('../../services/scheduling/icsService').buildIcs).toBe('function');
     expect(typeof require('../../services/scheduling/schedulingShared').ownerColumns).toBe('function');
+    expect(typeof require('../../services/scheduling/bookingMetricsService').getSummary).toBe('function');
+    expect(typeof require('../../services/scheduling/schedulingNotifyPrefs').hostWants).toBe('function');
     expect(typeof require('../../routes/scheduling')).toBe('function'); // express router
     expect(typeof require('../../routes/schedulingPublic')).toBe('function');
     expect(typeof require('../../jobs/bookingReminders').runBookingReminders).toBe('function');
