@@ -112,7 +112,7 @@ struct DateOverridesView: View {
                 }
             }
 
-            PrimaryButton(title: "Add", isEnabled: viewModel.canAddCustom) {
+            PrimaryButton(title: addButtonTitle, isEnabled: viewModel.canAddCustom) {
                 await viewModel.addOverride()
             }
         }
@@ -235,6 +235,11 @@ struct DateOverridesView: View {
     }
 
     // MARK: Bindings
+
+    private var addButtonTitle: String {
+        if viewModel.isRange { return "Block these dates" }
+        return viewModel.mode == .unavailable ? "Block this date" : "Add custom hours"
+    }
 
     private var customStartBinding: Binding<Date> {
         Binding(
