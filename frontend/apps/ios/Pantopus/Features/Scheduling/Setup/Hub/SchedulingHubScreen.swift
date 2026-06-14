@@ -58,7 +58,7 @@ struct SchedulingHubScreen: View {
     private var content: some View {
         switch model.phase {
         case .loading:
-            SchedulingHubSkeleton()
+            SchedulingHubSkeleton(owner: model.owner)
         case .empty:
             ScrollView {
                 HubEmptyState(owner: model.owner, onSetUp: { model.startSetup() })
@@ -279,10 +279,12 @@ struct SchedulingHubScreen: View {
 // MARK: - Loading skeleton
 
 private struct SchedulingHubSkeleton: View {
+    let owner: SchedulingOwner
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s0) {
-                Shimmer(height: 252, cornerRadius: Radii.xl).padding(.horizontal, Spacing.s4).padding(.top, 14)
+                HubSummaryCard(content: .loading, owner: owner, nameFor: { _ in nil }, onShare: {}, onRetry: {}, onInsights: {})
                 Shimmer(height: 60, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s3)
                 Shimmer(width: 130, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s5).padding(.bottom, Spacing.s2)
                 VStack(spacing: Spacing.s2) {

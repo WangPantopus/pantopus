@@ -15,6 +15,7 @@ struct HubSummaryCard: View {
         case data(HubSummary)
         case empty
         case error
+        case loading
     }
 
     let content: Content
@@ -35,6 +36,8 @@ struct HubSummaryCard: View {
                 emptyBody
             case .error:
                 errorBody
+            case .loading:
+                loadingBody
             }
         }
         .padding(Spacing.s4)
@@ -116,7 +119,7 @@ struct HubSummaryCard: View {
     }
 
     private var divider: some View {
-        Rectangle().fill(Theme.Color.appBorderSubtle).frame(width: 1, height: 34)
+        Rectangle().fill(Theme.Color.appBorderSubtle).frame(width: 1, height: 34).padding(.vertical, 2)
     }
 
     private func breakdown(_ items: [HubSummary.EventTypeCount]) -> some View {
@@ -172,7 +175,7 @@ struct HubSummaryCard: View {
                 Spacer(minLength: Spacing.s0)
             }
             .padding(.top, 14)
-            SetupPrimaryCTA(title: "Share booking link", icon: .share, iconTrailing: false, owner: owner, height: 44, action: onShare)
+            SetupPrimaryCTA(title: "Share booking link", icon: .share, iconTrailing: false, owner: owner, height: 44, fontSize: 13.5, action: onShare)
                 .padding(.top, 14)
         }
     }
@@ -206,6 +209,35 @@ struct HubSummaryCard: View {
                 }
             }
             .padding(.top, 14)
+        }
+    }
+
+    // MARK: Loading
+
+    private var loadingBody: some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            HStack {
+                Shimmer(width: 88, height: 11, cornerRadius: 3)
+                Spacer()
+                Shimmer(width: 120, height: 26, cornerRadius: Radii.pill)
+            }
+            .padding(.bottom, 14)
+            HStack(alignment: .center, spacing: 10) {
+                ForEach(0..<4, id: \.self) { i in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Shimmer(height: 22, cornerRadius: 5).frame(maxWidth: .infinity).scaleEffect(x: 0.7, anchor: .leading)
+                        Shimmer(height: 9, cornerRadius: 3).frame(maxWidth: .infinity).scaleEffect(x: 0.9, anchor: .leading)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if i < 3 { divider }
+                }
+            }
+            Shimmer(height: 40, cornerRadius: Radii.sm).padding(.top, Spacing.s4)
+            HStack {
+                Spacer()
+                Shimmer(width: 86, height: 12, cornerRadius: 3)
+            }
+            .padding(.top, Spacing.s3)
         }
     }
 }

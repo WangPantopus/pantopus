@@ -175,11 +175,11 @@ struct ComposedAvailabilityNote: View {
                 Text("Everyone's set to \(timezone)").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong).lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: Spacing.s2)
                 HStack(spacing: Spacing.s1) {
-                    Icon(.check, size: 10, strokeWidth: 3, color: Theme.Color.success)
-                    Text("CONFIRMED").font(.system(size: 10, weight: .bold)).tracking(0.4).foregroundStyle(Theme.Color.success)
+                    Icon(.check, size: 10, strokeWidth: 3, color: Theme.Color.appTextInverse)
+                    Text("CONFIRMED").font(.system(size: 10, weight: .bold)).tracking(0.4).foregroundStyle(Theme.Color.appTextInverse)
                 }
                 .padding(.horizontal, Spacing.s2).padding(.vertical, 3)
-                .background(Theme.Color.successLight).clipShape(Capsule())
+                .background(Theme.Color.success).clipShape(Capsule())
             }
             .padding(.horizontal, 10).padding(.vertical, Spacing.s2)
             .background(Theme.Color.appSurface)
@@ -226,6 +226,9 @@ private struct OnboardingMemberList: View {
         return HStack(spacing: Spacing.s3) {
             Text(setupInitials(m.name)).font(.system(size: 14, weight: .bold)).foregroundStyle(tone.fg)
                 .frame(width: 40, height: 40).background(tone.bg).clipShape(Circle())
+                .overlay(alignment: .bottomTrailing) {
+                    if on { memberVerifiedBadge.offset(x: 2, y: 2) }
+                }
             VStack(alignment: .leading, spacing: 1) {
                 Text(m.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.Color.appText)
                 Text(m.rel).font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary).lineLimit(1)
@@ -236,6 +239,16 @@ private struct OnboardingMemberList: View {
                 .accessibilityLabel(m.name)
         }
         .padding(.horizontal, 13).padding(.vertical, 11)
+    }
+
+    /// Green verified/selected check badge on a selected member's avatar.
+    private var memberVerifiedBadge: some View {
+        ZStack {
+            Circle().fill(Theme.Color.success)
+            Icon(.check, size: 9, strokeWidth: 3.5, color: Theme.Color.appTextInverse)
+        }
+        .frame(width: 16, height: 16)
+        .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
     }
 
     private var inviteRow: some View {

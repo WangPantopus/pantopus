@@ -114,8 +114,8 @@ struct SchedulingSettingsScreen: View {
         SettingsGroup(title: "Scheduling defaults", accent: accent) {
             SettingsRow(
                 label: "Default timezone",
-                sub: model.timezoneValue,
-                trailing: .tzLock(locked: !model.isFresh, accent: accent),
+                sub: model.savingRow == .defaultTimezone ? nil : model.timezoneValue,
+                trailing: timezoneTrailing,
                 action: { model.openAvailability() }
             )
             SettingsDivider()
@@ -128,11 +128,23 @@ struct SchedulingSettingsScreen: View {
             SettingsDivider()
             SettingsRow(
                 label: "Cancellation policy",
-                sub: model.isFresh ? nil : "24-hour notice",
-                trailing: model.isFresh ? .chipChevron(SettingsChip(text: "Set up", icon: .plus, tone: .warning)) : .chevron,
+                sub: model.savingRow == .cancellationPolicy ? nil : (model.isFresh ? nil : "24-hour notice"),
+                trailing: cancellationTrailing,
                 action: { model.openCancellationPolicy() }
             )
         }
+    }
+
+    private var timezoneTrailing: SettingsRowTrailing {
+        if model.savingRow == .defaultTimezone { return .savingShimmer(width: 70) }
+        return .tzLock(locked: !model.isFresh, accent: accent)
+    }
+
+    private var cancellationTrailing: SettingsRowTrailing {
+        if model.savingRow == .cancellationPolicy { return .savingShimmer(width: 84) }
+        if model.justSavedRow == .cancellationPolicy { return .savedChip }
+        if model.isFresh { return .chipChevron(SettingsChip(text: "Set up", icon: .plus, tone: .warning)) }
+        return .chevron
     }
 
     // MARK: Payments (gated)
@@ -296,6 +308,10 @@ enum SettingsRowTrailing {
     case chipChevron(SettingsChip)
     case connectPill(accent: Color)
     case tzLock(locked: Bool, accent: Color)
+    /// In-flight write: a Shimmer placeholder in the trailing slot (JSX 'saving').
+    case savingShimmer(width: CGFloat)
+    /// Write succeeded: a green "Saved" chip + chevron (JSX 'saved').
+    case savedChip
 }
 
 struct SettingsRow: View {
@@ -338,6 +354,14 @@ struct SettingsRow: View {
             Text("Connect").font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.Color.appTextInverse)
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(accent).clipShape(Capsule())
+                .pantopusShadow(PantopusShadow(color: accent, opacity: 0.27, radius: 3, x: 0, y: 2))
+        case let .savingShimmer(width):
+            Shimmer(width: width, height: 14, cornerRadius: 7)
+        case .savedChip:
+            HStack(spacing: Spacing.s2) {
+                SettingsSavedChip()
+                Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
+            }
         case let .tzLock(locked, accent):
             HStack(spacing: 6) {
                 ZStack {
@@ -364,6 +388,20 @@ struct SettingsChip: View {
         }
         .padding(.horizontal, Spacing.s2).padding(.vertical, 3)
         .background(tone.bg).clipShape(Capsule())
+    }
+}
+
+/// Green "Saved" confirmation chip shown in a row's trailing slot right after a
+/// successful write (JSX SavedChip).
+struct SettingsSavedChip: View {
+    var body: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.success)
+            Text("Saved").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.success)
+        }
+        .padding(.horizontal, 9).padding(.vertical, Spacing.s1)
+        .background(Theme.Color.successLight)
+        .clipShape(Capsule())
     }
 }
 
