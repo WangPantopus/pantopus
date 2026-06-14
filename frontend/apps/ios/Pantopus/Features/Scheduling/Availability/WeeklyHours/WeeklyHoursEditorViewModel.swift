@@ -56,6 +56,8 @@ final class WeeklyHoursEditorViewModel {
     private let push: @MainActor (SchedulingRoute) -> Void
     private let client: SchedulingClient
     private var baselineSignature: String?
+    private var loadedName = ""
+    private var loadedTimezone = SchedulingTime.deviceTimeZoneIdentifier
 
     init(
         scheduleId: String,
@@ -108,6 +110,8 @@ final class WeeklyHoursEditorViewModel {
             scheduleName = schedule.name ?? "Working hours"
             timezoneId = schedule.timezone ?? SchedulingTime.deviceTimeZoneIdentifier
             lockTimezone = timezoneId == SchedulingTime.deviceTimeZoneIdentifier
+            loadedName = scheduleName
+            loadedTimezone = timezoneId
             days = Self.buildDays(from: response.rules.filter { $0.scheduleId == scheduleId })
             baselineSignature = signature()
             phase = .ready
@@ -238,18 +242,21 @@ final class WeeklyHoursEditorViewModel {
             )
 
             let trimmedName = scheduleName.trimmingCharacters(in: .whitespacesAndNewlines)
-            let nameChanged = !trimmedName.isEmpty
-            if nameChanged || timezoneId != SchedulingTime.deviceTimeZoneIdentifier {
+            let nameChanged = !trimmedName.isEmpty && trimmedName != loadedName
+            let tzChanged = timezoneId != loadedTimezone
+            if nameChanged || tzChanged {
                 _ = try await client.request(
                     SchedulingEndpoints.updateSchedule(
                         id: scheduleId,
                         UpdateScheduleRequest(
                             name: nameChanged ? trimmedName : nil,
-                            timezone: timezoneId
+                            timezone: tzChanged ? timezoneId : nil
                         )
                     ),
                     as: AvailabilityScheduleResponse.self
                 )
+                if nameChanged { loadedName = trimmedName }
+                loadedTimezone = timezoneId
             }
             baselineSignature = signature()
         } catch let error as SchedulingError {
