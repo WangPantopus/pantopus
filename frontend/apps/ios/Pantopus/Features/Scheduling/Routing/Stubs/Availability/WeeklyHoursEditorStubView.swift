@@ -36,7 +36,9 @@ struct WeeklyHoursEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B5", title: "Weekly Hours", stream: "I3")
+        WeeklyHoursEditorView(
+            viewModel: WeeklyHoursEditorViewModel(scheduleId: viewModel.scheduleId, push: viewModel.push)
+        )
     }
 }
 
