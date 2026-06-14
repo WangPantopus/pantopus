@@ -328,6 +328,8 @@ public enum HubRoute: Hashable {
     /// A18.4 — Persistent "waiting for approval" room.
     /// `pantopus://homes/:id/waiting-room`.
     case waitingRoom(homeId: String)
+    /// Calendarly scheduling sub-routes (Foundation I0b).
+    case scheduling(SchedulingRoute)
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -2283,6 +2285,8 @@ public struct HubTabRoot: View {
             NeighborMessageReceivedView(
                 viewModel: NeighborMessageReceivedViewModel(messageId: messageId)
             ) { pop() }
+        case let .scheduling(route):
+            SchedulingRouter.destination(for: route, owner: .personal) { push(.scheduling($0)) }
         #if DEBUG
         case .tokenGallery: TokenGalleryView()
         case .iconGallery: IconGalleryView()
