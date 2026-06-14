@@ -11,7 +11,7 @@
 import SwiftUI
 
 /// Routed-screen view-model stub for G10 (Buy Package). Stream I15 replaces
-/// the body.
+/// the body; `push` navigates deeper scheduling routes.
 @Observable
 @MainActor
 final class BuyPackageStubViewModel {
