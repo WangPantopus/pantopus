@@ -3,11 +3,12 @@
 //  Pantopus
 //
 //  C1 Booking Link / Public Page Management · Stream I4. A FormShell-based
-//  editor for the owner's public booking page: live/paused status, the public
-//  slug with live availability check, header fields, per-service visibility,
-//  intro/confirmation copy, page visibility, a payments entry, and the
-//  share/copy/preview footer. Presents C3 (ShareLinkSheet), C4 (one-off
-//  generator) and C2 (preview) locally. Tokens only.
+//  editor for the owner's public booking page: live/paused/draft status, the
+//  public slug with live availability check, header fields, per-service
+//  visibility, intro/confirmation copy, page visibility, an intake+payments
+//  links card, and the copy/share/QR footer. Presents C3 (ShareLinkSheet)
+//  locally and pushes the C2 preview. Tokens only — matched to
+//  booking-link-frames.jsx + event-editor-shell.jsx.
 //
 // swiftlint:disable file_length
 
@@ -63,7 +64,8 @@ public struct BookingPageManagementView: View {
             title: "Booking link",
             leading: .back,
             rightActionLabel: nil,
-            bottomActionLabel: "Save changes",
+            bottomActionLabel: bottomActionLabel,
+            bottomActionIcon: viewModel.isValid ? nil : .lock,
             isValid: viewModel.isValid,
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
@@ -71,16 +73,20 @@ public struct BookingPageManagementView: View {
             onCommit: { Task { await viewModel.save() } },
             content: {
                 Group {
-                    IdentityHeaderRow(theme: viewModel.theme)
-                    StatusCard(viewModel: viewModel)
-                    SlugCard(viewModel: viewModel)
-                    HeaderFieldsCard(viewModel: viewModel)
-                    ServiceVisibilityCard(viewModel: viewModel)
-                    CopyCard(viewModel: viewModel)
-                    navRows
-                    VisibilityCard(viewModel: viewModel)
-                    if viewModel.showPaymentsRow { paymentsRow }
-                    footerButtons
+                    PillarHeaderChip(theme: viewModel.theme)
+                    BookingMgmtStatusCard(viewModel: viewModel)
+                    BookingMgmtSlugCard(viewModel: viewModel)
+                    BookingMgmtHeaderCard(viewModel: viewModel)
+                    BookingMgmtServicesCard(viewModel: viewModel)
+                    BookingMgmtCopyCard(viewModel: viewModel)
+                    BookingMgmtVisibilityCard(viewModel: viewModel)
+                    linksCard
+                    BookingMgmtFooterButtons(
+                        disabled: viewModel.isDraft,
+                        onCopy: { BookingLinkActions.copy(viewModel.shareURL) },
+                        onShare: { activeSheet = .share },
+                        onViewQR: { activeSheet = .share }
+                    )
                     if let saveError = viewModel.saveError {
                         InlineNote(tone: .error, text: saveError, icon: .alertCircle)
                     }
@@ -88,39 +94,34 @@ public struct BookingPageManagementView: View {
                 .padding(.horizontal, Spacing.s4)
             }
         )
-        .overlay(alignment: .top) {
-            if viewModel.showSavedToast { SavedToast().padding(.top, Spacing.s2) }
+        .overlay(alignment: .bottom) {
+            if viewModel.showSavedToast {
+                BookingMgmtSavedToast().padding(.bottom, Spacing.s16)
+            }
         }
     }
 
-    private var navRows: some View {
+    /// The bottom save-bar label varies: a locked label when the slug is
+    /// invalid/taken (FormShell disables the CTA), "Save draft" for an
+    /// unpublished page, else "Save changes".
+    private var bottomActionLabel: String {
+        viewModel.isValid ? viewModel.saveLabel : "Fix your link to save"
+    }
+
+    /// Single card: Intake questions + Connect Stripe, one `BookingLinkRow` each.
+    private var linksCard: some View {
         BookingCard(padding: Spacing.s2) {
-            NavRow(icon: .helpCircle, title: "Intake questions", subtitle: "Set per service") {
-                viewModel.openIntakeQuestions()
-            }
-        }
-    }
-
-    private var paymentsRow: some View {
-        BookingCard(padding: Spacing.s2) {
-            NavRow(
-                icon: .creditCard,
-                title: "Connect payments",
-                subtitle: "Connect Stripe to take paid bookings"
-            ) { viewModel.openPayments() }
-        }
-    }
-
-    private var footerButtons: some View {
-        HStack(spacing: Spacing.s2) {
-            FooterButton(icon: .copy, title: "Copy link") {
-                BookingLinkActions.copy(viewModel.shareURL)
-            }
-            FooterButton(icon: .share, title: "Share") {
-                activeSheet = .share
-            }
-            FooterButton(icon: .eye, title: "Preview") {
-                previewRequest = PreviewRequest(slug: viewModel.savedSlug)
+            BookingLinkRow(
+                icon: .listChecks,
+                title: "Intake questions",
+                value: viewModel.questionCount,
+                showsDivider: viewModel.showPaymentsRow
+            ) { viewModel.openIntakeQuestions() }
+            if viewModel.showPaymentsRow {
+                BookingLinkRow(
+                    icon: .creditCard,
+                    title: "Connect Stripe to take paid bookings"
+                ) { viewModel.openPayments() }
             }
         }
     }
@@ -131,17 +132,17 @@ public struct BookingPageManagementView: View {
         switch sheet {
         case .share:
             ShareLinkSheet(
-                url: viewModel.savedDisplayURL,
+                url: viewModel.shareURL,
                 theme: viewModel.theme,
                 isLive: viewModel.isAcceptingBookings,
-                showOnProfile: viewModel.showOnProfile,
+                showOnProfile: viewModel.visibility == .listed,
                 addToSignature: viewModel.addToSignature,
                 onCopy: {},
                 onShare: { BookingLinkActions.presentShare([viewModel.shareURL]) },
                 onMessages: { BookingLinkActions.openMessages(with: viewModel.shareURL, openURL: openURL) },
                 onEmail: { BookingLinkActions.openEmail(with: viewModel.shareURL, openURL: openURL) },
                 onToggleShowOnProfile: { value in
-                    Task { @MainActor in viewModel.showOnProfile = value }
+                    Task { @MainActor in await viewModel.setListed(value) }
                 },
                 onToggleSignature: { value in
                     Task { @MainActor in viewModel.addToSignature = value }
@@ -169,38 +170,18 @@ public struct BookingPageManagementView: View {
     }
 }
 
-// MARK: - Identity header
-
-private struct IdentityHeaderRow: View {
-    let theme: SchedulingIdentityTheme
-
-    var body: some View {
-        HStack(spacing: Spacing.s2) {
-            Circle().fill(theme.accent).frame(width: 8, height: 8)
-            Text("\(theme.title) booking link")
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(theme.accent)
-            Spacer()
-        }
-        .accessibilityIdentifier("bookingPageManagement.identity")
-    }
-}
-
 // MARK: - Status card
 
-private struct StatusCard: View {
+private struct BookingMgmtStatusCard: View {
     @Bindable var viewModel: BookingPageManagementViewModel
 
     var body: some View {
         BookingCard {
-            CardOverline(text: "Status")
+            CardOverline(text: "Status", accent: viewModel.theme.accent)
             HStack(alignment: .center, spacing: Spacing.s3) {
-                VStack(alignment: .leading, spacing: Spacing.s1) {
-                    SchedulingStatusPill(viewModel.isAcceptingBookings ? .active : .paused)
-                    Text(viewModel.isAcceptingBookings
-                        ? "Anyone with the link can book you."
-                        : "Page is paused. People see a short note and cannot book.")
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    BookingStatusChip(tone: viewModel.statusTone)
+                    Text(viewModel.statusCopy)
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -214,31 +195,31 @@ private struct StatusCard: View {
                 .tint(viewModel.theme.accent)
                 .accessibilityIdentifier("bookingPageManagement.statusToggle")
             }
-            if !viewModel.isAcceptingBookings {
-                InlineNote(
-                    tone: .warning,
-                    text: "Resume to start taking bookings again.",
-                    icon: .pause
-                )
-            }
         }
     }
 }
 
 // MARK: - Slug card
 
-private struct SlugCard: View {
+private struct BookingMgmtSlugCard: View {
     @Bindable var viewModel: BookingPageManagementViewModel
+
+    private var isError: Bool {
+        switch viewModel.slugState {
+        case .taken, .invalid: true
+        default: false
+        }
+    }
 
     var body: some View {
         BookingCard {
-            CardOverline(text: "Your link")
+            CardOverline(text: "Your link", accent: viewModel.theme.accent)
             HStack(spacing: Spacing.s0) {
                 Text("\(BookingLinkURL.displayOrigin)/book/")
-                    .font(.system(size: 14, design: .monospaced))
+                    .font(.system(size: 12.5, design: .monospaced))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 TextField("your-handle", text: $viewModel.slugText)
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Theme.Color.appText)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -246,9 +227,20 @@ private struct SlugCard: View {
                     .accessibilityIdentifier("bookingPageManagement.slugField")
                 trailingStatusIcon
             }
-            .padding(Spacing.s3)
-            .background(Theme.Color.appSurfaceSunken)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
+            .background(Theme.Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(isError ? Theme.Color.error : Theme.Color.appBorder, lineWidth: 1.5)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.errorBg, lineWidth: 3)
+                    .opacity(isError ? 1 : 0)
+                    .padding(-3)
+            )
             slugStatusLine
         }
     }
@@ -258,9 +250,9 @@ private struct SlugCard: View {
         case .checking:
             ProgressView().controlSize(.small)
         case .available:
-            Icon(.checkCircle, size: 16, color: Theme.Color.success)
+            Icon(.checkCircle, size: 16, strokeWidth: 2.4, color: Theme.Color.success)
         case .taken, .invalid:
-            Icon(.alertCircle, size: 16, color: Theme.Color.error)
+            Icon(.alertCircle, size: 16, strokeWidth: 2.4, color: Theme.Color.error)
         case .unchanged:
             EmptyView()
         }
@@ -269,51 +261,42 @@ private struct SlugCard: View {
     @ViewBuilder private var slugStatusLine: some View {
         switch viewModel.slugState {
         case .available:
-            statusText("Available", color: Theme.Color.success, icon: .check)
-        case .checking:
-            statusText("Checking…", color: Theme.Color.appTextSecondary, icon: nil)
+            statusText("Available", color: Theme.Color.success, icon: .checkCircle)
         case let .invalid(message):
             statusText(message, color: Theme.Color.error, icon: .alertCircle)
         case let .taken(suggestions):
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 statusText("That handle is taken. Try another.", color: Theme.Color.error, icon: .alertCircle)
                 if !suggestions.isEmpty {
-                    SuggestionChips(suggestions: suggestions) { viewModel.applySuggestion($0) }
+                    BookingMgmtSuggestionChips(suggestions: suggestions) { viewModel.applySuggestion($0) }
                 }
             }
-        case .unchanged:
+        case .checking, .unchanged:
             EmptyView()
         }
     }
 
-    private func statusText(_ text: String, color: Color, icon: PantopusIcon?) -> some View {
+    private func statusText(_ text: String, color: Color, icon: PantopusIcon) -> some View {
         HStack(spacing: Spacing.s1) {
-            if let icon { Icon(icon, size: 13, color: color) }
+            Icon(icon, size: 13, strokeWidth: 2.4, color: color)
             Text(text)
-                .pantopusTextStyle(.caption)
+                .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(color)
         }
         .accessibilityIdentifier("bookingPageManagement.slugStatus")
     }
 }
 
-private struct SuggestionChips: View {
+private struct BookingMgmtSuggestionChips: View {
     let suggestions: [String]
     let onTap: (String) -> Void
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
             ForEach(suggestions, id: \.self) { suggestion in
-                Button { onTap(suggestion) } label: {
-                    Text(suggestion)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Theme.Color.primary600)
-                        .padding(.horizontal, Spacing.s3)
-                        .padding(.vertical, Spacing.s1)
-                        .background(Theme.Color.primary50)
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+                BookingPillChip(title: suggestion, isSelected: false, mono: true) {
+                    onTap(suggestion)
                 }
-                .buttonStyle(.plain)
                 .accessibilityIdentifier("bookingPageManagement.slugSuggestion")
             }
             Spacer(minLength: Spacing.s0)
@@ -321,30 +304,40 @@ private struct SuggestionChips: View {
     }
 }
 
-// MARK: - Header fields
+// MARK: - Header card (avatar + change photo, then name + tagline)
 
-private struct HeaderFieldsCard: View {
+private struct BookingMgmtHeaderCard: View {
     @Bindable var viewModel: BookingPageManagementViewModel
 
     var body: some View {
         BookingCard {
-            CardOverline(text: "Page header")
+            CardOverline(text: "Page header", accent: viewModel.theme.accent)
             HStack(spacing: Spacing.s3) {
                 BookingAvatar(
                     name: viewModel.titleText.isEmpty ? "You" : viewModel.titleText,
                     size: 48,
                     accent: viewModel.theme.accent
                 )
-                LabeledField(
-                    label: "Display name",
-                    placeholder: "Your name",
-                    text: $viewModel.titleText,
-                    identifier: "bookingPageManagement.titleField"
-                )
+                Button {
+                    // Photo upload is not wired in this stream.
+                } label: {
+                    Text("Change photo")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.primary600)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("bookingPageManagement.changePhoto")
+                Spacer(minLength: Spacing.s0)
             }
-            LabeledField(
+            BookingMgmtField(
+                label: "Display name",
+                placeholder: "Your name",
+                text: $viewModel.titleText,
+                identifier: "bookingPageManagement.titleField"
+            )
+            BookingMgmtField(
                 label: "Tagline",
-                placeholder: "What you do",
+                placeholder: "One short line",
                 text: $viewModel.taglineText,
                 identifier: "bookingPageManagement.taglineField"
             )
@@ -352,95 +345,87 @@ private struct HeaderFieldsCard: View {
     }
 }
 
-// MARK: - Service visibility
+// MARK: - Services card (pure toggle rows)
 
-private struct ServiceVisibilityCard: View {
+private struct BookingMgmtServicesCard: View {
     @Bindable var viewModel: BookingPageManagementViewModel
 
     var body: some View {
         BookingCard {
-            CardOverline(text: "Services people can book")
-            if viewModel.serviceRows.isEmpty {
+            CardOverline(text: "Services people can book", accent: viewModel.theme.accent)
+            if !viewModel.hasVisibleService {
                 InlineNote(
                     tone: .warning,
-                    text: "Turn on at least one service so people can book.",
+                    text: "Turn on at least one service so people can book",
                     icon: .alertTriangle
                 )
-                CompactButton(title: "Add a service", variant: .ghost, size: .inlineAction) {
-                    viewModel.createService()
-                }
-            } else {
-                ForEach(viewModel.serviceRows) { row in
-                    ServiceRow(row: row, accent: viewModel.theme.accent) { visible in
-                        Task { await viewModel.setServiceVisible(eventTypeId: row.id, visible: visible) }
-                    } onEdit: {
-                        viewModel.editService(row.id)
-                    }
-                }
-                if !viewModel.hasVisibleService {
-                    InlineNote(
-                        tone: .warning,
-                        text: "No services are visible. Turn one on so people can book.",
-                        icon: .alertTriangle
-                    )
+            }
+            ForEach(Array(viewModel.serviceRows.enumerated()), id: \.element.id) { index, row in
+                BookingMgmtServiceRow(
+                    row: row,
+                    isLast: index == viewModel.serviceRows.count - 1
+                ) { visible in
+                    Task { await viewModel.setServiceVisible(eventTypeId: row.id, visible: visible) }
                 }
             }
         }
     }
 }
 
-private struct ServiceRow: View {
+private struct BookingMgmtServiceRow: View {
     let row: BookingServiceRow
-    let accent: Color
+    let isLast: Bool
     let onToggle: (Bool) -> Void
-    let onEdit: () -> Void
 
     var body: some View {
-        HStack(spacing: Spacing.s3) {
-            Button(action: onEdit) {
-                HStack(spacing: Spacing.s3) {
-                    Icon(row.locationIcon, size: 18, color: accent)
-                        .frame(width: 32, height: 32)
-                        .background(accent.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(row.name)
-                            .pantopusTextStyle(.body)
-                            .fontWeight(.medium)
-                            .foregroundStyle(Theme.Color.appText)
-                            .lineLimit(1)
-                        Text(row.durationLabel)
-                            .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                    }
-                    Spacer(minLength: Spacing.s2)
+        VStack(spacing: Spacing.s0) {
+            HStack(spacing: Spacing.s3) {
+                Icon(
+                    row.locationIcon,
+                    size: 15,
+                    color: row.isVisible ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                )
+                .frame(width: 30, height: 30)
+                .background(row.isVisible ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(row.name)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .lineLimit(1)
+                    Text(row.durationLabel)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
                 }
+                Spacer(minLength: Spacing.s2)
+                Toggle("", isOn: Binding(get: { row.isVisible }, set: onToggle))
+                    .labelsHidden()
+                    .tint(Theme.Color.primary600)
+                    .accessibilityIdentifier("bookingPageManagement.serviceToggle.\(row.id)")
             }
-            .buttonStyle(.plain)
-            Toggle("", isOn: Binding(get: { row.isVisible }, set: onToggle))
-                .labelsHidden()
-                .tint(accent)
-                .accessibilityIdentifier("bookingPageManagement.serviceToggle.\(row.id)")
+            .padding(.vertical, Spacing.s2)
+            if !isLast {
+                Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+            }
         }
-        .padding(.vertical, Spacing.s1)
     }
 }
 
 // MARK: - Intro & confirmation
 
-private struct CopyCard: View {
+private struct BookingMgmtCopyCard: View {
     @Bindable var viewModel: BookingPageManagementViewModel
 
     var body: some View {
         BookingCard {
-            CardOverline(text: "Intro & confirmation")
-            MultilineField(
-                label: "Intro",
+            CardOverline(text: "Intro & confirmation", accent: viewModel.theme.accent)
+            BookingMgmtMultilineField(
+                label: "Intro message",
                 placeholder: "A short welcome shown on your page",
                 text: $viewModel.introText,
                 identifier: "bookingPageManagement.introField"
             )
-            MultilineField(
+            BookingMgmtMultilineField(
                 label: "Confirmation message",
                 placeholder: "Shown after someone books",
                 text: $viewModel.confirmationText,
@@ -452,59 +437,28 @@ private struct CopyCard: View {
 
 // MARK: - Page visibility
 
-private struct VisibilityCard: View {
+private struct BookingMgmtVisibilityCard: View {
     @Bindable var viewModel: BookingPageManagementViewModel
 
     var body: some View {
         BookingCard {
-            CardOverline(text: "Visibility")
-            SegmentedPair(
+            CardOverline(text: "Visibility", accent: viewModel.theme.accent)
+            BookingSegmented(
                 options: [("Listed", BookingPageVisibility.listed), ("Link-only", .unlisted)],
-                selection: $viewModel.visibility,
-                accent: viewModel.theme.accent
+                selection: $viewModel.visibility
             )
             Text(viewModel.visibility == .listed
-                ? "Shown on your profile and discoverable."
-                : "Only people with the link can find it.")
-                .pantopusTextStyle(.caption)
+                ? "Shown on your Pantopus profile and in search."
+                : "Only people with the link can find your page.")
+                .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
-    }
-}
-
-private struct SegmentedPair<Value: Equatable>: View {
-    let options: [(String, Value)]
-    @Binding var selection: Value
-    let accent: Color
-
-    var body: some View {
-        HStack(spacing: Spacing.s1) {
-            ForEach(options.indices, id: \.self) { index in
-                let option = options[index]
-                let isSelected = selection == option.1
-                Button { selection = option.1 } label: {
-                    Text(option.0)
-                        .pantopusTextStyle(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(isSelected ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Spacing.s2)
-                        .background(isSelected ? accent : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("bookingPageManagement.visibility.\(option.0)")
-            }
-        }
-        .padding(Spacing.s1)
-        .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 }
 
 // MARK: - Shared field bits
 
-private struct LabeledField: View {
+private struct BookingMgmtField: View {
     let label: String
     let placeholder: String
     @Binding var text: String
@@ -513,20 +467,25 @@ private struct LabeledField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text(label)
-                .pantopusTextStyle(.caption)
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextField(placeholder, text: $text)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
-                .padding(Spacing.s3)
-                .background(Theme.Color.appSurfaceSunken)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .background(Theme.Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1.5)
+                )
                 .accessibilityIdentifier(identifier)
         }
     }
 }
 
-private struct MultilineField: View {
+private struct BookingMgmtMultilineField: View {
     let label: String
     let placeholder: String
     @Binding var text: String
@@ -535,64 +494,59 @@ private struct MultilineField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text(label)
-                .pantopusTextStyle(.caption)
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextField(placeholder, text: $text, axis: .vertical)
                 .lineLimit(2...5)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
-                .padding(Spacing.s3)
-                .background(Theme.Color.appSurfaceSunken)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .frame(minHeight: 48, alignment: .top)
+                .background(Theme.Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1.5)
+                )
                 .accessibilityIdentifier(identifier)
         }
     }
 }
 
-private struct NavRow: View {
-    let icon: PantopusIcon
-    let title: String
-    let subtitle: String
-    let action: () -> Void
+// MARK: - Footer action buttons (copy · share · QR)
+
+private struct BookingMgmtFooterButtons: View {
+    let disabled: Bool
+    let onCopy: () -> Void
+    let onShare: () -> Void
+    let onViewQR: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.s3) {
-                Icon(icon, size: 18, color: Theme.Color.appTextSecondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .pantopusTextStyle(.body)
-                        .fontWeight(.medium)
-                        .foregroundStyle(Theme.Color.appText)
-                    Text(subtitle)
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Spacer(minLength: Spacing.s2)
-                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
-            }
-            .padding(Spacing.s2)
-            .contentShape(Rectangle())
+        HStack(spacing: Spacing.s2) {
+            BookingMgmtFooterButton(icon: .copy, title: "Copy link", disabled: disabled, action: onCopy)
+            BookingMgmtFooterButton(icon: .share, title: "Share", disabled: disabled, action: onShare)
+            BookingMgmtFooterButton(icon: .scanLine, title: "View QR", disabled: disabled, action: onViewQR)
         }
-        .buttonStyle(.plain)
+        .opacity(disabled ? 0.5 : 1)
     }
 }
 
-private struct FooterButton: View {
+private struct BookingMgmtFooterButton: View {
     let icon: PantopusIcon
     let title: String
+    let disabled: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: Spacing.s1) {
-                Icon(icon, size: 18, color: Theme.Color.primary600)
+            HStack(spacing: Spacing.s1) {
+                Icon(icon, size: 13, color: disabled ? Theme.Color.appTextMuted : Theme.Color.primary600)
                 Text(title)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appText)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.s3)
+            .frame(maxWidth: .infinity, minHeight: 40)
             .background(Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
@@ -601,26 +555,26 @@ private struct FooterButton: View {
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
         .accessibilityIdentifier("bookingPageManagement.footer.\(title)")
     }
 }
 
 // MARK: - Toast / loading / error
 
-private struct SavedToast: View {
+private struct BookingMgmtSavedToast: View {
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.checkCircle, size: 16, color: Theme.Color.success)
+            Icon(.checkCircle, size: 15, strokeWidth: 3, color: Theme.Color.success)
             Text("Saved")
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(Theme.Color.appText)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextInverse)
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.vertical, Spacing.s2)
-        .background(Theme.Color.appSurface)
+        .background(Theme.Color.appText)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-        .pantopusShadow(.md)
+        .pantopusShadow(.lg)
         .accessibilityIdentifier("bookingPageManagement.savedToast")
     }
 }

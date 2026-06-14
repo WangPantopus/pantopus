@@ -47,6 +47,32 @@ public struct OneOffEventTypeOption: Identifiable, Sendable, Equatable {
     public let durationLabel: String
     public let icon: PantopusIcon
     public let slug: String?
+    /// Selectable durations for the in-card "Custom duration" chip row.
+    public var durations: [Int]
+    /// Short modality word for the row subline, e.g. "video".
+    public var modalityLabel: String
+    /// Default duration in minutes (seeds the custom-duration chip selection).
+    public var defaultDurationMin: Int
+
+    public init(
+        id: String,
+        name: String,
+        durationLabel: String,
+        icon: PantopusIcon,
+        slug: String?,
+        durations: [Int] = [],
+        modalityLabel: String = "video",
+        defaultDurationMin: Int = 30
+    ) {
+        self.id = id
+        self.name = name
+        self.durationLabel = durationLabel
+        self.icon = icon
+        self.slug = slug
+        self.durations = durations
+        self.modalityLabel = modalityLabel
+        self.defaultDurationMin = defaultDurationMin
+    }
 }
 
 /// One proposed-slot row.
@@ -55,6 +81,26 @@ public struct OneOffSlotOption: Identifiable, Sendable, Equatable {
     public let start: String
     public let end: String
     public let label: String
+    /// Two-line presentation for the proposed-slot row (design: "Tue · Jun 17").
+    public var dateLabel: String
+    /// Time-range line for the proposed-slot row (design: "9:00 – 11:00 AM").
+    public var timeLabel: String
+
+    public init(
+        id: String,
+        start: String,
+        end: String,
+        label: String,
+        dateLabel: String = "",
+        timeLabel: String = ""
+    ) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.label = label
+        self.dateLabel = dateLabel.isEmpty ? label : dateLabel
+        self.timeLabel = timeLabel
+    }
 }
 
 /// The collapsed result after a successful generate.
@@ -84,6 +130,11 @@ public final class OneOffLinkGeneratorViewModel {
     public var offerSpecificTimes = false
     public var expiry: OneOffExpiry = .d7
     public var singleUse = true
+    /// Options-card second toggle (design default OFF). Collects intake
+    /// questions before the invitee books.
+    public var askIntakeQuestions = false
+    /// In-card "Custom duration" chip selection for the chosen event type.
+    public var selectedDurationMin: Int = 30
 
     public private(set) var eventTypeOptions: [OneOffEventTypeOption] = []
     public private(set) var slotOptions: [OneOffSlotOption] = []
@@ -122,6 +173,29 @@ public final class OneOffLinkGeneratorViewModel {
         selectedEventTypeId != nil
     }
 
+    /// Duration chips for the selected event type's in-card "Custom duration"
+    /// row. Falls back to the standard ladder if the event type omits durations.
+    public var durationOptions: [Int] {
+        let durations = selectedEventType?.durations ?? []
+        return durations.isEmpty ? [15, 30, 45, 60] : durations
+    }
+
+    /// Proposed slots (the ones the invitee will pick from) as ordered rows.
+    /// Mirrors the design's removable "Tue · Jun 17 / 9:00 – 11:00 AM" rows.
+    public var selectedSlots: [OneOffSlotOption] {
+        slotOptions.filter { selectedSlotIds.contains($0.id) }
+    }
+
+    /// Set the in-card custom-duration chip selection.
+    public func selectDuration(_ minutes: Int) {
+        selectedDurationMin = minutes
+    }
+
+    /// Remove a proposed slot (design: trailing "x" on each slot row).
+    public func removeSlot(_ id: String) {
+        selectedSlotIds.remove(id)
+    }
+
     // MARK: - Load
 
     public func load() async {
@@ -137,15 +211,20 @@ public final class OneOffLinkGeneratorViewModel {
             )
             rawEventTypes = eventResponse.eventTypes.filter { $0.isActive ?? true }
             eventTypeOptions = rawEventTypes.map { event in
-                OneOffEventTypeOption(
+                let defaultMin = event.defaultDuration ?? event.durations.first ?? 30
+                return OneOffEventTypeOption(
                     id: event.id,
                     name: event.name,
-                    durationLabel: BookingDuration.label(event.defaultDuration ?? event.durations.first ?? 30),
+                    durationLabel: BookingDuration.label(defaultMin),
                     icon: BookingLocationMode.icon(event.locationMode),
-                    slug: event.slug
+                    slug: event.slug,
+                    durations: event.durations,
+                    modalityLabel: BookingLocationMode.shortLabel(event.locationMode),
+                    defaultDurationMin: defaultMin
                 )
             }
             selectedEventTypeId = eventTypeOptions.first?.id
+            selectedDurationMin = eventTypeOptions.first?.defaultDurationMin ?? 30
             loadedOnce = true
             state = .configuring
         } catch {
@@ -157,6 +236,7 @@ public final class OneOffLinkGeneratorViewModel {
     public func selectEventType(_ id: String) {
         guard id != selectedEventTypeId else { return }
         selectedEventTypeId = id
+        selectedDurationMin = eventTypeOptions.first { $0.id == id }?.defaultDurationMin ?? selectedDurationMin
         slotOptions = []
         selectedSlotIds = []
         if offerSpecificTimes { Task { await loadSlots() } }
@@ -194,12 +274,38 @@ public final class OneOffLinkGeneratorViewModel {
                     start: slot.start,
                     end: slot.end,
                     label: SchedulingTime.localString(utcISO: slot.start, tz: timeZoneIdentifier)
-                        ?? slot.startLocal ?? slot.start
+                        ?? slot.startLocal ?? slot.start,
+                    dateLabel: slotDateLabel(slot.start)
+                        ?? SchedulingTime.localString(utcISO: slot.start, tz: timeZoneIdentifier)
+                        ?? slot.startLocal ?? slot.start,
+                    timeLabel: slotTimeRange(start: slot.start, end: slot.end) ?? ""
                 )
             }
         } catch {
             slotOptions = []
         }
+    }
+
+    /// "Tue · Jun 17" weekday-and-date line for a proposed-slot row.
+    private func slotDateLabel(_ utcISO: String) -> String? {
+        guard let date = SchedulingTime.parseUTC(utcISO),
+              let zone = TimeZone(identifier: timeZoneIdentifier) else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeZone = zone
+        formatter.dateFormat = "EEE · MMM d"
+        return formatter.string(from: date)
+    }
+
+    /// "9:00 – 11:00 AM" time-range line for a proposed-slot row.
+    private func slotTimeRange(start: String, end: String) -> String? {
+        guard let startDate = SchedulingTime.parseUTC(start),
+              let endDate = SchedulingTime.parseUTC(end),
+              let zone = TimeZone(identifier: timeZoneIdentifier) else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeZone = zone
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return "\(formatter.string(from: startDate)) – \(formatter.string(from: endDate))"
     }
 
     // MARK: - Generate
@@ -249,7 +355,7 @@ public final class OneOffLinkGeneratorViewModel {
         } else {
             parts.append("Expires in \(expiry.label.lowercased())")
         }
-        if singleUse { parts.append("single use") }
+        if singleUse { parts.append("Single use") }
         return parts.joined(separator: " · ")
     }
 
@@ -266,6 +372,7 @@ public final class OneOffLinkGeneratorViewModel {
     func setStateForPreview(_ state: OneOffState, options: [OneOffEventTypeOption]) {
         eventTypeOptions = options
         selectedEventTypeId = options.first?.id
+        selectedDurationMin = options.first?.defaultDurationMin ?? selectedDurationMin
         self.state = state
         loadedOnce = true
     }
