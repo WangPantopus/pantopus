@@ -36,7 +36,7 @@ struct SchedulingNotificationPrefsStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "A4", title: "Notification Preferences", stream: "I1")
+        SchedulingNotificationPrefsScreen(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
