@@ -158,8 +158,14 @@ final class WeeklyHoursEditorViewModel {
 
     func addRange(_ weekday: Int) {
         guard let index = days.firstIndex(where: { $0.weekday == weekday }) else { return }
-        let start = days[index].ranges.last.map { TimeOfDay(hour: min($0.end.hour + 1, 23), minute: 0) } ?? .nineAM
-        let end = TimeOfDay(hour: min(start.hour + 1, 23), minute: start.minute)
+        // Clamp the start hour to 22 so the default end (start + 1h) stays
+        // within the day and the synthesized window always has positive
+        // duration (start < end) — otherwise a late last range would seed an
+        // invalid 23:00–23:00 block that blocks Save.
+        let lastEndHour = days[index].ranges.last?.end.hour ?? 8
+        let startHour = min(lastEndHour + 1, 22)
+        let start = TimeOfDay(hour: startHour, minute: 0)
+        let end = TimeOfDay(hour: startHour + 1, minute: 0)
         days[index].ranges.append(TimeRange(start: start, end: end))
         days[index].isEnabled = true
     }
