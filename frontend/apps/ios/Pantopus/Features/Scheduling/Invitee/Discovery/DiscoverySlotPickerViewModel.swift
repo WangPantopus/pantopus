@@ -1,0 +1,293 @@
+//
+//  DiscoverySlotPickerViewModel.swift
+//  Pantopus
+//
+//  C6 Date + Time Slot Picker (Stream I5) — drives the Foundation `SlotPicker`.
+//  Fetches public slots for the visible month (`GET …/:eventTypeSlug/slots` or
+//  the one-off `…/book/o/:token`), always passing `tz` (IANA) and rendering the
+//  returned `startLocal`. Month paging, timezone change (re-fetch), and
+//  jump-to-next-available are all here. `status:'paused'` is a calm state.
+//  Selecting a slot hands off to C6→D1 (`.inviteeIntakeForm`); this stream
+//  stops at slot selection.
+//
+
+import SwiftUI
+
+@Observable
+@MainActor
+final class DiscoverySlotPickerViewModel {
+    enum Phase: Equatable {
+        case loading
+        case ready
+        case paused
+        case error(message: String)
+    }
+
+    let slug: String
+    let eventTypeSlug: String
+    let oneOffToken: String?
+    private let push: @MainActor (SchedulingRoute) -> Void
+    private let client: SchedulingClient
+
+    private(set) var phase: Phase = .loading
+    private(set) var eventType: PublicEventTypeView?
+    private(set) var timezoneId: String
+    private(set) var monthAnchor: Date
+    private(set) var selectedDate: Date
+    private(set) var selectedSlotStart: String?
+    /// All slots fetched for the visible month range.
+    private(set) var rangeSlots: [SlotDTO] = []
+
+    private var didLoad = false
+    /// Bumped on every fetch; stale completions (overlapping nav taps) are dropped.
+    private var fetchGeneration = 0
+
+    /// Pillar accent is unknown on the public picker route (it carries no
+    /// owner type), so the picker uses the brand sky for today/selected.
+    let accent: Color = Theme.Color.primary600
+
+    init(
+        slug: String,
+        eventTypeSlug: String,
+        tz: String,
+        oneOffToken: String?,
+        push: @escaping @MainActor (SchedulingRoute) -> Void,
+        client: SchedulingClient
+    ) {
+        self.slug = slug
+        self.eventTypeSlug = eventTypeSlug
+        timezoneId = tz
+        self.oneOffToken = oneOffToken
+        self.push = push
+        self.client = client
+        let cal = DiscoveryCalendar.calendar(tz: tz)
+        monthAnchor = cal.startOfDay(for: Date())
+        selectedDate = cal.startOfDay(for: Date())
+    }
+
+    // MARK: - Derived
+
+    var timezoneLabel: String {
+        DiscoveryTimeZone.label(for: timezoneId)
+    }
+
+    var availableDays: Set<Date> {
+        DiscoveryCalendar.availableDays(rangeSlots, tz: timezoneId)
+    }
+
+    var daySlots: [SlotDTO] {
+        DiscoveryCalendar.slots(rangeSlots, on: selectedDate, tz: timezoneId)
+    }
+
+    var dstHint: String? {
+        DiscoveryCalendar.dstHint(monthAnchor: monthAnchor, tz: timezoneId)
+    }
+
+    var slotPickerState: SlotPicker.LoadState {
+        switch phase {
+        case .loading:
+            return .loading
+        case .error, .paused:
+            return .noAvailability
+        case .ready:
+            if availableDays.isEmpty { return .noAvailability }
+            return daySlots.isEmpty ? .dayFull : .loaded
+        }
+    }
+
+    var summaryDetail: String? {
+        guard let eventType else { return nil }
+        let duration = (eventType.defaultDuration ?? eventType.durations?.first).map { "\($0) min" }
+        let location = DiscoveryLocation.label(mode: eventType.locationMode, detail: eventType.locationDetail)
+        return [duration, location].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    // MARK: - Loading
+
+    func load() async {
+        guard !didLoad else { return }
+        didLoad = true
+        await fetchRange()
+        // If the current month has nothing open, advance to the first month that
+        // does — so an invitee (incl. the C8 "see open times" hand-off) lands on
+        // real availability instead of an empty current month.
+        if phase == .ready, availableDays.isEmpty {
+            await jumpNextAvailable()
+        }
+    }
+
+    func refresh() async {
+        await fetchRange()
+    }
+
+    private func fetchRange() async {
+        fetchGeneration &+= 1
+        let generation = fetchGeneration
+        phase = .loading
+        let (from, to) = DiscoveryCalendar.monthRange(monthAnchor: monthAnchor, tz: timezoneId)
+        do {
+            if let oneOffToken {
+                let view: OneOffBookView = try await client.request(
+                    SchedulingPublicEndpoints.oneOffView(token: oneOffToken, tz: timezoneId, from: from, to: to)
+                )
+                guard generation == fetchGeneration else { return }
+                eventType = view.eventType
+                rangeSlots = view.slots
+                phase = .ready
+            } else {
+                let response: PublicSlotsResponse = try await client.request(
+                    SchedulingPublicEndpoints.slots(
+                        slug: slug, eventTypeSlug: eventTypeSlug, from: from, to: to, tz: timezoneId
+                    )
+                )
+                guard generation == fetchGeneration else { return }
+                eventType = response.eventType
+                rangeSlots = response.slots
+                switch response.status {
+                case .paused:
+                    phase = .paused
+                case .unavailable, .expired:
+                    phase = .error(message: "This link isn't available")
+                case .active, .secret, .unknown:
+                    phase = .ready
+                }
+            }
+            if phase == .ready { selectFirstAvailableDayIfNeeded() }
+        } catch let error as SchedulingError {
+            guard generation == fetchGeneration else { return }
+            phase = .error(message: message(for: error))
+        } catch {
+            guard generation == fetchGeneration else { return }
+            phase = .error(message: "Something went wrong. Try again.")
+        }
+    }
+
+    // MARK: - Interaction
+
+    func selectDate(_ date: Date) {
+        selectedDate = date
+        selectedSlotStart = nil
+    }
+
+    func selectSlot(_ slot: SlotDTO) {
+        selectedSlotStart = slot.start
+        // FOUNDATION GAP: `.inviteeIntakeForm` (frozen I0b route) carries no
+        // `oneOffToken`, so one-off-link bookings (oneOffToken != nil) cannot
+        // commit via POST /book/o/:token in I6. Latent today — no in-app path
+        // reaches the picker with a non-nil token — but I6/Foundation must thread
+        // `oneOffToken` through the intake route before one-off entry ships.
+        push(.inviteeIntakeForm(
+            slug: slug,
+            eventTypeSlug: eventTypeSlug,
+            start: slot.start,
+            tz: timezoneId
+        ))
+    }
+
+    func changeMonth(_ delta: Int) async {
+        let cal = DiscoveryCalendar.calendar(tz: timezoneId)
+        guard let newAnchor = cal.date(byAdding: .month, value: delta, to: monthAnchor) else { return }
+        // Never page before the current month — past days are all unbookable and
+        // would hand the backend an inverted (from > to) range.
+        let currentMonthStart = cal.dateInterval(of: .month, for: Date())?.start ?? cal.startOfDay(for: Date())
+        guard let newMonthStart = cal.dateInterval(of: .month, for: newAnchor)?.start,
+              newMonthStart >= currentMonthStart else { return }
+        monthAnchor = newAnchor
+        if let interval = cal.dateInterval(of: .month, for: newAnchor) {
+            selectedDate = max(interval.start, cal.startOfDay(for: Date()))
+        }
+        selectedSlotStart = nil
+        await fetchRange()
+    }
+
+    func changeTimezone(_ identifier: String) async {
+        guard identifier != timezoneId else { return }
+        timezoneId = identifier
+        // Re-normalize anchors to the new zone so the visible month / selected day
+        // don't drift by a day at zone/DST boundaries.
+        let cal = DiscoveryCalendar.calendar(tz: identifier)
+        monthAnchor = cal.startOfDay(for: monthAnchor)
+        selectedDate = cal.startOfDay(for: selectedDate)
+        await fetchRange()
+    }
+
+    /// Move to the next day with availability — within the loaded range first,
+    /// then scanning forward up to six months. Honors the "next-horizon paging"
+    /// contract so the booker is never dead-ended.
+    func jumpNextAvailable() async {
+        let cal = DiscoveryCalendar.calendar(tz: timezoneId)
+        let afterStart = cal.startOfDay(for: selectedDate)
+        if let next = availableDays.filter({ $0 > afterStart }).min() {
+            selectDate(next)
+            return
+        }
+        let savedAnchor = monthAnchor
+        let savedSelected = selectedDate
+        for _ in 0..<6 {
+            guard let nextAnchor = cal.date(byAdding: .month, value: 1, to: monthAnchor) else { break }
+            monthAnchor = nextAnchor
+            await fetchRange()
+            guard phase == .ready else { break }
+            if let first = availableDays.min() {
+                selectDate(first)
+                return
+            }
+        }
+        // Nothing open in the scanned horizon — restore the starting month rather
+        // than stranding the booker in a far-future empty month.
+        monthAnchor = savedAnchor
+        selectedDate = savedSelected
+        selectedSlotStart = nil
+        await fetchRange()
+    }
+
+    // MARK: - Helpers
+
+    private func selectFirstAvailableDayIfNeeded() {
+        guard daySlots.isEmpty else { return }
+        let cal = DiscoveryCalendar.calendar(tz: timezoneId)
+        let todayStart = cal.startOfDay(for: Date())
+        if let first = availableDays.filter({ $0 >= todayStart }).min() {
+            selectedDate = first
+        }
+    }
+
+    private func message(for error: SchedulingError) -> String {
+        switch error {
+        case .notFound:
+            "This link isn't available"
+        default:
+            error.userMessage ?? "Something went wrong. Try again."
+        }
+    }
+}
+
+#if DEBUG
+extension DiscoverySlotPickerViewModel {
+    /// Fixture-seeded loaded state (today populated) for `#Preview` / screenshots.
+    static func previewLoaded() -> DiscoverySlotPickerViewModel {
+        let tz = "America/Los_Angeles"
+        let viewModel = DiscoverySlotPickerViewModel(
+            slug: "ada", eventTypeSlug: "intro", tz: tz, oneOffToken: nil, push: { _ in }, client: .shared
+        )
+        let etJSON = #"{"id":"et1","name":"Intro call","slug":"intro","durations":[30],"default_duration":30,"location_mode":"video"}"#
+        if let data = etJSON.data(using: .utf8) {
+            viewModel.eventType = try? JSONDecoder().decode(PublicEventTypeView.self, from: data)
+        }
+        let cal = DiscoveryCalendar.calendar(tz: tz)
+        let formatter = ISO8601DateFormatter()
+        let base = cal.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
+        var slots: [SlotDTO] = []
+        for hourOffset in [0, 1, 2, 5, 6, 7] {
+            if let start = cal.date(byAdding: .hour, value: hourOffset, to: base),
+               let end = cal.date(byAdding: .minute, value: 30, to: start) {
+                slots.append(SlotDTO(start: formatter.string(from: start), end: formatter.string(from: end)))
+            }
+        }
+        viewModel.rangeSlots = slots
+        viewModel.phase = .ready
+        viewModel.didLoad = true
+        return viewModel
+    }
+}
+#endif

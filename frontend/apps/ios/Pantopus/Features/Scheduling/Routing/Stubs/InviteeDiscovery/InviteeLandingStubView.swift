@@ -29,14 +29,18 @@ final class InviteeLandingStubViewModel {
 }
 
 struct InviteeLandingStubView: View {
-    @State private var viewModel: InviteeLandingStubViewModel
+    private let viewModel: BookingLandingViewModel
 
-    init(viewModel: InviteeLandingStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeLandingStubViewModel) {
+        viewModel = BookingLandingViewModel(
+            slug: stub.slug,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "C5", title: "Book", stream: "I5")
+        BookingLandingView(viewModel: viewModel)
     }
 }
 
