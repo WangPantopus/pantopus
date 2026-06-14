@@ -58,14 +58,25 @@ struct AvailabilityScheduleListView: View {
     // MARK: Helper header
 
     private var helperHeader: some View {
-        Text("Times here are the source your home and business pages build from.")
-            .pantopusTextStyle(.caption)
-            .foregroundStyle(Theme.Color.appTextSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s4)
-            .padding(.top, Spacing.s3)
-            .padding(.bottom, Spacing.s1)
-            .accessibilityIdentifier("scheduling.availability.helper")
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Personal")
+                .pantopusTextStyle(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.Color.personal)
+                .padding(.horizontal, Spacing.s2)
+                .padding(.vertical, Spacing.s1)
+                .background(Theme.Color.personalBg)
+                .clipShape(Capsule())
+                .accessibilityIdentifier("scheduling.availability.identityPill")
+            Text("Times here are the source your home and business pages build from.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s3)
+        .padding(.bottom, Spacing.s1)
+        .accessibilityIdentifier("scheduling.availability.helper")
     }
 
     // MARK: Overflow menu

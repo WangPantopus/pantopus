@@ -29,6 +29,8 @@ final class BookingLimitsViewModelTests: XCTestCase {
      "assignees":[],"questions":[]}
     """
 
+    private static let updated = #"{"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30]}}"#
+
     func testLoadAppliesFields() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.detail)]
         let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
@@ -58,10 +60,7 @@ final class BookingLimitsViewModelTests: XCTestCase {
     }
 
     func testSaveSucceedsAfterEdit() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.detail),
-            .status(200, body: #"{"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30]}}"#)
-        ]
+        SequencedURLProtocol.sequence = [.status(200, body: Self.detail), .status(200, body: Self.updated)]
         let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
         await viewModel.load()
         viewModel.horizonDays = 45
@@ -71,6 +70,44 @@ final class BookingLimitsViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.saveError)
     }
 
+    /// Per-field-dirty: editing only the window must NOT re-send the untouched
+    /// (and possibly lossy) min_notice / slot_interval / cap fields.
+    func testUntouchedFieldsNotResent() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.detail), .status(200, body: Self.updated)]
+        let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
+        await viewModel.load()
+        viewModel.horizonDays = 45
+        _ = await viewModel.save()
+
+        guard let put = SequencedURLProtocol.capturedRequests.last else {
+            return XCTFail("Missing PUT request")
+        }
+        let body = Self.bodyData(from: put)
+        guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            return XCTFail("Missing body")
+        }
+        XCTAssertEqual(json["max_horizon_days"] as? Int, 45)
+        XCTAssertNil(json["min_notice_min"])
+        XCTAssertNil(json["slot_interval_min"])
+        XCTAssertNil(json["daily_cap"])
+        XCTAssertNil(json["per_booker_cap"])
+    }
+
+    /// Turning a previously-set cap OFF can't be persisted (omitted != null), so
+    /// save must report failure (not a false success) and resync.
+    func testCapClearReportsUnsupported() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.detail), .status(200, body: Self.detail)]
+        let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
+        await viewModel.load()
+        XCTAssertTrue(viewModel.limitPerDay)
+        viewModel.limitPerDay = false // attempt to clear the daily cap
+        XCTAssertTrue(viewModel.isDirty)
+        let ok = await viewModel.save()
+        XCTAssertFalse(ok)
+        XCTAssertNotNil(viewModel.saveError)
+        XCTAssertTrue(viewModel.limitPerDay) // reverted by resync — UI matches server
+    }
+
     func testLoadFailureProducesError() async {
         SequencedURLProtocol.sequence = [.status(404, body: #"{"error":"NOT_FOUND"}"#)]
         let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
@@ -78,5 +115,22 @@ final class BookingLimitsViewModelTests: XCTestCase {
         guard case .error = viewModel.phase else {
             return XCTFail("Expected .error, got \(viewModel.phase)")
         }
+    }
+
+    /// URLProtocol-stubbed sessions expose the body via httpBodyStream.
+    private static func bodyData(from request: URLRequest) -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        var data = Data()
+        stream.open()
+        defer { stream.close() }
+        let bufferSize = 4096
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

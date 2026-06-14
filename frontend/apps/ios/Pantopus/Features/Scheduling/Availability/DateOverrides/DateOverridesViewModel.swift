@@ -90,6 +90,13 @@ final class DateOverridesViewModel {
         return TimeRange(start: customStart, end: customEnd).isValid
     }
 
+    /// Upper bound for the date-range picker so a blocked range can't exceed
+    /// the per-write cap (and silently drop the tail past `dates(from:to:)`'s
+    /// guard). 60 days comfortably covers a long vacation hold.
+    var maxRangeEnd: Date {
+        Calendar.current.date(byAdding: .day, value: 60, to: selectedDate) ?? selectedDate
+    }
+
     // MARK: Load
 
     func load() async {
@@ -188,11 +195,12 @@ final class DateOverridesViewModel {
             )
             overrides = Self.buildEntries(from: response.overrides)
         } catch let error as SchedulingError {
+            // Keep the in-memory list and composer state intact on failure —
+            // re-fetching here would flash the loading skeleton and discard
+            // what the user just entered. They can simply retry.
             errorMessage = error.userMessage ?? "Couldn't save your overrides."
-            await fetch()
         } catch {
             errorMessage = "Couldn't save your overrides."
-            await fetch()
         }
     }
 
