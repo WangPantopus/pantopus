@@ -33,6 +33,30 @@ enum DiscoveryTheme {
         default: .personal
         }
     }
+
+    /// The host-pillar banner gradient stops (light → accent → dark).
+    static func bannerColors(forOwnerType ownerType: String?) -> [Color] {
+        switch (ownerType ?? "").lowercased() {
+        case "home": [Theme.Color.home.opacity(0.55), Theme.Color.home, Theme.Color.homeDark]
+        case "business": [Theme.Color.business.opacity(0.55), Theme.Color.business, Theme.Color.businessDark]
+        default: [Theme.Color.primary300, Theme.Color.primary600, Theme.Color.primary800]
+        }
+    }
+
+    /// The host-pillar avatar gradient stops.
+    static func avatarColors(forOwnerType ownerType: String?) -> [Color] {
+        switch (ownerType ?? "").lowercased() {
+        case "home": [Theme.Color.home, Theme.Color.homeDark]
+        case "business": [Theme.Color.business, Theme.Color.businessDark]
+        default: [Theme.Color.primary400, Theme.Color.primary700]
+        }
+    }
+
+    /// The host's first name, derived from the page title (for second-person copy).
+    static func firstName(from title: String?) -> String {
+        let trimmed = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.split(separator: " ").first.map(String.init) ?? trimmed
+    }
 }
 
 /// Friendly labels for an IANA timezone identifier (the SlotPicker chip text).
@@ -46,6 +70,16 @@ enum DiscoveryTimeZone {
             return name
         }
         return prettyCity(from: identifier)
+    }
+
+    /// The short, DST-aware abbreviation for the chip, e.g. "PDT". Falls back to
+    /// the GMT offset for zones without a usable abbreviation.
+    static func abbreviation(for identifier: String, at date: Date = Date()) -> String {
+        guard let zone = TimeZone(identifier: identifier) else { return prettyCity(from: identifier) }
+        if let abbr = zone.abbreviation(for: date), !abbr.isEmpty, !abbr.hasPrefix("GMT") {
+            return abbr
+        }
+        return gmtOffset(for: identifier, at: date)
     }
 
     /// The current GMT offset for the zone, e.g. "GMT-7".

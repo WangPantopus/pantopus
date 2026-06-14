@@ -34,25 +34,33 @@ struct NoAvailabilityView: View {
         case .loading:
             loading
         case let .noTimes(monthName):
-            EmptyState(
-                icon: .calendar,
+            DiscoveryEmptyCard(
+                icon: .calendarDays,
                 headline: "No open times in \(monthName)",
-                subcopy: "Availability changes often. Try a later month.",
-                cta: .init(title: "See next month") { await viewModel.seeNextMonth() }
+                caption: "Availability changes often. Try a later month.",
+                primaryTitle: "See \(viewModel.nextMonthName)",
+                primaryIcon: .arrowRight,
+                primaryAction: { await viewModel.seeNextMonth() },
+                secondaryTitle: "Get notified when times open",
+                secondaryIcon: .bell,
+                secondaryAction: {}
             )
+            .padding(.horizontal, Spacing.s4)
         case let .found(monthName):
-            EmptyState(
+            DiscoveryEmptyCard(
                 icon: .calendarClock,
                 headline: "Times open up in \(monthName)",
-                subcopy: "Open times are available — pick one that works for you.",
-                cta: .init(title: "See open times") { viewModel.openPicker() }
+                caption: "Open times are available — pick one that works for you.",
+                primaryTitle: "See open times",
+                primaryIcon: .arrowRight,
+                primaryAction: { viewModel.openPicker() }
             )
+            .padding(.horizontal, Spacing.s4)
         case .paused:
             DiscoveryNotice(
-                icon: .calendarClock,
+                icon: .pause,
                 title: "This page isn't taking bookings right now",
-                message: "Check back soon — the host can reopen it at any time.",
-                accent: viewModel.accent
+                message: "Check back later — the host can reopen it at any time."
             )
             .padding(.horizontal, Spacing.s4)
         case let .error(message):
