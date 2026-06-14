@@ -24,7 +24,7 @@ public struct BookingPagePreviewView: View {
 
     public var body: some View {
         VStack(spacing: Spacing.s0) {
-            PreviewBar { dismiss() }
+            BookingPreviewBar { dismiss() }
             previewPill
             content
         }
@@ -85,7 +85,7 @@ public struct BookingPagePreviewView: View {
 
 // MARK: - Preview chrome
 
-private struct PreviewBar: View {
+private struct BookingPreviewBar: View {
     let onExit: () -> Void
 
     var body: some View {

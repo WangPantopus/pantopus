@@ -109,7 +109,7 @@ public final class BookingPageManagementViewModel {
         var visibility: BookingPageVisibility = .listed
     }
 
-    public init(
+    init(
         owner: SchedulingOwner,
         api: APIClient = .shared,
         push: @escaping @MainActor (SchedulingRoute) -> Void
