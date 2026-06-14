@@ -110,34 +110,52 @@ public final class BookingPageManagementViewModel {
 
     public init(
         owner: SchedulingOwner,
-        push: @escaping @MainActor (SchedulingRoute) -> Void,
-        api: APIClient = .shared
+        api: APIClient = .shared,
+        push: @escaping @MainActor (SchedulingRoute) -> Void
     ) {
         self.owner = owner
-        self.push = push
         self.api = api
+        self.push = push
     }
 
     // MARK: - Derived
 
-    public var theme: SchedulingIdentityTheme { SchedulingIdentityTheme(owner) }
+    public var theme: SchedulingIdentityTheme {
+        SchedulingIdentityTheme(owner)
+    }
 
     /// `pantopus.com/book/<slug>` for display.
-    public var displaySlugURL: String { BookingLinkURL.display(slug: slugText) }
+    public var displaySlugURL: String {
+        BookingLinkURL.display(slug: slugText)
+    }
 
     /// The persisted slug (editing the field doesn't change the live link
     /// until saved). Used for the share sheet and preview.
-    public var savedSlug: String { original.slug.isEmpty ? slugText : original.slug }
+    public var savedSlug: String {
+        original.slug.isEmpty ? slugText : original.slug
+    }
 
     /// `https://pantopus.com/book/<slug>` for share/QR/open.
-    public var shareURL: String { BookingLinkURL.shareable(slug: savedSlug) }
+    public var shareURL: String {
+        BookingLinkURL.shareable(slug: savedSlug)
+    }
 
     /// `pantopus.com/book/<slug>` of the persisted slug, for the share card.
-    public var savedDisplayURL: String { BookingLinkURL.display(slug: savedSlug) }
+    public var savedDisplayURL: String {
+        BookingLinkURL.display(slug: savedSlug)
+    }
 
-    public var hasServices: Bool { !serviceRows.isEmpty }
-    public var hasVisibleService: Bool { serviceRows.contains { $0.isVisible } }
-    public var showPaymentsRow: Bool { owner.supportsPayments }
+    public var hasServices: Bool {
+        !serviceRows.isEmpty
+    }
+
+    public var hasVisibleService: Bool {
+        serviceRows.contains { $0.isVisible }
+    }
+
+    public var showPaymentsRow: Bool {
+        owner.supportsPayments
+    }
 
     public var isDirty: Bool {
         current() != original
@@ -169,7 +187,9 @@ public final class BookingPageManagementViewModel {
         await fetch()
     }
 
-    public func refresh() async { await fetch() }
+    public func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         do {
@@ -178,7 +198,7 @@ public final class BookingPageManagementViewModel {
             )
             page = pageResponse.page
             // Event types are best-effort — the page still renders without them.
-            eventTypes = (try? await fetchEventTypes()) ?? []
+            eventTypes = await (try? fetchEventTypes()) ?? []
             hydrate(from: pageResponse.page)
             rebuildServiceRows()
             loadedOnce = true
@@ -249,7 +269,9 @@ public final class BookingPageManagementViewModel {
         }
     }
 
-    private func runSlugCheck(_ slug: String) async {
+    /// Internal (not private) so targeted tests can drive a deterministic
+    /// availability check without waiting on the debounce timer.
+    func runSlugCheck(_ slug: String) async {
         guard slug == slugText.lowercased(), slug != original.slug else { return }
         do {
             let result: CheckSlugResponse = try await api.request(
@@ -319,8 +341,13 @@ public final class BookingPageManagementViewModel {
         let previous = serviceRows
         serviceRows = serviceRows.map { row in
             row.id == eventTypeId
-                ? BookingServiceRow(id: row.id, name: row.name, durationLabel: row.durationLabel,
-                                    locationIcon: row.locationIcon, isVisible: visible)
+                ? BookingServiceRow(
+                    id: row.id,
+                    name: row.name,
+                    durationLabel: row.durationLabel,
+                    locationIcon: row.locationIcon,
+                    isVisible: visible
+                )
                 : row
         }
         do {
@@ -395,11 +422,15 @@ public final class BookingPageManagementViewModel {
         try? await Task.sleep(nanoseconds: 2_000_000_000)
         showSavedToast = false
     }
+}
 
+// MARK: - Actions, navigation & preview seam
+
+public extension BookingPageManagementViewModel {
     // MARK: - C3 ShareLinkSheet callbacks
 
     /// Regenerate the public slug (danger — invalidates the old link).
-    public func regenerateLink() async {
+    func regenerateLink() async {
         do {
             let response: BookingPageResponse = try await api.request(
                 SchedulingEndpoints.resetSlug(owner: owner)
@@ -412,25 +443,25 @@ public final class BookingPageManagementViewModel {
     }
 
     /// Turn the page live from the share sheet's draft banner.
-    public func turnOnPage() async {
+    func turnOnPage() async {
         await setAcceptingBookings(true)
     }
 
     // MARK: - Navigation
 
-    public func openIntakeQuestions() {
+    func openIntakeQuestions() {
         push(.eventTypeList(owner: owner))
     }
 
-    public func openPayments() {
+    func openPayments() {
         push(.paymentsSetup(owner: owner))
     }
 
-    public func editService(_ id: String) {
+    func editService(_ id: String) {
         push(.eventTypeEditor(owner: owner, eventTypeId: id))
     }
 
-    public func createService() {
+    func createService() {
         push(.eventTypeEditor(owner: owner, eventTypeId: nil))
     }
 

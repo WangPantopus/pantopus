@@ -175,12 +175,16 @@ public struct BookingPageManagementView: View {
     enum ManagementSheet: Identifiable {
         case share
         case oneOff
-        var id: String { self == .share ? "share" : "oneOff" }
+        var id: String {
+            self == .share ? "share" : "oneOff"
+        }
     }
 
     struct PreviewRequest: Identifiable {
         let slug: String
-        var id: String { slug }
+        var id: String {
+            slug
+        }
     }
 }
 
@@ -301,7 +305,7 @@ private struct SlugCard: View {
         }
     }
 
-    @ViewBuilder private func statusText(_ text: String, color: Color, icon: PantopusIcon?) -> some View {
+    private func statusText(_ text: String, color: Color, icon: PantopusIcon?) -> some View {
         HStack(spacing: Spacing.s1) {
             if let icon { Icon(icon, size: 13, color: color) }
             Text(text)
@@ -345,13 +349,24 @@ private struct HeaderFieldsCard: View {
         BookingCard {
             CardOverline(text: "Page header")
             HStack(spacing: Spacing.s3) {
-                BookingAvatar(name: viewModel.titleText.isEmpty ? "You" : viewModel.titleText,
-                              size: 48, accent: viewModel.theme.accent)
-                LabeledField(label: "Display name", placeholder: "Your name", text: $viewModel.titleText,
-                             identifier: "bookingPageManagement.titleField")
+                BookingAvatar(
+                    name: viewModel.titleText.isEmpty ? "You" : viewModel.titleText,
+                    size: 48,
+                    accent: viewModel.theme.accent
+                )
+                LabeledField(
+                    label: "Display name",
+                    placeholder: "Your name",
+                    text: $viewModel.titleText,
+                    identifier: "bookingPageManagement.titleField"
+                )
             }
-            LabeledField(label: "Tagline", placeholder: "What you do", text: $viewModel.taglineText,
-                         identifier: "bookingPageManagement.taglineField")
+            LabeledField(
+                label: "Tagline",
+                placeholder: "What you do",
+                text: $viewModel.taglineText,
+                identifier: "bookingPageManagement.taglineField"
+            )
         }
     }
 }
@@ -438,10 +453,18 @@ private struct CopyCard: View {
     var body: some View {
         BookingCard {
             CardOverline(text: "Intro & confirmation")
-            MultilineField(label: "Intro", placeholder: "A short welcome shown on your page",
-                           text: $viewModel.introText, identifier: "bookingPageManagement.introField")
-            MultilineField(label: "Confirmation message", placeholder: "Shown after someone books",
-                           text: $viewModel.confirmationText, identifier: "bookingPageManagement.confirmationField")
+            MultilineField(
+                label: "Intro",
+                placeholder: "A short welcome shown on your page",
+                text: $viewModel.introText,
+                identifier: "bookingPageManagement.introField"
+            )
+            MultilineField(
+                label: "Confirmation message",
+                placeholder: "Shown after someone books",
+                text: $viewModel.confirmationText,
+                identifier: "bookingPageManagement.confirmationField"
+            )
         }
     }
 }
@@ -534,7 +557,7 @@ private struct MultilineField: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextField(placeholder, text: $text, axis: .vertical)
-                .lineLimit(2 ... 5)
+                .lineLimit(2...5)
                 .pantopusTextStyle(.body)
                 .foregroundStyle(Theme.Color.appText)
                 .padding(Spacing.s3)
@@ -625,7 +648,7 @@ private struct ManagementLoadingView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                ForEach(0 ..< 4, id: \.self) { _ in
+                ForEach(0..<4, id: \.self) { _ in
                     VStack(alignment: .leading, spacing: Spacing.s2) {
                         Shimmer(width: 90, height: 11, cornerRadius: Radii.sm)
                         Shimmer(height: 52, cornerRadius: Radii.lg)
@@ -665,7 +688,7 @@ private struct ManagementErrorView: View {
 
 #if DEBUG
 #Preview("Loaded") {
-    let viewModel = BookingPageManagementViewModel(owner: .personal, push: { _ in })
+    let viewModel = BookingPageManagementViewModel(owner: .personal) { _ in }
     viewModel.hydrateForPreview(page: BookingPageSampleData.livePage, eventTypes: BookingPageSampleData.eventTypes)
     return NavigationStack { BookingPageManagementView(viewModel: viewModel) }
 }
