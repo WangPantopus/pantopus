@@ -38,14 +38,21 @@ final class InviteeSlotPickerStubViewModel {
 }
 
 struct InviteeSlotPickerStubView: View {
-    @State private var viewModel: InviteeSlotPickerStubViewModel
+    private let viewModel: DiscoverySlotPickerViewModel
 
-    init(viewModel: InviteeSlotPickerStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeSlotPickerStubViewModel) {
+        viewModel = DiscoverySlotPickerViewModel(
+            slug: stub.slug,
+            eventTypeSlug: stub.eventTypeSlug,
+            tz: stub.tz,
+            oneOffToken: stub.oneOffToken,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "C6", title: "Pick a Time", stream: "I5")
+        DiscoverySlotPickerView(viewModel: viewModel)
     }
 }
 
