@@ -36,7 +36,7 @@ struct BookingPageManagementStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "C1", title: "Booking Page", stream: "I4")
+        BookingPageManagementView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
