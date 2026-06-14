@@ -23,7 +23,7 @@ public struct BookingPagePreviewView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             PreviewBar { dismiss() }
             previewPill
             content
@@ -32,6 +32,7 @@ public struct BookingPagePreviewView: View {
         .background(Theme.Color.appBg.ignoresSafeArea())
         .background(Theme.Color.appText.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .accessibilityIdentifier("bookingPagePreview.screen")
     }
@@ -76,8 +77,8 @@ public struct BookingPagePreviewView: View {
                 InertPickTimeButton(accent: viewModel.theme.accent)
             }
             .padding(Spacing.s4)
+            .allowsHitTesting(false) // affordances are inert; the ScrollView still scrolls
         }
-        .allowsHitTesting(false) // the render is non-interactive
         .accessibilityIdentifier("bookingPagePreview.rendered")
     }
 }

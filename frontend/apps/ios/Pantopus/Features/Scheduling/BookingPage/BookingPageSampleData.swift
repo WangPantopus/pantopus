@@ -43,18 +43,6 @@ enum BookingPageSampleData {
         """#
     )
 
-    static let pausedPage: BookingPageDTO = decode(
-        BookingPageDTO.self,
-        #"""
-        {
-          "id": "page_2", "owner_type": "user", "owner_id": null, "slug": "maria-k",
-          "is_live": true, "is_paused": true, "title": "Maria Kassulke",
-          "tagline": "Product coach", "intro": "Back soon.", "timezone": "America/New_York",
-          "visibility": "unlisted"
-        }
-        """#
-    )
-
     static let eventTypes: [EventTypeDTO] = decode(
         EventTypesResponse.self,
         #"""
@@ -110,13 +98,6 @@ enum BookingPageSampleData {
           "status": "active",
           "eventTypes": []
         }
-        """#
-    )
-
-    static let oneOffResponse: OneOffLinkResponse = decode(
-        OneOffLinkResponse.self,
-        #"""
-        {"token":"abc123","path":"/book/o/abc123","expires_at":"2026-06-21T12:00:00Z","single_use":true}
         """#
     )
 }
