@@ -12,6 +12,7 @@
 //  Owner context flows through SchedulingOwner → endpoint builders; never
 //  hand-rolled. Tokens-only UI. No default-arg @MainActor VM init.
 //
+// swiftlint:disable file_length type_body_length
 
 import Foundation
 import Observation
@@ -158,6 +159,45 @@ public final class BookingPageManagementViewModel {
         owner.supportsPayments
     }
 
+    /// A page that has never been published reads as a *draft* (design's third
+    /// status tone). Draft = not live; the toggle reads OFF, the status copy
+    /// reads "Not published yet…", the footer dims, and the save bar says
+    /// "Save draft". `isLive` is the persisted publish flag.
+    public var isDraft: Bool {
+        !isLive
+    }
+
+    /// Maps the live/paused/draft tri-state onto the shared `BookingStatusChip`
+    /// tone. Draft wins over paused (an unpublished page is a draft regardless
+    /// of the paused flag).
+    var statusTone: BookingStatusTone {
+        if isDraft { return .draft }
+        return isAcceptingBookings ? .live : .paused
+    }
+
+    /// One-line status helper copy under the chip — matches the design's copy
+    /// map (live / paused / draft).
+    public var statusCopy: String {
+        switch statusTone {
+        case .live: "Anyone with this link can book you."
+        case .paused: "Page is paused. People see a short note and cannot book."
+        case .draft: "Not published yet. Finish setup, then publish to go live."
+        }
+    }
+
+    /// Bottom save-bar label: an unpublished page saves a *draft*; a published
+    /// page saves *changes*.
+    public var saveLabel: String {
+        isDraft ? "Save draft" : "Save changes"
+    }
+
+    /// Value shown on the "Intake questions" link row. The list-level event-type
+    /// DTOs don't carry their questions, so there's no authoritative count to
+    /// show; return `nil` so the row omits the value rather than faking one.
+    public var questionCount: String? {
+        nil
+    }
+
     public var isDirty: Bool {
         current() != original
     }
@@ -224,6 +264,7 @@ public final class BookingPageManagementViewModel {
         confirmationText = page.confirmationMessage ?? ""
         slugText = page.slug
         visibility = BookingPageVisibility(rawValue: page.visibility ?? "listed") ?? .listed
+        showOnProfile = visibility == .listed
         isLive = page.isLive
         isPaused = page.isPaused
         isAcceptingBookings = page.isLive && !page.isPaused
@@ -451,6 +492,35 @@ public extension BookingPageManagementViewModel {
     /// Turn the page live from the share sheet's draft banner.
     func turnOnPage() async {
         await setAcceptingBookings(true)
+    }
+
+    /// C3 share-sheet "Show on profile" toggle. The share sheet's profile
+    /// switch maps to page `visibility` (`listed` ⇆ `unlisted`). Optimistically
+    /// flips the local segmented value and persists it through the same
+    /// `updateBookingPage` path the save bar uses, so it sticks without a full
+    /// form save. Mirrors `showOnProfile` for the sheet's read-back.
+    func setListed(_ listed: Bool) async {
+        let previousVisibility = visibility
+        let previousShow = showOnProfile
+        visibility = listed ? .listed : .unlisted
+        showOnProfile = listed
+        do {
+            let response: BookingPageResponse = try await api.request(
+                SchedulingEndpoints.updateBookingPage(
+                    owner: owner,
+                    BookingPageUpdateRequest(visibility: visibility.rawValue)
+                )
+            )
+            page = response.page
+            visibility = BookingPageVisibility(rawValue: response.page.visibility ?? "listed") ?? .listed
+            original.visibility = visibility
+            showOnProfile = visibility == .listed
+        } catch {
+            visibility = previousVisibility
+            showOnProfile = previousShow
+            saveError = SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
+                ?? "Couldn't update visibility."
+        }
     }
 
     // MARK: - Navigation

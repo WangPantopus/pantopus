@@ -2,18 +2,28 @@
 //  BookingPageSupport.swift
 //  Pantopus
 //
-//  Shared building blocks for Stream I4 (Booking page & sharing): the
-//  public booking-link URL builder, the system share/messages/email
-//  actions, an avatar, and a couple of small token-styled card primitives
-//  reused by C1 (management), C2 (preview), C4 (one-off generator) and
-//  H16 (zero-state).
+//  Shared building blocks for Stream I4 (Booking page & sharing), matched to
+//  the Calendarly design mockups (event-editor-shell.jsx / booking-link /
+//  preview / oneoff / share frames): the public booking-link URL builder, the
+//  system share/messages/email actions, the avatar, and token-styled design
+//  primitives (cards, overlines, section labels, pillar chip, status chip,
+//  link rows, segmented control, chips) reused by C1/C2/C4/H16.
 //
 //  Tokens only — no hardcoded colors/spacing. Owner context, DTOs, endpoints
-//  and SharedUI come from Foundation and are consumed read-only.
+//  and the Foundation SharedUI come from Foundation and are consumed read-only.
 //
 
 import SwiftUI
 import UIKit
+
+extension View {
+    /// Applies a Pantopus shadow only when one is provided (avoids a
+    /// non-existent `.none` shadow token for conditional styling).
+    @ViewBuilder
+    func bookingShadow(_ shadow: PantopusShadow?) -> some View {
+        if let shadow { pantopusShadow(shadow) } else { self }
+    }
+}
 
 // MARK: - Public booking-link URL builder
 
@@ -25,27 +35,21 @@ import UIKit
 /// design's `pantopus.com`). A shared `publicBookingBaseURL` in Foundation/
 /// config would be the better long-term home — flagged in the I4 PR.
 enum BookingLinkURL {
-    /// Human-facing origin without a scheme, e.g. `pantopus.com`.
     static let displayOrigin = "pantopus.com"
-    /// Scheme used for tappable/QR links.
     static let scheme = "https"
 
-    /// `pantopus.com/book/<slug>` — for monospace display.
     static func display(slug: String) -> String {
         "\(displayOrigin)/book/\(slug)"
     }
 
-    /// `https://pantopus.com/book/<slug>` — for share/QR/open.
     static func shareable(slug: String) -> String {
         "\(scheme)://\(display(slug: slug))"
     }
 
-    /// A backend one-off `path` (e.g. `/book/o/<token>`) → `pantopus.com/book/o/<token>`.
     static func display(path: String) -> String {
         "\(displayOrigin)\(normalized(path))"
     }
 
-    /// A backend one-off `path` → `https://pantopus.com/book/o/<token>`.
     static func shareable(path: String) -> String {
         "\(scheme)://\(display(path: path))"
     }
@@ -57,23 +61,18 @@ enum BookingLinkURL {
 
 // MARK: - Share / messages / email actions
 
-/// Centralises the share-target side effects the C3 `ShareLinkSheet` and the
-/// C4 generated-link card invoke. The `ShareLinkSheet` copies to the
-/// pasteboard itself; `copy` here is for our own footer buttons.
 @MainActor
 enum BookingLinkActions {
     static func copy(_ string: String) {
         UIPasteboard.general.string = string
     }
 
-    /// `sms:&body=<link>` deep link into Messages. No-op if unconstructable.
     static func openMessages(with link: String, openURL: OpenURLAction) {
         let body = link.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? link
         guard let url = URL(string: "sms:&body=\(body)") else { return }
         openURL(url)
     }
 
-    /// `mailto:` with a booking-link subject + body.
     static func openEmail(with link: String, openURL: OpenURLAction) {
         let subject = "Book a time with me".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let body = link.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? link
@@ -81,10 +80,8 @@ enum BookingLinkActions {
         openURL(url)
     }
 
-    /// Presents the system `UIActivityViewController`. Uses UIKit topmost-VC
-    /// presentation so it works when invoked from inside another SwiftUI
-    /// sheet (ShareLinkSheet / one-off generated card), where stacking a
-    /// second `.sheet` would be fragile.
+    /// Presents the system `UIActivityViewController` via UIKit topmost-VC so it
+    /// works from inside another SwiftUI sheet.
     static func presentShare(_ items: [Any]) {
         guard let scene = UIApplication.shared.connectedScenes
             .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
@@ -100,11 +97,11 @@ enum BookingLinkActions {
     }
 }
 
-// MARK: - Avatar
+// MARK: - Avatar (solid pillar-gradient disc + white initials)
 
-/// A simple round avatar: remote image with an accent-tinted initials
-/// fallback. Lighter than `AvatarWithIdentityRing` (no progress ring) and
-/// reused by C1's header and C2's preview.
+/// Round avatar matching the design's solid gradient disc with white initials
+/// and a soft shadow (remote image when available). Reused by C1's header and
+/// C2's public preview.
 struct BookingAvatar: View {
     let name: String
     var imageURLString: String?
@@ -118,23 +115,28 @@ struct BookingAvatar: View {
                     if case let .success(image) = phase {
                         image.resizable().scaledToFill()
                     } else {
-                        initialsCircle
+                        disc
                     }
                 }
             } else {
-                initialsCircle
+                disc
             }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
+        .pantopusShadow(.md)
     }
 
-    private var initialsCircle: some View {
+    private var disc: some View {
         ZStack {
-            Circle().fill(accent.opacity(0.15))
+            LinearGradient(
+                colors: [accent.opacity(0.78), accent],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             Text(initials)
                 .font(.system(size: size * 0.36, weight: .bold))
-                .foregroundStyle(accent)
+                .foregroundStyle(Theme.Color.appTextInverse)
         }
     }
 
@@ -144,12 +146,12 @@ struct BookingAvatar: View {
     }
 }
 
-// MARK: - Card primitives
+// MARK: - Card chrome
 
-/// White rounded card with a hairline border + small shadow — the booking
-/// surface card chrome used across I4 (1px `appBorder`, 16px radius, `sm`).
+/// White rounded card: 1px `appBorder`, 16px radius, `sm` shadow — the booking
+/// surface card used across I4.
 struct BookingCard<Content: View>: View {
-    var padding: CGFloat = Spacing.s4
+    var padding: CGFloat = Spacing.s3
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -168,20 +170,193 @@ struct BookingCard<Content: View>: View {
     }
 }
 
-/// 11px uppercase secondary overline used above grouped cards/fields.
+/// Pillar-accent overline inside a card (uppercase 9.5/700) — per the shell
+/// contract, card overlines carry the pillar accent.
 struct CardOverline: View {
+    let text: String
+    var accent: Color = Theme.Color.appTextSecondary
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(0.8)
+            .foregroundStyle(accent)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Neutral uppercase section header rendered ABOVE a card (C4 sheet groups).
+struct SectionLabel: View {
     let text: String
 
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: 9.5, weight: .bold))
             .tracking(0.8)
             .foregroundStyle(Theme.Color.appTextSecondary)
             .accessibilityAddTraits(.isHeader)
     }
 }
 
-/// An inline note banner ("Turn on at least one service…", draft hints).
+// MARK: - Pillar identity chip (the only place besides overlines carrying pillar)
+
+struct PillarHeaderChip: View {
+    let theme: SchedulingIdentityTheme
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Icon(icon, size: 11, strokeWidth: 2.4, color: theme.accent)
+            Text(theme.title.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(theme.accent)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(theme.accentBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+        .accessibilityIdentifier("scheduling.pillarChip")
+    }
+
+    private var icon: PantopusIcon {
+        switch theme.identity {
+        case .business: .briefcase
+        case .home: .home
+        default: .user
+        }
+    }
+}
+
+// MARK: - Status chip (Live / Paused / Draft with a colored dot)
+
+enum BookingStatusTone { case live, paused, draft }
+
+struct BookingStatusChip: View {
+    let tone: BookingStatusTone
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(dot).frame(width: 6, height: 6)
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .textCase(.uppercase)
+                .foregroundStyle(fg)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(bg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+    }
+
+    private var label: String {
+        switch tone {
+        case .live: "Live"
+        case .paused: "Paused"
+        case .draft: "Draft"
+        }
+    }
+
+    private var bg: Color {
+        switch tone {
+        case .live: Theme.Color.successLight
+        case .paused: Theme.Color.appSurfaceSunken
+        case .draft: Theme.Color.warningBg
+        }
+    }
+
+    private var fg: Color {
+        switch tone {
+        case .live: Theme.Color.success
+        case .paused: Theme.Color.appTextStrong
+        case .draft: Theme.Color.warning
+        }
+    }
+
+    private var dot: Color {
+        switch tone {
+        case .live: Theme.Color.success
+        case .paused: Theme.Color.appTextMuted
+        case .draft: Theme.Color.warning
+        }
+    }
+}
+
+// MARK: - Link row (icon tile + label + value + chevron)
+
+struct BookingLinkRow: View {
+    let icon: PantopusIcon
+    let title: String
+    var value: String?
+    var showsDivider: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        VStack(spacing: Spacing.s0) {
+            Button(action: action) {
+                HStack(spacing: Spacing.s3) {
+                    Icon(icon, size: 15, color: Theme.Color.appTextStrong)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.Color.appSurfaceSunken)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(title)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appText)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: Spacing.s2)
+                    if let value {
+                        Text(value)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                    }
+                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+                }
+                .padding(.vertical, Spacing.s2)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if showsDivider {
+                Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+            }
+        }
+    }
+}
+
+// MARK: - Segmented control (design: white selected pill + primary700 text)
+
+struct BookingSegmented<Value: Hashable>: View {
+    let options: [(String, Value)]
+    @Binding var selection: Value
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(options.indices, id: \.self) { index in
+                let option = options[index]
+                let isSelected = selection == option.1
+                Button { selection = option.1 } label: {
+                    Text(option.0)
+                        .font(.system(size: 11.5, weight: isSelected ? .bold : .semibold))
+                        .foregroundStyle(isSelected ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.s2)
+                        .background(isSelected ? Theme.Color.appSurface : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                        .bookingShadow(isSelected ? .sm : nil)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("scheduling.segment.\(option.0)")
+            }
+        }
+        .padding(3)
+        .background(Theme.Color.appSurfaceSunken)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+}
+
+// MARK: - Inline note (warning / info / error, tone-tinted with a 1px border)
+
 struct InlineNote: View {
     enum Tone { case warning, info, error }
     let tone: Tone
@@ -190,16 +365,20 @@ struct InlineNote: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
-            Icon(icon, size: 15, color: foreground)
+            Icon(icon, size: 14, color: foreground)
             Text(text)
-                .pantopusTextStyle(.caption)
+                .font(.system(size: 11.5))
                 .foregroundStyle(foreground)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s3)
         .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(border, lineWidth: 1)
+        )
     }
 
     private var foreground: Color {
@@ -217,12 +396,45 @@ struct InlineNote: View {
         case .error: Theme.Color.errorBg
         }
     }
+
+    private var border: Color {
+        switch tone {
+        case .warning: Theme.Color.warningLight
+        case .info: Theme.Color.primary100
+        case .error: Theme.Color.errorLight
+        }
+    }
+}
+
+// MARK: - Pill chip (expiry / suggestions): sky-filled selected, bordered default
+
+struct BookingPillChip: View {
+    let title: String
+    var isSelected: Bool = false
+    var mono: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: isSelected ? .bold : .semibold, design: mono ? .monospaced : .default))
+                .foregroundStyle(isSelected ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .background(isSelected ? Theme.Color.primary600 : Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                        .stroke(isSelected ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+                .bookingShadow(isSelected ? .primary : nil)
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 // MARK: - Location-mode display
 
-/// Maps an event-type `location_mode` to a label + glyph for service rows and
-/// preview cards. Falls back gracefully for unknown/custom values.
 enum BookingLocationMode {
     static func label(_ mode: String?) -> String {
         switch (mode ?? "").lowercased() {
@@ -232,6 +444,18 @@ enum BookingLocationMode {
         case "custom": "Custom"
         case "ask": "They choose"
         default: "Video call"
+        }
+    }
+
+    /// Short modality word for sublines, e.g. "video".
+    static func shortLabel(_ mode: String?) -> String {
+        switch (mode ?? "").lowercased() {
+        case "video": "video"
+        case "phone": "phone"
+        case "in_person": "in person"
+        case "custom": "custom"
+        case "ask": "they choose"
+        default: "video"
         }
     }
 
@@ -249,7 +473,6 @@ enum BookingLocationMode {
 // MARK: - Duration formatting
 
 enum BookingDuration {
-    /// `30` → "30 min"; `60` → "1 hr"; `90` → "1 hr 30 min".
     static func label(_ minutes: Int) -> String {
         if minutes < 60 { return "\(minutes) min" }
         let hours = minutes / 60
