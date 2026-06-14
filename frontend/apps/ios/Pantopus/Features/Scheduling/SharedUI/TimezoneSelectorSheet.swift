@@ -49,7 +49,7 @@ public struct TimezoneSelectorSheet: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             header
             searchField
             ScrollView {
@@ -71,17 +71,22 @@ public struct TimezoneSelectorSheet: View {
     // MARK: - Chrome
 
     private var header: some View {
-        HStack {
+        ZStack {
             Text("Time zone")
-                .pantopusTextStyle(.h3)
+                .pantopusTextStyle(.body)
+                .fontWeight(.bold)
                 .foregroundStyle(Theme.Color.appText)
-            Spacer()
-            Button("Done", action: onDone)
-                .font(Theme.Font.body)
-                .fontWeight(.semibold)
-                .foregroundStyle(Theme.Color.primary600)
+            HStack {
+                Spacer()
+                Button("Done", action: onDone)
+                    .font(Theme.Font.small)
+                    .fontWeight(.bold)
+                    .foregroundStyle(accent)
+            }
         }
-        .padding(Spacing.s4)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s2)
+        .padding(.bottom, Spacing.s3)
     }
 
     private var searchField: some View {
@@ -108,11 +113,9 @@ public struct TimezoneSelectorSheet: View {
             overriddenBanner
         }
         sectionHeader("Detected")
-        row(for: detected, detectedChip: true)
+        listCard([detected], detectedChip: true)
         sectionHeader("Common")
-        ForEach(Self.common.filter { $0 != detected }, id: \.self) { id in
-            row(for: id)
-        }
+        listCard(Self.common)
     }
 
     @ViewBuilder
@@ -121,10 +124,28 @@ public struct TimezoneSelectorSheet: View {
         if matches.isEmpty {
             noMatch()
         } else {
-            ForEach(matches, id: \.self) { id in
-                row(for: id)
+            sectionHeader("Results")
+            listCard(matches)
+        }
+    }
+
+    private func listCard(_ identifiers: [String], detectedChip: Bool = false) -> some View {
+        VStack(spacing: Spacing.s0) {
+            ForEach(Array(identifiers.enumerated()), id: \.element) { index, identifier in
+                row(for: identifier, detectedChip: detectedChip)
+                if index < identifiers.count - 1 {
+                    Divider()
+                        .overlay(Theme.Color.appBorder)
+                        .padding(.leading, Spacing.s4)
+                }
             }
         }
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
     private var filteredIdentifiers: [String] {
@@ -138,42 +159,68 @@ public struct TimezoneSelectorSheet: View {
 
     private var overriddenBanner: some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.info, size: 14, color: Theme.Color.info)
-            Text("You changed this from your detected zone")
+            Icon(.info, size: 14, color: Theme.Color.primary700)
+            Text("You changed this from your detected zone.")
                 .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-            Spacer(minLength: Spacing.s2)
-            Button("Reset to detected") { onSelect(detected) }
-                .font(Theme.Font.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(Theme.Color.primary600)
+                .foregroundStyle(Theme.Color.primary700)
+            Spacer(minLength: Spacing.s2)
+            Button { onSelect(detected) } label: {
+                HStack(spacing: Spacing.s1) {
+                    Icon(.arrowRight, size: 12, strokeWidth: 2.4, color: accent)
+                    Text("Reset to detected")
+                        .pantopusTextStyle(.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(accent)
+                }
+            }
+            .buttonStyle(.plain)
         }
-        .padding(Spacing.s2)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.infoBg)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.primary100, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .padding(.bottom, Spacing.s1)
     }
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .pantopusTextStyle(.overline)
-            .foregroundStyle(Theme.Color.appTextMuted)
+            .foregroundStyle(Theme.Color.appTextSecondary)
             .padding(.top, Spacing.s2)
+            .padding(.horizontal, Spacing.s1)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func noMatch() -> some View {
         VStack(spacing: Spacing.s2) {
-            Icon(.search, size: 26, color: Theme.Color.appTextMuted)
+            Icon(.search, size: 24, strokeWidth: 1.85, color: Theme.Color.appTextSecondary)
+                .frame(width: 52, height: 52)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(Circle())
             Text("No time zones match \u{201C}\(query)\u{201D}")
                 .pantopusTextStyle(.small)
+                .fontWeight(.semibold)
                 .foregroundStyle(Theme.Color.appText)
-            Text("Try a city name")
+                .multilineTextAlignment(.center)
+            Text("Try a city name.")
                 .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextMuted)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: 190)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.s8)
+        .padding(.horizontal, Spacing.s4)
+        .background(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .strokeBorder(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [5]))
+        )
+        .padding(.top, Spacing.s4)
     }
 
     // MARK: - Row
@@ -184,32 +231,43 @@ public struct TimezoneSelectorSheet: View {
             onSelect(identifier)
         } label: {
             HStack(spacing: Spacing.s3) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: Spacing.s2) {
-                        Text(cityName(identifier))
-                            .pantopusTextStyle(.body)
-                            .foregroundStyle(Theme.Color.appText)
-                        if detectedChip {
-                            Text("Detected")
-                                .pantopusTextStyle(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Theme.Color.primary700)
-                                .padding(.horizontal, Spacing.s2)
-                                .padding(.vertical, 1)
-                                .background(Theme.Color.primary50)
-                                .clipShape(Capsule())
-                        }
+                ZStack {
+                    if isSelected {
+                        Icon(.check, size: 18, strokeWidth: 2.6, color: accent)
                     }
-                    Text(offsetAndTime(identifier))
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+                .frame(width: 18)
+                HStack(spacing: Spacing.s2) {
+                    Text(cityName(identifier))
+                        .pantopusTextStyle(.small)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appText)
+                        .multilineTextAlignment(.leading)
+                    if detectedChip {
+                        Text("Detected")
+                            .pantopusTextStyle(.overline)
+                            .foregroundStyle(Theme.Color.primary700)
+                            .padding(.horizontal, Spacing.s2)
+                            .padding(.vertical, 2)
+                            .background(Theme.Color.primary50)
+                            .clipShape(Capsule())
+                    }
                 }
                 Spacer(minLength: Spacing.s2)
-                if isSelected {
-                    Icon(.check, size: 18, color: accent)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(gmtOffset(identifier))
+                        .pantopusTextStyle(.caption)
+                        .fontWeight(.semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                    Text(localTime(identifier))
+                        .pantopusTextStyle(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.Color.appTextMuted)
                 }
             }
-            .padding(.vertical, Spacing.s2)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
@@ -228,18 +286,23 @@ public struct TimezoneSelectorSheet: View {
         return identifier.replacingOccurrences(of: "_", with: " ")
     }
 
-    private func offsetAndTime(_ identifier: String) -> String {
-        guard let tz = TimeZone(identifier: identifier) else { return identifier }
+    private func gmtOffset(_ identifier: String) -> String {
+        guard let tz = TimeZone(identifier: identifier) else { return "" }
         let seconds = tz.secondsFromGMT()
+        if seconds == 0 { return "GMT" }
         let sign = seconds < 0 ? "-" : "+"
         let hours = abs(seconds) / 3600
         let minutes = (abs(seconds) % 3600) / 60
-        let offset = minutes == 0 ? "GMT\(sign)\(hours)" : String(format: "GMT%@%d:%02d", sign, hours, minutes)
+        return minutes == 0 ? "GMT\(sign)\(hours)" : String(format: "GMT%@%d:%02d", sign, hours, minutes)
+    }
+
+    private func localTime(_ identifier: String) -> String {
+        guard let tz = TimeZone(identifier: identifier) else { return "" }
         let fmt = DateFormatter()
         fmt.timeZone = tz
         fmt.timeStyle = .short
         fmt.dateStyle = .none
-        return "\(offset) · \(fmt.string(from: Date()))"
+        return fmt.string(from: Date())
     }
 }
 
