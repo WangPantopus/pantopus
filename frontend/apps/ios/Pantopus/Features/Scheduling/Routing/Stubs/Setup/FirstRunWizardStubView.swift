@@ -36,7 +36,7 @@ struct FirstRunWizardStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "A2", title: "Set Up Booking Link", stream: "I1")
+        FirstRunWizardScreen(owner: viewModel.owner)
     }
 }
 

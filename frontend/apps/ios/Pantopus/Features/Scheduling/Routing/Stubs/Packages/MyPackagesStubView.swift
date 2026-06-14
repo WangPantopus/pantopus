@@ -4,15 +4,15 @@
 //
 //  Foundation (I0b) routed stub — G11 My Packages · Stream I15.
 //  Placeholder for the I15 feature stream to replace. The init is
-//  wired with `push`; the route/router are frozen. (Customer-facing, so
-//  no owner payload.)
+//  wired with `push`; the route/router are frozen. Customer self-service
+//  route — no owner context.
 //
 //
 
 import SwiftUI
 
 /// Routed-screen view-model stub for G11 (My Packages). Stream I15 replaces
-/// the body.
+/// the body; `push` navigates deeper scheduling routes.
 @Observable
 @MainActor
 final class MyPackagesStubViewModel {
