@@ -10,8 +10,8 @@
 
 import SwiftUI
 
-/// Routed-screen view-model stub for G8 (Packages). Stream I15 replaces the
-/// body; `push` navigates deeper scheduling routes.
+/// Routed-screen view-model stub for G8 (Packages). Stream I15 replaces
+/// the body; `push` navigates deeper scheduling routes.
 @Observable
 @MainActor
 final class PackagesListStubViewModel {

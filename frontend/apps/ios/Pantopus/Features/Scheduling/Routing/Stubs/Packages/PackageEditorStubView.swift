@@ -10,8 +10,8 @@
 
 import SwiftUI
 
-/// Routed-screen view-model stub for G9 (Package Editor). `packageId` is nil
-/// when creating a new package. Stream I15 replaces the body.
+/// Routed-screen view-model stub for G9 (Package Editor). Stream I15 replaces
+/// the body; `push` navigates deeper scheduling routes.
 @Observable
 @MainActor
 final class PackageEditorStubViewModel {
