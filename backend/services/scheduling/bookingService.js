@@ -378,8 +378,18 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
   assertTransition(ctx.booking, ['pending', 'confirmed'], 'reschedule');
   const { booking, eventType, page } = ctx;
+  const mode = (eventType && eventType.assignment_mode) || 'one_on_one';
   if (actorRole === 'invitee' && eventType && eventType.allow_invitee_reschedule === false) {
     throw new BookingError('This booking cannot be rescheduled by the guest.', 403, 'INVITEE_RESCHEDULE_DISABLED');
+  }
+  // Enforce the reschedule cutoff for guest-initiated moves (the policy the invitee was shown).
+  // Host/system reschedules are not gated. Uses the frozen policy snapshot to match the UI deadline.
+  if (actorRole === 'invitee') {
+    const policy = booking.policy_snapshot || {};
+    const cutoffMin = policy.reschedule_cutoff_min != null ? policy.reschedule_cutoff_min : (eventType && eventType.reschedule_cutoff_min) || 0;
+    if (cutoffMin > 0 && Date.now() > Date.parse(booking.start_at) - cutoffMin * MIN_MS) {
+      throw new BookingError('It is too late to reschedule this booking.', 409, 'RESCHEDULE_CUTOFF_PASSED');
+    }
   }
   const durationMs = Date.parse(booking.end_at) - Date.parse(booking.start_at);
   const newStartMs = new Date(newStartIso).getTime();
@@ -399,13 +409,16 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
     viewerTimezone: booking.invitee_timezone,
     excludeBookingId: booking.id, // don't let the booking block its own new (possibly overlapping) time
   });
-  if (!avail.available && (eventType.assignment_mode || 'one_on_one') !== 'round_robin') {
-    // For round-robin we may switch hosts below; for others the slot must be free.
-    throw new BookingError('That time is not available.', 409, 'SLOT_UNAVAILABLE');
+  if (!avail.available) {
+    // Round-robin may switch to a different eligible host below, but only if SOME host is free;
+    // for every other mode (and round-robin with no eligible host) the slot must be free.
+    if (mode !== 'round_robin' || !avail.eligibleHosts.length) {
+      throw new BookingError('That time is not available.', 409, 'SLOT_UNAVAILABLE');
+    }
   }
 
   let nextHost = booking.host_user_id;
-  if ((eventType.assignment_mode || 'one_on_one') === 'round_robin') {
+  if (mode === 'round_robin') {
     const eligible = requestedHostId && avail.eligibleHosts.includes(requestedHostId) ? [requestedHostId] : avail.eligibleHosts;
     nextHost = (await pickRoundRobinHost(eventType.id, eligible)) || booking.host_user_id;
   }
@@ -428,7 +441,7 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
     throw new BookingError('Could not reschedule.', 500, 'RESCHEDULE_FAILED');
   }
   // Round-robin fairness: count the rotation against the newly-assigned host.
-  if ((eventType.assignment_mode || 'one_on_one') === 'round_robin' && nextHost && nextHost !== booking.host_user_id) {
+  if (mode === 'round_robin' && nextHost && nextHost !== booking.host_user_id) {
     await bumpAssigneeRotation(eventType.id, nextHost);
   }
   await notify.notifyBookingEvent({ booking: updated, eventType, page, kind: 'rescheduled' });
