@@ -43,6 +43,7 @@ struct WeeklyHoursEditorView: View {
             }
             .sheet(item: $viewModel.activeSheet) { sheet in
                 sheetContent(sheet)
+                    .presentationDragIndicator(.visible)
             }
             .alert("Couldn't save", isPresented: saveErrorPresented) {
                 Button("OK", role: .cancel) {}

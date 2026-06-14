@@ -76,6 +76,7 @@ struct BookingLimitsView: View {
             Stepper(value: $viewModel.minNoticeHours, in: 0...168) {
                 labelValue("Minimum notice", "\(viewModel.minNoticeHours) \(viewModel.minNoticeHours == 1 ? "hour" : "hours")")
             }
+            .accessibilityIdentifier("scheduling.bookingLimits.minNoticeStepper")
             Text("Can't be booked inside this window.")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -87,6 +88,7 @@ struct BookingLimitsView: View {
             Stepper(value: $viewModel.horizonDays, in: 1...730) {
                 labelValue("Book up to", "\(viewModel.horizonDays) days")
             }
+            .accessibilityIdentifier("scheduling.bookingLimits.horizonStepper")
             if viewModel.windowConflict {
                 Text("Your booking window is shorter than your minimum notice, so no times will show.")
                     .pantopusTextStyle(.caption)
@@ -101,20 +103,24 @@ struct BookingLimitsView: View {
                 Text("Max per day").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
             }
             .tint(Theme.Color.primary600)
+            .accessibilityIdentifier("scheduling.bookingLimits.dailyCapToggle")
             if viewModel.limitPerDay {
                 Stepper(value: $viewModel.dailyCap, in: 1...50) {
                     labelValue("Bookings per day", "\(viewModel.dailyCap)")
                 }
+                .accessibilityIdentifier("scheduling.bookingLimits.dailyCapStepper")
             }
             Divider().background(Theme.Color.appBorderSubtle)
             Toggle(isOn: $viewModel.limitPerPerson) {
                 Text("Per-person limit").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
             }
             .tint(Theme.Color.primary600)
+            .accessibilityIdentifier("scheduling.bookingLimits.perPersonToggle")
             if viewModel.limitPerPerson {
                 Stepper(value: $viewModel.perBookerCap, in: 1...20) {
                     labelValue("Bookings per person", "\(viewModel.perBookerCap)")
                 }
+                .accessibilityIdentifier("scheduling.bookingLimits.perPersonStepper")
             }
         }
     }
@@ -127,6 +133,7 @@ struct BookingLimitsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .accessibilityIdentifier("scheduling.bookingLimits.slotInterval")
             Text("How often a booking can start.")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)

@@ -8,10 +8,18 @@
 //  Owner-scoped (personal sky by default, or the event type's pillar when
 //  opened as a per-type override from I2).
 //
-//  NOTE (Foundation contract limitation): `UpdateEventTypeRequest` encodes
-//  with `encodeIfPresent`, so a nil numeric field is OMITTED, not sent as
-//  null. Turning a cap OFF therefore cannot CLEAR an existing server-side
-//  cap through this PUT — it just stops sending it. Flagged for Foundation.
+//  Saving is PER-FIELD-DIRTY: only the fields the user actually changed are
+//  put in the request body, so opening the sheet to tweak one control can
+//  never silently rewrite an untouched value the UI can't faithfully
+//  represent (e.g. a sub-hour `min_notice_min` or a non-60/30/15
+//  `slot_interval_min`).
+//
+//  Clearing a cap (toggling `daily_cap`/`per_booker_cap` off) can't be
+//  expressed: the Foundation `UpdateEventTypeRequest` encodes with
+//  `encodeIfPresent`, so a nil field is OMITTED, not sent as JSON `null`,
+//  and the backend leaves omitted fields untouched. Rather than report a
+//  false success, we surface a clear message and resync. (A proper fix needs
+//  a tri-state encoder in Foundation — flagged.)
 //
 
 import Observation
@@ -74,6 +82,14 @@ final class BookingLimitsViewModel {
     private let client: SchedulingClient
     private var baselineSignature: String?
 
+    // Raw loaded values, so per-field-dirty save never clobbers a value the
+    // UI can't faithfully represent.
+    private var loadedMinNoticeMin: Int?
+    private var loadedHorizonDays: Int?
+    private var loadedSlotIntervalMin: Int?
+    private var loadedDailyCap: Int?
+    private var loadedPerBookerCap: Int?
+
     init(owner: SchedulingOwner, eventTypeId: String, client: SchedulingClient = .shared) {
         self.owner = owner
         self.eventTypeId = eventTypeId
@@ -129,7 +145,16 @@ final class BookingLimitsViewModel {
 
     private func apply(_ eventType: EventTypeDTO) {
         eventTypeName = eventType.name
-        if let notice = eventType.minNoticeMin { minNoticeHours = max(0, notice / 60) }
+        loadedMinNoticeMin = eventType.minNoticeMin
+        loadedHorizonDays = eventType.maxHorizonDays
+        loadedSlotIntervalMin = eventType.slotIntervalMin
+        loadedDailyCap = eventType.dailyCap
+        loadedPerBookerCap = eventType.perBookerCap
+
+        // Round (not truncate) so a 90-min notice reads as ~2h rather than 1h.
+        if let notice = eventType.minNoticeMin {
+            minNoticeHours = max(0, Int((Double(notice) / 60).rounded()))
+        }
         if let horizon = eventType.maxHorizonDays { horizonDays = max(1, horizon) }
         if let cap = eventType.dailyCap { limitPerDay = true
             dailyCap = max(1, cap)
@@ -142,23 +167,64 @@ final class BookingLimitsViewModel {
 
     // MARK: Save
 
-    /// Returns true on a successful save so the View can dismiss.
+    /// Returns true on a successful save so the View can dismiss. Builds the
+    /// request from only the fields the user changed.
     func save() async -> Bool {
         guard canSave else { return false }
         isSaving = true
         defer { isSaving = false }
-        let request = UpdateEventTypeRequest(
-            minNoticeMin: minNoticeHours * 60,
-            maxHorizonDays: horizonDays,
-            slotIntervalMin: slotInterval.rawValue,
-            dailyCap: limitPerDay ? dailyCap : nil,
-            perBookerCap: limitPerPerson ? perBookerCap : nil
-        )
+
+        var request = UpdateEventTypeRequest()
+        var hasChanges = false
+
+        let noticeMin = minNoticeHours * 60
+        if noticeMin != loadedMinNoticeMin {
+            request.minNoticeMin = noticeMin
+            hasChanges = true
+        }
+        if horizonDays != loadedHorizonDays {
+            request.maxHorizonDays = horizonDays
+            hasChanges = true
+        }
+        if slotInterval.rawValue != loadedSlotIntervalMin {
+            request.slotIntervalMin = slotInterval.rawValue
+            hasChanges = true
+        }
+
+        // Caps: a numeric value can be set/raised/lowered, but a removal
+        // (set → off) can't be expressed via the partial PUT.
+        var clearRequested = false
+        let desiredDaily: Int? = limitPerDay ? dailyCap : nil
+        if desiredDaily != loadedDailyCap {
+            if let value = desiredDaily { request.dailyCap = value
+                hasChanges = true
+            } else { clearRequested = true }
+        }
+        let desiredPerBooker: Int? = limitPerPerson ? perBookerCap : nil
+        if desiredPerBooker != loadedPerBookerCap {
+            if let value = desiredPerBooker { request.perBookerCap = value
+                hasChanges = true
+            } else { clearRequested = true }
+        }
+
         do {
-            _ = try await client.request(
-                SchedulingEndpoints.updateEventType(owner: owner, id: eventTypeId, request),
-                as: EventTypeResponse.self
-            )
+            if hasChanges {
+                _ = try await client.request(
+                    SchedulingEndpoints.updateEventType(owner: owner, id: eventTypeId, request),
+                    as: EventTypeResponse.self
+                )
+            }
+            if clearRequested {
+                // The omitted-field PUT can't clear a cap; be honest and resync.
+                saveError = "Removing a limit isn't supported yet — any other changes were saved."
+                await fetch()
+                return false
+            }
+            loadedMinNoticeMin = noticeMin
+            loadedHorizonDays = horizonDays
+            loadedSlotIntervalMin = slotInterval.rawValue
+            loadedDailyCap = desiredDaily
+            loadedPerBookerCap = desiredPerBooker
             baselineSignature = signature()
             return true
         } catch let error as SchedulingError {

@@ -95,7 +95,7 @@ struct DateOverridesView: View {
                 DatePicker(
                     "Until",
                     selection: $viewModel.rangeEndDate,
-                    in: viewModel.selectedDate...,
+                    in: viewModel.selectedDate...viewModel.maxRangeEnd,
                     displayedComponents: .date
                 )
                 .tint(Theme.Color.primary600)
