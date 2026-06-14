@@ -54,7 +54,7 @@ struct SchedulingNotificationPrefsScreen: View {
 
                 sectionOverline("Scheduling & bookings")
 
-                NotifCategoryCard(label: "Notify me", accent: accent, accentBg: accentBg, opacity: model.paused ? 0.55 : 1, disabled: model.paused, helper: "Only you see these. Pick the channel for each event.") {
+                NotifCategoryCard(label: "Notify me", accent: accent, accentBg: accentBg, opacity: model.paused ? 0.55 : 1, disabled: model.paused, helper: "Only you see these. Pick the channel for each event.", smsHint: model.showSmsHint, onSmsTap: { model.showSmsHint.toggle() }) {
                     ForEach(Array(model.notifyMe.enumerated()), id: \.element.id) { idx, row in
                         NotifMatrixRow(
                             row: row,
@@ -167,12 +167,12 @@ struct SchedulingNotificationPrefsScreen: View {
                 .frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Notifications paused").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.warning)
-                    Text("Booking alerts are off while paused").font(.system(size: 11.5)).foregroundStyle(Theme.Color.warning)
+                    Text("Emergency alerts still come through").font(.system(size: 11.5)).foregroundStyle(Theme.Color.warning)
                 }
                 Spacer(minLength: Spacing.s2)
             }
             .padding(.horizontal, 14).padding(.vertical, Spacing.s3)
-            .background(Theme.Color.warningBg.opacity(0.5))
+            .background(Theme.Color.warningBg)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.warningLight, lineWidth: 1))
         }
@@ -333,6 +333,9 @@ struct NotifCategoryCard<Content: View>: View {
     var opacity: Double = 1
     var disabled: Bool = false
     var helper: String?
+    /// When true, a small "SMS coming soon" tooltip floats above the S column.
+    var smsHint: Bool = false
+    var onSmsTap: (() -> Void)?
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -345,6 +348,13 @@ struct NotifCategoryCard<Content: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
             .opacity(opacity)
+            .overlay(alignment: .topTrailing) {
+                if smsHint {
+                    smsTooltip
+                        .padding(.trailing, 10)
+                        .offset(y: -18)
+                }
+            }
             if let helper {
                 Text(helper).font(.system(size: 11.5)).foregroundStyle(disabled ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary)
                     .padding(.horizontal, Spacing.s1).padding(.top, Spacing.s2)
@@ -366,11 +376,31 @@ struct NotifCategoryCard<Content: View>: View {
                     Icon(.lock, size: 8, strokeWidth: 2.6, color: Theme.Color.appBorderStrong)
                 }
                 .frame(width: 22)
+                .contentShape(Rectangle())
+                .onTapGesture { onSmsTap?() }
             }
         }
         .padding(.horizontal, Spacing.s4).padding(.top, 9).padding(.bottom, Spacing.s2)
         .background(accentBg)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1) }
+    }
+
+    private var smsTooltip: some View {
+        Text("SMS coming soon")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .background(Theme.Color.appText)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay(alignment: .bottomTrailing) {
+                Rectangle()
+                    .fill(Theme.Color.appText)
+                    .frame(width: 8, height: 8)
+                    .rotationEffect(.degrees(45))
+                    .offset(x: -14, y: 4)
+            }
+            .pantopusShadow(.lg)
+            .accessibilityHidden(true)
     }
 }
 

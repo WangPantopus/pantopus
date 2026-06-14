@@ -46,6 +46,8 @@ final class SchedulingNotificationPrefsModel {
 
     private(set) var pushOff = false
     private(set) var paused = false
+    /// Whether the "SMS coming soon" tooltip is showing over the locked S column.
+    var showSmsHint = false
 
     private let client = SchedulingClient.shared
     private let api = APIClient.shared
