@@ -36,7 +36,7 @@ struct SchedulingHubStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "A1", title: "Scheduling Hub", stream: "I1")
+        SchedulingHubScreen(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
