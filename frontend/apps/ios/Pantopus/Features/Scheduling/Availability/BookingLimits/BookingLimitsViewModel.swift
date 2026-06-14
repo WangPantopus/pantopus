@@ -23,7 +23,9 @@ enum SlotInterval: Int, CaseIterable, Identifiable {
     case halfHour = 30
     case every15 = 15
 
-    var id: Int { rawValue }
+    var id: Int {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -86,9 +88,17 @@ final class BookingLimitsViewModel {
         minNoticeHours > horizonDays * 24
     }
 
-    var isValid: Bool { !windowConflict }
-    var isDirty: Bool { signature() != baselineSignature }
-    var canSave: Bool { isValid && isDirty && !isSaving }
+    var isValid: Bool {
+        !windowConflict
+    }
+
+    var isDirty: Bool {
+        signature() != baselineSignature
+    }
+
+    var canSave: Bool {
+        isValid && isDirty && !isSaving
+    }
 
     // MARK: Load
 
@@ -97,7 +107,9 @@ final class BookingLimitsViewModel {
         await fetch()
     }
 
-    func reload() async { await fetch() }
+    func reload() async {
+        await fetch()
+    }
 
     private func fetch() async {
         phase = .loading
@@ -119,8 +131,12 @@ final class BookingLimitsViewModel {
         eventTypeName = eventType.name
         if let notice = eventType.minNoticeMin { minNoticeHours = max(0, notice / 60) }
         if let horizon = eventType.maxHorizonDays { horizonDays = max(1, horizon) }
-        if let cap = eventType.dailyCap { limitPerDay = true; dailyCap = max(1, cap) }
-        if let cap = eventType.perBookerCap { limitPerPerson = true; perBookerCap = max(1, cap) }
+        if let cap = eventType.dailyCap { limitPerDay = true
+            dailyCap = max(1, cap)
+        }
+        if let cap = eventType.perBookerCap { limitPerPerson = true
+            perBookerCap = max(1, cap)
+        }
         slotInterval = SlotInterval.from(minutes: eventType.slotIntervalMin)
     }
 

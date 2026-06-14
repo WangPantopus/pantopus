@@ -17,7 +17,9 @@ import SwiftUI
 final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
     // MARK: ListOfRowsDataSource chrome
 
-    var title: String { "Availability" }
+    var title: String {
+        "Availability"
+    }
 
     var topBarAction: TopBarAction? {
         TopBarAction(icon: .plus, accessibilityLabel: "New schedule") { [weak self] in
@@ -25,9 +27,15 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
         }
     }
 
-    var tabs: [ListOfRowsTab] { [] }
+    var tabs: [ListOfRowsTab] {
+        []
+    }
+
     var selectedTab: String = ""
-    var fab: FABAction? { nil }
+    var fab: FABAction? {
+        nil
+    }
+
     private(set) var state: ListOfRowsState = .loading
 
     // MARK: Local UI state (driven from the View)
@@ -66,8 +74,14 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
 
     // MARK: Load
 
-    func load() async { await fetch(showLoading: !isLoaded) }
-    func refresh() async { await fetch(showLoading: false) }
+    func load() async {
+        await fetch(showLoading: !isLoaded)
+    }
+
+    func refresh() async {
+        await fetch(showLoading: false)
+    }
+
     func loadMoreIfNeeded() async {}
 
     private func fetch(showLoading: Bool) async {
@@ -238,6 +252,7 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
                 template: .fileChevron,
                 leading: .icon(.calendarClock, tint: Theme.Color.primary600),
                 trailing: .kebab,
+                onTap: { [weak self] in Task { @MainActor in self?.push(.weeklyHoursEditor(scheduleId: scheduleId)) } },
                 onSecondary: { [weak self] in Task { @MainActor in self?.openMenu(schedule) } },
                 subtitleIcon: .clock,
                 inlineChip: isDefault
@@ -246,7 +261,7 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
                         tint: .custom(background: Theme.Color.primary600, foreground: Theme.Color.appTextInverse)
                     )
                     : nil
-            ) { [weak self] in Task { @MainActor in self?.push(.weeklyHoursEditor(scheduleId: scheduleId)) } }
+            )
         }
         state = .loaded(
             sections: [RowSection(id: "schedules", rows: rows, style: .card)],

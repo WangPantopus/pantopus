@@ -18,7 +18,9 @@ enum BlockRepeat: String, CaseIterable, Identifiable {
     case daily
     case weekly
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {

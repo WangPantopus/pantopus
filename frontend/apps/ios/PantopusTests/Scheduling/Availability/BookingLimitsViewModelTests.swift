@@ -5,8 +5,8 @@
 //  Stream I3 — B7 booking-limits projection tests.
 //
 
-@testable import Pantopus
 import XCTest
+@testable import Pantopus
 
 @MainActor
 final class BookingLimitsViewModelTests: XCTestCase {
