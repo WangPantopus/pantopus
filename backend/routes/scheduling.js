@@ -351,15 +351,15 @@ router.put('/event-types/:id', validate(eventTypePatchSchema), asyncHandler(asyn
 router.delete('/event-types/:id', asyncHandler(async (req, res) => {
   const et = await loadOwnedEventType(req);
   await assertCanManageOwner(et.owner_type, et.owner_id, req.user.id, 'edit');
-  // Refuse to delete with active upcoming bookings (preserve history / avoid orphaning).
+  // Refuse to hard-delete if ANY booking references this event type: Booking_event_type_id_fkey
+  // is ON DELETE CASCADE, so deleting would silently destroy past/paid booking history. Deactivate
+  // (is_active=false) instead to retire it while preserving the record.
   const { count } = await supabaseAdmin
     .from('Booking')
     .select('id', { count: 'exact', head: true })
-    .eq('event_type_id', et.id)
-    .in('status', ['pending', 'confirmed'])
-    .gte('start_at', new Date().toISOString());
+    .eq('event_type_id', et.id);
   if ((count || 0) > 0) {
-    return res.status(409).json({ error: 'HAS_UPCOMING_BOOKINGS', message: 'Cancel upcoming bookings before deleting, or deactivate instead.' });
+    return res.status(409).json({ error: 'HAS_BOOKINGS', message: 'This event type has booking history. Deactivate it instead of deleting.' });
   }
   await supabaseAdmin.from('EventType').delete().eq('id', et.id);
   res.json({ ok: true });
@@ -764,6 +764,19 @@ const findATimeSchema = Joi.object({
 router.post('/find-a-time', withOwner('view'), validate(findATimeSchema), asyncHandler(async (req, res) => {
   requireHome(req);
   const { ownerType, ownerId } = req.scheduling;
+  // Identity firewall: only compose the availability of ACTIVE members of this home. Without this,
+  // a home member could probe any user's personal free/busy by passing arbitrary UUIDs.
+  const { data: occ } = await supabaseAdmin
+    .from('HomeOccupancy')
+    .select('user_id')
+    .eq('home_id', ownerId)
+    .eq('is_active', true)
+    .in('user_id', req.body.member_ids);
+  const memberSet = new Set((occ || []).map((r) => r.user_id));
+  const invalidMembers = req.body.member_ids.filter((id) => !memberSet.has(id));
+  if (invalidMembers.length) {
+    return res.status(400).json({ error: 'INVALID_MEMBER', message: 'All members must belong to this home.', invalid: invalidMembers });
+  }
   // Synthesize an ephemeral event type for the compute call.
   const pseudoEventType = {
     id: null,
@@ -1240,10 +1253,31 @@ router.post('/bookings/:id/nudge', validate(Joi.object({ message: Joi.string().m
 router.post('/bookings/:id/propose-reschedule', validate(Joi.object({ start_at: Joi.string().isoDate().required(), host_user_id: Joi.string().uuid() })), asyncHandler((req, res) => lifecycleHandler(req, res, (b) => bookingService.proposeReschedule(b.id, req.user.id, req.body.start_at, req.body.host_user_id))));
 // Customer applies a package credit to their own booking (not owner-gated).
 router.post('/bookings/:id/apply-credit', validate(Joi.object({ credit_id: Joi.string().uuid().required() })), asyncHandler(async (req, res) => {
-  const { data: booking } = await supabaseAdmin.from('Booking').select('id, invitee_user_id, payment_id, package_credit_id').eq('id', req.params.id).maybeSingle();
+  const { data: booking } = await supabaseAdmin
+    .from('Booking')
+    .select('id, invitee_user_id, payment_id, package_credit_id, event_type_id, owner_type, owner_id, status')
+    .eq('id', req.params.id)
+    .maybeSingle();
   if (!booking) return res.status(404).json({ error: 'NOT_FOUND' });
   if (booking.invitee_user_id !== req.user.id) return res.status(403).json({ error: 'NOT_YOUR_BOOKING' });
   if (booking.package_credit_id) return res.status(409).json({ error: 'ALREADY_APPLIED' });
+  if (booking.payment_id) return res.status(409).json({ error: 'ALREADY_PAID', message: 'This booking is already being paid for.' });
+  if (!['pending', 'confirmed'].includes(booking.status)) return res.status(409).json({ error: 'BAD_STATE', message: 'This booking can no longer take a credit.' });
+  // The credit must come from a package sold by this booking's owner, and (if the package is scoped
+  // to a specific event type) must match that event type.
+  const { data: credit } = await supabaseAdmin
+    .from('PackageCredit')
+    .select('id, buyer_user_id, BookingPackage:package_id ( owner_type, owner_id, event_type_id )')
+    .eq('id', req.body.credit_id)
+    .maybeSingle();
+  if (!credit || credit.buyer_user_id !== req.user.id) return res.status(404).json({ error: 'CREDIT_NOT_FOUND' });
+  const pkg = credit.BookingPackage;
+  if (pkg && (pkg.owner_type !== booking.owner_type || pkg.owner_id !== booking.owner_id)) {
+    return res.status(400).json({ error: 'CREDIT_WRONG_OWNER', message: 'This credit cannot be used here.' });
+  }
+  if (pkg && pkg.event_type_id && pkg.event_type_id !== booking.event_type_id) {
+    return res.status(400).json({ error: 'CREDIT_WRONG_EVENT_TYPE', message: 'This credit is for a different appointment type.' });
+  }
   const result = await packages.redeemForBooking({ bookingId: booking.id, creditId: req.body.credit_id, userId: req.user.id });
   if (!result.success) return res.status(409).json({ error: result.error, message: result.message });
   res.json({ ok: true, remaining: result.remaining });

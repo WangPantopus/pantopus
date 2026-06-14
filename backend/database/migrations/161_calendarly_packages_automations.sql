@@ -232,7 +232,9 @@ DO $$ BEGIN
 END $$;
 
 -- Re-define wallet_credit to roll booking/package income into lifetime_received.
--- (Verbatim copy of the existing function with the lifetime_received CASE extended.)
+-- (Copy of the existing function with the lifetime_received CASE extended. The lifetime_withdrawals
+--  CASE from 097_fix_withdrawal_reversal_counter MUST be preserved here, or re-running this
+--  CREATE OR REPLACE silently reverts that fix.)
 CREATE OR REPLACE FUNCTION "public"."wallet_credit"(
   "p_user_id" "uuid", "p_amount" bigint, "p_type" character varying,
   "p_description" "text" DEFAULT NULL::"text", "p_payment_id" "uuid" DEFAULT NULL::"uuid",
@@ -280,6 +282,10 @@ BEGIN
       lifetime_deposits = CASE
         WHEN p_type = 'deposit' THEN lifetime_deposits + p_amount
         ELSE lifetime_deposits
+      END,
+      lifetime_withdrawals = CASE
+        WHEN p_type = 'withdrawal_reversal' THEN GREATEST(lifetime_withdrawals - p_amount, 0)
+        ELSE lifetime_withdrawals
       END,
       updated_at = now()
   WHERE id = v_wallet.id;
