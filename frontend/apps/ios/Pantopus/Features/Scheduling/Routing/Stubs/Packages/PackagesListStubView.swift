@@ -1,20 +1,20 @@
 //
-//  FirstRunWizardStubView.swift
+//  PackagesListStubView.swift
 //  Pantopus
 //
-//  Foundation (I0b) routed stub — A2 Set Up Booking Link · Stream I1.
-//  Placeholder for the I1 feature stream to replace. The init is
+//  Foundation (I0b) routed stub — G8 Packages · Stream I15.
+//  Placeholder for the I15 feature stream to replace. The init is
 //  wired with the route payload + `push`; the route/router are frozen.
 //
 //
 
 import SwiftUI
 
-/// Routed-screen view-model stub for A2 (Set Up Booking Link). Stream I1 replaces
+/// Routed-screen view-model stub for G8 (Packages). Stream I15 replaces
 /// the body; `push` navigates deeper scheduling routes.
 @Observable
 @MainActor
-final class FirstRunWizardStubViewModel {
+final class PackagesListStubViewModel {
     let owner: SchedulingOwner
     /// Pushes a deeper scheduling route onto the host navigation stack.
     let push: @MainActor (SchedulingRoute) -> Void
@@ -28,22 +28,22 @@ final class FirstRunWizardStubViewModel {
     }
 }
 
-struct FirstRunWizardStubView: View {
-    @State private var viewModel: FirstRunWizardStubViewModel
+struct PackagesListStubView: View {
+    @State private var viewModel: PackagesListStubViewModel
 
-    init(viewModel: FirstRunWizardStubViewModel) {
+    init(viewModel: PackagesListStubViewModel) {
         _viewModel = State(wrappedValue: viewModel)
     }
 
     var body: some View {
-        FirstRunWizardScreen(owner: viewModel.owner)
+        SchedulingStubScaffold(screenID: "G8", title: "Packages", stream: "I15")
     }
 }
 
 #if DEBUG
 #Preview {
     NavigationStack {
-        FirstRunWizardStubView(viewModel: FirstRunWizardStubViewModel(owner: .personal) { _ in })
+        PackagesListStubView(viewModel: PackagesListStubViewModel(owner: .personal) { _ in })
     }
 }
 #endif
