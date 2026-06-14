@@ -27,7 +27,7 @@ public final class BookingPageZeroStateViewModel {
     private let api: APIClient
     private var loadedOnce = false
 
-    public init(
+    init(
         owner: SchedulingOwner,
         api: APIClient = .shared,
         push: @escaping @MainActor (SchedulingRoute) -> Void

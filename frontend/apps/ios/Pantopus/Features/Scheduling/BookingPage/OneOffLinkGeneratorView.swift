@@ -243,7 +243,7 @@ private struct OfferTimesCard: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 } else {
                     ForEach(viewModel.slotOptions) { slot in
-                        SlotRow(
+                        OneOffSlotRow(
                             label: slot.label,
                             isSelected: viewModel.selectedSlotIds.contains(slot.id),
                             accent: viewModel.theme.accent
@@ -259,7 +259,7 @@ private struct OfferTimesCard: View {
     }
 }
 
-private struct SlotRow: View {
+private struct OneOffSlotRow: View {
     let label: String
     let isSelected: Bool
     let accent: Color
