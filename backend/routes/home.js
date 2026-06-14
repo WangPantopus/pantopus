@@ -5022,7 +5022,61 @@ router.get('/:id/events', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch events' });
     }
 
-    res.json({ events: data || [] });
+    const events = data || [];
+
+    // Calendarly: union confirmed/pending home bookings onto the household calendar.
+    // Query-time union — bookings are never copied into HomeCalendarEvent — so the calendar
+    // always reflects the live booking state. Gated on calendar.view (matching the Booking RLS)
+    // so the booking layer is not exposed more broadly than the existing event access.
+    // Degrades gracefully if scheduling tables are absent.
+    try {
+      const calAccess = await checkHomePermission(homeId, userId, 'calendar.view');
+      let bq = supabaseAdmin
+        .from('Booking')
+        .select('id, home_id, event_type_id, resource_id, host_user_id, invitee_name, start_at, end_at, status, location_detail, created_by')
+        .eq('owner_type', 'home')
+        .eq('owner_id', homeId)
+        .in('status', ['pending', 'confirmed']);
+      if (start_after) bq = bq.gte('start_at', start_after);
+      if (start_before) bq = bq.lte('start_at', start_before);
+      const { data: bookings } = calAccess.hasAccess ? await bq : { data: [] };
+
+      if (bookings && bookings.length) {
+        const etIds = [...new Set(bookings.map((b) => b.event_type_id).filter(Boolean))];
+        const etNames = {};
+        if (etIds.length) {
+          const { data: ets } = await supabaseAdmin.from('EventType').select('id, name').in('id', etIds);
+          for (const et of ets || []) etNames[et.id] = et.name;
+        }
+        for (const b of bookings) {
+          const baseTitle = b.event_type_id ? etNames[b.event_type_id] || 'Appointment' : 'Resource booking';
+          events.push({
+            id: b.id,
+            home_id: b.home_id,
+            event_type: b.resource_id ? 'resource_booking' : 'appointment',
+            title: b.invitee_name ? `${baseTitle} — ${b.invitee_name}` : baseTitle,
+            description: null,
+            start_at: b.start_at,
+            end_at: b.end_at,
+            location_notes: b.location_detail || null,
+            recurrence_rule: null,
+            assigned_to: b.host_user_id ? [b.host_user_id] : null,
+            alerts_enabled: true,
+            created_by: b.created_by,
+            visibility: 'members',
+            // Calendarly markers (extra fields; clients that don't read them ignore these):
+            source: 'booking',
+            booking_id: b.id,
+            booking_status: b.status,
+          });
+        }
+      }
+    } catch (unionErr) {
+      logger.warn('[home events] booking union skipped', { error: unionErr.message, homeId });
+    }
+
+    events.sort((a, b2) => new Date(a.start_at) - new Date(b2.start_at));
+    res.json({ events });
   } catch (err) {
     logger.error('Events fetch error', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch events' });
@@ -5040,7 +5094,7 @@ router.post('/:id/events', verifyToken, async (req, res) => {
     const access = await checkHomePermission(homeId, userId);
     if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
 
-    const { event_type, title, description, start_at, end_at, location_notes, recurrence_rule, assigned_to, alerts_enabled } = req.body;
+    const { event_type, title, description, start_at, end_at, location_notes, recurrence_rule, assigned_to, alerts_enabled, request_rsvp, reminders } = req.body;
 
     if (!event_type || !title || !start_at) {
       return res.status(400).json({ error: 'event_type, title, and start_at are required' });
@@ -5059,6 +5113,8 @@ router.post('/:id/events', verifyToken, async (req, res) => {
         recurrence_rule: recurrence_rule || null,
         assigned_to: assigned_to || null,
         alerts_enabled: alerts_enabled !== false,
+        request_rsvp: request_rsvp === true,
+        reminders: Array.isArray(reminders) ? reminders : [],
         created_by: userId,
       })
       .select()
@@ -5087,7 +5143,7 @@ router.put('/:id/events/:eventId', verifyToken, async (req, res) => {
     const access = await checkHomePermission(homeId, userId);
     if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
 
-    const allowed = ['title', 'description', 'event_type', 'start_at', 'end_at', 'location_notes', 'recurrence_rule', 'assigned_to', 'alerts_enabled'];
+    const allowed = ['title', 'description', 'event_type', 'start_at', 'end_at', 'location_notes', 'recurrence_rule', 'assigned_to', 'alerts_enabled', 'request_rsvp', 'reminders'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -5140,6 +5196,82 @@ router.delete('/:id/events/:eventId', verifyToken, async (req, res) => {
   } catch (err) {
     logger.error('Event delete error', { error: err.message });
     res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+/**
+ * GET /api/homes/:id/events/:eventId — event detail incl. attendee RSVPs.
+ */
+router.get('/:id/events/:eventId', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId, eventId } = req.params;
+    const access = await checkHomePermission(homeId, req.user.id);
+    if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
+    const { data: event } = await supabaseAdmin
+      .from('HomeCalendarEvent')
+      .select('*')
+      .eq('id', eventId)
+      .eq('home_id', homeId)
+      .maybeSingle();
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    const { data: attendees } = await supabaseAdmin
+      .from('HomeCalendarEventAttendee')
+      .select('user_id, rsvp_status, updated_at')
+      .eq('event_id', eventId);
+    res.json({ event, attendees: attendees || [] });
+  } catch (err) {
+    logger.error('Event detail error', { error: err.message });
+    res.status(500).json({ error: 'Failed to load event' });
+  }
+});
+
+/**
+ * POST /api/homes/:id/events/:eventId/rsvp — a member records their RSVP for a home event.
+ */
+router.post('/:id/events/:eventId/rsvp', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId, eventId } = req.params;
+    const userId = req.user.id;
+    const status = req.body && req.body.status;
+    if (!['going', 'maybe', 'declined', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'status must be going | maybe | declined | pending' });
+    }
+    const access = await checkHomePermission(homeId, userId);
+    if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
+    // Confirm the event belongs to this home.
+    const { data: event } = await supabaseAdmin
+      .from('HomeCalendarEvent')
+      .select('id')
+      .eq('id', eventId)
+      .eq('home_id', homeId)
+      .maybeSingle();
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    const { data: existing } = await supabaseAdmin
+      .from('HomeCalendarEventAttendee')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    let row;
+    if (existing) {
+      ({ data: row } = await supabaseAdmin
+        .from('HomeCalendarEventAttendee')
+        .update({ rsvp_status: status, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select('user_id, rsvp_status')
+        .single());
+    } else {
+      ({ data: row } = await supabaseAdmin
+        .from('HomeCalendarEventAttendee')
+        .insert({ event_id: eventId, user_id: userId, rsvp_status: status })
+        .select('user_id, rsvp_status')
+        .single());
+    }
+    res.json({ attendee: row });
+  } catch (err) {
+    logger.error('Event RSVP error', { error: err.message });
+    res.status(500).json({ error: 'Failed to record RSVP' });
   }
 });
 
