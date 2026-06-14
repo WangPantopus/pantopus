@@ -163,6 +163,7 @@ struct SetupPrimaryCTA: View {
     var owner: SchedulingOwner
     var height: CGFloat = 48
     var enabled: Bool = true
+    var fontSize: CGFloat = 14.5
     let action: () -> Void
 
     var body: some View {
@@ -171,7 +172,7 @@ struct SetupPrimaryCTA: View {
                 if let icon, !iconTrailing {
                     Icon(icon, size: 17, strokeWidth: 2.2, color: labelColor)
                 }
-                Text(title).font(.system(size: 14.5, weight: .bold)).tracking(-0.1).foregroundStyle(labelColor)
+                Text(title).font(.system(size: fontSize, weight: .bold)).tracking(-0.1).foregroundStyle(labelColor)
                 if let icon, iconTrailing {
                     Icon(icon, size: 16, color: labelColor)
                 }
@@ -276,7 +277,7 @@ enum SetupChipTone { case success, warning, primary, neutral
     var bg: Color {
         switch self {
         case .success: Theme.Color.successLight
-        case .warning: Theme.Color.warningBg
+        case .warning: Theme.Color.warmAmberBg
         case .primary: Theme.Color.primary50
         case .neutral: Theme.Color.appSurfaceSunken
         }
@@ -285,7 +286,7 @@ enum SetupChipTone { case success, warning, primary, neutral
     var fg: Color {
         switch self {
         case .success: Theme.Color.success
-        case .warning: Theme.Color.warning
+        case .warning: Theme.Color.warmAmber
         case .primary: Theme.Color.primary700
         case .neutral: Theme.Color.appTextStrong
         }

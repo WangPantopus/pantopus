@@ -33,6 +33,13 @@ final class SchedulingSettingsModel {
     private(set) var isDisabling = false
     private(set) var isResetting = false
 
+    /// Per-row write fidelity (matches the JSX 'saving'/'saved' frames): the row
+    /// id whose value is being written (shows a Shimmer in its trailing slot) and
+    /// the one that just succeeded (shows a green "Saved" chip briefly).
+    enum RowID: Equatable { case cancellationPolicy, defaultTimezone }
+    private(set) var savingRow: RowID?
+    private(set) var justSavedRow: RowID?
+
     private let client = SchedulingClient.shared
     private let api = APIClient.shared
 
@@ -148,6 +155,25 @@ final class SchedulingSettingsModel {
         Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             showSavedToast = false
+        }
+    }
+
+    /// Mark a settings row as actively writing: shows a Shimmer in its trailing
+    /// slot until `finishSavingRow` clears it. Matches the JSX 'saving' frame.
+    func beginSavingRow(_ row: RowID) {
+        justSavedRow = nil
+        savingRow = row
+    }
+
+    /// Resolve an in-flight row write: clear the Shimmer and briefly show the
+    /// green "Saved" chip in that row's trailing slot, plus the top toast.
+    func finishSavingRow(_ row: RowID) {
+        savingRow = nil
+        justSavedRow = row
+        flashSaved()
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if justSavedRow == row { justSavedRow = nil }
         }
     }
 }

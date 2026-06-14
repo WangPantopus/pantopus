@@ -93,7 +93,8 @@ struct WizardStepRail: View {
                 }
             }
             .frame(width: 22, height: 22)
-            .overlay(active ? Circle().stroke(accentBg, lineWidth: 2).padding(-2) : nil)
+            .overlay(active ? Circle().stroke(accent, lineWidth: 2) : nil)
+            .overlay(active ? Circle().stroke(accentBg, lineWidth: 2).frame(width: 26, height: 26) : nil)
             Text(step.1)
                 .font(.system(size: 9.5, weight: active ? .bold : .medium))
                 .foregroundStyle(active ? accent : (isDone ? Theme.Color.appTextStrong : Theme.Color.appTextMuted))
@@ -322,7 +323,7 @@ struct WizardTimezoneChip: View {
                 Icon(.chevronDown, size: 14, color: Theme.Color.primary700)
             }
             .padding(.horizontal, Spacing.s3).padding(.vertical, 9)
-            .background(accentBg)
+            .background(Theme.Color.primary50)
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Theme.Color.primary100, lineWidth: 1))
         }
@@ -423,7 +424,7 @@ struct WizardSuccessHero: View {
                     .padding(.horizontal, 11).padding(.vertical, 7)
                     .background(accentBg)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(Theme.Color.primary100, lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(accentBg, lineWidth: 1))
                 }
                 .accessibilityIdentifier("wizardSuccessCopy")
             }
