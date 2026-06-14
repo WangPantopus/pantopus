@@ -143,6 +143,48 @@ describe('bookingService.createResourceBooking guards', () => {
   });
 });
 
+describe('bookingService.rescheduleBooking policy guards', () => {
+  const bookingService = require('../../services/scheduling/bookingService');
+  const availabilityService = require('../../services/scheduling/availabilityService');
+  beforeEach(() => resetTables());
+  afterEach(() => jest.restoreAllMocks());
+
+  const seedBooking = (over) => seedTable('Booking', [{
+    id: 'b', event_type_id: 'et', status: 'confirmed',
+    start_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    end_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    policy_snapshot: {}, owner_type: 'user', owner_id: 'u1', host_user_id: 'u1',
+    ...over,
+  }]);
+  const farFuture = () => new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString();
+
+  it('rejects an invitee reschedule past the reschedule cutoff (server-side, not just UI)', async () => {
+    seedBooking({ policy_snapshot: { reschedule_cutoff_min: 120 } }); // start is 30 min out, cutoff 2h
+    seedTable('EventType', [{ id: 'et', assignment_mode: 'one_on_one', allow_invitee_reschedule: true, reschedule_cutoff_min: 120 }]);
+    await expect(
+      bookingService.rescheduleBooking('b', 'inv1', farFuture(), 'invitee')
+    ).rejects.toMatchObject({ code: 'RESCHEDULE_CUTOFF_PASSED', statusCode: 409 });
+  });
+
+  it('lets the host reschedule inside the cutoff window (cutoff gates guests only)', async () => {
+    seedBooking({ policy_snapshot: { reschedule_cutoff_min: 120 } });
+    seedTable('EventType', [{ id: 'et', assignment_mode: 'one_on_one', reschedule_cutoff_min: 120 }]);
+    jest.spyOn(availabilityService, 'isSlotAvailable').mockResolvedValue({ available: true, eligibleHosts: ['u1'] });
+    const newStart = farFuture();
+    const updated = await bookingService.rescheduleBooking('b', 'u1', newStart, 'host');
+    expect(updated.start_at).toBe(newStart);
+  });
+
+  it('rejects a round-robin reschedule when no host is free at the new time', async () => {
+    seedBooking({ owner_type: 'business', owner_id: 'biz1', host_user_id: 'h1', event_type_id: 'etrr' });
+    seedTable('EventType', [{ id: 'etrr', assignment_mode: 'round_robin' }]);
+    jest.spyOn(availabilityService, 'isSlotAvailable').mockResolvedValue({ available: false, eligibleHosts: [] });
+    await expect(
+      bookingService.rescheduleBooking('b', 'biz1', farFuture(), 'host')
+    ).rejects.toMatchObject({ code: 'SLOT_UNAVAILABLE', statusCode: 409 });
+  });
+});
+
 describe('bookingService.isOverlapViolation', () => {
   const bookingService = require('../../services/scheduling/bookingService');
   it('detects the exclusion-constraint SQLSTATE and constraint name', () => {
