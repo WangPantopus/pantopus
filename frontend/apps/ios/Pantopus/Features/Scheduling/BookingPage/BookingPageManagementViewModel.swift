@@ -42,11 +42,12 @@ public struct BookingServiceRow: Identifiable, Sendable, Equatable {
     public let isVisible: Bool
 }
 
-/// Render state for the management screen.
+/// Render state for the management screen. There is no `.empty` case: the
+/// page is auto-created server-side, so the form always loads (the page
+/// zero-state is the separate H16 screen).
 public enum BookingPageManagementState: Sendable, Equatable {
     case loading
     case loaded
-    case empty
     case error(message: String)
 }
 
@@ -385,8 +386,9 @@ public final class BookingPageManagementViewModel {
             } catch {
                 let scheduling = SchedulingError.from(error as? APIError ?? .invalidResponse)
                 if scheduling.code == "SLUG_TAKEN" {
+                    // Surface inline on the slug field only (avoid a duplicate
+                    // bottom error). saveError was cleared at the top of save().
                     slugState = .taken(suggestions: [])
-                    saveError = "That handle is taken. Try another."
                 } else {
                     saveError = scheduling.userMessage ?? "Couldn't save your handle."
                 }
@@ -430,12 +432,16 @@ public extension BookingPageManagementViewModel {
     // MARK: - C3 ShareLinkSheet callbacks
 
     /// Regenerate the public slug (danger — invalidates the old link).
+    /// Updates only slug-related state so unsaved header/intro edits survive.
     func regenerateLink() async {
         do {
             let response: BookingPageResponse = try await api.request(
                 SchedulingEndpoints.resetSlug(owner: owner)
             )
-            hydrate(from: response.page)
+            page = response.page
+            slugText = response.page.slug
+            original.slug = response.page.slug
+            slugState = .unchanged
         } catch {
             saveError = SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
                 ?? "Couldn't regenerate your link."

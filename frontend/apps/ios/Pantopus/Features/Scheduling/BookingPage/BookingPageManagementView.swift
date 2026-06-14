@@ -51,20 +51,6 @@ public struct BookingPageManagementView: View {
             ManagementLoadingView()
         case .loaded:
             form
-        case .empty:
-            EmptyState(
-                icon: .link,
-                headline: "Set up your booking link",
-                subcopy: "Create a link people can use to book time with you.",
-                cta: EmptyState.CTA(title: "Set up booking link") {
-                    await MainActor.run { viewModel.push(.firstRunWizard(owner: viewModel.owner)) }
-                },
-                tint: viewModel.theme.accentBg,
-                accent: viewModel.theme.accent
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Theme.Color.appBg)
-            .accessibilityIdentifier("bookingPageManagement.empty")
         case let .error(message):
             ManagementErrorView(message: message) { Task { await viewModel.refresh() } }
         }
@@ -165,18 +151,13 @@ public struct BookingPageManagementView: View {
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
-        case .oneOff:
-            OneOffLinkGeneratorView(owner: viewModel.owner)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
         }
     }
 
     enum ManagementSheet: Identifiable {
         case share
-        case oneOff
         var id: String {
-            self == .share ? "share" : "oneOff"
+            "share"
         }
     }
 
@@ -252,7 +233,7 @@ private struct SlugCard: View {
     var body: some View {
         BookingCard {
             CardOverline(text: "Your link")
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 Text("\(BookingLinkURL.displayOrigin)/book/")
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(Theme.Color.appTextSecondary)
@@ -335,7 +316,7 @@ private struct SuggestionChips: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("bookingPageManagement.slugSuggestion")
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
     }
 }

@@ -195,7 +195,7 @@ struct InlineNote: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(foreground)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s3)
         .background(background)

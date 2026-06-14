@@ -66,6 +66,21 @@ final class OneOffLinkGeneratorViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.generateError)
     }
 
+    func testLoadSlotsPopulatesOfferedTimes() async {
+        let viewModel = await loadedVM()
+        let slotsJSON = #"""
+        {"eventType":{"id":"et_1","name":"Intro call","slug":"intro","durations":[30]},
+        "timezone":"America/New_York","status":"active",
+        "slots":[{"start":"2026-07-01T16:00:00Z","end":"2026-07-01T16:30:00Z","startLocal":"2026-07-01T12:00:00-04:00"}]}
+        """#
+        SequencedURLProtocol.sequence = [.status(200, body: slotsJSON)]
+        await viewModel.loadSlots()
+        XCTAssertEqual(viewModel.slotOptions.count, 1)
+        XCTAssertEqual(viewModel.slotOptions.first?.start, "2026-07-01T16:00:00Z")
+        viewModel.toggleSlot("2026-07-01T16:00:00Z")
+        XCTAssertTrue(viewModel.selectedSlotIds.contains("2026-07-01T16:00:00Z"))
+    }
+
     func testExpiryMinutesMapping() {
         XCTAssertEqual(OneOffExpiry.h24.minutes, 1440)
         XCTAssertEqual(OneOffExpiry.d7.minutes, 10080)
