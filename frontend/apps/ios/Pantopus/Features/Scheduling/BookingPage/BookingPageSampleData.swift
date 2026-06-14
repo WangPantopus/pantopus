@@ -14,7 +14,7 @@ import Foundation
 enum BookingPageSampleData {
     private static let decoder = JSONDecoder()
 
-    private static func decode<T: Decodable>(_ type: T.Type, _ json: String) -> T {
+    private static func decode<T: Decodable>(_: T.Type, _ json: String) -> T {
         // swiftlint:disable:next force_try
         try! decoder.decode(T.self, from: Data(json.utf8))
     }

@@ -301,7 +301,7 @@ private struct PreviewLoadingView: View {
                 Shimmer(width: 72, height: 72, cornerRadius: Radii.pill)
                 Shimmer(width: 160, height: 16)
                 Shimmer(width: 120, height: 12)
-                ForEach(0 ..< 3, id: \.self) { _ in
+                ForEach(0..<3, id: \.self) { _ in
                     Shimmer(height: 64, cornerRadius: Radii.lg)
                 }
             }

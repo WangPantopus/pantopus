@@ -91,7 +91,9 @@ enum BookingLinkActions {
             let root = scene.keyWindow?.rootViewController
         else { return }
         var top = root
-        while let presented = top.presentedViewController { top = presented }
+        while let presented = top.presentedViewController {
+            top = presented
+        }
         let activity = UIActivityViewController(activityItems: items, applicationActivities: nil)
         activity.popoverPresentationController?.sourceView = top.view
         top.present(activity, animated: true)

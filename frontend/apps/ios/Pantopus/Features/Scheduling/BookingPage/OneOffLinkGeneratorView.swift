@@ -291,7 +291,7 @@ private struct ExpiryCard: View {
             CardOverline(text: "Expires")
             FlowChips(
                 options: OneOffExpiry.allCases,
-                isSelected: { $0 == viewModel.expiry },
+                selected: viewModel.expiry,
                 label: \.label,
                 accent: viewModel.theme.accent
             ) { viewModel.expiry = $0 }
@@ -301,7 +301,7 @@ private struct ExpiryCard: View {
 
 private struct FlowChips<Option: Hashable>: View {
     let options: [Option]
-    let isSelected: (Option) -> Bool
+    let selected: Option
     let label: (Option) -> String
     let accent: Color
     let onSelect: (Option) -> Void
@@ -309,15 +309,15 @@ private struct FlowChips<Option: Hashable>: View {
     var body: some View {
         HStack(spacing: Spacing.s2) {
             ForEach(options, id: \.self) { option in
-                let selected = isSelected(option)
+                let isSelected = option == selected
                 Button { onSelect(option) } label: {
                     Text(label(option))
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(selected ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
+                        .foregroundStyle(isSelected ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
                         .padding(.horizontal, Spacing.s2)
                         .padding(.vertical, Spacing.s1)
                         .frame(maxWidth: .infinity)
-                        .background(selected ? accent : Theme.Color.appSurfaceSunken)
+                        .background(isSelected ? accent : Theme.Color.appSurfaceSunken)
                         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -413,7 +413,7 @@ private struct CopiedToast: View {
 private struct OneOffLoadingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            ForEach(0 ..< 3, id: \.self) { _ in
+            ForEach(0..<3, id: \.self) { _ in
                 Shimmer(height: 60, cornerRadius: Radii.lg)
             }
             Spacer()
@@ -445,15 +445,15 @@ private struct OneOffErrorView: View {
 
 #if DEBUG
 #Preview("Configuring") {
-    let viewModel = OneOffLinkGeneratorViewModel(owner: .personal, push: { _ in })
+    let viewModel = OneOffLinkGeneratorViewModel(owner: .personal) { _ in }
     viewModel.setStateForPreview(.configuring, options: [
-        OneOffEventTypeOption(id: "et_1", name: "Intro call", durationLabel: "30 min", icon: .video, slug: "intro"),
+        OneOffEventTypeOption(id: "et_1", name: "Intro call", durationLabel: "30 min", icon: .video, slug: "intro")
     ])
     return OneOffLinkGeneratorView(viewModel: viewModel)
 }
 
 #Preview("Generated") {
-    let viewModel = OneOffLinkGeneratorViewModel(owner: .personal, push: { _ in })
+    let viewModel = OneOffLinkGeneratorViewModel(owner: .personal) { _ in }
     viewModel.setStateForPreview(
         .generated(OneOffGeneratedLink(
             displayURL: "pantopus.com/book/o/abc123",

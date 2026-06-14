@@ -115,7 +115,7 @@ private struct ZeroStateErrorView: View {
 
 #if DEBUG
 #Preview("No services") {
-    let viewModel = BookingPageZeroStateViewModel(owner: .personal, push: { _ in })
+    let viewModel = BookingPageZeroStateViewModel(owner: .personal) { _ in }
     viewModel.setStateForPreview(.ready(hasEventTypes: false))
     return NavigationStack { BookingPageZeroStateView(viewModel: viewModel) }
 }
