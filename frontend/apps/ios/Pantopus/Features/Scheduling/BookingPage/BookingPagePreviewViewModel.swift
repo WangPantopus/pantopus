@@ -41,7 +41,9 @@ public final class BookingPagePreviewViewModel {
         self.api = api
     }
 
-    public var theme: SchedulingIdentityTheme { SchedulingIdentityTheme(owner) }
+    public var theme: SchedulingIdentityTheme {
+        SchedulingIdentityTheme(owner)
+    }
 
     public func load() async {
         if loadedOnce { return }
@@ -49,7 +51,9 @@ public final class BookingPagePreviewViewModel {
         await fetch()
     }
 
-    public func refresh() async { await fetch() }
+    public func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         do {
@@ -71,9 +75,10 @@ public final class BookingPagePreviewViewModel {
         case .paused, .expired, .unavailable:
             return .pageOff(page: view.page, status: view.status)
         case .active, .secret, .unknown:
-            return view.eventTypes.isEmpty
-                ? .allHidden(page: view.page)
-                : .rendered(page: view.page, eventTypes: view.eventTypes)
+            if view.eventTypes.isEmpty {
+                return .allHidden(page: view.page)
+            }
+            return .rendered(page: view.page, eventTypes: view.eventTypes)
         }
     }
 

@@ -29,15 +29,17 @@ public final class BookingPageZeroStateViewModel {
 
     public init(
         owner: SchedulingOwner,
-        push: @escaping @MainActor (SchedulingRoute) -> Void,
-        api: APIClient = .shared
+        api: APIClient = .shared,
+        push: @escaping @MainActor (SchedulingRoute) -> Void
     ) {
         self.owner = owner
-        self.push = push
         self.api = api
+        self.push = push
     }
 
-    public var theme: SchedulingIdentityTheme { SchedulingIdentityTheme(owner) }
+    public var theme: SchedulingIdentityTheme {
+        SchedulingIdentityTheme(owner)
+    }
 
     public func load() async {
         if loadedOnce { return }
@@ -45,7 +47,9 @@ public final class BookingPageZeroStateViewModel {
         await fetch()
     }
 
-    public func refresh() async { await fetch() }
+    public func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         do {

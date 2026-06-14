@@ -102,15 +102,17 @@ public final class OneOffLinkGeneratorViewModel {
 
     public init(
         owner: SchedulingOwner,
-        push: @escaping @MainActor (SchedulingRoute) -> Void,
-        api: APIClient = .shared
+        api: APIClient = .shared,
+        push: @escaping @MainActor (SchedulingRoute) -> Void
     ) {
         self.owner = owner
-        self.push = push
         self.api = api
+        self.push = push
     }
 
-    public var theme: SchedulingIdentityTheme { SchedulingIdentityTheme(owner) }
+    public var theme: SchedulingIdentityTheme {
+        SchedulingIdentityTheme(owner)
+    }
 
     public var selectedEventType: OneOffEventTypeOption? {
         eventTypeOptions.first { $0.id == selectedEventTypeId }
