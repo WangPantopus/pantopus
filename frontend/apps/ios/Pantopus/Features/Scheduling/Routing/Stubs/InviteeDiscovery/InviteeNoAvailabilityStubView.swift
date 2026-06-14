@@ -35,14 +35,20 @@ final class InviteeNoAvailabilityStubViewModel {
 }
 
 struct InviteeNoAvailabilityStubView: View {
-    @State private var viewModel: InviteeNoAvailabilityStubViewModel
+    private let viewModel: NoAvailabilityViewModel
 
-    init(viewModel: InviteeNoAvailabilityStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeNoAvailabilityStubViewModel) {
+        viewModel = NoAvailabilityViewModel(
+            slug: stub.slug,
+            eventTypeSlug: stub.eventTypeSlug,
+            tz: stub.tz,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "C8", title: "No Availability", stream: "I5")
+        NoAvailabilityView(viewModel: viewModel)
     }
 }
 
