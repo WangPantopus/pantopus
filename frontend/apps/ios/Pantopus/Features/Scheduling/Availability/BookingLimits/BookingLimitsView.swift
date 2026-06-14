@@ -2,9 +2,10 @@
 //  BookingLimitsView.swift
 //  Pantopus
 //
-//  Stream I3 — B7 Booking Limits & Notice Rules (sheet). Numeric stepper +
-//  segmented controls for the event type's notice/limit fields, with the
-//  window-shorter-than-notice conflict state that disables Done.
+//  Stream I3 — B7 Booking Limits & Notice Rules (sheet). One white card per
+//  rule: a label, a one-line caption explaining the effect, and a numeric
+//  stepper with a unit suffix (or a segmented control). The window-shorter-
+//  than-notice conflict outlines in error red and disables Done.
 //
 
 import SwiftUI
@@ -58,7 +59,8 @@ struct BookingLimitsView: View {
             helper
             noticeGroup
             windowGroup
-            limitsGroup
+            dailyCapGroup
+            perPersonGroup
             startTimesGroup
         }
     }
@@ -72,61 +74,49 @@ struct BookingLimitsView: View {
     }
 
     private var noticeGroup: some View {
-        FormFieldGroup("Minimum notice") {
+        ruleCard("Minimum notice", caption: "Can't be booked inside this window.") {
             Stepper(value: $viewModel.minNoticeHours, in: 0...168) {
-                labelValue("Minimum notice", "\(viewModel.minNoticeHours) \(viewModel.minNoticeHours == 1 ? "hour" : "hours")")
+                valueLabel("\(viewModel.minNoticeHours) \(viewModel.minNoticeHours == 1 ? "hour" : "hours")")
             }
             .accessibilityIdentifier("scheduling.bookingLimits.minNoticeStepper")
-            Text("Can't be booked inside this window.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
         }
     }
 
     private var windowGroup: some View {
-        FormFieldGroup("Booking window") {
+        ruleCard(
+            "Book up to",
+            caption: "How far ahead people can book.",
+            error: viewModel.windowConflict
+                ? "Your booking window is shorter than your minimum notice, so no times will show."
+                : nil
+        ) {
             Stepper(value: $viewModel.horizonDays, in: 1...730) {
-                labelValue("Book up to", "\(viewModel.horizonDays) days")
+                valueLabel("\(viewModel.horizonDays) days")
             }
             .accessibilityIdentifier("scheduling.bookingLimits.horizonStepper")
-            if viewModel.windowConflict {
-                Text("Your booking window is shorter than your minimum notice, so no times will show.")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.error)
-            }
         }
     }
 
-    private var limitsGroup: some View {
-        FormFieldGroup("Limits") {
-            Toggle(isOn: $viewModel.limitPerDay) {
-                Text("Max per day").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
+    private var dailyCapGroup: some View {
+        ruleCard("Max per day", caption: "The most bookings you'll take in a day.") {
+            Stepper(value: $viewModel.dailyCap, in: 1...50) {
+                valueLabel("\(viewModel.dailyCap)")
             }
-            .tint(Theme.Color.primary600)
-            .accessibilityIdentifier("scheduling.bookingLimits.dailyCapToggle")
-            if viewModel.limitPerDay {
-                Stepper(value: $viewModel.dailyCap, in: 1...50) {
-                    labelValue("Bookings per day", "\(viewModel.dailyCap)")
-                }
-                .accessibilityIdentifier("scheduling.bookingLimits.dailyCapStepper")
+            .accessibilityIdentifier("scheduling.bookingLimits.dailyCapStepper")
+        }
+    }
+
+    private var perPersonGroup: some View {
+        ruleCard("Per-person limit", caption: "How many times one person can book.") {
+            Stepper(value: $viewModel.perBookerCap, in: 1...20) {
+                valueLabel("\(viewModel.perBookerCap) \(viewModel.perBookerCap == 1 ? "booking" : "bookings")")
             }
-            Divider().background(Theme.Color.appBorderSubtle)
-            Toggle(isOn: $viewModel.limitPerPerson) {
-                Text("Per-person limit").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
-            }
-            .tint(Theme.Color.primary600)
-            .accessibilityIdentifier("scheduling.bookingLimits.perPersonToggle")
-            if viewModel.limitPerPerson {
-                Stepper(value: $viewModel.perBookerCap, in: 1...20) {
-                    labelValue("Bookings per person", "\(viewModel.perBookerCap)")
-                }
-                .accessibilityIdentifier("scheduling.bookingLimits.perPersonStepper")
-            }
+            .accessibilityIdentifier("scheduling.bookingLimits.perPersonStepper")
         }
     }
 
     private var startTimesGroup: some View {
-        FormFieldGroup("Start times") {
+        ruleCard("Start times", caption: "Where start times land in the hour.") {
             Picker("Start times", selection: $viewModel.slotInterval) {
                 ForEach(SlotInterval.allCases) { interval in
                     Text(interval.label).tag(interval)
@@ -134,28 +124,40 @@ struct BookingLimitsView: View {
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier("scheduling.bookingLimits.slotInterval")
-            Text("How often a booking can start.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
         }
     }
 
-    private func labelValue(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label)
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appText)
-            Spacer()
-            Text(value)
-                .pantopusTextStyle(.body)
+    // MARK: Building blocks
+
+    private func ruleCard(
+        _ label: String,
+        caption: String,
+        error: String? = nil,
+        @ViewBuilder control: () -> some View
+    ) -> some View {
+        FormFieldGroup(label) {
+            control()
+            Text(caption)
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
+            if let error {
+                Text(error)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.error)
+            }
         }
+    }
+
+    private func valueLabel(_ value: String) -> some View {
+        Text(value)
+            .pantopusTextStyle(.body)
+            .foregroundStyle(Theme.Color.appText)
     }
 
     private var loadingSkeleton: some View {
         ScrollView {
             VStack(spacing: Spacing.s5) {
-                ForEach(0..<4, id: \.self) { _ in
+                ForEach(0..<5, id: \.self) { _ in
                     Shimmer(height: 64, cornerRadius: Radii.lg)
                         .padding(.horizontal, Spacing.s4)
                 }

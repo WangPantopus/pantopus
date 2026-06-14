@@ -125,7 +125,7 @@ struct WeekdayHoursRow: View {
             } label: {
                 HStack(spacing: Spacing.s1) {
                     Icon(.copy, size: 13, color: Theme.Color.appTextSecondary)
-                    Text("Copy to…")
+                    Text("Copy to other days")
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
@@ -152,7 +152,7 @@ struct NoHoursWarningCard: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.appText)
             }
-            Text("People can't book you until you add at least one.")
+            Text("People can't book you until you add at least one block.")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             Button(action: onUseDefault) {
