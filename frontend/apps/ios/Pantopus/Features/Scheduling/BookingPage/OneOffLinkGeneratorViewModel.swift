@@ -100,7 +100,7 @@ public final class OneOffLinkGeneratorViewModel {
     private var loadedOnce = false
     private let timeZoneIdentifier = SchedulingTime.deviceTimeZoneIdentifier
 
-    public init(
+    init(
         owner: SchedulingOwner,
         api: APIClient = .shared,
         push: @escaping @MainActor (SchedulingRoute) -> Void

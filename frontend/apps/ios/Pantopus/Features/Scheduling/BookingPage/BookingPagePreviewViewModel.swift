@@ -31,7 +31,7 @@ public final class BookingPagePreviewViewModel {
     private let api: APIClient
     private var loadedOnce = false
 
-    public init(
+    init(
         owner: SchedulingOwner,
         slug: String,
         api: APIClient = .shared
