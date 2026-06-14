@@ -39,7 +39,9 @@ struct BookingLimitsStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B7", title: "Booking Limits", stream: "I3")
+        BookingLimitsView(
+            viewModel: BookingLimitsViewModel(owner: viewModel.owner, eventTypeId: viewModel.eventTypeId)
+        )
     }
 }
 
