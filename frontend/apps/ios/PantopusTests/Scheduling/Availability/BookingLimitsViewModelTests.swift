@@ -29,6 +29,13 @@ final class BookingLimitsViewModelTests: XCTestCase {
      "assignees":[],"questions":[]}
     """
 
+    /// An event type with NO caps set (daily_cap / per_booker_cap absent → null).
+    private static let detailNoCaps = """
+    {"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30],
+     "min_notice_min":240,"max_horizon_days":30,"slot_interval_min":30},
+     "assignees":[],"questions":[]}
+    """
+
     private static let updated = #"{"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30]}}"#
 
     func testLoadAppliesFields() async {
@@ -41,9 +48,7 @@ final class BookingLimitsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.minNoticeHours, 4) // 240 / 60
         XCTAssertEqual(viewModel.horizonDays, 30)
         XCTAssertEqual(viewModel.slotInterval, .halfHour)
-        XCTAssertTrue(viewModel.limitPerDay)
         XCTAssertEqual(viewModel.dailyCap, 5)
-        XCTAssertTrue(viewModel.limitPerPerson)
         XCTAssertEqual(viewModel.perBookerCap, 2)
         XCTAssertFalse(viewModel.isDirty)
         XCTAssertFalse(viewModel.windowConflict)
@@ -93,19 +98,37 @@ final class BookingLimitsViewModelTests: XCTestCase {
         XCTAssertNil(json["per_booker_cap"])
     }
 
-    /// Turning a previously-set cap OFF can't be persisted (omitted != null), so
-    /// save must report failure (not a false success) and resync.
-    func testCapClearReportsUnsupported() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.detail), .status(200, body: Self.detail)]
+    /// Moving a cap stepper sends the new cap.
+    func testCapChangeIsSent() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.detail), .status(200, body: Self.updated)]
         let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
         await viewModel.load()
-        XCTAssertTrue(viewModel.limitPerDay)
-        viewModel.limitPerDay = false // attempt to clear the daily cap
-        XCTAssertTrue(viewModel.isDirty)
-        let ok = await viewModel.save()
-        XCTAssertFalse(ok)
-        XCTAssertNotNil(viewModel.saveError)
-        XCTAssertTrue(viewModel.limitPerDay) // reverted by resync — UI matches server
+        viewModel.dailyCap = 10
+        _ = await viewModel.save()
+
+        guard let put = SequencedURLProtocol.capturedRequests.last else {
+            return XCTFail("Missing PUT request")
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: Self.bodyData(from: put)) as? [String: Any] else {
+            return XCTFail("Missing body")
+        }
+        XCTAssertEqual(json["daily_cap"] as? Int, 10)
+    }
+
+    /// A no-cap event type whose cap stepper is untouched must NOT acquire a cap
+    /// just because the stepper shows a default value.
+    func testNoCapEventTypeNotCappedWhenUntouched() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.detailNoCaps), .status(200, body: Self.updated)]
+        let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
+        await viewModel.load()
+        viewModel.horizonDays = 45 // change something else
+        _ = await viewModel.save()
+
+        guard let put = SequencedURLProtocol.capturedRequests.last,
+              let json = try? JSONSerialization.jsonObject(with: Self.bodyData(from: put)) as? [String: Any]
+        else { return XCTFail("Missing body") }
+        XCTAssertNil(json["daily_cap"])
+        XCTAssertNil(json["per_booker_cap"])
     }
 
     func testLoadFailureProducesError() async {

@@ -8,18 +8,18 @@
 //  Owner-scoped (personal sky by default, or the event type's pillar when
 //  opened as a per-type override from I2).
 //
-//  Saving is PER-FIELD-DIRTY: only the fields the user actually changed are
-//  put in the request body, so opening the sheet to tweak one control can
-//  never silently rewrite an untouched value the UI can't faithfully
-//  represent (e.g. a sub-hour `min_notice_min` or a non-60/30/15
-//  `slot_interval_min`).
+//  Per the design these are always-present numeric steppers (no on/off
+//  toggles). Saving is PER-FIELD-DIRTY: only the fields the user actually
+//  changed are put in the request body, so (a) opening the sheet to tweak one
+//  control can't silently rewrite an untouched value the UI can't faithfully
+//  represent (a sub-hour `min_notice_min` or a non-60/30/15 `slot_interval_min`),
+//  and (b) a freshly-created event type with no cap (null) isn't given a cap
+//  just because the stepper shows a default — we only send a cap once the user
+//  moves it.
 //
-//  Clearing a cap (toggling `daily_cap`/`per_booker_cap` off) can't be
-//  expressed: the Foundation `UpdateEventTypeRequest` encodes with
-//  `encodeIfPresent`, so a nil field is OMITTED, not sent as JSON `null`,
-//  and the backend leaves omitted fields untouched. Rather than report a
-//  false success, we surface a clear message and resync. (A proper fix needs
-//  a tri-state encoder in Foundation — flagged.)
+//  NOTE: the design also shows a weekly cap ("20 per week"), but the backend
+//  has no weekly-cap field (only daily_cap + per_booker_cap), so it is omitted
+//  — flagged for a backend follow-up.
 //
 
 import Observation
@@ -66,12 +66,10 @@ final class BookingLimitsViewModel {
     let owner: SchedulingOwner
     let eventTypeId: String
 
-    // Editable fields
+    // Editable fields (always-present steppers, per the design).
     var minNoticeHours = 4
     var horizonDays = 60
-    var limitPerDay = false
     var dailyCap = 8
-    var limitPerPerson = false
     var perBookerCap = 2
     var slotInterval: SlotInterval = .every15
 
@@ -82,13 +80,14 @@ final class BookingLimitsViewModel {
     private let client: SchedulingClient
     private var baselineSignature: String?
 
-    // Raw loaded values, so per-field-dirty save never clobbers a value the
-    // UI can't faithfully represent.
+    // Raw loaded values + the stepper values shown at load, so per-field-dirty
+    // save never clobbers an untouched value (and never imposes a cap the
+    // backend didn't have).
     private var loadedMinNoticeMin: Int?
     private var loadedHorizonDays: Int?
     private var loadedSlotIntervalMin: Int?
-    private var loadedDailyCap: Int?
-    private var loadedPerBookerCap: Int?
+    private var initialDailyCap = 8
+    private var initialPerBookerCap = 2
 
     init(owner: SchedulingOwner, eventTypeId: String, client: SchedulingClient = .shared) {
         self.owner = owner
@@ -148,21 +147,18 @@ final class BookingLimitsViewModel {
         loadedMinNoticeMin = eventType.minNoticeMin
         loadedHorizonDays = eventType.maxHorizonDays
         loadedSlotIntervalMin = eventType.slotIntervalMin
-        loadedDailyCap = eventType.dailyCap
-        loadedPerBookerCap = eventType.perBookerCap
 
         // Round (not truncate) so a 90-min notice reads as ~2h rather than 1h.
         if let notice = eventType.minNoticeMin {
             minNoticeHours = max(0, Int((Double(notice) / 60).rounded()))
         }
         if let horizon = eventType.maxHorizonDays { horizonDays = max(1, horizon) }
-        if let cap = eventType.dailyCap { limitPerDay = true
-            dailyCap = max(1, cap)
-        }
-        if let cap = eventType.perBookerCap { limitPerPerson = true
-            perBookerCap = max(1, cap)
-        }
+        if let cap = eventType.dailyCap { dailyCap = max(1, cap) }
+        if let cap = eventType.perBookerCap { perBookerCap = max(1, cap) }
         slotInterval = SlotInterval.from(minutes: eventType.slotIntervalMin)
+
+        initialDailyCap = dailyCap
+        initialPerBookerCap = perBookerCap
     }
 
     // MARK: Save
@@ -190,21 +186,15 @@ final class BookingLimitsViewModel {
             request.slotIntervalMin = slotInterval.rawValue
             hasChanges = true
         }
-
-        // Caps: a numeric value can be set/raised/lowered, but a removal
-        // (set → off) can't be expressed via the partial PUT.
-        var clearRequested = false
-        let desiredDaily: Int? = limitPerDay ? dailyCap : nil
-        if desiredDaily != loadedDailyCap {
-            if let value = desiredDaily { request.dailyCap = value
-                hasChanges = true
-            } else { clearRequested = true }
+        // Only send a cap once the user moves it off the value shown at load —
+        // so a freshly-created event type (no cap) isn't capped by default.
+        if dailyCap != initialDailyCap {
+            request.dailyCap = dailyCap
+            hasChanges = true
         }
-        let desiredPerBooker: Int? = limitPerPerson ? perBookerCap : nil
-        if desiredPerBooker != loadedPerBookerCap {
-            if let value = desiredPerBooker { request.perBookerCap = value
-                hasChanges = true
-            } else { clearRequested = true }
+        if perBookerCap != initialPerBookerCap {
+            request.perBookerCap = perBookerCap
+            hasChanges = true
         }
 
         do {
@@ -214,17 +204,11 @@ final class BookingLimitsViewModel {
                     as: EventTypeResponse.self
                 )
             }
-            if clearRequested {
-                // The omitted-field PUT can't clear a cap; be honest and resync.
-                saveError = "Removing a limit isn't supported yet — any other changes were saved."
-                await fetch()
-                return false
-            }
             loadedMinNoticeMin = noticeMin
             loadedHorizonDays = horizonDays
             loadedSlotIntervalMin = slotInterval.rawValue
-            loadedDailyCap = desiredDaily
-            loadedPerBookerCap = desiredPerBooker
+            initialDailyCap = dailyCap
+            initialPerBookerCap = perBookerCap
             baselineSignature = signature()
             return true
         } catch let error as SchedulingError {
@@ -240,8 +224,8 @@ final class BookingLimitsViewModel {
         [
             String(minNoticeHours),
             String(horizonDays),
-            limitPerDay ? String(dailyCap) : "off",
-            limitPerPerson ? String(perBookerCap) : "off",
+            String(dailyCap),
+            String(perBookerCap),
             String(slotInterval.rawValue)
         ].joined(separator: "|")
     }
