@@ -33,7 +33,9 @@ struct AvailabilityScheduleListStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B4", title: "Availability", stream: "I3")
+        AvailabilityScheduleListView(
+            viewModel: AvailabilityScheduleListViewModel(push: viewModel.push)
+        )
     }
 }
 

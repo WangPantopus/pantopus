@@ -33,7 +33,7 @@ struct BlockOffTimeStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B9", title: "Block Off Time", stream: "I3")
+        BlockOffTimeView(viewModel: BlockOffTimeViewModel())
     }
 }
 

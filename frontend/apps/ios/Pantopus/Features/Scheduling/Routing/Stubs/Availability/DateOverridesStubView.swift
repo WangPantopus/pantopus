@@ -36,7 +36,9 @@ struct DateOverridesStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B6", title: "Date Overrides", stream: "I3")
+        DateOverridesView(
+            viewModel: DateOverridesViewModel(scheduleId: viewModel.scheduleId)
+        )
     }
 }
 
