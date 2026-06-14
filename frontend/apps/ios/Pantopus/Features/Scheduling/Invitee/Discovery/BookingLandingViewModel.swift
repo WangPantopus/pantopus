@@ -33,6 +33,7 @@ final class BookingLandingViewModel {
 
     private(set) var state: State = .loading
     private var isFetching = false
+    private var didLoad = false
 
     /// Designated, test-injectable initializer. No default arguments (Xcode 16.4
     /// crashes on default-argument `@MainActor` view-model initializers).
@@ -57,7 +58,8 @@ final class BookingLandingViewModel {
     }
 
     func load() async {
-        if case .loaded = state { return }
+        guard !didLoad else { return }
+        didLoad = true
         await fetch()
     }
 
@@ -139,6 +141,7 @@ extension BookingLandingViewModel {
         if let data = json.data(using: .utf8), let view = try? JSONDecoder().decode(PublicBookView.self, from: data) {
             viewModel.state = .loaded(view)
         }
+        viewModel.didLoad = true
         return viewModel
     }
 
@@ -154,6 +157,31 @@ extension BookingLandingViewModel {
         if let data = json.data(using: .utf8), let view = try? JSONDecoder().decode(PublicBookView.self, from: data) {
             viewModel.state = .paused(view)
         }
+        viewModel.didLoad = true
+        return viewModel
+    }
+
+    /// Fixture-seeded empty (active, no event types) state.
+    static func previewEmpty() -> BookingLandingViewModel {
+        let viewModel = BookingLandingViewModel(slug: "ada", push: { _ in }, client: .shared)
+        let json = #"""
+        {
+          "page": {"slug": "ada", "title": "Ada Lovelace", "tagline": "Founder · Analytical Engine Co.", "owner_type": "user"},
+          "status": "active", "eventTypes": []
+        }
+        """#
+        if let data = json.data(using: .utf8), let view = try? JSONDecoder().decode(PublicBookView.self, from: data) {
+            viewModel.state = .empty(view)
+        }
+        viewModel.didLoad = true
+        return viewModel
+    }
+
+    /// Fixture-seeded error state.
+    static func previewError() -> BookingLandingViewModel {
+        let viewModel = BookingLandingViewModel(slug: "ada", push: { _ in }, client: .shared)
+        viewModel.state = .error(message: "This link isn't available")
+        viewModel.didLoad = true
         return viewModel
     }
 }

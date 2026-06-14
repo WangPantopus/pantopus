@@ -39,30 +39,36 @@ public struct SchedulingSlotRow: View {
     public var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.s3) {
+                Icon(.clock, size: 14, color: isSelected ? accent : Theme.Color.appTextSecondary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(time)
-                        .pantopusTextStyle(.body)
-                        .fontWeight(.semibold)
+                        .pantopusTextStyle(.small)
+                        .fontWeight(.bold)
+                        .monospacedDigit()
                         .foregroundStyle(isSelected ? accent : Theme.Color.appText)
                     if let detail {
                         Text(detail)
                             .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.appTextMuted)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
                 Spacer(minLength: Spacing.s2)
-                Icon(.chevronRight, size: 16, color: isSelected ? accent : Theme.Color.appTextMuted)
+                if isSelected {
+                    Icon(.checkCircle, size: 18, color: accent)
+                } else {
+                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+                }
             }
             .padding(.horizontal, Spacing.s4)
             .padding(.vertical, Spacing.s3)
             .frame(minHeight: 44)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? accent.opacity(0.08) : Theme.Color.appSurface)
+            .background(isSelected ? accent.opacity(0.10) : Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(isSelected ? accent : Theme.Color.appBorder, lineWidth: isSelected ? 1.5 : 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .opacity(isDisabled ? 0.5 : 1)
         }
         .buttonStyle(.plain)

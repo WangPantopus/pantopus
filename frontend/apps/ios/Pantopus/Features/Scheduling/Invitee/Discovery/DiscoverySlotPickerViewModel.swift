@@ -42,9 +42,20 @@ final class DiscoverySlotPickerViewModel {
     /// Bumped on every fetch; stale completions (overlapping nav taps) are dropped.
     private var fetchGeneration = 0
 
-    /// Pillar accent is unknown on the public picker route (it carries no
-    /// owner type), so the picker uses the brand sky for today/selected.
-    let accent: Color = Theme.Color.primary600
+    /// Host name + pillar, fetched from the booking page (the slots route carries
+    /// neither) — drives the "with {host}" summary line and the pillar accent.
+    private(set) var hostName: String?
+    private(set) var ownerType: String?
+
+    /// The host pillar accent (sky / green / violet) for today/selected.
+    var accent: Color {
+        DiscoveryTheme.accent(forOwnerType: ownerType)
+    }
+
+    /// The lightest pillar tint for the summary icon tile.
+    var accentBg: Color {
+        DiscoveryTheme.accentBg(forOwnerType: ownerType)
+    }
 
     init(
         slug: String,
@@ -68,7 +79,7 @@ final class DiscoverySlotPickerViewModel {
     // MARK: - Derived
 
     var timezoneLabel: String {
-        DiscoveryTimeZone.label(for: timezoneId)
+        DiscoveryTimeZone.abbreviation(for: timezoneId)
     }
 
     var availableDays: Set<Date> {
@@ -98,8 +109,9 @@ final class DiscoverySlotPickerViewModel {
     var summaryDetail: String? {
         guard let eventType else { return nil }
         let duration = (eventType.defaultDuration ?? eventType.durations?.first).map { "\($0) min" }
-        let location = DiscoveryLocation.label(mode: eventType.locationMode, detail: eventType.locationDetail)
-        return [duration, location].compactMap { $0 }.joined(separator: " · ")
+        let trailing = hostName.map { "with \($0)" }
+            ?? DiscoveryLocation.label(mode: eventType.locationMode, detail: eventType.locationDetail)
+        return [duration, trailing].compactMap { $0 }.joined(separator: " · ")
     }
 
     // MARK: - Loading
@@ -107,6 +119,7 @@ final class DiscoverySlotPickerViewModel {
     func load() async {
         guard !didLoad else { return }
         didLoad = true
+        await loadHostInfo()
         await fetchRange()
         // If the current month has nothing open, advance to the first month that
         // does — so an invitee (incl. the C8 "see open times" hand-off) lands on
@@ -114,6 +127,16 @@ final class DiscoverySlotPickerViewModel {
         if phase == .ready, availableDays.isEmpty {
             await jumpNextAvailable()
         }
+    }
+
+    /// Best-effort fetch of the booking page for the host name + pillar. Failures
+    /// are silent — the picker still works, just without the host name/accent.
+    private func loadHostInfo() async {
+        guard hostName == nil, ownerType == nil, !slug.isEmpty else { return }
+        let view: PublicBookView? = try? await client.request(SchedulingPublicEndpoints.bookPage(slug: slug))
+        guard let view else { return }
+        hostName = view.page.title
+        ownerType = view.page.ownerType
     }
 
     func refresh() async {
@@ -276,16 +299,27 @@ extension DiscoverySlotPickerViewModel {
         }
         let cal = DiscoveryCalendar.calendar(tz: tz)
         let formatter = ISO8601DateFormatter()
-        let base = cal.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
+        let today = cal.startOfDay(for: Date())
+        let selectedDay = cal.date(byAdding: .day, value: 3, to: today) ?? today
+        func slot(_ day: Date, hour: Int) -> SlotDTO? {
+            guard let start = cal.date(bySettingHour: hour, minute: 0, second: 0, of: day),
+                  let end = cal.date(byAdding: .minute, value: 30, to: start) else { return nil }
+            return SlotDTO(start: formatter.string(from: start), end: formatter.string(from: end))
+        }
         var slots: [SlotDTO] = []
-        for hourOffset in [0, 1, 2, 5, 6, 7] {
-            if let start = cal.date(byAdding: .hour, value: hourOffset, to: base),
-               let end = cal.date(byAdding: .minute, value: 30, to: start) {
-                slots.append(SlotDTO(start: formatter.string(from: start), end: formatter.string(from: end)))
+        for hour in [9, 10, 11, 14, 15] {
+            if let entry = slot(selectedDay, hour: hour) { slots.append(entry) }
+        }
+        for offset in [2, 4, 5, 6] {
+            if let day = cal.date(byAdding: .day, value: offset, to: today), let entry = slot(day, hour: 10) {
+                slots.append(entry)
             }
         }
         viewModel.rangeSlots = slots
+        viewModel.selectedDate = selectedDay
         viewModel.phase = .ready
+        viewModel.hostName = "Maria Kessler"
+        viewModel.ownerType = "user"
         viewModel.didLoad = true
         return viewModel
     }

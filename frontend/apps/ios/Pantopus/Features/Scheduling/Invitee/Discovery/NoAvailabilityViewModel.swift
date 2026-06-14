@@ -109,11 +109,22 @@ final class NoAvailabilityViewModel {
     }
 
     private var monthName: String {
+        monthName(monthAnchor)
+    }
+
+    /// The month after the currently-scanned one — for the "See {month}" CTA.
+    var nextMonthName: String {
+        let cal = DiscoveryCalendar.calendar(tz: timezoneId)
+        let next = cal.date(byAdding: .month, value: 1, to: monthAnchor) ?? monthAnchor
+        return monthName(next)
+    }
+
+    private func monthName(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = DiscoveryCalendar.calendar(tz: timezoneId)
         formatter.timeZone = TimeZone(identifier: timezoneId) ?? .current
         formatter.dateFormat = "LLLL"
-        return formatter.string(from: monthAnchor)
+        return formatter.string(from: date)
     }
 }
 

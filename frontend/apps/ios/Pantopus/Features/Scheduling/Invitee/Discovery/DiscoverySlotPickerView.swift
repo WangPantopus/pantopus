@@ -86,10 +86,9 @@ struct DiscoverySlotPickerView: View {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 summaryHeader
                 DiscoveryNotice(
-                    icon: .calendarClock,
+                    icon: .pause,
                     title: "This page isn't taking bookings right now",
-                    message: "Check back soon — the host can reopen it at any time.",
-                    accent: viewModel.accent
+                    message: "Check back later — the host can reopen it at any time."
                 )
             }
             .padding(.horizontal, Spacing.s4)
@@ -101,55 +100,56 @@ struct DiscoverySlotPickerView: View {
 
     private var summaryHeader: some View {
         HStack(spacing: Spacing.s3) {
-            ZStack {
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(viewModel.accent.opacity(0.12))
-                    .frame(width: 44, height: 44)
-                Icon(
-                    DiscoveryLocation.icon(mode: viewModel.eventType?.locationMode),
-                    size: 22,
-                    color: viewModel.accent
-                )
-            }
-            VStack(alignment: .leading, spacing: Spacing.s1) {
+            Icon(
+                DiscoveryLocation.icon(mode: viewModel.eventType?.locationMode),
+                size: 16,
+                color: viewModel.accent
+            )
+            .frame(width: 34, height: 34)
+            .background(viewModel.accentBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
                 if let name = viewModel.eventType?.name {
                     Text(name)
-                        .pantopusTextStyle(.body)
+                        .pantopusTextStyle(.small)
                         .fontWeight(.semibold)
                         .foregroundStyle(Theme.Color.appText)
                 } else {
-                    Shimmer(width: 140, height: 16)
+                    Shimmer(width: 140, height: 14)
                 }
                 if let detail = viewModel.summaryDetail {
                     Text(detail)
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 } else if viewModel.eventType == nil {
-                    Shimmer(width: 90, height: 12)
+                    Shimmer(width: 90, height: 11)
                 }
             }
             Spacer(minLength: Spacing.s2)
         }
-        .padding(Spacing.s4)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.appSurface)
-        .overlay(
+        .background(
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
+                .fill(Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                        .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+                )
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
     private func errorState(_ message: String) -> some View {
         VStack {
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             EmptyState(
                 icon: .link,
                 headline: message,
                 subcopy: "It may have been turned off or moved.",
                 cta: .init(title: "Try again") { await viewModel.refresh() }
             )
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
