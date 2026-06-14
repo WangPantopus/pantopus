@@ -194,3 +194,105 @@ describe('bookingService.isOverlapViolation', () => {
     expect(bookingService._internal.isOverlapViolation(null)).toBe(false);
   });
 });
+
+// Regression for PUT /api/scheduling/booking-page → 500
+// "Cannot read properties of null (reading 'id')": ensurePage could return null
+// (swallowed insert error / lost create race), and every caller dereferences
+// page.id. It must now always resolve a page or throw.
+describe('ensurePage (booking-page get-or-create) — never returns null', () => {
+  const { _internal: { ensurePage } } = require('../../routes/scheduling');
+  const { ownerColumns } = require('../../services/scheduling/schedulingShared');
+  const supabaseAdmin = require('../__mocks__/supabaseAdmin');
+  const { getTable } = supabaseAdmin;
+
+  const ctx = (ownerId = 'u1') => ({ ownerType: 'user', ownerId, oc: ownerColumns('user', ownerId) });
+  const seedPage = (over) => ({
+    owner_type: 'user', owner_id: 'u1', owner_user_id: 'u1', home_id: null,
+    slug: 'user-u1', is_live: false, created_by: 'u1', created_at: '2026-01-01T00:00:00Z', ...over,
+  });
+
+  beforeEach(() => resetTables());
+  afterEach(() => jest.restoreAllMocks());
+
+  it('returns the existing page without creating a duplicate', async () => {
+    seedTable('BookingPage', [seedPage({ id: 'p1' })]);
+    const page = await ensurePage(ctx(), 'u1');
+    expect(page.id).toBe('p1');
+    expect(getTable('BookingPage')).toHaveLength(1);
+  });
+
+  it('auto-creates the page when none exists (mirrors the GET path)', async () => {
+    const page = await ensurePage(ctx(), 'u1');
+    expect(page).toBeTruthy();
+    expect(page.owner_id).toBe('u1');
+    expect(page.slug).toBe('user-u1');
+    expect(getTable('BookingPage')).toHaveLength(1);
+  });
+
+  it('tolerates accidental duplicate rows instead of erroring on maybeSingle', async () => {
+    seedTable('BookingPage', [
+      seedPage({ id: 'p1', created_at: '2026-01-01T00:00:00Z' }),
+      seedPage({ id: 'p2', slug: 'user-u1-dup', created_at: '2026-02-01T00:00:00Z' }),
+    ]);
+    const page = await ensurePage(ctx(), 'u1');
+    expect(page).toBeTruthy();
+    expect(['p1', 'p2']).toContain(page.id);
+    expect(getTable('BookingPage')).toHaveLength(2); // no third row created
+  });
+
+  it('retries with a suffixed slug when the auto base slug collides with another owner', async () => {
+    seedTable('BookingPage', [{
+      id: 'other', owner_type: 'business', owner_id: 'biz9', owner_user_id: 'biz9', home_id: null,
+      slug: 'user-u1', is_live: false, created_by: 'biz9', created_at: '2026-01-01T00:00:00Z',
+    }]);
+    const page = await ensurePage(ctx(), 'u1');
+    expect(page).toBeTruthy();
+    expect(page.owner_id).toBe('u1');
+    expect(page.slug).not.toBe('user-u1');
+    expect(page.slug).toMatch(/^user-u1-/);
+    expect(getTable('BookingPage')).toHaveLength(2);
+  });
+
+  it('re-reads the owner page instead of returning null when the create loses a slug race', async () => {
+    // The page exists, but the initial lookup misses it (the GET/PUT create
+    // race the iOS client triggers). The insert then loses the slug-unique
+    // race; ensurePage must re-read the row rather than return null.
+    seedTable('BookingPage', [seedPage({ id: 'p1' })]);
+    const realFrom = supabaseAdmin.from.bind(supabaseAdmin);
+    let firstLookup = true;
+    jest.spyOn(supabaseAdmin, 'from').mockImplementation((table) => {
+      const builder = realFrom(table);
+      if (table === 'BookingPage' && firstLookup) {
+        builder.maybeSingle = () => { firstLookup = false; return Promise.resolve({ data: null, error: null }); };
+      }
+      return builder;
+    });
+    const page = await ensurePage(ctx(), 'u1');
+    expect(page.id).toBe('p1');
+    expect(getTable('BookingPage')).toHaveLength(1); // no duplicate created
+  });
+
+  it('throws (never returns null) when the insert fails for a non-collision reason', async () => {
+    // The original bug: a transient/schema-cache insert error was swallowed and
+    // ensurePage returned null, so callers null-deref'd page.id into an opaque
+    // 500. It must surface the error loudly instead.
+    const hardError = { code: '42P01', message: "Could not find the table 'public.BookingPage' in the schema cache" };
+    jest.spyOn(supabaseAdmin, 'from').mockImplementation(() => {
+      let writing = false;
+      const builder = {
+        insert() { writing = true; return builder; },
+        select() { return builder; },
+        eq() { return builder; },
+        order() { return builder; },
+        limit() { return builder; },
+        single() { return builder; },
+        maybeSingle() { return builder; },
+        then(resolve, reject) {
+          return Promise.resolve(writing ? { data: null, error: hardError } : { data: null, error: null }).then(resolve, reject);
+        },
+      };
+      return builder;
+    });
+    await expect(ensurePage(ctx(), 'u1')).rejects.toMatchObject({ code: '42P01' });
+  });
+});
