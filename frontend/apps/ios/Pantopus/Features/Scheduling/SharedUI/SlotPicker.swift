@@ -103,8 +103,22 @@ public struct SlotPicker: View {
                 onJumpNextAvailable: onJumpNextAvailable
             )
             Divider().background(Theme.Color.appBorderSubtle)
+            if state != .noAvailability {
+                Text(dayHeading)
+                    .pantopusTextStyle(.small)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Theme.Color.appText)
+            }
             slotColumn
         }
+    }
+
+    private var dayHeading: String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter.string(from: selectedDate)
     }
 
     // MARK: - Timezone chip
@@ -112,17 +126,21 @@ public struct SlotPicker: View {
     private var timeZoneChip: some View {
         Button(action: onTapTimeZone) {
             HStack(spacing: Spacing.s2) {
-                Icon(.globe, size: 16, color: Theme.Color.primary600)
+                Icon(.globe, size: 13, color: Theme.Color.appTextSecondary)
                 Text("Times shown in \(timeZoneLabel)")
-                    .pantopusTextStyle(.small)
-                    .foregroundStyle(Theme.Color.appText)
-                Spacer(minLength: Spacing.s1)
-                Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+                    .pantopusTextStyle(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                Icon(.chevronDown, size: 13, color: Theme.Color.appTextMuted)
             }
             .padding(.horizontal, Spacing.s3)
             .padding(.vertical, Spacing.s2)
-            .background(Theme.Color.primary50)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                    .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Time zone, \(timeZoneLabel). Tap to change.")
@@ -169,11 +187,11 @@ public struct SlotPicker: View {
                     VStack(alignment: .leading, spacing: Spacing.s2) {
                         Text(group.title)
                             .pantopusTextStyle(.overline)
-                            .foregroundStyle(Theme.Color.appTextMuted)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
                         ForEach(groupSlots, id: \.self) { slot in
                             SchedulingSlotRow(
                                 time: timeLabel(for: slot),
-                                detail: durationLabel(for: slot),
+                                detail: nil,
                                 accent: accent,
                                 isSelected: slot.start == selectedSlotStart
                             ) {
@@ -252,14 +270,6 @@ public struct SlotPicker: View {
         ) ?? slot.startLocal ?? slot.start
     }
 
-    private func durationLabel(for slot: SlotDTO) -> String? {
-        guard let start = SchedulingTime.parseUTC(slot.start),
-              let end = SchedulingTime.parseUTC(slot.end) else { return nil }
-        let minutes = Int(end.timeIntervalSince(start) / 60)
-        guard minutes > 0 else { return nil }
-        return "\(minutes) min"
-    }
-
     private func slotGroup(for slot: SlotDTO) -> SlotGroup {
         guard let date = SchedulingTime.parseUTC(slot.start) else { return .afternoon }
         let hour = calendar.component(.hour, from: date)
@@ -315,13 +325,14 @@ private struct SlotPickerCalendar: View {
     private var header: some View {
         HStack {
             Text(monthTitle)
-                .pantopusTextStyle(.body)
-                .fontWeight(.semibold)
+                .pantopusTextStyle(.small)
+                .fontWeight(.bold)
                 .foregroundStyle(Theme.Color.appText)
             Spacer()
             if let onJumpNextAvailable {
                 Button("Next available", action: onJumpNextAvailable)
                     .font(Theme.Font.caption)
+                    .fontWeight(.bold)
                     .foregroundStyle(accent)
             }
             Button { onChangeMonth(-1) } label: {
@@ -353,12 +364,14 @@ private struct SlotPickerCalendar: View {
         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
         let isToday = calendar.isDateInToday(day)
         let enabled = isDayEnabled(day)
+        let isAvailable = enabled && !isSelected && !isToday
         Button {
             if enabled { onSelectDate(day) }
         } label: {
             Text("\(calendar.component(.day, from: day))")
                 .pantopusTextStyle(.small)
-                .fontWeight(isSelected ? .semibold : .regular)
+                .fontWeight(isSelected || isToday ? .bold : (isAvailable ? .semibold : .regular))
+                .monospacedDigit()
                 .foregroundStyle(dayForeground(isSelected: isSelected, enabled: enabled))
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
@@ -372,6 +385,14 @@ private struct SlotPickerCalendar: View {
                         .stroke(isToday && !isSelected ? accent : Color.clear, lineWidth: 1.5)
                         .frame(width: 36, height: 36)
                 )
+                .overlay(alignment: .bottom) {
+                    if isAvailable {
+                        Circle()
+                            .fill(accent)
+                            .frame(width: 4, height: 4)
+                            .padding(.bottom, Spacing.s1)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
