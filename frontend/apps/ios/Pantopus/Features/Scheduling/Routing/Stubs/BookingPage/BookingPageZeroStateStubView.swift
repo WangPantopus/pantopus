@@ -36,7 +36,7 @@ struct BookingPageZeroStateStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H16", title: "Get Started", stream: "I4")
+        BookingPageZeroStateView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 

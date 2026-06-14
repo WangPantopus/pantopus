@@ -1,0 +1,458 @@
+//
+//  BookingPageManagementViewModel.swift
+//  Pantopus
+//
+//  C1 Booking Link / Public Page Management · Stream I4. Loads the owner's
+//  booking page (auto-created server-side) plus its event types, edits the
+//  header/intro/visibility fields, flips live/paused and per-service
+//  visibility optimistically, runs a debounced slug-availability check, and
+//  saves via PUT /booking-page (+ PUT /booking-page/slug on slug change,
+//  handling 409 SLUG_TAKEN). Also vends the data C3 (ShareLinkSheet) needs.
+//
+//  Owner context flows through SchedulingOwner → endpoint builders; never
+//  hand-rolled. Tokens-only UI. No default-arg @MainActor VM init.
+//
+
+import Foundation
+import Observation
+
+// MARK: - Supporting types
+
+/// Page-visibility segmented control value (booking page `visibility`).
+public enum BookingPageVisibility: String, Sendable, Equatable, CaseIterable {
+    case listed
+    case unlisted
+}
+
+/// Inline slug-availability check state for the handle field.
+public enum SlugCheckState: Sendable, Equatable {
+    case unchanged
+    case checking
+    case available
+    case taken(suggestions: [String])
+    case invalid(message: String)
+}
+
+/// One row in the service-visibility card.
+public struct BookingServiceRow: Identifiable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let durationLabel: String
+    public let locationIcon: PantopusIcon
+    public let isVisible: Bool
+}
+
+/// Render state for the management screen.
+public enum BookingPageManagementState: Sendable, Equatable {
+    case loading
+    case loaded
+    case empty
+    case error(message: String)
+}
+
+// MARK: - View model
+
+@Observable
+@MainActor
+public final class BookingPageManagementViewModel {
+    // MARK: Public render state
+
+    public private(set) var state: BookingPageManagementState = .loading
+
+    // MARK: Editable fields (bound by the view)
+
+    public var titleText = ""
+    public var taglineText = ""
+    public var introText = ""
+    public var confirmationText = ""
+    public var slugText = ""
+    public var visibility: BookingPageVisibility = .listed
+
+    // MARK: Live/immediate state
+
+    /// Accepting-bookings switch = `is_live && !is_paused`.
+    public private(set) var isAcceptingBookings = true
+    public private(set) var isLive = true
+    public private(set) var isPaused = false
+    public private(set) var slugState: SlugCheckState = .unchanged
+    public private(set) var serviceRows: [BookingServiceRow] = []
+    public private(set) var isSaving = false
+    public private(set) var saveError: String?
+    public private(set) var showSavedToast = false
+
+    // MARK: C3 ShareLinkSheet state
+
+    public var showOnProfile = false
+    public var addToSignature = false
+
+    // MARK: Dependencies
+
+    public let owner: SchedulingOwner
+    public let push: @MainActor (SchedulingRoute) -> Void
+    private let api: APIClient
+
+    // MARK: Raw + originals
+
+    private var page: BookingPageDTO?
+    private var eventTypes: [EventTypeDTO] = []
+    private var original = OriginalSnapshot()
+    private var loadedOnce = false
+    private var slugCheckTask: Task<Void, Never>?
+
+    private struct OriginalSnapshot: Equatable {
+        var title = ""
+        var tagline = ""
+        var intro = ""
+        var confirmation = ""
+        var slug = ""
+        var visibility: BookingPageVisibility = .listed
+    }
+
+    public init(
+        owner: SchedulingOwner,
+        push: @escaping @MainActor (SchedulingRoute) -> Void,
+        api: APIClient = .shared
+    ) {
+        self.owner = owner
+        self.push = push
+        self.api = api
+    }
+
+    // MARK: - Derived
+
+    public var theme: SchedulingIdentityTheme { SchedulingIdentityTheme(owner) }
+
+    /// `pantopus.com/book/<slug>` for display.
+    public var displaySlugURL: String { BookingLinkURL.display(slug: slugText) }
+
+    /// The persisted slug (editing the field doesn't change the live link
+    /// until saved). Used for the share sheet and preview.
+    public var savedSlug: String { original.slug.isEmpty ? slugText : original.slug }
+
+    /// `https://pantopus.com/book/<slug>` for share/QR/open.
+    public var shareURL: String { BookingLinkURL.shareable(slug: savedSlug) }
+
+    /// `pantopus.com/book/<slug>` of the persisted slug, for the share card.
+    public var savedDisplayURL: String { BookingLinkURL.display(slug: savedSlug) }
+
+    public var hasServices: Bool { !serviceRows.isEmpty }
+    public var hasVisibleService: Bool { serviceRows.contains { $0.isVisible } }
+    public var showPaymentsRow: Bool { owner.supportsPayments }
+
+    public var isDirty: Bool {
+        current() != original
+    }
+
+    public var isValid: Bool {
+        switch slugState {
+        case .checking, .taken, .invalid: false
+        case .unchanged, .available: !slugText.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    private func current() -> OriginalSnapshot {
+        OriginalSnapshot(
+            title: titleText,
+            tagline: taglineText,
+            intro: introText,
+            confirmation: confirmationText,
+            slug: slugText,
+            visibility: visibility
+        )
+    }
+
+    // MARK: - Load
+
+    public func load() async {
+        if loadedOnce { return }
+        state = .loading
+        await fetch()
+    }
+
+    public func refresh() async { await fetch() }
+
+    private func fetch() async {
+        do {
+            let pageResponse: BookingPageResponse = try await api.request(
+                SchedulingEndpoints.getBookingPage(owner: owner)
+            )
+            page = pageResponse.page
+            // Event types are best-effort — the page still renders without them.
+            eventTypes = (try? await fetchEventTypes()) ?? []
+            hydrate(from: pageResponse.page)
+            rebuildServiceRows()
+            loadedOnce = true
+            state = .loaded
+        } catch {
+            state = .error(message: SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
+                ?? "Couldn't load your booking page. Try again.")
+        }
+    }
+
+    private func fetchEventTypes() async throws -> [EventTypeDTO] {
+        let response: EventTypesResponse = try await api.request(
+            SchedulingEndpoints.getEventTypes(owner: owner)
+        )
+        return response.eventTypes
+    }
+
+    private func hydrate(from page: BookingPageDTO) {
+        titleText = page.title ?? ""
+        taglineText = page.tagline ?? ""
+        introText = page.intro ?? ""
+        confirmationText = page.confirmationMessage ?? ""
+        slugText = page.slug
+        visibility = BookingPageVisibility(rawValue: page.visibility ?? "listed") ?? .listed
+        isLive = page.isLive
+        isPaused = page.isPaused
+        isAcceptingBookings = page.isLive && !page.isPaused
+        slugState = .unchanged
+        original = current()
+    }
+
+    private func rebuildServiceRows() {
+        serviceRows = eventTypes
+            .filter { $0.isActive ?? true }
+            .map { event in
+                BookingServiceRow(
+                    id: event.id,
+                    name: event.name,
+                    durationLabel: BookingDuration.label(event.defaultDuration ?? event.durations.first ?? 30),
+                    locationIcon: BookingLocationMode.icon(event.locationMode),
+                    isVisible: (event.visibility ?? "public").lowercased() != "secret"
+                )
+            }
+    }
+
+    // MARK: - Slug availability (debounced)
+
+    /// Call on every slug edit. Validates format locally, then debounces a
+    /// `check-slug` round-trip. No check when the slug is unchanged.
+    public func slugTextChanged() {
+        slugCheckTask?.cancel()
+        let candidate = slugText.lowercased()
+        if candidate != slugText { slugText = candidate } // force lowercase
+
+        guard candidate != original.slug else {
+            slugState = .unchanged
+            return
+        }
+        if let formatError = Self.slugFormatError(candidate) {
+            slugState = .invalid(message: formatError)
+            return
+        }
+        slugState = .checking
+        slugCheckTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.runSlugCheck(candidate)
+        }
+    }
+
+    private func runSlugCheck(_ slug: String) async {
+        guard slug == slugText.lowercased(), slug != original.slug else { return }
+        do {
+            let result: CheckSlugResponse = try await api.request(
+                SchedulingEndpoints.checkSlug(owner: owner, slug: slug)
+            )
+            guard slug == slugText.lowercased() else { return }
+            if result.error == "INVALID_SLUG" {
+                slugState = .invalid(message: result.message ?? "That handle isn't allowed. Try another.")
+            } else if result.available {
+                slugState = .available
+            } else {
+                slugState = .taken(suggestions: result.suggestions ?? [])
+            }
+        } catch {
+            // A failed check shouldn't block saving — fall back to letting the
+            // server validate on commit.
+            slugState = .unchanged
+        }
+    }
+
+    static func slugFormatError(_ slug: String) -> String? {
+        if slug.count < 3 || slug.count > 50 { return "Use 3 to 50 characters." }
+        let pattern = "^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$"
+        if slug.range(of: pattern, options: .regularExpression) == nil {
+            return "Use lowercase letters, numbers and hyphens."
+        }
+        return nil
+    }
+
+    public func applySuggestion(_ suggestion: String) {
+        slugText = suggestion
+        slugTextChanged()
+    }
+
+    // MARK: - Status toggle (optimistic)
+
+    public func setAcceptingBookings(_ accepting: Bool) async {
+        let previousAccepting = isAcceptingBookings
+        let previousPaused = isPaused
+        let previousLive = isLive
+        isAcceptingBookings = accepting
+        isPaused = !accepting
+        if accepting { isLive = true }
+        do {
+            let response: BookingPageResponse = try await api.request(
+                SchedulingEndpoints.updateBookingPage(
+                    owner: owner,
+                    BookingPageUpdateRequest(isLive: accepting ? true : nil, isPaused: !accepting)
+                )
+            )
+            page = response.page
+            isLive = response.page.isLive
+            isPaused = response.page.isPaused
+            isAcceptingBookings = response.page.isLive && !response.page.isPaused
+        } catch {
+            isAcceptingBookings = previousAccepting
+            isPaused = previousPaused
+            isLive = previousLive
+            saveError = SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
+                ?? "Couldn't update your status."
+        }
+    }
+
+    // MARK: - Service visibility toggle (optimistic)
+
+    public func setServiceVisible(eventTypeId: String, visible: Bool) async {
+        let previous = serviceRows
+        serviceRows = serviceRows.map { row in
+            row.id == eventTypeId
+                ? BookingServiceRow(id: row.id, name: row.name, durationLabel: row.durationLabel,
+                                    locationIcon: row.locationIcon, isVisible: visible)
+                : row
+        }
+        do {
+            let _: EventTypeResponse = try await api.request(
+                SchedulingEndpoints.updateEventType(
+                    owner: owner,
+                    id: eventTypeId,
+                    UpdateEventTypeRequest(visibility: visible ? "public" : "secret")
+                )
+            )
+            // `serviceRows` is the optimistic source of truth; a later refresh
+            // re-fetches event types and rebuilds it authoritatively.
+        } catch {
+            serviceRows = previous
+            saveError = SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
+                ?? "Couldn't update that service."
+        }
+    }
+
+    // MARK: - Save
+
+    public func save() async {
+        guard isValid, !isSaving else { return }
+        isSaving = true
+        saveError = nil
+        defer { isSaving = false }
+
+        // 1) Slug first (its own endpoint + 409 handling) when changed.
+        if slugText != original.slug {
+            do {
+                let response: BookingPageResponse = try await api.request(
+                    SchedulingEndpoints.updateBookingPageSlug(owner: owner, BookingPageSlugRequest(slug: slugText))
+                )
+                page = response.page
+            } catch {
+                let scheduling = SchedulingError.from(error as? APIError ?? .invalidResponse)
+                if scheduling.code == "SLUG_TAKEN" {
+                    slugState = .taken(suggestions: [])
+                    saveError = "That handle is taken. Try another."
+                } else {
+                    saveError = scheduling.userMessage ?? "Couldn't save your handle."
+                }
+                return
+            }
+        }
+
+        // 2) The rest of the page fields.
+        do {
+            let response: BookingPageResponse = try await api.request(
+                SchedulingEndpoints.updateBookingPage(
+                    owner: owner,
+                    BookingPageUpdateRequest(
+                        title: titleText.trimmedOrNil,
+                        tagline: taglineText.trimmedOrNil,
+                        intro: introText.trimmedOrNil,
+                        confirmationMessage: confirmationText.trimmedOrNil,
+                        visibility: visibility.rawValue
+                    )
+                )
+            )
+            page = response.page
+            hydrate(from: response.page)
+            await flashSavedToast()
+        } catch {
+            saveError = SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
+                ?? "Couldn't save your changes."
+        }
+    }
+
+    private func flashSavedToast() async {
+        showSavedToast = true
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        showSavedToast = false
+    }
+
+    // MARK: - C3 ShareLinkSheet callbacks
+
+    /// Regenerate the public slug (danger — invalidates the old link).
+    public func regenerateLink() async {
+        do {
+            let response: BookingPageResponse = try await api.request(
+                SchedulingEndpoints.resetSlug(owner: owner)
+            )
+            hydrate(from: response.page)
+        } catch {
+            saveError = SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
+                ?? "Couldn't regenerate your link."
+        }
+    }
+
+    /// Turn the page live from the share sheet's draft banner.
+    public func turnOnPage() async {
+        await setAcceptingBookings(true)
+    }
+
+    // MARK: - Navigation
+
+    public func openIntakeQuestions() {
+        push(.eventTypeList(owner: owner))
+    }
+
+    public func openPayments() {
+        push(.paymentsSetup(owner: owner))
+    }
+
+    public func editService(_ id: String) {
+        push(.eventTypeEditor(owner: owner, eventTypeId: id))
+    }
+
+    public func createService() {
+        push(.eventTypeEditor(owner: owner, eventTypeId: nil))
+    }
+
+    // MARK: - Preview/test seam
+
+    #if DEBUG
+    func hydrateForPreview(page: BookingPageDTO, eventTypes: [EventTypeDTO]) {
+        self.page = page
+        self.eventTypes = eventTypes
+        hydrate(from: page)
+        rebuildServiceRows()
+        loadedOnce = true
+        state = .loaded
+    }
+    #endif
+}
+
+// MARK: - Helpers
+
+private extension String {
+    var trimmedOrNil: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}

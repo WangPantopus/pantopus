@@ -36,7 +36,7 @@ struct OneOffLinkGeneratorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "C4", title: "One-off Link", stream: "I4")
+        OneOffLinkGeneratorView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
