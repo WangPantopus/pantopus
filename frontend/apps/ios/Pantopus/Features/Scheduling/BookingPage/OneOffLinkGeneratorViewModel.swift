@@ -174,7 +174,9 @@ public final class OneOffLinkGeneratorViewModel {
         if selectedSlotIds.contains(id) { selectedSlotIds.remove(id) } else { selectedSlotIds.insert(id) }
     }
 
-    private func loadSlots() async {
+    /// Internal (not private) so targeted tests can drive the offered-slots
+    /// fetch directly instead of through the fire-and-forget toggle Task.
+    func loadSlots() async {
         guard let slug = pageSlug, let eventSlug = selectedEventType?.slug else { return }
         slotsLoading = true
         defer { slotsLoading = false }
@@ -238,7 +240,11 @@ public final class OneOffLinkGeneratorViewModel {
 
     private func caption(expiresAt: String?, singleUse: Bool) -> String {
         var parts: [String] = []
-        if expiry == .never, expiresAt == nil {
+        if let expiresAt,
+           let formatted = SchedulingTime.localString(utcISO: expiresAt, tz: timeZoneIdentifier) {
+            // Trust the server's actual expiry over the requested chip.
+            parts.append("Expires \(formatted)")
+        } else if expiry == .never {
             parts.append("No expiry")
         } else {
             parts.append("Expires in \(expiry.label.lowercased())")

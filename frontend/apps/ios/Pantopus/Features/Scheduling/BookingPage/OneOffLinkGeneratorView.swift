@@ -28,11 +28,12 @@ public struct OneOffLinkGeneratorView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             header
             content
         }
         .background(Theme.Color.appBg)
+        .toolbar(.hidden, for: .navigationBar)
         .task { await viewModel.load() }
         .overlay(alignment: .top) {
             if showCopied { CopiedToast().padding(.top, Spacing.s12) }
@@ -271,7 +272,7 @@ private struct SlotRow: View {
                 Text(label)
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appText)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.vertical, Spacing.s1)
             .contentShape(Rectangle())
