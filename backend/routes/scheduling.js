@@ -55,30 +55,61 @@ async function ensureDefaultSchedule(userId) {
   return sched.id;
 }
 
-async function ensurePage({ ownerType, ownerId, oc }, userId) {
-  const { data: page } = await supabaseAdmin
+// Find an owner's booking page. (owner_type, owner_id) is indexed but NOT
+// unique (see migration 159 — only lower(slug) is unique), so an owner can
+// accidentally accumulate duplicate rows; order + limit(1) keeps a plain
+// maybeSingle() from erroring on "multiple rows returned" and deterministically
+// returns the oldest page.
+async function findPage(ownerType, ownerId) {
+  const { data, error } = await supabaseAdmin
     .from('BookingPage')
     .select('*')
     .eq('owner_type', ownerType)
     .eq('owner_id', ownerId)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .maybeSingle();
-  if (page) return page;
+  if (error) throw error;
+  return data;
+}
+
+// Get-or-create the booking page for an owner. Guarantees a non-null page or
+// throws — every caller dereferences page.id, so a silent null here surfaces
+// as an opaque "Cannot read properties of null" 500 (the original bug). The
+// auto-create races with itself (the iOS client GETs then immediately PUTs the
+// page): if the insert loses a slug-unique race we re-read the now-existing row
+// instead of returning null, and any non-collision insert error is surfaced
+// loudly rather than swallowed.
+async function ensurePage({ ownerType, ownerId, oc }, userId) {
+  const existing = await findPage(ownerType, ownerId);
+  if (existing) return existing;
+
   const baseSlug = `${ownerType}-${String(ownerId).slice(0, 8)}`;
-  const { data: created, error } = await supabaseAdmin
+  const insertPage = (slug) => supabaseAdmin
     .from('BookingPage')
-    .insert({ ...oc, slug: baseSlug, is_live: false, created_by: userId })
+    .insert({ ...oc, slug, is_live: false, created_by: userId })
     .select('*')
     .single();
-  if (error) {
-    // Slug collision on the auto base — append a suffix.
-    const { data: retry } = await supabaseAdmin
-      .from('BookingPage')
-      .insert({ ...oc, slug: `${baseSlug}-${Date.now().toString(36)}`, is_live: false, created_by: userId })
-      .select('*')
-      .single();
-    return retry;
-  }
-  return created;
+
+  const first = await insertPage(baseSlug);
+  if (!first.error) return first.data;
+  if (!uniqueViolation(first.error)) throw first.error; // transient/structural — don't mask it
+
+  // Unique violation: either this owner's page was created concurrently
+  // (re-read it) or the auto base slug collides with another owner's page
+  // (retry once with a unique suffix).
+  const raced = await findPage(ownerType, ownerId);
+  if (raced) return raced;
+
+  // Random (not time-based) suffix so two requests retrying in the same
+  // millisecond don't regenerate the same slug — matches the slug-reset idiom.
+  const retry = await insertPage(`${baseSlug}-${Math.random().toString(36).slice(2, 10)}`);
+  if (!retry.error) return retry.data;
+  if (!uniqueViolation(retry.error)) throw retry.error;
+
+  const racedAgain = await findPage(ownerType, ownerId);
+  if (racedAgain) return racedAgain;
+  throw retry.error; // give up loudly rather than returning null
 }
 
 function uniqueViolation(error) {
@@ -1401,3 +1432,5 @@ router.post('/polls/:id/finalize', validate(Joi.object({ option_id: Joi.string()
 }));
 
 module.exports = router;
+// Exposed for unit tests (see tests/unit/schedulingLogic.test.js).
+module.exports._internal = { ensurePage, findPage };
