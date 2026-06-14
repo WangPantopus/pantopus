@@ -224,6 +224,35 @@ public enum HomesEndpoints {
         )
     }
 
+    /// `GET /api/homes/:id/events/:eventId` — event detail + RSVP attendees
+    /// (route `backend/routes/home.js`). Added for Calendarly I10 (Home Event
+    /// Detail + RSVP); consumed read-only by the feature stream. Decodes
+    /// `HomeEventDetailResponse`.
+    public static func getHomeEvent(
+        homeId: String,
+        eventId: String
+    ) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/events/\(eventId)"
+        )
+    }
+
+    /// `POST /api/homes/:id/events/:eventId/rsvp` — upsert the signed-in
+    /// member's RSVP (`HomeEventRsvpRequest` → `HomeEventRsvpResponse`). Added
+    /// for Calendarly I10.
+    public static func rsvpHomeEvent(
+        homeId: String,
+        eventId: String,
+        request: HomeEventRsvpRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/events/\(eventId)/rsvp",
+            body: request
+        )
+    }
+
     // MARK: - Maintenance (T6.3b / P10)
 
     /// `GET /api/homes/:id/maintenance` — route `backend/routes/home.js`
