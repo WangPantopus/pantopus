@@ -5,8 +5,8 @@
 //  Stream I3 — pure-logic tests for the Availability formatting helpers.
 //
 
-@testable import Pantopus
 import XCTest
+@testable import Pantopus
 
 final class AvailabilityFormattingTests: XCTestCase {
     // MARK: TimeOfDay

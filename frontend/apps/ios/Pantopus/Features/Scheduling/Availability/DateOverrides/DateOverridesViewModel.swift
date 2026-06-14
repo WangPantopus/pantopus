@@ -18,14 +18,21 @@ struct OverrideEntry: Identifiable, Hashable {
     var isUnavailable: Bool
     var start: TimeOfDay?
     var end: TimeOfDay?
-    var id: String { date }
+    var id: String {
+        date
+    }
 }
 
 enum OverrideMode: String, CaseIterable, Identifiable {
     case unavailable
     case customHours
-    var id: String { rawValue }
-    var label: String { self == .unavailable ? "Unavailable" : "Custom hours" }
+    var id: String {
+        rawValue
+    }
+
+    var label: String {
+        self == .unavailable ? "Unavailable" : "Custom hours"
+    }
 }
 
 @Observable
@@ -67,7 +74,9 @@ final class DateOverridesViewModel {
         USHolidays.forYear(Calendar.current.component(.year, from: Date()))
     }
 
-    var holidayCount: Int { currentYearHolidays.count }
+    var holidayCount: Int {
+        currentYearHolidays.count
+    }
 
     /// True when every current-year holiday is already present as an
     /// unavailable override.
@@ -88,7 +97,9 @@ final class DateOverridesViewModel {
         await fetch()
     }
 
-    func reload() async { await fetch() }
+    func reload() async {
+        await fetch()
+    }
 
     private func fetch() async {
         phase = .loading

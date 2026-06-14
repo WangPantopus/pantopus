@@ -5,8 +5,8 @@
 //  Stream I3 — B6 date-overrides + B9 block-off projection tests.
 //
 
-@testable import Pantopus
 import XCTest
+@testable import Pantopus
 
 @MainActor
 final class DateOverridesAndBlockOffViewModelTests: XCTestCase {
@@ -23,15 +23,18 @@ final class DateOverridesAndBlockOffViewModelTests: XCTestCase {
         ))
     }
 
+    private static let twoSchedulesOverrides = #"""
+    {"schedules":[],"rules":[],"overrides":[{"schedule_id":"s1","date":"2026-07-04","is_unavailable":true},{"schedule_id":"s2","date":"2026-08-01","is_unavailable":true}]}
+    """#
+
+    private static let blockResponse = #"""
+    {"block":{"id":"b1","start_at":"2026-06-18T14:00:00Z","end_at":"2026-06-18T15:00:00Z"}}
+    """#
+
     // MARK: B6 — Date Overrides
 
     func testOverridesFilterBySchedule() async {
-        SequencedURLProtocol.sequence = [.status(200, body: """
-        {"schedules":[],"rules":[],"overrides":[
-          {"schedule_id":"s1","date":"2026-07-04","is_unavailable":true},
-          {"schedule_id":"s2","date":"2026-08-01","is_unavailable":true}
-        ]}
-        """)]
+        SequencedURLProtocol.sequence = [.status(200, body: Self.twoSchedulesOverrides)]
         let viewModel = DateOverridesViewModel(scheduleId: "s1", client: makeClient())
         await viewModel.load()
         guard case .ready = viewModel.phase else {
@@ -70,9 +73,7 @@ final class DateOverridesAndBlockOffViewModelTests: XCTestCase {
     }
 
     func testBlockOffSaveCreatesBlock() async {
-        SequencedURLProtocol.sequence = [.status(200, body: """
-        {"block":{"id":"b1","start_at":"2026-06-18T14:00:00Z","end_at":"2026-06-18T15:00:00Z"}}
-        """)]
+        SequencedURLProtocol.sequence = [.status(200, body: Self.blockResponse)]
         let viewModel = BlockOffTimeViewModel(client: makeClient())
         viewModel.reason = "Dentist"
         let ok = await viewModel.save()

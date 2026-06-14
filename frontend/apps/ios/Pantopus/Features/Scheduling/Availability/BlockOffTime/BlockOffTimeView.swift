@@ -45,7 +45,7 @@ struct BlockOffTimeView: View {
     private var reasonGroup: some View {
         FormFieldGroup("Reason") {
             TextField("Dentist", text: $viewModel.reason)
-                .font(.system(size: 16))
+                .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityIdentifier("scheduling.blockOff.reasonField")
             Text("Optional — only you can see this.")

@@ -5,8 +5,8 @@
 //  Stream I3 — B4 schedule-list projection tests.
 //
 
-@testable import Pantopus
 import XCTest
+@testable import Pantopus
 
 @MainActor
 final class AvailabilityScheduleListViewModelTests: XCTestCase {
