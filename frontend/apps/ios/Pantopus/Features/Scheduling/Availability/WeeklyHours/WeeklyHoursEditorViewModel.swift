@@ -18,14 +18,18 @@ struct DayHours: Identifiable, Hashable {
     let weekday: Int
     var isEnabled: Bool
     var ranges: [TimeRange]
-    var id: Int { weekday }
+    var id: Int {
+        weekday
+    }
 }
 
 /// Locally-presented sheet from the weekly-hours editor.
 enum WeeklyHoursSheet: String, Identifiable {
     case dateOverrides
     case blockOff
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 }
 
 @Observable
@@ -81,8 +85,13 @@ final class WeeklyHoursEditorViewModel {
         return true
     }
 
-    var allOff: Bool { !days.contains { $0.isEnabled } }
-    var isDirty: Bool { signature() != baselineSignature }
+    var allOff: Bool {
+        !days.contains { $0.isEnabled }
+    }
+
+    var isDirty: Bool {
+        signature() != baselineSignature
+    }
 
     /// `Pacific Time · auto` style chip label.
     var timezoneDisplay: String {
@@ -97,7 +106,9 @@ final class WeeklyHoursEditorViewModel {
         await fetch()
     }
 
-    func reload() async { await fetch() }
+    func reload() async {
+        await fetch()
+    }
 
     private func fetch() async {
         phase = .loading

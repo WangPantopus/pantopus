@@ -5,8 +5,8 @@
 //  Stream I3 — B5 weekly-hours editor projection tests.
 //
 
-@testable import Pantopus
 import XCTest
+@testable import Pantopus
 
 @MainActor
 final class WeeklyHoursEditorViewModelTests: XCTestCase {
@@ -65,7 +65,9 @@ final class WeeklyHoursEditorViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: Self.composite)]
         let viewModel = WeeklyHoursEditorViewModel(scheduleId: "s1", push: { _ in }, client: makeClient())
         await viewModel.load()
-        for weekday in Weekday.displayOrder { viewModel.setEnabled(weekday, false) }
+        for weekday in Weekday.displayOrder {
+            viewModel.setEnabled(weekday, false)
+        }
         XCTAssertTrue(viewModel.allOff)
         XCTAssertTrue(viewModel.formValid) // all-off is valid
     }

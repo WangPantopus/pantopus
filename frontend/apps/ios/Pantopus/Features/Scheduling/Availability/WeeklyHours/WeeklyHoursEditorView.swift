@@ -93,7 +93,7 @@ struct WeeklyHoursEditorView: View {
     private var nameGroup: some View {
         FormFieldGroup("Schedule name") {
             TextField("Working hours", text: $viewModel.scheduleName)
-                .font(.system(size: 16))
+                .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
                 .textInputAutocapitalization(.words)
                 .accessibilityIdentifier("scheduling.weeklyHours.nameField")

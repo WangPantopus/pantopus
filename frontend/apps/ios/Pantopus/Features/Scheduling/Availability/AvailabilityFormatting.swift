@@ -41,7 +41,9 @@ public struct TimeOfDay: Sendable, Hashable, Comparable {
     }
 
     /// Minutes since midnight — handy for range comparisons.
-    public var minutesSinceMidnight: Int { hour * 60 + minute }
+    public var minutesSinceMidnight: Int {
+        hour * 60 + minute
+    }
 
     public static func < (lhs: TimeOfDay, rhs: TimeOfDay) -> Bool {
         lhs.minutesSinceMidnight < rhs.minutesSinceMidnight
@@ -88,10 +90,14 @@ public struct TimeRange: Sendable, Hashable, Identifiable {
     }
 
     /// A window is well-formed when it has positive duration.
-    public var isValid: Bool { start < end }
+    public var isValid: Bool {
+        start < end
+    }
 
     /// Localized display, e.g. `9:00 AM – 5:00 PM`.
-    public var display: String { "\(start.display) – \(end.display)" }
+    public var display: String {
+        "\(start.display) – \(end.display)"
+    }
 
     public static let nineToFive = TimeRange(start: .nineAM, end: .fivePM)
 }
@@ -113,8 +119,13 @@ public enum Weekday {
         0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat"
     ]
 
-    public static func longName(_ weekday: Int) -> String { longNames[weekday] ?? "" }
-    public static func shortName(_ weekday: Int) -> String { shortNames[weekday] ?? "" }
+    public static func longName(_ weekday: Int) -> String {
+        longNames[weekday] ?? ""
+    }
+
+    public static func shortName(_ weekday: Int) -> String {
+        shortNames[weekday] ?? ""
+    }
 }
 
 /// Builds the human-readable summary line shown on the B4 schedule list
@@ -212,7 +223,9 @@ public enum USHolidays {
     public struct Holiday: Sendable, Hashable, Identifiable {
         public let date: String
         public let name: String
-        public var id: String { date }
+        public var id: String {
+            date
+        }
     }
 
     /// The 11 US federal holidays for `year`, observed-date math included for
