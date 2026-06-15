@@ -228,6 +228,45 @@ class ChatConversationViewModelTest {
             assertTrue(loaded.rows.first() is ChatTimelineRow.DayDivider)
         }
 
+    /**
+     * The backend returns messages oldest-first (backend/routes/chats.js
+     * fetches the newest N rows then reverses them). The initial load must
+     * preserve that order — oldest bubble at the top, newest at the bottom —
+     * and must never re-reverse it back to newest-first.
+     */
+    @Test fun load_keeps_backend_oldest_first_order() =
+        runTest {
+            coEvery { repo.conversationMessages(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(
+                    ChatMessagesResponse(
+                        messages =
+                            listOf(
+                                message(id = "m_old", userId = "u_other", text = "first", createdAt = "2026-04-20T09:00:00.000Z"),
+                                message(id = "m_mid", userId = "u_me", text = "second", createdAt = "2026-04-20T10:00:00.000Z"),
+                                message(id = "m_new", userId = "u_other", text = "third", createdAt = "2026-04-20T11:00:00.000Z"),
+                            ),
+                        hasMore = false,
+                    ),
+                )
+            val vm = makeViewModel()
+            vm.configure(
+                mode = ChatThreadMode.Person(otherUserId = "u_other"),
+                counterparty = counterpartyPerson,
+                currentUserId = "u_me",
+            )
+            vm.load()
+            val loaded = vm.state.value as ChatConversationUiState.Loaded
+            val bubbleIds =
+                loaded.rows
+                    .filterIsInstance<ChatTimelineRow.Bubble>()
+                    .map { it.content.id }
+            assertEquals(
+                "initial load must render oldest-first (backend order), not reversed to newest-first",
+                listOf("m_old", "m_mid", "m_new"),
+                bubbleIds,
+            )
+        }
+
     @Test fun load_subscribes_to_backend_socket_event_names() =
         runTest {
             coEvery { repo.conversationMessages(any(), any(), any(), any(), any()) } returns

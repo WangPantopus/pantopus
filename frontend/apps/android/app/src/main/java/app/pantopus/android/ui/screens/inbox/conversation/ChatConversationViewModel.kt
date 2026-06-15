@@ -1262,8 +1262,14 @@ class ChatConversationViewModel
                         // this fetch was in flight may have upserted its
                         // message ahead of us.
                         val existingIds = messages.mapTo(mutableSetOf()) { it.id }
-                        val ordered = response.data.messages.asReversed().filterNot { existingIds.contains(it.id) }
-                        messages.addAll(0, ordered)
+                        // Backend returns messages oldest-first (ascending) —
+                        // see backend/routes/chats.js, which fetches the newest
+                        // N rows then reverses them. Append + sort by created_at
+                        // so the held list stays oldest-first regardless of which
+                        // page these rows came from.
+                        val incoming = response.data.messages.filterNot { existingIds.contains(it.id) }
+                        messages.addAll(incoming)
+                        messages.sortBy { it.createdAt }
                         // A fetched row carrying one of our client ids means
                         // that send landed server-side (e.g. the POST response
                         // was lost, then a socket refetch ran) — retire every

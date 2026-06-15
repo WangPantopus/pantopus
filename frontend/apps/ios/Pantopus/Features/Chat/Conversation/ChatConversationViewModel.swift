@@ -1443,7 +1443,7 @@ public final class ChatConversationViewModel {
             // we don't hold yet. Never touches the pagination cursors, so
             // a socket echo can't wipe the history the user scrolled to.
             var didChange = false
-            for fetched in response.messages.reversed() {
+            for fetched in response.messages {
                 if let index = messages.firstIndex(where: { $0.id == fetched.id }) {
                     if messages[index] != fetched {
                         messages[index] = fetched
@@ -1463,13 +1463,16 @@ public final class ChatConversationViewModel {
             joinActiveRoomsIfPossible()
             return
         }
-        // Backend returns newest-first; we keep an oldest-first array
-        // for stable projection. Drop ids we already hold — a send
-        // completing while this fetch was in flight may have upserted
-        // its message ahead of us.
+        // Backend returns messages oldest-first (ascending) — see
+        // backend/routes/chats.js, which fetches the newest N rows then
+        // reverses them. Drop ids we already hold (a send completing while
+        // this fetch was in flight may have upserted its message ahead of
+        // us), then sort by (created_at, id) so the held array stays
+        // oldest-first regardless of which page these rows came from.
         let existingIds = Set(messages.map(\.id))
-        let ordered = response.messages.reversed().filter { !existingIds.contains($0.id) }
-        messages.insert(contentsOf: ordered, at: 0)
+        let incoming = response.messages.filter { !existingIds.contains($0.id) }
+        messages.append(contentsOf: incoming)
+        messages.sort { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
         retireConfirmedClientIds(in: response)
         updateActiveRooms(response: response)
         hasMore = response.hasMore ?? false

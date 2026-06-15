@@ -148,6 +148,42 @@ final class ChatConversationViewModelTests: XCTestCase {
         if case .dayDivider = rows.first { /* ok */ } else { XCTFail("Expected day divider first") }
     }
 
+    /// The backend returns messages oldest-first (`backend/routes/chats.js`
+    /// fetches the newest N rows then `.reverse()`s them). The initial load
+    /// must preserve that order — oldest bubble at the top, newest at the
+    /// bottom — and must never re-reverse it back to newest-first.
+    func testInitialLoadKeepsBackendOldestFirstOrder() async {
+        URLProtocolStub.stub(
+            path: "/api/chat/conversations/u_other/messages",
+            response: .json(Self.messagesJSON(
+                Self.messageJSON(id: "m_old", userId: "u_other", text: "first", createdAt: "2026-04-20T09:00:00.000Z"),
+                Self.messageJSON(id: "m_mid", userId: "u_me", text: "second", createdAt: "2026-04-20T10:00:00.000Z"),
+                Self.messageJSON(id: "m_new", userId: "u_other", text: "third", createdAt: "2026-04-20T11:00:00.000Z")
+            ))
+        )
+        URLProtocolStub.stub(path: "/api/chat/conversations/u_other/read", response: .json("{}"))
+        let vm = ChatConversationViewModel(
+            mode: .person(otherUserId: "u_other"),
+            counterparty: Self.counterpartyPerson,
+            currentUserId: "u_me",
+            api: makeAPI()
+        )
+        await vm.load()
+        guard case let .loaded(rows) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        let bubbleIds = rows.compactMap { row -> String? in
+            if case let .bubble(content) = row { return content.id }
+            return nil
+        }
+        XCTAssertEqual(
+            bubbleIds,
+            ["m_old", "m_mid", "m_new"],
+            "initial load must render oldest-first (backend order), not reversed to newest-first"
+        )
+    }
+
     func testAIThreadStartsInEmptyForWelcomeFrame() async {
         let vm = ChatConversationViewModel(
             mode: .ai,
