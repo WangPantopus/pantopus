@@ -23,7 +23,11 @@ struct InvoicesListView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: "Invoices", onBack: { dismiss() })
+            PkgTopBar(title: "Invoices", onBack: { dismiss() }) {
+                PkgTopBarIconButton(icon: .search, accessibilityLabel: "Search", tint: Theme.Color.appText) {
+                    model.search()
+                }
+            }
             content
         }
         .background(Theme.Color.appBg)
@@ -66,6 +70,7 @@ struct InvoicesListView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 summary
+                filterChips
                 ForEach(model.sections) { section in
                     Text(section.day.uppercased())
                         .font(.system(size: 9, weight: .bold)).tracking(0.8)
@@ -74,10 +79,11 @@ struct InvoicesListView: View {
                     PkgRowCard {
                         ForEach(Array(section.invoices.enumerated()), id: \.element.id) { index, invoice in
                             InvoiceRow(
+                                initials: model.payerInitials(invoice),
                                 reference: model.reference(invoice),
+                                service: model.service(invoice),
                                 amount: model.amount(invoice),
-                                accent: model.accent,
-                                accentBg: model.theme.accentBg,
+                                ownerType: model.theme.title.lowercased(),
                                 onTap: { model.openInvoice(invoice) }
                             )
                             if index < section.invoices.count - 1 { Divider().background(Theme.Color.appBorder) }
@@ -92,24 +98,56 @@ struct InvoicesListView: View {
         .refreshable { await model.refresh() }
     }
 
+    /// Horizontal status filter chips (`invoiceslist-frames.jsx` `FilterChips`)
+    /// — business-violet on the selected chip, hairline-bordered surface
+    /// otherwise. Selection is view-only until the DTO carries `status`.
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(InvoicesListViewModel.InvoiceFilter.allCases) { filter in
+                    let on = model.selectedFilter == filter
+                    Button { model.selectFilter(filter) } label: {
+                        Text(filter.rawValue)
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(on ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+                            .padding(.horizontal, Spacing.s3)
+                            .frame(height: 30)
+                            .background(on ? model.accent : Theme.Color.appSurface)
+                            .overlay {
+                                if !on {
+                                    Capsule().stroke(Theme.Color.appBorder, lineWidth: 1)
+                                }
+                            }
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
     private var summary: some View {
-        PkgCard {
+        PkgCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
             HStack(spacing: Spacing.s0) {
-                stat(label: "Invoices", value: model.countLabel)
+                stat(label: "Invoices", value: model.countLabel, overdue: model.hasOverdue)
                 Rectangle().fill(Theme.Color.appBorder).frame(width: 1, height: 40)
-                stat(label: "Total invoiced", value: model.totalLabel)
+                stat(label: "Total invoiced", value: model.totalLabel, overdue: false)
             }
         }
     }
 
-    private func stat(label: String, value: String) -> some View {
+    /// One summary column. `overdue` paints the label + value amber to match the
+    /// design's `Summary overdue` treatment (driven by `model.hasOverdue`).
+    private func stat(label: String, value: String, overdue: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
                 .font(.system(size: 10, weight: .bold)).tracking(0.6)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .foregroundStyle(overdue ? Theme.Color.warning : Theme.Color.appTextSecondary)
             Text(value)
                 .font(.system(size: 21, weight: .heavy)).tracking(-0.5).monospacedDigit()
-                .foregroundStyle(Theme.Color.appText)
+                .foregroundStyle(overdue ? Theme.Color.warning : Theme.Color.appText)
                 .lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,14 +157,20 @@ struct InvoicesListView: View {
     private var loadingBody: some View {
         ScrollView {
             VStack(spacing: Spacing.s3) {
-                Shimmer(height: 76, cornerRadius: Radii.xl)
+                // Two-column summary skeleton (design frame 4 `Card`).
+                PkgCard(padding: EdgeInsets(top: 14, leading: 14, bottom: 14, trailing: 14)) {
+                    HStack(spacing: Spacing.s3) {
+                        summaryStatSkeleton
+                        summaryStatSkeleton
+                    }
+                }
                 PkgRowCard {
                     ForEach(0..<4, id: \.self) { i in
                         HStack(spacing: 11) {
                             Shimmer(width: 34, height: 34, cornerRadius: Radii.pill)
                             VStack(alignment: .leading, spacing: 6) { Shimmer(width: 120, height: 11); Shimmer(width: 80, height: 8) }
                             Spacer()
-                            Shimmer(width: 56, height: 14)
+                            Shimmer(width: 50, height: 24, cornerRadius: Radii.pill)
                         }
                         .padding(.vertical, 13)
                         if i < 3 { Divider().background(Theme.Color.appBorder) }
@@ -137,38 +181,66 @@ struct InvoicesListView: View {
             .padding(.top, Spacing.s3)
         }
     }
+
+    private var summaryStatSkeleton: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Shimmer(width: 60, height: 9)
+            Shimmer(width: 50, height: 18)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 // MARK: - Row
 
 private struct InvoiceRow: View {
+    let initials: String
+    /// Mono reference. Design's bold primary line is the payer name; the lean
+    /// DTO has no payer display name, so the reference currently serves as the
+    /// primary line (and the design's mono treatment is preserved on it). When
+    /// the payer name lands it becomes the primary and the reference returns to
+    /// the sub-line `INV-… · service` per design.
     let reference: String
+    let service: String
     let amount: String
-    let accent: Color
-    let accentBg: Color
+    let ownerType: String
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 11) {
-                Icon(.receipt, size: 16, color: accent)
-                    .frame(width: 34, height: 34)
-                    .background(accentBg)
-                    .clipShape(Circle())
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Invoice").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appText)
-                    Text(reference)
-                        .font(.system(size: 10.5, design: .monospaced)).foregroundStyle(Theme.Color.appTextSecondary)
+                ZStack {
+                    Circle().fill(SchedulingGradient.linear(for: ownerType))
+                    Text(initials)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
                 }
-                Spacer()
-                Text(amount)
-                    .font(.system(size: 13.5, weight: .bold)).monospacedDigit()
-                    .foregroundStyle(Theme.Color.appText)
+                .frame(width: 34, height: 34)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(reference)
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.Color.appText)
+                        .lineLimit(1)
+                    Text(service)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: Spacing.s2)
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(amount)
+                        .font(.system(size: 13.5, weight: .bold)).monospacedDigit()
+                        .foregroundStyle(Theme.Color.appText)
+                    // Design row trailing carries a tone-colored status pill
+                    // (Paid/Sent/Overdue/Void/Refunded). The DTO has no `status`,
+                    // so the pill is deferred — the trailing column is built to
+                    // host it (PkgChip) once the field lands.
+                }
             }
             .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Invoice \(reference), \(amount)")
+        .accessibilityLabel("Invoice \(reference), \(service), \(amount)")
     }
 }

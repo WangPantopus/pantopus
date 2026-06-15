@@ -59,7 +59,8 @@ struct InvoiceDetailView: View {
                     hero
                     payerPayee.padding(.top, 14)
                     lineItemsSection.padding(.top, 16)
-                    Color.clear.frame(height: Spacing.s10)
+                    paymentTermsSection.padding(.top, 16)
+                    Color.clear.frame(height: Spacing.s2)
                 }
                 .padding(.horizontal, Spacing.s4)
                 .padding(.top, Spacing.s2)
@@ -101,12 +102,17 @@ struct InvoiceDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
+    /// JSX `Section` chrome — `i data-lucide` glyph + uppercase overline title.
+    private func sectionHeader(_ title: String, icon: PantopusIcon) -> some View {
+        HStack(spacing: 6) {
+            Icon(icon, size: 13, color: Theme.Color.appTextSecondary)
+            Text(title.uppercased()).font(.system(size: 9.5, weight: .bold)).tracking(0.8).foregroundStyle(Theme.Color.appTextSecondary)
+        }
+    }
+
     private var lineItemsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Icon(.list, size: 13, color: Theme.Color.appTextSecondary)
-                Text("LINE ITEMS").font(.system(size: 9.5, weight: .bold)).tracking(0.8).foregroundStyle(Theme.Color.appTextSecondary)
-            }
+            sectionHeader("Line items", icon: .list)
             if model.lineItems.isEmpty {
                 Text("Itemized details aren't available for this invoice.")
                     .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
@@ -123,25 +129,30 @@ struct InvoiceDetailView: View {
 
     private var table: some View {
         VStack(spacing: Spacing.s0) {
-            HStack {
+            HStack(spacing: Spacing.s0) {
                 Text("ITEM").frame(maxWidth: .infinity, alignment: .leading)
-                Text("QTY").frame(width: 32, alignment: .center)
-                Text("TOTAL").frame(width: 72, alignment: .trailing)
+                Text("QTY").frame(width: 24, alignment: .center)
+                Text("UNIT").frame(width: 52, alignment: .trailing)
+                Text("TOTAL").frame(width: 56, alignment: .trailing)
             }
             .font(.system(size: 8.5, weight: .bold)).tracking(0.6).foregroundStyle(Theme.Color.appTextMuted)
             .padding(.horizontal, 11).padding(.vertical, 7)
             .background(Theme.Color.appSurfaceRaised)
             ForEach(model.lineItems) { item in
-                HStack {
-                    Text(item.label).font(.system(size: 11)).foregroundStyle(Theme.Color.appText)
+                HStack(spacing: Spacing.s0) {
+                    Text(item.label).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.Color.appText)
                         .frame(maxWidth: .infinity, alignment: .leading).lineLimit(2)
                     Text(item.quantity.map(String.init) ?? "—")
                         .font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
-                        .frame(width: 32, alignment: .center)
+                        .frame(width: 24, alignment: .center)
+                    Text(model.unitLabel(item))
+                        .font(.system(size: 11)).monospacedDigit()
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .frame(width: 52, alignment: .trailing)
                     Text(model.lineTotalLabel(item))
                         .font(.system(size: 11, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(Theme.Color.appText)
-                        .frame(width: 72, alignment: .trailing)
+                        .frame(width: 56, alignment: .trailing)
                 }
                 .padding(.horizontal, 11).padding(.vertical, 9)
                 Divider().background(Theme.Color.appBorderSubtle)
@@ -159,11 +170,23 @@ struct InvoiceDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
+    /// Static product policy copy — JSX "Payment terms" section.
+    private var paymentTermsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Payment terms", icon: .fileText)
+            Text("Net 14 from issue. Pantopus Pay, card, or ACH.")
+                .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextStrong)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private var dock: some View {
         PkgDock {
             ShareLink(item: model.shareText) {
                 HStack(spacing: 7) {
-                    Icon(.share, size: 15, color: Theme.Color.appText)
+                    Icon(.share2, size: 15, color: Theme.Color.appText)
                     Text("Share").font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
                 }
                 .frame(maxWidth: .infinity).frame(height: 46)

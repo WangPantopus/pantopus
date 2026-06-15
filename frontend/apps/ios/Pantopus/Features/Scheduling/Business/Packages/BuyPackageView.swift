@@ -57,17 +57,25 @@ struct BuyPackageView: View {
     // MARK: Checkout
 
     private var checkout: some View {
-        VStack(spacing: Spacing.s0) {
+        // Declined (frame 3) and already-owns-credits (frame 4) drop the intro
+        // caption + eligibility row to keep the sheet focused, matching the JSX.
+        let isDeclined = { if case .declined = model.payState { return true } else { return false } }()
+        let hasUpsell = model.existingCredit != nil
+        return VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(spacing: Spacing.s3) {
-                    Text("Save by buying sessions up front.")
-                        .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if !isDeclined && !hasUpsell && !model.isGuest {
+                        Text("Save by buying sessions up front.")
+                            .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     if case let .declined(message) = model.payState { declinedBanner(message) }
-                    if let credit = model.existingCredit { upsellBanner(credit) }
                     ownerCard
+                    if let credit = model.existingCredit { upsellBanner(credit) }
                     summaryCard
-                    eligibleRow
+                    if !isDeclined && !hasUpsell { eligibleRow }
+                    if model.isGuest { guestEmailCard }
+                    payMethodRow
                     footnote
                     Color.clear.frame(height: Spacing.s4)
                 }
@@ -133,17 +141,60 @@ struct BuyPackageView: View {
 
     private var eligibleRow: some View {
         HStack(alignment: .top, spacing: 10) {
-            Icon(.tag, size: 16, color: model.accent).padding(.top, 1)
+            Icon(.ticketCheck, size: 16, color: model.accent).padding(.top, 1)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Use credits on").font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
                 Text(model.package?.eventTypeId == nil ? "All of this provider's services" : "The selected service")
                     .font(.system(size: 11)).foregroundStyle(Theme.Color.appTextStrong)
+                Text("Credits expire 1 year after purchase")
+                    .font(.system(size: 10.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.top, 2)
             }
             Spacer()
         }
         .padding(.horizontal, 13).padding(.vertical, 11)
         .background(model.theme.accentBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    /// Saved payment-method row (buypackage frames 1-4). View-only structure —
+    /// the actual card on file + selector are not yet wired (deferred backend);
+    /// tapping today simply presents the Stripe sheet via the Pay CTA.
+    private var payMethodRow: some View {
+        HStack(spacing: 11) {
+            Icon(.creditCard, size: 16, color: Theme.Color.stripeBrand)
+                .frame(width: 34, height: 24)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+            Text("Add a payment method")
+                .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.Color.appText)
+            Spacer()
+            Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+        }
+        .padding(.horizontal, 13).padding(.vertical, 11)
+        .background(Theme.Color.appSurface)
+        .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    /// Guest-email card (buypackage frame 2). View-only — the email input +
+    /// "Sign in" link are not yet bound to an auth/receipt endpoint.
+    private var guestEmailCard: some View {
+        PkgCard {
+            Text("Email").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+            Text("you@email.com")
+                .font(.system(size: 12.5)).foregroundStyle(Theme.Color.appTextMuted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 11).padding(.vertical, 10)
+                .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1.5))
+            (
+                Text("We'll send your receipt and credits here. ")
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                + Text("Sign in").foregroundStyle(Theme.Color.primary600).fontWeight(.bold)
+            )
+            .font(.system(size: 10.5))
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var footnote: some View {
@@ -159,7 +210,7 @@ struct BuyPackageView: View {
     private func upsellBanner(_ credit: PackageCreditDTO) -> some View {
         VStack(spacing: 10) {
             HStack(alignment: .top, spacing: 9) {
-                Icon(.tag, size: 16, color: Theme.Color.info).padding(.top, 1)
+                Icon(.ticket, size: 16, color: Theme.Color.info).padding(.top, 1)
                 Text("You already have \(credit.remainingSessions ?? 0) credit\((credit.remainingSessions ?? 0) == 1 ? "" : "s") left on this package.")
                     .font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
                     .frame(maxWidth: .infinity, alignment: .leading)

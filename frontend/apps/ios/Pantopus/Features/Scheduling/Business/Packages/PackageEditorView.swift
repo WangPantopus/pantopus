@@ -77,6 +77,7 @@ struct PackageEditorView: View {
                 PkgNote(tone: .info, icon: .info,
                         text: "Changing the price creates a new Stripe price. Current buyers keep their terms.")
             }
+            expiryCard
             activeCard
             Color.clear.frame(height: Spacing.s8)
         }
@@ -94,6 +95,11 @@ struct PackageEditorView: View {
                 text: $model.name,
                 error: model.nameError,
                 helper: model.nameError ? "Give your package a name" : nil
+            )
+            PkgMultilineField(
+                label: "Description",
+                placeholder: "What's included",
+                text: $model.packageDescription
             )
         }
     }
@@ -145,11 +151,27 @@ struct PackageEditorView: View {
         }
     }
 
+    private var expiryCard: some View {
+        // Functional control → product sky (design `Segmented` selects in blue700),
+        // not the pillar accent. View-only until the expiry column lands.
+        PkgCard(overline: "Expiry") {
+            PkgSegmented(
+                options: PackageEditorViewModel.Expiry.allCases.map(\.label),
+                selectedIndex: PackageEditorViewModel.Expiry.allCases.firstIndex(of: model.expiry) ?? 1,
+                accent: Theme.Color.primary700
+            ) { idx in
+                model.expiry = PackageEditorViewModel.Expiry.allCases[idx]
+            }
+        }
+    }
+
     private var activeCard: some View {
+        // Design's toggle switch is functional sky (`E.blue600`), not the pillar
+        // accent — keep the switch product sky.
         PkgCard {
             PkgToggleRow(
                 icon: .power, label: "Active", sub: "Buyers can purchase this package",
-                isOn: $model.isActive, accent: model.accent
+                isOn: $model.isActive, accent: Theme.Color.primary600
             )
         }
     }
@@ -183,6 +205,45 @@ struct PackageEditorView: View {
         }
         .background(Theme.Color.appBg)
         .navigationBarBackButtonHidden(true)
+    }
+}
+
+// MARK: - Multiline field
+
+/// Multiline counterpart to the shared `PkgTextField`, matching the design's
+/// `TextInput … multiline` (1.5px border, radius 8, 48pt min height). Kept
+/// stream-local because `PkgTextField` is single-line; promote to the shared
+/// kit if another screen needs it.
+private struct PkgMultilineField: View {
+    var label: String? = nil
+    let placeholder: String
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let label {
+                Text(label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+            }
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text(placeholder)
+                        .font(.system(size: 13)).foregroundStyle(Theme.Color.appTextMuted)
+                        .padding(.horizontal, 11).padding(.vertical, 9)
+                }
+                TextField("", text: $text, axis: .vertical)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(2...5)
+                    .padding(.horizontal, 11).padding(.vertical, 9)
+            }
+            .frame(minHeight: 48, alignment: .topLeading)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
     }
 }
 

@@ -46,7 +46,7 @@ struct MyPackagesView: View {
             PkgErrorState(message: message) { Task { await model.load() } }
         case .empty:
             EmptyState(
-                icon: .tag,
+                icon: .ticket,
                 headline: "No packages yet",
                 subcopy: "When you buy a package, your credits show up here.",
                 cta: EmptyState.CTA(title: "Browse services") { await MainActor.run { model.browseServices() } },
@@ -139,14 +139,23 @@ private struct CreditCard: View {
         .opacity(spent ? 0.7 : 1)
     }
 
+    /// Displayed owner label. The `my-packages` contract carries no owner display
+    /// name, so we fall back to the pillar label ("Business provider"); the real
+    /// owner name + per-owner accent badge is a backend follow-up.
+    private var ownerName: String { "\(ownerTheme.title) provider" }
+
+    /// First letter of the owner label for the gradient initial-disc (JSX `name[0]`).
+    private var ownerInitial: String { String(ownerName.prefix(1)).uppercased() }
+
     private var ownerRow: some View {
         HStack(spacing: 9) {
-            ZStack {
-                Circle().fill(SchedulingGradient.linear(for: ownerTheme.title.lowercased()))
-                Icon(ownerTheme.icon, size: 13, color: Theme.Color.appTextInverse)
-            }
-            .frame(width: 28, height: 28)
-            Text("\(ownerTheme.title) provider").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.Color.appText)
+            Text(ownerInitial)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .frame(width: 28, height: 28)
+                .background(SchedulingGradient.linear(for: ownerTheme.title.lowercased()))
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Text(ownerName).font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.Color.appText)
             Icon(.badgeCheck, size: 13, color: ownerTheme.accent)
         }
     }

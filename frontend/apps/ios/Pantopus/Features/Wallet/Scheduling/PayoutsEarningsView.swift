@@ -36,7 +36,15 @@ struct PayoutsEarningsView: View {
 
     private var gatedBody: some View {
         VStack(spacing: Spacing.s0) {
-            BizTopBar(title: "Wallet", onBack: { dismiss() })
+            BizTopBar(
+                title: "Wallet",
+                trailing: AnyView(
+                    Icon(.history, size: 19, color: Theme.Color.appText)
+                        .frame(width: 36, height: 36)
+                        .accessibilityLabel("Transaction history")
+                ),
+                onBack: { dismiss() }
+            )
             content
         }
         .background(Theme.Color.appBg)
@@ -52,7 +60,7 @@ struct PayoutsEarningsView: View {
             Button("Withdraw $\(model.availableDisplay)") { Task { await model.withdraw() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Funds arrive in 2–3 business days.")
+            Text("Instant payout · funds arrive in 1–3 minutes.")
         }
     }
 
@@ -83,7 +91,7 @@ extension PayoutsEarningsView {
                 if model.payoutState == .onHold {
                     HoldBanner(
                         headline: "Your bank needs re-verifying",
-                        bodyText: "A quick check unlocks payouts. Earnings keep landing — they're safe."
+                        bodyText: "A 2-minute check unlocks payouts. Earnings keep landing — they're safe."
                     )
                     .padding(.bottom, Spacing.s3)
                 }
@@ -94,7 +102,10 @@ extension PayoutsEarningsView {
                 filterRow
                     .padding(.bottom, Spacing.s2)
 
-                sectionOverline(model.source == .all ? "Recent activity" : model.source.label)
+                sectionOverline(
+                    model.source == .all ? "Recent activity" : model.source.label,
+                    action: model.isEmpty ? nil : "See all"
+                )
                 if model.isEmpty { emptyEarnings } else { earningsList }
 
                 sectionOverline("Payout method").padding(.top, Spacing.s4)
@@ -131,13 +142,22 @@ extension PayoutsEarningsView {
         )
     }
 
-    private func sectionOverline(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.system(size: 10, weight: .bold))
-            .tracking(0.8)
-            .foregroundStyle(Theme.Color.appTextSecondary)
-            .padding(.bottom, Spacing.s2)
-            .accessibilityAddTraits(.isHeader)
+    private func sectionOverline(_ title: String, action: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityAddTraits(.isHeader)
+            if let action {
+                Spacer(minLength: Spacing.s0)
+                Text(action)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary600)
+                    .accessibilityIdentifier("scheduling.payoutsEarnings.seeAll")
+            }
+        }
+        .padding(.bottom, Spacing.s2)
     }
 
     // MARK: Filter chips
@@ -239,11 +259,11 @@ extension PayoutsEarningsView {
             Button { Task { await model.setupPayouts() } } label: {
                 HStack(spacing: 11) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.Color.businessBg)
+                        RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.Color.stripeBrand.opacity(0.10))
                         if model.connecting {
-                            ProgressView().tint(Theme.Color.business)
+                            ProgressView().tint(Theme.Color.stripeBrand)
                         } else {
-                            Icon(.creditCard, size: 16, color: Theme.Color.business)
+                            Icon(.creditCard, size: 16, color: Theme.Color.stripeBrand)
                         }
                     }
                     .frame(width: 32, height: 32)
@@ -280,7 +300,7 @@ extension PayoutsEarningsView {
                 method: WalletPayoutMethod(
                     bankLabel: "Bank account",
                     last4: "••••",
-                    bodyText: "Standard payout · 1–2 days",
+                    bodyText: "Instant payout · 1–3 min",
                     warn: false
                 ),
                 onManage: { Task { await model.openDashboard() } },
@@ -326,8 +346,8 @@ extension PayoutsEarningsView {
     private var lockedFootnote: String {
         switch model.payoutState {
         case .onHold: "Re-verify your bank above to unlock payouts."
-        case .notEnabled: "Finish Stripe setup to withdraw."
-        case .enabled: "Take a booking to start earning."
+        case .notEnabled: "Finish Stripe setup to withdraw"
+        case .enabled: "Take a booking to start earning"
         }
     }
 
@@ -410,7 +430,7 @@ private struct EarningRowView: View {
                         Text("Pending")
                             .font(.system(size: 8.5, weight: .bold))
                             .textCase(.uppercase)
-                            .foregroundStyle(Theme.Color.warning)
+                            .foregroundStyle(WalletPalette.amberDeep)
                             .padding(.horizontal, Spacing.s1)
                             .padding(.vertical, 1)
                             .background(Theme.Color.warningBg)
@@ -469,7 +489,7 @@ private struct EarningRowView: View {
 
     private var amountColor: Color {
         if row.direction == .out { return Theme.Color.appTextStrong }
-        return row.isPending ? Theme.Color.warning : Theme.Color.success
+        return row.isPending ? WalletPalette.amberDeep : Theme.Color.success
     }
 }
 
