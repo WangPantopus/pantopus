@@ -29,14 +29,18 @@ final class InviteePolicyBlockedStubViewModel {
 }
 
 struct InviteePolicyBlockedStubView: View {
-    @State private var viewModel: InviteePolicyBlockedStubViewModel
+    private let viewModel: PolicyBlockedViewModel
 
-    init(viewModel: InviteePolicyBlockedStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteePolicyBlockedStubViewModel) {
+        viewModel = PolicyBlockedViewModel(
+            token: stub.token,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D10", title: "Booking Policy", stream: "I7")
+        PolicyBlockedView(viewModel: viewModel)
     }
 }
 

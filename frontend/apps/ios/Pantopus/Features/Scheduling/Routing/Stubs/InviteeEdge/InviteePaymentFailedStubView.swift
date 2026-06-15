@@ -29,14 +29,18 @@ final class InviteePaymentFailedStubViewModel {
 }
 
 struct InviteePaymentFailedStubView: View {
-    @State private var viewModel: InviteePaymentFailedStubViewModel
+    private let viewModel: PaymentFailedViewModel
 
-    init(viewModel: InviteePaymentFailedStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteePaymentFailedStubViewModel) {
+        viewModel = PaymentFailedViewModel(
+            token: stub.token,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D6", title: "Payment Failed", stream: "I7")
+        PaymentFailedView(viewModel: viewModel)
     }
 }
 

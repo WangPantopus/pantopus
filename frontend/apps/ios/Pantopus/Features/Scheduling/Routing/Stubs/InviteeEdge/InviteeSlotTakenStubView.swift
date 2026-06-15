@@ -35,14 +35,20 @@ final class InviteeSlotTakenStubViewModel {
 }
 
 struct InviteeSlotTakenStubView: View {
-    @State private var viewModel: InviteeSlotTakenStubViewModel
+    private let viewModel: SlotTakenScreenViewModel
 
-    init(viewModel: InviteeSlotTakenStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeSlotTakenStubViewModel) {
+        viewModel = SlotTakenScreenViewModel(
+            slug: stub.slug,
+            eventTypeSlug: stub.eventTypeSlug,
+            tz: stub.tz,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D5", title: "Slot Taken", stream: "I7")
+        SlotTakenScreenView(viewModel: viewModel)
     }
 }
 
