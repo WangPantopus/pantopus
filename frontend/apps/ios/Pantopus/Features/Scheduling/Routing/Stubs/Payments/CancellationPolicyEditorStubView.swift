@@ -39,7 +39,11 @@ struct CancellationPolicyEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "G14", title: "Cancellation Policy", stream: "I14")
+        CancellationPolicyEditorView(
+            owner: viewModel.owner,
+            eventTypeId: viewModel.eventTypeId,
+            push: viewModel.push
+        )
     }
 }
 
