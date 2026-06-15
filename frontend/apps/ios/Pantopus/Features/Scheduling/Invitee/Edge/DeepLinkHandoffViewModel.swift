@@ -25,8 +25,6 @@ final class DeepLinkHandoffViewModel {
     private let client: SchedulingClient
 
     private(set) var state: State = .resolving
-    /// Drives the add-to-calendar sheet (D8) presented locally from `resolved`.
-    var addToCalendar: AddToCalendarItem?
     private var didLoad = false
     private var isFetching = false
 
@@ -82,11 +80,6 @@ final class DeepLinkHandoffViewModel {
         URL(string: "https://pantopus.com/booking/\(token)")
     }
 
-    /// Present the add-to-calendar sheet (D8) for the resolved booking.
-    func presentAddToCalendar(_ response: ManageBookingResponse) {
-        addToCalendar = AddToCalendarItem(token: token, eventRecap: recap(response))
-    }
-
     // MARK: - Presentation helpers
 
     func tz(_ response: ManageBookingResponse) -> String {
@@ -97,13 +90,6 @@ final class DeepLinkHandoffViewModel {
 
     func hostName(_ response: ManageBookingResponse) -> String? {
         response.page?.title
-    }
-
-    func recap(_ response: ManageBookingResponse) -> String {
-        let zone = tz(response)
-        let name = response.eventType?.name ?? "Your booking"
-        let when = EdgeFormat.dayTime(response.booking.startAt, tz: zone)
-        return when.map { "\(name) · \($0)" } ?? name
     }
 }
 

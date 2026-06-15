@@ -133,7 +133,30 @@ final class InviteeManageBookingViewModel {
         return "Review the host's cancellation policy before making changes."
     }
 
+    /// Window-closed-specific policy copy (design Frame 4): leads with the cutoff
+    /// then reassures that the host can still help directly.
+    var windowClosedPolicySentence: String {
+        let host = hostFirstName.isEmpty ? "Your host" : hostFirstName
+        if let window = eventType?.cancellationWindowMin, window > 0 {
+            return "Changes close \(max(1, window / 60)) hours before the start time. \(host) can still help directly."
+        }
+        return "Changes are closed online. \(host) can still help directly."
+    }
+
     var hostFirstName: String { DiscoveryTheme.firstName(from: page?.title) }
+
+    /// Display name for the host used in "Contact <host>" affordances.
+    var hostContactName: String {
+        let first = hostFirstName
+        return first.isEmpty ? "host" : first
+    }
+
+    /// The public booking page the invitee is sent to for "Contact host" /
+    /// "Request a new link" — mirrors the Policy-Blocked `messageHost` behavior.
+    var bookingPageURL: URL? {
+        guard let slug, !slug.isEmpty else { return nil }
+        return URL(string: "https://pantopus.com/book/\(slug)")
+    }
 
     // MARK: - Loading
 
@@ -173,7 +196,12 @@ final class InviteeManageBookingViewModel {
         if canCancel { showCancelSheet = true } else { push(.inviteePolicyBlocked(token: token)) }
     }
 
-    func openPolicyBlocked() { push(.inviteePolicyBlocked(token: token)) }
+    /// "Contact host" / "Contact <host>" — opens the public booking page so the
+    /// invitee can reach the host (mirrors Policy-Blocked's `messageHost`).
+    func contactHost(_ openURL: OpenURLAction) {
+        guard let url = bookingPageURL else { return }
+        openURL(url)
+    }
 
     func cancel(reason: String?) async {
         actionInFlight = true

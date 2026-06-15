@@ -24,6 +24,15 @@ struct MyBookingsView: View {
             .background(Theme.Color.appBg)
             .navigationTitle("My bookings")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {} label: {
+                        Icon(.search, size: 18, color: Theme.Color.appTextSecondary)
+                    }
+                    .accessibilityLabel("Search bookings")
+                    .accessibilityIdentifier("scheduling.myBookings.search")
+                }
+            }
             .task { await viewModel.load() }
             .refreshable { await viewModel.refresh() }
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
@@ -55,9 +64,13 @@ struct MyBookingsView: View {
         ScrollView {
             VStack(spacing: Spacing.s3) {
                 segmented
-                Text("Everything you've booked, in one place.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                if showTagline {
+                    Text("Everything you've booked, in one place.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .multilineTextAlignment(.center)
+                }
                 if currentGroups.isEmpty {
                     segmentEmpty
                 } else {
@@ -79,6 +92,11 @@ struct MyBookingsView: View {
         viewModel.segment == .upcoming ? viewModel.upcomingGroups : viewModel.pastGroups
     }
 
+    /// The design shows the tagline only on the populated Upcoming frame.
+    private var showTagline: Bool {
+        viewModel.segment == .upcoming && !currentGroups.isEmpty
+    }
+
     private var segmented: some View {
         HStack(spacing: 3) {
             segmentButton(title: "Upcoming", value: .upcoming)
@@ -93,7 +111,7 @@ struct MyBookingsView: View {
         let isSelected = viewModel.segment == value
         return Button { viewModel.segment = value } label: {
             Text(title)
-                .font(.system(size: 11.5, weight: isSelected ? .bold : .semibold))
+                .font(.system(size: 12.5, weight: isSelected ? .bold : .semibold))
                 .foregroundStyle(isSelected ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.s2)
@@ -108,22 +126,32 @@ struct MyBookingsView: View {
     private func bookingRow(_ booking: BookingDTO) -> some View {
         let isPast = viewModel.segment == .past
         let tz = booking.inviteeTimezone ?? SchedulingTime.deviceTimeZoneIdentifier
-        return HStack(spacing: Spacing.s3) {
+        return HStack(spacing: 11) {
             EdgePillarAvatar(name: booking.inviteeName, ownerType: booking.ownerType, size: 42)
             VStack(alignment: .leading, spacing: 2) {
-                Text(EdgeFormat.dayTime(booking.startAt, tz: tz) ?? "Booking")
+                // Design primary line is the event-type name. The lean
+                // /my-bookings payload omits it, so we fall back to the
+                // pillar label as the title (event name is deferredBackend).
+                Text(titleLabel(booking.ownerType))
                     .font(.system(size: 13.5, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
+                    .tracking(-0.1)
                     .lineLimit(1)
-                Text(ownerLabel(booking.ownerType))
+                // Design secondary line is "with {host} · {when}". The host
+                // name is deferredBackend, so we render the {when} alone.
+                Text(EdgeFormat.dayTime(booking.startAt, tz: tz) ?? "Time to be confirmed")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: Spacing.s2)
-            SchedulingStatusPill(status: booking.status)
+            VStack(alignment: .trailing, spacing: 6) {
+                SchedulingStatusPill(status: booking.status)
+                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+            }
         }
-        .padding(Spacing.s3)
+        .padding(.horizontal, 13)
+        .padding(.vertical, Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
@@ -131,11 +159,14 @@ struct MyBookingsView: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
-        .opacity(isPast ? 0.7 : 1)
+        .edgeShadow(.sm)
+        .opacity(isPast ? 0.66 : 1)
         .accessibilityElement(children: .combine)
     }
 
-    private func ownerLabel(_ ownerType: String?) -> String {
+    /// Design primary-line fallback: the host pillar as a title until the
+    /// backend joins the event-type name into the lean payload.
+    private func titleLabel(_ ownerType: String?) -> String {
         "\(EdgeOwnerTheme.owner(forOwnerType: ownerType).theme.title) booking"
     }
 
@@ -145,33 +176,53 @@ struct MyBookingsView: View {
         ScrollView {
             VStack(spacing: Spacing.s3) {
                 segmented
-                ForEach(0..<4, id: \.self) { _ in
-                    HStack(spacing: Spacing.s3) {
-                        Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 42, height: 42)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Shimmer(width: 160, height: 12)
-                            Shimmer(width: 110, height: 10)
-                        }
-                        Spacer()
-                        Shimmer(width: 56, height: 18)
-                    }
-                    .padding(Spacing.s3)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                            .stroke(Theme.Color.appBorder, lineWidth: 1)
-                    )
-                }
+                // Design groups skeleton rows under shimmer overline bars.
+                skeletonGroup(overlineWidth: 80)
+                skeletonGroup(overlineWidth: 64)
             }
             .padding(Spacing.s4)
         }
         .accessibilityLabel("Loading your bookings")
     }
 
+    private func skeletonGroup(overlineWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Shimmer(width: overlineWidth, height: 9)
+            ForEach(0..<2, id: \.self) { _ in skeletonRow }
+        }
+    }
+
+    private var skeletonRow: some View {
+        HStack(spacing: 11) {
+            Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 42, height: 42)
+            VStack(alignment: .leading, spacing: 7) {
+                Shimmer(width: 120, height: 11)
+                Shimmer(width: 160, height: 9)
+            }
+            Spacer(minLength: Spacing.s2)
+            Shimmer(width: 54, height: 16)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .edgeShadow(.sm)
+    }
+
     private var emptyState: some View {
         EmptyState(
             icon: .calendar,
             headline: "You haven't booked anything yet",
-            subcopy: "Bookings you make show up here — everything in one place."
+            subcopy: "Bookings you make show up here — everything in one place.",
+            cta: .init(title: "Find something to book") {
+                // Destination (discovery) is not yet wired into SchedulingRoute;
+                // the design renders this primary CTA, so it ships view-only.
+            }
         )
     }
 

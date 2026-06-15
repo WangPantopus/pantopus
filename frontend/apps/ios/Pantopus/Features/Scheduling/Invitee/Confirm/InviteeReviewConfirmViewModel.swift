@@ -87,6 +87,29 @@ final class InviteeReviewConfirmViewModel {
         return (event.depositCents ?? 0) > 0 && (event.depositCents ?? 0) < (event.priceCents ?? 0)
     }
 
+    /// A single itemized row in the totals box (mirrors the JSX `TotalsBox` rows).
+    struct PriceRow: Hashable {
+        let label: String
+        let amount: String
+        var strong: Bool = false
+        var credit: Bool = false
+    }
+
+    /// The itemized fee rows shown above the Total. Only the priced event line is
+    /// drivable from the model — a discrete service-fee/tax/credit breakdown isn't
+    /// exposed by `PublicEventTypeView`, so those JSX rows are intentionally
+    /// deferred (see `deferredBackend`).
+    var priceRows: [PriceRow] {
+        guard let event = eventType else { return [] }
+        let label = "\(event.name) · \(event.bookingDuration) min"
+        return [PriceRow(label: label, amount: ConfirmFormat.money(cents: event.priceCents ?? 0, currency: event.currency), strong: true)]
+    }
+
+    /// The deposit amount rendered (bold) in the deposit note + due-now hero.
+    var depositAmountLabel: String {
+        ConfirmFormat.money(cents: eventType?.depositCents ?? 0, currency: eventType?.currency)
+    }
+
     var summary: BookingSummary {
         let duration = eventType?.bookingDuration ?? 30
         let endAtISO = SchedulingTime.parseUTC(bookingStart).map { endISO(for: $0, durationMin: duration) }
@@ -261,6 +284,15 @@ final class InviteeReviewConfirmViewModel {
 
     var slotTakenLabel: String? {
         ConfirmFormat.dayAndTime(startUTC: bookingStart, endUTC: nil, tz: tz)
+    }
+
+    /// The slot-taken banner body, interpolating the just-taken time when known
+    /// (JSX: "Someone booked Wed, Jun 17 at 9:30 AM before you finished…").
+    var slotTakenBannerBody: String {
+        if let when = slotTakenLabel {
+            return "Someone booked \(when) before you finished. Nothing was charged."
+        }
+        return "Someone booked it before you finished. Nothing was charged."
     }
 
     // MARK: - Helpers
