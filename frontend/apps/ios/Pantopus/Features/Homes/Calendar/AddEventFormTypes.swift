@@ -51,30 +51,22 @@ enum AddEventRecurrence: String, CaseIterable, Hashable {
     }
 }
 
-/// Reminder lead-time. The picker shape matches the design spec; the
-/// granularity is UI-only today — the wire boolean (`alerts_enabled`)
-/// records whether any reminder is set, not the minute count. On load
-/// we default to `.fifteenMin` when the event has alerts enabled so the
-/// picker shows something sensible.
-enum AddEventReminder: String, CaseIterable, Hashable {
-    case none
-    case fiveMin
-    case fifteenMin
-    case oneHour
-    case oneDay
+/// Reminder lead-times (multi-select, Stream I10). Serialized to the event's
+/// `reminders` jsonb array as minutes-before integers; `alerts_enabled` mirrors
+/// whether any reminder is set, for backwards-compatibility with the column.
+enum AddEventReminderOffset: Int, CaseIterable, Hashable {
+    case atTime = 0
+    case tenMin = 10
+    case oneHour = 60
+    case oneDay = 1440
 
     var label: String {
         switch self {
-        case .none: "None"
-        case .fiveMin: "5 minutes before"
-        case .fifteenMin: "15 minutes before"
-        case .oneHour: "1 hour before"
-        case .oneDay: "1 day before"
+        case .atTime: "At time"
+        case .tenMin: "10 min"
+        case .oneHour: "1 hour"
+        case .oneDay: "1 day"
         }
-    }
-
-    var alertsEnabled: Bool {
-        self != .none
     }
 }
 

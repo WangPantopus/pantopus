@@ -33,13 +33,23 @@ final class HomeEventDetailStubViewModel {
 
 struct HomeEventDetailStubView: View {
     @State private var viewModel: HomeEventDetailStubViewModel
+    @Environment(\.dismiss) private var dismiss
 
     init(viewModel: HomeEventDetailStubViewModel) {
         _viewModel = State(wrappedValue: viewModel)
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F2", title: "Event", stream: "I10")
+        let homeId = viewModel.homeId
+        let push = viewModel.push
+        EventDetailView(
+            homeId: homeId,
+            eventId: viewModel.eventId,
+            onBack: { dismiss() },
+            onEdit: { event in
+                push(.homeEventEditor(homeId: homeId, eventId: event.id))
+            }
+        )
     }
 }
 

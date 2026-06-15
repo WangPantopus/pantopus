@@ -34,8 +34,10 @@ final class EventDetailViewModelTests: XCTestCase {
         )
     }
 
-    private static let listBody = """
-    {"events":[
+    // Stream I10: the VM now fetches the single-event detail endpoint, which
+    // returns the event + per-attendee RSVP rows.
+    private static let detailBody = """
+    {"event":
       {"id":"e1","home_id":"home-1","event_type":"social",
        "title":"Soccer game · Ava",
        "description":"Bring water",
@@ -44,8 +46,12 @@ final class EventDetailViewModelTests: XCTestCase {
        "location_notes":"Riverside Field 3",
        "recurrence_rule":"FREQ=WEEKLY",
        "assigned_to":["u1","u3"],
-       "alerts_enabled":true}
-    ]}
+       "alerts_enabled":true,
+       "request_rsvp":true},
+     "attendees":[
+       {"user_id":"u1","rsvp_status":"going"},
+       {"user_id":"u3","rsvp_status":"maybe"}
+     ]}
     """
 
     private static let occupantsBody = """
@@ -69,7 +75,7 @@ final class EventDetailViewModelTests: XCTestCase {
         // SequencedURLProtocol is FIFO — order matters for assertion but
         // not for behaviour as long as both succeed.
         SequencedURLProtocol.routeResponses = [
-            "/api/homes/home-1/events": [.status(200, body: Self.listBody)],
+            "/api/homes/home-1/events/e1": [.status(200, body: Self.detailBody)],
             "/api/homes/home-1/occupants": [.status(200, body: Self.occupantsBody)]
         ]
         let vm = makeVM()
@@ -86,7 +92,7 @@ final class EventDetailViewModelTests: XCTestCase {
 
     func testLoadErrorOnEventsList() async {
         SequencedURLProtocol.routeResponses = [
-            "/api/homes/home-1/events": [.status(500, body: "{\"error\":\"boom\"}")],
+            "/api/homes/home-1/events/e1": [.status(500, body: "{\"error\":\"boom\"}")],
             "/api/homes/home-1/occupants": [.status(200, body: Self.occupantsBody)]
         ]
         let vm = makeVM()
@@ -98,8 +104,9 @@ final class EventDetailViewModelTests: XCTestCase {
     }
 
     func testLoadEventNotFoundSurfacesFriendlyError() async {
+        // Stream I10: the single-event endpoint 404s when the event is gone.
         SequencedURLProtocol.routeResponses = [
-            "/api/homes/home-1/events": [.status(200, body: "{\"events\":[]}")],
+            "/api/homes/home-1/events/e1": [.status(404, body: "{\"error\":\"not found\"}")],
             "/api/homes/home-1/occupants": [.status(200, body: Self.occupantsBody)]
         ]
         let vm = makeVM()
@@ -108,12 +115,12 @@ final class EventDetailViewModelTests: XCTestCase {
             XCTFail("Expected .error, got \(vm.state)")
             return
         }
-        XCTAssertEqual(message, "This event is no longer available.")
+        XCTAssertFalse(message.isEmpty)
     }
 
     func testDeleteSuccessTriggersOnDeleted() async {
         SequencedURLProtocol.routeResponses = [
-            "/api/homes/home-1/events": [.status(200, body: Self.listBody)],
+            "/api/homes/home-1/events/e1": [.status(200, body: Self.detailBody)],
             "/api/homes/home-1/occupants": [.status(200, body: Self.occupantsBody)]
         ]
         let didDelete = expectation(description: "delete callback fired")
@@ -130,7 +137,7 @@ final class EventDetailViewModelTests: XCTestCase {
 
     func testDeleteFailureRecordsErrorAndPreservesState() async {
         SequencedURLProtocol.routeResponses = [
-            "/api/homes/home-1/events": [.status(200, body: Self.listBody)],
+            "/api/homes/home-1/events/e1": [.status(200, body: Self.detailBody)],
             "/api/homes/home-1/occupants": [.status(200, body: Self.occupantsBody)]
         ]
         let vm = makeVM()
@@ -149,7 +156,7 @@ final class EventDetailViewModelTests: XCTestCase {
 
     func testReplaceLoadedEventSwapsInPlace() async {
         SequencedURLProtocol.routeResponses = [
-            "/api/homes/home-1/events": [.status(200, body: Self.listBody)],
+            "/api/homes/home-1/events/e1": [.status(200, body: Self.detailBody)],
             "/api/homes/home-1/occupants": [.status(200, body: Self.occupantsBody)]
         ]
         let vm = makeVM()

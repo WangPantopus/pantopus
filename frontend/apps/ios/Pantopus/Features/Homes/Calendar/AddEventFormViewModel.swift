@@ -56,8 +56,13 @@ final class AddEventFormViewModel {
     var recurrence: AddEventRecurrence
     let originalRecurrence: AddEventRecurrence
 
-    var reminder: AddEventReminder
-    let originalReminder: AddEventReminder
+    /// Multi-select reminder lead-times (Stream I10).
+    var reminderOffsets: Set<AddEventReminderOffset>
+    let originalReminderOffsets: Set<AddEventReminderOffset>
+
+    /// Whether attendees get a Going / Maybe / Can't prompt (Stream I10).
+    var requestRsvp: Bool
+    let originalRequestRsvp: Bool
 
     /// Multi-select attendee user-ids. Order matches the original list.
     var selectedAttendeeIds: Set<String>
@@ -102,7 +107,11 @@ final class AddEventFormViewModel {
             )
             let hydratedCategory = CalendarEventCategory.from(eventType: editingEvent.eventType)
             let hydratedRecurrence = AddEventRecurrence.from(rrule: editingEvent.recurrenceRule)
-            let hydratedReminder: AddEventReminder = (editingEvent.alertsEnabled ?? false) ? .fifteenMin : .none
+            let hydratedReminders = Self.reminderOffsets(
+                from: editingEvent.reminders,
+                alertsEnabled: editingEvent.alertsEnabled ?? false
+            )
+            let hydratedRequestRsvp = editingEvent.requestRsvp ?? false
             let attendeeIds = Set(editingEvent.assignedTo ?? [])
 
             var titleField = FormFieldState(id: AddEventField.title.rawValue, originalValue: editingEvent.title)
@@ -127,8 +136,10 @@ final class AddEventFormViewModel {
             originalCategory = hydratedCategory
             recurrence = hydratedRecurrence
             originalRecurrence = hydratedRecurrence
-            reminder = hydratedReminder
-            originalReminder = hydratedReminder
+            reminderOffsets = hydratedReminders
+            originalReminderOffsets = hydratedReminders
+            requestRsvp = hydratedRequestRsvp
+            originalRequestRsvp = hydratedRequestRsvp
             selectedAttendeeIds = attendeeIds
             originalAttendeeIds = attendeeIds
         } else {
@@ -144,8 +155,11 @@ final class AddEventFormViewModel {
             originalCategory = .generic
             recurrence = .none
             originalRecurrence = .none
-            reminder = .none
-            originalReminder = .none
+            // The design preselects "10 min" on a fresh event.
+            reminderOffsets = [.tenMin]
+            originalReminderOffsets = [.tenMin]
+            requestRsvp = false
+            originalRequestRsvp = false
             selectedAttendeeIds = []
             originalAttendeeIds = []
         }
@@ -207,6 +221,18 @@ final class AddEventFormViewModel {
         }
     }
 
+    func toggleReminder(_ offset: AddEventReminderOffset) {
+        if reminderOffsets.contains(offset) {
+            reminderOffsets.remove(offset)
+        } else {
+            reminderOffsets.insert(offset)
+        }
+    }
+
+    func setRequestRsvp(_ value: Bool) {
+        requestRsvp = value
+    }
+
     private func rebuildEndIfAllDayChanged(from oldValue: Bool) {
         guard oldValue != allDay else { return }
         if allDay {
@@ -243,7 +269,8 @@ final class AddEventFormViewModel {
         default: return true
         }
         if recurrence != originalRecurrence { return true }
-        if reminder != originalReminder { return true }
+        if reminderOffsets != originalReminderOffsets { return true }
+        if requestRsvp != originalRequestRsvp { return true }
         if selectedAttendeeIds != originalAttendeeIds { return true }
         return false
     }

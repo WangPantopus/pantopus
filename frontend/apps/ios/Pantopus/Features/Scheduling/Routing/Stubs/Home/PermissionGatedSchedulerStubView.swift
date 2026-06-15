@@ -36,7 +36,9 @@ struct PermissionGatedSchedulerStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F15", title: "Scheduler", stream: "I10")
+        GatedSchedulerView(
+            viewModel: GatedSchedulerViewModel(homeId: viewModel.homeId)
+        )
     }
 }
 

@@ -33,13 +33,21 @@ final class HomeEventEditorStubViewModel {
 
 struct HomeEventEditorStubView: View {
     @State private var viewModel: HomeEventEditorStubViewModel
+    @Environment(\.dismiss) private var dismiss
 
     init(viewModel: HomeEventEditorStubViewModel) {
         _viewModel = State(wrappedValue: viewModel)
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F3", title: "Add Event", stream: "I10")
+        // Secondary entry point. The primary Home-tab flow (HubTabRoot) routes
+        // create → detail; here we pop back on close/commit.
+        CalendarEventFormRoute(
+            homeId: viewModel.homeId,
+            eventId: viewModel.eventId,
+            onClose: { dismiss() },
+            onCommitted: { _ in dismiss() }
+        )
     }
 }
 

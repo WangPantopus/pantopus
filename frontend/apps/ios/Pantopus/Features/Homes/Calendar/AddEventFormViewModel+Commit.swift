@@ -94,7 +94,9 @@ extension AddEventFormViewModel {
             locationNotes: location,
             recurrenceRule: recurrence.rrule,
             assignedTo: assignedIds.isEmpty ? nil : assignedIds,
-            alertsEnabled: reminder.alertsEnabled
+            alertsEnabled: !reminderOffsets.isEmpty,
+            requestRsvp: requestRsvp,
+            reminders: Self.remindersJSON(from: reminderOffsets)
         )
     }
 
@@ -112,7 +114,9 @@ extension AddEventFormViewModel {
             locationNotes: location ?? "",
             recurrenceRule: recurrence.rrule ?? "",
             assignedTo: assignedIds,
-            alertsEnabled: reminder.alertsEnabled
+            alertsEnabled: !reminderOffsets.isEmpty,
+            requestRsvp: requestRsvp,
+            reminders: Self.remindersJSON(from: reminderOffsets)
         )
     }
 
@@ -208,5 +212,35 @@ extension AddEventFormViewModel {
         let parts = name.split(separator: " ").prefix(2)
         let chars = parts.compactMap { $0.first.map(String.init) }
         return chars.joined().uppercased()
+    }
+
+    // MARK: - Reminders (Stream I10)
+
+    /// Serialize the selected lead-times to the `reminders` jsonb array as
+    /// minutes-before integers (ascending). `nil` when none are set so the
+    /// field is omitted from the request.
+    static func remindersJSON(from offsets: Set<AddEventReminderOffset>) -> [JSONValue]? {
+        guard !offsets.isEmpty else { return nil }
+        return offsets
+            .map(\.rawValue)
+            .sorted()
+            .map { JSONValue.number(Double($0)) }
+    }
+
+    /// Parse the `reminders` jsonb array back into lead-times for edit
+    /// hydration. Falls back to a single 10-minute reminder when the array is
+    /// absent but `alerts_enabled` is set (legacy events).
+    static func reminderOffsets(
+        from reminders: [JSONValue]?,
+        alertsEnabled: Bool
+    ) -> Set<AddEventReminderOffset> {
+        if let reminders, !reminders.isEmpty {
+            let parsed = reminders.compactMap { value -> AddEventReminderOffset? in
+                guard let minutes = value.numberValue.map({ Int($0) }) else { return nil }
+                return AddEventReminderOffset(rawValue: minutes)
+            }
+            if !parsed.isEmpty { return Set(parsed) }
+        }
+        return alertsEnabled ? [.tenMin] : []
     }
 }
