@@ -12,6 +12,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct SchedulingNotificationPrefsScreen: View {
     @State private var model: SchedulingNotificationPrefsModel
@@ -185,7 +186,11 @@ struct SchedulingNotificationPrefsScreen: View {
             Text("Push is off for Pantopus. Turn it on in Settings to get booking alerts.")
                 .pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextStrong).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Spacing.s2)
-            Button {} label: {
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
                 Text("Settings").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.Color.error)
                     .padding(.horizontal, 11).padding(.vertical, 5)
                     .background(Theme.Color.appSurface).clipShape(Capsule())
