@@ -36,7 +36,9 @@ struct ConnectedCalendarsStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B8", title: "Connected Calendars", stream: "I2")
+        ConnectedCalendarsView(
+            viewModel: ConnectedCalendarsViewModel(owner: viewModel.owner)
+        )
     }
 }
 

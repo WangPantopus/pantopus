@@ -36,7 +36,9 @@ struct EventTypeListStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B1", title: "Event Types", stream: "I2")
+        EventTypeListView(
+            viewModel: EventTypeListViewModel(owner: viewModel.owner, push: viewModel.push)
+        )
     }
 }
 

@@ -39,7 +39,11 @@ struct EventTypeEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B2", title: "Event Type Editor", stream: "I2")
+        EventTypeEditorView(viewModel: EventTypeEditorViewModel(
+            owner: viewModel.owner,
+            eventTypeId: viewModel.eventTypeId,
+            push: viewModel.push
+        ))
     }
 }
 
