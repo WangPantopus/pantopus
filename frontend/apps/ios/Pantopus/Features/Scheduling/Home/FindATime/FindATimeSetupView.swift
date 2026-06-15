@@ -252,7 +252,10 @@ struct FindATimeSetupView: View {
     }
 
     private func requirementToggle(_ row: FindATimePickRow) -> some View {
-        HStack(spacing: 3) {
+        // Design tints the whole Req/Opt track error when nothing is required
+        // (the invalid frame: every row's control turns errorBg + errorLight border).
+        let invalid = !viewModel.hasRequiredMember
+        return HStack(spacing: 3) {
             requirementSegment(
                 title: "Required",
                 isOn: row.requirement == .required,
@@ -267,8 +270,14 @@ struct FindATimeSetupView: View {
             ) { viewModel.setRequirement(.optional, for: row.id) }
         }
         .padding(3)
-        .background(Theme.Color.appSurfaceSunken)
+        .background(invalid ? Theme.Color.errorBg : Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .overlay {
+            if invalid {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .strokeBorder(Theme.Color.errorLight, lineWidth: 1)
+            }
+        }
     }
 
     private func requirementSegment(
@@ -410,7 +419,7 @@ struct FindATimeSetupView: View {
             FindATimeOverline(text: "Date window")
             Button { viewModel.showDateSheet = true } label: {
                 HStack(spacing: Spacing.s2) {
-                    Icon(.calendarClock, size: 16, color: viewModel.dateRangeValid ? Theme.Color.home : Theme.Color.error)
+                    Icon(.calendarRange, size: 16, color: viewModel.dateRangeValid ? Theme.Color.home : Theme.Color.error)
                     Text(viewModel.dateRangeLabel)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(viewModel.dateRangeValid ? Theme.Color.appText : Theme.Color.error)
@@ -435,7 +444,7 @@ struct FindATimeSetupView: View {
                 Button { viewModel.widenWindow() } label: {
                     HStack(spacing: Spacing.s2) {
                         Icon(.calendarPlus, size: 14, color: Theme.Color.appTextStrong)
-                        Text("Widen the window")
+                        Text("Widen to two weeks")
                     }
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextStrong)

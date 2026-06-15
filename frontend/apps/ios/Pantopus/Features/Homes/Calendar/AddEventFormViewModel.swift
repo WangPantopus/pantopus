@@ -174,11 +174,14 @@ final class AddEventFormViewModel {
     }
 
     var screenTitle: String {
-        isEditing ? "Edit event" : "Add event"
+        // Design `SheetBar title` — "New event" on create, "Edit event" on
+        // edit (`add-event-frames.jsx:64,80`).
+        isEditing ? "Edit event" : "New event"
     }
 
     var commitLabel: String {
-        isEditing ? "Save" : "Add"
+        // Design `SheetBar action="Save"` on both create and edit.
+        "Save"
     }
 
     /// Load the household roster + (when editing) re-fetch the source
@@ -283,10 +286,11 @@ final class AddEventFormViewModel {
         return true
     }
 
-    /// Returns an inline message when end-date is before start.
+    /// Returns an inline message when end-date is before start. Copy matches
+    /// the design's Ends-row error (`add-event-frames.jsx:39`).
     var endError: String? {
         guard let end = endDate, end < startDate else { return nil }
-        return "End must be on or after start."
+        return "End time is before the start time"
     }
 
     // MARK: - Submit

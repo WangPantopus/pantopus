@@ -223,9 +223,15 @@ final class FindATimeSetupViewModel {
         )
     }
 
+    /// Recovery hint shown as the no-overlap banner body. The banner title
+    /// already states "No time works for all N", so this is just the next-step
+    /// guidance — naming a specific member like the design ("Try making Dad
+    /// optional, or widen the date window.").
     private var noOverlapCopy: String {
-        let count = requiredMemberIds.count
-        return "No time works for all \(count). Make someone optional, or widen the date window."
+        if let name = requiredMembers.first?.displayName {
+            return "Try making \(name) optional, or widen the date window."
+        }
+        return "Try making someone optional, or widen the date window."
     }
 
     // MARK: - Helpers

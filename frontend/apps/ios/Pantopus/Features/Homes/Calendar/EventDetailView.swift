@@ -87,6 +87,9 @@ final class EventDetailViewModel {
 
     // MARK: - RSVP (Stream I10)
 
+    /// The signed-in member's user id, for the attendee-list "· you" suffix.
+    var currentUserId: String? { myUserId }
+
     /// The signed-in member's RSVP, or `nil` when they haven't replied.
     var myRsvp: HomeRsvpChoice? {
         guard let me = myUserId,
@@ -194,6 +197,7 @@ struct EventDetailView: View {
                 LoadedShell(
                     event: event,
                     attendeeNames: viewModel.attendeeNames,
+                    currentUserId: viewModel.currentUserId,
                     requestsRsvp: event.requestRsvp ?? false,
                     rsvpFor: { viewModel.rsvp(for: $0) },
                     myRsvp: viewModel.myRsvp,
@@ -227,22 +231,67 @@ struct EventDetailView: View {
 
 private struct LoadingShell: View {
     let onBack: @MainActor () -> Void
+
+    // JSX `FrameLoading` (event-detail-frames.jsx:121-131): a title + subtitle
+    // shimmer, then a detail-grid card of icon-tile rows and an attendees card
+    // of avatar rows — mirrors the loaded geometry.
     var body: some View {
         ContentDetailShell(
             title: "Event",
             onBack: onBack,
             header: {
-                Shimmer(height: 96, cornerRadius: Radii.lg)
-                    .padding(.horizontal, Spacing.s4)
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    Shimmer(width: 180, height: 22, cornerRadius: Radii.sm)
+                    Shimmer(width: 130, height: 12, cornerRadius: Radii.sm)
+                }
+                .padding(.horizontal, Spacing.s4)
             },
             body: {
                 VStack(spacing: Spacing.s3) {
-                    Shimmer(height: 60, cornerRadius: Radii.md)
-                    Shimmer(height: 60, cornerRadius: Radii.md)
+                    skeletonCard(rows: 4) { iconRow }
+                    skeletonCard(rows: 3) { avatarRow }
                 }
                 .padding(.horizontal, Spacing.s4)
             }
         )
+    }
+
+    private func skeletonCard<Row: View>(
+        rows: Int,
+        @ViewBuilder row: () -> Row
+    ) -> some View {
+        let row = row()
+        return VStack(spacing: Spacing.s3) {
+            ForEach(0..<rows, id: \.self) { _ in row }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl)
+                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+        )
+    }
+
+    private var iconRow: some View {
+        HStack(spacing: Spacing.s3) {
+            Shimmer(width: 30, height: 30, cornerRadius: Radii.md)
+            VStack(alignment: .leading, spacing: 6) {
+                Shimmer(width: 60, height: 8, cornerRadius: Radii.sm)
+                Shimmer(width: 110, height: 11, cornerRadius: Radii.sm)
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+    }
+
+    private var avatarRow: some View {
+        HStack(spacing: 10) {
+            Shimmer(width: 30, height: 30, cornerRadius: 15)
+            Shimmer(width: 90, height: 11, cornerRadius: Radii.sm)
+            Spacer(minLength: Spacing.s0)
+            Shimmer(width: 54, height: 18, cornerRadius: Radii.lg)
+        }
     }
 }
 
@@ -256,13 +305,19 @@ private struct ErrorShell: View {
             onBack: onBack,
             header: { EmptyView() },
             body: {
+                // JSX `FrameError` (event-detail-frames.jsx:135-147): a 56×56
+                // errorBg circle + `cloud-off` (error), "Couldn't load this
+                // event", a fixed deleted/connection line, and a "Retry"
+                // (rotate-cw) primary button.
                 EmptyState(
-                    icon: .alertCircle,
+                    icon: .cloudOff,
                     headline: "Couldn't load this event",
-                    subcopy: message,
-                    cta: EmptyState.CTA(title: "Try again") {
+                    subcopy: "It may have been deleted, or your connection dropped.",
+                    cta: EmptyState.CTA(title: "Retry") {
                         await MainActor.run { onRetry() }
-                    }
+                    },
+                    tint: Theme.Color.errorBg,
+                    accent: Theme.Color.error
                 )
                 .frame(height: 400)
             }
@@ -273,6 +328,7 @@ private struct ErrorShell: View {
 private struct LoadedShell: View {
     let event: CalendarEventDTO
     let attendeeNames: [String: String]
+    let currentUserId: String?
     let requestsRsvp: Bool
     let rsvpFor: @MainActor (String) -> HomeRsvpChoice
     let myRsvp: HomeRsvpChoice?
@@ -286,6 +342,13 @@ private struct LoadedShell: View {
     let onDelete: @MainActor () -> Void
 
     @State private var showsDeleteConfirm = false
+
+    /// The "Your RSVP" card enters its highlighted pending state (green border +
+    /// glow + hint) when RSVPs are requested but the signed-in member hasn't
+    /// replied yet (JSX `FramePending`, event-detail-frames.jsx:190-213).
+    private var rsvpPending: Bool {
+        requestsRsvp && (myRsvp == nil || myRsvp == .noReply)
+    }
 
     var body: some View {
         let category = CalendarEventCategory.from(eventType: event.eventType)
@@ -303,13 +366,13 @@ private struct LoadedShell: View {
                     .padding(.horizontal, Spacing.s4)
             },
             body: {
-                VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s3) {
                     DetailGrid(event: event, category: category)
                     if let assigned = event.assignedTo, !assigned.isEmpty {
                         AttendeesSection(
                             ids: assigned,
                             nameLookup: attendeeNames,
-                            showsRsvp: requestsRsvp,
+                            currentUserId: currentUserId,
                             rsvpFor: rsvpFor
                         )
                     }
@@ -318,6 +381,7 @@ private struct LoadedShell: View {
                             selected: myRsvp,
                             saving: rsvpSaving,
                             enabled: rsvpEnabled,
+                            pending: rsvpPending,
                             onSelect: onRsvp
                         )
                     }
@@ -329,31 +393,20 @@ private struct LoadedShell: View {
                             .pantopusTextStyle(.small)
                             .foregroundStyle(Theme.Color.error)
                     }
-                    Button(role: .destructive) {
-                        showsDeleteConfirm = true
-                    } label: {
-                        HStack(spacing: Spacing.s2) {
-                            Icon(.trash2, size: 16, color: Theme.Color.error)
-                            Text("Delete event")
-                                .pantopusTextStyle(.small)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Theme.Color.error)
-                        }
-                    }
-                    .accessibilityIdentifier("eventDetail_delete")
-                    .disabled(isDeleting)
                 }
                 .padding(.horizontal, Spacing.s4)
             },
             cta: {
-                PrimaryButton(
-                    title: "Edit",
-                    isLoading: false,
-                    isEnabled: !isDeleting
-                ) {
-                    await MainActor.run { onEdit() }
+                // JSX `StickyFooter` (event-detail-frames.jsx:112-115): a flex-1
+                // secondary (outlined) "Edit" + a red text "Delete".
+                HStack(spacing: Spacing.s3) {
+                    SecondaryEditButton(isEnabled: !isDeleting) {
+                        onEdit()
+                    }
+                    DeleteTextButton(isEnabled: !isDeleting) {
+                        showsDeleteConfirm = true
+                    }
                 }
-                .accessibilityIdentifier("eventDetail_edit")
             }
         )
         .confirmationDialog(
@@ -364,10 +417,76 @@ private struct LoadedShell: View {
             Button("Delete", role: .destructive) {
                 Task { @MainActor in onDelete() }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Keep", role: .cancel) {}
         } message: {
-            Text("Members will no longer see this event on the calendar.")
+            Text("This can't be undone. Attendees won't see it on the calendar anymore.")
         }
+    }
+}
+
+// MARK: - Footer buttons
+
+/// Outlined "Edit" button with a leading pencil — the design's flex-1
+/// `SecondaryBtn` (event-detail-frames.jsx:113).
+private struct SecondaryEditButton: View {
+    let isEnabled: Bool
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            // JSX `SecondaryBtn` (home-shell.jsx:198-203): h46, radius 12,
+            // surface fill, 1px borderStrong, no shadow, label 14/700 fg2,
+            // icon 15.
+            HStack(spacing: Spacing.s2) {
+                Icon(.pencil, size: 15, color: Theme.Color.appTextStrong)
+                Text("Edit")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorderStrong, lineWidth: 1)
+            )
+            .opacity(isEnabled ? 1 : 0.5)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityIdentifier("eventDetail_edit")
+        .accessibilityLabel("Edit")
+    }
+}
+
+/// Red text "Delete" with a leading trash glyph — the design's destructive
+/// `TextBtn` (event-detail-frames.jsx:114).
+private struct DeleteTextButton: View {
+    let isEnabled: Bool
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            // JSX `TextBtn` (home-shell.jsx:205-210): transparent, label 13/700
+            // in `tone` (here N.error), icon 14, gap 6.
+            HStack(spacing: 6) {
+                Icon(.trash2, size: 14, color: Theme.Color.error)
+                Text("Delete")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.error)
+            }
+            .padding(.horizontal, Spacing.s2)
+            .frame(minHeight: 44)
+            .opacity(isEnabled ? 1 : 0.5)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityIdentifier("eventDetail_delete")
+        .accessibilityLabel("Delete")
     }
 }
 
@@ -375,48 +494,27 @@ private struct EventHeader: View {
     let event: CalendarEventDTO
     let category: CalendarEventCategory
 
+    // JSX `EventHeader` (event-detail-frames.jsx:41-51): no leading icon tile,
+    // not carded. h2 title (21/700, letterSpacing -0.4, lineHeight 26) then a
+    // row of "Mon Jun 16 · 6:30 PM" (13/600, fg2) + the category chip. Location
+    // is NOT in the header — it lives in the detail grid.
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s3) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: Radii.sm)
-                        .fill(category.background)
-                        .frame(width: 48, height: 48)
-                    Icon(category.icon, size: 24, color: category.foreground)
-                }
-                VStack(alignment: .leading, spacing: Spacing.s1) {
-                    Text(event.title)
-                        .pantopusTextStyle(.h3)
-                        .foregroundStyle(Theme.Color.appText)
-                        .accessibilityAddTraits(.isHeader)
-                        .lineLimit(3)
-                    Text(formattedTimeRange)
-                        .pantopusTextStyle(.body)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Spacer(minLength: Spacing.s0)
-            }
+            Text(event.title)
+                .font(.system(size: 21, weight: .bold))
+                .tracking(-0.4)
+                .lineSpacing(2)
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
+                .lineLimit(3)
             HStack(spacing: Spacing.s2) {
+                Text(formattedTimeRange)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
                 CategoryPill(category: category)
-                if let location = event.locationNotes, !location.isEmpty {
-                    HStack(spacing: Spacing.s1) {
-                        Icon(.mapPin, size: 12, color: Theme.Color.appTextSecondary)
-                        Text(location)
-                            .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                            .lineLimit(1)
-                    }
-                }
             }
         }
-        .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-        )
     }
 
     private var formattedTimeRange: String {
@@ -474,101 +572,159 @@ private struct CategoryPill: View {
     }
 }
 
+/// One `DetailRow` — JSX (event-detail-frames.jsx:56-59 via shared `DetailRow`):
+/// a 30×30 sunken icon tile + an overline label stacked *above* the value.
+private struct DetailRow: View {
+    let icon: PantopusIcon
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: Spacing.s3) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Radii.md)
+                    .fill(Theme.Color.appSurfaceSunken)
+                    .frame(width: 30, height: 30)
+                // JSX icon color N.fg2 (home-shell.jsx:414).
+                Icon(icon, size: 15, color: Theme.Color.appTextStrong)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                // JSX label = 9.5/700, letterSpacing 0.06em, color N.fg4.
+                Text(label.uppercased())
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(0.57)
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                Text(value)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.vertical, Spacing.s2)
+    }
+}
+
 private struct DetailGrid: View {
     let event: CalendarEventDTO
     let category: CalendarEventCategory
 
+    // JSX `DetailGrid` (event-detail-frames.jsx:53-62): a single card padded
+    // 4px/13px, rows in the order Repeats · Reminder · Location · Type, each
+    // an icon-tile + overline-over-value `DetailRow`. The card draws no inner
+    // dividers — rows are simply stacked.
     var body: some View {
-        VStack(spacing: Spacing.s0) {
-            row(label: "Type", value: category.label)
+        VStack(spacing: Spacing.s1) {
             if let recurrence = recurrenceLabel(event.recurrenceRule) {
-                divider
-                row(label: "Repeats", value: recurrence)
+                DetailRow(icon: .arrowsRepeat, label: "Repeats", value: recurrence)
             }
-            divider
-            row(label: "Reminder", value: reminderLabel)
+            DetailRow(icon: .bell, label: "Reminder", value: reminderLabel)
             if let location = event.locationNotes, !location.isEmpty {
-                divider
-                row(label: "Location", value: location)
+                DetailRow(icon: .mapPin, label: "Location", value: location)
             }
+            DetailRow(icon: .tag, label: "Type", value: category.label)
         }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s1)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
+            RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
         )
     }
 
+    /// JSX reminder value = the per-offset list joined by " · ", longest lead
+    /// first (e.g. "1 hour before · 10 min before"). Built from the event's
+    /// `reminders` jsonb (minutes-before integers); falls back to "1 hour
+    /// before · 10 min before"'s sibling — a single "10 min before" — only via
+    /// `alerts_enabled` for legacy rows, else "Off".
     private var reminderLabel: String {
-        (event.alertsEnabled ?? false) ? "Enabled" : "Off"
+        let minutes: [Int] = (event.reminders ?? [])
+            .compactMap { $0.numberValue.map { Int($0) } }
+            .sorted(by: >)
+        if !minutes.isEmpty {
+            return minutes.map(Self.reminderPhrase).joined(separator: " · ")
+        }
+        return (event.alertsEnabled ?? false) ? "10 min before" : "Off"
+    }
+
+    /// Minutes-before → the design's human phrase ("At time", "10 min before",
+    /// "1 hour before", "1 day before"). Mirrors `AddEventReminderOffset`.
+    private static func reminderPhrase(_ minutes: Int) -> String {
+        switch minutes {
+        case 0: "At time"
+        case 1440: "1 day before"
+        case 60: "1 hour before"
+        default:
+            minutes % 60 == 0
+                ? "\(minutes / 60) hour\(minutes / 60 == 1 ? "" : "s") before"
+                : "\(minutes) min before"
+        }
     }
 
     private func recurrenceLabel(_ rrule: String?) -> String? {
         guard let rrule, !rrule.isEmpty else { return nil }
         let upper = rrule.uppercased()
-        if upper.contains("FREQ=WEEKLY") { return "Weekly" }
+        if upper.contains("FREQ=WEEKLY") {
+            if let day = Self.weeklyDay(upper) {
+                return "Every \(day)"
+            }
+            return "Weekly"
+        }
         if upper.contains("FREQ=YEARLY") { return "Yearly" }
         if upper.contains("FREQ=MONTHLY") { return "Monthly" }
         if upper.contains("FREQ=DAILY") { return "Daily" }
         return "Yes"
     }
 
-    private func row(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-            Spacer()
-            Text(value)
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appText)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.vertical, Spacing.s3)
-    }
-
-    private var divider: some View {
-        Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+    /// "FREQ=WEEKLY;BYDAY=MO" → "Monday" (the design renders "Every Monday").
+    private static func weeklyDay(_ upper: String) -> String? {
+        let map: [String: String] = [
+            "MO": "Monday", "TU": "Tuesday", "WE": "Wednesday", "TH": "Thursday",
+            "FR": "Friday", "SA": "Saturday", "SU": "Sunday"
+        ]
+        guard let range = upper.range(of: "BYDAY=") else { return nil }
+        let code = String(upper[range.upperBound...].prefix(2))
+        return map[code]
     }
 }
 
 private struct AttendeesSection: View {
     let ids: [String]
     let nameLookup: [String: String]
-    var showsRsvp: Bool = false
+    var currentUserId: String?
     var rsvpFor: (@MainActor (String) -> HomeRsvpChoice)?
 
+    // JSX Attendees card (event-detail-frames.jsx:105-108): a single `Card`
+    // whose first child is an `Overline` "Attendees", followed by `AttendeeRow`s
+    // with a per-member RSVP pill always shown and a "· you" suffix on self.
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                Icon(.usersRound, size: 16, color: Theme.Color.home)
-                Text("Attendees")
-                    .pantopusTextStyle(.small)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.appText)
-            }
+            SectionOverline(text: "Attendees")
             VStack(spacing: Spacing.s0) {
                 ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                     let name = nameLookup[id] ?? "Member"
                     AttendeeRow(
                         name: name,
                         initials: initials(for: name),
-                        rsvp: showsRsvp ? rsvpFor?(id) : nil
+                        isYou: id == currentUserId,
+                        rsvp: rsvpFor?(id) ?? .noReply
                     )
                     if index < ids.count - 1 {
                         Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
                     }
                 }
             }
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg)
-                    .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-            )
         }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl)
+                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+        )
     }
 
     private func initials(for name: String) -> String {
@@ -577,13 +733,29 @@ private struct AttendeesSection: View {
     }
 }
 
+/// JSX `Overline` (home-shell.jsx:129-131): uppercase 9.5/700, letterSpacing
+/// 0.08em (≈0.76pt at 9.5), default `fg3`.
+private struct SectionOverline: View {
+    let text: String
+    var color: Color = Theme.Color.appTextSecondary
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(0.76)
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct AttendeeRow: View {
     let name: String
     let initials: String
+    var isYou: Bool = false
     var rsvp: HomeRsvpChoice?
 
     var body: some View {
-        HStack(spacing: Spacing.s3) {
+        HStack(spacing: 10) {
             ZStack {
                 Circle().fill(Theme.Color.homeBg)
                 Text(initials.isEmpty ? "·" : initials)
@@ -591,38 +763,53 @@ private struct AttendeeRow: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.home)
             }
-            .frame(width: 28, height: 28)
-            Text(name)
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appText)
-            Spacer()
+            .frame(width: 30, height: 30)
+            // JSX name = 13/600 fg1, with a "· you" suffix in fg4 for self.
+            (
+                Text(name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Theme.Color.appText)
+                + Text(isYou ? " · you" : "")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Theme.Color.appTextMuted)
+            )
+            .lineLimit(1)
+            Spacer(minLength: Spacing.s2)
             if let rsvp {
                 HomeRsvpPill(rsvp)
             }
         }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.vertical, Spacing.s3)
+        .padding(.vertical, 9)
     }
 }
 
 /// "Your RSVP" card — an unselected home-green segmented control, or a
-/// confirmation row once recorded.
+/// confirmation row once recorded. When `pending` (RSVPs requested, no reply
+/// yet) the card enters the design's emphasised state: green border + green
+/// glow + a "Tap to let everyone know" hint (JSX `FramePending`,
+/// event-detail-frames.jsx:200-204).
 private struct YourRsvpCard: View {
     let selected: HomeRsvpChoice?
     let saving: Bool
     let enabled: Bool
+    var pending: Bool = false
     let onSelect: @MainActor (HomeRsvpChoice) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text("YOUR RSVP")
-                .font(.system(size: 9.5, weight: .bold))
-                .tracking(0.6)
-                .foregroundStyle(Theme.Color.homeDark)
+            SectionOverline(text: "Your RSVP", color: Theme.Color.homeDark)
             if let selected, selected != .noReply {
                 recorded(selected)
             } else {
                 control
+                if pending {
+                    HStack(spacing: 5) {
+                        Icon(.hand, size: 12, color: Theme.Color.homeDark)
+                        Text("Tap to let everyone know")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.homeDark)
+                    }
+                }
                 if !enabled {
                     Text("RSVP buttons are disabled until you reconnect.")
                         .font(.system(size: 10.5))
@@ -633,10 +820,19 @@ private struct YourRsvpCard: View {
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+            RoundedRectangle(cornerRadius: Radii.xl)
+                .stroke(
+                    pending ? Theme.Color.home : Theme.Color.appBorderSubtle,
+                    lineWidth: pending ? 1.5 : 1
+                )
+        )
+        .background(
+            // The design's `0 0 0 4px H.bg50` green glow around the pending card.
+            RoundedRectangle(cornerRadius: Radii.xl)
+                .stroke(Theme.Color.homeBg, lineWidth: pending ? 4 : 0)
+                .padding(-2)
         )
         .accessibilityIdentifier("eventDetail_yourRsvp")
     }
@@ -711,27 +907,26 @@ private struct YourRsvpCard: View {
 private struct NotesSection: View {
     let text: String
 
+    // JSX `NotesCard` (event-detail-frames.jsx:84-91): a single `Card` with an
+    // `Overline` "Notes" (default neutral fg3, no icon) over body text
+    // (12.5/fg2, line-height 18). No leading glyph, no inner card.
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                Icon(.fileText, size: 16, color: Theme.Color.primary600)
-                Text("Notes")
-                    .pantopusTextStyle(.small)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.appText)
-            }
+            SectionOverline(text: "Notes")
             Text(text)
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appText)
+                .font(.system(size: 12.5))
+                .lineSpacing(4)
+                .foregroundStyle(Theme.Color.appTextStrong)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Spacing.s4)
-                .background(Theme.Color.appSurface)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.lg)
-                        .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-                )
         }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl)
+                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+        )
     }
 }
 
