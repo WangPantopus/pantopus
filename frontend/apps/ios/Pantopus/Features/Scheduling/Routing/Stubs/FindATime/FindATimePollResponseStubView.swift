@@ -29,14 +29,26 @@ final class FindATimePollResponseStubViewModel {
 }
 
 struct FindATimePollResponseStubView: View {
-    @State private var viewModel: FindATimePollResponseStubViewModel
+    private let viewModel: PollResponseViewModel
 
-    init(viewModel: FindATimePollResponseStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: FindATimePollResponseStubViewModel) {
+        var voterName: String?
+        var voterEmail: String?
+        if case let .signedIn(user) = AuthManager.shared.state {
+            voterName = user.displayName
+            voterEmail = user.email
+        }
+        viewModel = PollResponseViewModel(
+            pollId: stub.pollId,
+            tz: SchedulingTime.deviceTimeZoneIdentifier,
+            voterName: voterName,
+            voterEmail: voterEmail,
+            client: .shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F6", title: "Poll", stream: "I11")
+        PollResponseView(viewModel: viewModel)
     }
 }
 

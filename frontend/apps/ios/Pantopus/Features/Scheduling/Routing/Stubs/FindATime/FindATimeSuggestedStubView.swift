@@ -32,14 +32,20 @@ final class FindATimeSuggestedStubViewModel {
 }
 
 struct FindATimeSuggestedStubView: View {
-    @State private var viewModel: FindATimeSuggestedStubViewModel
+    private let viewModel: FindATimeSuggestedViewModel
 
-    init(viewModel: FindATimeSuggestedStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: FindATimeSuggestedStubViewModel) {
+        viewModel = FindATimeSuggestedViewModel(
+            homeId: stub.homeId,
+            tz: stub.tz,
+            draft: FindATimeDraftStore.draft,
+            push: stub.push,
+            client: .shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F5", title: "Suggested Times", stream: "I11")
+        FindATimeSuggestedView(viewModel: viewModel)
     }
 }
 

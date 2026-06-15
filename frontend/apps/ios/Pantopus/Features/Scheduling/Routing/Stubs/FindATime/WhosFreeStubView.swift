@@ -32,14 +32,19 @@ final class WhosFreeStubViewModel {
 }
 
 struct WhosFreeStubView: View {
-    @State private var viewModel: WhosFreeStubViewModel
+    private let viewModel: WhosFreeViewModel
 
-    init(viewModel: WhosFreeStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: WhosFreeStubViewModel) {
+        viewModel = WhosFreeViewModel(
+            homeId: stub.homeId,
+            tz: stub.tz,
+            push: stub.push,
+            client: .shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F7", title: "Who's Free", stream: "I11")
+        WhosFreeView(viewModel: viewModel)
     }
 }
 
