@@ -39,7 +39,14 @@ struct WaitlistManagementStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "E13", title: "Waitlist", stream: "I9")
+        WaitlistManagementView(
+            viewModel: WaitlistManagementViewModel(
+                owner: viewModel.owner,
+                eventTypeId: viewModel.eventTypeId,
+                push: viewModel.push,
+                client: .shared
+            )
+        )
     }
 }
 

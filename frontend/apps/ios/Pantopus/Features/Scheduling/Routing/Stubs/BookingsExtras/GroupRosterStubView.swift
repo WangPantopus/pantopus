@@ -39,7 +39,14 @@ struct GroupRosterStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "E8", title: "Roster & Seats", stream: "I9")
+        GroupRosterView(
+            viewModel: GroupRosterViewModel(
+                owner: viewModel.owner,
+                bookingId: viewModel.bookingId,
+                push: viewModel.push,
+                client: .shared
+            )
+        )
     }
 }
 
