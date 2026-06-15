@@ -39,7 +39,10 @@ struct IntakeQuestionsEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "B3", title: "Intake Questions", stream: "I2")
+        IntakeQuestionsEditorView(viewModel: IntakeQuestionsEditorViewModel(
+            owner: viewModel.owner,
+            eventTypeId: viewModel.eventTypeId
+        ))
     }
 }
 
