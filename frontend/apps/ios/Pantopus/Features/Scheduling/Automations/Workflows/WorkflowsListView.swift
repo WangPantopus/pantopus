@@ -73,18 +73,63 @@ struct WorkflowsListView: View {
             loadingBody
         case .loaded:
             loadedBody
-        case let .error(message):
-            AutoErrorView(headline: "Couldn't load workflows", message: message) {
-                Task { await model.load() }
-            }
+        case .error:
+            errorBody
         }
+    }
+
+    // MARK: Error
+
+    /// JSX Frame 4 — a vertically-centered bordered WHITE CARD (radius 16, 1px
+    /// border, soft shadow) holding a 48×48 neutral `cloud-off` circle, the
+    /// "Couldn't load workflows" headline, and a FILLED-sky "Try again" button
+    /// (no leading icon). Built inline (vs the shared borderless `AutoErrorView`)
+    /// so the card chrome + filled CTA match this screen's design exactly.
+    private var errorBody: some View {
+        VStack {
+            VStack(spacing: 11) {
+                ZStack {
+                    Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 48, height: 48)
+                    Icon(.cloudOff, size: 23, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
+                }
+                .accessibilityHidden(true)
+                Text("Couldn't load workflows")
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                Button { Task { await model.load() } } label: {
+                    Text("Try again")
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .frame(height: 38)
+                        .padding(.horizontal, 18)
+                        .background(Theme.Color.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("automationsRetry")
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .pantopusShadow(.sm)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, Spacing.s5)
+        .accessibilityIdentifier("scheduling.workflows.error")
     }
 
     // MARK: Loaded
 
     private var loadedBody: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            // JSX `Scroll` sets a 12px gap between overline-groups.
+            VStack(alignment: .leading, spacing: Spacing.s3) {
                 if model.isGated { gatedBanner }
                 if !model.isGated { remindersGroup }
                 workflowsGroup
@@ -166,7 +211,10 @@ struct WorkflowsListView: View {
             Button { model.openWorkflow(workflow) } label: {
                 HStack(spacing: 11) {
                     autoIconTile(trigger.icon, bg: Theme.Color.appSurfaceSunken, fg: Theme.Color.appTextStrong)
-                    VStack(alignment: .leading, spacing: 3) {
+                    // JSX WfRow: trigger → channel row (marginTop:2) → status chip
+                    // (marginTop:5). Base spacing 2 with an extra 3pt above the pill
+                    // nets the 5pt gap the design draws.
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(trigger.summary(offsetMinutes: workflow.offsetMinutes ?? 0))
                             .font(.system(size: 12.5, weight: .semibold))
                             .foregroundStyle(Theme.Color.appText)
@@ -179,6 +227,7 @@ struct WorkflowsListView: View {
                                 .lineLimit(1)
                         }
                         SchedulingStatusPill(status: model.statusKey(workflow))
+                            .padding(.top, 3)
                     }
                     Spacer(minLength: Spacing.s2)
                 }
@@ -191,7 +240,10 @@ struct WorkflowsListView: View {
                     set: { _ in Task { await model.toggleActive(workflow) } }
                 ))
                 .labelsHidden()
-                .tint(model.accent)
+                // JSX `IToggle color={SKY}` — the row toggle is a functional
+                // control, so it stays product sky (primary600), not the pillar
+                // accent, on every owner.
+                .tint(Theme.Color.primary600)
                 .accessibilityLabel("\(workflow.name) active")
             }
         }
@@ -224,7 +276,11 @@ struct WorkflowsListView: View {
     @ViewBuilder
     private var fab: some View {
         if case .loaded = model.phase, !model.isGated {
-            AutoFAB(accent: model.accent, shadow: model.theme.ctaShadow, accessibilityLabel: "New workflow") {
+            // JSX FAB: `background:SKY` + sky shadow `rgba(2,132,199,0.32)`. The
+            // create FAB is a functional control, so it stays product sky
+            // (primary600 + the sky-tinted `.primary` shadow) on every owner
+            // rather than taking the pillar accent / pillar ctaShadow.
+            AutoFAB(accent: Theme.Color.primary600, shadow: .primary, accessibilityLabel: "New workflow") {
                 model.createWorkflow()
             }
             .padding(.trailing, Spacing.s4)
@@ -247,7 +303,7 @@ struct WorkflowsListView: View {
                 }
             }
             .padding(.horizontal, Spacing.s3)
-            .padding(.top, Spacing.s4)
+            .padding(.top, Spacing.s3)
         }
     }
 

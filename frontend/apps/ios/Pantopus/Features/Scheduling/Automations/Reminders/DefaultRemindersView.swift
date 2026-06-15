@@ -65,14 +65,18 @@ struct DefaultRemindersView: View {
         VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(model.firstOpen
-                        ? "We pre-picked two reminders most people keep. Change them anytime."
-                        : "Pick the lead-times that attach to every event you own.")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .padding(.horizontal, 2)
-
-                    if model.pushOff { pushOffBanner }
+                    // Frame 4 (push-off) drops the helper paragraph and leads with
+                    // the amber banner; Frames 1–3 lead with the helper instead.
+                    if model.pushOff {
+                        pushOffBanner
+                    } else {
+                        Text(model.firstOpen
+                            ? "We pre-picked two reminders most people keep. Change them anytime."
+                            : "Pick the lead-times that attach to every event you own.")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .padding(.horizontal, 2)
+                    }
 
                     reminderCard
 
@@ -113,16 +117,17 @@ struct DefaultRemindersView: View {
         return Button { model.toggle(minutes) } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 11) {
-                    Icon(on ? .checkCircle : .circle, size: 21, strokeWidth: on ? 2.4 : 2,
+                    Icon(on ? .checkCircle2 : .circle, size: 21, strokeWidth: on ? 2.4 : 2,
                          color: on ? model.accent : Theme.Color.appBorderStrong)
                     Text(label)
                         .font(.system(size: 14, weight: on ? .semibold : .medium))
                         .foregroundStyle(on ? Theme.Color.appText : Theme.Color.appTextSecondary)
                     Spacer(minLength: Spacing.s2)
                 }
-                if on { channelChips.padding(.leading, 32) }
+                if on { channelChips.padding(.leading, 31) }
             }
             .padding(.vertical, 11)
+            .padding(.horizontal, 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
