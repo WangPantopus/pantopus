@@ -26,9 +26,18 @@ const persona = identityFirewall && enabled(process.env.NEXT_PUBLIC_PERSONA_ENAB
 const personaBroadcast = persona && enabled(process.env.NEXT_PUBLIC_PERSONA_BROADCAST_ENABLED, defaultEnabled);
 const personaPaidMemberships = persona && enabled(process.env.NEXT_PUBLIC_PERSONA_PAID_MEMBERSHIPS_ENABLED, false);
 
+// Calendarly scheduling. `scheduling` is the master gate; `schedulingPaid`
+// gates priced surfaces (Stripe TEST mode; payout settlement deferred).
+// Default ON in non-prod / OFF in prod, like the identity flags.
+const scheduling = enabled(process.env.NEXT_PUBLIC_SCHEDULING_ENABLED, defaultEnabled);
+const schedulingPaid =
+  scheduling && enabled(process.env.NEXT_PUBLIC_SCHEDULING_PAID_ENABLED, defaultEnabled);
+
 export const webFeatureFlags = {
   identityFirewall,
   persona,
   personaBroadcast,
   personaPaidMemberships,
+  scheduling,
+  schedulingPaid,
 };
