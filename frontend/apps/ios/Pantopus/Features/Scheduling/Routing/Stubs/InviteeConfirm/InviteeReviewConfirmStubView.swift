@@ -37,15 +37,25 @@ final class InviteeReviewConfirmStubViewModel {
     }
 }
 
+/// Stream I6 adapter — builds the real D2 view-model from the routed stub payload
+/// and renders the real review/confirm screen. The D1 draft is read back from the
+/// in-session draft store (the frozen route can't carry it).
 struct InviteeReviewConfirmStubView: View {
-    @State private var viewModel: InviteeReviewConfirmStubViewModel
+    private let viewModel: InviteeReviewConfirmViewModel
 
-    init(viewModel: InviteeReviewConfirmStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeReviewConfirmStubViewModel) {
+        viewModel = InviteeReviewConfirmViewModel(
+            slug: stub.slug,
+            eventTypeSlug: stub.eventTypeSlug,
+            start: stub.start,
+            tz: stub.tz,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D2", title: "Review & Confirm", stream: "I6")
+        InviteeReviewConfirmView(viewModel: viewModel)
     }
 }
 

@@ -28,15 +28,21 @@ final class InviteeManageBookingStubViewModel {
     }
 }
 
+/// Stream I6 adapter — builds the real D4 view-model from the routed stub payload
+/// (the manage token) and renders the real manage-booking screen.
 struct InviteeManageBookingStubView: View {
-    @State private var viewModel: InviteeManageBookingStubViewModel
+    private let viewModel: InviteeManageBookingViewModel
 
-    init(viewModel: InviteeManageBookingStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeManageBookingStubViewModel) {
+        viewModel = InviteeManageBookingViewModel(
+            token: stub.token,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D4", title: "Manage Booking", stream: "I6")
+        InviteeManageBookingView(viewModel: viewModel)
     }
 }
 

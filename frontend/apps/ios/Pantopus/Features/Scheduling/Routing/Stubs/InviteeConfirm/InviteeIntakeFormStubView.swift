@@ -37,15 +37,30 @@ final class InviteeIntakeFormStubViewModel {
     }
 }
 
+/// Stream I6 adapter — builds the real D1 view-model from the routed stub payload
+/// and renders the real intake form. Prefills name/email when the invitee is
+/// signed in to the app.
 struct InviteeIntakeFormStubView: View {
-    @State private var viewModel: InviteeIntakeFormStubViewModel
+    private let viewModel: InviteeIntakeFormViewModel
 
-    init(viewModel: InviteeIntakeFormStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeIntakeFormStubViewModel) {
+        var prefill: InviteePrefill?
+        if case let .signedIn(user) = AuthManager.shared.state, !user.email.isEmpty {
+            prefill = InviteePrefill(name: user.displayName ?? "", email: user.email)
+        }
+        viewModel = InviteeIntakeFormViewModel(
+            slug: stub.slug,
+            eventTypeSlug: stub.eventTypeSlug,
+            start: stub.start,
+            tz: stub.tz,
+            prefill: prefill,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D1", title: "Your Details", stream: "I6")
+        InviteeIntakeFormView(viewModel: viewModel)
     }
 }
 
