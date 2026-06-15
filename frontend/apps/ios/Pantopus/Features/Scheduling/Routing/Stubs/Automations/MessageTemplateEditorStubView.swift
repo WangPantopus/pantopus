@@ -39,7 +39,7 @@ struct MessageTemplateEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H5", title: "Template Editor", stream: "I16")
+        MessageTemplateEditorView(owner: viewModel.owner, templateId: viewModel.templateId)
     }
 }
 
