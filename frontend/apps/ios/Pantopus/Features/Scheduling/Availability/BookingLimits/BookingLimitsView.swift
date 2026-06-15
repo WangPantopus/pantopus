@@ -98,7 +98,7 @@ struct BookingLimitsView: View {
     }
 
     private var dailyCapGroup: some View {
-        ruleCard("Max per day", caption: "The most bookings you'll take in a day.") {
+        ruleCard("Max per day", caption: "Most bookings you'll take in a day.") {
             Stepper(value: $viewModel.dailyCap, in: 1...50) {
                 valueLabel("\(viewModel.dailyCap)")
             }
@@ -107,7 +107,7 @@ struct BookingLimitsView: View {
     }
 
     private var perPersonGroup: some View {
-        ruleCard("Per-person limit", caption: "How many times one person can book.") {
+        ruleCard("Per-person limit", caption: "How many one person can hold at once.") {
             Stepper(value: $viewModel.perBookerCap, in: 1...20) {
                 valueLabel("\(viewModel.perBookerCap) \(viewModel.perBookerCap == 1 ? "booking" : "bookings")")
             }
@@ -116,7 +116,7 @@ struct BookingLimitsView: View {
     }
 
     private var startTimesGroup: some View {
-        ruleCard("Start times", caption: "Where start times land in the hour.") {
+        ruleCard("Start times", caption: "Where bookings can start within the hour.") {
             Picker("Start times", selection: $viewModel.slotInterval) {
                 ForEach(SlotInterval.allCases) { interval in
                     Text(interval.label).tag(interval)
@@ -137,13 +137,17 @@ struct BookingLimitsView: View {
     ) -> some View {
         FormFieldGroup(label) {
             control()
-            Text(caption)
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
             if let error {
-                Text(error)
+                HStack(alignment: .top, spacing: Spacing.s1) {
+                    Icon(.circleAlert, size: 12, strokeWidth: 2, color: Theme.Color.error)
+                    Text(error)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.error)
+                }
+            } else {
+                Text(caption)
                     .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.error)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
     }

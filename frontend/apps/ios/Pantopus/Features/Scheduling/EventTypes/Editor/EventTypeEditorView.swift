@@ -27,7 +27,7 @@ struct EventTypeEditorView: View {
     var body: some View {
         content
             .background(Theme.Color.appBg)
-            .navigationTitle(viewModel.isEditing ? "Event type" : "New event type")
+            .navigationTitle("Event type")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(isReady ? .hidden : .visible, for: .navigationBar)
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
@@ -56,29 +56,47 @@ struct EventTypeEditorView: View {
 
     private var editor: some View {
         FormShell(
-            title: viewModel.isEditing ? "Event type" : "New event type",
+            title: "Event type",
             leading: .back,
             rightActionLabel: "Save",
             isValid: viewModel.formValid,
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: { Task { if await viewModel.save() { dismiss() } } }
-        ) {
-            Group {
-                identityPill
-                basicsGroup
-                durationGroup
-                locationGroup
-                availabilityGroup
+            onCommit: { Task { if await viewModel.save() { dismiss() } } },
+            content: {
+                Group {
+                    identityPill
+                    basicsGroup
+                    durationGroup
+                    locationGroup
+                    if viewModel.isEditing {
+                        availabilityGroup
+                    }
+                }
+                if viewModel.showsAssignment { assignmentGroup }
+                if viewModel.isEditing {
+                    advancedGroup
+                    visibilityGroup
+                }
+                pricingGroup
+                if viewModel.isEditing { moreGroup }
             }
-            if viewModel.showsAssignment { assignmentGroup }
-            advancedGroup
-            visibilityGroup
-            pricingGroup
-            moreGroup
-        }
+            .disabled(viewModel.isSaving),
+            stickyBottom: {
+                AnyView(
+                    EventTypeSaveBar(
+                        label: viewModel.saveBarLabel,
+                        isEnabled: viewModel.formValid && viewModel.isDirty && !viewModel.isSaving,
+                        isSaving: viewModel.isSaving,
+                        onCommit: { Task { if await viewModel.save() { dismiss() } } }
+                    )
+                )
+            }
+        )
     }
+
+    private var accent: Color { viewModel.owner.theme.accent }
 
     // MARK: Identity pill
 
@@ -102,7 +120,7 @@ struct EventTypeEditorView: View {
     // MARK: Basics
 
     private var basicsGroup: some View {
-        FormFieldGroup("Basics") {
+        PillarFieldGroup("Basics", accent: accent) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 TextField("Name (e.g. Intro call)", text: Binding(
                     get: { viewModel.name },
@@ -149,7 +167,7 @@ struct EventTypeEditorView: View {
     // MARK: Duration
 
     private var durationGroup: some View {
-        FormFieldGroup("Duration") {
+        PillarFieldGroup("Duration", accent: accent) {
             Picker("Duration mode", selection: Binding(
                 get: { viewModel.durationMode },
                 set: { viewModel.setDurationMode($0) }
@@ -160,16 +178,34 @@ struct EventTypeEditorView: View {
             .pickerStyle(.segmented)
             .accessibilityIdentifier("scheduling.eventType.durationMode")
             if viewModel.durationMode == .single {
-                LabeledStepper(
-                    title: "Length",
-                    value: singleDurationBinding,
-                    range: 5...480,
-                    step: 5
-                ) { EventTypeFormat.duration($0) }
-                    .accessibilityIdentifier("scheduling.eventType.singleDuration")
+                singleDuration
             } else {
                 multipleDurations
             }
+        }
+    }
+
+    private var singleDuration: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Length")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            LabeledStepper(
+                title: EventTypeFormat.duration(viewModel.durations.first ?? 30),
+                value: singleDurationBinding,
+                range: 5...480,
+                step: 5
+            ) { _ in "" }
+                .accessibilityIdentifier("scheduling.eventType.singleDuration")
+            HStack(spacing: Spacing.s2) {
+                ForEach([15, 45, 60], id: \.self) { minutes in
+                    QuickDurationChip(minutes: minutes) {
+                        viewModel.setSingleDuration(minutes)
+                    }
+                }
+                Spacer(minLength: Spacing.s0)
+            }
+            if let durationError = viewModel.durationError { fieldError(durationError) }
         }
     }
 
@@ -196,7 +232,7 @@ struct EventTypeEditorView: View {
     // MARK: Location
 
     private var locationGroup: some View {
-        FormFieldGroup("Location") {
+        PillarFieldGroup("Location", accent: accent) {
             Picker("Location", selection: $viewModel.location) {
                 ForEach(locationOptions) { mode in
                     Text(mode.label).tag(mode)
@@ -217,12 +253,11 @@ struct EventTypeEditorView: View {
     // MARK: Availability
 
     private var availabilityGroup: some View {
-        FormFieldGroup("Availability") {
+        PillarFieldGroup("Availability", accent: accent) {
             EventTypeNavRow(
                 icon: .calendarClock,
                 title: "Schedule",
-                subtitle: "Working hours this event uses",
-                value: "Working hours"
+                subtitle: "Working hours this event uses"
             ) { viewModel.openAvailability() }
         }
     }
@@ -230,7 +265,7 @@ struct EventTypeEditorView: View {
     // MARK: Assignment (business)
 
     private var assignmentGroup: some View {
-        FormFieldGroup("Assignment") {
+        PillarFieldGroup("Assignment", accent: accent) {
             Picker("Assignment", selection: $viewModel.assignment) {
                 ForEach(EventAssignmentMode.allCases) { mode in
                     Text(mode.label).tag(mode)
@@ -238,9 +273,13 @@ struct EventTypeEditorView: View {
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier("scheduling.eventType.assignment")
-            Text(viewModel.assignment.caption)
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+            if viewModel.assignment == .collective {
+                collectiveControls
+            } else {
+                Text(viewModel.assignment.caption)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
             if viewModel.assignment == .group {
                 LabeledStepper(
                     title: "Seats per slot",
@@ -252,36 +291,44 @@ struct EventTypeEditorView: View {
         }
     }
 
+    private var collectiveControls: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Everyone must be free. The booking goes on every required host's calendar.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            LabeledStepper(
+                title: "Required hosts",
+                caption: "How many hosts must be available for a slot to open.",
+                value: $viewModel.requiredHosts,
+                range: 1...50
+            ) { "\($0)" }
+        }
+    }
+
     // MARK: Advanced (collapsible)
 
     private var advancedGroup: some View {
-        FormFieldGroup("Advanced") {
-            Button {
+        PillarFieldGroup(
+            "Advanced",
+            accent: accent,
+            isExpanded: viewModel.advancedExpanded,
+            onToggle: {
                 withAnimation(.easeInOut(duration: 0.2)) { viewModel.advancedExpanded.toggle() }
-            } label: {
-                HStack {
-                    Text("Buffers, notice & limits")
-                        .pantopusTextStyle(.body)
-                        .foregroundStyle(Theme.Color.appText)
-                    Spacer()
-                    Icon(viewModel.advancedExpanded ? .chevronUp : .chevronDown, size: 16, color: Theme.Color.appTextMuted)
-                }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("scheduling.eventType.advancedToggle")
+        ) {
             if viewModel.advancedExpanded { advancedControls }
         }
     }
 
     private var advancedControls: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
-            Divider().background(Theme.Color.appBorderSubtle)
-            LabeledStepper(title: "Buffer before", value: $viewModel.bufferBeforeMin, range: 0...240, step: 5) {
-                "\($0) min"
-            }
-            LabeledStepper(title: "Buffer after", value: $viewModel.bufferAfterMin, range: 0...240, step: 5) {
-                "\($0) min"
+            HStack(alignment: .top, spacing: Spacing.s3) {
+                LabeledStepper(title: "Buffer before", value: $viewModel.bufferBeforeMin, range: 0...240, step: 5) {
+                    "\($0) min"
+                }
+                LabeledStepper(title: "Buffer after", value: $viewModel.bufferAfterMin, range: 0...240, step: 5) {
+                    "\($0) min"
+                }
             }
             LabeledStepper(
                 title: "Minimum notice",
@@ -290,37 +337,38 @@ struct EventTypeEditorView: View {
                 range: 0...168
             ) { "\($0) \($0 == 1 ? "hour" : "hours")" }
             LabeledStepper(
-                title: "Book up to",
+                title: "Booking horizon",
                 caption: "How far ahead people can book.",
                 value: $viewModel.maxHorizonDays,
                 range: 1...730
             ) { "\($0) days" }
             LabeledStepper(
-                title: "Max per day",
+                title: "Per-day cap",
                 caption: "0 means no daily limit.",
                 value: $viewModel.dailyCap,
                 range: 0...50
-            ) { $0 == 0 ? "No limit" : "\($0)" }
+            ) { $0 == 0 ? "No limit" : "\($0)/day" }
         }
     }
 
     // MARK: Visibility
 
     private var visibilityGroup: some View {
-        FormFieldGroup("Visibility") {
-            CaptionToggle(title: "Require approval",
-                          caption: "You confirm each booking before it's set.",
+        PillarFieldGroup(nil, accent: accent) {
+            IconToggleRow(icon: .userCheck,
+                          title: "Require approval",
+                          subtitle: "Approve each booking before it's confirmed.",
                           isOn: $viewModel.requiresApproval)
             Divider().background(Theme.Color.appBorderSubtle)
-            CaptionToggle(title: "Unlisted (link only)",
-                          caption: "Hidden from your page; bookable only with the link.",
+            IconToggleRow(icon: .eyeOff,
+                          title: "Unlisted (link only)",
+                          subtitle: "Hidden from your public page.",
                           isOn: $viewModel.visibilitySecret)
-            if viewModel.isEditing {
-                Divider().background(Theme.Color.appBorderSubtle)
-                CaptionToggle(title: "Active",
-                              caption: "Turn off to stop taking new bookings.",
-                              isOn: $viewModel.isActiveField)
-            }
+            Divider().background(Theme.Color.appBorderSubtle)
+            IconToggleRow(icon: .circleCheck,
+                          title: "Active",
+                          subtitle: "People can book this right now.",
+                          isOn: $viewModel.isActiveField)
         }
     }
 
@@ -329,7 +377,7 @@ struct EventTypeEditorView: View {
     @ViewBuilder
     private var pricingGroup: some View {
         if viewModel.paidVisible {
-            FormFieldGroup("Pricing & payment") {
+            PillarFieldGroup("Pricing & payment", accent: accent) {
                 CaptionToggle(title: "Charge for this booking",
                               caption: "Collect payment when someone books.",
                               isOn: $viewModel.chargeEnabled)
@@ -341,29 +389,33 @@ struct EventTypeEditorView: View {
     private var pricingControls: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             Divider().background(Theme.Color.appBorderSubtle)
-            HStack(spacing: Spacing.s3) {
-                Text("Price")
-                    .pantopusTextStyle(.body)
-                    .foregroundStyle(Theme.Color.appText)
-                Spacer()
-                TextField("0", text: $viewModel.priceDollars)
-                    .font(Theme.Font.body)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(maxWidth: 100)
-                    .accessibilityIdentifier("scheduling.eventType.price")
-                Text(viewModel.currency)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
             if viewModel.stripeConnected == false {
-                EventInfoCard(
-                    icon: .creditCard,
-                    title: "Connect payments to charge",
-                    message: "Hook up Stripe to collect payments. Charges run in test mode for now.",
-                    actionTitle: "Connect Stripe",
-                    action: { viewModel.connectStripe() }
-                )
+                StripeConnectCard { viewModel.connectStripe() }
+            } else {
+                HStack(alignment: .bottom, spacing: Spacing.s3) {
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        Text("Price")
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                        TextField("0", text: $viewModel.priceDollars)
+                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Theme.Color.appText)
+                            .keyboardType(.decimalPad)
+                            .accessibilityIdentifier("scheduling.eventType.price")
+                    }
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        Text("Currency")
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                        Picker("Currency", selection: $viewModel.currency) {
+                            Text("USD").tag("USD")
+                            Text("EUR").tag("EUR")
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 130)
+                        .accessibilityIdentifier("scheduling.eventType.currency")
+                    }
+                }
             }
         }
     }
@@ -371,7 +423,7 @@ struct EventTypeEditorView: View {
     // MARK: More (link-outs)
 
     private var moreGroup: some View {
-        FormFieldGroup("More") {
+        PillarFieldGroup(nil, accent: accent) {
             EventTypeNavRow(
                 icon: .listChecks,
                 title: "Intake questions",
@@ -380,7 +432,7 @@ struct EventTypeEditorView: View {
             ) { viewModel.openIntakeQuestions() }
             Divider().background(Theme.Color.appBorderSubtle)
             EventTypeNavRow(
-                icon: .slidersHorizontal,
+                icon: .gauge,
                 title: "Booking limits",
                 subtitle: linkSubtitle("Notice, caps & start times"),
                 isEnabled: viewModel.isEditing
