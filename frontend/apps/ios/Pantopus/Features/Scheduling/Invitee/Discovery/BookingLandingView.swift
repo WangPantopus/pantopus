@@ -198,7 +198,7 @@ struct BookingLandingView: View {
 
     private func inlineNote(_ text: String) -> some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.arrowRight, size: 14, color: Theme.Color.primary600)
+            Icon(.arrowRightCircle, size: 14, color: Theme.Color.primary600)
             Text(text)
                 .pantopusTextStyle(.caption)
                 .fontWeight(.semibold)
@@ -296,7 +296,7 @@ struct BookingLandingView: View {
     private func errorScroll(_ message: String) -> some View {
         VStack(spacing: Spacing.s3) {
             Spacer(minLength: Spacing.s0)
-            Icon(.link, size: 26, strokeWidth: 1.75, color: Theme.Color.appTextSecondary)
+            Icon(.link2Off, size: 26, strokeWidth: 1.75, color: Theme.Color.appTextSecondary)
                 .frame(width: 60, height: 60)
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(Circle())

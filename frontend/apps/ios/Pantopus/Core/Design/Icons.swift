@@ -438,6 +438,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case textCursorInput = "text-cursor-input"
     case handPointer = "hand-pointer"
     case wand2 = "wand-2"
+    // Calendarly (scheduling) — second batch surfaced during the per-screen
+    // parity sweep. SF lacks a broken-link and a calendar+search glyph, noted
+    // inline.
+    case arrowRightCircle = "arrow-right-circle"
+    case link2Off = "link-2-off"
+    case calendarSearch = "calendar-search"
+    case gitMerge = "git-merge"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -792,6 +799,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .textCursorInput: "character.cursor.ibeam"
         case .handPointer: "hand.point.up.left"
         case .wand2: "wand.and.rays"
+        // Calendarly — second batch. `link-2-off` (broken link) and
+        // `calendar-search` have no SF equivalent; they fall back to the
+        // closest glyph (plain link / magnifier).
+        case .arrowRightCircle: "arrow.right.circle"
+        case .link2Off: "link"
+        case .calendarSearch: "magnifyingglass"
+        case .gitMerge: "arrow.triangle.merge"
         }
     }
 }

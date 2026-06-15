@@ -297,7 +297,7 @@ private struct FilteredEmpty: View {
 
     var body: some View {
         VStack(spacing: Spacing.s1) {
-            Icon(.calendarDays, size: 26, color: Theme.Color.home)
+            Icon(.calendarSearch, size: 26, color: Theme.Color.home)
                 .frame(width: 56, height: 56)
                 .background(Theme.Color.homeBg)
                 .clipShape(Circle())
