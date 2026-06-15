@@ -46,7 +46,7 @@ enum ConfirmFormat {
             return formatter(tz, format: "h:mm a").string(from: start)
         }
         let cal = calendar(tz)
-        let sameMeridiem = cal.component(.hour, from: start) < 12 == (cal.component(.hour, from: end) < 12)
+        let sameMeridiem = (cal.component(.hour, from: start) < 12) == (cal.component(.hour, from: end) < 12)
         let startStr = formatter(tz, format: sameMeridiem ? "h:mm" : "h:mm a").string(from: start)
         let endStr = formatter(tz, format: "h:mm a").string(from: end)
         return "\(startStr) – \(endStr)"
