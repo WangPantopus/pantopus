@@ -141,7 +141,7 @@ struct GroupRosterView: View {
         return "Waitlist · \(viewModel.waitingCount)"
     }
 
-    private func section(_ overline: String, @ViewBuilder rows: () -> some View) -> some View {
+    private func section<Rows: View>(_ overline: String, @ViewBuilder rows: () -> Rows) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2 + 1) {
             ExtrasOverline(text: overline)
                 .padding(.horizontal, Spacing.s4 + 2)

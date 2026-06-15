@@ -56,16 +56,15 @@ final class WaitlistManagementViewModel {
     private func fetch(showLoading: Bool) async {
         if showLoading { phase = .loading }
         do {
-            async let eventTypeResponse: EventTypeDetailResponse = client.request(
+            let eventType: EventTypeDetailResponse = try await client.request(
                 SchedulingEndpoints.getEventType(owner: owner, id: eventTypeId)
             )
-            async let waitlistResponse: WaitlistResponse = client.request(
+            let waitlistResponse: WaitlistResponse = try await client.request(
                 SchedulingEndpoints.getWaitlist(owner: owner, eventTypeId: eventTypeId)
             )
-            let (eventType, waitlist) = try await (eventTypeResponse, waitlistResponse)
 
             seatTotal = max(eventType.eventType.seatCap ?? 1, 1)
-            let waiting = waitlist.waitlist.filter { ($0.status ?? "waiting") == "waiting" }
+            let waiting = waitlistResponse.waitlist.filter { ($0.status ?? "waiting") == "waiting" }
             entries = Self.build(waiting)
             phase = entries.isEmpty ? .empty : .ready
         } catch let error as SchedulingError {
