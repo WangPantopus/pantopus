@@ -54,7 +54,7 @@ struct GatedSchedulerView: View {
                 viewModel.requestAccess()
             } label: {
                 HStack(spacing: 5) {
-                    Icon(.shieldCheck, size: 12, color: Theme.Color.homeDark)
+                    Icon(.shieldPlus, size: 12, color: Theme.Color.homeDark)
                     Text("Ask to manage")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Theme.Color.homeDark)

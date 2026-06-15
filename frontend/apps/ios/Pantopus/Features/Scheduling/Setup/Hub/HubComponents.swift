@@ -111,7 +111,7 @@ struct HubLinkCard: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: onShare) {
-                Icon(.scanLine, size: 15, color: Theme.Color.appTextStrong)
+                Icon(.qrCode, size: 15, color: Theme.Color.appTextStrong)
                     .frame(width: 30, height: 30)
                     .background(Theme.Color.appSurface)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))

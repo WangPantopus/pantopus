@@ -388,6 +388,57 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case circleDot = "circle-dot"
     case repeat2 = "repeat-2"
 
+    // Calendarly (scheduling) — every `data-lucide` token used across the
+    // booking / event-type / availability / payments / automations design
+    // suite that wasn't already on the icon menu. SF Symbols ships near-1:1
+    // glyphs for most; the few it lacks (calendar-sync, search-x, ticket-check,
+    // share-2) fall back to the closest available glyph, noted inline.
+    case store
+    case qrCode = "qr-code"
+    case settings
+    case settings2 = "settings-2"
+    case workflow
+    case moon
+    case calendarSync = "calendar-sync"
+    case calendarOff = "calendar-off"
+    case calendarX = "calendar-x"
+    case calendarCheck2 = "calendar-check-2"
+    case calendarRange = "calendar-range"
+    case searchX = "search-x"
+    case ticket
+    case ticketCheck = "ticket-check"
+    case shieldPlus = "shield-plus"
+    case userX = "user-x"
+    case rotateCcw = "rotate-ccw"
+    case rotateCw = "rotate-cw"
+    case packageOpen = "package-open"
+    case tentTree = "tent-tree"
+    case share2 = "share-2"
+    case bellPlus = "bell-plus"
+    case percent
+    case scissors
+    case scale
+    case coffee
+    case bedDouble = "bed-double"
+    case house
+    case move
+    case ellipsis
+    case ellipsisVertical = "ellipsis-vertical"
+    case circleAlert = "circle-alert"
+    case circleCheck = "circle-check"
+    case checkCircle2 = "check-circle-2"
+    case clockAlert = "clock-alert"
+    case pauseCircle = "pause-circle"
+    case listOrdered = "list-ordered"
+    case loaderCircle = "loader-circle"
+    case messageSquareText = "message-square-text"
+    case layoutTemplate = "layout-template"
+    case panelBottom = "panel-bottom"
+    case squareMousePointer = "square-mouse-pointer"
+    case textCursorInput = "text-cursor-input"
+    case handPointer = "hand-pointer"
+    case wand2 = "wand-2"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -691,6 +742,56 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .layoutGrid: "square.grid.2x2"
         case .circleDot: "smallcircle.filled.circle"
         case .repeat2: "arrow.triangle.2.circlepath"
+        // Calendarly (scheduling). SF Symbols ships direct glyphs for most;
+        // `calendar-sync` (no calendar+sync glyph → reuses the calendar+clock
+        // vector), `search-x` (no magnifyingglass.slash → plain glass),
+        // `ticket-check` (no ticket+check → plain ticket), and `share-2` (no
+        // node-share graph → iOS share-up) fall back to the closest match.
+        case .store: "storefront"
+        case .qrCode: "qrcode"
+        case .settings: "gearshape"
+        case .settings2: "gearshape.2"
+        case .workflow: "arrow.triangle.branch"
+        case .moon: "moon"
+        case .calendarSync: "calendar.badge.clock"
+        case .calendarOff: "calendar.badge.minus"
+        case .calendarX: "calendar.badge.exclamationmark"
+        case .calendarCheck2: "calendar.badge.checkmark"
+        case .calendarRange: "calendar.day.timeline.left"
+        case .searchX: "magnifyingglass"
+        case .ticket: "ticket"
+        case .ticketCheck: "ticket"
+        case .shieldPlus: "lock.shield"
+        case .userX: "person.crop.circle.badge.xmark"
+        case .rotateCcw: "arrow.counterclockwise"
+        case .rotateCw: "arrow.clockwise"
+        case .packageOpen: "shippingbox"
+        case .tentTree: "tent"
+        case .share2: "square.and.arrow.up"
+        case .bellPlus: "bell.badge"
+        case .percent: "percent"
+        case .scissors: "scissors"
+        case .scale: "scalemass"
+        case .coffee: "cup.and.saucer"
+        case .bedDouble: "bed.double"
+        case .house: "house"
+        case .move: "arrow.up.and.down.and.arrow.left.and.right"
+        case .ellipsis: "ellipsis"
+        case .ellipsisVertical: "ellipsis"
+        case .circleAlert: "exclamationmark.circle"
+        case .circleCheck: "checkmark.circle"
+        case .checkCircle2: "checkmark.circle.fill"
+        case .clockAlert: "clock.badge.exclamationmark"
+        case .pauseCircle: "pause.circle"
+        case .listOrdered: "list.number"
+        case .loaderCircle: "circle.dotted"
+        case .messageSquareText: "text.bubble"
+        case .layoutTemplate: "rectangle.3.group"
+        case .panelBottom: "dock.rectangle"
+        case .squareMousePointer: "cursorarrow.rays"
+        case .textCursorInput: "character.cursor.ibeam"
+        case .handPointer: "hand.point.up.left"
+        case .wand2: "wand.and.rays"
         }
     }
 }

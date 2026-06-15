@@ -2,10 +2,13 @@
 //  SchedulingStatusPill.swift
 //  Pantopus
 //
-//  Foundation (I0b) — the canonical booking/page status pill. Status is carried
-//  by a semantic chip + icon (NEVER a left-border or flood-fill): green for
-//  confirmed, amber for pending / paused, red for declined / no-show, muted for
-//  cancelled / past / expired / secret / unavailable. Tokens only.
+//  Foundation (I0b) — the canonical booking/page status pill. Matches the
+//  design's text-only chip grammar (booking-detail / bookings-inbox `StatusPill`):
+//  a Title-case label on a tinted fill with a hairline tone border — NO leading
+//  icon, fontSize 10 / weight 700, tight 3×8 padding. Tones: green for
+//  confirmed / active, amber for pending / draft, red for declined / no-show,
+//  neutral grey for paused / cancelled / completed / past / expired / secret /
+//  unavailable / waitlisted. Tokens only.
 //
 
 import SwiftUI
@@ -22,6 +25,7 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
     case past
     case active
     case paused
+    case draft
     case secret
     case expired
     case unavailable
@@ -37,8 +41,9 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
         "no_show": .noShow, "noshow": .noShow,
         "completed": .completed, "done": .completed,
         "past": .past,
-        "active": .active, "live": .active,
+        "active": .active, "live": .active, "published": .active,
         "paused": .paused,
+        "draft": .draft,
         "secret": .secret, "private": .secret, "hidden": .secret,
         "expired": .expired,
         "unavailable": .unavailable, "full": .unavailable, "fully_booked": .unavailable,
@@ -62,6 +67,7 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
         case .past: "Past"
         case .active: "Active"
         case .paused: "Paused"
+        case .draft: "Draft"
         case .secret: "Private"
         case .expired: "Expired"
         case .unavailable: "Fully booked"
@@ -70,31 +76,13 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
         }
     }
 
-    var icon: PantopusIcon {
-        switch self {
-        case .pending: .clock
-        case .confirmed: .checkCircle
-        case .cancelled: .xCircle
-        case .declined: .x
-        case .noShow: .ban
-        case .completed: .check
-        case .past: .clock
-        case .active: .circleDot
-        case .paused: .pause
-        case .secret: .lock
-        case .expired: .clock
-        case .unavailable: .calendar
-        case .waitlisted: .clock
-        case .unknown: .circle
-        }
-    }
-
     var tone: Tone {
         switch self {
-        case .confirmed, .active, .completed: .success
-        case .pending, .paused: .warning
+        case .confirmed, .active: .success
+        case .pending, .draft: .warning
         case .declined, .noShow: .error
-        case .cancelled, .past, .secret, .expired, .unavailable, .waitlisted, .unknown: .neutral
+        case .cancelled, .completed, .past, .paused, .secret,
+             .expired, .unavailable, .waitlisted, .unknown: .neutral
         }
     }
 
@@ -115,7 +103,18 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
             case .success: Theme.Color.success
             case .warning: Theme.Color.warning
             case .error: Theme.Color.error
-            case .neutral: Theme.Color.appTextMuted
+            case .neutral: Theme.Color.appTextSecondary
+            }
+        }
+
+        /// Hairline border tint — the design draws a 1px tone-light outline
+        /// around every status chip (neutral falls back to `appBorder`).
+        var border: Color {
+            switch self {
+            case .success: Theme.Color.successLight
+            case .warning: Theme.Color.warningLight
+            case .error: Theme.Color.errorLight
+            case .neutral: Theme.Color.appBorder
             }
         }
     }
@@ -135,20 +134,18 @@ public struct SchedulingStatusPill: View {
     }
 
     public var body: some View {
-        HStack(spacing: Spacing.s1) {
-            Icon(status.icon, size: 12, strokeWidth: 2, color: status.tone.foreground)
-            Text(status.label)
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
-        }
-        .foregroundStyle(status.tone.foreground)
-        .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, Spacing.s1)
-        .background(status.tone.background)
-        .clipShape(Capsule())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(status.label)
-        .accessibilityIdentifier("scheduling.statusPill.\(status.rawValue)")
+        Text(status.label)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(status.tone.foreground)
+            .lineLimit(1)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 3)
+            .background(status.tone.background)
+            .overlay(Capsule().strokeBorder(status.tone.border, lineWidth: 1))
+            .clipShape(Capsule())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(status.label)
+            .accessibilityIdentifier("scheduling.statusPill.\(status.rawValue)")
     }
 }
 

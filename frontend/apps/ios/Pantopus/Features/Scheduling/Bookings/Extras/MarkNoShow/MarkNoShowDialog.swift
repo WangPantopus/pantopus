@@ -28,7 +28,7 @@ struct MarkNoShowDialog: View {
     var body: some View {
         ExtrasDialog(isDismissable: !viewModel.isSubmitting, onDismiss: onClose) {
             ExtrasIconDisc(
-                icon: .userMinus,
+                icon: .userX,
                 background: Theme.Color.errorBg,
                 foreground: Theme.Color.error
             )

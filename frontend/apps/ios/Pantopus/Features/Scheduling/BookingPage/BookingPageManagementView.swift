@@ -526,7 +526,7 @@ private struct BookingMgmtFooterButtons: View {
         HStack(spacing: Spacing.s2) {
             BookingMgmtFooterButton(icon: .copy, title: "Copy link", disabled: disabled, action: onCopy)
             BookingMgmtFooterButton(icon: .share, title: "Share", disabled: disabled, action: onShare)
-            BookingMgmtFooterButton(icon: .scanLine, title: "View QR", disabled: disabled, action: onViewQR)
+            BookingMgmtFooterButton(icon: .qrCode, title: "View QR", disabled: disabled, action: onViewQR)
         }
         .opacity(disabled ? 0.5 : 1)
     }
