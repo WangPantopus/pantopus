@@ -36,7 +36,7 @@ struct InsightsDashboardStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H9", title: "Insights", stream: "I17")
+        InsightsDashboardView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
