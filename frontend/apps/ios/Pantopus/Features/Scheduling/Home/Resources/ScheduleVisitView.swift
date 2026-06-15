@@ -78,7 +78,7 @@ struct ScheduleVisitView: View {
     }
 
     private var detailsGroup: some View {
-        FormFieldGroup("Details") {
+        FormFieldGroup("Details", overlineColor: Theme.Color.homeDark) {
             TextField("e.g. Plumber visit", text: $viewModel.title)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
@@ -102,7 +102,7 @@ struct ScheduleVisitView: View {
     }
 
     private var hostsGroup: some View {
-        FormFieldGroup("Who must be home") {
+        FormFieldGroup("Who must be home", overlineColor: Theme.Color.homeDark) {
             if viewModel.members.isEmpty {
                 Text("No household members found.")
                     .pantopusTextStyle(.small)
@@ -137,7 +137,7 @@ struct ScheduleVisitView: View {
     }
 
     private var whenGroup: some View {
-        FormFieldGroup("When") {
+        FormFieldGroup("When", overlineColor: Theme.Color.homeDark) {
             DatePicker("Date", selection: $viewModel.date, displayedComponents: .date)
                 .tint(Theme.Color.home)
             Divider().background(Theme.Color.appBorderSubtle)
@@ -149,7 +149,7 @@ struct ScheduleVisitView: View {
     }
 
     private var accessGroup: some View {
-        FormFieldGroup("Access") {
+        FormFieldGroup("Access", overlineColor: Theme.Color.homeDark) {
             TextField("Entry note for the visitor", text: $viewModel.entryNote)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)

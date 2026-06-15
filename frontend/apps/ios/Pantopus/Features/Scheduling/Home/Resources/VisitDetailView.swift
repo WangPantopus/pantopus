@@ -409,7 +409,7 @@ private struct VisitEditSheet: View {
             onClose: { viewModel.isEditing = false },
             onCommit: { Task { await viewModel.saveEdit() } }
         ) {
-            FormFieldGroup("Details") {
+            FormFieldGroup("Details", overlineColor: Theme.Color.homeDark) {
                 TextField("Visit title", text: $viewModel.editTitle)
                     .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.appText)
@@ -426,7 +426,7 @@ private struct VisitEditSheet: View {
                     Spacer()
                 }
             }
-            FormFieldGroup("Who must be home") {
+            FormFieldGroup("Who must be home", overlineColor: Theme.Color.homeDark) {
                 ForEach(Array(viewModel.members.enumerated()), id: \.element.id) { index, member in
                     Button { viewModel.toggleEditHost(member.id) } label: {
                         HStack(spacing: Spacing.s2) {
@@ -444,7 +444,7 @@ private struct VisitEditSheet: View {
                     }
                 }
             }
-            FormFieldGroup("When") {
+            FormFieldGroup("When", overlineColor: Theme.Color.homeDark) {
                 DatePicker("Date", selection: $viewModel.editDate, displayedComponents: .date)
                     .tint(Theme.Color.home)
                 Divider().background(Theme.Color.appBorderSubtle)
@@ -453,7 +453,7 @@ private struct VisitEditSheet: View {
                 Divider().background(Theme.Color.appBorderSubtle)
                 CounterRow(label: "Visit length", value: $viewModel.editDuration, unit: "hr", range: 1...12)
             }
-            FormFieldGroup("Access") {
+            FormFieldGroup("Access", overlineColor: Theme.Color.homeDark) {
                 TextField("Entry note for the visitor", text: $viewModel.editNote)
                     .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.appText)

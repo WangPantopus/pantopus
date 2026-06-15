@@ -780,6 +780,32 @@ private struct ListingContextHeader: View {
     }
 }
 
+/// 36×20 product-sky switch used by `RowTrailing.toggle` /
+/// `.toggleWithKebab`. Sky regardless of pillar (a functional control).
+private struct RowToggle: View {
+    let isOn: Bool
+    let accessibilityLabel: String
+    let onChange: @Sendable (Bool) -> Void
+
+    var body: some View {
+        Button { onChange(!isOn) } label: {
+            ZStack(alignment: isOn ? .trailing : .leading) {
+                Capsule()
+                    .fill(isOn ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
+                    .frame(width: 36, height: 20)
+                Circle()
+                    .fill(Theme.Color.appSurface)
+                    .frame(width: 16, height: 16)
+                    .padding(.horizontal, 2)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
 /// Empty state with a "start from a template" quick-start list below the CTA
 /// (Calendarly Event-types / Resources empty frames). Plain empty states use
 /// `EmptyState` directly; this composes it with the template tiles.
@@ -1320,21 +1346,19 @@ private struct TrailingView: View {
         case .none:
             EmptyView()
         case let .toggle(isOn, accessibilityLabel, onChange):
-            Button { onChange(!isOn) } label: {
-                ZStack(alignment: isOn ? .trailing : .leading) {
-                    Capsule()
-                        .fill(isOn ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
-                        .frame(width: 36, height: 20)
-                    Circle()
-                        .fill(Theme.Color.appSurface)
-                        .frame(width: 16, height: 16)
-                        .padding(.horizontal, 2)
+            RowToggle(isOn: isOn, accessibilityLabel: accessibilityLabel, onChange: onChange)
+        case let .toggleWithKebab(isOn, accessibilityLabel, onToggle):
+            HStack(spacing: Spacing.s2) {
+                RowToggle(isOn: isOn, accessibilityLabel: accessibilityLabel, onChange: onToggle)
+                if let handler = onSecondary {
+                    Button(action: handler) {
+                        Icon(.moreHorizontal, size: 20, color: Theme.Color.appTextSecondary)
+                            .frame(width: 30, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("More actions for \(rowTitle)")
                 }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(accessibilityLabel)
-            .accessibilityValue(isOn ? "On" : "Off")
-            .accessibilityAddTraits(.isButton)
         case let .amountWithChip(amount, chipText, chipVariant, chipIcon):
             VStack(alignment: .trailing, spacing: Spacing.s1) {
                 Text(amount)

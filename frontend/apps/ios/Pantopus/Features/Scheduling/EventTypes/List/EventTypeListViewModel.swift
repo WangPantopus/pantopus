@@ -291,7 +291,13 @@ private extension EventTypeListViewModel {
             // for Duplicate/Delete (the design's inline active toggle is a
             // composite-trailing follow-up).
             leading: .dot(color: swatch.color),
-            trailing: .kebab,
+            // Design `EventRow` shows the inline active toggle AND the overflow
+            // kebab; the toggle flips is_active, the kebab keeps Duplicate/Delete.
+            trailing: .toggleWithKebab(
+                isOn: !isHidden,
+                accessibilityLabel: isHidden ? "Show \(eventType.name)" : "Hide \(eventType.name)",
+                onToggle: { [weak self] _ in Task { @MainActor in await self?.toggleHidden(eventType) } }
+            ),
             onTap: { [weak self] in Task { @MainActor in self?.open(eventType) } },
             onSecondary: { [weak self] in Task { @MainActor in self?.menuTarget = eventType } },
             chips: chips(for: eventType),

@@ -118,12 +118,17 @@ final class ResourceListViewModel: ListOfRowsDataSource {
     private func rebuild(resources: [ResourceDTO], bookings: [ResourceBooking]) {
         guard !resources.isEmpty else {
             // Design F9 empty frame: `package-open` disc + "Add what your
-            // household shares" + the "Start from a template." closer. The
-            // shared `EmptyState` can't render the design's full templates
-            // quick-start list (explainer card + "TEMPLATES" overline + 5
-            // tappable template rows) — that needs a bespoke empty-state slot
-            // on `ListOfRowsView`, tracked in sharedChangesNeeded. The glyph +
-            // copy below are the view-only fixes this VM can drive.
+            // household shares" + the "Start from a template" quick-start list
+            // (5 tappable template tiles), rendered via the EmptyContent
+            // `templates` slot.
+            let template: (String, PantopusIcon, String, Bool) -> ListOfRowsState.EmptyTemplate = { [weak self] id, icon, label, isOther in
+                .init(
+                    id: id, icon: icon, label: label,
+                    accent: isOther ? Theme.Color.appTextSecondary : Theme.Color.homeDark,
+                    accentBg: isOther ? Theme.Color.appSurfaceSunken : Theme.Color.homeBg,
+                    onTap: { Task { @MainActor in self?.openEditor(resourceId: nil) } }
+                )
+            }
             state = .empty(.init(
                 icon: .packageOpen,
                 headline: "Add what your household shares",
@@ -131,7 +136,14 @@ final class ResourceListViewModel: ListOfRowsDataSource {
                 ctaTitle: "Add a resource",
                 onCTA: { [weak self] in Task { @MainActor in self?.openEditor(resourceId: nil) } },
                 tint: Theme.Color.homeBg,
-                accent: Theme.Color.home
+                accent: Theme.Color.home,
+                templates: [
+                    template("guestroom", .bedDouble, "Guest room", false),
+                    template("driveway", .car, "Driveway", false),
+                    template("evcharger", .zap, "EV charger", false),
+                    template("tools", .wrench, "Tools", false),
+                    template("other", .plus, "Other", true)
+                ]
             ))
             return
         }

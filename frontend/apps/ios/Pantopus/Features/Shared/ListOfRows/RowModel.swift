@@ -336,6 +336,11 @@ public enum RowTrailing: Sendable {
     /// and the Resources row toggles bookable. Sky regardless of pillar
     /// (functional control). The handler receives the new value.
     case toggle(isOn: Bool, accessibilityLabel: String, onChange: @Sendable (Bool) -> Void)
+
+    /// An inline active toggle AND an overflow kebab side by side — the
+    /// Calendarly Event-types row shows both (the toggle drives active/hidden;
+    /// the kebab carries Duplicate / Delete via the row's `onSecondary`).
+    case toggleWithKebab(isOn: Bool, accessibilityLabel: String, onToggle: @Sendable (Bool) -> Void)
 }
 
 /// Single icon-only action used by `RowTrailing.iconActions`. Renders as a
