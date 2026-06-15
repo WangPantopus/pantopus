@@ -82,7 +82,7 @@ struct InviteeIntakeFormView: View {
         ConfirmFooter {
             ConfirmPrimaryButton(
                 label: viewModel.holdExpired ? "Pick another time" : "Review booking",
-                icon: viewModel.holdExpired ? .calendar : nil,
+                icon: viewModel.holdExpired ? .calendarSearch : nil,
                 accent: viewModel.accent,
                 isDisabled: !viewModel.holdExpired && !viewModel.isValid
             ) {
