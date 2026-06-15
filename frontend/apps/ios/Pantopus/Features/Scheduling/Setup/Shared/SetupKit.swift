@@ -131,8 +131,8 @@ enum SchedulingPillarChoice: String, CaseIterable, Identifiable {
     var icon: PantopusIcon {
         switch self {
         case .personal: .user
-        case .home: .home
-        case .business: .shoppingBag
+        case .home: .house
+        case .business: .briefcase
         }
     }
 

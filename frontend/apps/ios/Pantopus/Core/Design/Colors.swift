@@ -154,6 +154,14 @@ public extension Theme.Color {
     /// review cards.
     static let star = SwiftUI.Color("Accent/Star", bundle: Theme.bundle)
 
+    // MARK: - Brand marks (third-party)
+
+    /// Stripe brand purple — `#635bff`. The canonical Stripe wordmark / badge
+    /// color. Used on the payments-setup Stripe connect disc + "Powered by
+    /// Stripe" badges (G5/G6). NOT the business pillar violet (`#7C3AED`) — a
+    /// brand mark keeps its own color even on a pillar-accented surface.
+    static let stripeBrand = SwiftUI.Color("Brand/Stripe", bundle: Theme.bundle)
+
     // MARK: - App shell / neutrals
 
     /// App background — `#f6f7f9`.

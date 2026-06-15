@@ -187,12 +187,12 @@ struct SchedulingHubScreen: View {
         } else {
             items.append(HubManageItem(id: "memberAvailability", icon: .users, label: "Member availability", action: { model.openAvailability() }))
         }
-        items.append(HubManageItem(id: "calendars", icon: .calendarClock, label: "Connected calendars", value: model.connectedCalendarsValue, action: { model.openConnectedCalendars() }))
+        items.append(HubManageItem(id: "calendars", icon: .calendarSync, label: "Connected calendars", value: model.connectedCalendarsValue, action: { model.openConnectedCalendars() }))
         if let pending = model.pendingValue {
             items.append(HubManageItem(id: "bookings", icon: .inbox, label: "Bookings", value: pending, alert: true, action: { model.openBookings() }))
         }
         if model.canEdit {
-            items.append(HubManageItem(id: "settings", icon: .slidersHorizontal, label: "Settings", action: { model.openSettings() }))
+            items.append(HubManageItem(id: "settings", icon: .settings, label: "Settings", action: { model.openSettings() }))
         }
         return items
     }

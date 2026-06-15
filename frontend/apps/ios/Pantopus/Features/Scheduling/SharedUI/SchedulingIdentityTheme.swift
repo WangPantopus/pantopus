@@ -53,12 +53,15 @@ public struct SchedulingIdentityTheme: Sendable, Hashable {
         }
     }
 
-    /// Pillar glyph (Business uses the shopping-bag identity glyph).
+    /// Pillar glyph. Personal = `user`, Home = `house`, Business = `briefcase`
+    /// — the design's identity-pill glyph across the editors, event-types,
+    /// onboarding and one-off-link surfaces. (The A1 Hub tile overrides to
+    /// `store` locally, per `scheduling-hub-frames`.)
     public var icon: PantopusIcon {
         switch owner {
         case .personal: .user
-        case .home: .home
-        case .business: .shoppingBag
+        case .home: .house
+        case .business: .briefcase
         }
     }
 }
