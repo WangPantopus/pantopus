@@ -36,11 +36,30 @@ final class BookingsInboxViewModel {
     /// Transient action failure (approve/decline) surfaced as an inline banner.
     var actionError: String?
     var activeSheet: BookingActionSheet?
+    /// Drives the E9 filter bottom sheet, presented from the top-bar filter icon.
+    var filterSheetVisible = false
+    /// The most recently applied filter set (event-type / date-range facets are
+    /// recorded for the inbox to honor once `BookingActions.list` accepts them —
+    /// see `sharedChangesNeeded`). `nil` until the host applies a filter.
+    private(set) var appliedFilters: BookingFilters?
 
     private var didLoad = false
     private var fetchGeneration = 0
 
     var accent: Color { owner.theme.accent }
+
+    /// The active owner mapped to its scope-pill key, so the cross-owner pill row
+    /// (All / Personal / Home / Business) can mark the right pill filled. The
+    /// inbox is scoped to a single owner per route, so the other pills are
+    /// rendered for parity but cross-owner navigation needs an owner directory
+    /// the route doesn't carry (see `deferredBackend`).
+    var activeScopeKey: BookingScopeFilter {
+        switch owner {
+        case .personal: .personal
+        case .home: .home
+        case .business: .business
+        }
+    }
 
     init(
         owner: SchedulingOwner,
@@ -115,6 +134,43 @@ final class BookingsInboxViewModel {
     }
 
     func submitSearch() async {
+        await fetch()
+    }
+
+    // MARK: - Filter sheet (E9)
+
+    /// Open the E9 filter sheet from the top-bar filter icon.
+    func presentFilterSheet() { filterSheetVisible = true }
+
+    /// Build the filter sheet's view-model, seeding its event-type facet from the
+    /// inbox's best-effort event-type name map. The filter VM counts results
+    /// against this owner.
+    func makeFilterViewModel() -> BookingFilterViewModel {
+        let options = eventNames
+            .map { BookingFilterViewModel.EventTypeOption(id: $0.key, name: $0.value) }
+            .sorted { $0.name < $1.name }
+        return BookingFilterViewModel(owner: owner, eventTypeOptions: options, client: .shared)
+    }
+
+    /// Apply a filter set returned by the E9 sheet. The status facet maps onto
+    /// the inbox tab and the text facet onto the search field — both honored by
+    /// the existing `GET /bookings?status&q` path. Event-type / date-range facets
+    /// are recorded (`appliedFilters`) but need a richer `BookingActions.list`
+    /// to reach the wire (see `sharedChangesNeeded`).
+    ///
+    /// The status is read via its `queryValue` string (not the facet enum type)
+    /// to stay clear of the inbox-vs-facet `BookingStatusFilter` name collision.
+    func applyFilters(_ filters: BookingFilters) async {
+        appliedFilters = filters
+        searchText = filters.search
+        searchVisible = searchVisible || !filters.search.trimmingCharacters(in: .whitespaces).isEmpty
+        switch filters.status?.queryValue {
+        case "upcoming": selectedTab = .upcoming
+        case "pending": selectedTab = .pending
+        case "past": selectedTab = .past   // facet-only `.noShow` also maps here
+        case "cancelled": selectedTab = .cancelled
+        default: break                      // no status facet → keep current tab
+        }
         await fetch()
     }
 
