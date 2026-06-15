@@ -36,7 +36,7 @@ struct TeamPerformanceStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H12", title: "Team Performance", stream: "I17")
+        TeamPerformanceView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
