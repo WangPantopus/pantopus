@@ -29,14 +29,25 @@ final class FindATimeSetupStubViewModel {
 }
 
 struct FindATimeSetupStubView: View {
-    @State private var viewModel: FindATimeSetupStubViewModel
+    private let viewModel: FindATimeSetupViewModel
 
-    init(viewModel: FindATimeSetupStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: FindATimeSetupStubViewModel) {
+        let homeId = stub.homeId
+        let push = stub.push
+        viewModel = FindATimeSetupViewModel(
+            homeId: homeId,
+            tz: SchedulingTime.deviceTimeZoneIdentifier,
+            initialDraft: FindATimeDraftStore.draft,
+            onProceed: { draft in
+                FindATimeDraftStore.draft = draft
+                push(.findATimeSuggested(homeId: homeId, tz: draft.tz))
+            },
+            client: .shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F4", title: "Find a Time", stream: "I11")
+        FindATimeSetupView(viewModel: viewModel)
     }
 }
 
