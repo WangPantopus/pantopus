@@ -71,23 +71,45 @@ struct BookResourceView: View {
                     reminderRow
                     whenSection
                     forWhomSection
+                    notesSection
                 }
                 .padding(Spacing.s3)
                 .padding(.bottom, Spacing.s6)
             }
             stickyFooter
         }
+        .opacity(viewModel.isSubmitting ? 0.45 : 1)
+        .allowsHitTesting(!viewModel.isSubmitting)
+        .overlay {
+            if viewModel.isSubmitting {
+                submittingOverlay
+            }
+        }
+    }
+
+    private var submittingOverlay: some View {
+        VStack(spacing: Spacing.s2) {
+            SpinningLoader(size: 26, color: Theme.Color.home)
+            Text("Booking the charger")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
+        }
+        .padding(.horizontal, Spacing.s6)
+        .padding(.vertical, Spacing.s4)
+        .background(Theme.Color.appSurface.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .shadow(color: Color.black.opacity(0.1), radius: 12, y: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Booking the charger")
     }
 
     private var reminderRow: some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 96), spacing: Spacing.s2)],
-            alignment: .leading,
-            spacing: Spacing.s2
-        ) {
+        // Design RulesReminder is a content-hugging flex-row (gap 6, wrapping).
+        HStack(spacing: Spacing.s1 + 2) {
             ForEach(viewModel.ruleChips) { chip in
                 RuleChip(icon: chip.icon, text: chip.text, tone: .neutral)
             }
+            Spacer(minLength: 0)
         }
     }
 
@@ -188,6 +210,23 @@ struct BookResourceView: View {
         }
     }
 
+    private var notesSection: some View {
+        SectionCard(overline: "Notes") {
+            TextField("Add a note (optional)", text: $viewModel.note, axis: .vertical)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Theme.Color.appText)
+                .lineLimit(3...6)
+                .padding(Spacing.s2)
+                .background(Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .accessibilityIdentifier("scheduling.bookResource.noteField")
+        }
+    }
+
     private var stickyFooter: some View {
         HomePrimaryButton(
             title: "Submit booking",
@@ -209,12 +248,34 @@ struct BookResourceView: View {
     // MARK: Success / loading / error
 
     private func successBody(approval: Bool) -> some View {
-        VStack(spacing: Spacing.s4) {
+        let accent = approval ? Theme.Color.warning : Theme.Color.home
+        // Design halo: `radial-gradient(circle at 30% 30%, bg50, bg100)` —
+        // confirmed fades homeBg→homeBg (the lighter `#f0fdf4` inner tint has
+        // no token); approval fades warningBg→warningLight. Both stay in-family
+        // (never a white fade).
+        let haloInner = approval ? Theme.Color.warningBg : Theme.Color.homeBg
+        let haloOuter = approval ? Theme.Color.warningLight : Theme.Color.homeBg
+        return VStack(spacing: Spacing.s4) {
             ZStack {
-                Circle().fill(approval ? Theme.Color.warningBg : Theme.Color.homeBg).frame(width: 84, height: 84)
-                Circle().fill(approval ? Theme.Color.warning : Theme.Color.home).frame(width: 52, height: 52)
-                Icon(approval ? .clock : .check, size: 26, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
+                // 84pt radial-gradient halo (lit from the upper-left).
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [haloInner, haloOuter],
+                            center: UnitPoint(x: 0.3, y: 0.3),
+                            startRadius: 0,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 84, height: 84)
+                // Inset 52pt solid accent disc with a coloured glow.
+                Circle()
+                    .fill(accent)
+                    .frame(width: 52, height: 52)
+                    .shadow(color: accent.opacity(0.3), radius: 10, y: 8)
+                Icon(approval ? .clock : .check, size: 28, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
             }
+            .frame(width: 84, height: 84)
             Text(viewModel.successTitle)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
@@ -223,7 +284,19 @@ struct BookResourceView: View {
                 .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
-            HomePrimaryButton(title: "Back to calendar", icon: .home) {
+            if !viewModel.successNote.isEmpty {
+                HStack(spacing: Spacing.s1) {
+                    Icon(.calendarCheck, size: 13, color: Theme.Color.homeDark)
+                    Text(viewModel.successNote)
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.homeDark)
+                }
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .background(Theme.Color.homeBg)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+            }
+            HomePrimaryButton(title: "Back to calendar", icon: .house) {
                 viewModel.backToCalendar()
             }
             .frame(maxWidth: 240)
@@ -332,5 +405,21 @@ struct BookResourceView: View {
 
     private var saveErrorPresented: Binding<Bool> {
         Binding(get: { viewModel.saveError != nil }, set: { if !$0 { viewModel.saveError = nil } })
+    }
+}
+
+/// Continuously rotating `loader-circle` glyph, mirroring the design's
+/// `sh-spin 0.8s linear infinite` submitting spinner.
+private struct SpinningLoader: View {
+    let size: CGFloat
+    let color: Color
+    @State private var isSpinning = false
+
+    var body: some View {
+        Icon(.loaderCircle, size: size, color: color)
+            .rotationEffect(.degrees(isSpinning ? 360 : 0))
+            .animation(.linear(duration: 0.8).repeatForever(autoreverses: false), value: isSpinning)
+            .onAppear { isSpinning = true }
+            .accessibilityHidden(true)
     }
 }

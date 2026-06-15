@@ -187,7 +187,7 @@ struct ScheduleVisitView: View {
 
     private func fieldError(_ message: String) -> some View {
         HStack(spacing: Spacing.s1) {
-            Icon(.alertCircle, size: 11, color: Theme.Color.error)
+            Icon(.circleAlert, size: 11, color: Theme.Color.error)
             Text(message)
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.error)
@@ -209,10 +209,10 @@ struct SelectChipIcon: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.s1) {
-                Icon(icon, size: 13, color: isOn ? Theme.Color.home : Theme.Color.appTextSecondary)
+                Icon(icon, size: 13, color: isOn ? Theme.Color.homeDark : Theme.Color.appTextStrong)
                 Text(label)
                     .font(.system(size: 12, weight: isOn ? .bold : .semibold))
-                    .foregroundStyle(isOn ? Theme.Color.home : Theme.Color.appTextStrong)
+                    .foregroundStyle(isOn ? Theme.Color.homeDark : Theme.Color.appTextStrong)
             }
             .padding(.horizontal, Spacing.s3)
             .padding(.vertical, 7)

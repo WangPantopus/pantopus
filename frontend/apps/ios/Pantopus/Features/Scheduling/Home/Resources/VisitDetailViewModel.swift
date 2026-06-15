@@ -28,6 +28,21 @@ final class VisitDetailViewModel {
         case done
     }
 
+    /// View-only projection of the design's 4-step status timeline
+    /// (Offered → Reserved → Confirmed → Done). The concrete-visit model only
+    /// distinguishes Confirmed (upcoming) from Done (past), so a confirmed
+    /// visit lands on step 2 (Confirmed) and a done visit on step 3 (Done);
+    /// the earlier Offered/Reserved steps render as completed. The offer/
+    /// reserve/link lifecycle the design also draws has no v1 backend.
+    var statusStep: Int { lifecycle == .done ? 3 : 2 }
+
+    /// The design renders a header terminal chip in the Completed/Cancelled/
+    /// No-show states. The only terminal state this model derives is `done` →
+    /// Completed (check / success tones).
+    var terminalChip: (label: String, icon: PantopusIcon)? {
+        lifecycle == .done ? ("Completed", .check) : nil
+    }
+
     // MARK: State
 
     private(set) var state: ViewState = .loading
@@ -167,6 +182,11 @@ final class VisitDetailViewModel {
 
     func beginEdit() { isEditing = true }
     func bookAgain() { push(.scheduleVisit(homeId: homeId)) }
+
+    /// The design footer carries a trailing message affordance. There is no
+    /// visit-messaging endpoint in v1, so this is a no-op placeholder until a
+    /// thread/contact destination is wired up (see deferredBackend).
+    func messageVisitor() {}
 
     var editValid: Bool {
         !editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
