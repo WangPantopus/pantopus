@@ -41,6 +41,10 @@ final class BuyPackageViewModel {
     /// An existing live credit on this package — drives the "use a credit
     /// instead" upsell (buypackage frame 4).
     private(set) var existingCredit: PackageCreditDTO?
+    /// True when no signed-in user is resolved — drives the guest-email card
+    /// (buypackage frame 2). View-only structure; the email field + "Sign in"
+    /// link are not yet wired to an auth/receipt endpoint (deferred backend).
+    private(set) var isGuest = false
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
@@ -74,6 +78,8 @@ final class BuyPackageViewModel {
     func load() async {
         guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon; return }
         phase = .loading
+        // Signed-out viewers see the guest-email card (buypackage frame 2).
+        if case .signedOut = AuthManager.shared.state { isGuest = true }
         // Best-effort package summary (owner-scoped list).
         if let result: PackagesResponse = try? await client.request(SchedulingEndpoints.getPackages(owner: owner)) {
             package = result.packages.first { $0.id == packageId }

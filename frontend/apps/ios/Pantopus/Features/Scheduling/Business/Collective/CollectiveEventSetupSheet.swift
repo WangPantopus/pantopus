@@ -58,7 +58,10 @@ struct CollectiveEventSetupSheet: View {
                     membersSection
                     countCard(label: "Seats per appointment", sub: "Capacity for each slot",
                               value: model.seatsPerAppointment, onDec: { model.decrementSeats() }, onInc: { model.incrementSeats() })
-                    BizNote(tone: .info, icon: .layers,
+                    // Design `Note icon="git-merge"`; no gitMerge glyph in PantopusIcon
+                    // yet (flagged in sharedChangesNeeded). `.workflow`
+                    // (arrow.triangle.branch) is the closest merging-streams glyph.
+                    BizNote(tone: .info, icon: .workflow,
                             text: "Times come from where every required member is free. Fewer common openings means fewer slots.")
                 } else {
                     BizNote(tone: .info, icon: .info, text: "Turn on if a booking needs more than one person.")

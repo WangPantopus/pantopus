@@ -31,6 +31,17 @@ final class MemberWorkingHoursViewModel {
         var id: Int { weekday }
     }
 
+    /// The upcoming dated exception shown above the week grid. Drives both the
+    /// biz-tone date-override card (`memberhours` frame 2) and the error-tone
+    /// blocked-out / time-off card (frame 3), selected by `isBlocked`.
+    struct DatedException: Equatable {
+        let title: String
+        let sub: String
+        /// `true` → time-off (error tone, `ban`); `false` → custom hours
+        /// override (biz tone, `calendar-clock`).
+        let isBlocked: Bool
+    }
+
     // MARK: Inputs
 
     let mode: Mode
@@ -43,7 +54,7 @@ final class MemberWorkingHoursViewModel {
     private(set) var scheduleId: String?
     var timezoneId: String = SchedulingTime.deviceTimeZoneIdentifier
     private var loadedTimezone: String = SchedulingTime.deviceTimeZoneIdentifier
-    private(set) var upcomingOverride: String?
+    private(set) var upcomingException: DatedException?
     var showTimezoneSheet = false
     private(set) var isSaving = false
 
@@ -72,7 +83,17 @@ final class MemberWorkingHoursViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        if isReadOnly { phase = .ready; return }
+        if isReadOnly {
+            // `/availability` is hard-scoped to req.user, so a teammate's actual
+            // hours can't be fetched. Seed the 7-day scaffold so the dimmed
+            // read-only "inherits personal" grid (memberhours frame 4) renders
+            // its row structure; populating real ranges is a backend follow-up.
+            if days.isEmpty {
+                days = Weekday.displayOrder.map { DayHours(weekday: $0, ranges: []) }
+            }
+            phase = .ready
+            return
+        }
         phase = .loading
         do {
             let response: AvailabilityResponse = try await client.request(SchedulingEndpoints.getAvailability())
@@ -85,7 +106,7 @@ final class MemberWorkingHoursViewModel {
             timezoneId = schedule.timezone ?? SchedulingTime.deviceTimeZoneIdentifier
             loadedTimezone = timezoneId
             days = Self.buildDays(from: response.rules.filter { $0.scheduleId == schedule.id })
-            upcomingOverride = Self.nextOverrideSummary(response.overrides.filter { $0.scheduleId == schedule.id })
+            upcomingException = Self.nextException(response.overrides.filter { $0.scheduleId == schedule.id })
             phase = .ready
         } catch let error as SchedulingError {
             phase = .error(error.userMessage ?? "Couldn't load your hours.")
@@ -182,10 +203,25 @@ final class MemberWorkingHoursViewModel {
         }
     }
 
-    private static func nextOverrideSummary(_ overrides: [AvailabilityOverrideDTO]) -> String? {
+    /// The next dated exception, typed so the view can pick the biz-tone
+    /// (custom hours) vs error-tone (time off) card per `memberhours` frames
+    /// 2 and 3. A fully-unavailable override → blocked-out / time-off card.
+    private static func nextException(_ overrides: [AvailabilityOverrideDTO]) -> DatedException? {
         let today = OverrideFormatting.ymdKey(Date())
         let upcoming = overrides.filter { $0.date >= today }.sorted { $0.date < $1.date }
         guard let next = upcoming.first else { return nil }
-        return "\(OverrideFormatting.displayDate(next.date)) · \(OverrideFormatting.summary(for: next))"
+        let date = OverrideFormatting.displayDate(next.date)
+        if next.isUnavailable == true {
+            return DatedException(
+                title: "\(date) · Time off",
+                sub: "No bookings during these days",
+                isBlocked: true
+            )
+        }
+        return DatedException(
+            title: "\(date) · \(OverrideFormatting.summary(for: next))",
+            sub: "Overrides the weekly hours for this date",
+            isBlocked: false
+        )
     }
 }

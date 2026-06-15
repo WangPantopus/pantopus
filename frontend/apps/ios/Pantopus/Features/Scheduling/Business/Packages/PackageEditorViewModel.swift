@@ -24,6 +24,20 @@ import SwiftUI
 final class PackageEditorViewModel {
     enum Phase: Equatable { case loading, ready, error(String), comingSoon }
 
+    /// Expiry window for purchased credits (design's `Segmented`). View-only
+    /// for now — the packages table has no `expiry` column, so the selection is
+    /// not sent on save (see the backend note). Persistence is deferred.
+    enum Expiry: String, CaseIterable, Equatable {
+        case ninetyDays, oneYear, never
+        var label: String {
+            switch self {
+            case .ninetyDays: "90 days"
+            case .oneYear: "1 year"
+            case .never: "Never"
+            }
+        }
+    }
+
     // MARK: Inputs
 
     let owner: SchedulingOwner
@@ -34,10 +48,18 @@ final class PackageEditorViewModel {
     // MARK: Editable fields
 
     var name = ""
+    /// Free-text "what's included" blurb (design's Description field). View-only:
+    /// no `description` column on the packages table, so it is not persisted on
+    /// save (deferred to a backend follow-up). Default empty.
+    var packageDescription = ""
     var sessionsCount = 5
     var priceText = ""
-    /// Single eligible event type (`nil` = all services).
+    /// Single eligible event type (`nil` = all services). The design tiles read
+    /// as a multi-select; the wire only carries one `event_type_id`, so this
+    /// stays single-select until a backend array lands (deferred).
     var selectedEventTypeId: String?
+    /// Credit-expiry window. View-only (no `expiry` column) — see `Expiry`.
+    var expiry: Expiry = .oneYear
     var isActive = true
 
     // MARK: State
