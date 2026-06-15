@@ -286,7 +286,11 @@ private extension EventTypeListViewModel {
             title: eventType.name,
             subtitle: subtitle(for: eventType, location: location),
             template: .fileChevron,
-            leading: .typeIcon(location.icon, background: swatch.tint, foreground: swatch.color),
+            // Design `EventRow` leads with a 6px category-colour dot (not an
+            // icon tile); the location lives in the meta line. Kebab retained
+            // for Duplicate/Delete (the design's inline active toggle is a
+            // composite-trailing follow-up).
+            leading: .dot(color: swatch.color),
             trailing: .kebab,
             onTap: { [weak self] in Task { @MainActor in self?.open(eventType) } },
             onSecondary: { [weak self] in Task { @MainActor in self?.menuTarget = eventType } },
@@ -324,16 +328,19 @@ private extension EventTypeListViewModel {
     }
 
     var emptyAllContent: ListOfRowsState.EmptyContent {
-        // Design `FrameEmpty` — calendar-plus hero, primary CTA. (The
-        // "Start from a template" overline + duration template chips the
-        // design draws below the CTA need a new `EmptyContent` slot on the
-        // shared shell — see sharedChangesNeeded.)
+        // Design `FrameEmpty` — calendar-plus hero, primary CTA, then a
+        // "Start from a template" list of duration quick-starts below.
         .init(
             icon: .calendarPlus,
             headline: "You don't have any event types yet",
             subcopy: "An event type is something people can book — a call, a meeting, a visit. Start from a template or build your own.",
             ctaTitle: "Create your first event type",
-            onCTA: { [weak self] in Task { @MainActor in self?.createNew() } }
+            onCTA: { [weak self] in Task { @MainActor in self?.createNew() } },
+            templates: [
+                .init(id: "t15", icon: .clock, label: "15-minute meeting") { [weak self] in Task { @MainActor in self?.createNew() } },
+                .init(id: "t30", icon: .clock, label: "30-minute meeting") { [weak self] in Task { @MainActor in self?.createNew() } },
+                .init(id: "t60", icon: .clock, label: "60-minute meeting") { [weak self] in Task { @MainActor in self?.createNew() } }
+            ]
         )
     }
 

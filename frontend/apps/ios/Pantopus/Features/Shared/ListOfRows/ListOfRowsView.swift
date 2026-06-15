@@ -138,17 +138,21 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: Vi
                 onRefresh: { await dataSource.refresh() }
             )
         case let .empty(content):
-            EmptyState(
-                icon: content.icon,
-                headline: content.headline,
-                subcopy: content.subcopy,
-                cta: content.ctaTitle.flatMap { title in
-                    guard let handler = content.onCTA else { return nil }
-                    return EmptyState.CTA(title: title) { await MainActor.run { handler() } }
-                },
-                tint: content.tint ?? Theme.Color.personalBg,
-                accent: content.accent ?? Theme.Color.primary600
-            )
+            if let templates = content.templates, !templates.isEmpty {
+                EmptyWithTemplatesView(content: content, templates: templates)
+            } else {
+                EmptyState(
+                    icon: content.icon,
+                    headline: content.headline,
+                    subcopy: content.subcopy,
+                    cta: content.ctaTitle.flatMap { title in
+                        guard let handler = content.onCTA else { return nil }
+                        return EmptyState.CTA(title: title) { await MainActor.run { handler() } }
+                    },
+                    tint: content.tint ?? Theme.Color.personalBg,
+                    accent: content.accent ?? Theme.Color.primary600
+                )
+            }
         case let .error(message):
             ListOfRowsErrorBanner(message: message) { Task { await dataSource.load() } }
         }
@@ -776,6 +780,72 @@ private struct ListingContextHeader: View {
     }
 }
 
+/// Empty state with a "start from a template" quick-start list below the CTA
+/// (Calendarly Event-types / Resources empty frames). Plain empty states use
+/// `EmptyState` directly; this composes it with the template tiles.
+private struct EmptyWithTemplatesView: View {
+    let content: ListOfRowsState.EmptyContent
+    let templates: [ListOfRowsState.EmptyTemplate]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.s5) {
+                EmptyState(
+                    icon: content.icon,
+                    headline: content.headline,
+                    subcopy: content.subcopy,
+                    cta: content.ctaTitle.flatMap { title in
+                        guard let handler = content.onCTA else { return nil }
+                        return EmptyState.CTA(title: title) { await MainActor.run { handler() } }
+                    },
+                    tint: content.tint ?? Theme.Color.personalBg,
+                    accent: content.accent ?? Theme.Color.primary600
+                )
+                templatesSection
+            }
+            .padding(.vertical, Spacing.s6)
+        }
+    }
+
+    private var templatesSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Start from a template".uppercased())
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(Theme.Color.appTextMuted)
+                .padding(.horizontal, Spacing.s4)
+            VStack(spacing: Spacing.s2) {
+                ForEach(templates) { template in
+                    Button(action: template.onTap) {
+                        HStack(spacing: Spacing.s3) {
+                            Icon(template.icon, size: 18, color: template.accent ?? Theme.Color.primary600)
+                                .frame(width: 36, height: 36)
+                                .background(template.accentBg ?? Theme.Color.primary50)
+                                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                            Text(template.label)
+                                .pantopusTextStyle(.body)
+                                .foregroundStyle(Theme.Color.appText)
+                            Spacer(minLength: Spacing.s2)
+                            Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+                        }
+                        .padding(.horizontal, Spacing.s3)
+                        .padding(.vertical, Spacing.s2)
+                        .background(Theme.Color.appSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .stroke(Theme.Color.appBorder, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("listOfRows.template.\(template.id)")
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct ListOfRowsErrorBanner: View {
     let message: String
     let retry: () -> Void
@@ -1078,6 +1148,11 @@ private struct LeadingView: View {
             )
         case .none:
             EmptyView()
+        case let .dot(color):
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+                .frame(width: 16, alignment: .center)
         case let .typeIcon(icon, background, foreground):
             Icon(icon, size: 19, color: foreground)
                 .frame(width: 40, height: 40)
@@ -1244,6 +1319,22 @@ private struct TrailingView: View {
             }
         case .none:
             EmptyView()
+        case let .toggle(isOn, accessibilityLabel, onChange):
+            Button { onChange(!isOn) } label: {
+                ZStack(alignment: isOn ? .trailing : .leading) {
+                    Capsule()
+                        .fill(isOn ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
+                        .frame(width: 36, height: 20)
+                    Circle()
+                        .fill(Theme.Color.appSurface)
+                        .frame(width: 16, height: 16)
+                        .padding(.horizontal, 2)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityValue(isOn ? "On" : "Off")
+            .accessibilityAddTraits(.isButton)
         case let .amountWithChip(amount, chipText, chipVariant, chipIcon):
             VStack(alignment: .trailing, spacing: Spacing.s1) {
                 Text(amount)

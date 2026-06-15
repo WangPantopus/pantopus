@@ -84,7 +84,7 @@ struct ResourceEditorView: View {
     }
 
     private var detailsGroup: some View {
-        FormFieldGroup("Details") {
+        FormFieldGroup("Details", overlineColor: Theme.Color.homeDark) {
             TextField("Name this resource", text: $viewModel.name)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
@@ -111,13 +111,13 @@ struct ResourceEditorView: View {
     // F10 "Photo" section — dashed "Add a photo · Optional" affordance. The
     // image-picker wiring is deferred; this renders the designed structure.
     private var photoGroup: some View {
-        FormFieldGroup("Photo") {
+        FormFieldGroup("Photo", overlineColor: Theme.Color.homeDark) {
             PhotoAddRow()
         }
     }
 
     private var whoCanBookGroup: some View {
-        FormFieldGroup("Who can book") {
+        FormFieldGroup("Who can book", overlineColor: Theme.Color.homeDark) {
             Picker("Who can book", selection: $viewModel.whoCanBook) {
                 ForEach(WhoCanBook.allCases, id: \.self) { option in
                     Text(option.label).tag(option)
@@ -215,7 +215,7 @@ struct ResourceEditorView: View {
     }
 
     private var hoursGroup: some View {
-        FormFieldGroup("Available hours") {
+        FormFieldGroup("Available hours", overlineColor: Theme.Color.homeDark) {
             WeekdayPicker(selected: viewModel.hoursDays) { viewModel.toggleDay($0) }
             Divider().background(Theme.Color.appBorderSubtle)
             HStack {

@@ -167,6 +167,14 @@ public enum RowLeading: Sendable {
     /// 18pt with a 1.5pt magic-border ring and a 10pt magic-violet
     /// sparkles glyph.
     case magicArchetypeTile(PantopusIcon, gradient: GradientPair)
+
+    // MARK: Calendarly (scheduling)
+
+    /// A small (10pt) category-colour dot in a slim leading column — the
+    /// Calendarly Event-types / Resources row leads with a colour dot before
+    /// the name (per `event-types-frames` / `resources-list-frames`) rather
+    /// than a 40pt icon tile.
+    case dot(color: Color)
 }
 
 // MARK: - Bidder stack data
@@ -320,6 +328,14 @@ public enum RowTrailing: Sendable {
     /// compact buttons) and `.circularAction` (icon-only): this is a
     /// single text pill carrying its own tap handler.
     case pillButton(label: String, tone: RowPillTone, handler: @Sendable () -> Void)
+
+    // MARK: Calendarly (scheduling)
+
+    /// An inline 36×20 product-sky switch — the Calendarly Event-types row
+    /// toggles a type active/hidden in place (per `event-types-frames`),
+    /// and the Resources row toggles bookable. Sky regardless of pillar
+    /// (functional control). The handler receives the new value.
+    case toggle(isOn: Bool, accessibilityLabel: String, onChange: @Sendable (Bool) -> Void)
 }
 
 /// Single icon-only action used by `RowTrailing.iconActions`. Renders as a

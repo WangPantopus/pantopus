@@ -122,4 +122,11 @@ final class PackagesListViewModel {
         let each = SchedulingMoney.perSession(totalCents: package.priceCents, sessions: sessions, currency: package.currency)
         return "\(sessionLabel) · \(total) · \(each) each"
     }
+
+    /// "· 12 sold" beside the status chip, or `nil` when the package has no
+    /// recorded purchases (or the count is absent) so brand-new packages stay clean.
+    func soldLabel(for package: SchedulingPackageDTO) -> String? {
+        guard let sold = package.soldCount, sold > 0 else { return nil }
+        return "· \(sold) sold"
+    }
 }

@@ -85,6 +85,7 @@ struct PackagesListView: View {
                     PackagePill(
                         package: package,
                         subtitle: model.subtitle(for: package),
+                        soldLabel: model.soldLabel(for: package),
                         accent: model.accent,
                         accentBg: model.theme.accentBg,
                         onTap: { model.openPackage(package) },
@@ -221,6 +222,7 @@ struct PackagesListView: View {
 private struct PackagePill: View {
     let package: SchedulingPackageDTO
     let subtitle: String
+    let soldLabel: String?
     let accent: Color
     let accentBg: Color
     let onTap: () -> Void
@@ -228,6 +230,12 @@ private struct PackagePill: View {
     let onRestore: () -> Void
 
     private var isArchived: Bool { package.isActive == false }
+
+    private var accessibilityLabel: String {
+        var parts = [package.name, subtitle, isArchived ? "archived" : "active"]
+        if let sold = package.soldCount, sold > 0 { parts.append("\(sold) sold") }
+        return parts.joined(separator: ", ")
+    }
 
     var body: some View {
         HStack(spacing: 11) {
@@ -243,8 +251,16 @@ private struct PackagePill: View {
                 Text(subtitle)
                     .font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(1)
-                PkgChip(text: isArchived ? "Archived" : "Active", tone: isArchived ? .neutral : .success, uppercased: true)
-                    .padding(.top, 3)
+                HStack(spacing: 7) {
+                    PkgChip(text: isArchived ? "Archived" : "Active", tone: isArchived ? .neutral : .success, uppercased: true)
+                    if let soldLabel {
+                        Text(soldLabel)
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextMuted)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.top, 3)
             }
             Spacer(minLength: Spacing.s2)
             trailing
@@ -254,7 +270,7 @@ private struct PackagePill: View {
         .contentShape(Rectangle())
         .onTapGesture { if !isArchived { onTap() } }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(package.name), \(subtitle), \(isArchived ? "archived" : "active")")
+        .accessibilityLabel(accessibilityLabel)
     }
 
     @ViewBuilder

@@ -23,6 +23,7 @@ public struct PantopusButton: View {
     private let kind: PantopusButtonKind
     private let isLoading: Bool
     private let isEnabled: Bool
+    private let icon: PantopusIcon?
     private let action: () async -> Void
 
     public init(
@@ -30,12 +31,14 @@ public struct PantopusButton: View {
         kind: PantopusButtonKind,
         isLoading: Bool = false,
         isEnabled: Bool = true,
+        icon: PantopusIcon? = nil,
         action: @escaping () async -> Void
     ) {
         self.title = title
         self.kind = kind
         self.isLoading = isLoading
         self.isEnabled = isEnabled
+        self.icon = icon
         self.action = action
     }
 
@@ -44,9 +47,14 @@ public struct PantopusButton: View {
             Task { await action() }
         } label: {
             ZStack {
-                Text(title)
-                    .pantopusTextStyle(.body)
-                    .opacity(isLoading ? 0 : 1)
+                HStack(spacing: Spacing.s2) {
+                    if let icon {
+                        Icon(icon, size: 16, strokeWidth: 2.2, color: foreground)
+                    }
+                    Text(title)
+                        .pantopusTextStyle(.body)
+                }
+                .opacity(isLoading ? 0 : 1)
                 if isLoading {
                     ProgressView().tint(foreground)
                 }
@@ -98,17 +106,20 @@ public struct PrimaryButton: View {
     public let title: String
     public var isLoading: Bool = false
     public var isEnabled: Bool = true
+    public var icon: PantopusIcon?
     public let action: () async -> Void
 
     public init(
         title: String,
         isLoading: Bool = false,
         isEnabled: Bool = true,
+        icon: PantopusIcon? = nil,
         action: @escaping () async -> Void
     ) {
         self.title = title
         self.isLoading = isLoading
         self.isEnabled = isEnabled
+        self.icon = icon
         self.action = action
     }
 
@@ -118,6 +129,7 @@ public struct PrimaryButton: View {
             kind: .primary,
             isLoading: isLoading,
             isEnabled: isEnabled,
+            icon: icon,
             action: action
         )
     }

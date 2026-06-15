@@ -41,6 +41,12 @@ public enum ListOfRowsState: Sendable {
         /// (`primary600`). A14.4 pairs the grey disc with a secondary-text
         /// glyph.
         public let accent: Color?
+        /// Optional "start from a template" quick-start tiles rendered below
+        /// the CTA under an uppercase overline. Calendarly Event-types /
+        /// Resources empty frames show these (per `event-types-frames`
+        /// `FrameEmpty` / `resources-list-frames`). `nil` (default) keeps the
+        /// plain icon+headline+subcopy+CTA empty state for every other screen.
+        public let templates: [EmptyTemplate]?
 
         public init(
             icon: PantopusIcon,
@@ -49,7 +55,8 @@ public enum ListOfRowsState: Sendable {
             ctaTitle: String? = nil,
             onCTA: (@Sendable () -> Void)? = nil,
             tint: Color? = nil,
-            accent: Color? = nil
+            accent: Color? = nil,
+            templates: [EmptyTemplate]? = nil
         ) {
             self.icon = icon
             self.headline = headline
@@ -58,6 +65,36 @@ public enum ListOfRowsState: Sendable {
             self.onCTA = onCTA
             self.tint = tint
             self.accent = accent
+            self.templates = templates
+        }
+    }
+
+    /// A single "start from a template" quick-start tile (icon disc + label)
+    /// rendered in the empty state's template list. The `accent`/`accentBg`
+    /// drive the disc tint (pass the pillar accent, or a neutral pair for an
+    /// "Other / blank" tile). `nil` accents fall back to product sky.
+    public struct EmptyTemplate: Sendable, Identifiable {
+        public let id: String
+        public let icon: PantopusIcon
+        public let label: String
+        public let accent: Color?
+        public let accentBg: Color?
+        public let onTap: @Sendable () -> Void
+
+        public init(
+            id: String,
+            icon: PantopusIcon,
+            label: String,
+            accent: Color? = nil,
+            accentBg: Color? = nil,
+            onTap: @escaping @Sendable () -> Void
+        ) {
+            self.id = id
+            self.icon = icon
+            self.label = label
+            self.accent = accent
+            self.accentBg = accentBg
+            self.onTap = onTap
         }
     }
 }
