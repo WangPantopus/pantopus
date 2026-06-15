@@ -36,6 +36,13 @@ struct ResourceEditorView: View {
                 readyBody
             }
         }
+        .opacity(viewModel.isSaving ? 0.45 : 1)
+        .allowsHitTesting(!viewModel.isSaving)
+        .overlay {
+            if viewModel.isSaving {
+                savingOverlay
+            }
+        }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.resourceEditor")
         .task { await viewModel.load() }
@@ -67,6 +74,7 @@ struct ResourceEditorView: View {
 
     @ViewBuilder private var readyBody: some View {
         detailsGroup
+        photoGroup
         whoCanBookGroup
         rulesGroup
         hoursGroup
@@ -100,6 +108,14 @@ struct ResourceEditorView: View {
         }
     }
 
+    // F10 "Photo" section — dashed "Add a photo · Optional" affordance. The
+    // image-picker wiring is deferred; this renders the designed structure.
+    private var photoGroup: some View {
+        FormFieldGroup("Photo") {
+            PhotoAddRow()
+        }
+    }
+
     private var whoCanBookGroup: some View {
         FormFieldGroup("Who can book") {
             Picker("Who can book", selection: $viewModel.whoCanBook) {
@@ -108,36 +124,94 @@ struct ResourceEditorView: View {
                 }
             }
             .pickerStyle(.segmented)
-            if viewModel.whoCanBook != .members {
-                Text("In this version, all active home members can book. Per-member access is coming soon.")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+            if viewModel.whoCanBook == .specific {
+                specificMemberPicker
             }
         }
     }
 
-    private var rulesGroup: some View {
-        FormFieldGroup("Booking rules") {
-            CounterRow(
-                label: "Max duration",
-                value: $viewModel.maxDurationHours,
-                unit: "hr",
-                range: 1...24,
-                error: viewModel.durationError != nil
-            )
-            if let error = viewModel.durationError {
-                fieldError(error)
+    // F10 "Specific" member picker — avatar + name + check rows. The member
+    // directory feed is deferred (see ResourceEditorViewModel.members), so the
+    // rows render once a roster is present and otherwise show the caption.
+    @ViewBuilder private var specificMemberPicker: some View {
+        if viewModel.members.isEmpty {
+            Text("In this version, all active home members can book. Per-member access is coming soon.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        } else {
+            VStack(spacing: Spacing.s0) {
+                ForEach(Array(viewModel.members.enumerated()), id: \.element.id) { index, member in
+                    MemberSelectRow(
+                        member: member,
+                        isOn: viewModel.selectedMemberIds.contains(member.id),
+                        showsDivider: index < viewModel.members.count - 1
+                    ) {
+                        viewModel.toggleMember(member.id)
+                    }
+                }
             }
-            Divider().background(Theme.Color.appBorderSubtle)
-            CounterRow(label: "Buffer between bookings", value: $viewModel.bufferMin, unit: "min", range: 0...120, step: 5)
-            Divider().background(Theme.Color.appBorderSubtle)
-            Toggle(isOn: $viewModel.requiresApproval) {
-                Text("Requires approval")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-            }
-            .tint(Theme.Color.home)
         }
+    }
+
+    // F10 "Booking rules" collapsible disclosure. The header carries a green
+    // overline + chevron; collapsed shows the smart-defaults helper, expanded
+    // shows the Max duration / Buffer / Requires-approval rows.
+    private var rulesGroup: some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { viewModel.toggleRules() }
+            } label: {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: Spacing.s1) {
+                        Text("Booking rules".uppercased())
+                            .pantopusTextStyle(.overline)
+                            .foregroundStyle(Theme.Color.homeDark)
+                        if !viewModel.isRulesExpanded {
+                            Text(viewModel.ruleHelper)
+                                .font(.system(size: 10.5, weight: .regular))
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                        }
+                    }
+                    Spacer()
+                    Icon(
+                        viewModel.isRulesExpanded ? .chevronUp : .chevronDown,
+                        size: 18,
+                        color: Theme.Color.appTextMuted
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("scheduling.resourceEditor.rulesDisclosure")
+            .accessibilityAddTraits(.isHeader)
+            if viewModel.isRulesExpanded {
+                VStack(alignment: .leading, spacing: Spacing.s3) {
+                    CounterRow(
+                        label: "Max duration",
+                        value: $viewModel.maxDurationHours,
+                        unit: "hr",
+                        range: 1...24,
+                        error: viewModel.durationError != nil
+                    )
+                    if let error = viewModel.durationError {
+                        fieldError(error)
+                    }
+                    Divider().background(Theme.Color.appBorderSubtle)
+                    CounterRow(label: "Buffer between bookings", value: $viewModel.bufferMin, unit: "min", range: 0...120, step: 5)
+                    Divider().background(Theme.Color.appBorderSubtle)
+                    Toggle(isOn: $viewModel.requiresApproval) {
+                        Text("Requires approval")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                    }
+                    .tint(Theme.Color.home)
+                }
+                .padding(.top, Spacing.s3)
+            }
+        }
+        .padding(Spacing.s4)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
     }
 
     private var hoursGroup: some View {
@@ -206,11 +280,31 @@ struct ResourceEditorView: View {
 
     private func fieldError(_ message: String) -> some View {
         HStack(spacing: Spacing.s1) {
-            Icon(.alertCircle, size: 11, color: Theme.Color.error)
+            Icon(.circleAlert, size: 11, color: Theme.Color.error)
             Text(message)
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.error)
         }
+    }
+
+    // MARK: Saving overlay (F10 "saving" frame)
+
+    /// Centered white card with a spinning green loader + "Saving resource",
+    /// floated over the dimmed form while a commit is in flight.
+    private var savingOverlay: some View {
+        VStack(spacing: Spacing.s3) {
+            ResourceSavingSpinner()
+            Text("Saving resource")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
+        }
+        .padding(.vertical, Spacing.s5)
+        .padding(.horizontal, Spacing.s6)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .shadow(color: Theme.Color.appText.opacity(0.1), radius: 12, y: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Saving resource")
     }
 
     private var saveErrorPresented: Binding<Bool> {
@@ -230,7 +324,7 @@ struct SelectChip: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 12, weight: isOn ? .bold : .semibold))
-                .foregroundStyle(isOn ? Theme.Color.home : Theme.Color.appTextStrong)
+                .foregroundStyle(isOn ? Theme.Color.homeDark : Theme.Color.appTextStrong)
                 .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, 7)
                 .background(isOn ? Theme.Color.homeBg : Theme.Color.appSurface)
@@ -242,6 +336,88 @@ struct SelectChip: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// F10 "Add a photo" dashed-border row. View-only affordance — the image
+/// picker is deferred until a media-upload path exists for resources.
+struct PhotoAddRow: View {
+    var body: some View {
+        Button {
+            // Image-picker wiring deferred (no resource photo-upload endpoint).
+        } label: {
+            HStack(spacing: Spacing.s3) {
+                Icon(.imagePlus, size: 17, color: Theme.Color.appTextSecondary)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.Color.appSurfaceSunken)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                Text("Add a photo")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                Spacer()
+                Text("Optional")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .strokeBorder(
+                        Theme.Color.appBorderStrong,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [4, 4])
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("scheduling.resourceEditor.addPhoto")
+        .accessibilityLabel("Add a photo, optional")
+    }
+}
+
+/// F10 "Specific" picker row: avatar + name + trailing selection check.
+struct MemberSelectRow: View {
+    let member: HomeMember
+    let isOn: Bool
+    var showsDivider: Bool = true
+    let action: () -> Void
+
+    var body: some View {
+        VStack(spacing: Spacing.s0) {
+            Button(action: action) {
+                HStack(spacing: Spacing.s3) {
+                    HomeMemberAvatar(member: member, size: 32)
+                    Text(member.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Spacer()
+                    SelectionCheck(isOn: isOn)
+                }
+                .padding(.vertical, Spacing.s2)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+            if showsDivider {
+                Divider().background(Theme.Color.appBorderSubtle)
+            }
+        }
+    }
+}
+
+/// Continuously rotating green loader for the F10 saving overlay.
+private struct ResourceSavingSpinner: View {
+    @State private var spinning = false
+
+    var body: some View {
+        Icon(.loaderCircle, size: 26, color: Theme.Color.home)
+            .rotationEffect(.degrees(spinning ? 360 : 0))
+            .animation(
+                .linear(duration: 0.8).repeatForever(autoreverses: false),
+                value: spinning
+            )
+            .onAppear { spinning = true }
+            .accessibilityHidden(true)
     }
 }
 

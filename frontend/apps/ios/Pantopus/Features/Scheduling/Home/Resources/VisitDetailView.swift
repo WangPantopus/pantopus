@@ -76,6 +76,7 @@ struct VisitDetailView: View {
                 VStack(alignment: .leading, spacing: Spacing.s3) {
                     headerCard
                     banner
+                    statusTimeline
                     hostsCard
                     if viewModel.entryNote != nil {
                         accessCard
@@ -95,7 +96,7 @@ struct VisitDetailView: View {
                 ZStack {
                     Circle().fill(
                         LinearGradient(
-                            colors: [Theme.Color.home, Theme.Color.homeDark],
+                            colors: [Theme.Color.categoryUnboxing, Theme.Color.categoryUnboxingDark],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -109,9 +110,12 @@ struct VisitDetailView: View {
                     Text(viewModel.title)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
-                    RuleChip(icon: viewModel.kind.icon, text: viewModel.kind.label, tone: .home)
+                    visitTypeChip
                 }
-                Spacer()
+                Spacer(minLength: 0)
+                if let terminal = viewModel.terminalChip {
+                    terminalChip(label: terminal.label, icon: terminal.icon)
+                }
             }
             HStack(spacing: Spacing.s2) {
                 Icon(.clock, size: 14, color: timeColor)
@@ -127,9 +131,102 @@ struct VisitDetailView: View {
         }
     }
 
+    /// Teal "Vendor"/"Guest" category chip (the design accents the visit type
+    /// with teal `#ccfbf1`/`#0f766e`, distinct from the home-green pillar).
+    private var visitTypeChip: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(viewModel.kind.icon, size: 10, color: Theme.Color.categoryUnboxingDark)
+            Text(viewModel.kind.label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.Color.categoryUnboxingDark)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 2)
+        .background(Theme.Color.categoryUnboxingBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+    }
+
+    /// Header terminal chip (Completed) shown in the `done` state.
+    private func terminalChip(label: String, icon: PantopusIcon) -> some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(icon, size: 11, color: Theme.Color.success)
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.Color.success)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(Theme.Color.successBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+    }
+
+    // MARK: Status timeline
+
+    private static let statusSteps = ["Offered", "Reserved", "Confirmed", "Done"]
+
+    /// 4-step Offered → Reserved → Confirmed → Done progress, mirroring the
+    /// design's `StatusTimeline`. `current` is the active step; earlier steps
+    /// render completed (check), later steps muted.
+    private var statusTimeline: some View {
+        let current = viewModel.statusStep
+        return SectionCard {
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                Text("Status")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(Theme.Color.homeDark)
+                    .accessibilityAddTraits(.isHeader)
+                HStack(alignment: .top, spacing: Spacing.s0) {
+                    ForEach(Array(Self.statusSteps.enumerated()), id: \.offset) { index, label in
+                        statusStepNode(index: index, label: label, current: current)
+                        if index < Self.statusSteps.count - 1 {
+                            Rectangle()
+                                .fill(index < current ? Theme.Color.home : Theme.Color.appBorder)
+                                .frame(height: 2)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 10)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func statusStepNode(index: Int, label: String, current: Int) -> some View {
+        let done = index < current
+        let active = index == current
+        let filled = done || active
+        return VStack(spacing: 5) {
+            ZStack {
+                Circle()
+                    .fill(filled ? Theme.Color.home : Theme.Color.appSurfaceSunken)
+                if active {
+                    Circle()
+                        .stroke(Theme.Color.home, lineWidth: 2)
+                        .padding(-3)
+                }
+                if done {
+                    Icon(.check, size: 11, strokeWidth: 3, color: Theme.Color.appTextInverse)
+                } else {
+                    Text("\(index + 1)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(filled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
+                }
+            }
+            .frame(width: 22, height: 22)
+            Text(label)
+                .font(.system(size: 9, weight: active ? .bold : .medium))
+                .foregroundStyle(active ? Theme.Color.homeDark : (done ? Theme.Color.appTextStrong : Theme.Color.appTextMuted))
+                .multilineTextAlignment(.center)
+        }
+        .frame(width: 46)
+    }
+
     @ViewBuilder private var banner: some View {
         switch viewModel.lifecycle {
         case .confirmed:
+            // Design `home`-tone banner for the confirmed/on-calendar state.
             calloutBanner(
                 icon: .calendarCheck,
                 title: "On the home calendar",
@@ -138,13 +235,9 @@ struct VisitDetailView: View {
                 fg: Theme.Color.home
             )
         case .done:
-            calloutBanner(
-                icon: .check,
-                title: "Visit complete",
-                body: "This visit has passed.",
-                bg: Theme.Color.appSurfaceSunken,
-                fg: Theme.Color.appTextSecondary
-            )
+            // Design's Completed state carries no banner — only the header
+            // terminal chip + the timeline at Done.
+            EmptyView()
         }
     }
 
@@ -196,6 +289,7 @@ struct VisitDetailView: View {
                         .foregroundStyle(Theme.Color.appText)
                 }
                 Spacer(minLength: 0)
+                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
             }
         }
     }
@@ -215,6 +309,14 @@ struct VisitDetailView: View {
                     viewModel.bookAgain()
                 }
             }
+            // Design footer always carries a trailing `message-circle` text btn.
+            Button { viewModel.messageVisitor() } label: {
+                Icon(.messageCircle, size: 18, color: Theme.Color.appTextStrong)
+                    .frame(width: 46, height: 46)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Message")
+            .accessibilityIdentifier("scheduling.visitDetail.message")
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s2)

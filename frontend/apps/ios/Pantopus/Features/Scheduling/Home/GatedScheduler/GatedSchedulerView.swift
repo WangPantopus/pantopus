@@ -63,6 +63,12 @@ struct GatedSchedulerView: View {
                 .padding(.vertical, 5)
                 .background(Theme.Color.homeBg)
                 .clipShape(Capsule())
+                // Design: pale-green pill carries a 1px green-200 (`H.bg200`)
+                // border; no exact green-200 token exists, so the home accent at
+                // low opacity reproduces the faint outline.
+                .overlay(
+                    Capsule().stroke(Theme.Color.home.opacity(0.25), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("gatedScheduler_askToManage")
@@ -114,7 +120,10 @@ struct GatedSchedulerView: View {
             } else {
                 HintBar()
             }
-            if let strip = viewModel.monthStrip {
+            // Design: the read-only (Frame 1) and pending (Frame 3) frames show
+            // the MonthStrip; the my-assignments frame (Frame 2) omits it so the
+            // pinned assignments lead the body.
+            if viewModel.assignments.isEmpty, let strip = viewModel.monthStrip {
                 MonthStripHeader(
                     state: strip,
                     onSelectDay: { _ in },
@@ -186,8 +195,8 @@ private struct HintBar: View {
         HStack(spacing: Spacing.s2) {
             Icon(.eye, size: 14, color: Theme.Color.info)
             Text(text)
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.Color.info)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.Color.primary800)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Spacing.s3)
@@ -230,7 +239,7 @@ private struct AssignmentRow: View {
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
                     HStack(spacing: Spacing.s1) {
-                        HStack(spacing: 3) {
+                        HStack(spacing: Spacing.s1) {
                             Icon(.userCheck, size: 10, color: Theme.Color.personal)
                             Text("Your slot")
                                 .font(.system(size: 9.5, weight: .bold))
@@ -274,6 +283,8 @@ private struct AssignmentRow: View {
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.infoLight, lineWidth: 1.5)
         )
+        // Design: subtle sky drop shadow `0 1px 3px rgba(2,132,199,0.08)`.
+        .shadow(color: Theme.Color.personal.opacity(0.08), radius: 1.5, x: 0, y: 1)
     }
 
     private func actionLabel(icon: PantopusIcon, title: String, filled: Bool) -> some View {
