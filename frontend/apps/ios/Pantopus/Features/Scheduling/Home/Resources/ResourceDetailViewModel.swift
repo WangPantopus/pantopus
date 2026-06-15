@@ -61,6 +61,22 @@ final class ResourceDetailViewModel {
     var actionError: String?
     private(set) var isMutating = false
 
+    /// Count of pending approval requests — drives the header "Pending
+    /// approval (N)" badge button (F11 approval-pending frame). Mirrors
+    /// `approvals.count`; surfaced as a distinct field so the view can read it
+    /// without depending on the queue card being rendered.
+    private(set) var pendingApprovalCount = 0
+
+    /// View-only fully-booked variant (F11 fully-booked frame): when set, the
+    /// detail shows an amber "Fully booked …" banner and the sticky CTA flips
+    /// to "Book next opening · <label>". Defaults to the normal (not-full)
+    /// state; the resource-detail bookings list does not expose forward
+    /// availability, so the through-label and next-opening label are populated
+    /// only when the backend provides them (see deferred-backend note).
+    private(set) var fullyBookedThroughLabel: String?
+    private(set) var nextOpeningLabel: String?
+    var isFullyBooked: Bool { nextOpeningLabel != nil }
+
     // MARK: Dependencies
 
     let homeId: String
@@ -165,6 +181,8 @@ final class ResourceDetailViewModel {
             }
             : []
 
+        pendingApprovalCount = approvals.count
+
         let confirmed = requiresApproval ? mine.filter { !$0.isPending } : mine
         sections = Self.groupByDay(confirmed, who: who, member: member)
     }
@@ -217,7 +235,18 @@ final class ResourceDetailViewModel {
     // MARK: Actions
 
     func bookThis() { push(.bookResource(homeId: homeId, resourceId: resourceId)) }
+
+    /// Fully-booked CTA — routes to the same booking sheet (the next-opening
+    /// slot is selected there). No dedicated endpoint.
+    func bookNextOpening() { push(.bookResource(homeId: homeId, resourceId: resourceId)) }
+
     func edit() { push(.resourceEditor(homeId: homeId, resourceId: resourceId)) }
+
+    /// Header pending-approval badge tap — scrolls/anchors to the approval
+    /// queue, which already lives in the same scroll view; surfaced as an
+    /// action hook so the badge button is interactive even when the queue is
+    /// the affordance the user lands on.
+    func openApprovalQueue() {}
 
     func approve(_ id: String) async {
         await mutate { try await self.client.send(SchedulingEndpoints.approveBooking(owner: self.owner, id: id)) }

@@ -117,10 +117,17 @@ final class ResourceListViewModel: ListOfRowsDataSource {
 
     private func rebuild(resources: [ResourceDTO], bookings: [ResourceBooking]) {
         guard !resources.isEmpty else {
+            // Design F9 empty frame: `package-open` disc + "Add what your
+            // household shares" + the "Start from a template." closer. The
+            // shared `EmptyState` can't render the design's full templates
+            // quick-start list (explainer card + "TEMPLATES" overline + 5
+            // tappable template rows) — that needs a bespoke empty-state slot
+            // on `ListOfRowsView`, tracked in sharedChangesNeeded. The glyph +
+            // copy below are the view-only fixes this VM can drive.
             state = .empty(.init(
-                icon: .package,
+                icon: .packageOpen,
                 headline: "Add what your household shares",
-                subcopy: "Anything members book — rooms, the driveway, tools. Add your first resource to get started.",
+                subcopy: "Anything members book — rooms, the driveway, tools. Start from a template.",
                 ctaTitle: "Add a resource",
                 onCTA: { [weak self] in Task { @MainActor in self?.openEditor(resourceId: nil) } },
                 tint: Theme.Color.homeBg,

@@ -46,14 +46,21 @@ final class BookResourceViewModel {
     private(set) var selectionCount = 0
     var forWhom: HomeMember?
     private(set) var members: [HomeMember] = []
+    /// Optional free-text note captured on the "Notes" section. NOTE: the
+    /// `POST …/resources/:rid/book` route and `BookResourceRequest` DTO do not
+    /// yet carry a note field, so this is captured view-only and not transmitted
+    /// until the shared DTO + backend route gain a `note` param.
+    var note = ""
     private(set) var isSubmitting = false
     var saveError: String?
     /// Drives the Foundation SlotTakenSheet.
     var slotConflict: SlotConflictPresentation?
 
-    /// Success-screen copy.
+    /// Success-screen copy. `successNote` drives the `calendar-check` note pill
+    /// shown between the body and the "Back to calendar" CTA.
     private(set) var successTitle = ""
     private(set) var successBody = ""
+    private(set) var successNote = ""
 
     // MARK: Dependencies
 
@@ -291,11 +298,19 @@ final class BookResourceViewModel {
                 SchedulingEndpoints.bookResource(owner: owner, resourceId: resourceId, request)
             )
             let approval = response.booking.status == "pending"
-            successTitle = approval ? "Request sent to an admin" : "Booked"
             let range = selectionRangeLabel
-            successBody = approval
-                ? "We'll notify you when your booking is approved.\n\(resourceName) · \(dayLabel) · \(range)"
-                : "\(resourceName) · \(dayLabel) · \(range)"
+            let slotLabel = "\(resourceName) · \(dayLabel) · \(range)"
+            if approval {
+                // F12 approval-requested: title + notify body + slot note pill.
+                successTitle = "Request sent to an admin"
+                successBody = "We'll notify you when your booking is approved."
+                successNote = slotLabel
+            } else {
+                // F12 confirmed: title "Booked" + slot body + calendar note pill.
+                successTitle = "Booked"
+                successBody = slotLabel
+                successNote = "Added to the home calendar"
+            }
             phase = .success(approval: approval)
         } catch let error as SchedulingError {
             await handleConflict(error)
