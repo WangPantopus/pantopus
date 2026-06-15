@@ -95,13 +95,12 @@ final class GroupRosterViewModel {
             var total = attendees.count
             var entries: [WaitlistEntryDTO] = []
             if let id = detail.booking.eventTypeId {
-                async let eventTypeResponse: EventTypeDetailResponse = client.request(
+                let eventType: EventTypeDetailResponse = try await client.request(
                     SchedulingEndpoints.getEventType(owner: owner, id: id)
                 )
-                async let waitlistResponse: WaitlistResponse = client.request(
+                let waitlistResult: WaitlistResponse = try await client.request(
                     SchedulingEndpoints.getWaitlist(owner: owner, eventTypeId: id)
                 )
-                let (eventType, waitlistResult) = try await (eventTypeResponse, waitlistResponse)
                 total = eventType.eventType.seatCap ?? max(total, 1)
                 entries = waitlistResult.waitlist.filter { ($0.status ?? "waiting") == "waiting" }
             }
