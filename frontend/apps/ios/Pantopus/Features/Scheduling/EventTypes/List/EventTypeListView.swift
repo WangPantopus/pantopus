@@ -87,11 +87,14 @@ struct EventTypeListView: View {
 
     // MARK: Overflow menu
 
+    // Design `OverflowMenu` order: Copy booking link · Duplicate · Share ·
+    // Hide · Delete (Delete destructive; native dialog can't sky-tint the
+    // first item).
     @ViewBuilder
     private func menuButtons(for eventType: EventTypeDTO) -> some View {
         Button("Copy booking link") { viewModel.copyLink(eventType) }
-        Button("Share") { viewModel.share(eventType) }
         Button("Duplicate") { Task { await viewModel.duplicate(eventType) } }
+        Button("Share") { viewModel.share(eventType) }
         if eventType.isActive == false {
             Button("Make active") { Task { await viewModel.toggleHidden(eventType) } }
         } else {

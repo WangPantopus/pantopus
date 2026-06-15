@@ -87,6 +87,13 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     private var activeTypes: [EventTypeDTO] { eventTypes.filter { $0.isActive != false } }
     private var hiddenTypes: [EventTypeDTO] { eventTypes.filter { $0.isActive == false } }
 
+    /// Business owners price their bookable services (design `FrameBusiness`);
+    /// personal events have no price concept (design `FramePersonal`).
+    var isBusiness: Bool {
+        if case .business = owner { return true }
+        return false
+    }
+
     private var isLoaded: Bool {
         if case .loaded = state { return true }
         if case .empty = state { return true }
@@ -129,6 +136,13 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
 
     func createNew() {
         push(.eventTypeEditor(owner: owner, eventTypeId: nil))
+    }
+
+    /// Drives the all-hidden empty state's "View hidden" CTA — flips the
+    /// segmented filter to the Hidden tab in place (design `FrameAllHidden`).
+    func showHiddenTab() {
+        tab = .hidden
+        rebuild()
     }
 
     private func open(_ eventType: EventTypeDTO) {
@@ -270,7 +284,7 @@ private extension EventTypeListViewModel {
         return RowModel(
             id: eventType.id,
             title: eventType.name,
-            subtitle: EventTypeFormat.durationsAndLocation(eventType.durations, location: location),
+            subtitle: subtitle(for: eventType, location: location),
             template: .fileChevron,
             leading: .typeIcon(location.icon, background: swatch.tint, foreground: swatch.color),
             trailing: .kebab,
@@ -281,14 +295,28 @@ private extension EventTypeListViewModel {
         )
     }
 
+    /// "30 min · Video · $120" — the design appends the price to the meta
+    /// line after a "·" (design `EventRow`, business services frame) rather
+    /// than rendering it as a separate pill chip. Personal events carry no
+    /// price concept (design `FramePersonal` shows none); business services
+    /// always show one, rendering "Free" for a zero price (design
+    /// `FrameBusiness` → `price="Free"`).
+    func subtitle(for eventType: EventTypeDTO, location: EventLocationMode) -> String {
+        var meta = EventTypeFormat.durationsAndLocation(eventType.durations, location: location)
+        if isBusiness, let cents = eventType.priceCents {
+            let price = cents == 0
+                ? "Free"
+                : EventTypeFormat.price(cents: cents, currency: eventType.currency ?? "USD")
+            meta += " · \(price)"
+        }
+        return meta
+    }
+
     func chips(for eventType: EventTypeDTO) -> [RowChip]? {
         var chips: [RowChip] = []
-        if let cents = eventType.priceCents, cents > 0 {
-            chips.append(RowChip(
-                text: EventTypeFormat.price(cents: cents, currency: eventType.currency ?? "USD"),
-                tint: .custom(background: Theme.Color.appSurfaceSunken, foreground: Theme.Color.appText)
-            ))
-        }
+        // The design business row shows a `users`-icon "N hosts" badge inline
+        // beside the name. The list `EventTypeDTO` carries no assignee count,
+        // so the badge is data-blocked — see deferredBackend.
         if eventType.visibility == "secret" {
             chips.append(RowChip(text: "Unlisted", icon: .eyeOff, tint: .status(.neutral)))
         }
@@ -296,10 +324,14 @@ private extension EventTypeListViewModel {
     }
 
     var emptyAllContent: ListOfRowsState.EmptyContent {
+        // Design `FrameEmpty` — calendar-plus hero, primary CTA. (The
+        // "Start from a template" overline + duration template chips the
+        // design draws below the CTA need a new `EmptyContent` slot on the
+        // shared shell — see sharedChangesNeeded.)
         .init(
-            icon: .calendarClock,
+            icon: .calendarPlus,
             headline: "You don't have any event types yet",
-            subcopy: "Create a bookable meeting or service so neighbors can pick a time that works.",
+            subcopy: "An event type is something people can book — a call, a meeting, a visit. Start from a template or build your own.",
             ctaTitle: "Create your first event type",
             onCTA: { [weak self] in Task { @MainActor in self?.createNew() } }
         )
@@ -307,10 +339,15 @@ private extension EventTypeListViewModel {
 
     var emptyTabContent: ListOfRowsState.EmptyContent {
         if tab == .active {
+            // Design `FrameAllHidden` — eye-off grey disc, "Everything's
+            // hidden", and a "View hidden →" ghost button that flips to the
+            // Hidden tab.
             return .init(
                 icon: .eyeOff,
-                headline: "Nothing active right now",
-                subcopy: "Everything's hidden. Switch to Hidden to bring one back.",
+                headline: "Everything's hidden",
+                subcopy: "Switch to Hidden to bring one back, or create a new event type.",
+                ctaTitle: "View hidden",
+                onCTA: { [weak self] in Task { @MainActor in self?.showHiddenTab() } },
                 tint: Theme.Color.appSurfaceSunken,
                 accent: Theme.Color.appTextSecondary
             )

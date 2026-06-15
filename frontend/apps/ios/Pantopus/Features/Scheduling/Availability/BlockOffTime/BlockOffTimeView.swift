@@ -20,6 +20,7 @@ struct BlockOffTimeView: View {
     var body: some View {
         FormShell(
             title: "Block off time",
+            subtitle: "Personal · Availability",
             leading: .close,
             rightActionLabel: "Save",
             isValid: viewModel.isValid,
@@ -30,6 +31,9 @@ struct BlockOffTimeView: View {
         ) {
             reasonGroup
             whenGroup
+            if let conflict = viewModel.conflict {
+                conflictCard(conflict)
+            }
             repeatsGroup
             footnote
         }
@@ -48,7 +52,7 @@ struct BlockOffTimeView: View {
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityIdentifier("scheduling.blockOff.reasonField")
-            Text("Optional — only you can see this.")
+            Text("Optional · only you can see this.")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
@@ -60,7 +64,12 @@ struct BlockOffTimeView: View {
                 .tint(Theme.Color.primary600)
             Divider().background(Theme.Color.appBorderSubtle)
             Toggle(isOn: $viewModel.allDay) {
-                Text("All day").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("All day").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
+                    Text("Block the whole day")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
             }
             .tint(Theme.Color.primary600)
             if !viewModel.allDay {
@@ -91,15 +100,71 @@ struct BlockOffTimeView: View {
                 }
             }
             .pickerStyle(.segmented)
+            if let caption = viewModel.repeats.caption {
+                Text(caption)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
         }
     }
 
     private var footnote: some View {
-        Text("This time won't be offered for booking. It's private to you.")
-            .pantopusTextStyle(.caption)
-            .foregroundStyle(Theme.Color.appTextSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s4)
+        HStack(alignment: .top, spacing: Spacing.s1) {
+            Icon(.lock, size: 12, strokeWidth: 2, color: Theme.Color.appTextMuted)
+                .padding(.top, 1)
+            Text("This time won't be offered for booking. It's private to you.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s4)
+    }
+
+    // ─── Conflict warning card (chip-led, semantic) ──────────────
+    // Mirrors block-time-frames.jsx · ConflictCard: warningBg surface,
+    // "Booking overlap" warning chip, body copy, and a "View booking" link.
+    private func conflictCard(_ conflict: BlockConflictWarning) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s1) {
+                Icon(.triangleAlert, size: 10, strokeWidth: 2.6, color: Theme.Color.appSurface)
+                Text("Booking overlap")
+                    .font(.system(size: 9, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.4)
+                    .foregroundStyle(Theme.Color.appSurface)
+            }
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 3)
+            .background(Theme.Color.warning)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+            Text("This overlaps a \(conflict.bookingLabel). Blocking won't cancel it.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.appText)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                viewModel.viewConflictingBooking()
+            } label: {
+                HStack(spacing: 5) {
+                    Icon(.arrowUpRight, size: 13, strokeWidth: 2, color: Theme.Color.warning)
+                    Text("View booking")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.warning)
+                }
+            }
+            .accessibilityIdentifier("scheduling.blockOff.viewBooking")
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .padding(.horizontal, Spacing.s4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("scheduling.blockOff.conflictWarning")
     }
 
     private var startBinding: Binding<Date> {

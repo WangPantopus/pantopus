@@ -78,44 +78,44 @@ struct WeeklyHoursEditorView: View {
             onClose: { dismiss() },
             onCommit: { Task { await viewModel.save() } }
         ) {
-            nameGroup
-            timezoneGroup
             if viewModel.allOff {
+                CompositionGapCard()
                 NoHoursWarningCard { viewModel.applyNineToFiveDefault() }
             }
+            nameGroup
+            timezoneGroup
             weeklyHoursGroup
             linkGroup
-            compositionNote
         }
     }
 
     // MARK: Groups
 
     private var nameGroup: some View {
-        FormFieldGroup("Schedule name") {
-            TextField("Working hours", text: $viewModel.scheduleName)
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.appText)
-                .textInputAutocapitalization(.words)
-                .accessibilityIdentifier("scheduling.weeklyHours.nameField")
+        FormFieldGroup("Schedule") {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text("Name")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                TextField("Working hours", text: $viewModel.scheduleName)
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.appText)
+                    .textInputAutocapitalization(.words)
+                    .accessibilityIdentifier("scheduling.weeklyHours.nameField")
+            }
         }
     }
 
     private var timezoneGroup: some View {
-        FormFieldGroup("Time zone") {
+        FormFieldGroup("Timezone") {
             Button { viewModel.showTimezoneSheet = true } label: {
-                HStack(spacing: Spacing.s3) {
-                    Icon(.globe, size: 18, color: Theme.Color.primary600)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Time zone")
-                            .pantopusTextStyle(.body)
-                            .foregroundStyle(Theme.Color.appText)
-                        Text(viewModel.timezoneDisplay)
-                            .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                    }
+                HStack(spacing: Spacing.s2) {
+                    Icon(.globe, size: 15, color: Theme.Color.appTextSecondary)
+                    Text(viewModel.timezoneDisplay)
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appText)
                     Spacer(minLength: Spacing.s2)
-                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+                    Icon(.chevronDown, size: 16, color: Theme.Color.appTextMuted)
                 }
                 .contentShape(Rectangle())
             }
@@ -123,9 +123,14 @@ struct WeeklyHoursEditorView: View {
             .accessibilityIdentifier("scheduling.weeklyHours.timezoneRow")
             Divider().background(Theme.Color.appBorderSubtle)
             Toggle(isOn: Binding(get: { viewModel.lockTimezone }, set: viewModel.setLockTimezone)) {
-                Text("Lock to my timezone")
-                    .pantopusTextStyle(.body)
-                    .foregroundStyle(Theme.Color.appText)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Lock to my timezone")
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Keep these hours even when you travel")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
             }
             .tint(Theme.Color.primary600)
         }
@@ -150,34 +155,26 @@ struct WeeklyHoursEditorView: View {
         }
     }
 
+    // No overline in the design's links card (`<Card pillar="personal">` only),
+    // so this card is laid out inline rather than via FormFieldGroup.
     private var linkGroup: some View {
-        FormFieldGroup("More") {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
             SchedulingLinkRow(
-                icon: .calendarDays,
+                icon: .calendarX,
                 title: "Date overrides & holidays",
-                subtitle: "Days off and one-time hours"
+                subtitle: "None set"
             ) { viewModel.activeSheet = .dateOverrides }
             Divider().background(Theme.Color.appBorderSubtle)
             SchedulingLinkRow(
                 icon: .slidersHorizontal,
                 title: "Booking limits & notice rules",
-                subtitle: "Set per service"
+                subtitle: "Defaults"
             ) { viewModel.openBookingLimits() }
-            Divider().background(Theme.Color.appBorderSubtle)
-            SchedulingLinkRow(
-                icon: .ban,
-                title: "Block off time",
-                subtitle: "Add a one-off busy hold"
-            ) { viewModel.activeSheet = .blockOff }
         }
-    }
-
-    private var compositionNote: some View {
-        Text("Your home and business pages build on these hours, so set them first.")
-            .pantopusTextStyle(.caption)
-            .foregroundStyle(Theme.Color.appTextSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s4)
+        .padding(Spacing.s4)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
     }
 
     // MARK: Sheets
