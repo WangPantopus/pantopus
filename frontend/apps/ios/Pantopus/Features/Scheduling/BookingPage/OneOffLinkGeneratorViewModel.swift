@@ -107,7 +107,26 @@ public struct OneOffSlotOption: Identifiable, Sendable, Equatable {
 public struct OneOffGeneratedLink: Sendable, Equatable {
     public let displayURL: String
     public let shareURL: String
+    /// Combined meta caption (kept for accessibility / fallbacks).
     public let caption: String
+    /// Expiry segment for the meta pill (design: "Expires in 7 days").
+    public let expiryText: String
+    /// Whether to show the "Single use" segment in the meta pill.
+    public let singleUse: Bool
+
+    public init(
+        displayURL: String,
+        shareURL: String,
+        caption: String,
+        expiryText: String = "",
+        singleUse: Bool = false
+    ) {
+        self.displayURL = displayURL
+        self.shareURL = shareURL
+        self.caption = caption
+        self.expiryText = expiryText.isEmpty ? caption : expiryText
+        self.singleUse = singleUse
+    }
 }
 
 public enum OneOffState: Sendable, Equatable {
@@ -337,26 +356,30 @@ public final class OneOffLinkGeneratorViewModel {
     }
 
     private func makeGeneratedLink(from response: OneOffLinkResponse) -> OneOffGeneratedLink {
-        OneOffGeneratedLink(
+        let isSingleUse = response.singleUse ?? singleUse
+        let expiryText = expiryCaption(expiresAt: response.expiresAt)
+        var parts = [expiryText]
+        if isSingleUse { parts.append("Single use") }
+        return OneOffGeneratedLink(
             displayURL: BookingLinkURL.display(path: response.path),
             shareURL: BookingLinkURL.shareable(path: response.path),
-            caption: caption(expiresAt: response.expiresAt, singleUse: response.singleUse ?? singleUse)
+            caption: parts.joined(separator: " · "),
+            expiryText: expiryText,
+            singleUse: isSingleUse
         )
     }
 
-    private func caption(expiresAt: String?, singleUse: Bool) -> String {
-        var parts: [String] = []
+    /// The expiry segment of the result meta pill (design: "Expires in 7 days").
+    private func expiryCaption(expiresAt: String?) -> String {
         if let expiresAt,
            let formatted = SchedulingTime.localString(utcISO: expiresAt, tz: timeZoneIdentifier) {
             // Trust the server's actual expiry over the requested chip.
-            parts.append("Expires \(formatted)")
+            return "Expires \(formatted)"
         } else if expiry == .never {
-            parts.append("No expiry")
+            return "No expiry"
         } else {
-            parts.append("Expires in \(expiry.label.lowercased())")
+            return "Expires in \(expiry.label.lowercased())"
         }
-        if singleUse { parts.append("Single use") }
-        return parts.joined(separator: " · ")
     }
 
     public func reset() {

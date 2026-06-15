@@ -187,12 +187,14 @@ private struct BookingMgmtStatusCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Spacing.s2)
+                // Per the design, the status switch (and all toggles/CTAs) stay
+                // sky/primary regardless of the page's pillar accent.
                 Toggle("", isOn: Binding(
                     get: { viewModel.isAcceptingBookings },
                     set: { value in Task { await viewModel.setAcceptingBookings(value) } }
                 ))
                 .labelsHidden()
-                .tint(viewModel.theme.accent)
+                .tint(Theme.Color.primary600)
                 .accessibilityIdentifier("bookingPageManagement.statusToggle")
             }
         }
@@ -245,15 +247,14 @@ private struct BookingMgmtSlugCard: View {
         }
     }
 
+    /// The design's slug input box holds only the `pantopus.com/book/` prefix
+    /// and the editable handle — availability is shown on the line *below*, not
+    /// as an in-box glyph. Only the transient debounce spinner lives in-box.
     @ViewBuilder private var trailingStatusIcon: some View {
         switch viewModel.slugState {
         case .checking:
             ProgressView().controlSize(.small)
-        case .available:
-            Icon(.checkCircle, size: 16, strokeWidth: 2.4, color: Theme.Color.success)
-        case .taken, .invalid:
-            Icon(.alertCircle, size: 16, strokeWidth: 2.4, color: Theme.Color.error)
-        case .unchanged:
+        case .available, .taken, .invalid, .unchanged:
             EmptyView()
         }
     }
@@ -468,7 +469,7 @@ private struct BookingMgmtField: View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .foregroundStyle(Theme.Color.appTextStrong)
             TextField(placeholder, text: $text)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
@@ -495,7 +496,7 @@ private struct BookingMgmtMultilineField: View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .foregroundStyle(Theme.Color.appTextStrong)
             TextField(placeholder, text: $text, axis: .vertical)
                 .lineLimit(2...5)
                 .font(Theme.Font.body)
@@ -565,7 +566,8 @@ private struct BookingMgmtFooterButton: View {
 private struct BookingMgmtSavedToast: View {
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.checkCircle, size: 15, strokeWidth: 3, color: Theme.Color.success)
+            // Design uses a bare lucide `check` (not a circled check), strokeWidth 3.
+            Icon(.check, size: 15, strokeWidth: 3, color: Theme.Color.success)
             Text("Saved")
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextInverse)

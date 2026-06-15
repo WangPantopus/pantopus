@@ -91,15 +91,26 @@ public struct TimezoneSelectorSheet: View {
 
     private var searchField: some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.search, size: 16, color: Theme.Color.appTextMuted)
+            Icon(.search, size: 16, color: Theme.Color.appTextSecondary)
             TextField("Search city or time zone", text: $query)
                 .font(Theme.Font.body)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Icon(.x, size: 16, color: Theme.Color.appTextMuted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
         .background(Theme.Color.appSurfaceSunken)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         .padding(.horizontal, Spacing.s4)
         .padding(.bottom, Spacing.s2)
@@ -167,7 +178,7 @@ public struct TimezoneSelectorSheet: View {
             Spacer(minLength: Spacing.s2)
             Button { onSelect(detected) } label: {
                 HStack(spacing: Spacing.s1) {
-                    Icon(.arrowRight, size: 12, strokeWidth: 2.4, color: accent)
+                    Icon(.rotateCcw, size: 12, strokeWidth: 2.4, color: accent)
                     Text("Reset to detected")
                         .pantopusTextStyle(.caption)
                         .fontWeight(.bold)
@@ -199,7 +210,7 @@ public struct TimezoneSelectorSheet: View {
 
     private func noMatch() -> some View {
         VStack(spacing: Spacing.s2) {
-            Icon(.search, size: 24, strokeWidth: 1.85, color: Theme.Color.appTextSecondary)
+            Icon(.searchX, size: 24, strokeWidth: 1.85, color: Theme.Color.appTextSecondary)
                 .frame(width: 52, height: 52)
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(Circle())
@@ -238,7 +249,7 @@ public struct TimezoneSelectorSheet: View {
                 }
                 .frame(width: 18)
                 HStack(spacing: Spacing.s2) {
-                    Text(cityName(identifier))
+                    Text(highlightedName(cityName(identifier)))
                         .pantopusTextStyle(.small)
                         .fontWeight(.semibold)
                         .foregroundStyle(Theme.Color.appText)
@@ -276,6 +287,20 @@ public struct TimezoneSelectorSheet: View {
     }
 
     // MARK: - Formatting
+
+    /// The display name with the active search substring highlighted in amber,
+    /// mirroring the design's `<mark>` (case-insensitive, first match).
+    private func highlightedName(_ name: String) -> AttributedString {
+        var attributed = AttributedString(name)
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty,
+              let range = name.range(of: needle, options: .caseInsensitive),
+              let lower = AttributedString.Index(range.lowerBound, within: attributed),
+              let upper = AttributedString.Index(range.upperBound, within: attributed)
+        else { return attributed }
+        attributed[lower..<upper].backgroundColor = Theme.Color.warningBg
+        return attributed
+    }
 
     private func cityName(_ identifier: String) -> String {
         if let tz = TimeZone(identifier: identifier),

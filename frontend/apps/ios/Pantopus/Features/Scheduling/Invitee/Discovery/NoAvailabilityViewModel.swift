@@ -70,6 +70,13 @@ final class NoAvailabilityViewModel {
         await evaluate()
     }
 
+    /// "Get notified when times open" — design's terminal `fullyBooked` notify
+    /// affordance. View-only stub; the waitlist/notify subscription is deferred
+    /// backend.
+    func notifyWhenAvailable() {
+        // Deferred: subscribe the invitee to a new-times notification.
+    }
+
     /// Hand off to C6 so the booker can pick from the open times.
     func openPicker() {
         push(.inviteeSlotPicker(
