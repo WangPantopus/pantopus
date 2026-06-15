@@ -40,7 +40,7 @@ struct CancellationPolicyEditorView: View {
 
     private var gatedBody: some View {
         VStack(spacing: Spacing.s0) {
-            BizTopBar(title: "Cancellation policy", onBack: { dismiss() })
+            BizTopBar(title: "Cancellation & refund policy", onBack: { dismiss() })
             content
         }
         .background(Theme.Color.appBg)
@@ -123,7 +123,7 @@ struct CancellationPolicyEditorView: View {
                     )
                 }
                 BizRowDivider()
-                customRow(icon: .badgePercent, label: "Refund after cutoff") {
+                customRow(icon: .percent, label: "Refund after cutoff") {
                     UnitStepper(
                         value: model.customRefundPct,
                         unit: "%",
@@ -147,7 +147,7 @@ struct CancellationPolicyEditorView: View {
                 BizRowDivider()
                 Button { model.cycleNoShow() } label: {
                     HStack(spacing: 11) {
-                        iconTile(.userMinus)
+                        iconTile(.userX)
                         VStack(alignment: .leading, spacing: 1) {
                             Text("No-show handling")
                                 .font(.system(size: 12.5, weight: .semibold))
@@ -273,6 +273,9 @@ private struct PresetCard: View {
                 RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(selected ? accent : Theme.Color.appBorder, lineWidth: selected ? 1.5 : 1)
             )
+            // JSX: unselected cards carry `0 1px 2px rgba(0,0,0,0.03)`; selected
+            // cards are flat (`boxShadow:'none'`).
+            .pantopusShadow(selected ? PantopusShadow(color: .black, opacity: 0, radius: 0, x: 0, y: 0) : .sm)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("scheduling.cancellationPolicyEditor.preset.\(preset.rawValue)")

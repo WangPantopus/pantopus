@@ -32,6 +32,12 @@ final class TeamBookingAvailabilityViewModel {
         let bookable: Bool
         let summary: String
         let isSelf: Bool
+        /// Drives the hours-source chip ("Personal hours" / "Business hours").
+        /// The roster + `team-availability` reads expose no per-member hours
+        /// source, so this defaults to the system behaviour the explainer states
+        /// ("Bookings use each member's personal availability"). Per-member
+        /// personal-vs-business discrimination is deferred to the backend.
+        let usesPersonalHours: Bool
     }
 
     enum Coverage: Equatable {
@@ -144,7 +150,8 @@ final class TeamBookingAvailabilityViewModel {
                     avatarURL: user.profilePictureUrl,
                     bookable: bookable,
                     summary: bookable ? "Open \(dayCount) day\(dayCount == 1 ? "" : "s") this week" : "Not taking bookings",
-                    isSelf: currentUserId != nil && user.id == currentUserId
+                    isSelf: currentUserId != nil && user.id == currentUserId,
+                    usesPersonalHours: true
                 )
             }
             coverage = Self.coverage(window: window, freeByMember: freeByMember)

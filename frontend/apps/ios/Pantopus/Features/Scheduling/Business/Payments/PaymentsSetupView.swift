@@ -158,9 +158,10 @@ extension PaymentsSetupView {
     private var stripeBadge: some View {
         Text(verbatim: "S")
             .font(.system(size: 17, weight: .heavy))
+            .tracking(-0.5)
             .foregroundStyle(Theme.Color.appTextInverse)
             .frame(width: 34, height: 34)
-            .background(Theme.Color.business)
+            .background(Theme.Color.stripeBrand)
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             .accessibilityHidden(true)
     }
@@ -218,7 +219,7 @@ extension PaymentsSetupView {
             )
             BizRowDivider()
             BizSettingsRow(
-                icon: .pencil,
+                icon: .textCursorInput,
                 label: "Statement descriptor",
                 sub: model.isConnected ? "Managed on Stripe" : nil,
                 trailing: { rowTrailing },
@@ -301,7 +302,7 @@ extension PaymentsSetupView {
     private var taxGroup: some View {
         BizGroup(title: "Tax", accent: model.accent) {
             BizSettingsRow(
-                icon: .badgePercent,
+                icon: .percent,
                 label: "Collect tax",
                 sub: model.isConnected ? "Stripe Tax" : nil,
                 trailing: { rowTrailing },
@@ -311,7 +312,7 @@ extension PaymentsSetupView {
             BizSettingsRow(
                 icon: .fileText,
                 label: "Tax rate · Stripe Tax",
-                sub: model.isConnected ? "Automatic" : nil,
+                sub: model.isConnected ? "automatic" : nil,
                 trailing: { rowTrailing },
                 onTap: model.isConnected ? { Task { await model.openDashboard() } } : nil
             )

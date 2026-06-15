@@ -243,14 +243,14 @@ private struct PackagePill: View {
                 Text(subtitle)
                     .font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(1)
-                PkgChip(text: isArchived ? "Archived" : "Active", tone: isArchived ? .neutral : .success)
+                PkgChip(text: isArchived ? "Archived" : "Active", tone: isArchived ? .neutral : .success, uppercased: true)
                     .padding(.top, 3)
             }
             Spacer(minLength: Spacing.s2)
             trailing
         }
         .padding(.vertical, 12)
-        .opacity(isArchived ? 0.7 : 1)
+        .opacity(isArchived ? 0.6 : 1)
         .contentShape(Rectangle())
         .onTapGesture { if !isArchived { onTap() } }
         .accessibilityElement(children: .combine)

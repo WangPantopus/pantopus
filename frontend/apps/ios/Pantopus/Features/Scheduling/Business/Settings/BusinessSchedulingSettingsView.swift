@@ -99,6 +99,7 @@ struct BusinessSchedulingSettingsView: View {
                         disabled: model.isGated,
                         onSelect: { idx in model.confirmationApprove = idx == 1 }
                     )
+                    .opacity(model.isGated ? 0.55 : 1)
                     Text(model.confirmationApprove
                         ? "You approve each request before it lands on your calendar."
                         : "Auto-confirm sends the booking straight to your calendar.")
@@ -128,7 +129,7 @@ struct BusinessSchedulingSettingsView: View {
             BizSettingsRow(icon: .clock, label: "Minimum notice", sub: model.minNoticeValue,
                            trailing: { gatedChevron }, onTap: rowTap { model.openSchedulingDefaults() })
             BizRowDivider()
-            BizSettingsRow(icon: .calendarDays, label: "Booking horizon", sub: model.horizonValue,
+            BizSettingsRow(icon: .calendarRange, label: "Booking horizon", sub: model.horizonValue,
                            trailing: { gatedChevron }, onTap: rowTap { model.openSchedulingDefaults() })
             BizRowDivider()
             BizSettingsRow(icon: .arrowRightLeft, label: "Buffers", sub: model.buffersValue,
@@ -180,8 +181,9 @@ struct BusinessSchedulingSettingsView: View {
     private var paymentsGroup: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             BizGroup(title: "Payments") {
-                BizSettingsRow(icon: .creditCard, iconTint: Theme.Color.business, label: "Stripe payments",
-                               sub: model.paymentsConnected ? "Payout connected" : "Not connected",
+                BizSettingsRow(icon: .creditCard, iconTint: Theme.Color.stripeBrand,
+                               iconBg: Theme.Color.stripeBrand.opacity(0.10), label: "Stripe payments",
+                               sub: model.paymentsConnected ? model.payoutSub : "Not connected",
                                trailing: { paymentsTrailing }, onTap: { model.openPayments() })
             }
             if model.paymentsRequired {
@@ -325,6 +327,10 @@ struct BizGroup<Content: View>: View {
 struct BizSettingsRow<Trailing: View>: View {
     var icon: PantopusIcon?
     var iconTint: Color?
+    /// Explicit disc background. When nil, derives from `iconTint` (0.14) or the
+    /// sunken neutral. Brand marks (e.g. the Stripe disc) pass an explicit cool
+    /// wash here so the disc reads as the brand swatch, not a tinted-glyph chip.
+    var iconBg: Color?
     let label: String
     var sub: String?
     let trailing: Trailing
@@ -333,6 +339,7 @@ struct BizSettingsRow<Trailing: View>: View {
     init(
         icon: PantopusIcon? = nil,
         iconTint: Color? = nil,
+        iconBg: Color? = nil,
         label: String,
         sub: String? = nil,
         @ViewBuilder trailing: () -> Trailing,
@@ -340,6 +347,7 @@ struct BizSettingsRow<Trailing: View>: View {
     ) {
         self.icon = icon
         self.iconTint = iconTint
+        self.iconBg = iconBg
         self.label = label
         self.sub = sub
         self.trailing = trailing()
@@ -351,7 +359,7 @@ struct BizSettingsRow<Trailing: View>: View {
             if let icon {
                 ZStack {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(iconTint == nil ? Theme.Color.appSurfaceSunken : iconTint!.opacity(0.14))
+                        .fill(iconBg ?? (iconTint == nil ? Theme.Color.appSurfaceSunken : iconTint!.opacity(0.14)))
                     Icon(icon, size: 16, color: iconTint ?? Theme.Color.appTextSecondary)
                 }
                 .frame(width: 32, height: 32)
@@ -411,16 +419,46 @@ struct BizSegmented: View {
 // MARK: - Skeleton + error
 
 private struct BizSettingsSkeleton: View {
+    // Mirrors `bizsettings-frames.jsx` FrameLoading: three ShimGroups of 1 / 4 / 2
+    // rows, each row a 32×32 disc + two stacked text shimmers in a card.
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
-                ForEach(0..<3, id: \.self) { _ in
-                    Shimmer(width: 90, height: 9, cornerRadius: Radii.xs)
-                    Shimmer(height: 130, cornerRadius: Radii.xl)
-                }
+                shimGroup(rows: 1)
+                shimGroup(rows: 4)
+                shimGroup(rows: 2)
             }
             .padding(.horizontal, Spacing.s3)
             .padding(.top, Spacing.s4)
+        }
+    }
+
+    private func shimGroup(rows: Int) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Shimmer(width: 90, height: 9, cornerRadius: Radii.xs)
+            VStack(spacing: Spacing.s0) {
+                ForEach(0..<rows, id: \.self) { i in
+                    HStack(spacing: 11) {
+                        Shimmer(width: 32, height: 32, cornerRadius: 9)
+                        VStack(alignment: .leading, spacing: Spacing.s0) {
+                            Shimmer(width: 130, height: 11, cornerRadius: Radii.xs)
+                            Shimmer(width: 170, height: 8, cornerRadius: Radii.xs)
+                                .padding(.top, 6)
+                        }
+                        Spacer(minLength: Spacing.s2)
+                    }
+                    .padding(.vertical, 13)
+                    if i != rows - 1 { BizRowDivider() }
+                }
+            }
+            .padding(.horizontal, 13)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .pantopusShadow(.sm)
         }
     }
 }
