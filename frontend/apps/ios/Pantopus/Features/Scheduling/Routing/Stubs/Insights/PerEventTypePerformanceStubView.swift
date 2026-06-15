@@ -39,7 +39,11 @@ struct PerEventTypePerformanceStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H10", title: "Performance", stream: "I17")
+        PerEventTypePerformanceView(
+            owner: viewModel.owner,
+            eventTypeId: viewModel.eventTypeId,
+            push: viewModel.push
+        )
     }
 }
 

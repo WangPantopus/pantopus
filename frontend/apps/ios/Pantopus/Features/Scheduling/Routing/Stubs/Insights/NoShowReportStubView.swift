@@ -36,7 +36,7 @@ struct NoShowReportStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H11", title: "No-show Report", stream: "I17")
+        NoShowReportView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
