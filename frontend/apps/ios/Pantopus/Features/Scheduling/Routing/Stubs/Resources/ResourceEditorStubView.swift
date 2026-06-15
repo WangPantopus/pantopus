@@ -39,7 +39,13 @@ struct ResourceEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F10", title: "Resource Editor", stream: "I12")
+        ResourceEditorView(
+            viewModel: ResourceEditorViewModel(
+                homeId: viewModel.homeId,
+                resourceId: viewModel.resourceId,
+                push: viewModel.push
+            )
+        )
     }
 }
 
