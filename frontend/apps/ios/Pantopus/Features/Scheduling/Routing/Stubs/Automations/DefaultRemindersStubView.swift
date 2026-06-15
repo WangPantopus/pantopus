@@ -36,7 +36,7 @@ struct DefaultRemindersStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H1", title: "Reminders", stream: "I16")
+        DefaultRemindersView(owner: viewModel.owner)
     }
 }
 
