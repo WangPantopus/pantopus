@@ -24,8 +24,8 @@ final class PackagesListViewModelTests: XCTestCase {
 
     private let mixed = #"""
     {"packages":[
-      {"id":"pk1","owner_type":"business","owner_id":"biz1","name":"5-session cleaning","sessions_count":5,"price_cents":22000,"currency":"USD","is_active":true,"created_at":"2026-06-10T00:00:00Z"},
-      {"id":"pk2","owner_type":"business","owner_id":"biz1","name":"Summer 4-pack","sessions_count":4,"price_cents":16000,"currency":"USD","is_active":false,"created_at":"2026-06-09T00:00:00Z"}
+      {"id":"pk1","owner_type":"business","owner_id":"biz1","name":"5-session cleaning","sessions_count":5,"price_cents":22000,"currency":"USD","is_active":true,"created_at":"2026-06-10T00:00:00Z","sold_count":12},
+      {"id":"pk2","owner_type":"business","owner_id":"biz1","name":"Summer 4-pack","sessions_count":4,"price_cents":16000,"currency":"USD","is_active":false,"created_at":"2026-06-09T00:00:00Z","sold_count":0}
     ]}
     """#
 
@@ -43,6 +43,31 @@ final class PackagesListViewModelTests: XCTestCase {
         XCTAssertTrue(subtitle.contains("5 sessions"))
         XCTAssertTrue(subtitle.contains("220"))
         XCTAssertTrue(subtitle.contains("44"))
+    }
+
+    func testSoldLabelReflectsPurchaseCount() async {
+        let model = vm([
+            "/api/scheduling/packages": [.status(200, body: mixed)],
+            "/api/scheduling/payments/status": [.status(200, body: #"{"applicable":true,"connected":true}"#)]
+        ])
+        await model.load()
+        // pk1 has 12 issued credits → "· 12 sold"; pk2 has 0 → hidden.
+        XCTAssertEqual(model.activePackages[0].soldCount, 12)
+        XCTAssertEqual(model.soldLabel(for: model.activePackages[0]), "· 12 sold")
+        XCTAssertNil(model.soldLabel(for: model.archivedPackages[0]))
+    }
+
+    func testSoldLabelNilWhenCountAbsent() async {
+        // create/update responses omit `sold_count`; decode must not fail and the label hides.
+        let body = #"{"packages":[{"id":"pk9","owner_type":"business","owner_id":"biz1","name":"No-count pack","sessions_count":3,"price_cents":9000,"currency":"USD","is_active":true,"created_at":"2026-06-08T00:00:00Z"}]}"#
+        let model = vm([
+            "/api/scheduling/packages": [.status(200, body: body)],
+            "/api/scheduling/payments/status": [.status(200, body: #"{"applicable":true,"connected":true}"#)]
+        ])
+        await model.load()
+        XCTAssertEqual(model.phase, .loaded)
+        XCTAssertNil(model.activePackages[0].soldCount)
+        XCTAssertNil(model.soldLabel(for: model.activePackages[0]))
     }
 
     func testEmptyShowsPayoutsGateWhenUnconnected() async {

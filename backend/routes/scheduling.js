@@ -1208,9 +1208,23 @@ const packageSchema = Joi.object({
   is_active: Joi.boolean().default(true),
 });
 router.get('/packages', withOwner('view'), asyncHandler(async (req, res) => {
-  const { data } = await supabaseAdmin.from('BookingPackage').select('*')
+  const { data } = await supabaseAdmin.from('BookingPackage').select('*, credits:PackageCredit(count)')
     .eq('owner_type', req.scheduling.ownerType).eq('owner_id', req.scheduling.ownerId).order('created_at', { ascending: false });
-  res.json({ packages: data || [] });
+  // `sold_count` = granted credits (one PackageCredit row per purchase). Credits are granted
+  // optimistically at purchase and honored system-wide (my-packages, redemption), so this is the
+  // count of package instances customers hold — the meaningful "sold" signal for the owner badge.
+  // PostgREST returns the embedded aggregate as `credits: [{ count }]`; flatten it onto each row so
+  // the list renders "· N sold" without an N+1 fetch.
+  // Caveat (deliberate): a paid checkout inserts the credit at payment-intent time (packageService
+  // .purchasePackage), so abandoned paid intents can inflate the count until package payment
+  // settlement/reconciliation is wired — currently the documented deferral in packageService.js.
+  // We do NOT filter on Payment capture here: package settlement is deferred, so paid credits never
+  // reach a captured state and such a filter would under-count real sales to ~zero.
+  const packages = (data || []).map(({ credits, ...pkg }) => ({
+    ...pkg,
+    sold_count: Array.isArray(credits) ? (credits[0]?.count ?? 0) : 0,
+  }));
+  res.json({ packages });
 }));
 router.post('/packages', withOwner('edit'), validate(packageSchema), asyncHandler(async (req, res) => {
   const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
