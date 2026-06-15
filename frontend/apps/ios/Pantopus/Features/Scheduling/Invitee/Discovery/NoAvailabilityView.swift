@@ -35,7 +35,7 @@ struct NoAvailabilityView: View {
             loading
         case let .noTimes(monthName):
             DiscoveryEmptyCard(
-                icon: .calendarDays,
+                icon: .calendarX,
                 headline: "No open times in \(monthName)",
                 caption: "Availability changes often. Try a later month.",
                 primaryTitle: "See \(viewModel.nextMonthName)",

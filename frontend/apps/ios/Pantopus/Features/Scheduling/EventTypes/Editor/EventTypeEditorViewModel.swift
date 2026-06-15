@@ -42,6 +42,7 @@ final class EventTypeEditorViewModel {
     var locationDetail = ""
     var assignment: EventAssignmentMode = .oneOnOne
     var seatCap = 1
+    var requiredHosts = 2
     var requiresApproval = false
     var visibilitySecret = false
     var isActiveField = true
@@ -75,6 +76,10 @@ final class EventTypeEditorViewModel {
     private var baselineSignature = ""
 
     var isEditing: Bool { eventTypeId != nil }
+
+    /// Full-width save-bar label — the design's "Create event type" (create) /
+    /// "Save event type" (edit).
+    var saveBarLabel: String { isEditing ? "Save event type" : "Create event type" }
 
     var showsAssignment: Bool {
         switch owner {
@@ -328,7 +333,7 @@ extension EventTypeEditorViewModel {
     private func validateBeforeSave() -> Bool {
         nameError = nameValid ? nil : "Give this a name."
         slugError = slugValid ? nil : "Use lowercase letters, numbers and hyphens."
-        durationError = durationsValid ? nil : "Pick a length between 5 and 480 minutes."
+        durationError = durationsValid ? nil : "Enter a length between 5 and 480 minutes."
         return formValid
     }
 

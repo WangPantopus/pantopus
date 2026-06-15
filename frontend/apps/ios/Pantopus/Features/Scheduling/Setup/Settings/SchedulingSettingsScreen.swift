@@ -195,9 +195,9 @@ struct SchedulingSettingsScreen: View {
             .padding(.horizontal, Spacing.s4).padding(.top, 18).padding(.bottom, Spacing.s2)
 
             VStack(spacing: Spacing.s0) {
-                dangerRow(icon: .refreshCw, label: "Reset booking link", busy: model.isResetting) { confirmReset = true }
+                dangerRow(icon: .rotateCcw, label: "Reset booking link", busy: model.isResetting) { confirmReset = true }
                 Rectangle().fill(Theme.Color.errorLight).frame(height: 1)
-                dangerRow(icon: .ban, label: "Disable scheduling", busy: model.isDisabling) { confirmDisable = true }
+                dangerRow(icon: .calendarX, label: "Disable scheduling", busy: model.isDisabling) { confirmDisable = true }
             }
             .background(Theme.Color.errorBg)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))

@@ -78,6 +78,13 @@ final class DateOverridesViewModel {
         currentYearHolidays.count
     }
 
+    /// The current-year US holiday set, exposed for the read-only
+    /// imported-holiday list shown when the holiday set is on. View-only —
+    /// the source of truth for "is the set on" is `holidaysEnabled`.
+    var currentYearHolidayList: [USHolidays.Holiday] {
+        currentYearHolidays
+    }
+
     /// True when every current-year holiday is already present as an
     /// unavailable override.
     var holidaysEnabled: Bool {

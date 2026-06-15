@@ -232,7 +232,7 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
             state = .empty(.init(
                 icon: .calendarClock,
                 headline: "You don't have a schedule yet",
-                subcopy: "Add your open hours so neighbors can book a time that works for you.",
+                subcopy: "Set the hours you're open to bookings. Your home and business pages build from this.",
                 ctaTitle: "Add working hours",
                 onCTA: { [weak self] in Task { @MainActor in await self?.createDefaultSchedule() } }
             ))
@@ -250,11 +250,14 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
                 title: schedule.name ?? "Schedule",
                 subtitle: subtitle,
                 template: .fileChevron,
-                leading: .icon(.calendarClock, tint: Theme.Color.primary600),
+                leading: .typeIcon(
+                    .calendarClock,
+                    background: Theme.Color.primary50,
+                    foreground: Theme.Color.primary600
+                ),
                 trailing: .kebab,
                 onTap: { [weak self] in Task { @MainActor in self?.push(.weeklyHoursEditor(scheduleId: scheduleId)) } },
                 onSecondary: { [weak self] in Task { @MainActor in self?.openMenu(schedule) } },
-                subtitleIcon: .clock,
                 inlineChip: isDefault
                     ? RowChip(
                         text: "Default",
@@ -263,8 +266,13 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
                     : nil
             )
         }
+        // Single-schedule frame: the design shows a footnote explaining the
+        // list is skipped — opening Availability drops straight into the editor.
+        let footnote = schedules.count == 1
+            ? "With one schedule, this list is skipped — opening Availability drops you straight into the editor."
+            : nil
         state = .loaded(
-            sections: [RowSection(id: "schedules", rows: rows, style: .card)],
+            sections: [RowSection(id: "schedules", footer: footnote, rows: rows, style: .card)],
             hasMore: false
         )
     }

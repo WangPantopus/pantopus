@@ -77,6 +77,9 @@ struct SchedulingHubScreen: View {
         ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(spacing: Spacing.s0) {
+                    if !model.canEdit {
+                        viewOnlyBanner
+                    }
                     summaryCard
                     if !model.owner.isPersonal {
                         HubComposedNote(owner: model.owner, members: composedMembers)
@@ -138,6 +141,24 @@ struct SchedulingHubScreen: View {
         }
     }
 
+    /// Permission-gated (member) read-only context banner — matches the design's
+    /// info-tinted "view-only" strip at the top of the gated frame.
+    private var viewOnlyBanner: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.eye, size: 16, color: Theme.Color.info)
+            Text("You have view-only access. Ask an owner to make changes.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.Color.appTextStrong)
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 11)
+        .background(Theme.Color.infoBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s3)
+    }
+
     private var pausedInfoLine: some View {
         HStack(spacing: Spacing.s2) {
             Icon(.info, size: 14, color: Theme.Color.appTextMuted)
@@ -187,12 +208,12 @@ struct SchedulingHubScreen: View {
         } else {
             items.append(HubManageItem(id: "memberAvailability", icon: .users, label: "Member availability", action: { model.openAvailability() }))
         }
-        items.append(HubManageItem(id: "calendars", icon: .calendarClock, label: "Connected calendars", value: model.connectedCalendarsValue, action: { model.openConnectedCalendars() }))
+        items.append(HubManageItem(id: "calendars", icon: .calendarSync, label: "Connected calendars", value: model.connectedCalendarsValue, action: { model.openConnectedCalendars() }))
         if let pending = model.pendingValue {
             items.append(HubManageItem(id: "bookings", icon: .inbox, label: "Bookings", value: pending, alert: true, action: { model.openBookings() }))
         }
         if model.canEdit {
-            items.append(HubManageItem(id: "settings", icon: .slidersHorizontal, label: "Settings", action: { model.openSettings() }))
+            items.append(HubManageItem(id: "settings", icon: .settings, label: "Settings", action: { model.openSettings() }))
         }
         return items
     }

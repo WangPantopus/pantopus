@@ -38,6 +38,26 @@ enum BlockRepeat: String, CaseIterable, Identifiable {
         case .weekly: "FREQ=WEEKLY"
         }
     }
+
+    /// Sub-caption shown under the repeat control once a recurring rule is
+    /// chosen. Mirrors the design's "Repeats … indefinitely" helper line.
+    /// `nil` for a one-off (no caption).
+    var caption: String? {
+        switch self {
+        case .never: nil
+        case .daily: "Repeats every day · Ends never. Tap to add an end date."
+        case .weekly: "Repeats every week · Ends never. Tap to add an end date."
+        }
+    }
+}
+
+/// View-only presentation of a booking-overlap warning. The actual overlap
+/// detection (checking the chosen window against confirmed bookings) is a
+/// backend concern — see `deferredBackend`. This struct lets the view render
+/// the design's conflict frame once that signal exists.
+struct BlockConflictWarning: Equatable {
+    /// Human label for the conflicting booking, e.g. "confirmed 2:30 PM booking".
+    let bookingLabel: String
 }
 
 @Observable
@@ -51,6 +71,11 @@ final class BlockOffTimeViewModel {
     var endTime = TimeOfDay(hour: 15, minute: 0)
     var repeats: BlockRepeat = .never
 
+    /// Set when the chosen window overlaps a confirmed booking. Drives the
+    /// design's conflict-warning card. Detection is backend-driven and not
+    /// yet wired (see deferredBackend), so this stays `nil` for now.
+    var conflict: BlockConflictWarning?
+
     private(set) var isSaving = false
     var saveError: String?
 
@@ -63,6 +88,14 @@ final class BlockOffTimeViewModel {
     /// Timed blocks need a positive window; all-day blocks are always valid.
     var isValid: Bool {
         allDay || TimeRange(start: startTime, end: endTime).isValid
+    }
+
+    /// Tapped from the conflict-warning card's "View booking" link. Routing to
+    /// the overlapping booking's detail screen requires the booking id and a
+    /// navigation hook that aren't wired yet (see deferredBackend); this is the
+    /// view-only seam so the design's affordance renders today.
+    func viewConflictingBooking() {
+        // No-op until the conflict signal carries a booking id + route.
     }
 
     /// Returns true on success so the View can dismiss.

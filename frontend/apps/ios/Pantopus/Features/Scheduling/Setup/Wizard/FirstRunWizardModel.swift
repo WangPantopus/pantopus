@@ -78,7 +78,10 @@ final class FirstRunWizardModel: WizardModel {
                 title: "Set up booking",
                 progressLabel: .stepOf(current: 1, total: 4),
                 progressFraction: 0.25,
-                leading: .close,
+                // Design step-1 chrome is a plain back chevron that exits the
+                // wizard (no discard sheet) — `.back` routes to leadingTapped()
+                // which finishes on `.link`.
+                leading: .back,
                 primaryCTALabel: "Continue · pick a type",
                 primaryCTAEnabled: step1Ready,
                 primaryCTAIdentifier: "firstRunWizardPrimary",
