@@ -27,6 +27,24 @@ enum AddEventRecurrence: String, CaseIterable, Hashable {
         }
     }
 
+    /// Short label rendered in the Home add/edit-event segmented control
+    /// (`Segmented options={['No','Daily','Weekly','Monthly']}` in
+    /// `add-event-frames.jsx:69`).
+    var segmentedLabel: String {
+        switch self {
+        case .none: "No"
+        case .daily: "Daily"
+        case .weekly: "Weekly"
+        case .monthly: "Monthly"
+        case .yearly: "Yearly"
+        }
+    }
+
+    /// The four options the design's segmented control offers. `.yearly`
+    /// stays in the enum for round-tripping an existing FREQ=YEARLY event on
+    /// edit, but the picker only exposes the designed four.
+    static let pickerOptions: [AddEventRecurrence] = [.none, .daily, .weekly, .monthly]
+
     /// Serialize to an iCal RRULE. `.none` → nil.
     var rrule: String? {
         switch self {

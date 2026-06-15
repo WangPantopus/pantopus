@@ -289,7 +289,8 @@ struct FindATimeSuggestedView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.homeDark)
             }
-            MemberDotStack(members: slot.members, freeIds: slot.freeMemberIds, size: 24)
+            HStack { MemberDotStack(members: slot.members, freeIds: slot.freeMemberIds) }
+                .frame(maxWidth: .infinity)
             FindATimePrimaryButton(title: "Book it", icon: .check, isLoading: viewModel.isActing) {
                 await viewModel.book(slot)
             }
@@ -312,7 +313,7 @@ struct FindATimeSuggestedView: View {
             VStack(spacing: Spacing.s4) {
                 ZStack {
                     Circle().fill(Theme.Color.warningBg).frame(width: 56, height: 56)
-                    Icon(.calendarClock, size: 26, color: Theme.Color.warning)
+                    Icon(.calendarX, size: 26, color: Theme.Color.warning)
                 }
                 VStack(spacing: 5) {
                     Text("No time works for all \(viewModel.members.count)")
@@ -325,7 +326,7 @@ struct FindATimeSuggestedView: View {
                         .frame(maxWidth: 240)
                 }
                 VStack(spacing: Spacing.s2) {
-                    FindATimePrimaryButton(title: "Adjust who's needed", icon: .userMinus) {
+                    FindATimePrimaryButton(title: "Make someone optional", icon: .userMinus) {
                         showEdit = true
                     }
                     FindATimeSecondaryButton(title: "Widen the window", icon: .calendarPlus) {
@@ -412,17 +413,17 @@ struct FindATimeSuggestedView: View {
                         Text("Finding times that work for everyone")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Theme.Color.appText)
-                        Text("Composing your household's free time")
+                        Text(viewModel.composingSubtitle)
                             .font(.system(size: 11))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                     .padding(.vertical, Spacing.s3)
                     ForEach(0..<4, id: \.self) { _ in
                         VStack(alignment: .leading, spacing: Spacing.s2) {
-                            Shimmer(width: 160, height: 13, cornerRadius: Radii.xs)
+                            Shimmer(width: 150, height: 12, cornerRadius: Radii.xs)
                             HStack(spacing: Spacing.s2) {
-                                Shimmer(width: 56, height: 20, cornerRadius: Radii.pill)
-                                Shimmer(width: 60, height: 9, cornerRadius: Radii.xs)
+                                Shimmer(width: 56, height: 20, cornerRadius: Radii.lg)
+                                Shimmer(width: 50, height: 9, cornerRadius: Radii.xs)
                             }
                         }
                         .padding(Spacing.s3)

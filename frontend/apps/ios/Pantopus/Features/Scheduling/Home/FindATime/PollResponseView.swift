@@ -108,6 +108,10 @@ struct PollResponseView: View {
                 .foregroundStyle(Theme.Color.appText)
             voteControl(option)
         }
+        // Design dims the whole proposed-slot group (label + control) to 0.55
+        // with pointer-events off when the proposal is closed.
+        .opacity(viewModel.isClosed ? 0.55 : 1)
+        .allowsHitTesting(!viewModel.isClosed)
     }
 
     private func voteControl(_ option: PollOptionRow) -> some View {
@@ -120,7 +124,6 @@ struct PollResponseView: View {
         .padding(3)
         .background(Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .opacity(viewModel.isClosed ? 0.7 : 1)
     }
 
     private func voteSegment(
@@ -147,18 +150,15 @@ struct PollResponseView: View {
     }
 
     private var submitBar: some View {
-        VStack(spacing: Spacing.s1) {
-            FindATimePrimaryButton(
-                title: "Submit response",
-                icon: .send,
-                isLoading: viewModel.isSubmitting,
-                isEnabled: viewModel.allAnswered
-            ) {
-                await viewModel.submit()
-            }
-            Text("\(viewModel.answeredCount) of \(viewModel.options.count) answered")
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextMuted)
+        // Design StickyFooter is the primary "Submit response" button alone — no
+        // answered-count line.
+        FindATimePrimaryButton(
+            title: "Submit response",
+            icon: .send,
+            isLoading: viewModel.isSubmitting,
+            isEnabled: viewModel.allAnswered
+        ) {
+            await viewModel.submit()
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.top, Spacing.s2)
@@ -183,8 +183,14 @@ struct PollResponseView: View {
     }
 
     private var closedBanner: some View {
+        // Design home-tone Banner (home-shell.jsx `Banner tone="home"`):
+        //   bg  = H.bg50  -> successBg (the soft near-white green wash; the
+        //         homeBg green-100 stop is one shade too saturated),
+        //   bd  = H.bg200 -> homeBg (closest tonal-green token; the saturated
+        //         pillar accent `home` is far too strong for a 1px hairline),
+        //   ic  = H.accent -> home, title = H.accent700 -> homeDark, body = N.fg2.
         HStack(alignment: .top, spacing: Spacing.s2) {
-            Icon(.checkCircle, size: 15, color: Theme.Color.home)
+            Icon(.checkCircle2, size: 15, color: Theme.Color.home)
             VStack(alignment: .leading, spacing: 2) {
                 Text("This proposal closed")
                     .font(.system(size: 12, weight: .bold))
@@ -196,7 +202,7 @@ struct PollResponseView: View {
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.homeBg)
+        .background(Theme.Color.successBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)

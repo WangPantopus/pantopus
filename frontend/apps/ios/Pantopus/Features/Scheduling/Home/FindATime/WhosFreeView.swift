@@ -18,6 +18,8 @@ struct WhosFreeView: View {
         _viewModel = State(wrappedValue: viewModel)
     }
 
+    private var isOffline: Bool { !NetworkMonitor.shared.isOnline }
+
     private struct WhosFreeSelection: Identifiable, Hashable {
         let member: FindATimeMember
         let bucketIndex: Int
@@ -31,11 +33,14 @@ struct WhosFreeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    // Design mutes the Add action while composing (loading) and
+                    // while showing offline-cached data (FrameComposing / FrameOffline).
+                    let addMuted = isOffline || viewModel.phase == .loading
                     Button("Add") { viewModel.startFindATime() }
-                        .foregroundStyle(Theme.Color.homeDark)
+                        .foregroundStyle(addMuted ? Theme.Color.appTextMuted : Theme.Color.homeDark)
+                        .disabled(addMuted)
                 }
             }
-            .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
             .task { await viewModel.load() }
             .accessibilityIdentifier("scheduling.whosFree")
             .alert("Added to calendar", isPresented: actionMessagePresented) {
@@ -100,6 +105,9 @@ struct WhosFreeView: View {
     private var loadedBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
+                if isOffline {
+                    offlineBanner
+                }
                 filterChips
                 if viewModel.hasNoFreeTime {
                     emptyBanner
@@ -108,13 +116,16 @@ struct WhosFreeView: View {
                     grid
                     legend
                 }
+                .opacity(isOffline ? 0.6 : 1)
                 if viewModel.hasNoFreeTime {
                     FindATimeSecondaryButton(title: "Try next week", icon: .chevronRight) {
                         viewModel.setViewMode(.week)
                     }
+                } else if let unknownName = viewModel.firstUnknownMemberName {
+                    optedOutBanner(name: unknownName)
                 } else {
                     HStack(spacing: Spacing.s1) {
-                        Icon(.calendarPlus, size: 12, color: Theme.Color.appTextMuted)
+                        Icon(.handPointer, size: 12, color: Theme.Color.appTextMuted)
                         Text("Tap a free block to plan something")
                             .font(.system(size: 10.5))
                             .foregroundStyle(Theme.Color.appTextSecondary)
@@ -201,6 +212,13 @@ struct WhosFreeView: View {
             .fill(cellColor(state))
             .frame(height: 26)
             .frame(maxWidth: .infinity)
+            .overlay {
+                // Off-hours + unknown cells carry the design's 45° hatch texture.
+                if state == .offHours || state == .unknown {
+                    DiagonalHatch(line: Theme.Color.appBorder)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                }
+            }
             .overlay(alignment: .topLeading) {
                 if state == .free {
                     Circle().fill(Theme.Color.home).frame(width: 5, height: 5).padding(3)
@@ -227,6 +245,8 @@ struct WhosFreeView: View {
         switch state {
         case .free: Theme.Color.homeBg
         case .busy: Theme.Color.appSurfaceSunken
+        case .tentative: Theme.Color.warmAmberBg
+        case .offHours: Theme.Color.appSurfaceMuted
         case .unknown: Theme.Color.appSurfaceMuted
         }
     }
@@ -236,6 +256,8 @@ struct WhosFreeView: View {
         switch state {
         case .free: stateLabel = "free"
         case .busy: stateLabel = "busy"
+        case .tentative: stateLabel = "tentative"
+        case .offHours: stateLabel = "off-hours"
         case .unknown: stateLabel = "availability unknown"
         }
         return "\(member.displayName), \(viewModel.columnLabels[bucketIndex]), \(stateLabel)"
@@ -244,13 +266,18 @@ struct WhosFreeView: View {
     // MARK: Legend
 
     private var legend: some View {
+        // Design loaded legend is Free / Busy / Tentative / Off-hours; the
+        // opted-out frame swaps Off-hours → Unknown when a member hasn't shared.
         HStack(spacing: Spacing.s4) {
-            legendItem(color: Theme.Color.homeBg, dot: true, label: "Free")
-            legendItem(color: Theme.Color.appSurfaceSunken, dot: false, label: "Busy")
+            legendItem(state: .free, label: "Free")
+            legendItem(state: .busy, label: "Busy")
+            legendItem(state: .tentative, label: "Tentative")
             if viewModel.hasUnknownMember {
-                legendItem(color: Theme.Color.appSurfaceMuted, dot: false, label: "Unknown")
+                legendItem(state: .unknown, label: "Unknown")
+            } else {
+                legendItem(state: .offHours, label: "Off-hours")
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(.top, Spacing.s2)
         .overlay(alignment: .top) {
@@ -258,13 +285,19 @@ struct WhosFreeView: View {
         }
     }
 
-    private func legendItem(color: Color, dot: Bool, label: String) -> some View {
+    private func legendItem(state: WhosFreeViewModel.CellState, label: String) -> some View {
         HStack(spacing: Spacing.s1) {
             RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
-                .fill(color)
+                .fill(cellColor(state))
                 .frame(width: 13, height: 13)
+                .overlay {
+                    if state == .offHours || state == .unknown {
+                        DiagonalHatch(line: Theme.Color.appBorder)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
+                    }
+                }
                 .overlay(alignment: .topLeading) {
-                    if dot {
+                    if state == .free {
                         Circle().fill(Theme.Color.home).frame(width: 4, height: 4).padding(2)
                     }
                 }
@@ -278,12 +311,12 @@ struct WhosFreeView: View {
 
     private var emptyBanner: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
-            Icon(.calendarClock, size: 15, color: Theme.Color.info)
+            Icon(.calendarX, size: 15, color: Theme.Color.info)
             VStack(alignment: .leading, spacing: 2) {
                 Text("No overlapping free time this \(viewModel.viewMode == .day ? "day" : "week")")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Theme.Color.info)
-                Text("Everyone's booked up. Try a wider range to find a shared opening.")
+                Text("Everyone's booked up. Try next week to find a shared opening.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.Color.appTextStrong)
             }
@@ -295,6 +328,49 @@ struct WhosFreeView: View {
         .overlay {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .strokeBorder(Theme.Color.infoLight, lineWidth: 1)
+        }
+    }
+
+    // MARK: Amber banners (opted-out · offline-cached)
+
+    /// Frame 4 — an opted-out member's row is all-unknown; the design pairs it
+    /// with an amber `eye-off` explainer.
+    private func optedOutBanner(name: String) -> some View {
+        amberBanner(
+            icon: .eyeOff,
+            title: "\(name) hasn't shared free/busy",
+            body: "You can't see \(name)'s availability or include \(name) in Find a time until they share it."
+        )
+    }
+
+    /// Frame 5 — showing last-synced data while offline.
+    private var offlineBanner: some View {
+        amberBanner(
+            icon: .wifiOff,
+            title: "Showing last synced",
+            body: "Reconnect to refresh availability."
+        )
+    }
+
+    private func amberBanner(icon: PantopusIcon, title: String, body: String) -> some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(icon, size: 15, color: Theme.Color.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                Text(body)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.warningLight, lineWidth: 1)
         }
     }
 
@@ -387,5 +463,30 @@ struct WhosFreeView: View {
             get: { viewModel.actionError != nil },
             set: { if !$0 { viewModel.actionError = nil } }
         )
+    }
+}
+
+/// The 45° hatch texture the design draws on off-hours / unknown cells via a
+/// `repeating-linear-gradient(45deg, …)`. Thin parallel strokes over the cell's
+/// base fill; the caller clips it to the cell's rounded rect.
+private struct DiagonalHatch: View {
+    var line: Color
+    var spacing: CGFloat = 4
+    var lineWidth: CGFloat = 1
+
+    var body: some View {
+        GeometryReader { proxy in
+            let extent = proxy.size.width + proxy.size.height
+            Path { path in
+                var offset = -proxy.size.height
+                while offset < extent {
+                    path.move(to: CGPoint(x: offset, y: 0))
+                    path.addLine(to: CGPoint(x: offset + proxy.size.height, y: proxy.size.height))
+                    offset += spacing
+                }
+            }
+            .stroke(line, lineWidth: lineWidth)
+        }
+        .accessibilityHidden(true)
     }
 }

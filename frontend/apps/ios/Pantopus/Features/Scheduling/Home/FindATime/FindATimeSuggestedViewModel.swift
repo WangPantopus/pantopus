@@ -76,6 +76,20 @@ final class FindATimeSuggestedViewModel {
         return "\(peopleLabel) · \(durationMin) min · this week"
     }
 
+    /// Composing line under the loading title — a grammatical list of the
+    /// member names (design: "Composing Mom, Dad and Ava").
+    var composingSubtitle: String {
+        let names = members.map(\.displayName)
+        guard !names.isEmpty else { return "Composing your household's free time" }
+        let list: String
+        switch names.count {
+        case 1: list = names[0]
+        case 2: list = "\(names[0]) and \(names[1])"
+        default: list = "\(names.dropLast().joined(separator: ", ")) and \(names[names.count - 1])"
+        }
+        return "Composing \(list)"
+    }
+
     // MARK: - Load
 
     func load() async {

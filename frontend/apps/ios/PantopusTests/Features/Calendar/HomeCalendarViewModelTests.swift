@@ -294,7 +294,8 @@ final class HomeCalendarViewModelTests: XCTestCase {
         XCTAssertEqual(strip.monthLabel, "October 2025")
         XCTAssertEqual(strip.days.count, 7)
         XCTAssertEqual(strip.days[0].id, "2025-10-12")
-        XCTAssertEqual(strip.days[0].dayOfWeek, "Sun")
+        // Design uses single-letter weekday initials (EEEEE) in the month strip.
+        XCTAssertEqual(strip.days[0].dayOfWeek, "S")
         XCTAssertEqual(strip.days[0].eventCount, 3)
         XCTAssertEqual(strip.days[1].eventCount, 1)
         XCTAssertEqual(strip.days[2].eventCount, 2)
