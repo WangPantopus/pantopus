@@ -95,6 +95,9 @@ export * as ai from './endpoints/ai';                              // AI Agent �
 export * as mailCompose from './endpoints/mailCompose';            // Mail Compose — four-moment flow
 export * as linkPreview from './endpoints/linkPreview';            // Link preview (OG metadata)
 export * as supportTrains from './endpoints/supportTrains';        // Support Train (activities)
+export * as scheduling from './endpoints/scheduling';              // Calendarly scheduling (host)
+export * as publicBooking from './endpoints/publicBooking';        // Calendarly public booking flow
+export type { BookingListParams } from './endpoints/scheduling';
 
 // Also export individual endpoint functions for convenience
 export { login, register, logout, getAuthMethods, updatePassword, reauthenticate } from './endpoints/auth';
@@ -300,3 +303,65 @@ export type {
   SentNeighborMessage,
   SendNeighborMessageInput,
 } from './endpoints/neighborMessages';
+
+// Convenience type re-exports for the Calendarly scheduling contract (W0).
+// Namespace access (api.scheduling.*, api.publicBooking.*) is the primary
+// surface; these mirror the most-used types. (InvoiceLineItem is omitted to
+// avoid colliding with the businesses re-export above — use the namespace.)
+export type {
+  SchedulingOwnerType,
+  SchedulingOwnerRef,
+  BookingPage,
+  BookingPageInput,
+  EventType,
+  EventTypeDetail,
+  EventTypeInput,
+  IntakeQuestion,
+  EventTypeAssignee,
+  EventTypeAssignment,
+  AvailabilitySchedule,
+  AvailabilityRule,
+  AvailabilityOverride,
+  AvailabilityBlock,
+  AvailabilityBundle,
+  NotificationPreferences,
+  Booking,
+  BookingStatus,
+  BookingSource,
+  BookingDetail,
+  BookingsSummary,
+  BookingCreateInput,
+  BookingSlot,
+  SlotConflict,
+  SlotConflictCode,
+  OneOffLink,
+  PublicBookingPage,
+  PublicEventType,
+  PublicSlotsResponse,
+  PublicOneOff,
+  PublicBookingInput,
+  CreatePublicBookingResult,
+  BookingManageView,
+  Workflow,
+  WorkflowTrigger,
+  MessageTemplate,
+  MessageChannel,
+  PaymentsStatus,
+  Package,
+  MyPackageCredit,
+  Invoice,
+  ConnectedCalendar,
+  Resource,
+  ResourceBooking,
+  Visit,
+  FindATime,
+  WhosFree,
+  TeamAvailability,
+  Poll,
+  PollDetail,
+  WaitlistEntry,
+  NoShowInsights,
+  TeamInsights,
+  HomeCalendarUnionEvent,
+  DecodedSchedulingError,
+} from '@pantopus/types';
