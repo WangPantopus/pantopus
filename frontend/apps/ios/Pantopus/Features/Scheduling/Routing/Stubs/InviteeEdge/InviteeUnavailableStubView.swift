@@ -32,14 +32,19 @@ final class InviteeUnavailableStubViewModel {
 }
 
 struct InviteeUnavailableStubView: View {
-    @State private var viewModel: InviteeUnavailableStubViewModel
+    private let viewModel: TerminalStateViewModel
 
-    init(viewModel: InviteeUnavailableStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeUnavailableStubViewModel) {
+        viewModel = TerminalStateViewModel(
+            slug: stub.slug,
+            oneOffToken: stub.oneOffToken,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D7", title: "Unavailable", stream: "I7")
+        TerminalStateView(viewModel: viewModel)
     }
 }
 
