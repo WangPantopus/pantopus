@@ -39,7 +39,7 @@ struct PackageEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "G9", title: "Package Editor", stream: "I15")
+        PackageEditorView(owner: viewModel.owner, packageId: viewModel.packageId, push: viewModel.push)
     }
 }
 

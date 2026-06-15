@@ -36,7 +36,7 @@ struct PackagesListStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "G8", title: "Packages", stream: "I15")
+        PackagesListView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
