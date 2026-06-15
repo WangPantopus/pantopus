@@ -132,7 +132,10 @@ enum SchedulingPillarChoice: String, CaseIterable, Identifiable {
         switch self {
         case .personal: .user
         case .home: .house
-        case .business: .briefcase
+        // The A1 Hub identity switcher uses the storefront glyph for Business
+        // (per scheduling-hub-frames); the editors/onboarding pills use
+        // `briefcase` via SchedulingIdentityTheme.
+        case .business: .store
         }
     }
 

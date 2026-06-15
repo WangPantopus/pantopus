@@ -113,7 +113,9 @@ final class SchedulingOnboardingModel: WizardModel {
             title: title,
             progressLabel: .stepOf(current: displayStep, total: totalSteps),
             progressFraction: Double(displayStep) / Double(totalSteps),
-            leading: stepIndex == 1 ? .close : .back,
+            // Design: every onboarding step (incl. step 1) leads with a back
+            // chevron — no X / discard sheet. `.back` exits via leadingTapped().
+            leading: .back,
             primaryCTALabel: primaryLabel,
             primaryCTAEnabled: primaryEnabled,
             primaryCTAIdentifier: "onboardingPrimary",
