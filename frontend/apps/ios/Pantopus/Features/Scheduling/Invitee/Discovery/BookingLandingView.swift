@@ -219,7 +219,7 @@ struct BookingLandingView: View {
 
     private func pausedCard(_ firstName: String) -> some View {
         DiscoveryNotice(
-            icon: .pause,
+            icon: .moon,
             title: "This page isn't taking bookings right now",
             message: "Check back later, or reach out to \(firstName) directly."
         )
@@ -227,7 +227,7 @@ struct BookingLandingView: View {
 
     private func emptyCard(_ firstName: String) -> some View {
         DiscoveryNotice(
-            icon: .calendarDays,
+            icon: .calendarOff,
             title: "No times are set up yet",
             message: "\(firstName) hasn't added any availability. Check back soon.",
             dashed: true,

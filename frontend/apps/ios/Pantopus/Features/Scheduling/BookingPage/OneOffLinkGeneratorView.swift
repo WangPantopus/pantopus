@@ -158,7 +158,7 @@ public struct OneOffLinkGeneratorView: View {
                     BookingLinkActions.copy(link.shareURL)
                     flashCopied()
                 }
-                OneOffMetaPill(caption: link.caption)
+                OneOffMetaPill(expiryText: link.expiryText, singleUse: link.singleUse)
                 OneOffSection(label: "Send via") {
                     HStack(spacing: Spacing.s3) {
                         OneOffShareTile(icon: .share, title: "Share") {
@@ -465,7 +465,7 @@ private struct OneOffOptionsCard: View {
         BookingCard(padding: Spacing.s0) {
             VStack(spacing: Spacing.s0) {
                 OneOffOptionRow(
-                    icon: .link,
+                    icon: .ticket,
                     title: "Single use",
                     subtitle: "Link stops working after one booking.",
                     isOn: $viewModel.singleUse,
@@ -559,7 +559,7 @@ private struct OneOffGenerateButton: View {
 private struct OneOffResultHero: View {
     var body: some View {
         HStack(spacing: Spacing.s3) {
-            Icon(.checkCircle, size: 20, strokeWidth: 3, color: Theme.Color.appTextInverse)
+            Icon(.check, size: 20, strokeWidth: 3, color: Theme.Color.appTextInverse)
                 .frame(width: 40, height: 40)
                 .background(Theme.Color.success)
                 .clipShape(Circle())
@@ -595,7 +595,7 @@ private struct OneOffResultURL: View {
             Button(action: onCopy) {
                 HStack(spacing: Spacing.s1) {
                     Icon(
-                        copied ? .checkCircle : .copy,
+                        copied ? .check : .copy,
                         size: 14,
                         strokeWidth: 2.4,
                         color: Theme.Color.appTextInverse
@@ -626,20 +626,34 @@ private struct OneOffResultURL: View {
 }
 
 private struct OneOffMetaPill: View {
-    let caption: String
+    let expiryText: String
+    let singleUse: Bool
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.calendarClock, size: 12, color: Theme.Color.appTextSecondary)
-            Text(caption)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .lineLimit(1)
+            segment(icon: .calendarClock, text: expiryText)
+            if singleUse {
+                Circle()
+                    .fill(Theme.Color.appTextMuted)
+                    .frame(width: 3, height: 3)
+                segment(icon: .ticket, text: "Single use")
+            }
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
         .background(Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func segment(icon: PantopusIcon, text: String) -> some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(icon, size: 12, color: Theme.Color.appTextStrong)
+            Text(text)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .lineLimit(1)
+        }
     }
 }
 
@@ -700,7 +714,7 @@ private struct OneOffGenerateErrorNote: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
-            Icon(.alertCircle, size: 16, strokeWidth: 2.2, color: Theme.Color.error)
+            Icon(.circleAlert, size: 16, strokeWidth: 2.2, color: Theme.Color.error)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text(message)
@@ -715,7 +729,7 @@ private struct OneOffGenerateErrorNote: View {
                     Task { await retry() }
                 } label: {
                     HStack(spacing: Spacing.s1) {
-                        Icon(.refreshCw, size: 13, strokeWidth: 2.4, color: Theme.Color.error)
+                        Icon(.rotateCcw, size: 13, strokeWidth: 2.4, color: Theme.Color.error)
                         Text("Try again")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Theme.Color.error)
@@ -730,9 +744,9 @@ private struct OneOffGenerateErrorNote: View {
         }
         .padding(Spacing.s3)
         .background(Theme.Color.errorBg)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.errorLight, lineWidth: 1)
         )
         .accessibilityIdentifier("oneOffLinkGenerator.generateError")
@@ -744,7 +758,7 @@ private struct OneOffGenerateErrorNote: View {
 private struct OneOffCopiedToast: View {
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.checkCircle, size: 15, strokeWidth: 2.4, color: Theme.Color.success)
+            Icon(.checkCircle2, size: 15, strokeWidth: 2.4, color: Theme.Color.success)
             Text("Link copied")
                 .font(.system(size: 12.5, weight: .bold))
                 .foregroundStyle(Theme.Color.success)
@@ -869,7 +883,9 @@ private struct OneOffFlowLayout: Layout {
         .generated(OneOffGeneratedLink(
             displayURL: "pantopus.com/book/x/7gq4f2",
             shareURL: "https://pantopus.com/book/x/7gq4f2",
-            caption: "Expires in 7 days · Single use"
+            caption: "Expires in 7 days · Single use",
+            expiryText: "Expires in 7 days",
+            singleUse: true
         )),
         options: []
     )

@@ -79,26 +79,28 @@ public struct SchedulingSlotRow: View {
 }
 
 /// A shimmer placeholder the exact width of a real slot row, for the loading and
-/// "checking live availability" states.
+/// "checking live availability" states. Mirrors the design `SkelSlotRow`: a
+/// leading icon square, a single time bar, then a trailing chevron square — so
+/// the skeleton geometry matches a real `SchedulingSlotRow` 1:1.
 public struct SchedulingSlotRowSkeleton: View {
     public init() {}
 
     public var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Shimmer(width: 96, height: 16)
-                Shimmer(width: 64, height: 12)
-            }
-            Spacer()
+        HStack(spacing: Spacing.s2 + 2) {
+            Shimmer(width: 14, height: 14, cornerRadius: Radii.xs)
+            Shimmer(width: 66, height: 13, cornerRadius: Radii.xs)
+            Spacer(minLength: 0)
+            Shimmer(width: 16, height: 16, cornerRadius: Radii.xs)
         }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.vertical, Spacing.s3)
-        .frame(minHeight: 44, alignment: .leading)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 }
 

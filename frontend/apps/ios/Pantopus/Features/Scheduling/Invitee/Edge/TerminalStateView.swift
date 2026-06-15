@@ -74,25 +74,238 @@ struct TerminalStateView: View {
                     .lineSpacing(2)
                     .frame(maxWidth: 250)
             }
+            extra(kind: kind)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Spacing.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom) { dock(kind: kind) }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("\(copy.title). \(copy.body)")
+    }
+
+    /// Per-status content block shown between the head/body and the dock
+    /// (design: `extra`). Private → access-code input · paused → host note +
+    /// reopen chip · cancelled → "Book again" inline link.
+    @ViewBuilder
+    private func extra(kind: TerminalKind) -> some View {
+        switch kind {
+        case .privateLink:
+            TerminalCodeInput(
+                code: $viewModel.accessCode,
+                onSubmit: { viewModel.submitAccessCode() }
+            )
+        case .paused:
+            if let note = viewModel.hostNote {
+                TerminalPausedCard(
+                    hostName: viewModel.hostNameLabel,
+                    note: note,
+                    reopenLabel: viewModel.reopenLabel
+                )
+            }
+        case .cancelled:
+            if viewModel.slug?.isEmpty == false {
+                Button { viewModel.openBookingPage() } label: {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(.rotateCcw, size: 14, strokeWidth: 2.3, color: Theme.Color.primary600)
+                        Text("Book again")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Theme.Color.primary600)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("scheduling.terminalState.bookAgain")
+            }
+        case .notFound, .expired, .fullyBooked:
+            EmptyView()
+        }
     }
 
     @ViewBuilder
     private func dock(kind: TerminalKind) -> some View {
         EdgeDock {
-            if kind == .cancelled, viewModel.slug?.isEmpty == false {
-                PrimaryButton(title: "Book again") { viewModel.openBookingPage() }
-            } else if (kind == .paused || kind == .fullyBooked), viewModel.slug?.isEmpty == false {
-                GhostButton(title: "Back to this page") { viewModel.openBookingPage() }
-            }
-            GhostButton(title: "Go back") { dismiss() }
+            dockExtra(kind: kind)
+            TerminalGetTheAppButton()
+            GhostButton(title: "Back to Pantopus") { dismiss() }
         }
+    }
+
+    /// The status-specific secondary CTA pinned above the "Get the app" dock
+    /// button (design: `dockExtra`).
+    @ViewBuilder
+    private func dockExtra(kind: TerminalKind) -> some View {
+        switch kind {
+        case .expired:
+            TerminalSecondaryButton(icon: .mail, label: "Request a new link") {
+                viewModel.requestNewLink()
+            }
+        case .paused:
+            TerminalSecondaryButton(icon: .bell, label: "Notify me when it reopens") {
+                viewModel.notifyWhenAvailable()
+            }
+        case .fullyBooked:
+            TerminalSecondaryButton(icon: .bell, label: "Notify me when times open") {
+                viewModel.notifyWhenAvailable()
+            }
+        case .notFound, .privateLink, .cancelled:
+            EmptyView()
+        }
+    }
+}
+
+// MARK: - Per-status affordances
+
+/// "Have a code?" inline access-code field + submit arrow (design `CodeInput`).
+/// View-only: the unlock round-trip is deferred backend.
+private struct TerminalCodeInput: View {
+    @Binding var code: String
+    let onSubmit: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Have a code?")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            HStack(spacing: Spacing.s2) {
+                TextField("Enter access code", text: $code)
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(Theme.Color.appText)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .submitLabel(.go)
+                    .onSubmit(onSubmit)
+                    .frame(height: 42)
+                    .padding(.horizontal, Spacing.s3)
+                    .background(Theme.Color.appSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                Button(action: onSubmit) {
+                    Icon(.arrowRight, size: 17, strokeWidth: 2.3, color: Theme.Color.primary600)
+                        .frame(width: 42, height: 42)
+                        .background(Theme.Color.primary50)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Submit code")
+            }
+        }
+        .frame(maxWidth: 236)
+    }
+}
+
+/// Paused host note card: initials disc + "A note from {host}" + italic quote +
+/// "Reopens …" chip (design `PausedCard`). Rendered only when the backend
+/// supplies the note (deferred otherwise).
+private struct TerminalPausedCard: View {
+    let hostName: String
+    let note: String
+    let reopenLabel: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s2) {
+                Text(initials)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        LinearGradient(
+                            colors: [Theme.Color.primary400, Theme.Color.primary700],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(Circle())
+                Text("A note from \(hostName)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            Text("\u{201C}\(note)\u{201D}")
+                .font(.system(size: 12))
+                .italic()
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let reopenLabel {
+                HStack(spacing: Spacing.s1) {
+                    Icon(.calendar, size: 12, color: Theme.Color.appTextSecondary)
+                    Text(reopenLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                }
+                .padding(.horizontal, Spacing.s2)
+                .padding(.vertical, Spacing.s1)
+                .background(Theme.Color.appSurface)
+                .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+                .clipShape(Capsule())
+            }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: 240, alignment: .leading)
+        .background(Theme.Color.appSurfaceSunken)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private var initials: String {
+        let parts = hostName.split(separator: " ").prefix(2).compactMap(\.first)
+        return parts.isEmpty ? "·" : String(parts).uppercased()
+    }
+}
+
+/// Outlined secondary dock CTA: glyph + label (design `SecondaryButton`).
+private struct TerminalSecondaryButton: View {
+    let icon: PantopusIcon
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Icon(icon, size: 14, strokeWidth: 2.1, color: Theme.Color.appText)
+                Text(label)
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorderStrong, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("scheduling.terminalState.secondary.\(label)")
+    }
+}
+
+/// The Pantopus-branded "Get the app" CTA pinned on every status (design `Dock`'s
+/// filled PILLAR button). View-only stub — the store hand-off is deferred backend.
+private struct TerminalGetTheAppButton: View {
+    var body: some View {
+        Button {} label: {
+            HStack(spacing: 7) {
+                Icon(.smartphone, size: 16, strokeWidth: 2.2, color: Theme.Color.appTextInverse)
+                Text("Get the app")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background(Theme.Color.primary600)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .pantopusShadow(.primary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("scheduling.terminalState.getTheApp")
     }
 }
 
@@ -121,7 +334,7 @@ private enum TerminalCopy {
                 icon: .lock,
                 tone: .neutral,
                 title: "This is a private link",
-                body: "Ask the host for the right link to book a time."
+                body: "Ask the host for the right link, or enter your access code below."
             )
         case .expired:
             return Copy(
@@ -133,7 +346,7 @@ private enum TerminalCopy {
         case .paused:
             return Copy(
                 icon: .pauseCircle,
-                tone: .warning,
+                tone: .neutral,
                 title: "Bookings are paused",
                 body: "\(host) isn't taking new bookings at the moment."
             )

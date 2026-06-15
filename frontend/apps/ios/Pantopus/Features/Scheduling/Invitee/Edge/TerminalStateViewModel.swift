@@ -41,6 +41,18 @@ final class TerminalStateViewModel {
     private var didLoad = false
     private var isFetching = false
 
+    /// The `private`-link access code the invitee types into the inline field
+    /// (design: "Have a code?" → "Enter access code"). View-only for now; the
+    /// unlock round-trip is deferred backend.
+    var accessCode: String = ""
+
+    /// The paused host's note + reopen label, shown in the paused note card
+    /// (design: "A note from Maria" + "Reopens Jun 20"). The booking page does
+    /// not yet wire these, so they stay `nil` (card is hidden) until the backend
+    /// surfaces them — see `deferredBackend`.
+    private(set) var hostNote: String?
+    private(set) var reopenLabel: String?
+
     /// Designated, test-injectable initializer (no default-argument `@MainActor`
     /// init — Xcode 16.4 crashes on those).
     init(
@@ -138,6 +150,33 @@ final class TerminalStateViewModel {
         push(.inviteeLanding(slug: slug))
     }
 
+    /// Submit the typed access code to unlock a `private` link. View-only stub —
+    /// the unlock endpoint is deferred backend; no-ops when the field is blank.
+    func submitAccessCode() {
+        guard !accessCode.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        // Deferred: POST the code, re-resolve the page on success.
+    }
+
+    /// "Request a new link" (expired) / "Notify me when …" (paused, fully booked)
+    /// secondary CTAs. View-only stubs — the notify/relink endpoints are deferred
+    /// backend.
+    func requestNewLink() {
+        // Deferred: trigger a fresh single-use link for this invitee.
+    }
+
+    func notifyWhenAvailable() {
+        // Deferred: subscribe the invitee to reopen / new-times notifications.
+    }
+
+    /// The resolved host's first name (for the paused note card header), falling
+    /// back to "the host" when the page carries no title.
+    var hostNameLabel: String {
+        if case let .resolved(_, hostName) = state, let hostName, !hostName.isEmpty {
+            return hostName
+        }
+        return "the host"
+    }
+
     private func firstName(from title: String?) -> String? {
         let trimmed = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -151,6 +190,10 @@ extension TerminalStateViewModel {
         let viewModel = TerminalStateViewModel(slug: "ada", oneOffToken: nil, push: { _ in }, client: .shared)
         viewModel.state = .resolved(kind, hostName: hostName)
         viewModel.didLoad = true
+        if kind == .paused {
+            viewModel.hostNote = "Out of office for a bit — back to taking bookings soon. Thanks for your patience."
+            viewModel.reopenLabel = "Reopens Jun 20"
+        }
         return viewModel
     }
 }

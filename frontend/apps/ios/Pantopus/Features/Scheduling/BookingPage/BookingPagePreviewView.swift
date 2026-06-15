@@ -58,7 +58,7 @@ public struct BookingPagePreviewView: View {
         case let .rendered(page, eventTypes):
             publicRender(page: page, eventTypes: eventTypes)
         case let .pageOff(page, status):
-            PageOffNotice(page: page, status: status, accent: viewModel.theme.accent)
+            PageOffNotice(page: page, status: status)
         case let .allHidden(page):
             AllHiddenNotice(page: page, accent: viewModel.theme.accent)
         case let .error(message):
@@ -76,7 +76,6 @@ public struct BookingPagePreviewView: View {
                     ForEach(Array(eventTypes.enumerated()), id: \.element.id) { index, eventType in
                         PublicEventTypeCard(
                             eventType: eventType,
-                            accent: viewModel.theme.accent,
                             isSelected: index == 0
                         )
                     }
@@ -90,7 +89,7 @@ public struct BookingPagePreviewView: View {
         }
         // Sticky bottom CTA bar — translucent backdrop + top hairline, inert.
         .overlay(alignment: .bottom) {
-            BookingMgmtStickyCTA(accent: viewModel.theme.accent)
+            BookingMgmtStickyCTA()
                 .allowsHitTesting(false)
         }
         .accessibilityIdentifier("bookingPagePreview.rendered")
@@ -105,9 +104,9 @@ private struct BookingPreviewBar: View {
     var body: some View {
         HStack(spacing: Spacing.s2) {
             Icon(.eye, size: 16, color: Theme.Color.appTextInverse)
+            // JSX PreviewBar label: fontSize 12.5 / weight 600.
             Text("Previewing your booking page")
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
+                .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextInverse)
             Spacer()
             Button(action: onExit) {
@@ -137,14 +136,14 @@ private struct PublicHeader: View {
         VStack(spacing: Spacing.s1) {
             BookingAvatar(name: page.title ?? "Host", imageURLString: page.avatarURL, size: 64, accent: accent)
                 .padding(.bottom, Spacing.s1)
+            // JSX PublicHeader name: fontSize 18 / weight 700 (not h3=20).
             Text(page.title ?? "Host")
-                .pantopusTextStyle(.h3)
-                .fontWeight(.bold)
+                .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             if let tagline = page.tagline, !tagline.isEmpty {
+                // JSX headline: fontSize 12.5 / weight 600 / color blue700.
                 Text(tagline)
-                    .pantopusTextStyle(.small)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary700)
                     .multilineTextAlignment(.center)
             }
@@ -165,7 +164,6 @@ private struct PublicHeader: View {
 
 private struct PublicEventTypeCard: View {
     let eventType: PublicEventTypeView
-    let accent: Color
     var isSelected: Bool = false
 
     var body: some View {
@@ -173,15 +171,16 @@ private struct PublicEventTypeCard: View {
             Icon(
                 BookingLocationMode.icon(eventType.locationMode),
                 size: 18,
-                color: isSelected ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                // JSX unselected tile glyph uses fg2 (appTextStrong), not fg3.
+                color: isSelected ? Theme.Color.primary600 : Theme.Color.appTextStrong
             )
             .frame(width: 38, height: 38)
             .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
             .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
             VStack(alignment: .leading, spacing: Spacing.s1) {
+                // JSX event-type name: fontSize 14 / weight 600 (not body=16).
                 Text(eventType.name)
-                    .pantopusTextStyle(.body)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
                 HStack(spacing: Spacing.s2) {
                     BookingMgmtDurationLabel(eventType: eventType)
@@ -195,14 +194,16 @@ private struct PublicEventTypeCard: View {
         .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        // JSX selected border + ring are fixed sky (blue600), not the pillar
+        // accent — the public render uses brand sky regardless of owner pillar.
         .overlay(
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                .stroke(isSelected ? accent : Theme.Color.appBorder, lineWidth: isSelected ? 1.5 : 1)
+                .stroke(isSelected ? Theme.Color.primary600 : Theme.Color.appBorder, lineWidth: isSelected ? 1.5 : 1)
         )
-        // 3px accent ring on the selected card (design boxShadow ring).
+        // 3px sky ring on the selected card (design boxShadow ring).
         .overlay(
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                .stroke(accent.opacity(0.10), lineWidth: 3)
+                .stroke(Theme.Color.primary600.opacity(0.10), lineWidth: 3)
                 .opacity(isSelected ? 1 : 0)
         )
         .pantopusShadow(.sm)
@@ -212,10 +213,11 @@ private struct PublicEventTypeCard: View {
 private struct BookingMgmtDurationLabel: View {
     let eventType: PublicEventTypeView
     var body: some View {
+        // JSX duration line: fontSize 11.5 / weight 500 / color fg3, gap 4, clock 11.
         HStack(spacing: Spacing.s1) {
             Icon(.clock, size: 11, color: Theme.Color.appTextSecondary)
             Text(BookingDuration.label(eventType.defaultDuration ?? eventType.durations?.first ?? 30))
-                .pantopusTextStyle(.caption)
+                .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
     }
@@ -225,24 +227,24 @@ private struct LocationChip: View {
     let mode: String?
 
     var body: some View {
-        HStack(spacing: 3) {
-            Icon(BookingLocationMode.icon(mode), size: 11, strokeWidth: 2.4, color: Theme.Color.primary700)
+        // JSX ModeChip: gap 4, icon 10 / strokeWidth 2.4, padding 3px 8px.
+        HStack(spacing: Spacing.s1) {
+            Icon(BookingLocationMode.icon(mode), size: 10, strokeWidth: 2.4, color: Theme.Color.primary700)
             Text(BookingLocationMode.label(mode))
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.Color.primary700)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 2)
+        .padding(.vertical, 3)
         .background(Theme.Color.primary50)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
     }
 }
 
-/// Sticky bottom "Pick a time" CTA — translucent backdrop, top hairline, an
-/// accent-filled 44pt button with a trailing arrow. Inert in preview.
+/// Sticky bottom "Pick a time" CTA — translucent backdrop, top hairline, a
+/// sky-filled 44pt button with a trailing arrow. Inert in preview. JSX fixes
+/// the button to blue600 (brand sky), independent of the owner pillar.
 private struct BookingMgmtStickyCTA: View {
-    let accent: Color
-
     var body: some View {
         HStack(spacing: 7) {
             Text("Pick a time")
@@ -252,7 +254,7 @@ private struct BookingMgmtStickyCTA: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 44)
-        .background(accent)
+        .background(Theme.Color.primary600)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .pantopusShadow(.primary)
         .padding(.horizontal, Spacing.s4)
@@ -274,7 +276,6 @@ private struct BookingMgmtStickyCTA: View {
 private struct PageOffNotice: View {
     let page: PublicPageView
     let status: SchedulingStatus
-    let accent: Color
 
     var body: some View {
         VStack(spacing: Spacing.s3) {
@@ -283,12 +284,13 @@ private struct PageOffNotice: View {
                 Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 60, height: 60)
                 Icon(icon, size: 26, strokeWidth: 1.75, color: Theme.Color.appTextSecondary)
             }
+            // JSX NoticeCard title: fontSize 16 / weight 600.
             Text(headline)
-                .pantopusTextStyle(.body)
-                .fontWeight(.semibold)
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
+            // JSX NoticeCard body: fontSize 12.5 / color fg3 / maxWidth 220.
             Text(caption)
-                .pantopusTextStyle(.caption)
+                .font(.system(size: 12.5, weight: .regular))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 220)
@@ -298,13 +300,13 @@ private struct PageOffNotice: View {
         .accessibilityIdentifier("bookingPagePreview.pageOff")
     }
 
-    /// `moon` is unavailable in the frozen icon set; `.pause` substitutes for the
-    /// paused state per the design fallback.
+    /// JSX FramePaused uses `moon` for the paused state; expired/unavailable
+    /// are honest extra states for the same notice card.
     private var icon: PantopusIcon {
         switch status {
         case .expired: .calendarClock
         case .unavailable: .calendarCheck
-        default: .pause
+        default: .moon
         }
     }
 
@@ -334,15 +336,14 @@ private struct AllHiddenNotice: View {
             VStack(spacing: Spacing.s4) {
                 PublicHeader(page: page, accent: accent)
                 VStack(spacing: Spacing.s2) {
-                    // `calendar-off` is unavailable in the frozen icon set;
-                    // `.eyeOff` substitutes per the design fallback.
-                    Icon(.eyeOff, size: 20, strokeWidth: 1.9, color: Theme.Color.appTextSecondary)
+                    // JSX FrameHidden tile glyph is `calendar-off`.
+                    Icon(.calendarOff, size: 20, strokeWidth: 1.9, color: Theme.Color.appTextSecondary)
                         .frame(width: 42, height: 42)
                         .background(Theme.Color.appSurfaceSunken)
                         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                    // JSX: fontSize 14 / weight 600.
                     Text("No services are visible yet")
-                        .pantopusTextStyle(.small)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                     Text("Turn one on so people see something to book.")
                         .pantopusTextStyle(.caption)
