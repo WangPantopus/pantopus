@@ -32,14 +32,19 @@ final class RecurringSetupStubViewModel {
 }
 
 struct RecurringSetupStubView: View {
-    @State private var viewModel: RecurringSetupStubViewModel
+    private let viewModel: RecurringSetupViewModel
 
-    init(viewModel: RecurringSetupStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: RecurringSetupStubViewModel) {
+        viewModel = RecurringSetupViewModel(
+            owner: stub.owner,
+            eventTypeId: stub.eventTypeId,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D12", title: "Recurring Setup", stream: "I7")
+        RecurringSetupView(viewModel: viewModel)
     }
 }
 
