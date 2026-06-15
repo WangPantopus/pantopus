@@ -39,7 +39,13 @@ struct BookResourceStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F12", title: "Book Resource", stream: "I12")
+        BookResourceView(
+            viewModel: BookResourceViewModel(
+                homeId: viewModel.homeId,
+                resourceId: viewModel.resourceId,
+                push: viewModel.push
+            )
+        )
     }
 }
 
