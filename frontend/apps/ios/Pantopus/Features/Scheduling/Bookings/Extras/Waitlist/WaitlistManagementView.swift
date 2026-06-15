@@ -55,7 +55,7 @@ struct WaitlistManagementView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 CapacityHeaderCard(
-                    filled: viewModel.seatTotal,
+                    filled: viewModel.displayedFilled,
                     total: viewModel.seatTotal,
                     waiting: viewModel.waitingCount,
                     accent: theme.accent
@@ -63,7 +63,7 @@ struct WaitlistManagementView: View {
                 .padding(.horizontal, Spacing.s4)
                 .padding(.top, Spacing.s3)
 
-                ExtrasOverline(text: "\(viewModel.waitingCount) waiting")
+                ExtrasOverline(text: viewModel.sectionOverline)
                     .padding(.horizontal, Spacing.s4 + 2)
                     .padding(.top, Spacing.s4)
                     .padding(.bottom, Spacing.s2 + 1)
@@ -76,7 +76,7 @@ struct WaitlistManagementView: View {
                             meta: person.meta,
                             accent: theme.accent,
                             accentBackground: theme.accentBg,
-                            promote: .init(isEnabled: true) {
+                            promote: .init(isEnabled: !viewModel.isFull) {
                                 if let entryId = person.promoteEntryId {
                                     Task { await viewModel.promote(entryId: entryId) }
                                 }

@@ -103,8 +103,17 @@ final class RescheduleReassignViewModel {
         return hosts.filter { $0 != booking.hostUserId }.count
     }
 
-    var ctaTitle: String { mode == .propose ? "Send proposal" : "Reschedule now" }
-    var ctaIcon: PantopusIcon { mode == .propose ? .send : .calendarCheck }
+    /// CTA copy. After a failed submit the design's error frame swaps the
+    /// primary to "Try again" / `rotate-cw` (reschedule-frames.jsx FrameError);
+    /// otherwise it follows the apply mode.
+    var ctaTitle: String {
+        if error != nil { return "Try again" }
+        return mode == .propose ? "Send proposal" : "Reschedule now"
+    }
+    var ctaIcon: PantopusIcon {
+        if error != nil { return .rotateCw }
+        return mode == .propose ? .send : .calendarCheck
+    }
     var canSubmit: Bool { selectedSlot != nil && !submitting }
 
     // MARK: - Loading

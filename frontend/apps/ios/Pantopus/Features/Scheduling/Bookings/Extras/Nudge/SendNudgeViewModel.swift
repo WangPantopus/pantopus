@@ -58,6 +58,8 @@ final class SendNudgeViewModel {
 
     private(set) var isSending = false
     private(set) var didSend = false
+    /// Recipient count captured at send time, for the sent-confirmation toast.
+    private(set) var sentCount = 0
     var errorMessage: String?
 
     private(set) var templates: [MessageTemplateDTO] = []
@@ -94,6 +96,12 @@ final class SendNudgeViewModel {
 
     var ctaTitle: String { hasRecipients ? "Send to \(recipientCount)" : "Send" }
 
+    /// Dark-toast confirmation copy shown after a successful send,
+    /// e.g. "Update sent to 12 attendees".
+    var sentConfirmation: String {
+        "Update sent to \(sentCount) attendee\(sentCount == 1 ? "" : "s")"
+    }
+
     func select(_ audience: NudgeAudience) {
         self.audience = audience
     }
@@ -125,6 +133,7 @@ final class SendNudgeViewModel {
             let _: SchedulingOkResponse = try await client.request(
                 SchedulingEndpoints.nudgeBooking(owner: owner, id: bookingId, NudgeRequest(message: message))
             )
+            sentCount = recipientCount
             didSend = true
         } catch let error as SchedulingError {
             errorMessage = error.userMessage ?? "Couldn't send — try again"

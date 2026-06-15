@@ -92,7 +92,8 @@ final class BookingFollowUpViewModel {
     }
 
     var primaryIcon: PantopusIcon {
-        if errorMessage != nil, !isSaveNoteOnly { return .refreshCw }
+        // JSX error frame CTA uses lucide `rotate-cw` (not `refresh-cw`).
+        if errorMessage != nil, !isSaveNoteOnly { return .rotateCw }
         return isSaveNoteOnly ? .lock : .send
     }
 

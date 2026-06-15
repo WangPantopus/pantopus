@@ -60,6 +60,29 @@ final class BookingDetailViewModel {
 
     var canReassign: Bool { BookingsPillar.supportsReassign(owner) && (booking?.hostUserId != nil) }
 
+    /// Whether this booking overlaps another on the host's calendar. The booking
+    /// payload carries no overlap flag yet, so this is `false` until the backend
+    /// surfaces a conflict signal — the amber `ConflictBanner` (design frame 6)
+    /// is wired and ready, gated on this. (deferredBackend: conflict detection.)
+    var hasConflict: Bool { false }
+
+    /// The cancelled banner line — actor + date + quoted reason when available
+    /// ("Cancelled by host on Jun 11 · '<reason>'"), matching design frame 4.
+    /// Falls back to the bare sentence when the payload omits a reason.
+    var cancelledBannerText: String {
+        let isDeclined = status == .declined
+        let verb = isDeclined ? "Declined" : "Cancelled"
+        var line = "\(verb) by host"
+        if let when = shortStamp(booking?.updatedAt) {
+            line += " on \(when)"
+        }
+        if let reason = booking?.cancelReason?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !reason.isEmpty {
+            line += " · \u{201C}\(reason)\u{201D}"
+        }
+        return line
+    }
+
     /// The status-timeline steps derived from created_at / status / start_at.
     var timelineSteps: [BookingTimelineStep] {
         guard let booking else { return [] }
@@ -69,13 +92,18 @@ final class BookingDetailViewModel {
         switch SchedulingPillStatus(backend: booking.status) {
         case .pending:
             steps.append(BookingTimelineStep(label: "Awaiting approval", time: nil, done: false))
-        case .confirmed, .active, .completed:
+        case .confirmed, .active, .completed, .past:
             steps.append(BookingTimelineStep(label: "Confirmed", time: shortStamp(booking.updatedAt), done: true))
             steps.append(BookingTimelineStep(
                 label: eventEnded ? "Met" : "Meeting",
                 time: BookingsTime.shortWhen(startUTC: booking.startAt),
                 done: eventEnded
             ))
+            // Design frame 3: a trailing not-done "Follow-up · Pending" node once
+            // the meeting has passed.
+            if eventEnded {
+                steps.append(BookingTimelineStep(label: "Follow-up", time: "Pending", done: false))
+            }
         case .noShow:
             steps.append(BookingTimelineStep(label: "Confirmed", time: nil, done: true))
             steps.append(BookingTimelineStep(label: "No-show", time: shortStamp(booking.updatedAt), done: true))
@@ -107,6 +135,11 @@ final class BookingDetailViewModel {
                     Task { await self?.markNoShow() }
                 })
             }
+            // Cancel moves to the overflow now that the confirmed dock surfaces
+            // Message as its primary (design frame 1/8); keep it reachable here.
+            items.append(BookingRowAction(title: "Cancel booking", icon: .xCircle, isDestructive: true) { [weak self] in
+                self?.presentCancel()
+            })
         default:
             break
         }
@@ -142,6 +175,30 @@ final class BookingDetailViewModel {
     func presentReschedule() { if let booking { activeSheet = .reschedule(booking) } }
     func presentCancel() { if let booking { activeSheet = .cancel(booking) } }
     func switchToReschedule(_ booking: BookingDTO) { activeSheet = .reschedule(booking) }
+
+    // MARK: - Dock CTAs awaiting backend wiring
+    //
+    // The per-state docks (design frames 3/4/5/8) surface Message, Follow up,
+    // Rebook, Send rebook link and a conflict-banner "View". None of these have
+    // an endpoint, route, or local sheet yet (`BookingActions`/`SchedulingRoute`/
+    // `BookingActionSheet` carry no message/follow-up/rebook/conflict member),
+    // so the buttons render JSX-faithfully and these handlers are intentional
+    // no-ops pending that wiring. (deferredBackend.)
+
+    /// Message the invitee (design confirmed/no-show/member docks + requester row).
+    func message() { /* deferredBackend: messaging route/endpoint */ }
+
+    /// Send a post-meeting follow-up (design past dock primary).
+    func followUp() { /* deferredBackend: follow-up composer sheet/endpoint */ }
+
+    /// Re-create this booking at a fresh time (design past/cancelled docks).
+    func rebook() { /* deferredBackend: rebook flow/endpoint */ }
+
+    /// Send the invitee a link to rebook (design no-show dock primary).
+    func sendRebookLink() { /* deferredBackend: rebook-link endpoint */ }
+
+    /// View the overlapping booking (design conflict banner "View").
+    func viewConflict() { /* deferredBackend: conflict target id */ }
 
     func markNoShow() async {
         actionError = nil

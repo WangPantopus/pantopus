@@ -156,20 +156,46 @@ struct SendNudgeSheet: View {
     }
 
     private var successOverlay: some View {
-        VStack(spacing: Spacing.s4) {
-            ExtrasIconDisc(
-                icon: .check,
-                background: Theme.Color.successBg,
-                foreground: Theme.Color.success,
-                diameter: 72
-            )
-            Text("Update sent")
-                .font(.system(size: 16.5, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
+        ZStack {
+            VStack(spacing: Spacing.s4) {
+                ExtrasIconDisc(
+                    icon: .check,
+                    background: Theme.Color.successBg,
+                    foreground: Theme.Color.success,
+                    diameter: 72
+                )
+                Text("Update sent")
+                    .font(.system(size: 16.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            VStack {
+                Spacer()
+                sentToast
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.bottom, Spacing.s8)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.appSurface)
         .transition(.opacity)
+    }
+
+    /// Dark bottom toast bar — "Update sent to N attendees" with a success check.
+    private var sentToast: some View {
+        HStack(spacing: Spacing.s2 + 2) {
+            Icon(.checkCircle2, size: 18, color: Theme.Color.successLight)
+            Text(viewModel.sentConfirmation)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(.white)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Spacing.s3 + 2)
+        .padding(.vertical, Spacing.s3)
+        .background(Theme.Color.appText)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg + 1, style: .continuous))
+        .shadow(color: Theme.Color.appText.opacity(0.3), radius: 12, y: 8)
     }
 }
 
