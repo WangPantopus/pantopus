@@ -39,7 +39,13 @@ struct VisitDetailStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F14", title: "Visit", stream: "I12")
+        VisitDetailView(
+            viewModel: VisitDetailViewModel(
+                homeId: viewModel.homeId,
+                eventId: viewModel.eventId,
+                push: viewModel.push
+            )
+        )
     }
 }
 
