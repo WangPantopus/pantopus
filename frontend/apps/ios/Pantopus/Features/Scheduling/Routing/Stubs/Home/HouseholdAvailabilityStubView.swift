@@ -36,7 +36,12 @@ struct HouseholdAvailabilityStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F8", title: "My Availability", stream: "I10")
+        MyHouseholdAvailabilityView(
+            viewModel: MyHouseholdAvailabilityViewModel(
+                homeId: viewModel.homeId,
+                push: viewModel.push
+            )
+        )
     }
 }
 
