@@ -335,7 +335,7 @@ private enum PolicyCopy {
             )
         case let .rescheduleCutoff(deadline, cancelUntil):
             return Note(
-                icon: .clock,
+                icon: .clockAlert,
                 tone: .warning,
                 title: "Reschedule window has closed",
                 body: deadline.flatMap { EdgeFormat.deadline($0, tz: tz) }

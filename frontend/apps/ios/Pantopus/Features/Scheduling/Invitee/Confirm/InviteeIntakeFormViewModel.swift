@@ -96,8 +96,19 @@ final class InviteeIntakeFormViewModel {
     var accentBg: Color { DiscoveryTheme.accentBg(forOwnerType: page?.ownerType) }
     var avatarColors: [Color] { DiscoveryTheme.avatarColors(forOwnerType: page?.ownerType) }
     var hostName: String? { page?.title }
+    var hostFirstName: String { DiscoveryTheme.firstName(from: page?.title) }
     var hostInitials: String { ConfirmFormat.initials(from: page?.title) }
     var tzChipLabel: String { ConfirmFormat.tzChipLabel(tz: selectedTz) }
+
+    /// Textarea ("What should we cover?") placeholder — interpolates the host's
+    /// first name when known ("A sentence or two helps Maria prepare."), else a
+    /// host-free fallback. Mirrors the design's host-interpolated hint.
+    var coverPlaceholder: String {
+        let first = hostFirstName.trimmingCharacters(in: .whitespaces)
+        return first.isEmpty
+            ? "A sentence or two helps."
+            : "A sentence or two helps \(first) prepare."
+    }
 
     var dayAndTimeLine: String {
         guard let event = eventType, let date = SchedulingTime.parseUTC(start) else {

@@ -55,11 +55,39 @@ final class InviteeConfirmedViewModel {
 
     var heroTitle: String { isPending ? "Request sent" : "You're booked" }
 
+    /// The success-hero variant, derived from the payment shape. Each carries its
+    /// own body copy mirroring the design's per-frame thank-you lines.
+    enum ConfirmedVariant: Equatable { case free, paid, deposit, sending }
+
+    /// Pending → request; deposit booking → deposit-paid; email still in flight →
+    /// sending; any settled charge → paid; otherwise the free path.
+    var variant: ConfirmedVariant {
+        guard showsReceipt else { return .free }
+        if receiptProcessing { return .sending }
+        if isDeposit { return .deposit }
+        return .paid
+    }
+
     var heroBody: String {
         if isPending {
             return "The host reviews each request before it's confirmed. We'll email you the moment it's set."
         }
-        return "We've sent the details to your email."
+        switch variant {
+        case .deposit:
+            return "Your deposit is in. The rest is due when you arrive."
+        case .paid:
+            return "We've sent the details and receipt to your email."
+        case .sending:
+            return "We're sending the details to your email."
+        case .free:
+            return "We've sent the details to your email."
+        }
+    }
+
+    /// Opens the host's public booking page so the invitee can reach out — the
+    /// same affordance the Policy-Blocked surface uses for "Message host".
+    var messageHostURL: URL? {
+        page?.slug.flatMap { URL(string: "https://pantopus.com/book/\($0)") }
     }
 
     var summary: BookingSummary {
@@ -102,7 +130,7 @@ final class InviteeConfirmedViewModel {
     }
 
     var receiptAmount: String? {
-        guard let cents = payment?.amountTotal else { return nil }
+        guard let cents = receiptChargeCents else { return nil }
         return ConfirmFormat.money(cents: cents, currency: payment?.currency)
     }
 
@@ -111,11 +139,41 @@ final class InviteeConfirmedViewModel {
         return status == "processing" || status == "pending" || payment?.paidAt == nil
     }
 
-    var timelineSteps: [(label: String, state: TimelineStepState)] {
+    /// A booking is a deposit when the event type defines a deposit that is
+    /// strictly smaller than the total charged — i.e. a balance remains.
+    var isDeposit: Bool {
+        guard let deposit = eventType?.depositCents, deposit > 0,
+              let total = payment?.amountTotal, deposit < total else { return false }
+        return true
+    }
+
+    /// The amount the invitee actually paid now — the deposit for a deposit
+    /// booking, otherwise the full total.
+    private var receiptChargeCents: Int? {
+        if isDeposit { return eventType?.depositCents }
+        return payment?.amountTotal
+    }
+
+    /// "Deposit received" for a partial deposit, else "Payment received".
+    var receiptTitle: String {
+        if receiptProcessing { return "Payment processing" }
+        return isDeposit ? "Deposit received" : "Payment received"
+    }
+
+    /// e.g. "$40.00 due at your visit" — the remaining balance after a deposit.
+    var depositBalanceLabel: String? {
+        guard isDeposit, let total = payment?.amountTotal,
+              let deposit = eventType?.depositCents else { return nil }
+        let balance = total - deposit
+        guard balance > 0 else { return nil }
+        return "\(ConfirmFormat.money(cents: balance, currency: payment?.currency)) due at your visit"
+    }
+
+    var timelineSteps: [(label: String, sub: String?, state: TimelineStepState)] {
         [
-            ("Submitted", .done),
-            ("Awaiting host", .current),
-            ("Confirmed", .pending)
+            ("Submitted", "Just now", .done),
+            ("Awaiting host", nil, .current),
+            ("Confirmed", nil, .pending)
         ]
     }
 
@@ -164,13 +222,35 @@ final class InviteeConfirmedViewModel {
 extension InviteeConfirmedViewModel {
     static func previewConfirmed() -> InviteeConfirmedViewModel { make(status: "confirmed") }
     static func previewPending() -> InviteeConfirmedViewModel { make(status: "pending") }
+    static func previewPaid() -> InviteeConfirmedViewModel {
+        make(status: "confirmed", paymentJSON: #""payment":{"amount_total":4800,"currency":"usd","payment_status":"paid","paid_at":"2026-06-13T16:41:00Z"},"#)
+    }
+    static func previewDeposit() -> InviteeConfirmedViewModel {
+        make(
+            status: "confirmed",
+            depositCents: 2000,
+            paymentJSON: #""payment":{"amount_total":6000,"currency":"usd","payment_status":"paid","paid_at":"2026-06-13T16:41:00Z"},"#
+        )
+    }
+    static func previewSending() -> InviteeConfirmedViewModel {
+        make(status: "confirmed", paymentJSON: #""payment":{"amount_total":4800,"currency":"usd","payment_status":"processing"},"#)
+    }
 
-    private static func make(status: String) -> InviteeConfirmedViewModel {
+    private static func make(
+        status: String,
+        depositCents: Int? = nil,
+        paymentJSON: String = ""
+    ) -> InviteeConfirmedViewModel {
+        // Paid-bearing previews must light the paid surface, which defaults OFF;
+        // mirrors the InviteeReviewConfirm preview factory.
+        if !paymentJSON.isEmpty { SchedulingFeatureFlags.paidEnabled = true }
         let viewModel = InviteeConfirmedViewModel(manageToken: "tok_preview", push: { _ in }, client: .shared)
+        let depositField = depositCents.map { ",\"deposit_cents\":\($0)" } ?? ""
         let json = """
         {"booking":{"id":"b1","status":"\(status)","start_at":"2026-06-17T16:30:00Z","end_at":"2026-06-17T17:00:00Z","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
         "actions":{"can_cancel":true,"can_reschedule":true},
-        "eventType":{"id":"et1","name":"Intro call","slug":"intro","default_duration":30,"location_mode":"video"},
+        \(paymentJSON)
+        "eventType":{"id":"et1","name":"Intro call","slug":"intro","default_duration":30,"location_mode":"video"\(depositField)},
         "page":{"slug":"ada","title":"Maria Kessler","owner_type":"user","timezone":"America/Los_Angeles"}}
         """
         if let data = json.data(using: .utf8), let response = try? JSONDecoder().decode(ManageBookingResponse.self, from: data) {

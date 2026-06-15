@@ -58,48 +58,65 @@ public struct SlotTakenSheet: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            errorBlock
-            content
-            footer
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                errorBlock
+                content
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s2)
+            .padding(.bottom, Spacing.s3)
+            .frame(maxWidth: .infinity)
+            savedNote
         }
-        .padding(Spacing.s5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .accessibilityIdentifier("scheduling.slotTakenSheet")
     }
 
-    // MARK: - Header
+    // MARK: - Header (A18 error halo — centered)
 
     private var errorBlock: some View {
-        HStack(alignment: .top, spacing: Spacing.s3) {
+        VStack(spacing: Spacing.s3 - 1) {
             ZStack {
-                Circle().fill(Theme.Color.warningBg).frame(width: 44, height: 44)
-                Icon(.clock, size: 22, color: Theme.Color.warning)
+                // Outer soft halo.
+                Circle().fill(Theme.Color.warningBg).opacity(0.6).frame(width: 64, height: 64)
+                // Inner ringed disc.
+                Circle()
+                    .fill(Theme.Color.warningBg)
+                    .frame(width: 50, height: 50)
+                    .overlay(Circle().strokeBorder(Theme.Color.warningLight, lineWidth: 2))
+                Icon(.calendarX, size: 24, strokeWidth: 2, color: Theme.Color.warning)
             }
-            VStack(alignment: .leading, spacing: Spacing.s1) {
+            VStack(spacing: Spacing.s1 + 2) {
                 Text("That time was just taken")
                     .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
                 Text(subtitle)
-                    .pantopusTextStyle(.small)
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 228)
             }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s1 + 2)
     }
 
     private var subtitle: String {
         switch mode {
         case .alternatives:
             if let takenTimeLabel {
-                return "Someone grabbed \(takenTimeLabel) first. Here are the closest open times."
+                return "Someone grabbed \(takenTimeLabel) first. Here are the closest open times — no problem, these are still open."
             }
-            return "Here are the closest open times."
+            return "Here are the closest open times — no problem, these are still open."
         case .fullyBooked:
-            return "This day is fully booked. Join the waitlist and we'll let you know the moment something opens."
+            return "And the rest of this day just filled up too."
         case .refreshing:
-            return "Checking live availability…"
+            return "Checking which times are still open right now."
         }
     }
 
@@ -109,60 +126,149 @@ public struct SlotTakenSheet: View {
     private var content: some View {
         switch mode {
         case .alternatives:
-            VStack(spacing: Spacing.s2) {
-                ForEach(alternatives, id: \.self) { alt in
-                    SchedulingSlotRow(
-                        time: timeLabel(for: alt),
-                        detail: dayLabel(for: alt),
-                        accent: accent
-                    ) {
-                        onSelect(alt)
+            VStack(spacing: Spacing.s4) {
+                VStack(spacing: Spacing.s2) {
+                    ForEach(alternatives, id: \.self) { alt in
+                        SchedulingSlotRow(
+                            time: timeLabel(for: alt),
+                            detail: dayLabel(for: alt),
+                            accent: accent
+                        ) {
+                            onSelect(alt)
+                        }
                     }
                 }
+                ghostButton(icon: .search, title: "Pick another time", action: onPickAnotherTime)
             }
         case .fullyBooked:
-            emptyFullyBooked
-        case .refreshing:
-            VStack(spacing: Spacing.s2) {
-                ForEach(0..<3, id: \.self) { _ in SchedulingSlotRowSkeleton() }
+            VStack(spacing: Spacing.s4) {
+                emptyFullyBooked
+                VStack(spacing: Spacing.s2 + 1) {
+                    if let onJoinWaitlist {
+                        primaryButton(icon: .bellPlus, title: "Join the waitlist", action: onJoinWaitlist)
+                    }
+                    ghostButton(icon: .search, title: "See another day", action: onSeeAnotherDay ?? onPickAnotherTime)
+                }
             }
-            .accessibilityLabel("Checking live availability")
+        case .refreshing:
+            VStack(spacing: Spacing.s4) {
+                VStack(spacing: Spacing.s2) {
+                    ForEach(0..<3, id: \.self) { _ in SchedulingSlotRowSkeleton() }
+                }
+                .accessibilityLabel("Checking live availability")
+                liveCheckIndicator
+                ghostButton(icon: .search, title: "Pick another time", action: onPickAnotherTime)
+            }
         }
     }
 
-    private var emptyFullyBooked: some View {
-        VStack(spacing: Spacing.s2) {
-            Icon(.calendar, size: 26, color: Theme.Color.appTextMuted)
-            Text("This day is fully booked")
-                .pantopusTextStyle(.small)
+    /// "Checking live availability" pulse row beneath the skeleton rows.
+    private var liveCheckIndicator: some View {
+        HStack(spacing: Spacing.s2 - 1) {
+            Circle()
+                .fill(accent)
+                .frame(width: 7, height: 7)
+            Text("Checking live availability")
+                .pantopusTextStyle(.caption)
+                .fontWeight(.semibold)
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.s6)
+    }
+
+    private var emptyFullyBooked: some View {
+        VStack(spacing: Spacing.s2 + 1) {
+            ZStack {
+                Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 48, height: 48)
+                Icon(.calendarX, size: 22, strokeWidth: 1.9, color: Theme.Color.appTextSecondary)
+            }
+            Text("This day is fully booked")
+                .pantopusTextStyle(.small)
+                .fontWeight(.bold)
+                .foregroundStyle(Theme.Color.appText)
+            Text("Join the waitlist and we'll text you the moment a time opens up.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 208)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.s5 + 2)
+        .padding(.horizontal, Spacing.s4)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .foregroundStyle(Theme.Color.appBorder)
+            RoundedRectangle(cornerRadius: Radii.lg + 2, style: .continuous)
+                .strokeBorder(
+                    Theme.Color.appBorderStrong,
+                    style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+                )
         )
     }
 
     // MARK: - Footer
 
-    private var footer: some View {
-        VStack(spacing: Spacing.s3) {
-            switch mode {
-            case .alternatives, .refreshing:
-                GhostButton(title: "Pick another time", action: onPickAnotherTime)
-                Text("Your details are saved.")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextMuted)
-            case .fullyBooked:
-                if let onJoinWaitlist {
-                    PrimaryButton(title: "Join the waitlist", action: onJoinWaitlist)
-                }
-                GhostButton(title: "See another day", action: onSeeAnotherDay ?? onPickAnotherTime)
-            }
+    /// Sticky "Your details are saved." footer with a success shield-check.
+    private var savedNote: some View {
+        HStack(spacing: Spacing.s2 - 2) {
+            Icon(.shieldCheck, size: 13, color: Theme.Color.success)
+            Text("Your details are saved.")
+                .pantopusTextStyle(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.Color.appTextSecondary)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.top, Spacing.s2 + 2)
+        .padding(.bottom, Spacing.s4 + 2)
+        .padding(.horizontal, Spacing.s4)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Theme.Color.appBorder)
+                .frame(height: 1)
+        }
+    }
+
+    // MARK: - Icon-leading buttons (design ghost/primary carry a leading glyph)
+
+    private func ghostButton(icon: PantopusIcon, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s2 - 1) {
+                Icon(icon, size: 15, strokeWidth: 2.1, color: Theme.Color.appText)
+                Text(title)
+                    .pantopusTextStyle(.small)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .pantopusShadow(.sm)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private func primaryButton(icon: PantopusIcon, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s2 - 1) {
+                Icon(icon, size: 16, strokeWidth: 2.2, color: Theme.Color.appTextInverse)
+                Text(title)
+                    .pantopusTextStyle(.small)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Theme.Color.appTextInverse)
+            }
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .background(accent)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .pantopusShadow(.primary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Formatting
