@@ -36,7 +36,13 @@ struct ManualBookingStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "E12", title: "Manual Booking", stream: "I9")
+        ManualBookingView(
+            viewModel: ManualBookingViewModel(
+                owner: viewModel.owner,
+                push: viewModel.push,
+                client: .shared
+            )
+        )
     }
 }
 
