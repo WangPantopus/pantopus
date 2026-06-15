@@ -32,7 +32,7 @@ struct MyPackagesStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "G11", title: "My Packages", stream: "I15")
+        MyPackagesView(push: viewModel.push)
     }
 }
 
