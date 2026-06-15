@@ -33,13 +33,14 @@ final class MessagePreviewStubViewModel {
 
 struct MessagePreviewStubView: View {
     @State private var viewModel: MessagePreviewStubViewModel
+    @Environment(\.dismiss) private var dismiss
 
     init(viewModel: MessagePreviewStubViewModel) {
         _viewModel = State(wrappedValue: viewModel)
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H7", title: "Message Preview", stream: "I16")
+        MessagePreviewView(owner: viewModel.owner, templateId: viewModel.templateId, onClose: { dismiss() })
     }
 }
 

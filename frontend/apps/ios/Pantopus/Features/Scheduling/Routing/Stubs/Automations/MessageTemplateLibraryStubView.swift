@@ -36,7 +36,7 @@ struct MessageTemplateLibraryStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H8", title: "Template Library", stream: "I16")
+        MessageTemplateLibraryView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
