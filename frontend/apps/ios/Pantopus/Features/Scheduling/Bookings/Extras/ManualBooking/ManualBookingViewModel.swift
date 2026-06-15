@@ -13,6 +13,8 @@
 //  create API (documented gaps) — the invitee form posts name + contact.
 //
 
+// swiftlint:disable type_body_length
+
 import Observation
 import SwiftUI
 
@@ -341,7 +343,9 @@ final class ManualBookingViewModel: WizardModel {
                       let existingEnd = SchedulingTime.parseUTC(booking.endAt ?? "")
                 else { continue }
                 if existingStart < endDate, startDate < existingEnd {
-                    let detail = SchedulingTime.localString(utcISO: booking.startAt, tz: tz, dateStyle: .none, timeStyle: .short) ?? "Existing booking"
+                    let detail = SchedulingTime.localString(
+                        date: existingStart, tz: tz, dateStyle: .none, timeStyle: .short
+                    ) ?? "Existing booking"
                     return DoubleBookConflict(
                         severity: .soft,
                         title: "This time overlaps",

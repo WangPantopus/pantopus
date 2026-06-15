@@ -186,9 +186,8 @@ struct WaitlistJoinSheet: View {
                 timeZoneLabel: "Pacific Time",
                 client: .shared
             ),
-            accent: Theme.Color.business,
-            onClose: {}
-        )
+            accent: Theme.Color.business
+        ) {}
     }
 }
 #endif

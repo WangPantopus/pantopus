@@ -9,6 +9,8 @@
 //  the E12 stub.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 struct ManualBookingView: View {
@@ -205,10 +207,20 @@ struct ManualBookingView: View {
 
         ExtrasOverline(text: "Contact")
         HStack(spacing: Spacing.s2) {
-            ExtrasPillChip(title: "Email", isSelected: viewModel.contactMode == .email, selectedForeground: theme.accent, selectedBackground: theme.accentBg) {
+            ExtrasPillChip(
+                title: "Email",
+                isSelected: viewModel.contactMode == .email,
+                selectedForeground: theme.accent,
+                selectedBackground: theme.accentBg
+            ) {
                 viewModel.contactMode = .email
             }
-            ExtrasPillChip(title: "Phone", isSelected: viewModel.contactMode == .phone, selectedForeground: theme.accent, selectedBackground: theme.accentBg) {
+            ExtrasPillChip(
+                title: "Phone",
+                isSelected: viewModel.contactMode == .phone,
+                selectedForeground: theme.accent,
+                selectedBackground: theme.accentBg
+            ) {
                 viewModel.contactMode = .phone
             }
         }
@@ -421,7 +433,8 @@ struct ManualBookingView: View {
                 accent: theme.accent,
                 onCancel: { viewModel.showDoubleBook = false },
                 onViewConflict: nil,
-                onBookAnyway: { Task { await viewModel.bookAnyway() } }
+                onBookAnyway: { Task { await viewModel.bookAnyway() } },
+                onPickAnotherMember: nil
             )
         }
     }
