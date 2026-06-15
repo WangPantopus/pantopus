@@ -32,14 +32,19 @@ final class BookingDetailStubViewModel {
 }
 
 struct BookingDetailStubView: View {
-    @State private var viewModel: BookingDetailStubViewModel
+    private let viewModel: BookingDetailViewModel
 
-    init(viewModel: BookingDetailStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: BookingDetailStubViewModel) {
+        viewModel = BookingDetailViewModel(
+            owner: stub.owner,
+            bookingId: stub.bookingId,
+            push: stub.push,
+            actions: BookingActions(owner: stub.owner)
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "E2", title: "Booking", stream: "I8")
+        BookingDetailView(viewModel: viewModel)
     }
 }
 
