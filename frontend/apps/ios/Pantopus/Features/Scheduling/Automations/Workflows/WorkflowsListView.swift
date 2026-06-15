@@ -140,7 +140,7 @@ struct WorkflowsListView: View {
     private var emptyPrompt: some View {
         if model.scope == .global {
             AutoInlineEmpty(
-                icon: .zap,
+                icon: .workflow,
                 headline: "No follow-ups yet",
                 subcopy: "Reminders are handled. Add a thank-you or a review request to run automatically.",
                 accent: model.accent,
@@ -150,7 +150,7 @@ struct WorkflowsListView: View {
             )
         } else {
             AutoInlineEmpty(
-                icon: .zap,
+                icon: .workflow,
                 headline: "No event-type workflows",
                 subcopy: "Workflows scoped to a single event type show up here. Add one from its editor.",
                 accent: model.accent,

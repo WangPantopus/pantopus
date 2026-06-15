@@ -156,7 +156,7 @@ public struct ShareLinkSheet: View {
     private var shareTargets: some View {
         HStack(spacing: Spacing.s3) {
             shareTile(icon: .share, label: "Share", action: onShare)
-            shareTile(icon: .scanLine, label: "QR code") { showQR = true }
+            shareTile(icon: .qrCode, label: "QR code") { showQR = true }
             shareTile(icon: .messageCircle, label: "Messages", action: onMessages)
             shareTile(icon: .mail, label: "Email", action: onEmail)
         }

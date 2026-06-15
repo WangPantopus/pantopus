@@ -111,7 +111,7 @@ private enum TerminalCopy {
         switch kind {
         case .notFound:
             return Copy(
-                icon: .search,
+                icon: .searchX,
                 tone: .neutral,
                 title: "We can't find that page",
                 body: "The link may be mistyped, or this page no longer exists."
@@ -132,14 +132,14 @@ private enum TerminalCopy {
             )
         case .paused:
             return Copy(
-                icon: .pause,
+                icon: .pauseCircle,
                 tone: .warning,
                 title: "Bookings are paused",
                 body: "\(host) isn't taking new bookings at the moment."
             )
         case .fullyBooked:
             return Copy(
-                icon: .calendarDays,
+                icon: .calendarX,
                 tone: .neutral,
                 title: "No times are open right now",
                 body: "Every slot is taken for now — new times open up regularly."
