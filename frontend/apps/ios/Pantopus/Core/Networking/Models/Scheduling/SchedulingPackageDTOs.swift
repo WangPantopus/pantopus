@@ -22,6 +22,9 @@ public struct SchedulingPackageDTO: Decodable, Sendable, Hashable, Identifiable 
     public let eventTypeId: String?
     public let isActive: Bool?
     public let createdAt: String?
+    /// Number of credits issued (one per purchase). Surfaced by `GET /packages`
+    /// only; `nil` on create/update responses, which don't embed the count.
+    public let soldCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -34,6 +37,7 @@ public struct SchedulingPackageDTO: Decodable, Sendable, Hashable, Identifiable 
         case eventTypeId = "event_type_id"
         case isActive = "is_active"
         case createdAt = "created_at"
+        case soldCount = "sold_count"
     }
 }
 
