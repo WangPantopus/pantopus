@@ -21,7 +21,13 @@ struct ExtrasDialog<Content: View>: View {
     /// Tapping the scrim dismisses unless the dialog is mid-submit.
     let isDismissable: Bool
     let onDismiss: () -> Void
-    @ViewBuilder var content: () -> Content
+    let content: Content
+
+    init(isDismissable: Bool, onDismiss: @escaping () -> Void, @ViewBuilder content: () -> Content) {
+        self.isDismissable = isDismissable
+        self.onDismiss = onDismiss
+        self.content = content()
+    }
 
     var body: some View {
         ZStack {
@@ -36,7 +42,7 @@ struct ExtrasDialog<Content: View>: View {
     }
 
     private var card: some View {
-        VStack(spacing: 0) { content() }
+        VStack(spacing: 0) { content }
             .padding(.horizontal, Spacing.s4)
             .padding(.top, Spacing.s5)
             .padding(.bottom, Spacing.s4)
@@ -183,12 +189,16 @@ struct ExtrasSheetGrabber: View {
 
 /// Sticky footer container with a top hairline border (sheet CTA row).
 struct ExtrasStickyFooter<Content: View>: View {
-    @ViewBuilder var content: () -> Content
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             Divider().overlay(Theme.Color.appBorder)
-            content()
+            content
                 .padding(.horizontal, Spacing.s4)
                 .padding(.top, Spacing.s3)
                 .padding(.bottom, Spacing.s5)
