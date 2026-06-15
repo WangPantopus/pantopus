@@ -94,9 +94,8 @@ struct GroupRosterView: View {
                                 verified: true,
                                 statusRaw: person.statusRaw,
                                 accent: theme.accent,
-                                accentBackground: theme.accentBg,
-                                onKebab: { showNudge = true }
-                            )
+                                accentBackground: theme.accentBg
+                            ) { showNudge = true }
                         }
                     }
                 }
@@ -261,9 +260,8 @@ struct GroupRosterView: View {
                 eventSubtitle: "\(viewModel.filled) attendee\(viewModel.filled == 1 ? "" : "s")",
                 counts: viewModel.nudgeCounts,
                 client: .shared
-            ),
-            onClose: { showNudge = false }
-        )
+            )
+        ) { showNudge = false }
     }
 
     @ViewBuilder private var noShowOverlay: some View {

@@ -191,9 +191,8 @@ struct BookingFollowUpSheet: View {
                 inviteeName: "Mara",
                 headerSubtitle: "Garden walkthrough · Mara Reyes · Jun 9",
                 client: .shared
-            ),
-            onClose: {}
-        )
+            )
+        ) {}
     }
 }
 #endif

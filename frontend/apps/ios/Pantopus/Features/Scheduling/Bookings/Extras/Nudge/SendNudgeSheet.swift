@@ -184,9 +184,8 @@ struct SendNudgeSheet: View {
                 eventSubtitle: "Group class · Sat, Jun 14",
                 counts: NudgeAudienceCounts(all: 12, confirmed: 10, noShows: 0),
                 client: .shared
-            ),
-            onClose: {}
-        )
+            )
+        ) {}
     }
 }
 #endif
