@@ -72,7 +72,7 @@ struct IntakeQuestionsEditorView: View {
     }
 
     private var helper: some View {
-        Text("Name and email are always asked. Add anything else you need.")
+        Text("Ask people a few things when they book. Name and email are always asked.")
             .pantopusTextStyle(.caption)
             .foregroundStyle(Theme.Color.appTextSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,63 +81,79 @@ struct IntakeQuestionsEditorView: View {
 
     private var lockedDefaults: some View {
         FormFieldGroup("Always asked") {
-            lockedRow("Name")
+            lockedRow("Name", icon: .user)
             Divider().background(Theme.Color.appBorderSubtle)
-            lockedRow("Email")
+            lockedRow("Email", icon: .mail)
         }
     }
 
-    private func lockedRow(_ title: String) -> some View {
+    private func lockedRow(_ title: String, icon: PantopusIcon) -> some View {
         HStack(spacing: Spacing.s3) {
-            Icon(.lock, size: 16, color: Theme.Color.appTextMuted).frame(width: 24)
+            Icon(icon, size: 15, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                .frame(width: 32, height: 32)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .pantopusTextStyle(.body)
                     .foregroundStyle(Theme.Color.appText)
                 Text("Always asked")
                     .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .foregroundStyle(Theme.Color.appTextMuted)
             }
             Spacer()
+            Icon(.lock, size: 14, strokeWidth: 2, color: Theme.Color.appTextMuted)
         }
     }
 
     @ViewBuilder
     private var questionList: some View {
-        if !viewModel.questions.isEmpty {
-            VStack(spacing: Spacing.s3) {
-                ForEach($viewModel.questions) { $question in
-                    IntakeQuestionCard(
-                        question: $question,
-                        isExpanded: viewModel.expandedId == question.id,
-                        isFirst: viewModel.questions.first?.id == question.id,
-                        isLast: viewModel.questions.last?.id == question.id,
-                        onToggle: { viewModel.toggleExpanded(question.id) },
-                        onDelete: { viewModel.deleteQuestion(question.id) },
-                        onMoveUp: { viewModel.move(question.id, by: -1) },
-                        onMoveDown: { viewModel.move(question.id, by: 1) },
-                        onTypeChange: { viewModel.didChangeType(question.id) },
-                        onAddOption: { viewModel.addOption(to: question.id) },
-                        onRemoveOption: { viewModel.removeOption(from: question.id, at: $0) }
-                    )
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Your questions".uppercased())
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .padding(.horizontal, Spacing.s4)
+                .accessibilityAddTraits(.isHeader)
+            if viewModel.questions.isEmpty {
+                Text("You haven't added any yet.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Spacing.s4)
+            } else {
+                VStack(spacing: Spacing.s3) {
+                    ForEach($viewModel.questions) { $question in
+                        IntakeQuestionCard(
+                            question: $question,
+                            isExpanded: viewModel.expandedId == question.id,
+                            isFirst: viewModel.questions.first?.id == question.id,
+                            isLast: viewModel.questions.last?.id == question.id,
+                            onToggle: { viewModel.toggleExpanded(question.id) },
+                            onDelete: { viewModel.deleteQuestion(question.id) },
+                            onMoveUp: { viewModel.move(question.id, by: -1) },
+                            onMoveDown: { viewModel.move(question.id, by: 1) },
+                            onTypeChange: { viewModel.didChangeType(question.id) },
+                            onAddOption: { viewModel.addOption(to: question.id) },
+                            onRemoveOption: { viewModel.removeOption(from: question.id, at: $0) }
+                        )
+                    }
                 }
+                .padding(.horizontal, Spacing.s4)
             }
-            .padding(.horizontal, Spacing.s4)
         }
     }
 
     private var addButton: some View {
         Button(action: { viewModel.addQuestion() }) {
             HStack(spacing: Spacing.s2) {
-                Icon(.plus, size: 16, color: Theme.Color.primary600)
+                Icon(.plus, size: 17, strokeWidth: 2.4, color: Theme.Color.appSurface)
                 Text("Add a question")
-                    .pantopusTextStyle(.body)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.primary600)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appSurface)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.s3)
-            .background(Theme.Color.primary50)
+            .frame(height: 44)
+            .background(Theme.Color.primary600)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)

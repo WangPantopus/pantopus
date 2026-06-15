@@ -9,7 +9,9 @@
 
 import SwiftUI
 
-/// Row of fixed colour swatches; the selected one wears a ring + check.
+/// Row of fixed colour swatches. The selected one wears a double-ring halo —
+/// a white gap then a thin ring in the swatch's own colour — per the design's
+/// `0 0 0 2px #fff, 0 0 0 4px c` selection treatment (no inner check glyph).
 struct EventTypeColorPicker: View {
     @Binding var selection: EventTypeSwatch
 
@@ -19,12 +21,14 @@ struct EventTypeColorPicker: View {
                 Button { selection = swatch } label: {
                     ZStack {
                         if selection == swatch {
-                            Circle().stroke(swatch.color, lineWidth: 2).frame(width: 30, height: 30)
+                            Circle()
+                                .stroke(Theme.Color.appSurface, lineWidth: 2)
+                                .frame(width: 24, height: 24)
+                            Circle()
+                                .stroke(swatch.color, lineWidth: 2)
+                                .frame(width: 28, height: 28)
                         }
-                        Circle().fill(swatch.color).frame(width: 22, height: 22)
-                        if selection == swatch {
-                            Icon(.check, size: 12, color: Theme.Color.appTextInverse)
-                        }
+                        Circle().fill(swatch.color).frame(width: 24, height: 24)
                     }
                     .frame(width: 30, height: 30)
                 }
@@ -116,6 +120,225 @@ struct CaptionToggle: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
+    }
+}
+
+/// White card with a **pillar-colored** UPPERCASE overline — the design's
+/// `Card.overline` (sky personal / violet business). Mirrors the shared
+/// `FormFieldGroup` geometry (16px-radius surface, s4 padding) but paints the
+/// overline in the active pillar accent instead of grey, and supports an
+/// overline-less card (the Controls/Visibility card draws no overline) plus a
+/// trailing chevron for the collapsible Advanced card.
+struct PillarFieldGroup<Content: View>: View {
+    let overline: String?
+    let accent: Color
+    var isExpanded: Bool?
+    var onToggle: (() -> Void)?
+    @ViewBuilder let content: () -> Content
+
+    init(
+        _ overline: String?,
+        accent: Color,
+        isExpanded: Bool? = nil,
+        onToggle: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.overline = overline
+        self.accent = accent
+        self.isExpanded = isExpanded
+        self.onToggle = onToggle
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            if let overline {
+                overlineHeader(overline)
+            }
+            content()
+        }
+        .padding(Spacing.s4)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
+    }
+
+    @ViewBuilder
+    private func overlineHeader(_ text: String) -> some View {
+        if let isExpanded, let onToggle {
+            Button(action: onToggle) {
+                HStack {
+                    Text(text.uppercased())
+                        .pantopusTextStyle(.overline)
+                        .foregroundStyle(accent)
+                    Spacer()
+                    Icon(isExpanded ? .chevronUp : .chevronDown, size: 16, color: Theme.Color.appTextMuted)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isHeader)
+        } else {
+            Text(text.uppercased())
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(accent)
+                .accessibilityAddTraits(.isHeader)
+        }
+    }
+}
+
+/// A small outlined "+ N" pill that adds a preset length in single-duration
+/// mode — the design's `QuickChip`.
+struct QuickDurationChip: View {
+    let minutes: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s1) {
+                Icon(.plus, size: 11, color: Theme.Color.primary600)
+                Text("\(minutes)")
+                    .pantopusTextStyle(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
+            .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Set length to \(minutes) minutes")
+    }
+}
+
+/// Pinned, full-width primary save bar — the design's sticky `SaveBar`
+/// ("Create event type" / "Save event type"), shimmering while a commit is in
+/// flight. Functional chrome stays product sky.
+struct EventTypeSaveBar: View {
+    let label: String
+    let isEnabled: Bool
+    let isSaving: Bool
+    let onCommit: () -> Void
+
+    var body: some View {
+        Group {
+            if isSaving {
+                HStack {
+                    Text("Saving…")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            } else {
+                Button(action: onCommit) {
+                    Text(label)
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .background(isEnabled ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                .disabled(!isEnabled)
+            }
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s3)
+        .padding(.bottom, Spacing.s4)
+        .background(Theme.Color.appSurface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+        }
+        .accessibilityIdentifier("scheduling.eventType.saveBar")
+    }
+}
+
+/// Stripe-not-connected inline card — the design's violet-tinted `StripeCard`
+/// with a credit-card tile, the connect copy, and a full-width sky
+/// "Connect Stripe" button carrying an external-link glyph.
+struct StripeConnectCard: View {
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(alignment: .top, spacing: Spacing.s3) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                        .fill(Theme.Color.business)
+                        .frame(width: 30, height: 30)
+                    Icon(.creditCard, size: 15, strokeWidth: 2.2, color: Theme.Color.appTextInverse)
+                }
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text("Connect payments to charge for bookings")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Pantopus uses Stripe to collect payments and deposits. It takes about a minute.")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                }
+            }
+            Button(action: action) {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.externalLink, size: 14, color: Theme.Color.appTextInverse)
+                    Text("Connect Stripe")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .frame(maxWidth: .infinity, minHeight: 38)
+                .background(Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("scheduling.eventType.connectStripe")
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.businessBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.business.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
+
+/// Toggle row with a leading icon tile — the design's `ControlsCard` `ToggleRow`
+/// idiom (icon tile tints sky when on, sunken when off; product-sky switch on
+/// the trailing edge; title + sub).
+struct IconToggleRow: View {
+    let icon: PantopusIcon
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: Spacing.s3) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                    .fill(isOn ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
+                    .frame(width: 30, height: 30)
+                Icon(icon, size: 15, color: isOn ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .pantopusTextStyle(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appText)
+                Text(subtitle)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            Spacer(minLength: Spacing.s2)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Theme.Color.primary600)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

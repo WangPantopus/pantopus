@@ -18,28 +18,39 @@ struct TimeRangeRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            timePicker(range.start, label: "Start time", onChange: onStart)
-            Text("–")
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appTextMuted)
-            timePicker(range.end, label: "End time", onChange: onEnd)
-            Spacer(minLength: Spacing.s2)
+            HStack(spacing: Spacing.s2) {
+                Icon(.clock, size: 14, color: Theme.Color.primary600)
+                timePicker(range.start, label: "Start time", onChange: onStart)
+                Text("–")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                timePicker(range.end, label: "End time", onChange: onEnd)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(range.isValid ? Theme.Color.appBorder : Theme.Color.error, lineWidth: 1.5)
+            )
+
             if let onRemove {
                 Button(action: onRemove) {
-                    Icon(.x, size: 16, color: Theme.Color.appTextMuted)
-                        .frame(width: 32, height: 32)
+                    Icon(.x, size: 15, color: Theme.Color.appTextMuted)
+                        .frame(width: 30, height: 30)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Remove time range")
             }
         }
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: .bottomLeading) {
             if !range.isValid {
                 Text("End must be after start")
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.error)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .offset(y: 14)
+                    .offset(y: 16)
             }
         }
     }
@@ -75,63 +86,71 @@ struct WeekdayHoursRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
-            Toggle(isOn: Binding(get: { day.isEnabled }, set: onToggle)) {
-                Text(Weekday.longName(day.weekday))
-                    .pantopusTextStyle(.body)
-                    .foregroundStyle(Theme.Color.appText)
+            HStack(spacing: Spacing.s3) {
+                Toggle(isOn: Binding(get: { day.isEnabled }, set: onToggle)) {
+                    Text(Weekday.longName(day.weekday))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(day.isEnabled ? Theme.Color.appText : Theme.Color.appTextSecondary)
+                }
+                .toggleStyle(.switch)
+                .tint(Theme.Color.primary600)
+                .accessibilityIdentifier("scheduling.weeklyHours.toggle.\(day.weekday)")
+
+                Spacer(minLength: Spacing.s2)
+
+                if day.isEnabled {
+                    copyMenu
+                } else {
+                    Text("Unavailable")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
             }
-            .tint(Theme.Color.primary600)
-            .accessibilityIdentifier("scheduling.weeklyHours.toggle.\(day.weekday)")
 
             if day.isEnabled {
-                ForEach(day.ranges) { range in
-                    TimeRangeRow(
-                        range: range,
-                        onStart: { onStart(range.id, $0) },
-                        onEnd: { onEnd(range.id, $0) },
-                        onRemove: day.ranges.count > 1 ? { onRemoveRange(range.id) } : nil
-                    )
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    ForEach(day.ranges) { range in
+                        TimeRangeRow(
+                            range: range,
+                            onStart: { onStart(range.id, $0) },
+                            onEnd: { onEnd(range.id, $0) },
+                            onRemove: day.ranges.count > 1 ? { onRemoveRange(range.id) } : nil
+                        )
+                    }
+                    addBlockButton
                 }
-                actionRow
-            } else {
-                Text("Unavailable")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextMuted)
+                .padding(.leading, Spacing.s12)
             }
         }
         .padding(.vertical, Spacing.s1)
     }
 
-    private var actionRow: some View {
-        HStack(spacing: Spacing.s3) {
-            Button(action: onAddRange) {
-                HStack(spacing: Spacing.s1) {
-                    Icon(.plus, size: 14, color: Theme.Color.primary600)
-                    Text("Add a block")
-                        .pantopusTextStyle(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.primary600)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add a time block to \(Weekday.longName(day.weekday))")
-
-            Spacer()
-
-            Menu {
-                Button("Copy to all days") { onCopy(targets(in: Weekday.displayOrder)) }
-                Button("Copy to weekdays") { onCopy(targets(in: [1, 2, 3, 4, 5])) }
-                Button("Copy to weekend") { onCopy(targets(in: [6, 0])) }
-            } label: {
-                HStack(spacing: Spacing.s1) {
-                    Icon(.copy, size: 13, color: Theme.Color.appTextSecondary)
-                    Text("Copy to other days")
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-            }
-            .accessibilityLabel("Copy \(Weekday.longName(day.weekday)) hours to other days")
+    /// Icon-only copy affordance (JSX renders a `copy` glyph that opens a
+    /// "copy to other days" popover). The native menu is the popover here.
+    private var copyMenu: some View {
+        Menu {
+            Button("Copy to all days") { onCopy(targets(in: Weekday.displayOrder)) }
+            Button("Copy to weekdays") { onCopy(targets(in: [1, 2, 3, 4, 5])) }
+            Button("Copy to weekend") { onCopy(targets(in: [6, 0])) }
+        } label: {
+            Icon(.copy, size: 15, color: Theme.Color.appTextMuted)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
         }
+        .accessibilityLabel("Copy \(Weekday.longName(day.weekday)) hours to other days")
+    }
+
+    private var addBlockButton: some View {
+        Button(action: onAddRange) {
+            HStack(spacing: Spacing.s1) {
+                Icon(.plus, size: 13, strokeWidth: 2.4, color: Theme.Color.primary600)
+                Text("Add a block")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary600)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add a time block to \(Weekday.longName(day.weekday))")
     }
 
     private func targets(in weekdays: [Int]) -> [Int] {
@@ -139,42 +158,95 @@ struct WeekdayHoursRow: View {
     }
 }
 
-/// Inline amber warning shown when every weekday is off.
+/// Sky-tinted "Use 9–5, Mon–Fri" quick-default button shared by the warning
+/// card and the empty hero (JSX `QuickDefaultButton`).
+struct QuickDefaultButton: View {
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.wandSparkles, size: 15, color: Theme.Color.primary700)
+                Text("Use 9–5, Mon–Fri")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary700)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(Theme.Color.primary50)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.primary200, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Use 9 to 5, Monday to Friday")
+    }
+}
+
+/// Inline amber warning shown when every weekday is off (JSX `WarningCard`).
 struct NoHoursWarningCard: View {
     let onUseDefault: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                Icon(.alertTriangle, size: 18, color: Theme.Color.warning)
-                Text("No hours set")
-                    .pantopusTextStyle(.body)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.appText)
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(alignment: .top, spacing: Spacing.s2) {
+                Icon(.alertTriangle, size: 17, color: Theme.Color.warning)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("No hours set")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("People can't book you until you add at least one block.")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
             }
-            Text("People can't book you until you add at least one block.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-            Button(action: onUseDefault) {
-                Text("Use 9–5, Mon–Fri")
-                    .pantopusTextStyle(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.warning)
-                    .padding(.horizontal, Spacing.s3)
-                    .padding(.vertical, Spacing.s2)
-                    .overlay(
-                        Capsule().stroke(Theme.Color.warning, lineWidth: 1)
-                    )
-            }
-            .buttonStyle(.plain)
-            .padding(.top, Spacing.s1)
+            QuickDefaultButton(onTap: onUseDefault)
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.warningBg)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.warningLight, lineWidth: 1)
+        )
         .padding(.horizontal, Spacing.s4)
         .accessibilityIdentifier("scheduling.weeklyHours.noHoursWarning")
+    }
+}
+
+/// Sky-tinted explainer card shown when the schedule is unset — these hours
+/// are the source the home & business pages compose on (JSX `CompositionGapCard`).
+struct CompositionGapCard: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.s3) {
+            Icon(.layers, size: 16, color: Theme.Color.primary700)
+                .frame(width: 32, height: 32)
+                .background(Theme.Color.primary100)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Start with your hours")
+                    .pantopusTextStyle(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Your family and business pages build on these hours, so set them first.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.primary50)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.primary200, lineWidth: 1)
+        )
+        .padding(.horizontal, Spacing.s4)
+        .accessibilityIdentifier("scheduling.weeklyHours.compositionGap")
     }
 }
 
@@ -189,11 +261,13 @@ struct SchedulingLinkRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.s3) {
-                Icon(icon, size: 18, color: Theme.Color.primary600)
-                    .frame(width: 28)
+                Icon(icon, size: 15, color: Theme.Color.appTextSecondary)
+                    .frame(width: 30, height: 30)
+                    .background(Theme.Color.appSurfaceSunken)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .pantopusTextStyle(.body)
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                     if let subtitle {
                         Text(subtitle)

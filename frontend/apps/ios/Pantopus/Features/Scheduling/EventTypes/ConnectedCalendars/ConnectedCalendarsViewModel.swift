@@ -17,11 +17,22 @@ struct CalendarProvider: Identifiable, Hashable {
     let id: String
     let name: String
     let icon: PantopusIcon
+    /// Short name used in the connecting handoff line ("Opening Google…").
+    let shortName: String
 
+    init(id: String, name: String, shortName: String, icon: PantopusIcon) {
+        self.id = id
+        self.name = name
+        self.shortName = shortName
+        self.icon = icon
+    }
+
+    // Design glyphs (connected-calendars-frames.jsx PROVIDERS): Google
+    // `calendar-days`, Apple `calendar`, Outlook `calendar-range`.
     static let all: [CalendarProvider] = [
-        CalendarProvider(id: "google", name: "Google Calendar", icon: .calendarDays),
-        CalendarProvider(id: "apple", name: "Apple Calendar", icon: .calendar),
-        CalendarProvider(id: "outlook", name: "Outlook", icon: .mail)
+        CalendarProvider(id: "google", name: "Google Calendar", shortName: "Google", icon: .calendarDays),
+        CalendarProvider(id: "apple", name: "Apple Calendar", shortName: "Apple", icon: .calendar),
+        CalendarProvider(id: "outlook", name: "Outlook", shortName: "Outlook", icon: .calendarRange)
     ]
 }
 
@@ -96,5 +107,28 @@ final class ConnectedCalendarsViewModel {
             return "Calendar sync is coming soon. We'll let you know when you can connect \(provider.name)."
         }
         return error.userMessage ?? "Couldn't connect \(provider.name) right now."
+    }
+
+    /// The provider definition matching a linked-account DTO's `provider`
+    /// string, so a connected/re-auth row can render the right tile + glyph.
+    func provider(for calendar: ConnectedCalendarDTO) -> CalendarProvider? {
+        guard let key = calendar.provider?.lowercased() else { return nil }
+        return providers.first { $0.id == key }
+    }
+
+    /// Whether a linked account is in the sync-error / re-auth state (design
+    /// frame 5). Maps the backend `status` string, tolerant of variants.
+    func needsReauth(_ calendar: ConnectedCalendarDTO) -> Bool {
+        switch calendar.status?.lowercased() {
+        case "needs_reauth", "reauth", "needs_reconnect", "error", "expired": true
+        default: false
+        }
+    }
+
+    /// Disconnecting a linked account is not yet wired to a backend route, so
+    /// surface the same honest "coming soon" notice rather than a dead button.
+    func disconnect(_ calendar: ConnectedCalendarDTO) {
+        let name = calendar.externalAccount ?? calendar.provider ?? "this calendar"
+        notice = "Disconnecting calendars is coming soon. We'll let you know when you can remove \(name)."
     }
 }

@@ -47,10 +47,10 @@ struct IntakeQuestionCard: View {
                 }
                 Spacer(minLength: Spacing.s2)
                 if question.required {
-                    Text("Required")
-                        .pantopusTextStyle(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.primary600)
+                    Text("Required".uppercased())
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.4)
+                        .foregroundStyle(Theme.Color.primary700)
                         .padding(.horizontal, Spacing.s2)
                         .padding(.vertical, Spacing.s1)
                         .background(Theme.Color.primary50)
@@ -92,7 +92,7 @@ struct IntakeQuestionCard: View {
             }
         } label: {
             HStack {
-                Text("Type")
+                Text("Answer type")
                     .pantopusTextStyle(.body)
                     .foregroundStyle(Theme.Color.appText)
                 Spacer()
@@ -110,18 +110,27 @@ struct IntakeQuestionCard: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("Options")
                 .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.Color.appTextStrong)
             ForEach(question.options.indices, id: \.self) { index in
                 HStack(spacing: Spacing.s2) {
+                    Icon(.gripVertical, size: 14, color: Theme.Color.appTextMuted)
                     TextField("Option \(index + 1)", text: $question.options[index])
                         .font(Theme.Font.body)
                         .foregroundStyle(Theme.Color.appText)
                     Button { onRemoveOption(index) } label: {
-                        Icon(.x, size: 14, color: Theme.Color.appTextMuted).frame(width: 28, height: 28)
+                        Icon(.x, size: 14, color: Theme.Color.appTextMuted)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Remove option \(index + 1)")
                 }
+                .padding(.horizontal, Spacing.s2)
+                .padding(.vertical, Spacing.s2)
+                .background(Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1.5)
+                )
             }
             Button(action: onAddOption) {
                 HStack(spacing: Spacing.s1) {
