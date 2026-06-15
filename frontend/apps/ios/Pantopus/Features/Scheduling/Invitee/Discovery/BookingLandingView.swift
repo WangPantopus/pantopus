@@ -198,7 +198,7 @@ struct BookingLandingView: View {
 
     private func inlineNote(_ text: String) -> some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.arrowRight, size: 14, color: Theme.Color.primary600)
+            Icon(.arrowRightCircle, size: 14, color: Theme.Color.primary600)
             Text(text)
                 .pantopusTextStyle(.caption)
                 .fontWeight(.semibold)
@@ -219,7 +219,7 @@ struct BookingLandingView: View {
 
     private func pausedCard(_ firstName: String) -> some View {
         DiscoveryNotice(
-            icon: .pause,
+            icon: .moon,
             title: "This page isn't taking bookings right now",
             message: "Check back later, or reach out to \(firstName) directly."
         )
@@ -227,7 +227,7 @@ struct BookingLandingView: View {
 
     private func emptyCard(_ firstName: String) -> some View {
         DiscoveryNotice(
-            icon: .calendarDays,
+            icon: .calendarOff,
             title: "No times are set up yet",
             message: "\(firstName) hasn't added any availability. Check back soon.",
             dashed: true,
@@ -296,7 +296,7 @@ struct BookingLandingView: View {
     private func errorScroll(_ message: String) -> some View {
         VStack(spacing: Spacing.s3) {
             Spacer(minLength: Spacing.s0)
-            Icon(.link, size: 26, strokeWidth: 1.75, color: Theme.Color.appTextSecondary)
+            Icon(.link2Off, size: 26, strokeWidth: 1.75, color: Theme.Color.appTextSecondary)
                 .frame(width: 60, height: 60)
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(Circle())

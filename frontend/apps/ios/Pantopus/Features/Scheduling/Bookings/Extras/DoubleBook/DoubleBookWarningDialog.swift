@@ -32,6 +32,9 @@ struct DoubleBookConflict: Equatable, Sendable {
 
 struct DoubleBookWarningDialog: View {
     let conflict: DoubleBookConflict
+    /// Retained for call-site compatibility; the design renders both CTAs in
+    /// the fixed brand blue regardless of owner context, so the dialog uses
+    /// `Theme.Color.primary600` for the action affordances (see JSX `PRIMARY`).
     var accent: Color = Theme.Color.primary600
     let onCancel: () -> Void
     var onViewConflict: (() -> Void)?
@@ -39,6 +42,11 @@ struct DoubleBookWarningDialog: View {
     var onPickAnotherMember: (() -> Void)?
 
     private var isHard: Bool { conflict.severity == .hard }
+
+    /// JSX hardcodes `PRIMARY = E.blue600` (primary600) for both the soft
+    /// "Book anyway" solid CTA and the hard "Pick another member" link — the
+    /// pillar accent is not applied to these affordances in the design.
+    private var ctaAccent: Color { Theme.Color.primary600 }
 
     var body: some View {
         ExtrasDialog(isDismissable: true, onDismiss: onCancel) {
@@ -127,7 +135,8 @@ struct DoubleBookWarningDialog: View {
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, 9)
         .background(Theme.Color.homeBg)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        // JSX green member-conflict pill uses borderRadius:11 → lg bucket (12), not md (8).
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     // MARK: Footer
@@ -142,13 +151,15 @@ struct DoubleBookWarningDialog: View {
                         onPickAnotherMember?()
                     } label: {
                         HStack(spacing: Spacing.s2) {
-                            Icon(.users, size: 15, color: accent)
+                            Icon(.users, size: 15, color: ctaAccent)
                             Text("Pick another member")
                         }
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(accent)
+                        .foregroundStyle(ctaAccent)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 46)
+                        // JSX "Pick another member" button is height:44 (line 106),
+                        // matching the disabled lock row and the 44pt CTA row.
+                        .frame(height: 44)
                     }
                     .buttonStyle(.plain)
                     .disabled(onPickAnotherMember == nil)
@@ -157,7 +168,7 @@ struct DoubleBookWarningDialog: View {
         } else {
             HStack(spacing: 9) {
                 ExtrasGhostButton(title: "Cancel") { onCancel() }
-                ExtrasSolidButton(title: "Book anyway", accent: accent) {
+                ExtrasSolidButton(title: "Book anyway", accent: ctaAccent) {
                     onBookAnyway?()
                 }
             }
@@ -172,7 +183,8 @@ struct DoubleBookWarningDialog: View {
         .font(.system(size: 13, weight: .bold))
         .foregroundStyle(Theme.Color.appTextMuted)
         .frame(maxWidth: .infinity)
-        .frame(height: 46)
+        // JSX disabled lock button is height:44 (matches the design's 44pt CTA row).
+        .frame(height: 44)
         .background(Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityHint("This time conflicts with the selected member's availability")

@@ -131,8 +131,14 @@ extension AddEventFormViewModel {
     // MARK: - Static helpers
 
     /// Bucket validator used internally + for hydration round-tripping.
+    /// The required-message matches the design's invalid-frame helper
+    /// ("Add a title to save this event" — `add-event-frames.jsx:101`).
     static let titleValidator: FormValidator = .all([
-        .required("Title"),
+        FormValidator { value in
+            value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Add a title to save this event"
+                : nil
+        },
         .maxLength(120)
     ])
 

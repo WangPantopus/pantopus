@@ -29,6 +29,13 @@ final class WhosFreeViewModel {
     enum CellState: Sendable, Hashable {
         case free
         case busy
+        /// Soft-hold / maybe block — design amber `#fef3c7`. The home `whos-free`
+        /// read only emits free slots today, so this isn't produced from live data
+        /// yet (see `deferredBackend`); the grid + legend model it for parity.
+        case tentative
+        /// Outside the member's working/awake window — design hatched `#f9fafb`.
+        /// Not distinguished by the current wire contract; modelled for parity.
+        case offHours
         case unknown
     }
 
@@ -76,6 +83,12 @@ final class WhosFreeViewModel {
     /// True when no member has a single free block in the window.
     var hasNoFreeTime: Bool {
         !rows.isEmpty && rows.allSatisfy { row in row.cells.allSatisfy { $0 != .free } }
+    }
+
+    /// The first member who hasn't shared free/busy (all-unknown row) — drives the
+    /// opted-out explainer banner ("<name> hasn't shared free/busy").
+    var firstUnknownMemberName: String? {
+        rows.first { row in row.cells.allSatisfy { $0 == .unknown } }?.member.displayName
     }
 
     var columnLabels: [String] { Self.columnLabels }

@@ -66,49 +66,91 @@ public struct ShareLinkSheet: View {
 
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: 11) {
                 if !isLive { draftBanner }
-                overline
-                urlCard
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    overline
+                    urlCard
+                    Text("Anyone with this link can book you.")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
                 shareTargets
                 qrCard
                 toggles
                 regenerate
             }
-            .padding(Spacing.s5)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s5)
         }
         .background(Theme.Color.appSurface)
         .accessibilityIdentifier("scheduling.shareLinkSheet")
+        .overlay(alignment: .bottom) { copiedToast }
         .fullScreenCover(isPresented: $showQR) { qrFullScreen }
         .alert("Regenerate this link?", isPresented: $confirmRegenerate) {
             Button("Cancel", role: .cancel) {}
             Button("Regenerate", role: .destructive, action: onRegenerate)
         } message: {
-            Text("The old link stops working.")
+            Text("The old link stops working. Anyone using it will need the new one.")
+        }
+    }
+
+    // Floating green "Link copied" pill toast (design Frame 3).
+    @ViewBuilder
+    private var copiedToast: some View {
+        if copied {
+            HStack(spacing: Spacing.s2) {
+                Icon(.checkCircle2, size: 15, strokeWidth: 2.4, color: Theme.Color.success)
+                Text("Link copied")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.success)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s2)
+            .background(Theme.Color.successBg)
+            .overlay(
+                Capsule().stroke(Theme.Color.success.opacity(0.35), lineWidth: 1)
+            )
+            .clipShape(Capsule())
+            .pantopusShadow(PantopusShadow.md)
+            .padding(.bottom, Spacing.s5)
+            .transition(.opacity)
         }
     }
 
     // MARK: - Pieces
 
     private var draftBanner: some View {
-        HStack(alignment: .top, spacing: Spacing.s2) {
-            Icon(.info, size: 16, color: Theme.Color.warning)
-            VStack(alignment: .leading, spacing: Spacing.s1) {
+        HStack(alignment: .top, spacing: 9) {
+            Icon(.triangleAlert, size: 15, strokeWidth: 2.2, color: Theme.Color.warning)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 5) {
                 Text("This page isn't live yet. People can't book until you turn it on.")
-                    .pantopusTextStyle(.small)
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let onTurnOnPage {
-                    Button("Turn on", action: onTurnOnPage)
-                        .font(Theme.Font.small)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.primary600)
+                    Button(action: onTurnOnPage) {
+                        HStack(spacing: 4) {
+                            Text("Turn on")
+                                .font(.system(size: 11.5, weight: .bold))
+                            Icon(.arrowRight, size: 12, strokeWidth: 2.4, color: Theme.Color.warning)
+                        }
+                        .foregroundStyle(Theme.Color.warning)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .padding(Spacing.s3)
+        .padding(.horizontal, 11)
+        .padding(.vertical, Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.warningBg)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.warning.opacity(0.4), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private var overline: some View {
@@ -121,40 +163,47 @@ public struct ShareLinkSheet: View {
     }
 
     private var urlCard: some View {
-        HStack(spacing: Spacing.s3) {
+        HStack(spacing: Spacing.s2) {
             Text(url)
-                .font(.system(size: 14, design: .monospaced))
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Theme.Color.appText)
                 .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: Spacing.s2)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Button {
                 UIPasteboard.general.string = url
-                copied = true
+                withAnimation(.easeOut(duration: 0.15)) { copied = true }
                 onCopy()
             } label: {
                 HStack(spacing: Spacing.s1) {
-                    Icon(copied ? .check : .copy, size: 14, color: copied ? Theme.Color.success : Theme.Color.appTextInverse)
+                    Icon(copied ? .check : .copy, size: 14, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
                     Text(copied ? "Copied" : "Copy")
-                        .font(Theme.Font.small)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(copied ? Theme.Color.success : Theme.Color.appTextInverse)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
                 }
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, Spacing.s2)
-                .background(copied ? Theme.Color.successBg : Theme.Color.primary600)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(copied ? Theme.Color.success : Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .pantopusShadow(PantopusShadow.md)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(copied ? "Link copied" : "Copy link")
         }
-        .padding(Spacing.s3)
-        .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .padding(.leading, Spacing.s3)
+        .padding(.trailing, Spacing.s2)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .pantopusShadow(PantopusShadow.sm)
     }
 
     private var shareTargets: some View {
-        HStack(spacing: Spacing.s3) {
+        HStack(spacing: Spacing.s2) {
             shareTile(icon: .share, label: "Share", action: onShare)
             shareTile(icon: .qrCode, label: "QR code") { showQR = true }
             shareTile(icon: .messageCircle, label: "Messages", action: onMessages)
@@ -166,14 +215,19 @@ public struct ShareLinkSheet: View {
         Button(action: action) {
             VStack(spacing: Spacing.s2) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .fill(Theme.Color.primary50)
-                        .frame(height: 52)
-                    Icon(icon, size: 22, color: Theme.Color.primary600)
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .fill(Theme.Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .stroke(Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .frame(width: 52, height: 52)
+                        .pantopusShadow(PantopusShadow.sm)
+                    Icon(icon, size: 21, strokeWidth: 2, color: Theme.Color.primary600)
                 }
                 Text(label)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
             }
         }
         .buttonStyle(.plain)
@@ -182,91 +236,198 @@ public struct ShareLinkSheet: View {
     }
 
     private var qrCard: some View {
-        Button { showQR = true } label: {
-            HStack(spacing: Spacing.s3) {
-                qrImage(url, size: 44)
-                    .frame(width: 44, height: 44)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Show QR")
-                        .pantopusTextStyle(.body)
-                        .foregroundStyle(Theme.Color.appText)
-                    Text("Scan to book")
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextMuted)
-                }
-                Spacer(minLength: Spacing.s2)
-                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+        HStack(spacing: 11) {
+            qrImage(url, size: 32)
+                .frame(width: 32, height: 32)
+                .padding(4)
+                .background(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Scan to book")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Print it or show it at a desk.")
+                    .font(.system(size: 10.5, weight: .regular))
+                    .foregroundStyle(Theme.Color.appTextMuted)
             }
-            .padding(Spacing.s3)
-            .background(Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            Spacer(minLength: Spacing.s2)
+            Button { showQR = true } label: {
+                Text("Show QR")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary700)
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.vertical, 7)
+                    .background(Theme.Color.primary50)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(Theme.Color.primary100, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show QR code")
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .pantopusShadow(PantopusShadow.sm)
     }
 
     private var toggles: some View {
         VStack(spacing: 0) {
-            toggleRow("Show on my profile", isOn: showOnProfile, onChange: onToggleShowOnProfile)
-            Divider().background(Theme.Color.appBorderSubtle)
-            toggleRow("Add to email signature", isOn: addToSignature, onChange: onToggleSignature)
+            toggleRow(
+                icon: .userRound,
+                label: "Show on my profile",
+                sub: "Neighbors see a Book button on your page.",
+                isOn: showOnProfile,
+                onChange: onToggleShowOnProfile
+            )
+            Divider().overlay(Theme.Color.appBorder)
+            toggleRow(
+                icon: .mail,
+                label: "Add to email signature",
+                sub: "Appends the link to outgoing mail.",
+                isOn: addToSignature,
+                onChange: onToggleSignature
+            )
         }
         .padding(.horizontal, Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .pantopusShadow(PantopusShadow.sm)
     }
 
-    private func toggleRow(_ label: String, isOn: Bool, onChange: @escaping @Sendable (Bool) -> Void) -> some View {
+    private func toggleRow(
+        icon: PantopusIcon,
+        label: String,
+        sub: String,
+        isOn: Bool,
+        onChange: @escaping @Sendable (Bool) -> Void
+    ) -> some View {
         Toggle(isOn: Binding(get: { isOn }, set: onChange)) {
-            Text(label)
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appText)
+            HStack(spacing: 11) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .fill(isOn ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
+                        .frame(width: 30, height: 30)
+                    Icon(icon, size: 15, strokeWidth: 2, color: isOn ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(sub)
+                        .font(.system(size: 10.5, weight: .regular))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .tint(Theme.Color.primary600)
-        .padding(.vertical, Spacing.s2)
+        .padding(.vertical, 9)
     }
 
     private var regenerate: some View {
-        Button("Regenerate link") { confirmRegenerate = true }
-            .font(Theme.Font.small)
-            .foregroundStyle(Theme.Color.error)
-            .frame(maxWidth: .infinity)
-            .padding(.top, Spacing.s2)
+        Button { confirmRegenerate = true } label: {
+            HStack(spacing: Spacing.s1) {
+                Icon(.rotateCcw, size: 14, strokeWidth: 2.2, color: Theme.Color.error)
+                Text("Regenerate link")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.error)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .padding(.top, Spacing.s1)
     }
 
     // MARK: - QR fullscreen
 
     private var qrFullScreen: some View {
-        VStack(spacing: Spacing.s5) {
+        VStack(spacing: 0) {
             HStack {
                 Spacer()
                 Button("Done") { showQR = false }
-                    .font(Theme.Font.body)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.Color.primary600)
             }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
+
             Spacer()
-            qrImage(url, size: 240)
-                .frame(width: 240, height: 240)
-                .padding(Spacing.s5)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            Text(url)
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
+
+            VStack(spacing: 0) {
+                overline
+                Spacer().frame(height: 18)
+                qrImage(url, size: 184)
+                    .frame(width: 184, height: 184)
+                    .padding(18)
+                    .background(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.xl3, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.xl3, style: .continuous))
+                    .pantopusShadow(PantopusShadow.xl)
+                Text(url)
+                    .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 22)
+                Text("Point a camera here to open the booking page.")
+                    .font(.system(size: 11.5, weight: .regular))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 200)
+                    .padding(.top, 14)
+            }
+            .padding(.horizontal, Spacing.s6)
+
             Spacer()
+
+            Button(action: saveQRToPhotos) {
+                HStack(spacing: 7) {
+                    Icon(.download, size: 15, color: Theme.Color.appTextStrong)
+                    Text("Save to Photos")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
+                .background(Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .pantopusShadow(PantopusShadow.sm)
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, Spacing.s6)
         }
-        .padding(Spacing.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Color.appBg)
+        .background(Theme.Color.appSurface)
+    }
+
+    /// Renders the booking-link QR at print resolution and writes it to the
+    /// user's photo library. Self-contained — the QR is generated locally via
+    /// CoreImage, so no callback/endpoint is required.
+    private func saveQRToPhotos() {
+        guard let cg = Self.qrCGImage(url, size: 1024) else { return }
+        UIImageWriteToSavedPhotosAlbum(UIImage(cgImage: cg), nil, nil, nil)
     }
 
     @ViewBuilder

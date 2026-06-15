@@ -80,10 +80,15 @@ struct MemberWorkingHoursSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 tzChip
-                if let summary = model.upcomingOverride {
-                    datedCard(icon: .calendarClock, title: summary, sub: "Overrides the weekly hours for this date", tone: .biz)
+                if let exception = model.upcomingException {
+                    datedCard(
+                        icon: exception.isBlocked ? .ban : .calendarClock,
+                        title: exception.title,
+                        sub: exception.sub,
+                        isError: exception.isBlocked
+                    )
                 }
-                weekCard
+                weekCard(readonly: false)
                 copyLink
                 BizOverline(text: "Date overrides")
                 overrideRows
@@ -109,18 +114,18 @@ struct MemberWorkingHoursSheet: View {
         .accessibilityLabel("Time zone, \(model.timezoneId)")
     }
 
-    private var weekCard: some View {
+    private func weekCard(readonly: Bool) -> some View {
         BizCard {
             VStack(spacing: Spacing.s0) {
                 ForEach(Array(model.days.enumerated()), id: \.element.id) { idx, day in
-                    dayRow(day)
+                    dayRow(day, readonly: readonly)
                     if idx < model.days.count - 1 { BizRowDivider() }
                 }
             }
         }
     }
 
-    private func dayRow(_ day: MemberWorkingHoursViewModel.DayHours) -> some View {
+    private func dayRow(_ day: MemberWorkingHoursViewModel.DayHours, readonly: Bool) -> some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
             Text(Weekday.shortName(day.weekday))
                 .font(.system(size: 12, weight: .bold))
@@ -135,21 +140,38 @@ struct MemberWorkingHoursSheet: View {
                 Spacer(minLength: Spacing.s0)
             } else {
                 FlowRanges(ranges: day.ranges) { range in
-                    rangePill(weekday: day.weekday, range: range)
+                    if readonly {
+                        readonlyRangePill(range: range)
+                    } else {
+                        rangePill(weekday: day.weekday, range: range)
+                    }
                 }
                 Spacer(minLength: Spacing.s0)
             }
-            Button { model.addRange(weekday: day.weekday) } label: {
-                ZStack {
-                    Circle().stroke(Theme.Color.appBorder, lineWidth: 1)
-                    Icon(.plus, size: 13, color: accent)
+            if !readonly {
+                Button { model.addRange(weekday: day.weekday) } label: {
+                    ZStack {
+                        Circle().stroke(Theme.Color.appBorder, lineWidth: 1)
+                        Icon(.plus, size: 13, color: accent)
+                    }
+                    .frame(width: 26, height: 26)
                 }
-                .frame(width: 26, height: 26)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add a range to \(Weekday.longName(day.weekday))")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add a range to \(Weekday.longName(day.weekday))")
         }
         .padding(.vertical, 11)
+    }
+
+    /// Static range chip for the read-only inherits grid: sunken fill, secondary
+    /// text, no remove `x` and no editing menu. Mirrors `RangeChip readonly`.
+    private func readonlyRangePill(range: TimeRange) -> some View {
+        Text(range.display)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .background(Theme.Color.appSurfaceSunken)
+            .clipShape(Capsule())
     }
 
     private func rangePill(weekday: Int, range: TimeRange) -> some View {
@@ -224,23 +246,37 @@ struct MemberWorkingHoursSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func datedCard(icon: PantopusIcon, title: String, sub: String, tone: BizTone) -> some View {
+    /// Dated-exception card. Biz tone (`.biz`) → custom-hours override
+    /// (`calendar-clock`, violet disc on `businessBg`, neutral text, `appBorder`).
+    /// Error tone (`.error`) → blocked-out / time-off (`ban`, error icon on a
+    /// white disc, `errorBg` card with an `errorLight` border, error-colored
+    /// title + sub). Mirrors `memberhours` `DatedCard`.
+    private func datedCard(icon: PantopusIcon, title: String, sub: String, isError: Bool) -> some View {
         HStack(spacing: 11) {
             ZStack {
-                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tone.bg)
-                Icon(icon, size: 16, color: tone.icon)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isError ? Theme.Color.appSurface : Theme.Color.businessBg)
+                Icon(icon, size: 16, color: isError ? Theme.Color.error : accent)
             }
             .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
-                Text(sub).font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
+                Text(title)
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(isError ? Theme.Color.error : Theme.Color.appText)
+                Text(sub)
+                    .font(.system(size: 11))
+                    .foregroundStyle(isError ? Theme.Color.error : Theme.Color.appTextSecondary)
             }
             Spacer(minLength: Spacing.s0)
+            Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
         }
         .padding(.horizontal, 13).padding(.vertical, Spacing.s3)
-        .background(Theme.Color.appSurface)
+        .background(isError ? Theme.Color.errorBg : Theme.Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(isError ? Theme.Color.errorLight : Theme.Color.appBorder, lineWidth: 1)
+        )
         .pantopusShadow(.sm)
     }
 
@@ -249,25 +285,38 @@ struct MemberWorkingHoursSheet: View {
     private var readOnlyBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
-                HStack(spacing: Spacing.s2) {
-                    Icon(.link, size: 16, color: accent)
-                    Text("These hours are managed by \(model.readOnlyMemberName ?? "this member"). Only they can change them.")
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(Theme.Color.appTextStrong)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: Spacing.s0)
-                }
-                .padding(.horizontal, 13).padding(.vertical, Spacing.s3)
-                .background(Theme.Color.businessBg)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-
-                BizNote(tone: .info, icon: .info,
-                        text: "Members set their own booking hours from their availability. Ask them to update it, or change the team's coverage from booking availability.")
+                inheritsLinkRow
+                weekCard(readonly: true)
+                    .opacity(0.6)
+                    .allowsHitTesting(false)
                 Color.clear.frame(height: Spacing.s4)
             }
             .padding(.horizontal, Spacing.s4)
             .padding(.top, Spacing.s1)
         }
+    }
+
+    /// Biz-tinted "inherits personal availability" row with a sky "View personal"
+    /// link. Mirrors `memberhours` frame 4 (`FrameInherits`).
+    private var inheritsLinkRow: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.link, size: 16, color: accent)
+            Text("These hours come from \(model.readOnlyMemberName ?? "this member")'s personal availability.")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: Spacing.s2)
+            Button { onNavigate?(.availabilityScheduleList) } label: {
+                Text("View personal")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary600)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 13).padding(.vertical, Spacing.s3)
+        .background(Theme.Color.businessBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     // MARK: Loading / error

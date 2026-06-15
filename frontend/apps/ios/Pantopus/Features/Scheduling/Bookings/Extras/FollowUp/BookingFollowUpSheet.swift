@@ -63,6 +63,7 @@ struct BookingFollowUpSheet: View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text("Follow up")
                 .font(.system(size: 16.5, weight: .bold))
+                .tracking(-0.2)
                 .foregroundStyle(Theme.Color.appText)
             Text(viewModel.headerSubtitle)
                 .font(.system(size: 11.5))
@@ -97,7 +98,9 @@ struct BookingFollowUpSheet: View {
                 placeholder: "Write a message, or pick an outcome above to start from a template.",
                 minHeight: 84
             )
-            ExtrasChipButton(title: "Send rebook link", icon: .link, accent: theme.accent) {
+            // Functional control — design's rebook-link chip is brand primary
+            // (JSX `color:PRIMARY`), not the owner pillar accent.
+            ExtrasChipButton(title: "Send rebook link", icon: .link, accent: Theme.Color.primary600) {
                 Task { await viewModel.appendRebookLink() }
             }
             .disabled(!viewModel.canAppendRebookLink)
@@ -130,11 +133,13 @@ struct BookingFollowUpSheet: View {
 
     private var pushToggle: some View {
         @Bindable var viewModel = viewModel
+        // Functional control — design's push toggle fills brand primary
+        // (JSX `background:PRIMARY`), not the owner pillar accent.
         return ExtrasChannelRow(
             icon: .bell,
             label: "Send via push + message",
             isOn: $viewModel.pushOn,
-            accent: theme.accent
+            accent: Theme.Color.primary600
         )
     }
 
@@ -146,10 +151,13 @@ struct BookingFollowUpSheet: View {
                     onClose()
                 }
             } else {
+                // Functional CTA — design's send/try-again button fills brand
+                // primary (JSX solid CTA `background:PRIMARY`, blue-tinted
+                // shadow `rgba(2,132,199,0.28)`), not the owner pillar accent.
                 ExtrasSolidButton(
                     title: viewModel.primaryTitle,
                     icon: viewModel.primaryIcon,
-                    accent: theme.accent,
+                    accent: Theme.Color.primary600,
                     isEnabled: viewModel.canSubmit,
                     isBusy: viewModel.isSending
                 ) {
@@ -159,24 +167,54 @@ struct BookingFollowUpSheet: View {
         }
     }
 
+    /// JSX frame 4 (Sent): a dimmed scrim over the parent content with a
+    /// centered success disc + white title, plus a dark pinned bottom toast.
     private var successOverlay: some View {
-        VStack(spacing: Spacing.s4) {
-            ExtrasIconDisc(
-                icon: .check,
-                background: Theme.Color.successBg,
-                foreground: Theme.Color.success,
-                diameter: 72
-            )
-            Text("Follow-up sent")
-                .font(.system(size: 16.5, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-            Text("Follow-up sent to \(viewModel.inviteeName)")
-                .font(.system(size: 12.5))
-                .foregroundStyle(Theme.Color.appTextSecondary)
+        ZStack {
+            Theme.Color.appText.opacity(0.42)
+                .ignoresSafeArea()
+            VStack(spacing: Spacing.s4) {
+                successDisc
+                Text("Follow-up sent")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.white)
+            }
+            successToast
+                .padding(.horizontal, Spacing.s4)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, Spacing.s8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Color.appSurface)
         .transition(.opacity)
+    }
+
+    /// 72pt success disc with a successLight ring (JSX `border:1px SUCCESS_LIGHT`)
+    /// and a heavier check stroke (JSX `strokeWidth:2.6`).
+    private var successDisc: some View {
+        ZStack {
+            Circle().fill(Theme.Color.successBg)
+            Circle().strokeBorder(Theme.Color.successLight, lineWidth: 1)
+            Icon(.check, size: 34, strokeWidth: 2.6, color: Theme.Color.success)
+        }
+        .frame(width: 72, height: 72)
+        .accessibilityHidden(true)
+    }
+
+    /// Dark pinned toast (JSX gray-900 bg, mapped to appText) with a
+    /// successLight `check-circle-2` glyph and the recipient name.
+    private var successToast: some View {
+        HStack(spacing: Spacing.s2 + 2) {
+            Icon(.checkCircle2, size: 18, color: Theme.Color.successLight)
+            Text("Follow-up sent to \(viewModel.inviteeName)")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Color.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s3 + 2)
+        .padding(.vertical, Spacing.s3)
+        .background(Theme.Color.appText)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .shadow(color: Theme.Color.appText.opacity(0.3), radius: 12, y: 8)
     }
 }
 

@@ -71,7 +71,7 @@ struct PaymentFailedView: View {
         scaffold(
             halo: .creditCard, tone: .error,
             title: "Your payment didn't go through",
-            body: "Your card was declined. Nothing was charged.",
+            body: "Your card was declined — not enough funds. Nothing was charged.",
             footnote: "Your time is still held. Try another card.",
             footnoteIcon: .shieldCheck
         ) {
@@ -123,12 +123,12 @@ struct PaymentFailedView: View {
     private var succeeded: some View {
         VStack(spacing: Spacing.s4) {
             Spacer(minLength: 0)
-            EdgeIconHalo(icon: .checkCircle, tone: .success, size: 84)
+            EdgeIconHalo(icon: .checkCircle2, tone: .success, size: 84)
             VStack(spacing: Spacing.s2) {
                 Text("Payment went through")
                     .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
-                Text("Your card worked. Taking you to your booking.")
+                Text("Your second card worked. Taking you to your booking.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .multilineTextAlignment(.center)
@@ -226,10 +226,10 @@ struct PaymentFailedView: View {
             EdgeDock {
                 dock()
                 HStack(spacing: Spacing.s1) {
-                    Icon(footnoteIcon, size: 13, color: Theme.Color.success)
+                    Icon(footnoteIcon, size: 13, color: Theme.Color.appTextMuted)
                     Text(footnote)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appTextMuted)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 .padding(.top, Spacing.s1)
             }
@@ -242,13 +242,16 @@ struct PaymentFailedView: View {
         HStack(spacing: Spacing.s2) {
             Icon(.timer, size: 13, strokeWidth: 2.2, color: released ? Theme.Color.error : Theme.Color.warning)
             Text(holdChipText(released: released))
-                .font(.system(size: 11.5, weight: .bold))
+                .font(.system(size: 11.5, weight: released ? .bold : .semibold))
                 .foregroundStyle(released ? Theme.Color.error : Theme.Color.warning)
                 .monospacedDigit()
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
         .background(released ? Theme.Color.errorBg : Theme.Color.warningBg)
+        .overlay(
+            Capsule().stroke(released ? Theme.Color.errorLight : Theme.Color.warningLight, lineWidth: 1)
+        )
         .clipShape(Capsule())
     }
 
@@ -270,7 +273,7 @@ struct PaymentFailedView: View {
                 Text("Your card")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
-                Text("Declined — nothing was charged")
+                Text("Declined · not enough funds")
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.error)
             }
@@ -299,7 +302,7 @@ struct PaymentFailedView: View {
         .background(Theme.Color.infoBg)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Theme.Color.primary100, lineWidth: 1)
+                .stroke(Theme.Color.infoLight, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }

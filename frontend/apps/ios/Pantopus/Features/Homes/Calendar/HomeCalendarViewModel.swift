@@ -328,7 +328,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         let dowFmt = DateFormatter()
         dowFmt.locale = Locale(identifier: "en_US_POSIX")
         dowFmt.timeZone = cal.timeZone
-        dowFmt.dateFormat = "EEE"
+        // Narrow weekday — single initial ("S M T W T F S"), matching the
+        // home-shell `MonthStrip` (NOT the 3-letter `EEE` abbreviation).
+        dowFmt.dateFormat = "EEEEE"
         let dayFmt = DateFormatter()
         dayFmt.locale = Locale(identifier: "en_US_POSIX")
         dayFmt.timeZone = cal.timeZone

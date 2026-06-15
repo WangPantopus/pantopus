@@ -19,6 +19,8 @@ public struct HomeCalendarView: View {
         _viewModel = State(initialValue: viewModel)
     }
 
+    private var isOffline: Bool { !NetworkMonitor.shared.isOnline }
+
     public var body: some View {
         @Bindable var bindable = viewModel
         return ZStack(alignment: .bottomTrailing) {
@@ -34,15 +36,20 @@ public struct HomeCalendarView: View {
                 Button {
                     viewModel.openWhosFree()
                 } label: {
-                    Icon(.users, size: 20, color: Theme.Color.homeDark)
+                    // Design mutes the "Who's free" action while offline.
+                    Icon(
+                        .users,
+                        size: 20,
+                        color: isOffline ? Theme.Color.appTextMuted : Theme.Color.homeDark
+                    )
                 }
+                .disabled(isOffline)
                 .accessibilityLabel("Who's free")
                 .accessibilityIdentifier("homeCalendar_whosFree")
             }
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("homeCalendar")
-        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .onAppear { Analytics.track(.screenHomeCalendarViewed) }
         .task { await viewModel.load() }
         .sheet(isPresented: $bindable.isCreateMenuPresented) {
@@ -58,50 +65,91 @@ public struct HomeCalendarView: View {
     }
 
     private var showsFab: Bool {
+        // Design drops the FAB on the loading, error, and offline frames
+        // (FrameLoading / FrameError / FrameOffline render only the TabBar —
+        // no create affordance). Default / empty / filtered-empty keep it.
+        if isOffline { return false }
         switch viewModel.state {
-        case .loading, .error: false
-        default: true
+        case .loading, .error: return false
+        default: return true
         }
     }
 
     // MARK: - Content
 
+    /// Every frame keeps the month strip + filter-chip chrome (and, when
+    /// offline, the inline amber banner) pinned above a swapping body region.
+    /// The design's loading / error / offline frames all retain that chrome.
     @ViewBuilder private var content: some View {
-        switch viewModel.state {
-        case .loading:
-            loadingView
-        case let .error(message):
-            EmptyState(
-                icon: .cloudOff,
-                headline: "Couldn't load the calendar",
-                subcopy: message,
-                cta: EmptyState.CTA(title: "Retry") { await viewModel.load() },
-                tint: Theme.Color.homeBg,
-                accent: Theme.Color.home
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        default:
-            VStack(spacing: 0) {
-                if let strip = viewModel.monthStrip {
-                    MonthStripHeader(
-                        state: strip,
-                        onSelectDay: { iso in viewModel.selectDay(isoDate: iso) },
-                        onPrevMonth: { viewModel.shiftWeek(.previous) },
-                        onNextMonth: { viewModel.shiftWeek(.next) }
-                    )
-                }
+        VStack(spacing: 0) {
+            if isOffline {
+                OfflineCalendarBanner()
+            }
+            if let strip = viewModel.monthStrip {
+                MonthStripHeader(
+                    state: strip,
+                    onSelectDay: { iso in viewModel.selectDay(isoDate: iso) },
+                    onPrevMonth: { viewModel.shiftWeek(.previous) },
+                    onNextMonth: { viewModel.shiftWeek(.next) }
+                )
+            }
+            if showsFilterRow {
                 FilterChipRow(
                     chips: viewModel.filterChips,
                     selected: viewModel.memberFilter,
                     onSelect: { viewModel.selectFilter($0) }
                 )
-                if let empty = viewModel.agendaEmpty {
-                    emptyView(empty)
-                } else {
-                    agendaList
-                }
+            }
+            bodyRegion
+        }
+    }
+
+    /// The filter row hides only on the error frame (no list to filter).
+    private var showsFilterRow: Bool {
+        switch viewModel.state {
+        case .error: false
+        default: true
+        }
+    }
+
+    @ViewBuilder private var bodyRegion: some View {
+        switch viewModel.state {
+        case .loading:
+            loadingView
+        case .error:
+            errorView
+        default:
+            if let empty = viewModel.agendaEmpty {
+                emptyView(empty)
+            } else {
+                agendaList
             }
         }
+    }
+
+    private var errorView: some View {
+        VStack(spacing: Spacing.s1) {
+            Icon(.cloudOff, size: 26, color: Theme.Color.error)
+                .frame(width: 56, height: 56)
+                .background(Theme.Color.errorBg)
+                .clipShape(Circle())
+                .padding(.bottom, Spacing.s3)
+            Text("Couldn't load the calendar")
+                .font(.system(size: 15.5, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .multilineTextAlignment(.center)
+            Text("Something went wrong on our side. Check your connection and try again.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 220)
+            PrimaryButton(title: "Retry") { await viewModel.load() }
+                .frame(width: 160)
+                .padding(.top, Spacing.s4)
+        }
+        .padding(.horizontal, Spacing.s6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("homeCalendar_error")
     }
 
     private var agendaList: some View {
@@ -114,7 +162,8 @@ public struct HomeCalendarView: View {
                         .padding(.horizontal, Spacing.s1)
                         .padding(.top, Spacing.s1)
                     ForEach(section.items) { item in
-                        HomeAgendaRowCard(item: item) {
+                        // Offline frame dims the (stale) synced rows.
+                        HomeAgendaRowCard(item: item, dimmed: isOffline) {
                             viewModel.openAgendaItem(item)
                         }
                     }
@@ -131,7 +180,7 @@ public struct HomeCalendarView: View {
         switch empty {
         case .firstRun:
             EmptyState(
-                icon: .calendarDays,
+                icon: .calendar,
                 headline: "Nothing scheduled",
                 subcopy: "Add your first event and it shows up here for the whole household.",
                 cta: EmptyState.CTA(title: "Add an event") {
@@ -248,7 +297,7 @@ private struct FilteredEmpty: View {
 
     var body: some View {
         VStack(spacing: Spacing.s1) {
-            Icon(.calendarDays, size: 26, color: Theme.Color.home)
+            Icon(.calendarSearch, size: 26, color: Theme.Color.home)
                 .frame(width: 56, height: 56)
                 .background(Theme.Color.homeBg)
                 .clipShape(Circle())
@@ -271,6 +320,10 @@ private struct FilteredEmpty: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 9)
                 .background(Theme.Color.homeBg)
+                .overlay(
+                    // Design clear-filter pill carries a subtle green (H.bg200) border.
+                    Capsule().stroke(Theme.Color.home.opacity(0.3), lineWidth: 1)
+                )
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -279,6 +332,43 @@ private struct FilteredEmpty: View {
         }
         .padding(.horizontal, Spacing.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Offline banner
+
+/// The design's bespoke offline frame renders an inline amber banner inside
+/// the surface, above the month strip (icon `wifi-off`, "You're offline" /
+/// "Showing the last synced schedule. Changes save when you reconnect.").
+/// This replaces the generic `.offlineBanner` strip on this screen.
+private struct OfflineCalendarBanner: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Icon(.wifiOff, size: 15, strokeWidth: 2.2, color: Theme.Color.warning)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("You're offline")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                Text("Showing the last synced schedule. Changes save when you reconnect.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(Theme.Color.warningBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s3)
+        .padding(.top, Spacing.s2)
+        .background(Theme.Color.appSurface)
+        .accessibilityIdentifier("homeCalendar_offlineBanner")
     }
 }
 

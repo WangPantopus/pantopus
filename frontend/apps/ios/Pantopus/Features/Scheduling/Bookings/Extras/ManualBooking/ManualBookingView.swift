@@ -111,7 +111,6 @@ struct ManualBookingView: View {
 
     @ViewBuilder private var timeStep: some View {
         stepTitle("Choose a time")
-        timezoneChip
         switch viewModel.availabilityPhase {
         case .loading:
             HStack(spacing: Spacing.s2) {
@@ -123,14 +122,20 @@ struct ManualBookingView: View {
         case let .error(message):
             VStack(spacing: Spacing.s4) {
                 ExtrasIconDisc(icon: .cloudOff, background: Theme.Color.errorBg, foreground: Theme.Color.error, diameter: 64)
-                Text(message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .multilineTextAlignment(.center)
+                VStack(spacing: Spacing.s2 - 2) {
+                    Text(message)
+                        .font(.system(size: 14.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Check your connection and try again.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.s8)
+            .padding(.vertical, Spacing.s10)
         case .loaded:
+            timezoneChip
             dayStrip
             let slots = viewModel.slotsForSelectedDay
             if slots.isEmpty {
@@ -203,33 +208,92 @@ struct ManualBookingView: View {
     @ViewBuilder private var detailsStep: some View {
         @Bindable var viewModel = viewModel
         stepTitle("Who's it for?")
-        labeledField(label: "Name", icon: .user, placeholder: "Invitee name", text: $viewModel.inviteeName)
+        searchField($viewModel.inviteeName)
 
-        ExtrasOverline(text: "Contact")
-        HStack(spacing: Spacing.s2) {
-            ExtrasPillChip(
-                title: "Email",
-                isSelected: viewModel.contactMode == .email,
-                selectedForeground: theme.accent,
-                selectedBackground: theme.accentBg
-            ) {
-                viewModel.contactMode = .email
-            }
-            ExtrasPillChip(
+        ExtrasOverline(text: "Invite by")
+        VStack(spacing: Spacing.s2 + 1) {
+            inviteByRow(
+                icon: .phone,
                 title: "Phone",
-                isSelected: viewModel.contactMode == .phone,
-                selectedForeground: theme.accent,
-                selectedBackground: theme.accentBg
+                subtitle: "Recommended",
+                isSelected: viewModel.contactMode == .phone
             ) {
                 viewModel.contactMode = .phone
+            }
+            inviteByRow(
+                icon: .mail,
+                title: "Email",
+                subtitle: nil,
+                isSelected: viewModel.contactMode == .email
+            ) {
+                viewModel.contactMode = .email
             }
         }
         if viewModel.contactMode == .email {
             labeledField(label: "Email", icon: .mail, placeholder: "invitee@email.com", text: $viewModel.inviteeEmail, isEmail: true)
         } else {
-            labeledField(label: "Phone", icon: .phone, placeholder: "Phone number", text: $viewModel.inviteePhone)
+            labeledField(label: "Phone number", icon: .phone, placeholder: "Phone number", text: $viewModel.inviteePhone)
         }
         labeledField(label: "Note for the invitee", icon: .messageSquare, placeholder: "Add a note (optional)", text: $viewModel.note)
+    }
+
+    /// Design step-3 invitee search field — `search` glyph on a sunken fill.
+    /// (The verified-invitee result card + not-on-Pantopus invite banner from
+    /// the design depend on an invitee directory the model lacks; deferred.)
+    private func searchField(_ text: Binding<String>) -> some View {
+        HStack(spacing: Spacing.s2 + 1) {
+            Icon(.search, size: 16, color: Theme.Color.appTextMuted)
+            TextField("Search or enter a name", text: text)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .textInputAutocapitalization(.words)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .frame(height: 42)
+        .background(Theme.Color.appSurfaceSunken)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+    }
+
+    /// A single "Invite by" channel selector row — pillar-accented when on, with
+    /// an optional "Recommended" subtitle and a trailing check on selection.
+    private func inviteByRow(
+        icon: PantopusIcon,
+        title: String,
+        subtitle: String?,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s3) {
+                Icon(icon, size: 17, color: isSelected ? theme.accent : Theme.Color.appTextStrong)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isSelected { Icon(.checkCircle, size: 18, color: theme.accent) }
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s3 - 1)
+            .background(isSelected ? theme.accentBg : Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .strokeBorder(isSelected ? theme.accent : Theme.Color.appBorder, lineWidth: isSelected ? 1.5 : 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: Step 4 — Review
@@ -336,7 +400,7 @@ struct ManualBookingView: View {
     private var timezoneChip: some View {
         HStack(spacing: Spacing.s2 - 2) {
             Icon(.globe, size: 13, color: Theme.Color.appTextStrong)
-            Text("Times in \(viewModel.tz)")
+            Text("Times in \(viewModel.tzLabel)")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextStrong)
         }

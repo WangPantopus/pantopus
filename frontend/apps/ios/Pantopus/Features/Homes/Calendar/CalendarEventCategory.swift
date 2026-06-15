@@ -19,7 +19,7 @@
 
 import SwiftUI
 
-/// The 11 designed event categories + a `generic` fallback for any
+/// The 12 designed event categories + a `generic` fallback for any
 /// `event_type` the inference helper can't classify.
 public enum CalendarEventCategory: String, CaseIterable, Sendable {
     case chore
@@ -32,6 +32,7 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
     case pet
     case bill
     case medical
+    case meal
     case trash
     case generic
 
@@ -48,8 +49,25 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .pet: "Pet"
         case .bill: "Bill"
         case .medical: "Medical"
+        case .meal: "Meal"
         case .trash: "Trash day"
         case .generic: "Event"
+        }
+    }
+
+    /// Label used by the Home add/edit-event category picker. The picker
+    /// surfaces the design's 5-category vocabulary (health/chore/meal/family/
+    /// school — `add-event-frames.jsx:8`, `CAT` in `home-shell.jsx`) where the
+    /// copy differs from the agenda `label` ("Health" vs "Medical",
+    /// pluralised "Chores"/"Meals").
+    public var pickerLabel: String {
+        switch self {
+        case .medical: "Health"
+        case .chore: "Chores"
+        case .meal: "Meals"
+        case .family: "Family"
+        case .school: "School"
+        default: label
         }
     }
 
@@ -66,6 +84,7 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .pet: .pawPrint
         case .bill: .receipt
         case .medical: .stethoscope
+        case .meal: .utensils
         case .trash: .trash2
         case .generic: .calendar
         }
@@ -104,6 +123,9 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .medical:
             // CSS fee2e2
             Color(red: 0xFE / 255.0, green: 0xE2 / 255.0, blue: 0xE2 / 255.0)
+        case .meal:
+            // CSS fef3c7 — warm amber, pairs with the design meal dot #d97706.
+            Color(red: 0xFE / 255.0, green: 0xF3 / 255.0, blue: 0xC7 / 255.0)
         case .trash:
             // CSS e2e8f0
             Color(red: 0xE2 / 255.0, green: 0xE8 / 255.0, blue: 0xF0 / 255.0)
@@ -146,12 +168,40 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .medical:
             // CSS b91c1c
             Color(red: 0xB9 / 255.0, green: 0x1C / 255.0, blue: 0x1C / 255.0)
+        case .meal:
+            // CSS d97706 — design meal accent.
+            Color(red: 0xD9 / 255.0, green: 0x77 / 255.0, blue: 0x06 / 255.0)
         case .trash:
             // CSS 334155
             Color(red: 0x33 / 255.0, green: 0x41 / 255.0, blue: 0x55 / 255.0)
         case .generic:
             // primary600
             Color(red: 0x02 / 255.0, green: 0x84 / 255.0, blue: 0xC7 / 255.0)
+        }
+    }
+
+    /// Solid category dot rendered in the Home add/edit-event picker pill.
+    /// Mirrors the design's `CAT[*].c` swatch (`home-shell.jsx:28-35`) for the
+    /// five picker categories; other categories reuse `foreground`.
+    public var dotColor: Color {
+        switch self {
+        case .medical:
+            // CSS e11d48 — design "health" dot.
+            Color(red: 0xE1 / 255.0, green: 0x1D / 255.0, blue: 0x48 / 255.0)
+        case .chore:
+            // CSS f97316 — design "chore" dot.
+            Color(red: 0xF9 / 255.0, green: 0x73 / 255.0, blue: 0x16 / 255.0)
+        case .meal:
+            // CSS d97706 — design "meal" dot.
+            Color(red: 0xD9 / 255.0, green: 0x77 / 255.0, blue: 0x06 / 255.0)
+        case .family:
+            // CSS 7c3aed — design "family" dot.
+            Color(red: 0x7C / 255.0, green: 0x3A / 255.0, blue: 0xED / 255.0)
+        case .school:
+            // CSS 2980b9 — design "school" dot.
+            Color(red: 0x29 / 255.0, green: 0x80 / 255.0, blue: 0xB9 / 255.0)
+        default:
+            foreground
         }
     }
 
@@ -194,6 +244,10 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         "medical": .medical,
         "doctor": .medical,
         "appointment": .medical,
+        "meal": .meal,
+        "breakfast": .meal,
+        "lunch": .meal,
+        "dinner": .meal,
         "trash": .trash,
         "garbage": .trash,
         "recycling": .trash,
@@ -216,7 +270,11 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         if raw.contains("delivery") || raw.contains("package") || raw.contains("amazon") {
             return .delivery
         }
-        if raw.contains("party") || raw.contains("dinner") || raw.contains("social") {
+        if raw.contains("meal") || raw.contains("breakfast") || raw.contains("lunch") ||
+            raw.contains("dinner") || raw.contains("brunch") || raw.contains("supper") {
+            return .meal
+        }
+        if raw.contains("party") || raw.contains("social") {
             return .social
         }
         if raw.contains("repair") || raw.contains("maintenance") || raw.contains("plumber") ||

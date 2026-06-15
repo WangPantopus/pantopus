@@ -150,15 +150,18 @@ struct TeamBookingAvailabilityView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
-                    if row.bookable {
-                        BizChip(tone: .biz, icon: .calendarCheck, text: "Bookable")
+                    if row.usesPersonalHours {
+                        BizChip(tone: .biz, icon: .user, text: "Personal hours")
                             .padding(.top, 5)
                     } else {
-                        BizChip(tone: .neutral, icon: .ban, text: "Off")
+                        BizChip(tone: .neutral, icon: .building2, text: "Business hours")
                             .padding(.top, 5)
                     }
                 }
                 Spacer(minLength: Spacing.s2)
+                if !model.isGated {
+                    TeamBookableToggle(on: row.bookable)
+                }
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
             }
             .padding(.vertical, Spacing.s3)
@@ -166,7 +169,7 @@ struct TeamBookingAvailabilityView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(row.name), \(row.summary)")
+        .accessibilityLabel("\(row.name), \(row.summary), \(row.bookable ? "bookable" : "off")")
     }
 
     @ViewBuilder
@@ -176,7 +179,7 @@ struct TeamBookingAvailabilityView: View {
             HStack(spacing: Spacing.s2) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.Color.appSurfaceSunken)
-                    Icon(.calendarDays, size: 16, color: Theme.Color.appTextSecondary)
+                    Icon(.calendarX, size: 16, color: Theme.Color.appTextSecondary)
                 }
                 .frame(width: 32, height: 32)
                 Text(text)
@@ -192,7 +195,7 @@ struct TeamBookingAvailabilityView: View {
             .overlay(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
             .pantopusShadow(.sm)
         case let .warning(text):
-            BizNote(tone: .warning, icon: .alertTriangle, text: text)
+            BizNote(tone: .warning, icon: .calendarX, text: text)
         case nil:
             EmptyView()
         }
@@ -210,7 +213,7 @@ struct TeamBookingAvailabilityView: View {
                     BizCard {
                         VStack(spacing: Spacing.s0) {
                             ForEach(0..<4, id: \.self) { idx in
-                                BizShimmerRow(showTrailingPill: false)
+                                BizShimmerRow(showTrailingPill: true)
                                 if idx < 3 { BizRowDivider() }
                             }
                         }
@@ -257,6 +260,30 @@ struct TeamBookingAvailabilityView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, Spacing.s8)
         .background(Theme.Color.appBg)
+    }
+}
+
+// MARK: - Bookable toggle
+
+/// iOS 46×28 switch mirroring the design's `IToggle` (violet when on). Reflects
+/// the member's derived bookability — the row tap opens G4, where the member's
+/// hours (and thus bookability) are actually edited; the backend exposes no
+/// per-member bookable WRITE, so this is a status indicator, not a control.
+private struct TeamBookableToggle: View {
+    let on: Bool
+
+    var body: some View {
+        ZStack(alignment: on ? .trailing : .leading) {
+            Capsule()
+                .fill(on ? Theme.Color.business : Theme.Color.appBorder)
+                .frame(width: 46, height: 28)
+            Circle()
+                .fill(Theme.Color.appSurface)
+                .frame(width: 24, height: 24)
+                .padding(.horizontal, 2)
+                .pantopusShadow(.sm)
+        }
+        .accessibilityHidden(true)
     }
 }
 

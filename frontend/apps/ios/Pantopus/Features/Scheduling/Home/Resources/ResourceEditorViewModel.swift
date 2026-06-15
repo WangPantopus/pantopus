@@ -40,6 +40,20 @@ final class ResourceEditorViewModel {
     var saveError: String?
     var showDeleteConfirm = false
     private(set) var isDeleting = false
+    /// Booking-rules disclosure (F10 `RulesDisclosure`). Collapsed on create so
+    /// the smart-defaults helper shows; expanded on edit per the design frames.
+    var isRulesExpanded = false
+
+    // MARK: Specific-member picker (view-only structure)
+
+    /// Household members surfaced when "Specific" is selected (F10
+    /// `WhoCanBook` → `MemberSelectRow`s). The directory feed is deferred —
+    /// this stays empty until a roster source is wired, so the picker renders
+    /// the rows + checks only once members are present and otherwise falls
+    /// back to the "coming soon" caption.
+    private(set) var members: [HomeMember] = []
+    /// Member ids granted access in the "Specific" picker (drives the row check).
+    var selectedMemberIds: Set<String> = []
 
     // MARK: Dependencies
 
@@ -85,18 +99,23 @@ final class ResourceEditorViewModel {
         isCreate ? !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty : true
     }
 
-    /// Collapsed-rule helper, e.g. "Charger defaults: 4 hr max · No approval".
+    /// Collapsed-rule helper. Create prefixes the type ("Charger defaults: 4 hr
+    /// max · No approval"); edit drops the prefix ("4 hr max · No approval") —
+    /// matching the two F10 `RulesDisclosure` `defaultHelper` strings.
     var ruleHelper: String {
         let approval = requiresApproval ? "Needs approval" : "No approval"
-        return "\(maxDurationHours) hr max · \(approval)"
+        let summary = "\(maxDurationHours) hr max · \(approval)"
+        return isCreate ? "\(kind.label) defaults: \(summary)" : summary
     }
 
     // MARK: Load
 
     func load() async {
         guard let resourceId else {
-            // Create — seed defaults for the initial type and present.
+            // Create — seed defaults for the initial type and present. Rules
+            // stay collapsed so the smart-defaults helper reads (F10 create).
             applyDefaults(for: kind)
+            isRulesExpanded = false
             loadState = .ready
             return
         }
@@ -111,6 +130,8 @@ final class ResourceEditorViewModel {
                 return
             }
             apply(resource)
+            // Edit opens the rules disclosure expanded (F10 edit frame).
+            isRulesExpanded = true
             loadState = .ready
         } catch let error as SchedulingError {
             loadState = .error(message: error.userMessage ?? "Couldn't load this resource.")
@@ -152,6 +173,20 @@ final class ResourceEditorViewModel {
             hoursDays.remove(weekday)
         } else {
             hoursDays.insert(weekday)
+        }
+    }
+
+    /// Toggle the disclosure (F10 chevron-up / chevron-down).
+    func toggleRules() {
+        isRulesExpanded.toggle()
+    }
+
+    /// Toggle a member's access in the "Specific" picker (view-only).
+    func toggleMember(_ id: String) {
+        if selectedMemberIds.contains(id) {
+            selectedMemberIds.remove(id)
+        } else {
+            selectedMemberIds.insert(id)
         }
     }
 

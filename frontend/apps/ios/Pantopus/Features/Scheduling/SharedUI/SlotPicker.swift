@@ -221,37 +221,16 @@ public struct SlotPicker: View {
     }
 
     private var noAvailabilityCard: some View {
-        VStack(spacing: Spacing.s3) {
-            ZStack {
-                Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 56, height: 56)
-                Icon(.calendar, size: 26, color: Theme.Color.appTextMuted)
-            }
-            Text("No open times in \(monthName)")
-                .pantopusTextStyle(.h3)
-                .foregroundStyle(Theme.Color.appText)
-                .multilineTextAlignment(.center)
-            Text("Availability changes often. Try a later month.")
-                .pantopusTextStyle(.small)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
-            VStack(spacing: Spacing.s2) {
-                if let onJumpNextAvailable {
-                    Button("Jump to next available", action: onJumpNextAvailable)
-                        .font(Theme.Font.small)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(accent)
-                }
-                if let onNotifyMe {
-                    Button("Get notified when times open", action: onNotifyMe)
-                        .font(Theme.Font.small)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-            }
-            .padding(.top, Spacing.s1)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.s8)
-        .padding(.horizontal, Spacing.s4)
+        SlotPickerEmptyCard(
+            // lucide `calendar-search` — see sharedChangesNeeded; `.calendarClock`
+            // is the closest existing glyph until the icon enum gains the case.
+            icon: .calendarClock,
+            title: "No open times in \(monthName)",
+            message: "Availability changes often. Try a later month.",
+            accent: accent,
+            primary: onJumpNextAvailable.map { (label: "See \(nextMonthName)", icon: PantopusIcon.arrowRight, action: $0) },
+            secondary: onNotifyMe.map { (label: "Get notified when times open", icon: PantopusIcon.bell, chip: nil, action: $0) }
+        )
     }
 
     // MARK: - Formatting
@@ -262,6 +241,19 @@ public struct SlotPicker: View {
         fmt.timeZone = calendar.timeZone
         fmt.dateFormat = "LLLL"
         return fmt.string(from: monthAnchor)
+    }
+
+    /// Label for the month after `monthAnchor` — the design's "See July" CTA when
+    /// the visible month is empty. Falls back to a generic label if math fails.
+    private var nextMonthName: String {
+        guard let next = calendar.date(byAdding: .month, value: 1, to: monthAnchor) else {
+            return "next month"
+        }
+        let fmt = DateFormatter()
+        fmt.calendar = calendar
+        fmt.timeZone = calendar.timeZone
+        fmt.dateFormat = "LLLL"
+        return fmt.string(from: next)
     }
 
     private func timeLabel(for slot: SlotDTO) -> String {
@@ -453,6 +445,96 @@ private struct SlotPickerCalendar: View {
         if isToday { label += ", today" }
         label += enabled ? ", available" : ", unavailable"
         return label
+    }
+}
+
+// MARK: - Empty-state card
+
+/// The design's `EmptyCard`: a centered icon-in-circle, title, body, a filled
+/// accent primary CTA (icon + label + soft shadow) and an optional outlined
+/// secondary CTA (icon + label + optional count chip). One reusable shape for
+/// the no-times-in-range, no-times-anywhere, and composed-empty frames.
+private struct SlotPickerEmptyCard: View {
+    let icon: PantopusIcon
+    let title: String
+    let message: String
+    let accent: Color
+    let primary: (label: String, icon: PantopusIcon, action: () -> Void)?
+    let secondary: (label: String, icon: PantopusIcon, chip: String?, action: () -> Void)?
+
+    var body: some View {
+        VStack(spacing: Spacing.s3) {
+            ZStack {
+                Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 50, height: 50)
+                Icon(icon, size: 23, strokeWidth: 1.85, color: Theme.Color.appTextSecondary)
+            }
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(message)
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: Spacing.s2) {
+                if let primary {
+                    Button(action: primary.action) {
+                        HStack(spacing: Spacing.s2) {
+                            Icon(primary.icon, size: 15, color: Theme.Color.appTextInverse)
+                            Text(primary.label)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Theme.Color.appTextInverse)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 42)
+                        .background(accent)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                        .shadow(color: accent.opacity(0.24), radius: 6, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if let secondary {
+                    Button(action: secondary.action) {
+                        HStack(spacing: Spacing.s2) {
+                            Icon(secondary.icon, size: 14, color: Theme.Color.appText)
+                            Text(secondary.label)
+                                .font(.system(size: 12.5, weight: .bold))
+                                .foregroundStyle(Theme.Color.appText)
+                            if let chip = secondary.chip {
+                                Text(chip)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Theme.Color.appTextSecondary)
+                                    .padding(.horizontal, Spacing.s2)
+                                    .padding(.vertical, 2)
+                                    .background(Theme.Color.appSurfaceSunken)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .background(Theme.Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .stroke(Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, Spacing.s1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Spacing.s5)
+        .padding(.vertical, Spacing.s6)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .strokeBorder(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 }
 

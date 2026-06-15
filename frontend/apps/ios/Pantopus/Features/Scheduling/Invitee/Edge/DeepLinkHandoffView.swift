@@ -28,7 +28,6 @@ struct DeepLinkHandoffView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task { await viewModel.load() }
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
-            .addToCalendarSheet(item: $viewModel.addToCalendar)
             .accessibilityIdentifier("scheduling.deepLinkHandoff")
     }
 
@@ -49,17 +48,23 @@ struct DeepLinkHandoffView: View {
     private var resolving: some View {
         VStack(spacing: Spacing.s4) {
             Spacer(minLength: 0)
-            EdgeIconHalo(icon: .smartphone, tone: .info, size: 64)
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                Shimmer(width: 160, height: 14)
-                Shimmer(width: 220, height: 12)
+            PantopusMark(size: 52)
+            HStack(spacing: Spacing.s3) {
+                Shimmer(width: 38, height: 38, cornerRadius: Radii.md)
+                VStack(alignment: .leading, spacing: 7) {
+                    Shimmer(width: 130, height: 11)
+                    Shimmer(width: 170, height: 9)
+                }
+                Spacer(minLength: 0)
             }
-            .padding(Spacing.s4)
+            .padding(Spacing.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             HStack(spacing: Spacing.s2) {
                 Circle().fill(Theme.Color.primary600).frame(width: 7, height: 7)
                 Text("Opening your booking")
@@ -99,10 +104,6 @@ struct DeepLinkHandoffView: View {
         .safeAreaInset(edge: .bottom) {
             EdgeDock {
                 PrimaryButton(title: "Continue in app") { viewModel.continueInApp() }
-                Button("Add to calendar") { viewModel.presentAddToCalendar(response) }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.Color.primary600)
-                    .frame(maxWidth: .infinity, minHeight: 36)
                 GhostButton(title: "Stay on web") { openWeb() }
             }
         }
@@ -194,7 +195,7 @@ struct DeepLinkHandoffView: View {
         .safeAreaInset(edge: .bottom) {
             EdgeDock {
                 PrimaryButton(title: "Continue on the web") { openWeb() }
-                GhostButton(title: "Try again") { await viewModel.retry() }
+                GhostButton(title: "Try the app again") { await viewModel.retry() }
             }
         }
         .accessibilityLabel(message)
@@ -202,6 +203,42 @@ struct DeepLinkHandoffView: View {
 
     private func openWeb() {
         if let url = viewModel.webURL { openURL(url) }
+    }
+}
+
+/// The Pantopus brand mark — a rounded-square sky gradient tile carrying the
+/// concentric-ring glyph. Leads the resolving interstitial (design `PantopusMark`).
+private struct PantopusMark: View {
+    var size: CGFloat = 52
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [Theme.Color.primary600, Theme.Color.primary700],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: size, height: size)
+            .overlay(glyph)
+            .shadow(color: Theme.Color.primary600.opacity(0.28), radius: 4, x: 0, y: 3)
+            .accessibilityHidden(true)
+    }
+
+    private var glyph: some View {
+        let g = size * 0.62
+        return ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.35), lineWidth: g * 0.05)
+                .frame(width: g * 0.85, height: g * 0.85)
+            Circle()
+                .stroke(Color.white, lineWidth: g * 0.07)
+                .frame(width: g * 0.5, height: g * 0.5)
+            Circle()
+                .fill(Color.white)
+                .frame(width: g * 0.16, height: g * 0.16)
+        }
     }
 }
 

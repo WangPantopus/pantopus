@@ -34,11 +34,16 @@ struct BookingFilterSheet: View {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
                     searchField
                     if !viewModel.activeSummary.isEmpty { activeSummarySection }
-                    if viewModel.resultCount == 0 { noResults }
-                    statusSection
-                    ownerContextSection
-                    if !viewModel.eventTypeOptions.isEmpty { eventTypeSection }
-                    dateRangeSection
+                    // No-results frame (JSX FrameNoResults) replaces the facet
+                    // sections with the empty note — the only escape is Clear all.
+                    if viewModel.resultCount == 0 {
+                        noResults
+                    } else {
+                        statusSection
+                        ownerContextSection
+                        if !viewModel.eventTypeOptions.isEmpty { eventTypeSection }
+                        dateRangeSection
+                    }
                 }
                 .padding(.horizontal, Spacing.s4)
                 .padding(.top, Spacing.s1)
@@ -199,7 +204,7 @@ struct BookingFilterSheet: View {
     private var noResults: some View {
         VStack(spacing: Spacing.s3) {
             ExtrasIconDisc(
-                icon: .search,
+                icon: .searchX,
                 background: Theme.Color.appSurfaceSunken,
                 foreground: Theme.Color.appTextSecondary,
                 diameter: 60

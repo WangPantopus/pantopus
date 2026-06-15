@@ -17,21 +17,64 @@ extension BookingDetailView {
         switch viewModel.status {
         case .cancelled, .declined:
             VStack(spacing: Spacing.s2) {
-                banner(
-                    viewModel.status == .declined ? "This request was declined." : "This booking was cancelled.",
-                    icon: .circleSlash, tone: .neutral
-                )
+                // Design frame 4: "Cancelled by host on Jun 11 · '<reason>'"
+                // (circle-slash, neutral sunken chip).
+                banner(viewModel.cancelledBannerText, icon: .circleSlash, tone: .neutral)
                 if booking.refundIssued == true {
                     refundLine
                 }
             }
         case .noShow:
-            banner("Marked no-show — the invitee didn't attend.", icon: .ban, tone: .error)
-        case .completed:
-            banner("This booking is complete.", icon: .checkCircle, tone: .success)
+            // Design frame 5: "Marked no-show · <name> didn't attend" (user-x).
+            banner(noShowBannerText, icon: .userX, tone: .error)
+        case .completed, .past:
+            // Design frame 3: blue "Send a follow-up" promo (sparkles), not a
+            // success "complete" line.
+            followUpPromoBanner
         default:
             EmptyView()
         }
+    }
+
+    /// "Marked no-show · <first name> didn't attend" — design no-show banner.
+    var noShowBannerText: String {
+        let first = (viewModel.booking?.inviteeName ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: " ").first.map(String.init)
+        if let first, !first.isEmpty {
+            return "Marked no-show · \(first) didn't attend"
+        }
+        return "Marked no-show · the invitee didn't attend"
+    }
+
+    /// Design frame 3 — blue `sparkles` promo above the past-booking dock.
+    var followUpPromoBanner: some View {
+        let first = (viewModel.booking?.inviteeName ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: " ").first.map(String.init)
+        let subject = (first?.isEmpty == false) ? first! : "them"
+        return HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.sparkles, size: 16, color: Theme.Color.primary600)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Send a follow-up")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Thank \(subject) and offer a time to book again.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.primary50)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.primary200, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     var refundLine: some View {
@@ -50,8 +93,17 @@ extension BookingDetailView {
 
     // MARK: - Section cards
 
+    /// Design uses "Requester" while a booking is live (confirmed/pending) and
+    /// "Attendee" once it's in a terminal/past state (frames 3/4/5).
+    var requesterOverline: String {
+        switch viewModel.status {
+        case .completed, .past, .noShow, .cancelled, .declined: "Attendee"
+        default: "Requester"
+        }
+    }
+
     func requesterCard(_ booking: BookingDTO) -> some View {
-        detailCard(overline: viewModel.status == .completed ? "Attendee" : "Requester", icon: .user) {
+        detailCard(overline: requesterOverline, icon: .user) {
             HStack(spacing: Spacing.s3) {
                 BookingAvatar(ownerType: booking.ownerType, name: booking.inviteeName, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
@@ -66,6 +118,22 @@ extension BookingDetailView {
                     }
                 }
                 Spacer(minLength: Spacing.s0)
+                // Design `AttendeeRow`: trailing 36×36 outlined `message-circle`
+                // icon button in the brand blue. Routes to the (deferred) message
+                // handler.
+                Button { viewModel.message() } label: {
+                    Icon(.messageCircle, size: 17, color: Theme.Color.primary600)
+                        .frame(width: 36, height: 36)
+                        .background(Theme.Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Message")
+                .accessibilityIdentifier("scheduling.bookingDetail.message")
             }
         }
     }

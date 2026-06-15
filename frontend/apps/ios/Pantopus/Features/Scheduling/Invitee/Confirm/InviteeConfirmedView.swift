@@ -16,6 +16,7 @@ struct InviteeConfirmedView: View {
     @State private var showAddToCalendar = false
     @State private var shareItem: ICSShareItem?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(viewModel: InviteeConfirmedViewModel) {
@@ -76,7 +77,7 @@ struct InviteeConfirmedView: View {
     private var hero: some View {
         VStack(spacing: Spacing.s4) {
             HaloBadge(
-                icon: viewModel.isPending ? .hourglass : .checkCircle,
+                icon: viewModel.isPending ? .hourglass : .checkCircle2,
                 tone: viewModel.isPending ? .info : .success,
                 animated: !reduceMotion
             )
@@ -97,15 +98,46 @@ struct InviteeConfirmedView: View {
 
     private var timelineCard: some View {
         ConfirmCard {
-            HStack(alignment: .top, spacing: Spacing.s0) {
-                ForEach(Array(viewModel.timelineSteps.enumerated()), id: \.offset) { index, step in
-                    timelineStep(step, isLast: index == viewModel.timelineSteps.count - 1)
+            ZStack(alignment: .top) {
+                timelineRail
+                HStack(alignment: .top, spacing: Spacing.s0) {
+                    ForEach(Array(viewModel.timelineSteps.enumerated()), id: \.offset) { index, step in
+                        timelineStep(step, isLast: index == viewModel.timelineSteps.count - 1)
+                    }
                 }
             }
         }
     }
 
-    private func timelineStep(_ step: (label: String, state: InviteeConfirmedViewModel.TimelineStepState), isLast: Bool) -> some View {
+    /// The connecting rail behind the nodes: a grey track spanning the inner 2/3
+    /// (node centers sit at 1/6, 1/2, 5/6) with a blue fill up to the active node.
+    private var timelineRail: some View {
+        GeometryReader { geo in
+            let inset = geo.size.width / 6
+            let span = geo.size.width - inset * 2
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.Color.appBorder)
+                    .frame(width: span, height: 2)
+                Capsule().fill(Theme.Color.primary600)
+                    .frame(width: span * timelineFill, height: 2)
+            }
+            .offset(x: inset, y: 14)
+        }
+        .frame(height: 28)
+    }
+
+    /// Progress fraction of the rail: 0 at submitted, 1/2 while awaiting host.
+    private var timelineFill: CGFloat {
+        let steps = viewModel.timelineSteps
+        if steps.allSatisfy({ $0.state == .done }) { return 1 }
+        if steps.contains(where: { $0.state == .current }) { return 0.5 }
+        return 0
+    }
+
+    private func timelineStep(
+        _ step: (label: String, sub: String?, state: InviteeConfirmedViewModel.TimelineStepState),
+        isLast: Bool
+    ) -> some View {
         VStack(spacing: Spacing.s2) {
             ZStack {
                 Circle()
@@ -122,10 +154,18 @@ struct InviteeConfirmedView: View {
                 case .pending: EmptyView()
                 }
             }
-            Text(step.label)
-                .font(.system(size: 10.5, weight: step.state == .pending ? .regular : .bold))
-                .foregroundStyle(step.state == .pending ? Theme.Color.appTextSecondary : Theme.Color.appText)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 2) {
+                Text(step.label)
+                    .font(.system(size: 10.5, weight: step.state == .pending ? .regular : .bold))
+                    .foregroundStyle(step.state == .pending ? Theme.Color.appTextSecondary : Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                if let sub = step.sub {
+                    Text(sub)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -161,7 +201,7 @@ struct InviteeConfirmedView: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: Spacing.s2) {
                 Icon(.badgeCheck, size: 16, strokeWidth: 2.2, color: Theme.Color.success)
-                Text(viewModel.receiptProcessing ? "Payment processing" : "Payment received")
+                Text(viewModel.receiptTitle)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Theme.Color.success)
                 Spacer(minLength: Spacing.s0)
@@ -172,10 +212,21 @@ struct InviteeConfirmedView: View {
                         .foregroundStyle(Theme.Color.success)
                 }
             }
+            if let balance = viewModel.depositBalanceLabel {
+                Text(balance)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Color.success)
+            }
+            Rectangle()
+                .fill(Theme.Color.successLight)
+                .frame(height: 1)
+                .padding(.top, Spacing.s1)
             if viewModel.receiptProcessing {
-                Text("We'll confirm once payment clears.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                HStack(spacing: Spacing.s2) {
+                    Icon(.mail, size: 13, color: Theme.Color.appTextMuted)
+                    Shimmer(height: 11, cornerRadius: Radii.sm)
+                }
+                .accessibilityLabel("Sending your receipt")
             } else {
                 HStack(spacing: Spacing.s1) {
                     Icon(.mailCheck, size: 13, color: Theme.Color.success)
@@ -200,7 +251,7 @@ struct InviteeConfirmedView: View {
     private var manageNote: some View {
         Button { viewModel.openManage() } label: {
             HStack(alignment: .top, spacing: Spacing.s2) {
-                Icon(.calendarClock, size: 14, color: Theme.Color.appTextMuted)
+                Icon(.settings2, size: 14, color: Theme.Color.appTextMuted)
                 (Text("Need to change it? ")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
@@ -223,7 +274,9 @@ struct InviteeConfirmedView: View {
         ConfirmFooter {
             if viewModel.isPending {
                 ConfirmPrimaryButton(label: "Done", icon: .check, accent: viewModel.accent) { dismiss() }
-                secondaryButton("Manage booking") { viewModel.openManage() }
+                secondaryButton("Message host") {
+                    if let url = viewModel.messageHostURL { openURL(url) }
+                }
             } else {
                 ConfirmPrimaryButton(label: "Add to calendar", icon: .calendarPlus, accent: viewModel.accent) {
                     showAddToCalendar = true
@@ -390,5 +443,17 @@ struct ICSShareSheet: UIViewControllerRepresentable {
 
 #Preview("Pending") {
     NavigationStack { InviteeConfirmedView(viewModel: .previewPending()) }
+}
+
+#Preview("Paid") {
+    NavigationStack { InviteeConfirmedView(viewModel: .previewPaid()) }
+}
+
+#Preview("Deposit") {
+    NavigationStack { InviteeConfirmedView(viewModel: .previewDeposit()) }
+}
+
+#Preview("Email sending") {
+    NavigationStack { InviteeConfirmedView(viewModel: .previewSending()) }
 }
 #endif

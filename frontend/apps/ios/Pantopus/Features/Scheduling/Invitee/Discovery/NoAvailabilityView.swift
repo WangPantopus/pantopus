@@ -43,7 +43,7 @@ struct NoAvailabilityView: View {
                 primaryAction: { await viewModel.seeNextMonth() },
                 secondaryTitle: "Get notified when times open",
                 secondaryIcon: .bell,
-                secondaryAction: {}
+                secondaryAction: { viewModel.notifyWhenAvailable() }
             )
             .padding(.horizontal, Spacing.s4)
         case let .found(monthName):

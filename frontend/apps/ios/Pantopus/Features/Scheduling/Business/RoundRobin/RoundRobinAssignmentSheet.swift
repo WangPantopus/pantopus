@@ -51,8 +51,8 @@ struct RoundRobinAssignmentSheet: View {
     private var readyBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s2) {
-                ruleCard(.balanced, name: "Balanced", desc: "Spread bookings by weight", icon: .gauge)
-                ruleCard(.priority, name: "Priority order", desc: "Fill the top of the list first", icon: .listChecks)
+                ruleCard(.balanced, name: "Balanced", desc: "Spread bookings by weight", icon: .scale)
+                ruleCard(.priority, name: "Priority order", desc: "Fill the top of the list first", icon: .listOrdered)
                 ruleCard(.strict, name: "Strict round-robin", desc: "One each, strictly in turn", icon: .arrowsRepeat)
 
                 BizOverline(text: "Bookable members", color: Theme.Color.appTextSecondary)
@@ -136,7 +136,9 @@ struct RoundRobinAssignmentSheet: View {
             BizAvatar(name: pick.name, imageURL: pick.avatarURL, size: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(pick.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appText).lineLimit(1)
-                Text(pick.role ?? "Uses personal availability")
+                // Design hardcodes this sub-line for every seat (roundrobin-frames.jsx
+                // SeatRow); the member's job title is never surfaced here.
+                Text("Uses personal availability")
                     .font(.system(size: 10.5)).foregroundStyle(Theme.Color.appTextSecondary).lineLimit(1)
             }
             Spacer(minLength: Spacing.s2)
@@ -148,7 +150,9 @@ struct RoundRobinAssignmentSheet: View {
 
     @ViewBuilder
     private func trailing(_ pick: RoundRobinAssignmentViewModel.Pick) -> some View {
-        if pick.checked {
+        // Design's single-member frame passes `hideTrailing`: with one member
+        // there's nothing to weight or reorder, so no stepper/grip renders.
+        if pick.checked && !model.isSingleMember {
             switch model.selectedRule {
             case .balanced:
                 BizStepper(

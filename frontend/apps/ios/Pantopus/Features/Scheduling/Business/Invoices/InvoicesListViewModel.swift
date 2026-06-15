@@ -18,6 +18,20 @@ import SwiftUI
 final class InvoicesListViewModel {
     enum Phase: Equatable { case loading, loaded, empty, gate, error(String), comingSoon }
 
+    /// Status filter chips (`invoiceslist-frames.jsx` `FilterChips`). The DTO
+    /// carries no `status`, so selecting a status chip cannot yet filter the
+    /// list (deferred); `.all` is the only chip with data behind it. The chip
+    /// row + selection are rendered now so the structure matches the design.
+    enum InvoiceFilter: String, CaseIterable, Identifiable {
+        case all = "All"
+        case paid = "Paid"
+        case sent = "Sent"
+        case overdue = "Overdue"
+        case refunded = "Refunded"
+
+        var id: String { rawValue }
+    }
+
     // MARK: Inputs
 
     let owner: SchedulingOwner
@@ -32,15 +46,28 @@ final class InvoicesListViewModel {
     private(set) var paymentsConnected = false
     private(set) var paymentsApplicable = true
 
+    /// Active status filter chip. View-only until the DTO carries `status`.
+    var selectedFilter: InvoiceFilter = .all
+
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
 
-    /// Sum of all invoice totals — the one summary stat the DTO supports.
+    /// The two-stat summary structure (`invoiceslist-frames.jsx` `Summary`).
+    /// The design's KPIs are Outstanding (amber when any invoice is overdue) /
+    /// Collected · month — both need per-invoice `status` + `paid_at`, which the
+    /// lean DTO omits. Until those land we surface the two DTO-derivable totals
+    /// in the same two-column layout, and the overdue-amber treatment stays a
+    /// view-only capability driven by `hasOverdue` (always false today).
     var totalLabel: String {
         SchedulingMoney.format(cents: invoices.reduce(0) { $0 + ($1.totalCents ?? 0) }, currency: invoices.first?.currency)
     }
 
     var countLabel: String { "\(invoices.count)" }
+
+    /// Drives the summary's amber treatment (design `Summary overdue`). No
+    /// `status` in the DTO yet → no invoice can be flagged overdue, so this is
+    /// always false until the field lands (deferred).
+    var hasOverdue: Bool { false }
 
     init(
         owner: SchedulingOwner,
@@ -86,6 +113,14 @@ final class InvoicesListViewModel {
     func openInvoice(_ invoice: InvoiceDTO) { push(.invoiceDetail(owner: owner, invoiceId: invoice.id)) }
     func connectPayments() { push(.paymentsSetup(owner: owner)) }
 
+    func selectFilter(_ filter: InvoiceFilter) { selectedFilter = filter }
+
+    /// Top-bar search affordance (`invoiceslist-frames.jsx` `SearchBtn`). The
+    /// design draws the glyph but wires no destination, and there is no invoice
+    /// search route/endpoint yet — so this is a no-op placeholder (deferred)
+    /// keeping the chrome structurally faithful.
+    func search() {}
+
     // MARK: Row formatting
 
     func amount(_ invoice: InvoiceDTO) -> String {
@@ -95,5 +130,22 @@ final class InvoicesListViewModel {
     /// Short monospace reference from the invoice id (no invoice_number in DTO).
     func reference(_ invoice: InvoiceDTO) -> String {
         "INV-" + invoice.id.prefix(6).uppercased()
+    }
+
+    /// Service sub-label (`INV-… · {service}`) — derived from the first parsed
+    /// line item. Falls back to "Service" when `line_items` carries no label.
+    func service(_ invoice: InvoiceDTO) -> String {
+        InvoiceParsing.lineItems(from: invoice.lineItems).first?.label ?? "Service"
+    }
+
+    /// Two-letter initials for the payer avatar disc. The DTO has no payer
+    /// display name (only `recipient_user_id`), so we derive a stable two-char
+    /// token from the invoice reference until the name lands (deferred).
+    func payerInitials(_ invoice: InvoiceDTO) -> String {
+        let token = (invoice.recipientUserId ?? invoice.id)
+            .filter(\.isLetter)
+            .prefix(2)
+            .uppercased()
+        return token.isEmpty ? "IN" : token
     }
 }

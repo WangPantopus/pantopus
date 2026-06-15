@@ -82,7 +82,7 @@ struct InviteeIntakeFormView: View {
         ConfirmFooter {
             ConfirmPrimaryButton(
                 label: viewModel.holdExpired ? "Pick another time" : "Review booking",
-                icon: viewModel.holdExpired ? .calendar : nil,
+                icon: viewModel.holdExpired ? .calendarSearch : nil,
                 accent: viewModel.accent,
                 isDisabled: !viewModel.holdExpired && !viewModel.isValid
             ) {
@@ -259,7 +259,9 @@ struct InviteeIntakeFormView: View {
         case "textarea":
             IntakeTextArea(
                 label: question.label, required: question.required ?? false,
-                value: answerBinding(key), error: error
+                value: answerBinding(key),
+                placeholder: viewModel.coverPlaceholder,
+                error: error
             )
         case "select":
             IntakeSelect(
@@ -291,7 +293,7 @@ struct InviteeIntakeFormView: View {
                 value: answerBinding(key),
                 placeholder: "(555) 000-0000",
                 leading: "+1",
-                helper: error == nil ? "For a text reminder before your booking." : nil,
+                helper: error == nil ? "For a text reminder before the call." : nil,
                 showValid: showValid(for: key, value: viewModel.textAnswer(key), error: error),
                 error: error,
                 keyboard: .phonePad,
@@ -395,7 +397,7 @@ struct InviteeIntakeFormView: View {
     private var expiredBanner: some View {
         ConfirmBanner(
             tone: .warning,
-            icon: .clock,
+            icon: .clockAlert,
             title: "This held time just expired",
             message: "Someone else can book it now. Pick another time to keep going."
         )
@@ -525,12 +527,13 @@ private struct IntakeTextArea: View {
     let label: String
     var required = false
     @Binding var value: String
+    var placeholder = "A sentence or two helps."
     var error: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             FieldLabelText(label: label, required: required)
-            TextField("A sentence or two helps.", text: $value, axis: .vertical)
+            TextField(placeholder, text: $value, axis: .vertical)
                 .font(.system(size: 13.5))
                 .foregroundStyle(Theme.Color.appText)
                 .lineLimit(3...6)

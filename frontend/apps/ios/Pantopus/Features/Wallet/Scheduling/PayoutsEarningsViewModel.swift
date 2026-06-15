@@ -50,7 +50,7 @@ struct EarningRow: Identifiable, Equatable, Sendable {
     var statusLabel: String {
         if isFee { return "Fee" }
         if direction == .out { return "Payout" }
-        return isPending ? "Processing" : "Cleared"
+        return isPending ? "Pending" : "Cleared"
     }
 }
 

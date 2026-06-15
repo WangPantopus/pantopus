@@ -115,14 +115,53 @@ struct BookingDetailView: View {
                 .padding(.bottom, hasDock ? 110 : Spacing.s8)
             }
             .refreshable { await viewModel.refresh() }
-            if hasDock { dockView }
+            if hasDock || viewModel.hasConflict {
+                VStack(spacing: Spacing.s0) {
+                    if viewModel.hasConflict { conflictBanner }
+                    if hasDock { dockView }
+                }
+            }
         }
+    }
+
+    // MARK: - Conflict banner (design frame 6)
+
+    private var conflictBanner: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.triangleAlert, size: 17, color: Theme.Color.warning)
+            Text("This overlaps another booking")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.warning)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: Spacing.s0)
+            Button { viewModel.viewConflict() } label: {
+                Text("View")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.warningBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
+        .padding(.bottom, Spacing.s3)
+        .accessibilityIdentifier("scheduling.bookingDetail.conflictBanner")
     }
 
     private var hasDock: Bool {
         switch viewModel.status {
-        case .pending, .confirmed, .active: true
-        default: false
+        case .pending, .confirmed, .active,
+             .completed, .past, .noShow,
+             .cancelled, .declined:
+            true
+        default:
+            false
         }
     }
 
@@ -163,14 +202,36 @@ struct BookingDetailView: View {
     private var dockView: some View {
         switch viewModel.status {
         case .pending:
+            // Design frame 2/6: Decline (ghost-danger, x) + Approve (primary, check).
             dockBar {
                 dockGhostDanger(title: "Decline", icon: .x) { viewModel.presentDecline() }
-                dockPrimary(title: "Approve", icon: .check, color: Theme.Color.primary600) { viewModel.presentReview() }
+                dockPrimary(title: "Approve", icon: .check) { viewModel.presentReview() }
             }
         case .confirmed, .active:
+            // Design frame 1/8: Reschedule (ghost, calendar-clock) + Message
+            // (primary, message-circle). The design makes Message the primary;
+            // Cancel lives in the overflow menu, not the dock.
             dockBar {
-                dockGhostDanger(title: "Cancel", icon: .xCircle) { viewModel.presentCancel() }
-                dockPrimary(title: "Reschedule", icon: .calendarClock, color: viewModel.accent) { viewModel.presentReschedule() }
+                dockGhost(title: "Reschedule", icon: .calendarClock) { viewModel.presentReschedule() }
+                dockPrimary(title: "Message", icon: .messageCircle) { viewModel.message() }
+            }
+        case .completed, .past:
+            // Design frame 3: Rebook (ghost, rotate-ccw) + Follow up (primary, send).
+            dockBar {
+                dockGhost(title: "Rebook", icon: .rotateCcw) { viewModel.rebook() }
+                dockPrimary(title: "Follow up", icon: .send) { viewModel.followUp() }
+            }
+        case .noShow:
+            // Design frame 5: Message (ghost, message-circle) + Send rebook link
+            // (primary, link).
+            dockBar {
+                dockGhost(title: "Message", icon: .messageCircle) { viewModel.message() }
+                dockPrimary(title: "Send rebook link", icon: .link) { viewModel.sendRebookLink() }
+            }
+        case .cancelled, .declined:
+            // Design frame 4: a single primary "Rebook this time" (rotate-ccw).
+            dockBar {
+                dockPrimary(title: "Rebook this time", icon: .rotateCcw) { viewModel.rebook() }
             }
         default:
             EmptyView()
@@ -186,6 +247,28 @@ struct BookingDetailView: View {
             .overlay(alignment: .top) { Rectangle().fill(Theme.Color.appBorder).frame(height: 1) }
     }
 
+    /// Neutral ghost button — design `BtnGhost` (no tone): `fg2` text + icon,
+    /// `borderStrong` 1px outline, surface fill.
+    private func dockGhost(title: String, icon: PantopusIcon, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s1) {
+                Icon(icon, size: 16, color: Theme.Color.appTextStrong)
+                Text(title).font(.system(size: 14, weight: .bold))
+            }
+            .foregroundStyle(Theme.Color.appTextStrong)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .strokeBorder(Theme.Color.appBorderStrong, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Danger ghost button — design `BtnGhost tone="danger"`: error text + icon,
+    /// `errorLight` outline.
     private func dockGhostDanger(title: String, icon: PantopusIcon, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: Spacing.s1) {
@@ -202,7 +285,9 @@ struct BookingDetailView: View {
         .buttonStyle(.plain)
     }
 
-    private func dockPrimary(title: String, icon: PantopusIcon, color: Color, action: @escaping () -> Void) -> some View {
+    /// Filled primary button — design `BtnPrimary`: always the brand
+    /// `PRIMARY` (`blue600`), never the owner accent.
+    private func dockPrimary(title: String, icon: PantopusIcon, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: Spacing.s1) {
                 Icon(icon, size: 16, color: Theme.Color.appTextInverse)
@@ -210,7 +295,7 @@ struct BookingDetailView: View {
             }
             .foregroundStyle(Theme.Color.appTextInverse)
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(color)
+            .background(Theme.Color.primary600)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)

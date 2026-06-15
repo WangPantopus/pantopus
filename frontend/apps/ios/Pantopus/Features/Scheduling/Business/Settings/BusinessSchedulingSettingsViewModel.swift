@@ -70,6 +70,13 @@ final class BusinessSchedulingSettingsViewModel {
     var timezone: String { page?.timezone ?? SchedulingTime.deviceTimeZoneIdentifier }
 
     var paymentsConnected: Bool { payments?.connected == true }
+
+    /// Connected-payout sub-line. The design shows the masked payout account
+    /// ("Payout to ••4291"), but `PaymentsStatusDTO` exposes no bank-last4 /
+    /// payout-destination field, so we surface the honest "Payout connected"
+    /// until that lands (see deferredBackend). Kept as a single source so the
+    /// row updates automatically once the field exists.
+    var payoutSub: String { "Payout connected" }
     var hasPaidServices: Bool { eventTypes.contains { ($0.priceCents ?? 0) > 0 } }
     /// Frame 4 trigger — paid services exist but Stripe isn't connected yet.
     var paymentsRequired: Bool { hasPaidServices && !paymentsConnected }

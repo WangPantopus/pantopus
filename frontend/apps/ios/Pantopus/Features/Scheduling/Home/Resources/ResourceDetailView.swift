@@ -57,6 +57,9 @@ struct ResourceDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s3) {
                     headerCard
+                    if viewModel.isFullyBooked {
+                        fullyBookedBanner
+                    }
                     if !viewModel.approvals.isEmpty {
                         approvalQueueCard
                     }
@@ -76,7 +79,7 @@ struct ResourceDetailView: View {
                 Icon(viewModel.kind.icon, size: 23, color: Theme.Color.home)
                     .frame(width: 46, height: 46)
                     .background(Theme.Color.homeBg)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(viewModel.resourceName)
                         .font(.system(size: 16, weight: .bold))
@@ -88,11 +91,51 @@ struct ResourceDetailView: View {
             if !viewModel.ruleChips.isEmpty {
                 FlexChipRow(chips: viewModel.ruleChips)
             }
+            if viewModel.pendingApprovalCount > 0 {
+                pendingApprovalBadge
+            }
         }
     }
 
+    /// Amber "Pending approval (N)" badge button inside the header card
+    /// (F11 approval-pending frame).
+    private var pendingApprovalBadge: some View {
+        Button {
+            viewModel.openApprovalQueue()
+        } label: {
+            HStack(spacing: Spacing.s2) {
+                Icon(.clock, size: 15, color: Theme.Color.warning)
+                Text("Pending approval (\(viewModel.pendingApprovalCount))")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Icon(.chevronRight, size: 15, color: Theme.Color.warning)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Color.warningBg)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.warningLight, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("scheduling.resourceDetail.pendingApprovalBadge")
+    }
+
     private var approvalQueueCard: some View {
-        SectionCard(overline: "Approval queue · \(viewModel.approvals.count)") {
+        SectionCard {
+            HStack(spacing: Spacing.s2) {
+                Icon(.clock, size: 13, color: Theme.Color.warning)
+                Text("Approval queue · \(viewModel.approvals.count)".uppercased())
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(0.6)
+                    .foregroundStyle(Theme.Color.warning)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+            }
             VStack(spacing: Spacing.s3) {
                 ForEach(Array(viewModel.approvals.enumerated()), id: \.element.id) { index, approval in
                     VStack(spacing: Spacing.s2) {
@@ -126,8 +169,12 @@ struct ResourceDetailView: View {
     }
 
     @ViewBuilder private var bookingsSection: some View {
+        // When the approval queue is shown above (F11 approval-pending frame),
+        // the remaining list is the confirmed subset → label it "Confirmed";
+        // otherwise the full upcoming list → "Upcoming bookings".
+        let bookingsLabel = viewModel.approvals.isEmpty ? "Upcoming bookings" : "Confirmed"
         if viewModel.sections.isEmpty {
-            ResourceOverlineLabel(text: "Upcoming bookings")
+            ResourceOverlineLabel(text: bookingsLabel)
                 .padding(.top, Spacing.s1)
             SectionCard {
                 HStack(spacing: Spacing.s2) {
@@ -139,7 +186,7 @@ struct ResourceDetailView: View {
                 }
             }
         } else {
-            ResourceOverlineLabel(text: "Upcoming bookings")
+            ResourceOverlineLabel(text: bookingsLabel)
                 .padding(.top, Spacing.s1)
             ForEach(viewModel.sections) { section in
                 Text(section.title)
@@ -158,7 +205,7 @@ struct ResourceDetailView: View {
         HStack(spacing: Spacing.s3) {
             Circle()
                 .fill(row.isPending ? Theme.Color.warning : Theme.Color.success)
-                .frame(width: 6, height: 6)
+                .frame(width: 5, height: 5)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.timeRange)
                     .font(.system(size: 13, weight: .bold))
@@ -187,9 +234,46 @@ struct ResourceDetailView: View {
         }
     }
 
+    /// Amber "Fully booked through …" banner (F11 fully-booked frame).
+    private var fullyBookedBanner: some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.calendarX, size: 15, strokeWidth: 2.2, color: Theme.Color.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.fullyBookedThroughLabel ?? "Fully booked")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                if let opening = viewModel.nextOpeningLabel {
+                    Text("Next opening is \(opening). You can still book that.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.warningBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("scheduling.resourceDetail.fullyBookedBanner")
+    }
+
     private var stickyFooter: some View {
-        HomePrimaryButton(title: "Book this", icon: .plus) {
-            viewModel.bookThis()
+        Group {
+            if viewModel.isFullyBooked, let opening = viewModel.nextOpeningLabel {
+                HomePrimaryButton(title: "Book next opening · \(opening)", icon: .calendarClock) {
+                    viewModel.bookNextOpening()
+                }
+            } else {
+                HomePrimaryButton(title: "Book this", icon: .plus) {
+                    viewModel.bookThis()
+                }
+            }
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s2)

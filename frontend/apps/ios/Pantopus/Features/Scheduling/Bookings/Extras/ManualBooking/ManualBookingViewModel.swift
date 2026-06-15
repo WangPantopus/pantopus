@@ -29,6 +29,15 @@ final class ManualBookingViewModel: WizardModel {
     let push: @MainActor (SchedulingRoute) -> Void
     let tz = SchedulingTime.deviceTimeZoneIdentifier
 
+    /// Friendly timezone name for the step-2 chip ("Times in Pacific Time"),
+    /// matching the design's "Times in Pacific" rather than the raw IANA id.
+    /// (Changing the timezone is not yet supported, so the design's
+    /// "· tap to change" affordance is deferred.)
+    var tzLabel: String {
+        guard let zone = TimeZone(identifier: tz) else { return tz }
+        return zone.localizedName(for: .generic, locale: .current) ?? tz
+    }
+
     private(set) var step: Step = .eventType
     var shouldDismiss = false
 
