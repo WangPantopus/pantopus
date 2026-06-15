@@ -55,6 +55,7 @@ struct AddEventFormView: View {
                 RecurrenceGroup(viewModel: viewModel)
                 AttendeesGroup(viewModel: viewModel)
                 ReminderGroup(viewModel: viewModel)
+                RequestRsvpGroup(viewModel: viewModel)
                 NotesGroup(viewModel: viewModel)
                 Color.clear.frame(height: Spacing.s5)
             }
@@ -439,19 +440,73 @@ private struct ReminderGroup: View {
 
     var body: some View {
         FormFieldGroup("Reminder") {
-            VStack(spacing: Spacing.s0) {
-                ForEach(AddEventReminder.allCases, id: \.self) { option in
-                    PickerRow(
-                        label: option.label,
-                        isSelected: viewModel.reminder == option,
-                        identifier: "addEvent_reminder_\(option.rawValue)"
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 88), spacing: Spacing.s2)],
+                spacing: Spacing.s2
+            ) {
+                ForEach(AddEventReminderOffset.allCases, id: \.self) { offset in
+                    ReminderChip(
+                        label: offset.label,
+                        isOn: viewModel.reminderOffsets.contains(offset)
                     ) {
-                        viewModel.reminder = option
-                    }
-                    if option != AddEventReminder.allCases.last {
-                        Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+                        viewModel.toggleReminder(offset)
                     }
                 }
+            }
+        }
+    }
+}
+
+private struct ReminderChip: View {
+    let label: String
+    let isOn: Bool
+    let onTap: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.s1) {
+                if isOn {
+                    Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.homeDark)
+                }
+                Text(label)
+                    .font(.system(size: 12, weight: isOn ? .bold : .semibold))
+                    .foregroundStyle(isOn ? Theme.Color.homeDark : Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .frame(maxWidth: .infinity)
+            .background(isOn ? Theme.Color.homeBg : Theme.Color.appSurface)
+            .overlay(
+                Capsule().stroke(isOn ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("addEvent_reminder_\(label)")
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+private struct RequestRsvpGroup: View {
+    @Bindable var viewModel: AddEventFormViewModel
+
+    var body: some View {
+        FormFieldGroup("RSVP") {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.requestRsvp },
+                    set: { viewModel.setRequestRsvp($0) }
+                )) {
+                    Text("Request RSVP from attendees")
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appText)
+                }
+                .toggleStyle(SwitchToggleStyle(tint: Theme.Color.home))
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("addEvent_requestRsvpToggle")
+                Text("Members get a Going / Maybe / Can't prompt")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
     }

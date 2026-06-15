@@ -30,6 +30,12 @@ final class EventDetailViewModel {
     private(set) var isDeleting: Bool = false
     private(set) var deleteError: String?
     private(set) var attendeeNames: [String: String] = [:]
+    /// Per-attendee RSVP rows from `GET …/events/:eventId` (Stream I10).
+    private(set) var attendees: [HomeEventAttendeeDTO] = []
+    /// Whether an RSVP write is in flight (dims the control).
+    private(set) var rsvpSaving = false
+    /// The signed-in member's id — resolved lazily in `load()`.
+    private var myUserId: String?
 
     private let homeId: String
     private let eventId: String
@@ -40,27 +46,26 @@ final class EventDetailViewModel {
         homeId: String,
         eventId: String,
         api: APIClient = .shared,
+        currentUserId: String? = nil,
         onDeleted: @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.homeId = homeId
         self.eventId = eventId
         self.api = api
+        myUserId = currentUserId
         self.onDeleted = onDeleted
     }
 
     func load() async {
         state = .loading
+        if myUserId == nil { myUserId = Self.signedInUserId() }
         do {
-            async let eventsTask: GetHomeEventsResponse =
-                api.request(HomesEndpoints.homeEvents(homeId: homeId))
+            async let detailTask: HomeEventDetailResponse =
+                api.request(HomesEndpoints.getHomeEvent(homeId: homeId, eventId: eventId))
             async let membersTask: OccupantsResponse =
                 api.request(HomesEndpoints.listOccupants(homeId: homeId))
-            let events = try await eventsTask.events
+            let detail = try await detailTask
             let members = await (try? membersTask.occupants) ?? []
-            guard let event = events.first(where: { $0.id == eventId }) else {
-                state = .error(message: "This event is no longer available.")
-                return
-            }
             var lookup: [String: String] = [:]
             for member in members {
                 let trimmed = member.displayName?.trimmingCharacters(in: .whitespaces) ?? ""
@@ -70,13 +75,68 @@ final class EventDetailViewModel {
                 lookup[member.userId] = name
             }
             attendeeNames = lookup
-            state = .loaded(event)
+            attendees = detail.attendees
+            state = .loaded(detail.event)
         } catch {
             state = .error(
                 message: (error as? APIError)?.errorDescription
                     ?? "Couldn't load this event."
             )
         }
+    }
+
+    // MARK: - RSVP (Stream I10)
+
+    /// The signed-in member's RSVP, or `nil` when they haven't replied.
+    var myRsvp: HomeRsvpChoice? {
+        guard let me = myUserId,
+              let raw = attendees.first(where: { $0.userId == me })?.rsvpStatus
+        else { return nil }
+        return HomeRsvpChoice(backend: raw)
+    }
+
+    /// RSVP status for any attendee id (defaults to no-reply).
+    func rsvp(for userId: String) -> HomeRsvpChoice {
+        guard let raw = attendees.first(where: { $0.userId == userId })?.rsvpStatus
+        else { return .noReply }
+        return HomeRsvpChoice(backend: raw) ?? .noReply
+    }
+
+    /// Record the signed-in member's RSVP. Optimistic — the local row flips
+    /// immediately and reverts if the write fails.
+    func setRsvp(_ choice: HomeRsvpChoice) async {
+        guard let me = myUserId, !rsvpSaving else { return }
+        let previous = attendees
+        upsertRsvp(userId: me, status: choice.backendValue)
+        rsvpSaving = true
+        defer { rsvpSaving = false }
+        do {
+            let response: HomeEventRsvpResponse = try await api.request(
+                HomesEndpoints.rsvpHomeEvent(
+                    homeId: homeId,
+                    eventId: eventId,
+                    request: HomeEventRsvpRequest(status: choice.backendValue)
+                )
+            )
+            upsertRsvp(userId: me, status: response.attendee.rsvpStatus ?? choice.backendValue)
+        } catch {
+            attendees = previous
+        }
+    }
+
+    private func upsertRsvp(userId: String, status: String?) {
+        if let index = attendees.firstIndex(where: { $0.userId == userId }) {
+            attendees[index] = HomeEventAttendeeDTO(userId: userId, rsvpStatus: status)
+        } else {
+            attendees.append(HomeEventAttendeeDTO(userId: userId, rsvpStatus: status))
+        }
+    }
+
+    static func signedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.id
+        }
+        return nil
     }
 
     /// Replace the loaded snapshot in place. Called by the host after a
@@ -134,10 +194,16 @@ struct EventDetailView: View {
                 LoadedShell(
                     event: event,
                     attendeeNames: viewModel.attendeeNames,
+                    requestsRsvp: event.requestRsvp ?? false,
+                    rsvpFor: { viewModel.rsvp(for: $0) },
+                    myRsvp: viewModel.myRsvp,
+                    rsvpSaving: viewModel.rsvpSaving,
+                    rsvpEnabled: NetworkMonitor.shared.isOnline,
                     isDeleting: viewModel.isDeleting,
                     deleteError: viewModel.deleteError,
                     onBack: onBack,
                     onEdit: { onEdit(event) },
+                    onRsvp: { choice in Task { await viewModel.setRsvp(choice) } },
                     onDelete: { Task { await viewModel.delete() } }
                 )
             case let .error(message):
@@ -207,10 +273,16 @@ private struct ErrorShell: View {
 private struct LoadedShell: View {
     let event: CalendarEventDTO
     let attendeeNames: [String: String]
+    let requestsRsvp: Bool
+    let rsvpFor: @MainActor (String) -> HomeRsvpChoice
+    let myRsvp: HomeRsvpChoice?
+    let rsvpSaving: Bool
+    let rsvpEnabled: Bool
     let isDeleting: Bool
     let deleteError: String?
     let onBack: @MainActor () -> Void
     let onEdit: @MainActor () -> Void
+    let onRsvp: @MainActor (HomeRsvpChoice) -> Void
     let onDelete: @MainActor () -> Void
 
     @State private var showsDeleteConfirm = false
@@ -234,7 +306,20 @@ private struct LoadedShell: View {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
                     DetailGrid(event: event, category: category)
                     if let assigned = event.assignedTo, !assigned.isEmpty {
-                        AttendeesSection(ids: assigned, nameLookup: attendeeNames)
+                        AttendeesSection(
+                            ids: assigned,
+                            nameLookup: attendeeNames,
+                            showsRsvp: requestsRsvp,
+                            rsvpFor: rsvpFor
+                        )
+                    }
+                    if requestsRsvp {
+                        YourRsvpCard(
+                            selected: myRsvp,
+                            saving: rsvpSaving,
+                            enabled: rsvpEnabled,
+                            onSelect: onRsvp
+                        )
                     }
                     if let description = event.description, !description.isEmpty {
                         NotesSection(text: description)
@@ -452,6 +537,8 @@ private struct DetailGrid: View {
 private struct AttendeesSection: View {
     let ids: [String]
     let nameLookup: [String: String]
+    var showsRsvp: Bool = false
+    var rsvpFor: (@MainActor (String) -> HomeRsvpChoice)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -465,7 +552,11 @@ private struct AttendeesSection: View {
             VStack(spacing: Spacing.s0) {
                 ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                     let name = nameLookup[id] ?? "Member"
-                    AttendeeRow(name: name, initials: initials(for: name))
+                    AttendeeRow(
+                        name: name,
+                        initials: initials(for: name),
+                        rsvp: showsRsvp ? rsvpFor?(id) : nil
+                    )
                     if index < ids.count - 1 {
                         Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
                     }
@@ -489,6 +580,7 @@ private struct AttendeesSection: View {
 private struct AttendeeRow: View {
     let name: String
     let initials: String
+    var rsvp: HomeRsvpChoice?
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
@@ -504,9 +596,115 @@ private struct AttendeeRow: View {
                 .pantopusTextStyle(.body)
                 .foregroundStyle(Theme.Color.appText)
             Spacer()
+            if let rsvp {
+                HomeRsvpPill(rsvp)
+            }
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.vertical, Spacing.s3)
+    }
+}
+
+/// "Your RSVP" card — an unselected home-green segmented control, or a
+/// confirmation row once recorded.
+private struct YourRsvpCard: View {
+    let selected: HomeRsvpChoice?
+    let saving: Bool
+    let enabled: Bool
+    let onSelect: @MainActor (HomeRsvpChoice) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("YOUR RSVP")
+                .font(.system(size: 9.5, weight: .bold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.Color.homeDark)
+            if let selected, selected != .noReply {
+                recorded(selected)
+            } else {
+                control
+                if !enabled {
+                    Text("RSVP buttons are disabled until you reconnect.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+            }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+        )
+        .accessibilityIdentifier("eventDetail_yourRsvp")
+    }
+
+    private var control: some View {
+        HStack(spacing: 3) {
+            ForEach(HomeRsvpChoice.selectable, id: \.self) { choice in
+                Button {
+                    onSelect(choice)
+                } label: {
+                    Text(choice.label)
+                        .font(.system(size: 12, weight: selected == choice ? .bold : .semibold))
+                        .foregroundStyle(selected == choice ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .background(selected == choice ? Theme.Color.home : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("eventDetail_rsvp_\(choice.rawValue)")
+            }
+        }
+        .padding(3)
+        .background(Theme.Color.appSurfaceSunken)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .opacity(enabled && !saving ? 1 : 0.5)
+        .disabled(!enabled || saving)
+    }
+
+    private func recorded(_ choice: HomeRsvpChoice) -> some View {
+        HStack(spacing: Spacing.s3) {
+            ZStack {
+                Circle().fill(choice.background)
+                Icon(choice.icon, size: 18, color: choice.foreground)
+            }
+            .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(recordedTitle(choice))
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Everyone can see your reply")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            Spacer()
+            Button {
+                // Clear back to the picker by reselecting "no reply".
+                onSelect(.noReply)
+            } label: {
+                HStack(spacing: 5) {
+                    Icon(.pencil, size: 14, color: Theme.Color.homeDark)
+                    Text("Change")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.homeDark)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(saving)
+            .accessibilityIdentifier("eventDetail_rsvpChange")
+        }
+    }
+
+    private func recordedTitle(_ choice: HomeRsvpChoice) -> String {
+        switch choice {
+        case .going: "You're going"
+        case .maybe: "You might go"
+        case .cant: "You can't make it"
+        case .noReply: "No reply yet"
+        }
     }
 }
 
