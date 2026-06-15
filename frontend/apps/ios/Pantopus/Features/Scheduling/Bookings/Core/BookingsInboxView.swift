@@ -54,21 +54,27 @@ struct BookingsInboxView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(spacing: Spacing.s1) {
+        @Bindable var viewModel = viewModel
+        return HStack(spacing: Spacing.s1) {
             iconButton(.chevronLeft, label: "Back", strong: true) { dismiss() }
             Text("Bookings")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
                 .frame(maxWidth: .infinity)
             iconButton(.search, label: "Search bookings") { viewModel.toggleSearch() }
-            // The full filter sheet (E9) is owned by another stream; the icon
-            // reveals the inline search for now.
-            iconButton(.slidersHorizontal, label: "Filter bookings") { viewModel.toggleSearch() }
+            iconButton(.slidersHorizontal, label: "Filter bookings") { viewModel.presentFilterSheet() }
         }
         .padding(.horizontal, Spacing.s2)
         .frame(height: 46)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.Color.appBorder).frame(height: 1) }
+        .sheet(isPresented: $viewModel.filterSheetVisible) {
+            BookingFilterSheet(
+                viewModel: viewModel.makeFilterViewModel(),
+                onApply: { filters in Task { await viewModel.applyFilters(filters) } },
+                onClose: { viewModel.filterSheetVisible = false }
+            )
+        }
     }
 
     private func iconButton(_ icon: PantopusIcon, label: String, strong: Bool = false, action: @escaping () -> Void) -> some View {
@@ -81,29 +87,66 @@ struct BookingsInboxView: View {
         .accessibilityLabel(label)
     }
 
-    // MARK: - Scope pill
+    // MARK: - Scope pills
 
-    // The I8 route scopes the inbox to one owner; the cross-owner "All" switcher
-    // would need an owner directory the route doesn't carry, so we render the
-    // active owner as the scope pill (matching the design's pill styling).
+    // The cross-owner scope row (All / Personal / Home / Business) matching the
+    // design's horizontally-scrolling pill switcher. The inbox is scoped to a
+    // single owner per route, so the pill for the active owner is filled in its
+    // identity colour and the others are rendered (for parity) but disabled —
+    // cross-owner navigation needs an owner directory the route doesn't carry
+    // (deferred). The active pill follows the owner-polymorphic accent.
     private var scopePills: some View {
-        HStack(spacing: Spacing.s2) {
-            let accent = viewModel.accent
-            HStack(spacing: Spacing.s2) {
-                Circle().fill(Theme.Color.appTextInverse.opacity(0.9)).frame(width: 7, height: 7)
-                Text(viewModel.owner.theme.title)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(BookingScopeFilter.allCases) { scope in
+                    scopePill(scope)
+                }
             }
-            .padding(.horizontal, Spacing.s3)
-            .frame(height: 31)
-            .background(accent)
-            .clipShape(Capsule())
-            Spacer()
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, 11)
+            .padding(.bottom, Spacing.s1 - 1)
         }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.top, Spacing.s3)
-        .padding(.bottom, Spacing.s1)
+        .accessibilityIdentifier("scheduling.bookingsInbox.scopePills")
+    }
+
+    private func scopePill(_ scope: BookingScopeFilter) -> some View {
+        let isActive = scope == viewModel.activeScopeKey
+        let color = scopeColor(scope)
+        return HStack(spacing: Spacing.s2 - 2) {
+            if scope != .all {
+                Circle()
+                    .fill(isActive ? Theme.Color.appTextInverse.opacity(0.9) : color)
+                    .frame(width: 7, height: 7)
+            }
+            Text(scope.label)
+                .font(.system(size: 12, weight: isActive ? .bold : .semibold))
+                .foregroundStyle(isActive ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+        }
+        .padding(.horizontal, Spacing.s3 + 1)
+        .frame(height: 31)
+        .background {
+            if isActive {
+                Capsule().fill(color)
+            } else {
+                Capsule().fill(Theme.Color.appSurface)
+                Capsule().strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+            }
+        }
+        // Inbox is scoped to one owner per route; the non-active pills render for
+        // visual parity but can't re-scope without an owner directory (deferred).
+        .allowsHitTesting(false)
+        .accessibilityLabel("Scope \(scope.label)")
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
+    }
+
+    /// Identity colour for a scope pill. "All" uses the neutral product sky; the
+    /// pillars use their identity accent.
+    private func scopeColor(_ scope: BookingScopeFilter) -> Color {
+        switch scope {
+        case .all, .personal: Theme.Color.personal
+        case .home: Theme.Color.home
+        case .business: Theme.Color.business
+        }
     }
 
     // MARK: - Segmented tabs
@@ -334,7 +377,7 @@ extension BookingsInboxView {
         switch viewModel.selectedTab {
         case .upcoming: .calendarClock
         case .pending: .checkCircle
-        case .past: .calendarDays
+        case .past: .history
         case .cancelled: .circleSlash
         }
     }
@@ -352,7 +395,7 @@ extension BookingsInboxView {
         switch viewModel.selectedTab {
         case .upcoming: "When neighbors book time with you, they show up here."
         case .pending: "No requests are waiting on your approval."
-        case .past: "Completed and past bookings collect here once you've met."
+        case .past: "Completed and past bookings will collect here once you've met with someone."
         case .cancelled: "Cancelled and declined bookings show up here."
         }
     }

@@ -66,6 +66,11 @@ struct RescheduleReassignSheet: View {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
                     SheetTitle(text: viewModel.canReassign ? "Reschedule & reassign" : "Pick a new time")
                     currentToNew
+                    // JSX FrameMemberPicker: the "Assign to" reassign section sits
+                    // between the current→new header and the tz/day/slot picker.
+                    if viewModel.canReassign {
+                        assignToSection
+                    }
                     SlotPicker(
                         state: viewModel.slotPickerState,
                         slots: viewModel.daySlots,
@@ -82,8 +87,10 @@ struct RescheduleReassignSheet: View {
                         onTapTimeZone: { showTimezone = true },
                         onJumpNextAvailable: { Task { await viewModel.jumpNextAvailable() } }
                     )
+                    if viewModel.canReassign {
+                        reassignExplainer
+                    }
                     authorityToggle
-                    if viewModel.canReassign { reassignRow }
                     notifyRow
                     if let error = viewModel.error { inlineError(error) }
                 }
@@ -102,7 +109,7 @@ struct RescheduleReassignSheet: View {
                 Text(viewModel.currentTimeLabel)
                     .font(.system(size: 12.5))
                     .strikethrough()
-                    .foregroundStyle(Theme.Color.appTextMuted)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                 Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, Spacing.s3)
@@ -115,7 +122,7 @@ struct RescheduleReassignSheet: View {
             HStack(spacing: Spacing.s2) {
                 Icon(.calendarClock, size: 16, color: viewModel.newTimeLabel == nil ? Theme.Color.appTextMuted : viewModel.accent)
                 Text(viewModel.newTimeLabel ?? "New time")
-                    .font(.system(size: 12.5, weight: viewModel.newTimeLabel == nil ? .regular : .bold))
+                    .font(.system(size: 12.5, weight: viewModel.newTimeLabel == nil ? .medium : .bold))
                     .foregroundStyle(viewModel.newTimeLabel == nil ? Theme.Color.appTextMuted : Theme.Color.appText)
                 Spacer(minLength: Spacing.s0)
             }
@@ -137,14 +144,14 @@ struct RescheduleReassignSheet: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("How to apply")
                 .pantopusTextStyle(.overline)
-                .foregroundStyle(Theme.Color.appTextMuted)
+                .foregroundStyle(Theme.Color.appTextSecondary)
             HStack(spacing: 3) {
                 ForEach(RescheduleMode.allCases, id: \.self) { option in
                     let isOn = viewModel.mode == option
                     Button { viewModel.mode = option } label: {
                         Text(option.label)
                             .font(.system(size: 11, weight: isOn ? .bold : .semibold))
-                            .foregroundStyle(isOn ? viewModel.accent : Theme.Color.appTextMuted)
+                            .foregroundStyle(isOn ? viewModel.accent : Theme.Color.appTextSecondary)
                             .frame(maxWidth: .infinity, minHeight: 38)
                             .background {
                                 if isOn {
@@ -160,11 +167,21 @@ struct RescheduleReassignSheet: View {
             .padding(3)
             .background(Theme.Color.appSurfaceSunken)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            Text(viewModel.mode == .propose
-                ? "Propose sends the new time for the invitee to accept."
-                : "Reschedule moves the booking immediately and notifies the invitee.")
+            Text("Propose sends the new time for the invitee to accept.")
                 .font(.system(size: 10))
                 .foregroundStyle(Theme.Color.appTextMuted)
+        }
+    }
+
+    /// JSX FrameMemberPicker "Assign to" block: an uppercase overline above the
+    /// reassign affordance. The design's named-member avatar strip awaits a roster
+    /// source (see sharedChangesNeeded); the toggle is the current data-gap form.
+    private var assignToSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Assign to")
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            reassignRow
         }
     }
 
@@ -192,16 +209,32 @@ struct RescheduleReassignSheet: View {
         .accessibilityIdentifier("scheduling.reschedule.reassign")
     }
 
+    /// JSX `Explainer` (reschedule-frames FrameMemberPicker): reassign times are
+    /// each member's own availability.
+    private var reassignExplainer: some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.info, size: 12, color: Theme.Color.appTextSecondary)
+            Text("Times come from each member's personal availability.")
+                .font(.system(size: 10.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Spacer(minLength: Spacing.s0)
+        }
+    }
+
     private var notifyRow: some View {
         @Bindable var viewModel = viewModel
         return Toggle(isOn: $viewModel.notifyInvitee) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Notify invitee")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Text("Push + message")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(Theme.Color.appTextMuted)
+            HStack(spacing: Spacing.s3) {
+                // JSX NotifySwitch: leading `bell` glyph (fg2) before the label block.
+                Icon(.bell, size: 17, color: Theme.Color.appTextStrong)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Notify invitee")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Push + message")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
             }
         }
         .tint(viewModel.accent)
@@ -234,7 +267,10 @@ struct RescheduleReassignSheet: View {
     private var proposalSentView: some View {
         VStack(spacing: Spacing.s4) {
             ZStack {
-                Circle().fill(Theme.Color.successBg).frame(width: 72, height: 72)
+                Circle()
+                    .fill(Theme.Color.successBg)
+                    .overlay(Circle().strokeBorder(Theme.Color.successLight, lineWidth: 1))
+                    .frame(width: 72, height: 72)
                 Icon(.send, size: 30, color: Theme.Color.success)
             }
             VStack(spacing: Spacing.s2) {
@@ -248,7 +284,7 @@ struct RescheduleReassignSheet: View {
             }
             Text("Waiting on \(viewModel.booking.inviteeName ?? "the invitee") to accept")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .foregroundStyle(Theme.Color.appTextStrong)
                 .padding(.horizontal, Spacing.s4)
                 .padding(.vertical, Spacing.s2)
                 .background(Theme.Color.appSurfaceSunken)
@@ -270,7 +306,11 @@ struct RescheduleReassignSheet: View {
         }
         .padding(Spacing.s3)
         .background(Theme.Color.errorBg)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.errorLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 }
 

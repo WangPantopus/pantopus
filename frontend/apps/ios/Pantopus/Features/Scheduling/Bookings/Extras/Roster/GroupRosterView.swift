@@ -50,21 +50,88 @@ struct GroupRosterView: View {
         case .loading:
             loadingSkeleton
         case .empty:
-            EmptyState(
-                icon: .usersRound,
-                headline: "No signups yet",
-                subcopy: "Share the booking link to fill seats.",
-                cta: .init(title: "Share booking link") { viewModel.openShareLink() },
-                tint: theme.accentBg,
-                accent: theme.accent
-            )
-        case let .error(message):
-            ErrorState(headline: "Couldn't load the roster", message: message) {
-                await viewModel.refresh()
-            }
+            emptyState
+        case .error:
+            errorState
         case .ready:
             loaded
         }
+    }
+
+    // MARK: Empty / error states
+
+    /// JSX frame 5 — the capacity header (0 of N) stays pinned above a centered
+    /// "No signups yet" block with a `users` disc and a `link` Share CTA.
+    private var emptyState: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                CapacityHeaderCard(
+                    filled: viewModel.filled,
+                    total: viewModel.seatTotal,
+                    waiting: viewModel.waitingCount,
+                    showStats: true,
+                    confirmed: viewModel.confirmedCount,
+                    pending: viewModel.pendingCount,
+                    accent: theme.accent
+                )
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, Spacing.s3)
+
+                VStack(spacing: Spacing.s4) {
+                    stateDisc(.users, background: theme.accentBg, foreground: theme.accent)
+                    VStack(spacing: Spacing.s2 - 1) {
+                        Text("No signups yet")
+                            .font(.system(size: 16.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.appText)
+                        Text("Share the booking link to fill seats.")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 200)
+                    }
+                    ExtrasSolidButton(
+                        title: "Share booking link",
+                        icon: .link,
+                        accent: Theme.Color.primary600,
+                        fillWidth: false
+                    ) { viewModel.openShareLink() }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, Spacing.s8 - 2)
+                .padding(.top, Spacing.s10)
+            }
+        }
+    }
+
+    /// JSX frame 6 — centered `cloud-off` disc + a ghost "Try again" CTA.
+    private var errorState: some View {
+        VStack(spacing: Spacing.s4 + 2) {
+            stateDisc(.cloudOff, background: Theme.Color.errorBg, foreground: Theme.Color.error)
+            VStack(spacing: Spacing.s2 - 1) {
+                Text("Couldn't load the roster")
+                    .font(.system(size: 16.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Check your connection and try again.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 210)
+            }
+            ExtrasGhostButton(title: "Try again", icon: .rotateCw, fillWidth: false) {
+                Task { await viewModel.refresh() }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, Spacing.s8 - 2)
+    }
+
+    /// 72pt tinted disc with a 32pt 1.8-stroke glyph (JSX empty/error hero).
+    private func stateDisc(_ icon: PantopusIcon, background: Color, foreground: Color) -> some View {
+        ZStack {
+            Circle().fill(background).frame(width: 72, height: 72)
+            Icon(icon, size: 32, strokeWidth: 1.8, color: foreground)
+        }
+        .accessibilityHidden(true)
     }
 
     // MARK: Loaded

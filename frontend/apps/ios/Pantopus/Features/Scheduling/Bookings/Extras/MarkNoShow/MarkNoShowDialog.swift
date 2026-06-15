@@ -98,10 +98,10 @@ struct MarkNoShowDialog: View {
             .padding(.vertical, Spacing.s2)
             .background(checked ? Theme.Color.errorBg : Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .strokeBorder(checked ? Theme.Color.errorLight : Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(viewModel.isSubmitting)

@@ -85,7 +85,7 @@ final class ApproveDeclineViewModel {
 
     private func message(for error: Error) -> String {
         let verb = mode == .review ? "approve" : "decline"
-        guard let scheduling = error as? SchedulingError else { return "Couldn't \(verb). Try again." }
+        guard let scheduling = error as? SchedulingError else { return "Couldn't \(verb) — try again" }
         switch scheduling {
         case let .conflict(code, message):
             switch code {
@@ -93,10 +93,10 @@ final class ApproveDeclineViewModel {
             case "ALREADY_DECLINED": return "This booking was already declined."
             case "PAST_DEADLINE": return "It's past the deadline to \(verb) this booking."
             case "INVALID_STATUS": return "This booking can no longer be \(verb)d."
-            default: return message ?? "Couldn't \(verb). Try again."
+            default: return message ?? "Couldn't \(verb) — try again"
             }
         default:
-            return scheduling.userMessage ?? "Couldn't \(verb). Try again."
+            return scheduling.userMessage ?? "Couldn't \(verb) — try again"
         }
     }
 }
@@ -107,15 +107,26 @@ struct ApproveDeclineSheet: View {
     /// "Propose another time" hand-off (the parent swaps in the reschedule sheet
     /// in propose mode). Hidden when nil.
     var onProposeTime: (() -> Void)?
+    /// View-only conflict signal (design frame 3): when true the review mode shows
+    /// the amber "This slot overlaps a confirmed booking" banner. There is no
+    /// overlap flag on `BookingDTO` yet, so this stays `false` until the host can
+    /// supply it (see deferredBackend).
+    var showConflictWarning: Bool
+    /// "View conflict" hand-off. Hidden when nil.
+    var onViewConflict: (() -> Void)?
 
     init(
         viewModel: ApproveDeclineViewModel,
         onCompleted: @escaping () async -> Void,
-        onProposeTime: (() -> Void)? = nil
+        onProposeTime: (() -> Void)? = nil,
+        showConflictWarning: Bool = false,
+        onViewConflict: (() -> Void)? = nil
     ) {
         _viewModel = State(wrappedValue: viewModel)
         self.onCompleted = onCompleted
         self.onProposeTime = onProposeTime
+        self.showConflictWarning = showConflictWarning
+        self.onViewConflict = onViewConflict
     }
 
     var body: some View {
@@ -126,6 +137,9 @@ struct ApproveDeclineSheet: View {
                 BookingRequesterCard(booking: viewModel.booking)
                 BookingSlotCard(booking: viewModel.booking, accent: viewModel.owner.theme.accent)
                 if viewModel.mode == .review {
+                    if showConflictWarning {
+                        conflictBanner
+                    }
                     IntakeAnswersDisclosure(answers: viewModel.booking.intakeAnswers)
                         .padding(.vertical, Spacing.s1)
                 } else {
@@ -200,6 +214,35 @@ struct ApproveDeclineSheet: View {
         }
     }
 
+    /// Design frame 3 — amber overlap warning shown above the actions in review
+    /// mode. `triangle-alert` glyph + copy + trailing "View conflict" hand-off.
+    private var conflictBanner: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.triangleAlert, size: 17, color: Theme.Color.warning)
+            Text("This slot overlaps a confirmed booking")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.warning)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let onViewConflict {
+                Button(action: onViewConflict) {
+                    Text("View conflict")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.warning)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(Spacing.s3)
+        .background(Theme.Color.warningBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("scheduling.approveDecline.conflictBanner")
+    }
+
     private func inlineError(_ message: String) -> some View {
         HStack(spacing: Spacing.s2) {
             Icon(.alertCircle, size: 16, color: Theme.Color.error)
@@ -211,10 +254,10 @@ struct ApproveDeclineSheet: View {
         .padding(Spacing.s3)
         .background(Theme.Color.errorBg)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .strokeBorder(Theme.Color.errorLight, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 }
 
@@ -228,6 +271,21 @@ struct ApproveDeclineSheet: View {
             ),
             onCompleted: {},
             onProposeTime: {}
+        )
+    }
+}
+
+#Preview("Review · conflict") {
+    Color.clear.sheet(isPresented: .constant(true)) {
+        ApproveDeclineSheet(
+            viewModel: ApproveDeclineViewModel(
+                owner: .business(id: "b"), booking: .preview(status: "pending", ownerType: "business"),
+                eventName: "Studio consultation", startInDecline: false, actions: BookingActions(owner: .business(id: "b"))
+            ),
+            onCompleted: {},
+            onProposeTime: {},
+            showConflictWarning: true,
+            onViewConflict: {}
         )
     }
 }
