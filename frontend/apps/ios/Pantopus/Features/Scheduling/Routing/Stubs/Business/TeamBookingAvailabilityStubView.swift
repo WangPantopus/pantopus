@@ -39,7 +39,7 @@ struct TeamBookingAvailabilityStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "G3", title: "Team Availability", stream: "I13")
+        TeamBookingAvailabilityView(owner: viewModel.owner, tz: viewModel.tz, push: viewModel.push)
     }
 }
 
