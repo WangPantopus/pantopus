@@ -61,7 +61,7 @@ struct SlotTakenScreenView: View {
             )
         case let .error(message):
             EmptyState(
-                icon: .calendarDays,
+                icon: .calendarX,
                 headline: message,
                 subcopy: "Open times change often — try again.",
                 cta: .init(title: "Try again") { await viewModel.refresh() }

@@ -111,25 +111,21 @@ struct InviteeReviewConfirmView: View {
     }
 
     private var totalsBox: some View {
-        let event = viewModel.eventType
-        let price = event?.priceCents ?? 0
-        let deposit = event?.depositCents ?? 0
-        let currency = event?.currency
-        return VStack(spacing: Spacing.s2) {
-            HStack {
-                Text("\(event?.name ?? "Booking") · \(event?.bookingDuration ?? 30) min")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Spacer()
-                Text(ConfirmFormat.money(cents: price, currency: currency))
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.Color.appText)
+        let price = viewModel.eventType?.priceCents ?? 0
+        let deposit = viewModel.eventType?.depositCents ?? 0
+        let currency = viewModel.eventType?.currency
+        return VStack(spacing: Spacing.s0) {
+            // Itemized fee rows (the lead line item is the priced event; fee/tax
+            // breakdown rows are deferred — the model exposes no fee/tax fields).
+            ForEach(Array(viewModel.priceRows.enumerated()), id: \.offset) { _, row in
+                priceLineRow(row)
             }
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+                .padding(.top, Spacing.s2)
+                .padding(.bottom, 6)
             if viewModel.isDeposit {
                 totalRow(title: "Due now", amount: ConfirmFormat.money(cents: deposit, currency: currency), hero: true)
-                HStack {
+                HStack(alignment: .firstTextBaseline) {
                     Text("Balance at your visit")
                         .font(.system(size: 11.5))
                         .foregroundStyle(Theme.Color.appTextSecondary)
@@ -139,19 +135,35 @@ struct InviteeReviewConfirmView: View {
                         .monospacedDigit()
                         .foregroundStyle(Theme.Color.appTextStrong)
                 }
+                .padding(.top, 6)
             } else {
                 totalRow(title: "Total", amount: ConfirmFormat.money(cents: price, currency: currency), hero: true)
             }
         }
-        .padding(Spacing.s3)
+        .padding(.horizontal, 13)
+        .padding(.vertical, Spacing.s2)
         .background(
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .fill(Theme.Color.appSurfaceRaised)
+                .fill(Theme.Color.appSurfaceMuted)
                 .overlay(
                     RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                         .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
                 )
         )
+    }
+
+    private func priceLineRow(_ row: InviteeReviewConfirmViewModel.PriceRow) -> some View {
+        HStack {
+            Text(row.label)
+                .font(.system(size: 12.5, weight: row.strong ? .semibold : .medium))
+                .foregroundStyle(row.strong ? Theme.Color.appText : Theme.Color.appTextStrong)
+            Spacer()
+            Text(row.amount)
+                .font(.system(size: 12.5, weight: row.credit ? .bold : (row.strong ? .semibold : .medium)))
+                .monospacedDigit()
+                .foregroundStyle(row.credit ? Theme.Color.success : (row.strong ? Theme.Color.appText : Theme.Color.appTextStrong))
+        }
+        .padding(.vertical, Spacing.s1)
     }
 
     private func totalRow(title: String, amount: String, hero: Bool) -> some View {
@@ -168,9 +180,15 @@ struct InviteeReviewConfirmView: View {
     }
 
     private var depositNote: some View {
-        Text("You pay a deposit now. The rest is due at your visit.")
-            .font(.system(size: 11))
-            .foregroundStyle(Theme.Color.appTextSecondary)
+        // Bold the "<amount> deposit" span, matching the JSX `DepositNote` <b>.
+        (
+            Text("You pay a ")
+                + Text("\(viewModel.depositAmountLabel) deposit").fontWeight(.bold).foregroundColor(Theme.Color.appTextStrong)
+                + Text(" now. The rest is due at your visit.")
+        )
+        .font(.system(size: 11))
+        .foregroundStyle(Theme.Color.appTextSecondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var refundLink: some View {
@@ -204,12 +222,13 @@ struct InviteeReviewConfirmView: View {
                     Text("Payment method")
                         .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
-                    Text("Card entry opens securely at checkout (Stripe test mode).")
+                    Text("Choose a card or Apple Pay")
                         .font(.system(size: 10.5))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Spacing.s0)
+                Icon(.chevronRight, size: 15, color: Theme.Color.appTextMuted)
             }
             .padding(Spacing.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -236,9 +255,9 @@ struct InviteeReviewConfirmView: View {
     private var slotTakenBanner: some View {
         ConfirmBanner(
             tone: .error,
-            icon: .xCircle,
+            icon: .calendarX,
             title: "This time was just taken",
-            message: "Someone booked it before you finished. Nothing was charged.",
+            message: viewModel.slotTakenBannerBody,
             linkLabel: "See other times",
             onTapLink: { viewModel.presentSlotTaken() }
         )

@@ -16,7 +16,7 @@ struct InviteeManageBookingView: View {
     @State private var viewModel: InviteeManageBookingViewModel
     @State private var showAddToCalendar = false
     @State private var shareItem: ICSShareItem?
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     init(viewModel: InviteeManageBookingViewModel) {
         _viewModel = State(wrappedValue: viewModel)
@@ -76,7 +76,7 @@ struct InviteeManageBookingView: View {
                 case .confirmed:
                     actionRegion
                     CalendarClusterView(accent: viewModel.accent) { showAddToCalendar = true }
-                    policyCard(viewModel.policySentence)
+                    policyCard(viewModel.windowClosed ? viewModel.windowClosedPolicySentence : viewModel.policySentence)
                 case .pending:
                     pendingNote
                     CalendarClusterView(accent: viewModel.accent) { showAddToCalendar = true }
@@ -110,16 +110,15 @@ struct InviteeManageBookingView: View {
                 tone: .destructive, disabled: viewModel.windowClosed
             ) { viewModel.tapCancel() }
             if viewModel.windowClosed {
-                Button { viewModel.openPolicyBlocked() } label: {
-                    HStack(alignment: .top, spacing: Spacing.s1) {
-                        Icon(.lock, size: 13, color: Theme.Color.warning)
-                        Text("Too late to change online — see options to contact your host.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.Color.warning)
-                        Spacer(minLength: Spacing.s0)
-                    }
+                HStack(alignment: .top, spacing: Spacing.s2) {
+                    Icon(.lock, size: 13, color: Theme.Color.warning)
+                    Text("Too late to change online — contact your host to reschedule or cancel.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: Spacing.s0)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 2)
             }
         }
     }
@@ -183,7 +182,7 @@ struct InviteeManageBookingView: View {
     private var pastNote: some View {
         HStack(spacing: Spacing.s2) {
             Icon(.check, size: 14, color: Theme.Color.appTextSecondary)
-            Text("This has already happened.")
+            Text("This call has already happened.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
             Spacer(minLength: Spacing.s0)
@@ -204,7 +203,7 @@ struct InviteeManageBookingView: View {
                         .foregroundStyle(Theme.Color.error)
                     Button { viewModel.bookAgain() } label: {
                         HStack(spacing: Spacing.s1) {
-                            Icon(.calendarClock, size: 13, strokeWidth: 2.3, color: viewModel.accent)
+                            Icon(.rotateCcw, size: 13, strokeWidth: 2.3, color: viewModel.accent)
                             Text("Book again")
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(viewModel.accent)
@@ -231,10 +230,22 @@ struct InviteeManageBookingView: View {
     private func policyCard(_ text: String) -> some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.info, size: 14, color: Theme.Color.appTextSecondary)
-            Text(text)
-                .font(.system(size: 11.5))
-                .foregroundStyle(Theme.Color.appTextStrong)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text(text)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button { viewModel.contactHost(openURL) } label: {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(.mail, size: 12, strokeWidth: 2.2, color: viewModel.accent)
+                        Text("Contact \(viewModel.hostContactName)")
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(viewModel.accent)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("scheduling.inviteeManageBooking.contactHost")
+            }
             Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s3)
@@ -264,16 +275,29 @@ struct InviteeManageBookingView: View {
                 Text("This link has expired")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
-                Text("For your security, manage links expire after a while. Re-open your booking from the latest confirmation email.")
+                Text("For your security, manage links expire after a while. Request a fresh one and we'll email it to you.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 240)
             }
             Spacer(minLength: Spacing.s0)
-            ConfirmPrimaryButton(label: "Done", icon: .check, accent: Theme.Color.primary600) { dismiss() }
-                .padding(.horizontal, Spacing.s4)
-                .padding(.bottom, Spacing.s4)
+            VStack(spacing: Spacing.s2) {
+                ConfirmPrimaryButton(label: "Request a new link", icon: .mail, accent: Theme.Color.primary600) {
+                    viewModel.contactHost(openURL)
+                }
+                Button { viewModel.contactHost(openURL) } label: {
+                    Text("Contact host")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("scheduling.inviteeManageBooking.expiredContactHost")
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.bottom, Spacing.s4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, Spacing.s5)
