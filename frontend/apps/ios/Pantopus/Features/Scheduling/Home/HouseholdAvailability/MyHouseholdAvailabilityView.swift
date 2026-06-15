@@ -69,7 +69,11 @@ struct MyHouseholdAvailabilityView: View {
                 }
 
                 exposureSection
-                FootNote()
+                // The not-set-up frame (JSX FrameNotSetUp) omits the footnote —
+                // it only appears once a Personal source exists to scope.
+                if viewModel.personalIsSetUp {
+                    FootNote()
+                }
             }
             .padding(.horizontal, Spacing.s3)
             .padding(.vertical, Spacing.s3)
@@ -143,13 +147,13 @@ struct MyHouseholdAvailabilityView: View {
                     }
                     if viewModel.personalIsSetUp {
                         DisclosureRow(
-                            icon: .clock,
+                            icon: .moon,
                             label: "Household quiet hours",
                             value: viewModel.quietHoursLabel
                         )
                     }
                     HouseholdToggleRow(
-                        icon: .calendarClock,
+                        icon: .calendarX,
                         label: "Auto-decline conflicting invites",
                         sub: nil,
                         isOn: viewModel.autoDecline,
