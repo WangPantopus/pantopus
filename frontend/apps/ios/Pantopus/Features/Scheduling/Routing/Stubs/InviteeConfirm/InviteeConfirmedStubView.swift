@@ -28,15 +28,21 @@ final class InviteeConfirmedStubViewModel {
     }
 }
 
+/// Stream I6 adapter — builds the real D3 view-model from the routed stub payload
+/// (the one-time manage token) and renders the real confirmation screen.
 struct InviteeConfirmedStubView: View {
-    @State private var viewModel: InviteeConfirmedStubViewModel
+    private let viewModel: InviteeConfirmedViewModel
 
-    init(viewModel: InviteeConfirmedStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: InviteeConfirmedStubViewModel) {
+        viewModel = InviteeConfirmedViewModel(
+            manageToken: stub.manageToken,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D3", title: "Confirmed", stream: "I6")
+        InviteeConfirmedView(viewModel: viewModel)
     }
 }
 
