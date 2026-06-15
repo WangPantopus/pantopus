@@ -200,7 +200,7 @@ struct InviteeConfirmedView: View {
     private var manageNote: some View {
         Button { viewModel.openManage() } label: {
             HStack(alignment: .top, spacing: Spacing.s2) {
-                Icon(.settings, size: 14, color: Theme.Color.appTextMuted)
+                Icon(.calendarClock, size: 14, color: Theme.Color.appTextMuted)
                 (Text("Need to change it? ")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)

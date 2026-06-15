@@ -103,8 +103,8 @@ final class InviteeIntakeFormViewModel {
         guard let event = eventType, let date = SchedulingTime.parseUTC(start) else {
             return ConfirmFormat.dayLine(startUTC: start, tz: selectedTz) ?? ""
         }
-        let endISO = endISO(for: date, durationMin: event.bookingDuration)
-        return ConfirmFormat.dayAndTime(startUTC: start, endUTC: endISO, tz: selectedTz)
+        let endAtISO = endISO(for: date, durationMin: event.bookingDuration)
+        return ConfirmFormat.dayAndTime(startUTC: start, endUTC: endAtISO, tz: selectedTz)
     }
 
     func changeTimezone(_ identifier: String) { selectedTz = identifier }
@@ -307,7 +307,7 @@ final class InviteeIntakeFormViewModel {
 
     func questionError(_ question: EventTypeQuestionDTO) -> String? {
         let key = questionKey(question)
-        guard (question.required ?? false), touched.contains(key) else { return nil }
+        guard question.required ?? false, touched.contains(key) else { return nil }
         let answered = answers[key]?.isAnswered ?? false
         return answered ? nil : "This question is required"
     }

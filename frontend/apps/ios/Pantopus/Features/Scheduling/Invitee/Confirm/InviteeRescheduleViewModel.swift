@@ -87,7 +87,7 @@ final class InviteeRescheduleViewModel {
             )
             monthSlots = response.slots
             // Default the selected day to the first day that has slots.
-            if daySlots.isEmpty, let firstDay = availableDays.sorted().first {
+            if daySlots.isEmpty, let firstDay = availableDays.min() {
                 selectedDate = firstDay
             }
             phase = .ready
@@ -122,7 +122,7 @@ final class InviteeRescheduleViewModel {
     }
 
     func jumpNextAvailable() async {
-        if let firstDay = availableDays.sorted().first {
+        if let firstDay = availableDays.min() {
             selectedDate = firstDay
         } else {
             await changeMonth(1)
