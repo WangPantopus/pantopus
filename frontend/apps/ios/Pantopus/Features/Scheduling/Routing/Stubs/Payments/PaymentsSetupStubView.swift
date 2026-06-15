@@ -36,7 +36,7 @@ struct PaymentsSetupStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "G6", title: "Payments Setup", stream: "I14")
+        PaymentsSetupView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 
