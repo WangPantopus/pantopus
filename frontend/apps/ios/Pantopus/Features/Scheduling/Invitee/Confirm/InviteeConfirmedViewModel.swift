@@ -64,7 +64,7 @@ final class InviteeConfirmedViewModel {
 
     var summary: BookingSummary {
         let duration = eventType?.bookingDuration ?? 30
-        let endISO = booking?.endAt ?? booking?.startAt.flatMap { start in
+        let endAtISO = booking?.endAt ?? booking?.startAt.flatMap { start in
             SchedulingTime.parseUTC(start).map { endISO(for: $0, durationMin: duration) }
         }
         let tz = bookingTz
@@ -77,7 +77,7 @@ final class InviteeConfirmedViewModel {
             eventName: eventType?.name ?? "Booking",
             hostName: page?.title,
             pillarTitle: nil,
-            dateLine: booking?.startAt.map { ConfirmFormat.dayAndTime(startUTC: $0, endUTC: endISO, tz: tz) },
+            dateLine: booking?.startAt.map { ConfirmFormat.dayAndTime(startUTC: $0, endUTC: endAtISO, tz: tz) },
             tzLabel: ConfirmFormat.tzChipLabel(tz: tz),
             locationTitle: location ?? "Details to follow",
             locationSub: isPending

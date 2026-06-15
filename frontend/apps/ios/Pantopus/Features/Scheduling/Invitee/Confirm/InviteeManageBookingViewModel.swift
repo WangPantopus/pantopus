@@ -94,7 +94,7 @@ final class InviteeManageBookingViewModel {
 
     var summary: BookingSummary {
         let duration = eventType?.bookingDuration ?? 30
-        let endISO = booking?.endAt ?? booking?.startAt.flatMap { start in
+        let endAtISO = booking?.endAt ?? booking?.startAt.flatMap { start in
             SchedulingTime.parseUTC(start).map { endISO(for: $0, durationMin: duration) }
         }
         let tz = bookingTz
@@ -107,7 +107,7 @@ final class InviteeManageBookingViewModel {
             eventName: eventType?.name ?? "Booking",
             hostName: page?.title,
             pillarTitle: ConfirmPillar.title(forOwnerType: page?.ownerType),
-            dateLine: booking?.startAt.map { ConfirmFormat.dayAndTime(startUTC: $0, endUTC: endISO, tz: tz) },
+            dateLine: booking?.startAt.map { ConfirmFormat.dayAndTime(startUTC: $0, endUTC: endAtISO, tz: tz) },
             tzLabel: ConfirmFormat.tzChipLabel(tz: tz),
             locationTitle: location ?? "Details to follow",
             locationSub: location == nil ? nil : "Join link is in your email and calendar invite.",

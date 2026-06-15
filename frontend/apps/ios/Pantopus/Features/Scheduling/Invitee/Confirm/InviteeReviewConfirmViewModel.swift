@@ -89,7 +89,7 @@ final class InviteeReviewConfirmViewModel {
 
     var summary: BookingSummary {
         let duration = eventType?.bookingDuration ?? 30
-        let endISO = SchedulingTime.parseUTC(bookingStart).map { endISO(for: $0, durationMin: duration) }
+        let endAtISO = SchedulingTime.parseUTC(bookingStart).map { endISO(for: $0, durationMin: duration) }
         let location = DiscoveryLocation.label(mode: eventType?.locationMode, detail: eventType?.locationDetail)
         let guests = draft.guests
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -101,7 +101,7 @@ final class InviteeReviewConfirmViewModel {
             eventName: eventType?.name ?? "Booking",
             hostName: page?.title,
             pillarTitle: ConfirmPillar.title(forOwnerType: page?.ownerType),
-            dateLine: ConfirmFormat.dayAndTime(startUTC: bookingStart, endUTC: endISO, tz: tz),
+            dateLine: ConfirmFormat.dayAndTime(startUTC: bookingStart, endUTC: endAtISO, tz: tz),
             tzLabel: ConfirmFormat.tzChipLabel(tz: tz),
             locationTitle: location ?? "Details to follow",
             locationSub: location == nil ? nil : "Join details are sent after you book.",
