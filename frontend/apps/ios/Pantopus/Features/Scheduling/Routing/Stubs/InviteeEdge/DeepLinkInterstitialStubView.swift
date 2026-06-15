@@ -29,14 +29,18 @@ final class DeepLinkInterstitialStubViewModel {
 }
 
 struct DeepLinkInterstitialStubView: View {
-    @State private var viewModel: DeepLinkInterstitialStubViewModel
+    private let viewModel: DeepLinkHandoffViewModel
 
-    init(viewModel: DeepLinkInterstitialStubViewModel) {
-        _viewModel = State(wrappedValue: viewModel)
+    init(viewModel stub: DeepLinkInterstitialStubViewModel) {
+        viewModel = DeepLinkHandoffViewModel(
+            token: stub.token,
+            push: stub.push,
+            client: SchedulingClient.shared
+        )
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "D9", title: "Open in App", stream: "I7")
+        DeepLinkHandoffView(viewModel: viewModel)
     }
 }
 
