@@ -39,7 +39,7 @@ struct WorkflowEditorStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "H3", title: "Workflow Editor", stream: "I16")
+        WorkflowEditorView(owner: viewModel.owner, workflowId: viewModel.workflowId)
     }
 }
 
