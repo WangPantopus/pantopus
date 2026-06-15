@@ -36,7 +36,19 @@ struct HomeCalendarStubView: View {
     }
 
     var body: some View {
-        SchedulingStubScaffold(screenID: "F1", title: "Home Calendar", stream: "I10")
+        let homeId = viewModel.homeId
+        let push = viewModel.push
+        HomeCalendarView(
+            viewModel: HomeCalendarViewModel(
+                homeId: homeId,
+                onAddEvent: {
+                    Task { @MainActor in push(.homeEventEditor(homeId: homeId, eventId: nil)) }
+                },
+                onOpenEvent: { eventId in
+                    Task { @MainActor in push(.homeEventDetail(homeId: homeId, eventId: eventId)) }
+                }
+            )
+        )
     }
 }
 
