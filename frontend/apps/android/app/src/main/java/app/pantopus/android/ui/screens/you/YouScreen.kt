@@ -105,6 +105,7 @@ fun YouScreen(
     onOpenMyHomes: () -> Unit = {},
     onOpenMyListings: () -> Unit = {},
     onOpenMyBusinesses: () -> Unit = {},
+    onOpenScheduling: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -230,6 +231,7 @@ fun YouScreen(
                 }
                 "me.editProfile" -> onOpenEditProfile()
                 "me.settings" -> onOpenSettings()
+                "me.scheduling.hub", "me.business.scheduling", "me.home.scheduling" -> onOpenScheduling()
                 "me.debug.openProfile" -> if (BuildConfig.DEBUG) debugProfileDialog = true
                 "me.debug.openPost" -> if (BuildConfig.DEBUG) debugPostDialog = true
                 "me.debug.inviteOwner" -> if (BuildConfig.DEBUG) debugInviteDialog = true
