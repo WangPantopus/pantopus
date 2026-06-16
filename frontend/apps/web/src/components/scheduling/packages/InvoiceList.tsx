@@ -14,10 +14,13 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { Receipt, Search, X } from "lucide-react";
 import * as api from "@pantopus/api";
-import type { Invoice, PaymentsStatus } from "@pantopus/types";
+import type {
+  Invoice,
+  PaymentsStatus,
+  SchedulingOwnerRef,
+} from "@pantopus/types";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { formatCents } from "@/components/scheduling/packages/money";
 import {
@@ -44,9 +47,8 @@ import PaidFeatureGate from "@/components/scheduling/packages/PaidFeatureGate";
 
 const BASE = "/app/scheduling/invoices";
 
-export default function InvoiceList() {
+export default function InvoiceList({ owner }: { owner: SchedulingOwnerRef }) {
   const router = useRouter();
-  const owner = useSchedulingOwner();
   const pillar = pillarForOwner(owner.ownerType);
 
   const [phase, setPhase] = useState<"loading" | "error" | "ready">("loading");

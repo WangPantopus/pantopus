@@ -6,13 +6,11 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
+import BusinessOwnerBoundary from "@/components/scheduling/business/BusinessOwnerBoundary";
 import { webFeatureFlags } from "@/lib/featureFlags";
 import { RefundPolicyEditor } from "@/components/scheduling/payments";
 
 export default function RefundPolicyPage() {
-  const owner = useSchedulingOwner();
-
   if (!webFeatureFlags.schedulingPaid) {
     return (
       <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
@@ -49,7 +47,9 @@ export default function RefundPolicyPage() {
         </p>
       </header>
 
-      <RefundPolicyEditor owner={owner} />
+      <BusinessOwnerBoundary>
+        {(owner) => <RefundPolicyEditor owner={owner} />}
+      </BusinessOwnerBoundary>
     </div>
   );
 }
