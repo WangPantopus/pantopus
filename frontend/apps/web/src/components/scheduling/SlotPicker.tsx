@@ -105,6 +105,35 @@ function slotParts(slot: BookingSlot): { hour: number; label: string } {
   return { hour: h, label: `${hour12}:${min} ${ampm}` };
 }
 
+// Human, date-aware label from an ISO date key (parsed as a local civil date so
+// negative-offset zones don't drift to the previous day).
+function humanDate(dateKey: string, opts: Intl.DateTimeFormatOptions): string {
+  const [y, m, d] = dateKey.split("-").map((n) => parseInt(n, 10));
+  if (!y || !m || !d) return dateKey;
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", opts);
+}
+
+// H14 a11y: the slot button's full accessible name — "Tue, Jun 16, 3:00 PM,
+// available" — so the time is never announced without its date or availability.
+function slotAriaLabel(slot: BookingSlot): string {
+  const date = humanDate(slotDayKey(slot), {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  return `${date}, ${slotParts(slot).label}, available`;
+}
+
+// H14 a11y: pillar-tinted keyboard focus ring (focus-visible → no change for
+// mouse users). Literal classes so Tailwind's JIT generates them.
+const FOCUS_RING: Record<Pillar, string> = {
+  personal: "focus-visible:ring-app-personal",
+  home: "focus-visible:ring-app-home",
+  business: "focus-visible:ring-app-business",
+};
+const FOCUS_BASE =
+  "focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1";
+
 function SlotGroup({
   title,
   slots,
@@ -112,6 +141,7 @@ function SlotGroup({
   selected,
   disabled,
   tk,
+  pillar,
 }: {
   title: string;
   slots: BookingSlot[];
@@ -119,10 +149,11 @@ function SlotGroup({
   selected?: string | null;
   disabled?: boolean;
   tk: ReturnType<typeof pillarTokens>;
+  pillar: Pillar;
 }) {
   if (slots.length === 0) return null;
   return (
-    <div>
+    <div role="group" aria-label={`${title} times`}>
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
         {title}
       </p>
@@ -136,8 +167,11 @@ function SlotGroup({
               disabled={disabled}
               onClick={() => onPick(slot)}
               aria-pressed={isSel}
+              aria-label={slotAriaLabel(slot)}
               className={clsx(
                 "rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                FOCUS_BASE,
+                FOCUS_RING[pillar],
                 disabled && "cursor-not-allowed opacity-50",
                 isSel
                   ? clsx(tk.bg, tk.textOn, "border-transparent")
@@ -292,7 +326,14 @@ export default function SlotPicker({
       <button
         type="button"
         onClick={() => setTzOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text hover:bg-app-hover"
+        aria-haspopup="dialog"
+        aria-expanded={tzOpen}
+        aria-label={`Time zone: ${zoneLabel(tz)}. Change time zone`}
+        className={clsx(
+          "inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text hover:bg-app-hover",
+          FOCUS_BASE,
+          FOCUS_RING[pillar],
+        )}
       >
         <Globe className="h-3.5 w-3.5 text-app-text-muted" aria-hidden />
         {zoneLabel(tz)}
@@ -349,9 +390,17 @@ export default function SlotPicker({
                 disabled={!available || disabled}
                 onClick={() => setSelectedDay(cell.key)}
                 aria-pressed={isSelected}
-                aria-label={cell.key}
+                aria-label={`${humanDate(cell.key, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}${isToday ? ", today" : ""}, ${
+                  available ? "available" : "no times available"
+                }`}
                 className={clsx(
                   "flex h-10 items-center justify-center rounded-full text-sm transition-colors",
+                  FOCUS_BASE,
+                  FOCUS_RING[pillar],
                   isSelected && clsx(tk.bg, tk.textOn, "font-semibold"),
                   !isSelected &&
                     available &&
@@ -437,6 +486,7 @@ export default function SlotPicker({
               selected={selected}
               disabled={disabled}
               tk={tk}
+              pillar={pillar}
             />
             <SlotGroup
               title="Afternoon"
@@ -445,6 +495,7 @@ export default function SlotPicker({
               selected={selected}
               disabled={disabled}
               tk={tk}
+              pillar={pillar}
             />
           </div>
         )}
