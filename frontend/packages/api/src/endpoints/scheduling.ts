@@ -641,14 +641,16 @@ export function applyCredit(
 }
 
 export function getNoShowInsights(days = 90, owner?: SchedulingOwnerRef) {
-  return get<NoShowInsights>(`${ownerBase(owner)}/bookings/insights/no-shows`, {
+  // Backend route is GET /insights/no-shows (no /bookings prefix).
+  return get<NoShowInsights>(`${ownerBase(owner)}/insights/no-shows`, {
     ...ownerParams(owner),
     days,
   });
 }
 
 export function getTeamInsights(days = 90, owner?: SchedulingOwnerRef) {
-  return get<TeamInsights>(`${ownerBase(owner)}/bookings/insights/team`, {
+  // Backend route is GET /insights/team (no /bookings prefix).
+  return get<TeamInsights>(`${ownerBase(owner)}/insights/team`, {
     ...ownerParams(owner),
     days,
   });
@@ -742,7 +744,9 @@ export function getFindATime(
   params: FindATimeQuery,
   owner?: SchedulingOwnerRef,
 ) {
-  return get<FindATime>(`${ownerBase(owner)}/find-a-time`, {
+  // Backend route is POST /find-a-time — validate(findATimeSchema) reads
+  // req.body, so params must be sent as the body, not as a query string.
+  return post<FindATime>(`${ownerBase(owner)}/find-a-time`, {
     ...ownerParams(owner),
     ...params,
   });
