@@ -301,6 +301,71 @@ import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTr
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.wallet.WalletScreen
 import app.pantopus.android.ui.screens.you.YouScreen
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling.hub.SchedulingHubScreen
+import app.pantopus.android.ui.screens.scheduling.setup.FirstRunWizardScreen
+import app.pantopus.android.ui.screens.scheduling.setup.OnboardingHomeBusinessScreen
+import app.pantopus.android.ui.screens.scheduling.settings.SchedulingSettingsRootScreen
+import app.pantopus.android.ui.screens.scheduling.settings.NotificationPrefsScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.EventTypeListScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.EventTypeEditorScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.IntakeQuestionsEditorScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.ConnectedCalendarsScreen
+import app.pantopus.android.ui.screens.scheduling.availability.AvailabilityListScreen
+import app.pantopus.android.ui.screens.scheduling.availability.WeeklyHoursEditorScreen
+import app.pantopus.android.ui.screens.scheduling.availability.DateOverridesScreen
+import app.pantopus.android.ui.screens.scheduling.availability.BookingLimitsScreen
+import app.pantopus.android.ui.screens.scheduling.availability.BlockOffTimeScreen
+import app.pantopus.android.ui.screens.scheduling.bookingpage.BookingPageManageScreen
+import app.pantopus.android.ui.screens.scheduling.bookingpage.PublicPagePreviewScreen
+import app.pantopus.android.ui.screens.scheduling.bookingpage.OneOffLinkGeneratorScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.discovery.BookerLandingScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.confirm.ManageBookingScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.customer.MyBookingsScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.customer.RecurringSetupScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.edge.OpenInAppInterstitialScreen
+import app.pantopus.android.ui.screens.scheduling.bookings.BookingsInboxScreen
+import app.pantopus.android.ui.screens.scheduling.bookings.BookingDetailScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.BookingSearchFilterScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.GroupRosterScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.ManualBookingScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.WaitlistScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.PostMeetingFollowupScreen
+import app.pantopus.android.ui.screens.scheduling.home.HouseholdAvailabilityScreen
+import app.pantopus.android.ui.screens.scheduling.home.PermissionGatedSchedulerScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.FindATimeSetupScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.SuggestedSlotsScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.MemberPollResponseScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.WhosFreeScreen
+import app.pantopus.android.ui.screens.scheduling.resources.ResourceListScreen
+import app.pantopus.android.ui.screens.scheduling.resources.ResourceEditorScreen
+import app.pantopus.android.ui.screens.scheduling.resources.ResourceDetailScreen
+import app.pantopus.android.ui.screens.scheduling.resources.BookResourceScreen
+import app.pantopus.android.ui.screens.scheduling.visits.VisitSetupScreen
+import app.pantopus.android.ui.screens.scheduling.visits.VisitDetailScreen
+import app.pantopus.android.ui.screens.scheduling.business.BusinessSchedulingSettingsScreen
+import app.pantopus.android.ui.screens.scheduling.business.TeamBookingAvailabilityScreen
+import app.pantopus.android.ui.screens.scheduling.business.CollectiveEventSetupScreen
+import app.pantopus.android.ui.screens.scheduling.business.MemberWorkingHoursScreen
+import app.pantopus.android.ui.screens.wallet.scheduling.PaymentsSetupScreen
+import app.pantopus.android.ui.screens.wallet.scheduling.PayoutsEarningsScreen
+import app.pantopus.android.ui.screens.scheduling.payments.CancellationRefundPolicyScreen
+import app.pantopus.android.ui.screens.scheduling.packages.PackagesListScreen
+import app.pantopus.android.ui.screens.scheduling.packages.PackageEditorScreen
+import app.pantopus.android.ui.screens.scheduling.packages.BuyPackageScreen
+import app.pantopus.android.ui.screens.scheduling.packages.MyPackagesScreen
+import app.pantopus.android.ui.screens.scheduling.invoices.InvoicesListScreen
+import app.pantopus.android.ui.screens.scheduling.invoices.InvoiceDetailScreen
+import app.pantopus.android.ui.screens.scheduling.automations.RemindersQuickSetupScreen
+import app.pantopus.android.ui.screens.scheduling.automations.WorkflowsListScreen
+import app.pantopus.android.ui.screens.scheduling.automations.WorkflowEditorScreen
+import app.pantopus.android.ui.screens.scheduling.automations.MessageTemplateEditorScreen
+import app.pantopus.android.ui.screens.scheduling.automations.TemplateLibraryScreen
+import app.pantopus.android.ui.screens.scheduling.insights.InsightsDashboardScreen
+import app.pantopus.android.ui.screens.scheduling.insights.EventTypePerformanceScreen
+import app.pantopus.android.ui.screens.scheduling.insights.NoShowReportScreen
+import app.pantopus.android.ui.screens.scheduling.insights.TeamPerformanceScreen
+import app.pantopus.android.ui.screens.scheduling.polish.NotificationPermissionPromptScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /** Non-tab routes reachable from within the Hub stack. */
@@ -1891,6 +1956,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenMyHomes = { navController.navigate(ChildRoutes.MY_HOMES) },
                         onOpenMyListings = { navController.navigate(ChildRoutes.MY_LISTINGS) },
                         onOpenMyBusinesses = { navController.navigate(ChildRoutes.MY_BUSINESSES) },
+                        onOpenScheduling = { navController.navigate(SchedulingRoutes.HUB) },
                     )
                 }
 
@@ -2243,6 +2309,485 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 ),
                             )
                         },
+                    )
+                }
+                // ── Calendarly scheduling (A0) — pre-stubbed routes; feature streams fill the bodies ──
+                composable(SchedulingRoutes.HUB) {
+                    SchedulingHubScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.SETUP_WIZARD) {
+                    FirstRunWizardScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.SETTINGS) {
+                    SchedulingSettingsRootScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.NOTIFICATIONS) {
+                    NotificationPrefsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.ONBOARDING) {
+                    OnboardingHomeBusinessScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.EVENT_TYPE_LIST) {
+                    EventTypeListScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.EVENT_TYPE_EDITOR,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_EVENT_TYPE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    EventTypeEditorScreen(
+                        eventTypeId = entry.arguments?.getString(SchedulingRoutes.ARG_EVENT_TYPE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.INTAKE_QUESTIONS_EDITOR,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_EVENT_TYPE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    IntakeQuestionsEditorScreen(
+                        eventTypeId = entry.arguments?.getString(SchedulingRoutes.ARG_EVENT_TYPE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.CONNECTED_CALENDARS) {
+                    ConnectedCalendarsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.AVAILABILITY_LIST) {
+                    AvailabilityListScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.WEEKLY_HOURS_EDITOR,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_SCHEDULE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    WeeklyHoursEditorScreen(
+                        scheduleId = entry.arguments?.getString(SchedulingRoutes.ARG_SCHEDULE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.DATE_OVERRIDES,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_SCHEDULE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    DateOverridesScreen(
+                        scheduleId = entry.arguments?.getString(SchedulingRoutes.ARG_SCHEDULE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.BOOKING_LIMITS) {
+                    BookingLimitsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.BLOCK_OFF_TIME) {
+                    BlockOffTimeScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.BOOKING_PAGE_MANAGE) {
+                    BookingPageManageScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.PUBLIC_PAGE_PREVIEW) {
+                    PublicPagePreviewScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.ONE_OFF_LINK_GENERATOR) {
+                    OneOffLinkGeneratorScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.PUBLIC_BOOKING,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_SLUG) { type = NavType.StringType }),
+                ) { entry ->
+                    BookerLandingScreen(
+                        slug = entry.arguments?.getString(SchedulingRoutes.ARG_SLUG).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.PUBLIC_BOOKING_ONEOFF,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_ONEOFF_TOKEN) { type = NavType.StringType }),
+                ) { entry ->
+                    BookerLandingScreen(
+                        oneOffToken = entry.arguments?.getString(SchedulingRoutes.ARG_ONEOFF_TOKEN).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.MANAGE_BOOKING,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_MANAGE_TOKEN) { type = NavType.StringType }),
+                ) { entry ->
+                    ManageBookingScreen(
+                        manageToken = entry.arguments?.getString(SchedulingRoutes.ARG_MANAGE_TOKEN).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.MY_BOOKINGS) {
+                    MyBookingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.OPEN_IN_APP_INTERSTITIAL) {
+                    OpenInAppInterstitialScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.RECURRING_SETUP) {
+                    RecurringSetupScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.BOOKINGS_INBOX) {
+                    BookingsInboxScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.BOOKING_DETAIL,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_BOOKING_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    BookingDetailScreen(
+                        bookingId = entry.arguments?.getString(SchedulingRoutes.ARG_BOOKING_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.BOOKING_SEARCH) {
+                    BookingSearchFilterScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.GROUP_ROSTER,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_BOOKING_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    GroupRosterScreen(
+                        bookingId = entry.arguments?.getString(SchedulingRoutes.ARG_BOOKING_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.MANUAL_BOOKING) {
+                    ManualBookingScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.WAITLIST) {
+                    WaitlistScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.POST_MEETING_FOLLOWUP,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_BOOKING_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    PostMeetingFollowupScreen(
+                        bookingId = entry.arguments?.getString(SchedulingRoutes.ARG_BOOKING_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.HOUSEHOLD_AVAILABILITY) {
+                    HouseholdAvailabilityScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.PERMISSION_GATED_SCHEDULER) {
+                    PermissionGatedSchedulerScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.FIND_A_TIME) {
+                    FindATimeSetupScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.FIND_A_TIME_SLOTS) {
+                    SuggestedSlotsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.MEMBER_POLL_RESPONSE,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_POLL_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    MemberPollResponseScreen(
+                        pollId = entry.arguments?.getString(SchedulingRoutes.ARG_POLL_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.WHOS_FREE) {
+                    WhosFreeScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.RESOURCE_LIST) {
+                    ResourceListScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.RESOURCE_EDITOR,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    ResourceEditorScreen(
+                        resourceId = entry.arguments?.getString(SchedulingRoutes.ARG_RESOURCE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.RESOURCE_DETAIL,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    ResourceDetailScreen(
+                        resourceId = entry.arguments?.getString(SchedulingRoutes.ARG_RESOURCE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.BOOK_RESOURCE,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    BookResourceScreen(
+                        resourceId = entry.arguments?.getString(SchedulingRoutes.ARG_RESOURCE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.VISIT_SETUP) {
+                    VisitSetupScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.VISIT_DETAIL,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_VISIT_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    VisitDetailScreen(
+                        visitId = entry.arguments?.getString(SchedulingRoutes.ARG_VISIT_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.BUSINESS_SCHEDULING_SETTINGS) {
+                    BusinessSchedulingSettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.TEAM_BOOKING_AVAILABILITY) {
+                    TeamBookingAvailabilityScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.COLLECTIVE_EVENT_SETUP,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_EVENT_TYPE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    CollectiveEventSetupScreen(
+                        eventTypeId = entry.arguments?.getString(SchedulingRoutes.ARG_EVENT_TYPE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.MEMBER_WORKING_HOURS,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_MEMBER_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    MemberWorkingHoursScreen(
+                        memberId = entry.arguments?.getString(SchedulingRoutes.ARG_MEMBER_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.PAYMENTS_SETUP) {
+                    PaymentsSetupScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.PAYOUTS) {
+                    PayoutsEarningsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.CANCELLATION_REFUND_POLICY) {
+                    CancellationRefundPolicyScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.PACKAGES_LIST) {
+                    PackagesListScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.PACKAGE_EDITOR,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_PACKAGE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    PackageEditorScreen(
+                        packageId = entry.arguments?.getString(SchedulingRoutes.ARG_PACKAGE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.BUY_PACKAGE,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_PACKAGE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    BuyPackageScreen(
+                        packageId = entry.arguments?.getString(SchedulingRoutes.ARG_PACKAGE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.MY_PACKAGES) {
+                    MyPackagesScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.INVOICES_LIST) {
+                    InvoicesListScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.INVOICE_DETAIL,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_INVOICE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    InvoiceDetailScreen(
+                        invoiceId = entry.arguments?.getString(SchedulingRoutes.ARG_INVOICE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.REMINDERS_QUICK_SETUP) {
+                    RemindersQuickSetupScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.WORKFLOWS_LIST) {
+                    WorkflowsListScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.WORKFLOW_EDITOR,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_WORKFLOW_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    WorkflowEditorScreen(
+                        workflowId = entry.arguments?.getString(SchedulingRoutes.ARG_WORKFLOW_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(
+                    route = SchedulingRoutes.MESSAGE_TEMPLATE_EDITOR,
+                    arguments = listOf(navArgument(SchedulingRoutes.ARG_TEMPLATE_ID) { type = NavType.StringType }),
+                ) { entry ->
+                    MessageTemplateEditorScreen(
+                        templateId = entry.arguments?.getString(SchedulingRoutes.ARG_TEMPLATE_ID).orEmpty(),
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.TEMPLATE_LIBRARY) {
+                    TemplateLibraryScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.INSIGHTS_DASHBOARD) {
+                    InsightsDashboardScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.EVENT_TYPE_PERFORMANCE) {
+                    EventTypePerformanceScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.NO_SHOW_REPORT) {
+                    NoShowReportScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.TEAM_PERFORMANCE) {
+                    TeamPerformanceScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+                composable(SchedulingRoutes.NOTIFICATION_PERMISSION_PROMPT) {
+                    NotificationPermissionPromptScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
                     )
                 }
                 composable(
