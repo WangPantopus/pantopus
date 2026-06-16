@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddAlert
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Air
@@ -84,6 +85,7 @@ import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Engineering
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -150,6 +152,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Person
@@ -180,6 +183,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
@@ -601,6 +605,16 @@ enum class PantopusIcon(
     // empty-state hero tile. Material fallbacks: ZoomOutMap / LocationOff.
     Maximize("maximize"),
     MapPinOff("map-pin-off"),
+
+    // Calendarly (A0) — the four glyphs the scheduling _shared/ components need
+    // that Material's set doesn't already cover under another PantopusIcon case.
+    // `calendar-x`/`calendar-off` (no-times / fully-booked / conflict halo),
+    // `search-x` (timezone no-match + not-found terminal state), `pause-circle`
+    // (host-paused state), `bell-plus` (waitlist join).
+    CalendarX("calendar-x"),
+    SearchX("search-x"),
+    PauseCircle("pause-circle"),
+    BellPlus("bell-plus"),
     ;
 
     companion object {
@@ -974,6 +988,13 @@ internal fun PantopusIcon.source(): IconSource =
         // `map-pin-off`.
         PantopusIcon.Maximize -> IconSource.Material(Icons.Filled.ZoomOutMap)
         PantopusIcon.MapPinOff -> IconSource.Material(Icons.Filled.LocationOff)
+        // Calendarly (A0). `EventBusy` is the calendar-with-strike for both
+        // `calendar-x` and `calendar-off`; `SearchOff` for `search-x`;
+        // `PauseCircle` for the host-paused state; `AddAlert` for `bell-plus`.
+        PantopusIcon.CalendarX -> IconSource.Material(Icons.Filled.EventBusy)
+        PantopusIcon.SearchX -> IconSource.Material(Icons.Filled.SearchOff)
+        PantopusIcon.PauseCircle -> IconSource.Material(Icons.Filled.PauseCircle)
+        PantopusIcon.BellPlus -> IconSource.Material(Icons.Filled.AddAlert)
     }
 
 /**
