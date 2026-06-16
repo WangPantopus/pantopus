@@ -5,14 +5,17 @@
 // the ManualBooking wizard. A 409 on create surfaces the Double-Book warning
 // (E10) inside the wizard.
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import * as api from "@pantopus/api";
 import type { EventType } from "@pantopus/types";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
+import {
+  ownerFromQuery,
+  ownerQueryString,
+} from "@/components/scheduling/bookings/owners";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import ManualBooking from "@/components/scheduling/bookings-extras/ManualBooking";
 import { PillarBadge } from "@/components/scheduling/bookings-extras/ui";
@@ -21,7 +24,18 @@ const SEARCH_PATH = "/app/scheduling/bookings/search";
 
 export default function ManualBookingPage() {
   const router = useRouter();
-  const owner = useSchedulingOwner();
+  const searchParams = useSearchParams();
+  // Owner context arrives via ?ot=&oid= (threaded from the inbox / search).
+  const ownerType = searchParams?.get("ot") ?? null;
+  const ownerId = searchParams?.get("oid") ?? null;
+  const owner = useMemo(
+    () =>
+      ownerFromQuery((k) =>
+        k === "ot" ? ownerType : k === "oid" ? ownerId : null,
+      ),
+    [ownerType, ownerId],
+  );
+  const backToBookings = `${SEARCH_PATH}${ownerQueryString(owner)}`;
   const pillar = pillarForOwner(owner.ownerType);
 
   const [phase, setPhase] = useState<"loading" | "error" | "ready">("loading");
@@ -56,7 +70,7 @@ export default function ManualBookingPage() {
       <header className="mb-5">
         <button
           type="button"
-          onClick={() => router.push(SEARCH_PATH)}
+          onClick={() => router.push(backToBookings)}
           className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-app-text-secondary transition hover:text-app-text"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
@@ -93,7 +107,7 @@ export default function ManualBookingPage() {
           pillar={pillar}
           pageSlug={pageSlug}
           eventTypes={eventTypes}
-          onBackToBookings={() => router.push(SEARCH_PATH)}
+          onBackToBookings={() => router.push(backToBookings)}
         />
       )}
     </div>

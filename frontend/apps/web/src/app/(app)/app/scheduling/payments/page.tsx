@@ -10,7 +10,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { CreditCard, ScrollText, WalletCards } from "lucide-react";
 import clsx from "clsx";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
+import BusinessOwnerBoundary from "@/components/scheduling/business/BusinessOwnerBoundary";
 import { webFeatureFlags } from "@/lib/featureFlags";
 import {
   PayoutsEarnings,
@@ -42,7 +42,6 @@ function PaymentsDisabled() {
 }
 
 function PaymentsContent() {
-  const owner = useSchedulingOwner();
   const [tab, setTab] = useState<Tab>("setup");
 
   return (
@@ -85,11 +84,15 @@ function PaymentsContent() {
         })}
       </div>
 
-      {tab === "setup" ? (
-        <SchedulingConnectPanel owner={owner} />
-      ) : (
-        <PayoutsEarnings owner={owner} />
-      )}
+      <BusinessOwnerBoundary>
+        {(owner) =>
+          tab === "setup" ? (
+            <SchedulingConnectPanel owner={owner} />
+          ) : (
+            <PayoutsEarnings owner={owner} />
+          )
+        }
+      </BusinessOwnerBoundary>
 
       {/* Policy editor handoff (G14). */}
       <Link

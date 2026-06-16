@@ -5,8 +5,8 @@
 // which notifies them a seat opened). A "Preview invitee view" button shows the
 // exact join sheet invitees get when an event type is full.
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, Plus, Users } from "lucide-react";
 import * as api from "@pantopus/api";
 import type { EventType, WaitlistEntry } from "@pantopus/types";
@@ -14,7 +14,7 @@ import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
 import { toast } from "@/components/ui/toast-store";
 import { confirmStore } from "@/components/ui/confirm-store";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
+import { ownerFromQuery } from "@/components/scheduling/bookings/owners";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { decodeError } from "@/components/scheduling/decodeError";
 import WaitlistManager from "@/components/scheduling/bookings-extras/WaitlistManager";
@@ -28,7 +28,17 @@ const NEW_EVENT_TYPE = "/app/scheduling/event-types/new";
 
 export default function WaitlistPage() {
   const router = useRouter();
-  const owner = useSchedulingOwner();
+  const searchParams = useSearchParams();
+  // Honor owner context from the URL (?ot=&oid=); defaults to personal.
+  const ownerType = searchParams?.get("ot") ?? null;
+  const ownerId = searchParams?.get("oid") ?? null;
+  const owner = useMemo(
+    () =>
+      ownerFromQuery((k) =>
+        k === "ot" ? ownerType : k === "oid" ? ownerId : null,
+      ),
+    [ownerType, ownerId],
+  );
   const pillar = pillarForOwner(owner.ownerType);
 
   const [phase, setPhase] = useState<"loading" | "error" | "ready">("loading");

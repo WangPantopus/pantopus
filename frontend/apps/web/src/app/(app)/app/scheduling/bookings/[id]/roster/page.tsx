@@ -6,8 +6,8 @@
 // group nudge), and a seat-cap stepper. 1:1 bookings (seat cap ≤ 1) get a calm
 // "not a group event" state rather than an empty roster.
 
-import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import * as api from "@pantopus/api";
 import type {
@@ -19,7 +19,10 @@ import type {
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
 import { toast } from "@/components/ui/toast-store";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
+import {
+  ownerFromQuery,
+  ownerQueryString,
+} from "@/components/scheduling/bookings/owners";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { decodeError } from "@/components/scheduling/decodeError";
 import RosterSeats from "@/components/scheduling/bookings-extras/RosterSeats";
@@ -33,8 +36,20 @@ const SEARCH_PATH = "/app/scheduling/bookings/search";
 export default function RosterPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const id = params?.id;
-  const owner = useSchedulingOwner();
+  // Owner context is carried from the inbox/search row via ?ot=&oid= so a
+  // home/business group booking loads under the right owner (not personal).
+  const ownerType = searchParams?.get("ot") ?? null;
+  const ownerId = searchParams?.get("oid") ?? null;
+  const owner = useMemo(
+    () =>
+      ownerFromQuery((k) =>
+        k === "ot" ? ownerType : k === "oid" ? ownerId : null,
+      ),
+    [ownerType, ownerId],
+  );
+  const backToBookings = `${SEARCH_PATH}${ownerQueryString(owner)}`;
   const pillar = pillarForOwner(owner.ownerType);
 
   const [phase, setPhase] = useState<"loading" | "error" | "ready">("loading");
@@ -124,7 +139,7 @@ export default function RosterPage() {
       <header className="mb-5">
         <button
           type="button"
-          onClick={() => router.push(SEARCH_PATH)}
+          onClick={() => router.push(backToBookings)}
           className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-app-text-secondary transition hover:text-app-text"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
@@ -173,7 +188,7 @@ export default function RosterPage() {
           </p>
           <button
             type="button"
-            onClick={() => router.push(SEARCH_PATH)}
+            onClick={() => router.push(backToBookings)}
             className="rounded-lg border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-primary-700 transition hover:bg-app-hover"
           >
             Back to bookings
