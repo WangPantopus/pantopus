@@ -12,6 +12,16 @@ import type { BookingSlot, SlotConflict } from "@pantopus/types";
 import { ShimmerLine } from "@/components/ui/Shimmer";
 import { pillarTokens, type Pillar } from "./pillarTokens";
 
+// H14 a11y: pillar-tinted keyboard focus ring (focus-visible → no visual change
+// for mouse users). Literal classes so Tailwind's JIT picks them up.
+const FOCUS_RING: Record<Pillar, string> = {
+  personal: "focus-visible:ring-app-personal",
+  home: "focus-visible:ring-app-home",
+  business: "focus-visible:ring-app-business",
+};
+const FOCUS_BASE =
+  "focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1";
+
 function formatSlot(slot: BookingSlot): { time: string; date: string } {
   const d = new Date(slot.startLocal || slot.start);
   if (Number.isNaN(d.getTime())) return { time: slot.start, date: "" };
@@ -55,7 +65,7 @@ export default function SlotConflictAlternatives({
         className,
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3" role="alert">
         <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-app-warning-bg">
           <AlertTriangle className="h-4 w-4 text-app-warning" aria-hidden />
         </span>
@@ -94,7 +104,12 @@ export default function SlotConflictAlternatives({
                 key={`${slot.start}-${slot.end}`}
                 type="button"
                 onClick={() => onPick(slot)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-app-border bg-app-surface px-3 py-3 text-left hover:bg-app-hover"
+                aria-label={`Book ${time}${date ? `, ${date}` : ""}`}
+                className={clsx(
+                  "flex w-full items-center justify-between gap-3 rounded-xl border border-app-border bg-app-surface px-3 py-3 text-left hover:bg-app-hover",
+                  FOCUS_BASE,
+                  FOCUS_RING[pillar],
+                )}
               >
                 <span>
                   <span className="block text-sm font-semibold text-app-text">
