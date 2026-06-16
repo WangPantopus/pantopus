@@ -182,6 +182,7 @@ class MeViewModel
                                         ),
                                         MeSectionRow("homes", PantopusIcon.Home, "My homes", routeKey = "me.homes"),
                                         MeSectionRow("businesses", PantopusIcon.ShoppingBag, "My businesses", routeKey = "me.businesses"),
+                                        MeSectionRow("scheduling", PantopusIcon.Calendar, "Scheduling", routeKey = "me.scheduling.hub"),
                                     ),
                             ),
                             MeSection(
@@ -307,6 +308,12 @@ class MeViewModel
                                             routeKey = "me.business.editProfile",
                                         ),
                                         MeSectionRow("settings", PantopusIcon.Menu, "Settings", routeKey = "me.settings"),
+                                        MeSectionRow(
+                                            "scheduling",
+                                            PantopusIcon.Calendar,
+                                            "Scheduling",
+                                            routeKey = "me.business.scheduling",
+                                        ),
                                     ),
                             ),
                             MeSection(
@@ -395,6 +402,13 @@ class MeViewModel
                                 PantopusIcon.Shield,
                                 "Emergency info",
                                 routeKey = "me.emergency",
+                                routeArgs = args,
+                            ),
+                            MeSectionRow(
+                                "scheduling",
+                                PantopusIcon.Calendar,
+                                "Scheduling",
+                                routeKey = "me.home.scheduling",
                                 routeArgs = args,
                             ),
                         ),
