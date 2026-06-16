@@ -25,7 +25,10 @@ import type { Booking, EventType } from "@pantopus/types";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
 import { toast } from "@/components/ui/toast-store";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
+import {
+  ownerFromQuery,
+  ownerQueryString,
+} from "@/components/scheduling/bookings/owners";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import BookingStatusPill from "@/components/scheduling/BookingStatusPill";
 import BookingSearchFilter from "@/components/scheduling/bookings-extras/BookingSearchFilter";
@@ -58,7 +61,17 @@ const MANUAL_PATH = "/app/scheduling/bookings/manual";
 export default function BookingsSearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const owner = useSchedulingOwner();
+  // Owner context travels in the URL (?ot=&oid=), same convention the inbox uses
+  // when it deep-links a row. Falls back to personal when absent.
+  const ownerType = searchParams?.get("ot") ?? null;
+  const ownerId = searchParams?.get("oid") ?? null;
+  const owner = useMemo(
+    () =>
+      ownerFromQuery((k) =>
+        k === "ot" ? ownerType : k === "oid" ? ownerId : null,
+      ),
+    [ownerType, ownerId],
+  );
   const pillar = pillarForOwner(owner.ownerType);
 
   const [filters, setFilters] = useState<BookingFilters>(() =>
@@ -147,7 +160,7 @@ export default function BookingsSearchPage() {
           </div>
           <button
             type="button"
-            onClick={() => router.push(MANUAL_PATH)}
+            onClick={() => router.push(`${MANUAL_PATH}${ownerQueryString(owner)}`)}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
           >
             <UserPlus className="h-4 w-4" strokeWidth={2.2} aria-hidden />
@@ -222,7 +235,7 @@ export default function BookingsSearchPage() {
               to: null,
             }))
           }
-          onBook={() => router.push(MANUAL_PATH)}
+          onBook={() => router.push(`${MANUAL_PATH}${ownerQueryString(owner)}`)}
         />
       )}
 
@@ -264,7 +277,9 @@ export default function BookingsSearchPage() {
                   })
                 }
                 onRoster={() =>
-                  router.push(`/app/scheduling/bookings/${b.id}/roster`)
+                  router.push(
+                    `/app/scheduling/bookings/${b.id}/roster${ownerQueryString(owner)}`,
+                  )
                 }
               />
             ))}

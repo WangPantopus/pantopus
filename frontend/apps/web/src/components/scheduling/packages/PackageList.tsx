@@ -22,12 +22,15 @@ import {
   Plus,
 } from "lucide-react";
 import * as api from "@pantopus/api";
-import type { Package, PaymentsStatus } from "@pantopus/types";
+import type {
+  Package,
+  PaymentsStatus,
+  SchedulingOwnerRef,
+} from "@pantopus/types";
 import { toast } from "@/components/ui/toast-store";
 import { confirmStore } from "@/components/ui/confirm-store";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { decodeError } from "@/components/scheduling/decodeError";
 import { packageSubLine } from "@/components/scheduling/packages/money";
@@ -45,9 +48,8 @@ import PaidFeatureGate from "@/components/scheduling/packages/PaidFeatureGate";
 
 const BASE = "/app/scheduling/packages";
 
-export default function PackageList() {
+export default function PackageList({ owner }: { owner: SchedulingOwnerRef }) {
   const router = useRouter();
-  const owner = useSchedulingOwner();
   const pillar = pillarForOwner(owner.ownerType);
 
   const [phase, setPhase] = useState<"loading" | "error" | "ready">("loading");

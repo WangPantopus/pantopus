@@ -27,11 +27,11 @@ import * as api from "@pantopus/api";
 import type {
   Invoice,
   SchedulingInvoiceLineItem as InvoiceLineItem,
+  SchedulingOwnerRef,
 } from "@pantopus/types";
 import { toast } from "@/components/ui/toast-store";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
-import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
 import {
   pillarForOwner,
   pillarTokens,
@@ -57,9 +57,14 @@ function str(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
-export default function InvoiceDetail({ id }: { id: string }) {
+export default function InvoiceDetail({
+  id,
+  owner,
+}: {
+  id: string;
+  owner: SchedulingOwnerRef;
+}) {
   const router = useRouter();
-  const owner = useSchedulingOwner();
   const pillar = pillarForOwner(owner.ownerType);
 
   const [phase, setPhase] = useState<"loading" | "error" | "ready">("loading");
