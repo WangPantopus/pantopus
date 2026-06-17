@@ -9,7 +9,6 @@
 // persist to notification-preferences. Business violet accents; sky controls.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import clsx from "clsx";
 import {
   AlertTriangle,
@@ -591,12 +590,12 @@ export default function BusinessSettings() {
                         <Chevron />
                       </div>
                     ) : (
-                      <Link
-                        href="/app/scheduling/payments"
-                        className="rounded-full bg-primary-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-700"
-                      >
+                      // The whole row already links to /app/scheduling/payments,
+                      // so this is a styled span, not a nested <Link> (which
+                      // would produce an invalid <a> inside <a>).
+                      <span className="rounded-full bg-primary-600 px-3 py-1.5 text-xs font-bold text-white">
                         Connect
-                      </Link>
+                      </span>
                     )
                   }
                 />
