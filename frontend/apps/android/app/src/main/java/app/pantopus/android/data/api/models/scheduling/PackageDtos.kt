@@ -23,6 +23,8 @@ data class PackageDto(
     @Json(name = "event_type_id") val eventTypeId: String? = null,
     @Json(name = "is_active") val isActive: Boolean? = null,
     @Json(name = "created_at") val createdAt: String? = null,
+    /** Derived on `GET /packages` — granted credits ("· N sold"). iOS parity. */
+    @Json(name = "sold_count") val soldCount: Int? = null,
 )
 
 /** `GET /packages` — `{ packages: [...] }`. */
@@ -77,7 +79,8 @@ data class PackageCreditDto(
     val id: String,
     @Json(name = "package_id") val packageId: String? = null,
     @Json(name = "buyer_user_id") val buyerUserId: String? = null,
-    @Json(name = "remaining_sessions") val remainingSessions: Int? = null,
+    @Json(name = "remaining") val remaining: Int? = null,
+    @Json(name = "total") val total: Int? = null,
     @Json(name = "purchased_at") val purchasedAt: String? = null,
     @Json(name = "BookingPackage") val bookingPackage: CreditPackageMeta? = null,
 )

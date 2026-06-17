@@ -201,7 +201,7 @@ interface SchedulingApi {
         @Body body: UpdateEventTypeRequest,
     ): EventTypeResponse
 
-    /** `DELETE /api/scheduling/event-types/:id` — 409 HAS_UPCOMING_BOOKINGS. */
+    /** `DELETE /api/scheduling/event-types/:id` — 409 `HAS_BOOKINGS` → deactivate instead. */
     @DELETE("api/{base}/event-types/{id}")
     suspend fun deleteEventType(
         @Path(value = "base", encoded = true) base: String,
