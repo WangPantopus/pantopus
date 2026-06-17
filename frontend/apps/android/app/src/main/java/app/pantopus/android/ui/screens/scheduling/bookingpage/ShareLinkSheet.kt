@@ -1,0 +1,546 @@
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "TooManyFunctions", "LongParameterList")
+
+package app.pantopus.android.ui.screens.scheduling.bookingpage
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
+
+/**
+ * C3 — the local "Share your link" bottom sheet. A rounded-top sheet over the
+ * dimmed booking-link screen with the copyable URL, share targets, a QR
+ * thumbnail (expanding to a fullscreen QR), profile/signature toggles, and a
+ * destructive "Regenerate link" (with a confirm). When the page is still a
+ * draft a warning banner sits on top. Context label + dot follow the pillar;
+ * functional chrome stays sky.
+ */
+private const val COPIED_RESET_MS = 1600L
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShareLinkSheet(
+    url: String,
+    displayName: String,
+    pillar: SchedulingPillar,
+    isDraft: Boolean,
+    sheetState: SheetState,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onMessages: () -> Unit,
+    onEmail: () -> Unit,
+    onRegenerate: () -> Unit,
+    onTurnOn: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    startWithQr: Boolean = false,
+) {
+    var copied by remember { mutableStateOf(false) }
+    var showQr by remember { mutableStateOf(startWithQr) }
+    var showRegenConfirm by remember { mutableStateOf(false) }
+    var showOnProfile by remember { mutableStateOf(true) }
+    var addToSignature by remember { mutableStateOf(false) }
+
+    LaunchedEffect(copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(COPIED_RESET_MS)
+            copied = false
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = PantopusColors.appSurface,
+        modifier = modifier.testTag("shareLinkSheet"),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).padding(bottom = Spacing.s5),
+            verticalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            if (isDraft) DraftBanner(onTurnOn = onTurnOn)
+
+            ContextLabel(pillar)
+            UrlCard(url = url, copied = copied, onCopy = {
+                onCopy()
+                copied = true
+            })
+            Text("Anyone with this link can book you.", color = PantopusColors.appTextSecondary, fontSize = 11.sp)
+
+            ShareTargetsRow(
+                onShare = onShare,
+                onQr = { showQr = true },
+                onMessages = onMessages,
+                onEmail = onEmail,
+            )
+            QrThumbCard(onShow = { showQr = true })
+            ShareSettingsCard(
+                showOnProfile = showOnProfile,
+                addToSignature = addToSignature,
+                onToggleProfile = { showOnProfile = !showOnProfile },
+                onToggleSignature = { addToSignature = !addToSignature },
+            )
+            RegenerateButton(onClick = { showRegenConfirm = true })
+        }
+    }
+
+    if (showQr) {
+        QrFullscreenDialog(url = url, displayName = displayName, pillar = pillar, onDone = { showQr = false })
+    }
+    if (showRegenConfirm) {
+        RegenerateConfirmDialog(
+            onCancel = { showRegenConfirm = false },
+            onConfirm = {
+                showRegenConfirm = false
+                onRegenerate()
+            },
+        )
+    }
+}
+
+@Composable
+internal fun ContextLabel(pillar: SchedulingPillar) {
+    val label =
+        when (pillar) {
+            SchedulingPillar.Home -> "Home booking link"
+            SchedulingPillar.Business -> "Business booking link"
+            SchedulingPillar.Personal -> "Personal booking link"
+        }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(pillar.accent))
+        Text(label.uppercase(java.util.Locale.US), color = pillar.accent, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun UrlCard(url: String, copied: Boolean, onCopy: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(start = Spacing.s3, top = Spacing.s2, bottom = Spacing.s2, end = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        MonoUrlText(url = url, modifier = Modifier.weight(1f))
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(if (copied) PantopusColors.success else PantopusColors.primary600)
+                    .clickable(onClick = onCopy)
+                    .padding(horizontal = 14.dp, vertical = 9.dp)
+                    .testTag("shareCopy"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            PantopusIconImage(
+                icon = if (copied) PantopusIcon.Check else PantopusIcon.Copy,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+            Text(if (copied) "Copied" else "Copy", color = PantopusColors.appTextInverse, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun ShareTargetsRow(
+    onShare: () -> Unit,
+    onQr: () -> Unit,
+    onMessages: () -> Unit,
+    onEmail: () -> Unit,
+) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        ShareTargetButton(PantopusIcon.Share, "Share", Modifier.weight(1f), onShare)
+        ShareTargetButton(PantopusIcon.Grid3x3, "QR code", Modifier.weight(1f), onQr)
+        ShareTargetButton(PantopusIcon.MessageCircle, "Messages", Modifier.weight(1f), onMessages)
+        ShareTargetButton(PantopusIcon.Mail, "Email", Modifier.weight(1f), onEmail)
+    }
+}
+
+@Composable
+internal fun ShareTargetButton(
+    icon: PantopusIcon,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier.clickable(onClick = onClick).testTag("shareTarget_$label"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = icon, contentDescription = null, size = 21.dp, tint = PantopusColors.primary600)
+        }
+        Text(
+            label,
+            color = PantopusColors.appTextStrong,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.5.sp,
+            modifier = Modifier.padding(top = Spacing.s1),
+        )
+    }
+}
+
+@Composable
+private fun QrThumbCard(onShow: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .padding(4.dp),
+        ) {
+            QrCanvas(modifier = Modifier.fillMaxSize())
+        }
+        Column(Modifier.weight(1f)) {
+            Text("Scan to book", color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
+            Text(
+                "Print it or show it at a desk.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 10.5.sp,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        Text(
+            "Show QR",
+            color = PantopusColors.primary700,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.primary50)
+                    .clickable(onClick = onShow)
+                    .padding(horizontal = Spacing.s3, vertical = 7.dp)
+                    .testTag("shareShowQr"),
+        )
+    }
+}
+
+@Composable
+private fun ShareSettingsCard(
+    showOnProfile: Boolean,
+    addToSignature: Boolean,
+    onToggleProfile: () -> Unit,
+    onToggleSignature: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(horizontal = Spacing.s3),
+    ) {
+        BLToggleRow(
+            label = "Show on my profile",
+            sub = "Neighbors see a Book button on your page.",
+            icon = PantopusIcon.UserRound,
+            on = showOnProfile,
+            onToggle = onToggleProfile,
+        )
+        BLToggleRow(
+            label = "Add to email signature",
+            sub = "Appends the link to outgoing mail.",
+            icon = PantopusIcon.Mail,
+            on = addToSignature,
+            onToggle = onToggleSignature,
+            last = true,
+        )
+    }
+}
+
+@Composable
+private fun RegenerateButton(onClick: () -> Unit) {
+    Box(modifier = Modifier.fillMaxWidth().padding(top = Spacing.s1), contentAlignment = Alignment.Center) {
+        Row(
+            modifier =
+                Modifier
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                    .testTag("shareRegenerate"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.RefreshCw, contentDescription = null, size = 14.dp, tint = PantopusColors.error)
+            Text("Regenerate link", color = PantopusColors.error, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
+        }
+    }
+}
+
+@Composable
+private fun DraftBanner(onTurnOn: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = 11.dp, vertical = Spacing.s2),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.TriangleAlert, contentDescription = null, size = 15.dp, tint = PantopusColors.warning)
+        Column(Modifier.weight(1f)) {
+            Text(
+                "This page isn't live yet. People can't book until you turn it on.",
+                color = PantopusColors.warning,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.5.sp,
+                lineHeight = 15.sp,
+            )
+            Row(
+                modifier = Modifier.clickable(onClick = onTurnOn).padding(top = Spacing.s1).testTag("shareTurnOn"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                Text("Turn on", color = PantopusColors.warning, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                PantopusIconImage(icon = PantopusIcon.ArrowRight, contentDescription = null, size = 12.dp, tint = PantopusColors.warning)
+            }
+        }
+    }
+}
+
+// ─── Fullscreen QR ──────────────────────────────────────────────────────────
+
+@Composable
+private fun QrFullscreenDialog(
+    url: String,
+    displayName: String,
+    pillar: SchedulingPillar,
+    onDone: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDone) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.xl3))
+                    .background(PantopusColors.appSurface)
+                    .padding(Spacing.s5),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Text(
+                    "Done",
+                    color = PantopusColors.primary600,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    modifier = Modifier.clickable(onClick = onDone).padding(Spacing.s1).testTag("qrDone"),
+                )
+            }
+            ContextLabel(pillar)
+            Box(
+                modifier =
+                    Modifier
+                        .padding(top = Spacing.s4)
+                        .clip(RoundedCornerShape(Radii.xl3))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl3))
+                        .padding(Spacing.s5),
+            ) {
+                QrCanvas(modifier = Modifier.size(184.dp))
+            }
+            Text(
+                displayName.ifBlank { "Your booking page" },
+                color = PantopusColors.appText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(top = Spacing.s5),
+            )
+            Text(
+                url,
+                color = PantopusColors.appTextSecondary,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.5.sp,
+                modifier = Modifier.padding(top = Spacing.s1),
+            )
+            Text(
+                "Point a camera here to open the booking page.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 11.5.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = Spacing.s3),
+            )
+        }
+    }
+}
+
+// ─── Regenerate confirm ─────────────────────────────────────────────────────
+
+@Composable
+private fun RegenerateConfirmDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
+    Dialog(onDismissRequest = onCancel) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.xl2))
+                    .background(PantopusColors.appSurface)
+                    .padding(Spacing.s5),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(PantopusColors.errorBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.RefreshCw, contentDescription = null, size = 20.dp, tint = PantopusColors.error)
+            }
+            Text(
+                "Regenerate this link?",
+                color = PantopusColors.appText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.padding(top = Spacing.s3),
+            )
+            Text(
+                "The old link stops working. Anyone using it will need the new one.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 12.5.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(top = Spacing.s2),
+            )
+            Row(modifier = Modifier.fillMaxWidth().padding(top = Spacing.s4), horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                ConfirmButton("Cancel", filled = false, modifier = Modifier.weight(1f), onClick = onCancel)
+                ConfirmButton("Regenerate", filled = true, modifier = Modifier.weight(1f), onClick = onConfirm)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfirmButton(label: String, filled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier =
+            modifier
+                .height(42.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(if (filled) PantopusColors.error else PantopusColors.appSurface)
+                .then(if (filled) Modifier else Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)))
+                .clickable(onClick = onClick)
+                .testTag("regen_$label"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (filled) PantopusColors.appTextInverse else PantopusColors.appText,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.5.sp,
+        )
+    }
+}
+
+// ─── Synthetic (decorative) QR ──────────────────────────────────────────────
+
+private const val QR_N = 25
+
+/** A deterministic, decorative QR grid (not scannable) — mirrors the design mock. */
+@Composable
+internal fun QrCanvas(modifier: Modifier = Modifier, foreground: Color = PantopusColors.appText) {
+    val cells = remember { qrCells() }
+    Canvas(modifier = modifier) {
+        val cell = size.minDimension / QR_N
+        for (r in 0 until QR_N) {
+            for (c in 0 until QR_N) {
+                if (cells[r * QR_N + c]) {
+                    drawRect(
+                        color = foreground,
+                        topLeft = androidx.compose.ui.geometry.Offset(c * cell, r * cell),
+                        size = androidx.compose.ui.geometry.Size(cell, cell),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun qrCells(): BooleanArray {
+    val out = BooleanArray(QR_N * QR_N)
+    var seed = 13L
+    for (i in out.indices) {
+        seed = (seed * 9301 + 49297) % 233280
+        out[i] = seed.toDouble() / 233280.0 > 0.5
+    }
+    fun finder(r0: Int, c0: Int) {
+        for (r in 0 until 7) {
+            for (c in 0 until 7) {
+                val on = r == 0 || r == 6 || c == 0 || c == 6 || (r in 2..4 && c in 2..4)
+                out[(r0 + r) * QR_N + (c0 + c)] = on
+            }
+        }
+    }
+    finder(0, 0)
+    finder(0, QR_N - 7)
+    finder(QR_N - 7, 0)
+    return out
+}
