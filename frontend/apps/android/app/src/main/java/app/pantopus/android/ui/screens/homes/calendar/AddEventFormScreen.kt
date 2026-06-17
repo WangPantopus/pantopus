@@ -5,7 +5,10 @@
     "LongParameterList",
     "TooManyFunctions",
 )
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
 
 package app.pantopus.android.ui.screens.homes.calendar
 
@@ -15,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,9 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -48,12 +49,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.PantopusFieldState
@@ -67,6 +71,7 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -77,13 +82,21 @@ import java.util.Locale
 /** Test tag on the screen root. */
 const val ADD_EVENT_SCREEN_TAG = "addEventForm"
 
+private val FORM_ZONE: ZoneId = ZoneId.of("UTC")
+
+/** Categories surfaced in the picker (matches design + iOS): Health, Chores, Meals, Family, School. */
+private val DESIGNED_CATEGORIES =
+    listOf(
+        CalendarEventCategory.Medical,
+        CalendarEventCategory.Chore,
+        CalendarEventCategory.Meal,
+        CalendarEventCategory.Family,
+        CalendarEventCategory.School,
+    )
+
 /**
- * P2.7 — Add / edit calendar event form. Mirrors iOS
- * `AddEventFormView`. Reuses the shared [FormShell] for chrome.
- *
- * @param onClose Pop callback.
- * @param onCommit Fires with the created / updated event id so the host
- *     can swap the form for the new detail.
+ * F3 — Add / Edit calendar event form. Mirrors iOS `AddEventFormView`.
+ * Reuses the shared [FormShell] (discard-confirm + saving overlay).
  */
 @Composable
 fun AddEventFormScreen(
@@ -92,6 +105,7 @@ fun AddEventFormScreen(
     viewModel: AddEventFormViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val online by viewModel.isOnline.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -111,38 +125,37 @@ fun AddEventFormScreen(
 
     AddEventFormBody(
         state = state,
+        offline = !online,
         onClose = onClose,
         onCommit = { viewModel.submit() },
         onUpdateField = viewModel::updateField,
         onSelectCategory = viewModel::selectCategory,
         onAllDay = viewModel::setAllDay,
         onSetStart = viewModel::setStartDate,
-        onSetEndEnabled = viewModel::setEndEnabled,
         onSetEnd = viewModel::setEndDate,
         onSetRecurrence = viewModel::setRecurrence,
-        onSetReminder = viewModel::setReminder,
+        onToggleReminder = viewModel::toggleReminder,
         onToggleAttendee = viewModel::toggleAttendee,
+        onSetRequestRsvp = viewModel::setRequestRsvp,
     )
 }
 
-/**
- * Stateless form body — exposed separately so Paparazzi snapshots can
- * render the form against fixture state without standing the VM up.
- */
+/** Stateless body — exposed so Paparazzi can render fixture state without the VM. */
 @Composable
 fun AddEventFormBody(
     state: AddEventUiState,
+    offline: Boolean,
     onClose: () -> Unit,
     onCommit: () -> Unit,
     onUpdateField: (AddEventField, String) -> Unit,
     onSelectCategory: (CalendarEventCategory) -> Unit,
     onAllDay: (Boolean) -> Unit,
     onSetStart: (java.time.ZonedDateTime) -> Unit,
-    onSetEndEnabled: (Boolean) -> Unit,
     onSetEnd: (java.time.ZonedDateTime) -> Unit,
     onSetRecurrence: (AddEventRecurrence) -> Unit,
-    onSetReminder: (AddEventReminder) -> Unit,
+    onToggleReminder: (AddEventReminderOffset) -> Unit,
     onToggleAttendee: (String) -> Unit,
+    onSetRequestRsvp: (Boolean) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize().testTag(ADD_EVENT_SCREEN_TAG)) {
         FormShell(
@@ -154,19 +167,14 @@ fun AddEventFormBody(
             onClose = onClose,
             onCommit = onCommit,
         ) {
+            if (offline) OfflineFormBanner()
             TitleGroup(state = state, onUpdate = onUpdateField)
             CategoryGroup(state = state, onSelect = onSelectCategory)
-            ScheduleGroup(
-                state = state,
-                onAllDay = onAllDay,
-                onSetStart = onSetStart,
-                onSetEndEnabled = onSetEndEnabled,
-                onSetEnd = onSetEnd,
-            )
-            LocationGroup(state = state, onUpdate = onUpdateField)
+            ScheduleGroup(state = state, onAllDay = onAllDay, onSetStart = onSetStart, onSetEnd = onSetEnd)
             RecurrenceGroup(state = state, onSelect = onSetRecurrence)
             AttendeesGroup(state = state, onToggle = onToggleAttendee)
-            ReminderGroup(state = state, onSelect = onSetReminder)
+            ReminderGroup(state = state, onToggle = onToggleReminder)
+            RequestRsvpGroup(state = state, onToggle = onSetRequestRsvp)
             NotesGroup(state = state, onUpdate = onUpdateField)
             Box(modifier = Modifier.height(Spacing.s5))
         }
@@ -178,16 +186,32 @@ fun AddEventFormBody(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = Spacing.s8)
                         .clip(RoundedCornerShape(Radii.pill))
-                        .background(
-                            if (toast.isError) PantopusColors.error else PantopusColors.success,
-                        ).padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+                        .background(if (toast.isError) PantopusColors.error else PantopusColors.success)
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
             ) {
-                Text(
-                    text = toast.text,
-                    style = PantopusTextStyle.small,
-                    color = PantopusColors.appTextInverse,
-                )
+                Text(text = toast.text, style = PantopusTextStyle.small, color = PantopusColors.appTextInverse)
             }
+        }
+    }
+}
+
+@Composable
+private fun OfflineFormBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .padding(horizontal = 11.dp, vertical = 9.dp)
+                .testTag("addEvent_offlineBanner"),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.WifiOff, contentDescription = null, size = 15.dp, tint = PantopusColors.warning)
+        Column {
+            Text(text = "You're offline", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PantopusColors.warning)
+            Text(text = "This event saves when you reconnect.", fontSize = 11.5.sp, color = PantopusColors.appTextStrong)
         }
     }
 }
@@ -212,7 +236,7 @@ private fun TitleGroup(
             label = "Title",
             value = snapshot?.value.orEmpty(),
             onValueChange = { onUpdate(AddEventField.Title, it) },
-            placeholder = "What's the event?",
+            placeholder = "Add a title",
             state = fieldState,
             fieldTestTag = "addEvent_titleField",
         )
@@ -221,40 +245,15 @@ private fun TitleGroup(
 
 // MARK: - Category
 
-private val DESIGNED_CATEGORIES =
-    listOf(
-        CalendarEventCategory.Chore,
-        CalendarEventCategory.Birthday,
-        CalendarEventCategory.Maintenance,
-        CalendarEventCategory.School,
-        CalendarEventCategory.Medical,
-        CalendarEventCategory.Social,
-        CalendarEventCategory.Family,
-        CalendarEventCategory.Pet,
-        CalendarEventCategory.Delivery,
-        CalendarEventCategory.Trash,
-        CalendarEventCategory.Bill,
-        CalendarEventCategory.Generic,
-    )
-
 @Composable
 private fun CategoryGroup(
     state: AddEventUiState,
     onSelect: (CalendarEventCategory) -> Unit,
 ) {
     FormFieldGroup(title = "Category") {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.heightIn(min = 240.dp, max = 360.dp),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            items(DESIGNED_CATEGORIES) { category ->
-                CategoryChip(
-                    category = category,
-                    isSelected = state.category == category,
-                    onClick = { onSelect(category) },
-                )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            DESIGNED_CATEGORIES.forEach { category ->
+                CategoryChip(category = category, isSelected = state.category == category, onClick = { onSelect(category) })
             }
         }
     }
@@ -271,48 +270,25 @@ private fun CategoryChip(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         modifier =
             Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp)
+                .heightIn(min = 36.dp)
                 .clip(RoundedCornerShape(Radii.md))
+                .background(if (isSelected) PantopusColors.homeBg else PantopusColors.appSurface)
                 .border(
-                    width = if (isSelected) 2.dp else 1.dp,
-                    color = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorder,
+                    width = 1.dp,
+                    color = if (isSelected) PantopusColors.homeBg else PantopusColors.appBorder,
                     shape = RoundedCornerShape(Radii.md),
                 ).clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                 .testTag("addEvent_category_${category.rawValue}")
-                .semantics { contentDescription = category.label },
+                .semantics { contentDescription = category.pickerLabel },
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(Radii.sm))
-                    .background(category.background),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = category.icon,
-                contentDescription = null,
-                size = Radii.xl,
-                tint = category.foreground,
-            )
-        }
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(category.dotColor))
         Text(
-            text = category.label,
-            style = PantopusTextStyle.small,
-            color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
+            text = category.pickerLabel,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+            color = if (isSelected) PantopusColors.homeDark else PantopusColors.appText,
         )
-        if (isSelected) {
-            PantopusIconImage(
-                icon = PantopusIcon.Check,
-                contentDescription = null,
-                size = 14.dp,
-                tint = PantopusColors.primary600,
-            )
-        }
     }
 }
 
@@ -323,80 +299,33 @@ private fun ScheduleGroup(
     state: AddEventUiState,
     onAllDay: (Boolean) -> Unit,
     onSetStart: (java.time.ZonedDateTime) -> Unit,
-    onSetEndEnabled: (Boolean) -> Unit,
     onSetEnd: (java.time.ZonedDateTime) -> Unit,
 ) {
-    FormFieldGroup(title = "Schedule") {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
-        ) {
-            Text(
-                text = "All day",
-                style = PantopusTextStyle.body,
-                color = PantopusColors.appText,
-                modifier = Modifier.weight(1f),
-            )
+    FormFieldGroup(title = "When") {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
+            Text(text = "All-day", style = PantopusTextStyle.body, color = PantopusColors.appText, modifier = Modifier.weight(1f))
             Switch(
                 checked = state.allDay,
                 onCheckedChange = onAllDay,
                 colors =
                     SwitchDefaults.colors(
-                        checkedTrackColor = PantopusColors.primary600,
+                        checkedTrackColor = PantopusColors.home,
                         uncheckedTrackColor = PantopusColors.appBorderStrong,
                     ),
                 modifier = Modifier.testTag("addEvent_allDayToggle"),
             )
         }
-
-        // Start
-        DateTimeRow(
-            label = "Starts",
-            value = state.startDate,
-            allDay = state.allDay,
-            testTagPrefix = "addEvent_startDate",
-            onChange = onSetStart,
-        )
-
-        // End — only when not all-day
-        if (!state.allDay) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+        DateTimeRow(label = "Starts", value = state.startDate, allDay = state.allDay, testTagPrefix = "addEvent_startDate", onChange = onSetStart)
+        if (!state.allDay && state.endDate != null) {
+            DateTimeRow(label = "Ends", value = state.endDate, allDay = false, testTagPrefix = "addEvent_endDate", onChange = onSetEnd)
+            state.endError?.let { error ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    modifier = Modifier.testTag("addEvent_endError"),
                 ) {
-                    Text(
-                        text = "Ends",
-                        style = PantopusTextStyle.body,
-                        color = PantopusColors.appText,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = state.endDate != null,
-                        onCheckedChange = onSetEndEnabled,
-                        colors =
-                            SwitchDefaults.colors(
-                                checkedTrackColor = PantopusColors.primary600,
-                                uncheckedTrackColor = PantopusColors.appBorderStrong,
-                            ),
-                        modifier = Modifier.testTag("addEvent_hasEndToggle"),
-                    )
-                }
-                if (state.endDate != null) {
-                    DateTimeRow(
-                        label = "End",
-                        value = state.endDate,
-                        allDay = false,
-                        testTagPrefix = "addEvent_endDate",
-                        onChange = onSetEnd,
-                    )
-                }
-                state.endError?.let { error ->
-                    Text(
-                        text = error,
-                        style = PantopusTextStyle.caption,
-                        color = PantopusColors.error,
-                    )
+                    PantopusIconImage(icon = PantopusIcon.AlertCircle, contentDescription = null, size = 11.dp, tint = PantopusColors.error)
+                    Text(text = error, style = PantopusTextStyle.caption, color = PantopusColors.error)
                 }
             }
         }
@@ -417,27 +346,11 @@ private fun DateTimeRow(
     val timeFmt = remember { DateTimeFormatter.ofPattern("h:mm a", Locale.US) }
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        Text(
-            text = label,
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            PickerChip(
-                label = dateFmt.format(value),
-                onClick = { showDatePicker = true },
-                modifier = Modifier.weight(1f).testTag("${testTagPrefix}_date"),
-            )
+        Text(text = label, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            PickerChip(label = dateFmt.format(value), onClick = { showDatePicker = true }, modifier = Modifier.weight(1f).testTag("${testTagPrefix}_date"))
             if (!allDay) {
-                PickerChip(
-                    label = timeFmt.format(value),
-                    onClick = { showTimePicker = true },
-                    modifier = Modifier.weight(1f).testTag("${testTagPrefix}_time"),
-                )
+                PickerChip(label = timeFmt.format(value), onClick = { showTimePicker = true }, modifier = Modifier.weight(1f).testTag("${testTagPrefix}_time"))
             }
         }
     }
@@ -448,7 +361,7 @@ private fun DateTimeRow(
             onDismiss = { showDatePicker = false },
             onSelect = { picked ->
                 showDatePicker = false
-                onChange(value.with(picked).withZoneSameInstant(value.zone))
+                onChange(value.with(picked))
             },
         )
     }
@@ -458,11 +371,7 @@ private fun DateTimeRow(
             onDismiss = { showTimePicker = false },
             onSelect = { picked ->
                 showTimePicker = false
-                onChange(
-                    LocalDateTime
-                        .of(value.toLocalDate(), picked)
-                        .atZone(value.zone),
-                )
+                onChange(LocalDateTime.of(value.toLocalDate(), picked).atZone(value.zone))
             },
         )
     }
@@ -481,40 +390,12 @@ private fun PickerChip(
                 .heightIn(min = 44.dp)
                 .clip(RoundedCornerShape(Radii.md))
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appSurface)
+                .background(PantopusColors.appSurfaceSunken)
                 .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s3),
     ) {
-        Text(
-            text = label,
-            style = PantopusTextStyle.body,
-            color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
-        )
-        PantopusIconImage(
-            icon = PantopusIcon.ChevronDown,
-            contentDescription = null,
-            size = Radii.xl,
-            tint = PantopusColors.appTextSecondary,
-        )
-    }
-}
-
-// MARK: - Location
-
-@Composable
-private fun LocationGroup(
-    state: AddEventUiState,
-    onUpdate: (AddEventField, String) -> Unit,
-) {
-    FormFieldGroup(title = "Location") {
-        PantopusTextField(
-            label = "Where",
-            value = state.fields[AddEventField.Location]?.value.orEmpty(),
-            onValueChange = { onUpdate(AddEventField.Location, it) },
-            placeholder = "Optional · address, room, link",
-            fieldTestTag = "addEvent_locationField",
-        )
+        Text(text = label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+        PantopusIconImage(icon = PantopusIcon.ChevronDown, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextSecondary)
     }
 }
 
@@ -525,18 +406,30 @@ private fun RecurrenceGroup(
     state: AddEventUiState,
     onSelect: (AddEventRecurrence) -> Unit,
 ) {
-    FormFieldGroup(title = "Repeat") {
-        Column {
-            val options = AddEventRecurrence.entries
-            options.forEachIndexed { index, option ->
-                PickerRow(
-                    label = option.label,
-                    isSelected = state.recurrence == option,
-                    testTag = "addEvent_recurrence_${option.rawValue}",
-                    onClick = { onSelect(option) },
-                )
-                if (index != options.lastIndex) {
-                    HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+    FormFieldGroup(title = "Repeats") {
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.md)).background(PantopusColors.appSurfaceSunken).padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            AddEventRecurrence.pickerOptions.forEach { option ->
+                val active = state.recurrence == option
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 34.dp)
+                            .clip(RoundedCornerShape(Radii.sm))
+                            .background(if (active) PantopusColors.home else Color.Transparent)
+                            .clickable { onSelect(option) }
+                            .testTag("addEvent_recurrence_${option.rawValue}"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = option.segmentedLabel,
+                        fontSize = 12.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                        color = if (active) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+                    )
                 }
             }
         }
@@ -550,26 +443,26 @@ private fun AttendeesGroup(
     state: AddEventUiState,
     onToggle: (String) -> Unit,
 ) {
-    FormFieldGroup(title = "Attendees") {
+    FormFieldGroup(title = "Assign to") {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(text = "Assign to", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong, modifier = Modifier.weight(1f))
+            Text(
+                text = "${state.selectedAttendeeIds.size} selected",
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.homeDark,
+                modifier = Modifier.testTag("addEvent_assignedCount"),
+            )
+        }
         if (state.attendees.isEmpty()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
             ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.UsersRound,
-                    contentDescription = null,
-                    size = 18.dp,
-                    tint = PantopusColors.appTextSecondary,
-                )
+                PantopusIconImage(icon = PantopusIcon.UsersRound, contentDescription = null, size = 18.dp, tint = PantopusColors.appTextSecondary)
                 Text(
-                    text =
-                        if (state.isLoadingMembers) {
-                            "Loading household members…"
-                        } else {
-                            "No household members loaded yet."
-                        },
+                    text = if (state.isLoadingMembers) "Loading household members…" else "No household members loaded yet.",
                     style = PantopusTextStyle.small,
                     color = PantopusColors.appTextSecondary,
                 )
@@ -577,11 +470,7 @@ private fun AttendeesGroup(
         } else {
             Column {
                 state.attendees.forEachIndexed { index, attendee ->
-                    AttendeeRow(
-                        attendee = attendee,
-                        isSelected = attendee.id in state.selectedAttendeeIds,
-                        onClick = { onToggle(attendee.id) },
-                    )
+                    AttendeeRow(attendee = attendee, isSelected = attendee.id in state.selectedAttendeeIds, onClick = { onToggle(attendee.id) })
                     if (index != state.attendees.lastIndex) {
                         HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
                     }
@@ -609,26 +498,8 @@ private fun AttendeeRow(
                 .testTag("addEvent_attendee_${attendee.id}")
                 .semantics { contentDescription = attendee.displayName },
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.homeBg),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = attendee.initials.ifEmpty { "·" },
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.home,
-            )
-        }
-        Text(
-            text = attendee.displayName,
-            style = PantopusTextStyle.body,
-            color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
-        )
+        HomeMemberAvatar(member = HomeMember(id = attendee.id, name = attendee.displayName, initials = attendee.initials), size = 32.dp)
+        Text(text = attendee.displayName, style = PantopusTextStyle.body, color = PantopusColors.appText, modifier = Modifier.weight(1f))
         CheckMark(isSelected = isSelected)
     }
 }
@@ -640,47 +511,81 @@ private fun CheckMark(isSelected: Boolean) {
             Modifier
                 .size(22.dp)
                 .clip(RoundedCornerShape(Radii.xs))
-                .background(if (isSelected) PantopusColors.primary600 else PantopusColors.appSurface)
+                .background(if (isSelected) PantopusColors.home else PantopusColors.appSurface)
                 .border(
                     width = if (isSelected) 0.dp else 1.5.dp,
-                    color = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorderStrong,
+                    color = if (isSelected) PantopusColors.home else PantopusColors.appBorderStrong,
                     shape = RoundedCornerShape(Radii.xs),
                 ),
         contentAlignment = Alignment.Center,
     ) {
         if (isSelected) {
-            PantopusIconImage(
-                icon = PantopusIcon.Check,
-                contentDescription = null,
-                size = 14.dp,
-                tint = PantopusColors.appTextInverse,
-            )
+            PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextInverse)
         }
     }
 }
 
-// MARK: - Reminder
+// MARK: - Reminder (multi-select)
 
 @Composable
 private fun ReminderGroup(
     state: AddEventUiState,
-    onSelect: (AddEventReminder) -> Unit,
+    onToggle: (AddEventReminderOffset) -> Unit,
 ) {
     FormFieldGroup(title = "Reminder") {
-        Column {
-            val options = AddEventReminder.entries
-            options.forEachIndexed { index, option ->
-                PickerRow(
-                    label = option.label,
-                    isSelected = state.reminder == option,
-                    testTag = "addEvent_reminder_${option.rawValue}",
-                    onClick = { onSelect(option) },
-                )
-                if (index != options.lastIndex) {
-                    HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            AddEventReminderOffset.entries.forEach { offset ->
+                val on = offset in state.reminderOffsets
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    modifier =
+                        Modifier
+                            .heightIn(min = 34.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(if (on) PantopusColors.homeBg else PantopusColors.appSurface)
+                            .border(1.dp, if (on) PantopusColors.homeBg else PantopusColors.appBorder, RoundedCornerShape(percent = 50))
+                            .clickable { onToggle(offset) }
+                            .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                            .testTag("addEvent_reminder_${offset.label}"),
+                ) {
+                    if (on) {
+                        PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 12.dp, tint = PantopusColors.homeDark)
+                    }
+                    Text(
+                        text = offset.label,
+                        fontSize = 12.sp,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
+                        color = if (on) PantopusColors.homeDark else PantopusColors.appTextStrong,
+                    )
                 }
             }
         }
+    }
+}
+
+// MARK: - Request RSVP
+
+@Composable
+private fun RequestRsvpGroup(
+    state: AddEventUiState,
+    onToggle: (Boolean) -> Unit,
+) {
+    FormFieldGroup(title = "RSVP") {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
+            Text(text = "Request RSVP from attendees", style = PantopusTextStyle.body, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+            Switch(
+                checked = state.requestRsvp,
+                onCheckedChange = onToggle,
+                colors =
+                    SwitchDefaults.colors(
+                        checkedTrackColor = PantopusColors.home,
+                        uncheckedTrackColor = PantopusColors.appBorderStrong,
+                    ),
+                modifier = Modifier.testTag("addEvent_requestRsvpToggle"),
+            )
+        }
+        Text(text = "Members get a Going / Maybe / Can't prompt", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
     }
 }
 
@@ -703,12 +608,7 @@ private fun NotesGroup(
                         .background(PantopusColors.appSurface)
                         .border(
                             width = 1.dp,
-                            color =
-                                if (snapshot?.error == null) {
-                                    PantopusColors.appBorder
-                                } else {
-                                    PantopusColors.error
-                                },
+                            color = if (snapshot?.error == null) PantopusColors.appBorder else PantopusColors.error,
                             shape = RoundedCornerShape(Radii.md),
                         ).padding(Spacing.s3),
             ) {
@@ -721,64 +621,20 @@ private fun NotesGroup(
                     modifier = Modifier.fillMaxWidth().testTag("addEvent_notesField"),
                     decorationBox = { inner ->
                         if ((snapshot?.value ?: "").isEmpty()) {
-                            Text(
-                                text = "Notes (optional)",
-                                style = PantopusTextStyle.body,
-                                color = PantopusColors.appTextMuted,
-                            )
+                            Text(text = "Add a note (optional)", style = PantopusTextStyle.body, color = PantopusColors.appTextMuted)
                         }
                         inner()
                     },
                 )
             }
             snapshot?.error?.let { error ->
-                Text(
-                    text = error,
-                    style = PantopusTextStyle.caption,
-                    color = PantopusColors.error,
-                )
+                Text(text = error, style = PantopusTextStyle.caption, color = PantopusColors.error)
             }
         }
     }
 }
 
-// MARK: - Helpers
-
-@Composable
-private fun PickerRow(
-    label: String,
-    isSelected: Boolean,
-    testTag: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp)
-                .clickable(onClick = onClick)
-                .padding(vertical = Spacing.s2)
-                .testTag(testTag)
-                .semantics { contentDescription = label },
-    ) {
-        Text(
-            text = label,
-            style = PantopusTextStyle.body,
-            color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
-        )
-        if (isSelected) {
-            PantopusIconImage(
-                icon = PantopusIcon.Check,
-                contentDescription = null,
-                size = 18.dp,
-                tint = PantopusColors.primary600,
-            )
-        }
-    }
-}
+// MARK: - Pickers
 
 @Composable
 private fun SimpleDatePickerDialog(
@@ -786,11 +642,7 @@ private fun SimpleDatePickerDialog(
     onSelect: (LocalDate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val initialMillis =
-        initial
-            .atStartOfDay(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
+    val initialMillis = initial.atStartOfDay(FORM_ZONE).toInstant().toEpochMilli()
     val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
     DatePickerDialog(
         onDismissRequest = onDismiss,
@@ -798,20 +650,13 @@ private fun SimpleDatePickerDialog(
             TextButton(onClick = {
                 val picked = state.selectedDateMillis
                 if (picked != null) {
-                    val date =
-                        java.time.Instant
-                            .ofEpochMilli(picked)
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDate()
-                    onSelect(date)
+                    onSelect(Instant.ofEpochMilli(picked).atZone(FORM_ZONE).toLocalDate())
                 } else {
                     onDismiss()
                 }
             }) { Text("Done") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     ) {
         DatePicker(state = state)
     }
@@ -823,22 +668,11 @@ private fun SimpleTimePickerDialog(
     onSelect: (LocalTime) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val state =
-        rememberTimePickerState(
-            initialHour = initial.hour,
-            initialMinute = initial.minute,
-            is24Hour = false,
-        )
+    val state = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = false)
     DatePickerDialog(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = {
-                onSelect(LocalTime.of(state.hour, state.minute))
-            }) { Text("Done") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
+        confirmButton = { TextButton(onClick = { onSelect(LocalTime.of(state.hour, state.minute)) }) { Text("Done") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     ) {
         Box(modifier = Modifier.padding(Spacing.s4)) { TimePicker(state = state) }
     }

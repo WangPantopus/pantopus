@@ -2236,6 +2236,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 ChildRoutes.calendarEventDetail(homeId = homeId, eventId = eventId),
                             )
                         },
+                        onNavigate = { route -> navController.navigate(route) },
                         onBack = { navController.popBackStack() },
                     )
                 }
