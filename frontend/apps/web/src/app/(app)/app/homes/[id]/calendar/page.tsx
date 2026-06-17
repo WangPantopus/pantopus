@@ -1,149 +1,96 @@
-'use client';
+"use client";
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus } from 'lucide-react';
-import * as api from '@pantopus/api';
-import { getAuthToken } from '@pantopus/api';
-import { toast } from '@/components/ui/toast-store';
-import CalendarCard from '@/components/home/cards/CalendarCard';
+// F1 — Household calendar / agenda (W10). Extends the existing home calendar
+// route to render the booking UNION (GET /api/homes/:id/events, rows tagged
+// source:'booking') alongside household events, with a member filter, assignee
+// avatar stacks, a create menu, and a "Who's free" entry. Read-only/gated for
+// members lacking calendar.edit (F15 render-mode). W10 is the sole owner of
+// this file.
+
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Users } from "lucide-react";
+import * as api from "@pantopus/api";
+import { getAuthToken } from "@pantopus/api";
+import {
+  HomePermissionsProvider,
+  useHomePermissions,
+} from "@/components/home/useHomePermissions";
+import HomeAgenda from "@/components/scheduling/home/HomeAgenda";
 
 function CalendarContent() {
   const router = useRouter();
-  const { id: homeId } = useParams<{ id: string }>();
-
-  const [tasks, setTasks] = useState<Record<string, any>[]>([]);
-  const [bills, setBills] = useState<Record<string, any>[]>([]);
-  const [events, setEvents] = useState<Record<string, any>[]>([]);
-  const [packages, setPackages] = useState<Record<string, any>[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Add event form
-  const [showAddEvent, setShowAddEvent] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDate, setNewDate] = useState('');
-  const [addingEvent, setAddingEvent] = useState(false);
+  const params = useParams();
+  const homeId = (params?.id ?? "") as string;
+  const { can, loading: permsLoading } = useHomePermissions();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getAuthToken()) router.push('/login');
+    if (!getAuthToken()) router.push("/login");
   }, [router]);
 
-  const fetchData = useCallback(async () => {
-    if (!homeId) return;
-    const [tasksRes, billsRes, eventsRes, pkgRes] = await Promise.allSettled([
-      api.homeProfile.getHomeTasks(homeId),
-      api.homeProfile.getHomeBills(homeId),
-      api.homeProfile.getHomeEvents(homeId),
-      api.homeProfile.getHomePackages(homeId),
-    ]);
-
-    if (tasksRes.status === 'fulfilled')
-      setTasks(((tasksRes.value as any)?.tasks || []) as Record<string, any>[]);
-    if (billsRes.status === 'fulfilled')
-      setBills(((billsRes.value as any)?.bills || []) as Record<string, any>[]);
-    if (eventsRes.status === 'fulfilled')
-      setEvents(((eventsRes.value as any)?.events || []) as Record<string, any>[]);
-    if (pkgRes.status === 'fulfilled')
-      setPackages(((pkgRes.value as any)?.packages || []) as Record<string, any>[]);
-  }, [homeId]);
-
   useEffect(() => {
-    setLoading(true);
-    fetchData().finally(() => setLoading(false));
-  }, [fetchData]);
+    api.users
+      .getMyProfile()
+      .then((u) => setCurrentUserId((u as { id?: string })?.id ?? null))
+      .catch(() => {});
+  }, []);
 
-  const handleAddEvent = useCallback(async () => {
-    if (!newTitle.trim() || !newDate || !homeId) return;
-    setAddingEvent(true);
-    try {
-      await api.homeProfile.createHomeEvent(homeId, {
-        event_type: 'general',
-        title: newTitle.trim(),
-        start_at: new Date(newDate).toISOString(),
-      });
-      setNewTitle('');
-      setNewDate('');
-      setShowAddEvent(false);
-      toast.success('Event added');
-      await fetchData();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to add event');
-    } finally {
-      setAddingEvent(false);
-    }
-  }, [homeId, newTitle, newDate, fetchData]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin h-8 w-8 border-3 border-emerald-600 border-t-transparent rounded-full" />
-      </div>
-    );
-  }
+  const canEdit = can("calendar.edit");
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="p-1.5 hover:bg-app-hover rounded-lg transition"
+            className="rounded-lg p-1.5 transition hover:bg-app-surface-sunken"
+            aria-label="Back"
           >
-            <ArrowLeft className="w-5 h-5 text-app-text" />
+            <ArrowLeft className="h-5 w-5 text-app-text" />
           </button>
-          <h1 className="text-xl font-bold text-app-text">Household Calendar</h1>
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-app-home">
+              Household
+            </div>
+            <h1 className="text-xl font-bold text-app-text">Calendar</h1>
+          </div>
         </div>
         <button
-          onClick={() => setShowAddEvent(!showAddEvent)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition"
+          onClick={() =>
+            router.push(`/app/homes/${homeId}/scheduling/whos-free`)
+          }
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-bold text-app-home transition hover:bg-app-home-bg"
         >
-          <Plus className="w-4 h-4" /> Add Event
+          <Users className="h-4 w-4" /> Who&apos;s free
         </button>
       </div>
 
-      {/* Add event form */}
-      {showAddEvent && (
-        <div className="bg-app-surface border border-app-border rounded-xl p-4 mb-4 space-y-3">
-          <input
-            type="text"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Event title"
-            className="w-full px-3 py-2 border border-app-border rounded-lg text-sm text-app-text bg-app-surface placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-400"
-          />
-          <input
-            type="datetime-local"
-            value={newDate}
-            onChange={(e) => setNewDate(e.target.value)}
-            className="w-full px-3 py-2 border border-app-border rounded-lg text-sm text-app-text bg-app-surface focus:outline-none focus:ring-2 focus:ring-emerald-400"
-          />
-          <button
-            onClick={handleAddEvent}
-            disabled={addingEvent || !newTitle.trim() || !newDate}
-            className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-semibold text-sm hover:bg-emerald-700 disabled:opacity-50 transition"
-          >
-            {addingEvent ? 'Adding...' : 'Add Event'}
-          </button>
+      {permsLoading ? (
+        <div className="animate-pulse space-y-3">
+          <div className="h-[88px] rounded-2xl bg-app-surface-sunken" />
+          <div className="h-9 w-48 rounded-full bg-app-surface-sunken" />
+          <div className="h-[64px] rounded-2xl bg-app-surface-sunken" />
+          <div className="h-[64px] rounded-2xl bg-app-surface-sunken" />
         </div>
+      ) : (
+        <HomeAgenda
+          homeId={homeId}
+          canEdit={canEdit}
+          currentUserId={currentUserId}
+        />
       )}
-
-      {/* Calendar views (agenda/week/month) */}
-      <CalendarCard
-        tasks={tasks}
-        bills={bills}
-        events={events}
-        packages={packages}
-        onBack={() => router.push(`/app/homes/${homeId}/dashboard`)}
-      />
     </div>
   );
 }
 
 export default function CalendarPage() {
+  const homeId = (useParams()?.id ?? "") as string;
   return (
     <Suspense>
-      <CalendarContent />
+      <HomePermissionsProvider homeId={homeId}>
+        <CalendarContent />
+      </HomePermissionsProvider>
     </Suspense>
   );
 }
