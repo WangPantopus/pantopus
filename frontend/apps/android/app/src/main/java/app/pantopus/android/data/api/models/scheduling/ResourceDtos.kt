@@ -76,8 +76,8 @@ data class ResourceBookingDto(
     @Json(name = "resource_id") val resourceId: String? = null,
     @Json(name = "start_at") val startAt: String? = null,
     @Json(name = "end_at") val endAt: String? = null,
-    val name: String? = null,
-    @Json(name = "booked_by") val bookedBy: String? = null,
+    @Json(name = "invitee_name") val inviteeName: String? = null,
+    @Json(name = "created_by") val createdBy: String? = null,
     val status: String? = null,
     @Json(name = "created_at") val createdAt: String? = null,
 )

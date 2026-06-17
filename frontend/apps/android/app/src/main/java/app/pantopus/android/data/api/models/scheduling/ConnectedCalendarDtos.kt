@@ -16,7 +16,7 @@ data class ConnectedCalendarDto(
     val provider: String? = null,
     @Json(name = "external_account") val externalAccount: String? = null,
     @Json(name = "check_conflicts") val checkConflicts: Boolean? = null,
-    @Json(name = "write_target") val writeTarget: String? = null,
+    @Json(name = "write_target") val writeTarget: Boolean? = null,
     val status: String? = null,
     @Json(name = "last_synced_at") val lastSyncedAt: String? = null,
 )
