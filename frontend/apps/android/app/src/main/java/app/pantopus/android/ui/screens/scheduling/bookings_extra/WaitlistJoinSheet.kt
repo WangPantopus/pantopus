@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
@@ -23,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.components.GhostButton
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.theme.PantopusColors
@@ -152,7 +155,7 @@ private fun JoinedConfirmation(
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = androidx.compose.foundation.layout.size(64.dp).clip(androidx.compose.foundation.shape.CircleShape).background(PantopusColors.successBg),
+            modifier = Modifier.size(64.dp).clip(CircleShape).background(PantopusColors.successBg),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 30.dp, tint = PantopusColors.success)
