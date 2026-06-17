@@ -352,12 +352,12 @@ import app.pantopus.android.ui.screens.scheduling.business.MemberWorkingHoursScr
 import app.pantopus.android.ui.screens.wallet.scheduling.PaymentsSetupScreen
 import app.pantopus.android.ui.screens.wallet.scheduling.PayoutsEarningsScreen
 import app.pantopus.android.ui.screens.scheduling.payments.CancellationRefundPolicyScreen
-import app.pantopus.android.ui.screens.scheduling.packages.PackagesListScreen
+import app.pantopus.android.ui.screens.scheduling.packages.PackagesListScreen as SchedulingPackagesListScreen
 import app.pantopus.android.ui.screens.scheduling.packages.PackageEditorScreen
 import app.pantopus.android.ui.screens.scheduling.packages.BuyPackageScreen
 import app.pantopus.android.ui.screens.scheduling.packages.MyPackagesScreen
 import app.pantopus.android.ui.screens.scheduling.invoices.InvoicesListScreen
-import app.pantopus.android.ui.screens.scheduling.invoices.InvoiceDetailScreen
+import app.pantopus.android.ui.screens.scheduling.invoices.InvoiceDetailScreen as SchedulingInvoiceDetailScreen
 import app.pantopus.android.ui.screens.scheduling.automations.RemindersQuickSetupScreen
 import app.pantopus.android.ui.screens.scheduling.automations.WorkflowsListScreen
 import app.pantopus.android.ui.screens.scheduling.automations.WorkflowEditorScreen
@@ -2690,7 +2690,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     )
                 }
                 composable(SchedulingRoutes.PACKAGES_LIST) {
-                    PackagesListScreen(
+                    SchedulingPackagesListScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
                     )
@@ -2731,7 +2731,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     route = SchedulingRoutes.INVOICE_DETAIL,
                     arguments = listOf(navArgument(SchedulingRoutes.ARG_INVOICE_ID) { type = NavType.StringType }),
                 ) { entry ->
-                    InvoiceDetailScreen(
+                    SchedulingInvoiceDetailScreen(
                         invoiceId = entry.arguments?.getString(SchedulingRoutes.ARG_INVOICE_ID).orEmpty(),
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },

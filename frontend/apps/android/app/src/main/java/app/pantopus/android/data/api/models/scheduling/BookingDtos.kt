@@ -34,8 +34,6 @@ data class BookingDto(
     @Json(name = "previous_start_at") val previousStartAt: String? = null,
     @Json(name = "cancel_reason") val cancelReason: String? = null,
     @Json(name = "created_via") val createdVia: String? = null,
-    @Json(name = "no_show_fee_applied") val noShowFeeApplied: Boolean? = null,
-    @Json(name = "refund_issued") val refundIssued: Boolean? = null,
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "updated_at") val updatedAt: String? = null,
 )
@@ -79,17 +77,35 @@ data class BookingResponse(
     val booking: BookingDto,
 )
 
-/** `POST /bookings` (manual create) — `{ booking, attendees }`. */
+/**
+ * `POST /bookings` (manual create) — `{ booking, manageToken, clientSecret }`.
+ * `clientSecret` drives the Stripe payment for a priced event type's manual
+ * booking; `manageToken` is the booker's one-time handle.
+ */
 @JsonClass(generateAdapter = true)
 data class CreateBookingResponse(
     val booking: BookingDto,
-    val attendees: List<AttendeeDto> = emptyList(),
+    val manageToken: String? = null,
+    val clientSecret: String? = null,
 )
 
-/** `POST /bookings/recurring` — `{ bookings: [...] }`. */
+/** One session that couldn't be booked in a recurring series. */
+@JsonClass(generateAdapter = true)
+data class RecurringFailure(
+    val start: String? = null,
+    val error: String? = null,
+    val message: String? = null,
+)
+
+/**
+ * `POST /bookings/recurring` — `{ recurrenceGroupId, created, failed }`.
+ * `created` are the booked sessions; `failed` reports per-session conflicts.
+ */
 @JsonClass(generateAdapter = true)
 data class RecurringBookingsResponse(
-    val bookings: List<BookingDto> = emptyList(),
+    val recurrenceGroupId: String? = null,
+    val created: List<BookingDto> = emptyList(),
+    val failed: List<RecurringFailure> = emptyList(),
 )
 
 /** `POST /bookings/:id/rsvp` — `{ attendee: … }`. */
@@ -98,21 +114,33 @@ data class AttendeeResponse(
     val attendee: AttendeeDto,
 )
 
-/** Next-booking pointer inside the summary card. */
+/** One day's count in the 30-day summary sparkline. */
 @JsonClass(generateAdapter = true)
-data class NextBookingRef(
-    @Json(name = "start_at") val startAt: String? = null,
-    @Json(name = "invitee_name") val inviteeName: String? = null,
+data class SummarySparkPoint(
+    val date: String? = null,
+    val count: Int = 0,
 )
 
-/** `GET /bookings/summary` — Scheduling Hub headline metrics. */
+/** Per-event-type booking count in the summary breakdown. */
+@JsonClass(generateAdapter = true)
+data class SummaryByEventType(
+    @Json(name = "event_type_id") val eventTypeId: String? = null,
+    val count: Int = 0,
+)
+
+/**
+ * `GET /bookings/summary` — Scheduling Hub headline metrics. Matches the live
+ * `bookingMetricsService.getSummary` shape (the companion doc drifted).
+ */
 @JsonClass(generateAdapter = true)
 data class BookingSummaryResponse(
+    @Json(name = "bookingsThisMonth") val bookingsThisMonth: Int = 0,
+    @Json(name = "bookingsLastMonth") val bookingsLastMonth: Int = 0,
+    @Json(name = "deltaPct") val deltaPct: Int = 0,
     @Json(name = "upcomingCount") val upcomingCount: Int = 0,
-    @Json(name = "pendingCount") val pendingCount: Int = 0,
-    @Json(name = "totalThisMonth") val totalThisMonth: Int = 0,
-    @Json(name = "noShowRate") val noShowRate: Double = 0.0,
-    @Json(name = "nextBooking") val nextBooking: NextBookingRef? = null,
+    @Json(name = "noShowCount") val noShowCount: Int = 0,
+    val sparkline: List<SummarySparkPoint> = emptyList(),
+    val byEventType: List<SummaryByEventType> = emptyList(),
 )
 
 /** `POST /bookings/:id/apply-credit` — `{ ok, remaining }`. */
