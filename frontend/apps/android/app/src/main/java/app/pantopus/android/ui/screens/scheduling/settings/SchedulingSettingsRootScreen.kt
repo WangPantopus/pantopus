@@ -1,19 +1,244 @@
-@file:Suppress("PackageNaming", "UNUSED_PARAMETER")
+@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.scheduling.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStubScaffold
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Spacing
 
-/**
- * A0 placeholder stub for "Scheduling settings". The owning Calendarly feature stream
- * replaces this body with the real screen (and adds its ViewModel); the
- * signature + nav args are the frozen contract `RootTabScreen` calls.
- */
 @Composable
 fun SchedulingSettingsRootScreen(
     onBack: () -> Unit = {},
     onNavigate: (String) -> Unit = {},
+    viewModel: SchedulingSettingsRootViewModel = hiltViewModel(),
 ) {
-    SchedulingStubScaffold(title = "Scheduling settings", onBack = onBack)
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
+    var showReset by remember { mutableStateOf(false) }
+    var showDisable by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.load() }
+
+    Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appSurfaceMuted)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            SettingsTopBar(title = "Booking settings", onBack = onBack)
+            when (val s = state) {
+                SchedulingSettingsUiState.Loading ->
+                    SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth().padding(Spacing.s4), rows = 5)
+                is SchedulingSettingsUiState.Error -> SettingsError(message = s.message, onRetry = viewModel::refresh)
+                is SchedulingSettingsUiState.Loaded ->
+                    SettingsBody(
+                        data = s.data,
+                        onNavigate = onNavigate,
+                        onReset = { showReset = true },
+                        onDisable = { showDisable = true },
+                        vm = viewModel,
+                    )
+            }
+        }
+        toast?.let { SettingsSavedToast(message = it, modifier = Modifier.align(Alignment.TopCenter)) }
+    }
+
+    if (showReset) {
+        ConfirmDialog(
+            title = "Reset booking link?",
+            message = "Your current link will stop working and a new one will be generated.",
+            confirm = "Reset link",
+            onConfirm = {
+                showReset = false
+                viewModel.resetSlug()
+            },
+            onDismiss = { showReset = false },
+        )
+    }
+    if (showDisable) {
+        ConfirmDialog(
+            title = "Disable scheduling?",
+            message = "Your booking page goes offline. Existing bookings stay on your calendar.",
+            confirm = "Disable scheduling",
+            onConfirm = {
+                showDisable = false
+                viewModel.disableScheduling()
+            },
+            onDismiss = { showDisable = false },
+        )
+    }
+}
+
+@Composable
+private fun SettingsBody(
+    data: SettingsData,
+    onNavigate: (String) -> Unit,
+    onReset: () -> Unit,
+    onDisable: () -> Unit,
+    vm: SchedulingSettingsRootViewModel,
+) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = Spacing.s8)) {
+        if (data.isBusiness) {
+            SettingsGroup(title = "Team", accent = PantopusColors.business) {
+                SettingsRow(
+                    label = "Team & seats",
+                    sublabel = "Manage members & booking seats",
+                    showDivider = true,
+                    onClick = { onNavigate(vm.teamRoute()) },
+                )
+                SettingsNewBookingsBlock(accent = PantopusColors.business)
+            }
+        }
+        SettingsGroup(title = "Automation", helper = "Reminders go out automatically before each booking.") {
+            SettingsRow(
+                label = "Default reminders",
+                sublabel = if (data.isFresh) null else (data.remindersValue ?: "1 day · 1 hr"),
+                onClick = { onNavigate(vm.remindersRoute()) },
+                trailing = {
+                    if (data.isFresh) SettingsChipChevron("Off", SettingsChipTone.Warning) else SettingsChevron()
+                },
+            )
+            SettingsRow(
+                label = "Workflows & follow-ups",
+                sublabel = if (data.isFresh) "No workflows yet" else null,
+                onClick = { onNavigate(vm.workflowsRoute()) },
+                trailing = {
+                    if (data.isFresh) {
+                        SettingsChipChevron("Set up", SettingsChipTone.Warning, PantopusIcon.Plus)
+                    } else {
+                        SettingsChipChevron("3 active", SettingsChipTone.Success)
+                    }
+                },
+            )
+            SettingsRow(
+                label = "Message templates",
+                sublabel = if (data.isFresh) "No templates yet" else "5 templates",
+                onClick = { onNavigate(vm.templatesRoute()) },
+                trailing = {
+                    if (data.isFresh) SettingsChipChevron("Set up", SettingsChipTone.Warning, PantopusIcon.Plus) else SettingsChevron()
+                },
+            )
+            SettingsRow(
+                label = "Booking notifications",
+                sublabel = if (data.isFresh) "Using defaults" else "Push · Email",
+                showDivider = false,
+                onClick = { onNavigate(vm.notificationsRoute()) },
+            )
+        }
+        SettingsGroup(title = "Scheduling defaults") {
+            SettingsRow(
+                label = "Default timezone",
+                sublabel = data.timezoneValue,
+                onClick = { onNavigate(vm.availabilityRoute()) },
+                trailing = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!data.isFresh) {
+                            PantopusIconImage(
+                                icon = PantopusIcon.Lock,
+                                contentDescription = null,
+                                size = 14.dp,
+                                tint = PantopusColors.primary600,
+                            )
+                            Spacer(Modifier.width(Spacing.s1))
+                        }
+                        SettingsChevron()
+                    }
+                },
+            )
+            SettingsRow(label = "Default availability", sublabel = "Mon–Fri, 9–5", onClick = { onNavigate(vm.availabilityRoute()) })
+            SettingsRow(
+                label = "Cancellation policy",
+                sublabel = if (data.isFresh) null else "24-hour notice",
+                showDivider = false,
+                onClick = { onNavigate(vm.cancellationPolicyRoute()) },
+                trailing = {
+                    if (data.isFresh) SettingsChipChevron("Set up", SettingsChipTone.Warning, PantopusIcon.Plus) else SettingsChevron()
+                },
+            )
+        }
+        if (data.paidEnabled) {
+            SettingsGroup(title = "Payments", helper = "Required only for paid event types.") {
+                SettingsRow(
+                    label = "Payments & payouts",
+                    sublabel = if (data.paymentsConnected) "Stripe · connected" else "Take payment at booking",
+                    showDivider = false,
+                    onClick = { onNavigate(vm.paymentsRoute()) },
+                    trailing = {
+                        if (data.paymentsConnected) {
+                            SettingsChip("Connected", SettingsChipTone.Success, PantopusIcon.Check)
+                        } else {
+                            SettingsConnectPill(accent = PantopusColors.primary600, onClick = { onNavigate(vm.paymentsRoute()) })
+                        }
+                    },
+                )
+            }
+        }
+        SettingsDangerGroup {
+            SettingsDangerRow(label = "Reset booking link", icon = PantopusIcon.RefreshCw, showDivider = true, onClick = onReset)
+            SettingsDangerRow(label = "Disable scheduling", icon = PantopusIcon.CalendarX, showDivider = false, onClick = onDisable)
+        }
+        SettingsMonoFooter(text = data.monoFooter)
+    }
+}
+
+@Composable
+private fun SettingsError(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.s4),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(64.dp))
+        PantopusIconImage(icon = PantopusIcon.CloudOff, contentDescription = null, size = 28.dp, tint = PantopusColors.appTextSecondary)
+        Spacer(Modifier.height(Spacing.s3))
+        Text("Couldn't load settings", style = PantopusTextStyle.h3, color = PantopusColors.appText)
+        Spacer(Modifier.height(Spacing.s2))
+        Text(message, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
+        Spacer(Modifier.height(Spacing.s4))
+        TextButton(onClick = onRetry) { Text("Try again", color = SchedulingPillar.Personal.accent) }
+    }
+}
+
+@Composable
+private fun ConfirmDialog(
+    title: String,
+    message: String,
+    confirm: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = PantopusColors.error) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
