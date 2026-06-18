@@ -58,11 +58,12 @@ struct SchedulingInvoiceDetailView: View {
         VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s0) {
-                    Text("\(model.reference) · issued \(model.issuedLabel)")
+                    Text(model.headerLine)
                         .font(.system(size: 10.5, design: .monospaced)).foregroundStyle(Theme.Color.appTextSecondary)
                     hero
                     payerPayee.padding(.top, 14)
                     lineItemsSection.padding(.top, 16)
+                    timelineSection.padding(.top, 16)
                     paymentTermsSection.padding(.top, 16)
                     Color.clear.frame(height: Spacing.s2)
                 }
@@ -172,6 +173,59 @@ struct SchedulingInvoiceDetailView: View {
         .background(Theme.Color.appSurface)
         .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    /// Payment-timeline section (`invoicedetail-frames.jsx` `Timeline`): a
+    /// bordered card with a left connecting rail, one check-dot row per
+    /// lifecycle event, and a mono timestamp trailing each label. Fed by the
+    /// VM's real Created/Sent events (richer Paid/Refunded/Voided dots stay
+    /// deferred pending the absent `status`/`paid_at` — see VM).
+    private var timelineSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Timeline", icon: .activity)
+            VStack(spacing: Spacing.s0) {
+                let events = model.timelineEvents
+                ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                    timelineRow(event, isLast: index == events.count - 1)
+                }
+            }
+            .padding(.horizontal, 13).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+    }
+
+    private func timelineRow(_ event: SchedulingInvoiceDetailViewModel.TimelineEvent, isLast: Bool) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            // Dot + connecting rail (design: 13px dot, 1.5px rail to next row).
+            ZStack(alignment: .top) {
+                if !isLast {
+                    Rectangle().fill(Theme.Color.appBorder)
+                        .frame(width: 1.5)
+                        .padding(.top, 13)
+                }
+                Circle().fill(timelineTone(event.tone))
+                    .frame(width: 13, height: 13)
+                    .overlay(Icon(.check, size: 8, strokeWidth: 4, color: Theme.Color.appTextInverse))
+            }
+            .frame(width: 13)
+            HStack(alignment: .firstTextBaseline) {
+                Text(event.label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.Color.appText)
+                Spacer(minLength: Spacing.s2)
+                Text(event.time).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.Color.appTextMuted)
+            }
+            .padding(.bottom, isLast ? 0 : 12)
+        }
+    }
+
+    private func timelineTone(_ tone: SchedulingInvoiceDetailViewModel.TimelineEvent.Tone) -> Color {
+        switch tone {
+        case .neutral: Theme.Color.appTextMuted
+        case .accent: model.accent
+        case .success: Theme.Color.success
+        }
     }
 
     /// Static product policy copy — JSX "Payment terms" section.

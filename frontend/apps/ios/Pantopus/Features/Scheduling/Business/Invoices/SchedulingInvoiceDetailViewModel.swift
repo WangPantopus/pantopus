@@ -46,6 +46,58 @@ final class SchedulingInvoiceDetailViewModel {
         return "Customer · " + recipient.prefix(6).uppercased()
     }
 
+    /// Net-14 due date (`invoicedetail-frames.jsx` mono header `· due Jun 18`).
+    /// The DTO carries no explicit `due_date`, but the Payment-terms section
+    /// states "Net 14 from issue", so the due day is derived deterministically
+    /// from `created_at + 14 days` — consistent with the stated terms rather
+    /// than fabricated. Falls back to nil (segment dropped) when the issue
+    /// timestamp can't be parsed.
+    var dueLabel: String? {
+        guard let iso = invoice?.createdAt, let issued = SchedulingTime.parseUTC(iso),
+              let due = Calendar.current.date(byAdding: .day, value: 14, to: issued) else { return nil }
+        return SchedulingTime.localString(
+            date: due,
+            tz: SchedulingTime.deviceTimeZoneIdentifier,
+            dateStyle: .medium,
+            timeStyle: .none
+        )
+    }
+
+    /// Payment-timeline events (`invoicedetail-frames.jsx` `Timeline`). The DTO
+    /// has no lifecycle field, so the rail is fed by the data that does exist:
+    /// `Created` (always, from `created_at`) plus a `Sent to customer` dot once
+    /// the in-session `send()` succeeds. The richer Paid/Deposit/Refunded/Voided
+    /// events from the design need the absent `status`/`paid_at` and stay
+    /// deferred — but the section chrome + real Created/Sent dots render now.
+    var timelineEvents: [TimelineEvent] {
+        var events: [TimelineEvent] = [
+            TimelineEvent(label: "Created", time: issuedLabel, tone: .neutral)
+        ]
+        if didSend {
+            events.append(TimelineEvent(label: "Sent to customer", time: sentLabel ?? "Just now", tone: .accent))
+        }
+        return events
+    }
+
+    struct TimelineEvent: Identifiable {
+        enum Tone { case neutral, accent, success }
+        let id = UUID()
+        let label: String
+        let time: String
+        let tone: Tone
+    }
+
+    private(set) var didSend = false
+    private var sentLabel: String?
+
+    /// Mono header (`invoicedetail-frames.jsx`): `INV-… · issued <day> · due <day>`.
+    /// The `· due` segment is appended only when a Net-14 due day is derivable.
+    var headerLine: String {
+        var line = "\(reference) · issued \(issuedLabel)"
+        if let due = dueLabel { line += " · due \(due)" }
+        return line
+    }
+
     var shareText: String { "\(reference) · \(totalLabel)" }
 
     init(
@@ -88,6 +140,13 @@ final class SchedulingInvoiceDetailViewModel {
         defer { sending = false }
         do {
             try await client.send(SchedulingEndpoints.sendInvoice(owner: owner, id: invoiceId))
+            didSend = true
+            sentLabel = SchedulingTime.localString(
+                date: Date(),
+                tz: SchedulingTime.deviceTimeZoneIdentifier,
+                dateStyle: .medium,
+                timeStyle: .none
+            )
             flashSent()
         } catch let error as SchedulingError {
             phase = .error(error.userMessage ?? "Couldn't send the invoice.")
