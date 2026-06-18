@@ -36,17 +36,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.homes.CalendarEventDto
 import app.pantopus.android.ui.components.EmptyState
-import app.pantopus.android.ui.components.PrimaryButton
+import app.pantopus.android.ui.components.GhostButton
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
@@ -63,9 +64,13 @@ import java.util.Locale
 
 const val EVENT_DETAIL_SCREEN_TAG = "eventDetail"
 
+private val DISPLAY_ZONE: ZoneId = ZoneId.of("UTC")
+
 /**
- * P2.7 — Read-only event detail. Mirrors iOS `EventDetailView`. Edit
- * pushes back to the form; delete fires the host's `onDeleted`.
+ * F2 — Event Detail + RSVP. Mirrors iOS `EventDetailView`. Renders the
+ * detail grid, attendee RSVP list, the member's own RSVP control (when
+ * the event requests RSVPs), notes, and Edit / Delete. Edit pushes back
+ * to the form; delete fires the host's `onDeleted`.
  */
 @Composable
 fun EventDetailScreen(
@@ -74,6 +79,7 @@ fun EventDetailScreen(
     viewModel: EventDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val online by viewModel.isOnline.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.configure(onDeleted = onBack)
@@ -84,17 +90,15 @@ fun EventDetailScreen(
         when (val current = state) {
             is EventDetailUiState.Loading -> LoadingShell(onBack = onBack)
             is EventDetailUiState.Error ->
-                ErrorShell(
-                    message = current.message,
-                    onBack = onBack,
-                    onRetry = { viewModel.load() },
-                )
+                ErrorShell(message = current.message, onBack = onBack, onRetry = { viewModel.load() })
             is EventDetailUiState.Loaded ->
                 LoadedShell(
                     snapshot = current,
+                    rsvpEnabled = online,
                     onBack = onBack,
                     onEdit = { onEdit(current.event) },
                     onDelete = { viewModel.delete() },
+                    onRsvp = viewModel::setRsvp,
                 )
         }
     }
@@ -110,9 +114,8 @@ private fun LoadingShell(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(Spacing.s2),
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             ) {
-                Shimmer(width = 320.dp, height = 24.dp, cornerRadius = Radii.sm)
-                Shimmer(width = 220.dp, height = 14.dp, cornerRadius = Radii.sm)
-                Shimmer(width = 120.dp, height = 14.dp, cornerRadius = Radii.pill)
+                Shimmer(width = 180.dp, height = 22.dp, cornerRadius = Radii.sm)
+                Shimmer(width = 130.dp, height = 12.dp, cornerRadius = Radii.sm)
             }
         },
         body = {
@@ -120,8 +123,8 @@ private fun LoadingShell(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(Spacing.s3),
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             ) {
-                Shimmer(width = 320.dp, height = 60.dp, cornerRadius = Radii.md)
-                Shimmer(width = 320.dp, height = 60.dp, cornerRadius = Radii.md)
+                Shimmer(width = 320.dp, height = 120.dp, cornerRadius = Radii.xl)
+                Shimmer(width = 320.dp, height = 120.dp, cornerRadius = Radii.xl)
             }
         },
     )
@@ -139,11 +142,13 @@ private fun ErrorShell(
         header = {},
         body = {
             EmptyState(
-                icon = PantopusIcon.AlertCircle,
+                icon = PantopusIcon.CloudOff,
                 headline = "Couldn't load this event",
-                subcopy = message,
-                ctaTitle = "Try again",
+                subcopy = message.ifBlank { "It may have been deleted, or your connection dropped." },
+                ctaTitle = "Retry",
                 onCta = onRetry,
+                tint = PantopusColors.errorBg,
+                accent = PantopusColors.error,
                 modifier = Modifier.height(400.dp),
             )
         },
@@ -153,9 +158,11 @@ private fun ErrorShell(
 @Composable
 private fun LoadedShell(
     snapshot: EventDetailUiState.Loaded,
+    rsvpEnabled: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onRsvp: (HomeRsvpChoice) -> Unit,
 ) {
     val event = snapshot.event
     val category = remember(event.eventType) { CalendarEventCategory.from(event.eventType) }
@@ -171,64 +178,57 @@ private fun LoadedShell(
                 onClick = onEdit,
             ),
         header = {
-            EventHeader(
-                event = event,
-                category = category,
-                modifier = Modifier.padding(horizontal = Spacing.s4),
-            )
+            EventHeader(event = event, category = category, modifier = Modifier.padding(horizontal = Spacing.s4))
         },
         body = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s3),
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             ) {
                 DetailGrid(event = event, category = category)
                 val assigned = event.assignedTo.orEmpty()
                 if (assigned.isNotEmpty()) {
-                    AttendeesSection(ids = assigned, nameLookup = snapshot.attendeeNames)
+                    AttendeesSection(snapshot = snapshot, ids = assigned)
+                }
+                if (event.requestRsvp == true) {
+                    YourRsvpCard(snapshot = snapshot, enabled = rsvpEnabled, onRsvp = onRsvp)
                 }
                 val description = event.description.orEmpty()
                 if (description.isNotEmpty()) {
                     NotesSection(text = description)
                 }
                 snapshot.deleteError?.let { error ->
-                    Text(
-                        text = error,
-                        style = PantopusTextStyle.small,
-                        color = PantopusColors.error,
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-                    modifier =
-                        Modifier
-                            .heightIn(min = 44.dp)
-                            .clickable(enabled = !snapshot.isDeleting) {
-                                showsDeleteConfirm = true
-                            }.testTag("eventDetail_delete"),
-                ) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.Trash2,
-                        contentDescription = null,
-                        size = Radii.xl,
-                        tint = PantopusColors.error,
-                    )
-                    Text(
-                        text = "Delete event",
-                        style = PantopusTextStyle.small,
-                        color = PantopusColors.error,
-                    )
+                    Text(text = error, style = PantopusTextStyle.small, color = PantopusColors.error)
                 }
             }
         },
         cta = {
-            PrimaryButton(
-                title = "Edit",
-                onClick = onEdit,
-                isEnabled = !snapshot.isDeleting,
-                modifier = Modifier.testTag("eventDetail_edit"),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                GhostButton(
+                    title = "Edit",
+                    onClick = onEdit,
+                    isEnabled = !snapshot.isDeleting,
+                    modifier = Modifier.weight(1f).testTag("eventDetail_edit"),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    modifier =
+                        Modifier
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .clickable(enabled = !snapshot.isDeleting) { showsDeleteConfirm = true }
+                            .padding(horizontal = Spacing.s2)
+                            .testTag("eventDetail_delete"),
+                ) {
+                    PantopusIconImage(icon = PantopusIcon.Trash2, contentDescription = null, size = 14.dp, tint = PantopusColors.error)
+                    Text(text = "Delete", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.error)
+                }
+            }
         },
     )
 
@@ -236,7 +236,7 @@ private fun LoadedShell(
         AlertDialog(
             onDismissRequest = { showsDeleteConfirm = false },
             title = { Text("Delete this event?") },
-            text = { Text("Members will no longer see this event on the calendar.") },
+            text = { Text("This can't be undone. Attendees won't see it on the calendar anymore.") },
             confirmButton = {
                 TextButton(onClick = {
                     showsDeleteConfirm = false
@@ -244,7 +244,7 @@ private fun LoadedShell(
                 }) { Text("Delete", color = PantopusColors.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showsDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showsDeleteConfirm = false }) { Text("Keep") }
             },
         )
     }
@@ -258,73 +258,27 @@ private fun EventHeader(
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
-                .padding(Spacing.s4),
+        modifier = modifier.fillMaxWidth().padding(top = Spacing.s2),
     ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(Radii.sm))
-                        .background(category.background),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = category.icon,
-                    contentDescription = null,
-                    size = Radii.xl3,
-                    tint = category.foreground,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                Text(
-                    text = event.title,
-                    style = PantopusTextStyle.h3,
-                    color = PantopusColors.appText,
-                    maxLines = 3,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text(
-                    text = formattedTimeRange(event),
-                    style = PantopusTextStyle.body,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
-        }
+        Text(
+            text = event.title,
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            maxLines = 3,
+            modifier = Modifier.semantics { heading() },
+        )
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
+            Text(
+                text = formattedTimeRange(event),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextStrong,
+            )
             CategoryPill(category = category)
-            val location = event.locationNotes.orEmpty()
-            if (location.isNotEmpty()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-                ) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.MapPin,
-                        contentDescription = null,
-                        size = Radii.lg,
-                        tint = PantopusColors.appTextSecondary,
-                    )
-                    Text(
-                        text = location,
-                        style = PantopusTextStyle.caption,
-                        color = PantopusColors.appTextSecondary,
-                        maxLines = 1,
-                    )
-                }
-            }
         }
     }
 }
@@ -337,19 +291,15 @@ private fun CategoryPill(category: CalendarEventCategory) {
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
-                .background(category.background)
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
     ) {
-        PantopusIconImage(
-            icon = category.icon,
-            contentDescription = null,
-            size = 10.dp,
-            tint = category.foreground,
-        )
+        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(category.dotColor))
         Text(
             text = category.label,
-            style = PantopusTextStyle.caption,
-            color = category.foreground,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextStrong,
         )
     }
 }
@@ -367,84 +317,66 @@ private fun DetailGrid(
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg)),
     ) {
-        DetailRow("Type", category.label)
-        recurrenceLabel(event.recurrenceRule)?.let { label ->
-            HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
-            DetailRow("Repeats", label)
-        }
-        HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
-        DetailRow(
-            "Reminder",
-            if (event.alertsEnabled == true) "Enabled" else "Off",
-        )
-        val location = event.locationNotes.orEmpty()
-        if (location.isNotEmpty()) {
-            HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
-            DetailRow("Location", location)
+        val rows =
+            buildList {
+                recurrenceLabel(event.recurrenceRule)?.let { add(Triple(PantopusIcon.ArrowsRepeat, "Repeats", it)) }
+                add(Triple(PantopusIcon.Bell, "Reminder", reminderSummary(event)))
+                event.locationNotes?.takeIf { it.isNotEmpty() }?.let { add(Triple(PantopusIcon.MapPin, "Location", it)) }
+                add(Triple(PantopusIcon.Tag, "Type", category.label))
+            }
+        rows.forEachIndexed { index, (icon, label, value) ->
+            DetailRow(icon = icon, label = label, value = value)
+            if (index < rows.lastIndex) {
+                HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+            }
         }
     }
 }
 
 @Composable
 private fun DetailRow(
+    icon: PantopusIcon,
     label: String,
     value: String,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Text(
-            text = label,
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = value,
-            style = PantopusTextStyle.body,
-            color = PantopusColors.appText,
-            textAlign = TextAlign.End,
-        )
+        Box(
+            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = icon, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextStrong)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = label.uppercase(Locale.ROOT),
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextMuted,
+            )
+            Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+        }
     }
 }
 
 @Composable
 private fun AttendeesSection(
+    snapshot: EventDetailUiState.Loaded,
     ids: List<String>,
-    nameLookup: Map<String, String>,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.UsersRound,
-                contentDescription = null,
-                size = Radii.xl,
-                tint = PantopusColors.home,
+    SectionCard(overline = "Attendees") {
+        ids.forEachIndexed { index, id ->
+            val name = snapshot.attendeeNames[id] ?: "Member"
+            AttendeeRow(
+                member = HomeMember(id = id, name = name, initials = HomeMember.initialsFor(name)),
+                isYou = id == snapshot.myUserId,
+                rsvp = snapshot.rsvpFor(id),
             )
-            Text(
-                text = "Attendees",
-                style = PantopusTextStyle.small,
-                color = PantopusColors.appText,
-            )
-        }
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg)),
-        ) {
-            ids.forEachIndexed { index, id ->
-                val name = nameLookup[id] ?: "Member"
-                AttendeeRow(name = name, initials = initials(name))
-                if (index < ids.lastIndex) {
-                    HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
-                }
+            if (index < ids.lastIndex) {
+                HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
             }
         }
     }
@@ -452,80 +384,218 @@ private fun AttendeesSection(
 
 @Composable
 private fun AttendeeRow(
-    name: String,
-    initials: String,
+    member: HomeMember,
+    isYou: Boolean,
+    rsvp: HomeRsvpChoice,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = Spacing.s3),
     ) {
+        HomeMemberAvatar(member = member, size = 30.dp)
+        Row(modifier = Modifier.weight(1f)) {
+            Text(text = member.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+            if (isYou) {
+                Text(text = " · you", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextMuted)
+            }
+        }
+        HomeRsvpPill(choice = rsvp)
+    }
+}
+
+@Composable
+private fun YourRsvpCard(
+    snapshot: EventDetailUiState.Loaded,
+    enabled: Boolean,
+    onRsvp: (HomeRsvpChoice) -> Unit,
+) {
+    val recorded = snapshot.myRsvp
+    val pending = recorded == null
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(
+                    width = if (pending) 1.5.dp else 1.dp,
+                    color = if (pending) PantopusColors.home else PantopusColors.appBorderSubtle,
+                    shape = RoundedCornerShape(Radii.lg),
+                ).padding(Spacing.s3)
+                .testTag("eventDetail_yourRsvp"),
+    ) {
+        Text(
+            text = "YOUR RSVP",
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.homeDark,
+        )
+        if (recorded != null) {
+            RecordedRsvp(choice = recorded, enabled = enabled, onChange = { onRsvp(HomeRsvpChoice.NoReply) })
+        } else {
+            RsvpSegmented(selected = null, enabled = enabled && !snapshot.rsvpSaving, onSelect = onRsvp)
+            if (!enabled) {
+                Text(
+                    text = "RSVP buttons are disabled until you reconnect.",
+                    fontSize = 10.5.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                    PantopusIconImage(icon = PantopusIcon.Hand, contentDescription = null, size = 12.dp, tint = PantopusColors.homeDark)
+                    Text(
+                        text = "Tap to let everyone know",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.homeDark,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordedRsvp(
+    choice: HomeRsvpChoice,
+    enabled: Boolean,
+    onChange: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Box(
-            modifier =
-                Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.homeBg),
+            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(Radii.pill)).background(choice.background),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = initials.ifEmpty { "·" },
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.home,
-            )
+            PantopusIconImage(icon = choice.icon, contentDescription = null, size = 18.dp, tint = choice.foreground)
         }
-        Text(
-            text = name,
-            style = PantopusTextStyle.body,
-            color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = recordedTitle(choice), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            Text(text = "Everyone can see your reply", fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.md))
+                    .clickable(enabled = enabled, onClick = onChange)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
+                    .testTag("eventDetail_rsvpChange"),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.Pencil, contentDescription = null, size = 14.dp, tint = PantopusColors.homeDark)
+            Text(text = "Change", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.homeDark)
+        }
+    }
+}
+
+@Composable
+private fun RsvpSegmented(
+    selected: HomeRsvpChoice?,
+    enabled: Boolean,
+    onSelect: (HomeRsvpChoice) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        HomeRsvpChoice.selectable.forEach { choice ->
+            val active = choice == selected
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = 34.dp)
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .background(if (active) PantopusColors.home else Color.Transparent)
+                        .clickable(enabled = enabled) { onSelect(choice) }
+                        .testTag("eventDetail_rsvp_${choice.name.lowercase(Locale.ROOT)}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = choice.label,
+                    fontSize = 12.sp,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (active) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun NotesSection(text: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.FileText,
-                contentDescription = null,
-                size = Radii.xl,
-                tint = PantopusColors.primary600,
-            )
-            Text(
-                text = "Notes",
-                style = PantopusTextStyle.small,
-                color = PantopusColors.appText,
-            )
-        }
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
-                    .padding(Spacing.s4),
-        ) {
-            Text(
-                text = text,
-                style = PantopusTextStyle.body,
-                color = PantopusColors.appText,
-            )
-        }
+    SectionCard(overline = "Notes") {
+        Text(
+            text = text,
+            fontSize = 12.5.sp,
+            color = PantopusColors.appTextStrong,
+            modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        )
     }
 }
 
+@Composable
+private fun SectionCard(
+    overline: String,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
+                .padding(vertical = Spacing.s2),
+    ) {
+        Text(
+            text = overline.uppercase(Locale.ROOT),
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s1),
+        )
+        content()
+    }
+}
+
+private fun recordedTitle(choice: HomeRsvpChoice): String =
+    when (choice) {
+        HomeRsvpChoice.Going -> "You're going"
+        HomeRsvpChoice.Maybe -> "You might go"
+        HomeRsvpChoice.Cant -> "You can't make it"
+        HomeRsvpChoice.NoReply -> "No reply yet"
+    }
+
+private fun reminderSummary(event: CalendarEventDto): String {
+    val reminders = event.reminders
+    if (reminders.isNullOrEmpty()) {
+        return if (event.alertsEnabled == true) "10 min before" else "Off"
+    }
+    return reminders.sortedDescending().joinToString(" · ") { reminderPhrase(it) }
+}
+
+private fun reminderPhrase(minutes: Int): String =
+    when {
+        minutes <= 0 -> "At time"
+        minutes == 1440 -> "1 day before"
+        minutes == 60 -> "1 hour before"
+        minutes % 60 == 0 -> "${minutes / 60} hours before"
+        else -> "$minutes min before"
+    }
+
 private fun formattedTimeRange(event: CalendarEventDto): String {
-    val zone = ZoneId.systemDefault()
-    val startInstant = AddEventFormViewModel.parseIsoInstant(event.startAt) ?: return event.startAt
-    val start = startInstant.atZone(zone)
-    val endInstant = event.endAt?.let { AddEventFormViewModel.parseIsoInstant(it) }
-    val end = endInstant?.atZone(zone)
+    val startInstant = HomeAgendaBuilder.parseInstant(event.startAt) ?: return event.startAt
+    val start = startInstant.atZone(DISPLAY_ZONE)
+    val endInstant = event.endAt?.let { HomeAgendaBuilder.parseInstant(it) }
+    val end = endInstant?.atZone(DISPLAY_ZONE)
     if (end == null && isMidnight(start)) {
         return "${longDateLabel(start)} · All day"
     }
@@ -534,7 +604,7 @@ private fun formattedTimeRange(event: CalendarEventDto): String {
 
 private fun isMidnight(date: ZonedDateTime): Boolean = date.hour == 0 && date.minute == 0 && date.second == 0
 
-private fun longDateLabel(date: ZonedDateTime): String = DateTimeFormatter.ofPattern("EEEE MMM d", Locale.US).format(date)
+private fun longDateLabel(date: ZonedDateTime): String = DateTimeFormatter.ofPattern("EEE MMM d", Locale.US).format(date)
 
 private fun formattedTime(
     start: ZonedDateTime,
@@ -556,11 +626,3 @@ private fun recurrenceLabel(rrule: String?): String? {
         else -> "Yes"
     }
 }
-
-private fun initials(name: String): String =
-    name
-        .split(' ')
-        .take(2)
-        .mapNotNull { it.firstOrNull()?.toString() }
-        .joinToString("")
-        .uppercase(Locale.ROOT)
