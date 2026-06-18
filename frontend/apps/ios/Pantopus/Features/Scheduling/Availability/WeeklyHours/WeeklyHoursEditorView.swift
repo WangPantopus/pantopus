@@ -13,10 +13,18 @@ import SwiftUI
 
 struct WeeklyHoursEditorView: View {
     @State private var viewModel: WeeklyHoursEditorViewModel
+    @State private var editingRange: TimeRangeEdit?
     @Environment(\.dismiss) private var dismiss
 
     init(viewModel: WeeklyHoursEditorViewModel) {
         _viewModel = State(wrappedValue: viewModel)
+    }
+
+    /// View-local target for the time-range picker sheet (which day + range).
+    private struct TimeRangeEdit: Identifiable {
+        let weekday: Int
+        let range: TimeRange
+        var id: UUID { range.id }
     }
 
     private var isReady: Bool {
@@ -24,10 +32,15 @@ struct WeeklyHoursEditorView: View {
         return false
     }
 
+    /// "Set hours" on the unset hero frame, "Edit schedule" everywhere else.
+    private var formTitle: String {
+        isReady && viewModel.isUnset ? "Set hours" : "Edit schedule"
+    }
+
     var body: some View {
         content
             .background(Theme.Color.appBg)
-            .navigationTitle("Weekly hours")
+            .navigationTitle(formTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(isReady ? .hidden : .visible, for: .navigationBar)
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
@@ -40,6 +53,12 @@ struct WeeklyHoursEditorView: View {
                     onSelect: { viewModel.changeTimezone($0) },
                     onDone: { viewModel.showTimezoneSheet = false }
                 )
+            }
+            .sheet(item: $editingRange) { target in
+                TimeRangePickerSheet(range: target.range) { start, end in
+                    viewModel.updateStart(target.weekday, target.range.id, start)
+                    viewModel.updateEnd(target.weekday, target.range.id, end)
+                }
             }
             .sheet(item: $viewModel.activeSheet) { sheet in
                 sheetContent(sheet)
@@ -68,59 +87,55 @@ struct WeeklyHoursEditorView: View {
 
     private var editor: some View {
         FormShell(
-            title: "Weekly hours",
+            title: formTitle,
             leading: .back,
             rightActionLabel: nil,
-            bottomActionLabel: "Save changes",
+            bottomActionLabel: "Save schedule",
             isValid: viewModel.formValid && viewModel.isDirty,
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
             onCommit: { Task { await viewModel.save() } }
         ) {
-            if viewModel.allOff {
+            AvailabilityHeaderPill()
+            if viewModel.isUnset {
                 CompositionGapCard()
-                NoHoursWarningCard { viewModel.applyNineToFiveDefault() }
+                WeeklyHoursEmptyHero { viewModel.applyNineToFiveDefault() }
+                linkGroup
+            } else {
+                if viewModel.allOff {
+                    NoHoursWarningCard { viewModel.applyNineToFiveDefault() }
+                }
+                nameGroup
+                timezoneGroup
+                weeklyHoursGroup
+                linkGroup
             }
-            nameGroup
-            timezoneGroup
-            weeklyHoursGroup
-            linkGroup
         }
     }
 
     // MARK: Groups
 
     private var nameGroup: some View {
-        FormFieldGroup("Schedule") {
+        AvailabilityCard(overline: "Schedule") {
             VStack(alignment: .leading, spacing: Spacing.s2) {
-                Text("Name")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                AvailabilityFieldLabel(text: "Name")
                 TextField("Working hours", text: $viewModel.scheduleName)
                     .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.appText)
                     .textInputAutocapitalization(.words)
+                    .disabled(viewModel.isSaving)
                     .accessibilityIdentifier("scheduling.weeklyHours.nameField")
             }
         }
     }
 
     private var timezoneGroup: some View {
-        FormFieldGroup("Timezone") {
-            Button { viewModel.showTimezoneSheet = true } label: {
-                HStack(spacing: Spacing.s2) {
-                    Icon(.globe, size: 15, color: Theme.Color.appTextSecondary)
-                    Text(viewModel.timezoneDisplay)
-                        .pantopusTextStyle(.body)
-                        .foregroundStyle(Theme.Color.appText)
-                    Spacer(minLength: Spacing.s2)
-                    Icon(.chevronDown, size: 16, color: Theme.Color.appTextMuted)
-                }
-                .contentShape(Rectangle())
+        AvailabilityCard(overline: "Timezone") {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                AvailabilityFieldLabel(text: "Time zone")
+                timezoneFieldButton
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("scheduling.weeklyHours.timezoneRow")
             Divider().background(Theme.Color.appBorderSubtle)
             Toggle(isOn: Binding(get: { viewModel.lockTimezone }, set: viewModel.setLockTimezone)) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -133,19 +148,57 @@ struct WeeklyHoursEditorView: View {
                 }
             }
             .tint(Theme.Color.primary600)
+            .disabled(viewModel.isSaving)
         }
     }
 
+    // Bordered field button (1.5px border, globe + value + chevron-down) with a
+    // muted "· auto" suffix when the timezone is auto-detected.
+    private var timezoneFieldButton: some View {
+        Button { viewModel.showTimezoneSheet = true } label: {
+            HStack(spacing: Spacing.s2) {
+                Icon(.globe, size: 15, color: Theme.Color.appTextSecondary)
+                timezoneLabel
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Icon(.chevronDown, size: 16, color: Theme.Color.appTextMuted)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 10)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isSaving)
+        .accessibilityIdentifier("scheduling.weeklyHours.timezoneRow")
+    }
+
+    private var timezoneLabel: some View {
+        // Bold the city; render the " · auto" suffix in muted fg4.
+        (
+            Text(viewModel.timezoneCityDisplay)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Theme.Color.appText)
+                + Text(viewModel.lockTimezone ? " · auto" : "")
+                .font(.system(size: 13))
+                .foregroundColor(Theme.Color.appTextMuted)
+        )
+    }
+
     private var weeklyHoursGroup: some View {
-        FormFieldGroup("Weekly hours") {
+        AvailabilityCard(overline: "Weekly hours") {
             ForEach(Array(viewModel.days.enumerated()), id: \.element.id) { index, day in
                 WeekdayHoursRow(
                     day: day,
+                    disabled: viewModel.isSaving,
                     onToggle: { viewModel.setEnabled(day.weekday, $0) },
                     onAddRange: { viewModel.addRange(day.weekday) },
                     onCopy: { viewModel.copyHours(from: day.weekday, to: $0) },
-                    onStart: { viewModel.updateStart(day.weekday, $0, $1) },
-                    onEnd: { viewModel.updateEnd(day.weekday, $0, $1) },
+                    onEditRange: { editingRange = TimeRangeEdit(weekday: day.weekday, range: $0) },
                     onRemoveRange: { viewModel.removeRange(day.weekday, $0) }
                 )
                 if index < viewModel.days.count - 1 {
@@ -155,10 +208,9 @@ struct WeeklyHoursEditorView: View {
         }
     }
 
-    // No overline in the design's links card (`<Card pillar="personal">` only),
-    // so this card is laid out inline rather than via FormFieldGroup.
+    // No overline in the design's links card (`<Card pillar="personal">` only).
     private var linkGroup: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
+        AvailabilityCard {
             SchedulingLinkRow(
                 icon: .calendarX,
                 title: "Date overrides & holidays",
@@ -171,10 +223,6 @@ struct WeeklyHoursEditorView: View {
                 subtitle: "Defaults"
             ) { viewModel.openBookingLimits() }
         }
-        .padding(Spacing.s4)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .padding(.horizontal, Spacing.s4)
     }
 
     // MARK: Sheets

@@ -11,6 +11,25 @@
 
 import SwiftUI
 
+/// One teammate offered in the E4 "Assign to" avatar rail
+/// (reschedule-frames FrameMemberPicker). Ids only — the named roster awaits a
+/// cross-stream source, so the rail shows id-initials (mirroring Android's
+/// `MemberOption`).
+struct ReassignCandidate: Identifiable, Hashable, Sendable {
+    let id: String
+    let initials: String
+    let label: String
+}
+
+/// One chip in the E4 horizontal weekday strip (reschedule-frames DayStrip).
+struct DayStripEntry: Identifiable, Hashable, Sendable {
+    let date: Date
+    let weekday: String
+    let dayNumber: String
+    let isSelected: Bool
+    var id: Date { date }
+}
+
 @Observable
 @MainActor
 final class RescheduleReassignViewModel {
@@ -35,6 +54,11 @@ final class RescheduleReassignViewModel {
     /// targets the first eligible host for the chosen slot; the named member
     /// picker awaits a roster source (cross-stream gap).
     var reassign = false
+    /// The teammate id the host picked from the "Assign to" avatar rail
+    /// (FrameMemberPicker). `nil` = keep the original host (the "All" affordance).
+    /// Ids only — the named roster awaits a cross-stream source, so the rail
+    /// renders id-initials, mirroring Android's `MemberOption`.
+    var selectedReassignHostId: String?
 
     private(set) var submitting = false
     private(set) var succeeded = false
@@ -70,6 +94,35 @@ final class RescheduleReassignViewModel {
     var availableDays: Set<Date> { BookingsCalendar.availableDays(rangeSlots, tz: timezoneId) }
     var daySlots: [SlotDTO] { BookingsCalendar.slots(rangeSlots, on: selectedDate, tz: timezoneId) }
 
+    /// The horizontal weekday strip (JSX DayStrip): every day with at least one
+    /// open slot in the visible range, soonest-first, with the selected flag.
+    var dayStripEntries: [DayStripEntry] {
+        let cal = BookingsCalendar.calendar(tz: timezoneId)
+        let selectedDay = cal.startOfDay(for: selectedDate)
+        let weekdayFmt = DateFormatter()
+        weekdayFmt.calendar = cal
+        weekdayFmt.timeZone = cal.timeZone
+        weekdayFmt.locale = .current
+        weekdayFmt.dateFormat = "EEE"
+        let dayFmt = DateFormatter()
+        dayFmt.calendar = cal
+        dayFmt.timeZone = cal.timeZone
+        dayFmt.dateFormat = "d"
+        return availableDays.sorted().map { day in
+            DayStripEntry(
+                date: day,
+                weekday: weekdayFmt.string(from: day),
+                dayNumber: dayFmt.string(from: day),
+                isSelected: cal.isDate(day, inSameDayAs: selectedDay)
+            )
+        }
+    }
+
+    /// JSX SlotRow label — the full "Tue, Oct 21 · 2:00–2:30 PM · PT" line.
+    func slotRowLabel(_ slot: SlotDTO) -> String {
+        BookingsTime.headerWhen(startUTC: slot.start, endUTC: slot.end, tz: timezoneId)
+    }
+
     var timezoneLabel: String {
         TimeZone(identifier: timezoneId)?.localizedName(for: .generic, locale: .current) ?? timezoneId
     }
@@ -101,6 +154,16 @@ final class RescheduleReassignViewModel {
     var eligibleHostCount: Int {
         let hosts = selectedSlot?.eligibleHosts ?? []
         return hosts.filter { $0 != booking.hostUserId }.count
+    }
+
+    /// The "Assign to" avatar rail (reschedule-frames FrameMemberPicker). The
+    /// host id ("keep" — the design's `+`/`All` trailing avatar) plus each
+    /// teammate free at the selected slot. Ids only; initials are the first two
+    /// id characters until a named roster source lands (the same data-gap form
+    /// Android's `MemberOption` uses).
+    var reassignCandidates: [ReassignCandidate] {
+        let hosts = (selectedSlot?.eligibleHosts ?? []).filter { $0 != booking.hostUserId }
+        return hosts.map { ReassignCandidate(id: $0, initials: BookingsAvatar.initials(fromId: $0), label: "Member") }
     }
 
     /// CTA copy. After a failed submit the design's error frame swaps the
@@ -156,7 +219,27 @@ final class RescheduleReassignViewModel {
 
     func selectSlot(_ slot: SlotDTO) {
         selectedSlot = slot
-        if eligibleHostCount == 0 { reassign = false }
+        if eligibleHostCount == 0 {
+            reassign = false
+            selectedReassignHostId = nil
+        } else if let picked = selectedReassignHostId,
+                  !(slot.eligibleHosts ?? []).contains(picked) {
+            // The teammate picked for the previous slot isn't free here.
+            selectedReassignHostId = nil
+            reassign = false
+        }
+    }
+
+    /// Pick (or clear, when re-tapped / "All") the reassign teammate from the rail.
+    func selectReassignHost(_ id: String?) {
+        guard canReassign else { return }
+        if selectedReassignHostId == id || id == nil {
+            selectedReassignHostId = nil
+            reassign = false
+        } else {
+            selectedReassignHostId = id
+            reassign = true
+        }
     }
 
     func changeMonth(_ delta: Int) async {
@@ -257,7 +340,10 @@ final class RescheduleReassignViewModel {
 
     private func reassignHostUserId(for slot: SlotDTO) -> String? {
         guard reassign, canReassign else { return nil }
-        return (slot.eligibleHosts ?? []).first { $0 != booking.hostUserId }
+        let eligible = (slot.eligibleHosts ?? []).filter { $0 != booking.hostUserId }
+        // Honor the rail's explicit pick; otherwise take the first free teammate.
+        if let picked = selectedReassignHostId, eligible.contains(picked) { return picked }
+        return eligible.first
     }
 
     private func handle(_ scheduling: SchedulingError) {

@@ -11,9 +11,45 @@
 import Observation
 import SwiftUI
 
+/// Feature-local loaded model for the bespoke F9 list. The design's
+/// `ResourceRow` (13.5pt/700 title · 11pt type tile · dot+label trailing) can't
+/// be expressed through the shared `ListOfRows` row chrome, so the loaded /
+/// empty / offline frames render bespoke from this projection. Loading / error
+/// still flow through the shared shell visuals (mirrored locally).
+struct ResourceListItem: Identifiable, Sendable {
+    let id: String
+    let name: String
+    let kind: ResourceKind
+    let statusLabel: String
+    let isFree: Bool
+}
+
 @Observable
 @MainActor
 final class ResourceListViewModel: ListOfRowsDataSource {
+    /// One-tap quick-start template (design F9 empty frame). Each opens the
+    /// editor seeded with the template's resource kind.
+    struct ResourceTemplate: Identifiable, Sendable {
+        let id: String
+        let label: String
+        let icon: PantopusIcon
+        let kind: ResourceKind
+        /// The "Other" template uses a neutral tile (no Home accent).
+        let isNeutral: Bool
+    }
+
+    static let templates: [ResourceTemplate] = [
+        ResourceTemplate(id: "room", label: "Guest room", icon: .doorOpen, kind: .room, isNeutral: false),
+        ResourceTemplate(id: "driveway", label: "Driveway", icon: .car, kind: .vehicle, isNeutral: false),
+        ResourceTemplate(id: "charger", label: "EV charger", icon: .zap, kind: .charger, isNeutral: false),
+        ResourceTemplate(id: "tools", label: "Tools", icon: .wrench, kind: .tool, isNeutral: false),
+        ResourceTemplate(id: "other", label: "Other", icon: .plus, kind: .other, isNeutral: true),
+    ]
+
+    /// Loaded resource rows for the bespoke list (empty when the screen is
+    /// loading / empty / errored — read `state` for the active frame).
+    private(set) var items: [ResourceListItem] = []
+
     // MARK: ListOfRows chrome
 
     var title: String { "Resources" }
@@ -105,25 +141,32 @@ final class ResourceListViewModel: ListOfRowsDataSource {
 
     // MARK: Navigation
 
-    private func openEditor(resourceId: String?) {
+    func openEditor(resourceId: String? = nil) {
         push(.resourceEditor(homeId: homeId, resourceId: resourceId))
     }
 
-    private func openDetail(_ resourceId: String) {
+    func openDetail(_ resourceId: String) {
         push(.resourceDetail(homeId: homeId, resourceId: resourceId))
+    }
+
+    /// Quick-start from an empty-frame template — opens the editor. (The wire
+    /// has no template-seed param, so this lands on the same "new resource"
+    /// editor the FAB / Add action open; the kind is the design hint.)
+    func openTemplate(_ template: ResourceTemplate) {
+        openEditor()
     }
 
     // MARK: Row building
 
     private func rebuild(resources: [ResourceDTO], bookings: [ResourceBooking]) {
         guard !resources.isEmpty else {
-            // Design F9 empty frame: `package-open` disc + "Add what your
-            // household shares" + the "Start from a template." closer. The
-            // shared `EmptyState` can't render the design's full templates
-            // quick-start list (explainer card + "TEMPLATES" overline + 5
-            // tappable template rows) — that needs a bespoke empty-state slot
-            // on `ListOfRowsView`, tracked in sharedChangesNeeded. The glyph +
-            // copy below are the view-only fixes this VM can drive.
+            items = []
+            // Design F9 empty frame renders bespoke in `ResourceListView` from
+            // the `.empty` marker below (explainer card + "TEMPLATES" overline +
+            // 5 tappable template rows, no primary CTA). The `EmptyState`
+            // payload here is retained only so the shared shell — and the
+            // existing projection tests that read `state` — keep a consistent
+            // empty marker; the bespoke view ignores its fields.
             state = .empty(.init(
                 icon: .packageOpen,
                 headline: "Add what your household shares",
@@ -136,21 +179,36 @@ final class ResourceListViewModel: ListOfRowsDataSource {
             return
         }
         let now = Date()
-        let rows = resources.map { resource -> RowModel in
+        items = resources.map { resource -> ResourceListItem in
             let kind = ResourceKind(wire: resource.resourceType)
             let status = Self.status(for: resource.id, bookings: bookings, now: now)
-            let id = resource.id
-            return RowModel(
-                id: id,
-                title: resource.name,
-                template: .statusChip,
-                leading: .typeIcon(kind.icon, background: Theme.Color.homeBg, foreground: Theme.Color.home),
-                trailing: .statusChip(text: status.label, variant: status.variant),
-                onTap: { [weak self] in Task { @MainActor in self?.openDetail(id) } },
-                chips: [RowChip(text: kind.label, tint: .status(.neutral))]
+            return ResourceListItem(
+                id: resource.id,
+                name: resource.name,
+                kind: kind,
+                statusLabel: status.label,
+                isFree: status.isFree
             )
         }
-        state = .loaded(sections: [RowSection(id: "resources", rows: rows, style: .card)], hasMore: false)
+        // The bespoke `ResourceListView` renders `items`; the shared shell only
+        // needs a non-empty loaded marker so its loading/empty/error routing
+        // (and existing projection tests) stay consistent.
+        let rows = items.map { item -> RowModel in
+            let id = item.id
+            return RowModel(
+                id: id,
+                title: item.name,
+                template: .statusChip,
+                leading: .typeIcon(item.kind.icon, background: Theme.Color.homeBg, foreground: Theme.Color.home),
+                trailing: .statusChip(
+                    text: item.statusLabel,
+                    variant: item.isFree ? .success : .neutral
+                ),
+                onTap: { [weak self] in Task { @MainActor in self?.openDetail(id) } },
+                chips: [RowChip(text: item.kind.label, tint: .status(.neutral))]
+            )
+        }
+        state = .loaded(sections: [RowSection(id: "resources", rows: rows, style: .flat)], hasMore: false)
     }
 
     /// A resource is "Booked until <end>" when a live booking spans `now`,
@@ -159,7 +217,7 @@ final class ResourceListViewModel: ListOfRowsDataSource {
         for resourceId: String,
         bookings: [ResourceBooking],
         now: Date
-    ) -> (label: String, variant: StatusChipVariant) {
+    ) -> (label: String, isFree: Bool) {
         let mine = bookings.filter { $0.resourceId == resourceId }
         let active = mine.first { booking in
             guard let startISO = booking.startAt, let start = SchedulingTime.parseUTC(startISO) else { return false }
@@ -167,8 +225,8 @@ final class ResourceListViewModel: ListOfRowsDataSource {
             return start <= now && now < end
         }
         if let active, let end = active.endAt {
-            return ("Booked until \(ResourceTime.timeLabel(end))", .neutral)
+            return ("Booked until \(ResourceTime.timeLabel(end))", false)
         }
-        return ("Free now", .success)
+        return ("Free now", true)
     }
 }

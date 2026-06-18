@@ -89,6 +89,15 @@ final class WeeklyHoursEditorViewModel {
         !days.contains { $0.isEnabled }
     }
 
+    /// True for a brand-new / unset schedule: every day is off AND the user
+    /// has not yet edited anything (the loaded baseline carried no rules).
+    /// Drives the design's dedicated empty "Set your hours" hero frame, which
+    /// is distinct from the all-day-off WARNING frame the user reaches by
+    /// turning every day off after editing.
+    var isUnset: Bool {
+        allOff && !isDirty
+    }
+
     var isDirty: Bool {
         signature() != baselineSignature
     }
@@ -97,6 +106,12 @@ final class WeeklyHoursEditorViewModel {
     var timezoneDisplay: String {
         let city = Self.cityName(timezoneId)
         return lockTimezone ? "\(city) · auto" : city
+    }
+
+    /// The city portion only (no " · auto" suffix), so the field button can
+    /// render the suffix in a separate muted color.
+    var timezoneCityDisplay: String {
+        Self.cityName(timezoneId)
     }
 
     // MARK: Load

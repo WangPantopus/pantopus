@@ -159,7 +159,12 @@ struct PillarFieldGroup<Content: View>: View {
         }
         .padding(Spacing.s4)
         .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .pantopusShadow(.sm)
         .padding(.horizontal, Spacing.s4)
     }
 
@@ -184,6 +189,52 @@ struct PillarFieldGroup<Content: View>: View {
                 .foregroundStyle(accent)
                 .accessibilityAddTraits(.isHeader)
         }
+    }
+}
+
+/// Compact bordered stepper box — the design `DurationCard` `Stepper` that sits
+/// inline beside the quick chips: a 1px-bordered pill showing "30 min" flanked
+/// by − / + tap targets. Distinct from `LabeledStepper` (a full-width row).
+struct CompactDurationStepper: View {
+    @Binding var value: Int
+    var unit = "min"
+    var range: ClosedRange<Int> = 5...480
+    var step = 5
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            button(.minus) { value = max(range.lowerBound, value - step) }
+            Text("\(value) \(unit)")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .monospacedDigit()
+                .frame(minWidth: 52)
+            button(.plus) { value = min(range.upperBound, value + step) }
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, Spacing.s2)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Length")
+        .accessibilityValue("\(value) \(unit)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: value = min(range.upperBound, value + step)
+            case .decrement: value = max(range.lowerBound, value - step)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func button(_ icon: PantopusIcon, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Icon(icon, size: 14, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -9,79 +9,16 @@
 
 import SwiftUI
 
-/// One start–end window with two tappable time buttons and an optional remove.
-struct TimeRangeRow: View {
-    let range: TimeRange
-    let onStart: (TimeOfDay) -> Void
-    let onEnd: (TimeOfDay) -> Void
-    let onRemove: (() -> Void)?
-
-    var body: some View {
-        HStack(spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                Icon(.clock, size: 14, color: Theme.Color.primary600)
-                timePicker(range.start, label: "Start time", onChange: onStart)
-                Text("–")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appTextMuted)
-                timePicker(range.end, label: "End time", onChange: onEnd)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, Spacing.s2)
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .stroke(range.isValid ? Theme.Color.appBorder : Theme.Color.error, lineWidth: 1.5)
-            )
-
-            if let onRemove {
-                Button(action: onRemove) {
-                    Icon(.x, size: 15, color: Theme.Color.appTextMuted)
-                        .frame(width: 30, height: 30)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove time range")
-            }
-        }
-        .overlay(alignment: .bottomLeading) {
-            if !range.isValid {
-                Text("End must be after start")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.error)
-                    .offset(y: 16)
-            }
-        }
-    }
-
-    private func timePicker(
-        _ time: TimeOfDay,
-        label: String,
-        onChange: @escaping (TimeOfDay) -> Void
-    ) -> some View {
-        DatePicker(
-            label,
-            selection: Binding(
-                get: { time.referenceDate() },
-                set: { onChange(TimeOfDay(from: $0)) }
-            ),
-            displayedComponents: .hourAndMinute
-        )
-        .labelsHidden()
-        .accessibilityLabel(label)
-    }
-}
-
-/// A single weekday: leading on/off toggle, then (when on) its time ranges,
-/// an "Add a block" affordance, and a "Copy to…" menu.
+/// A single weekday: leading on/off toggle, then (when on) its time ranges
+/// (each a labeled time-range button), an "Add a block" affordance, and a
+/// "Copy to…" menu.
 struct WeekdayHoursRow: View {
     let day: DayHours
+    var disabled: Bool = false
     let onToggle: (Bool) -> Void
     let onAddRange: () -> Void
     let onCopy: ([Int]) -> Void
-    let onStart: (UUID, TimeOfDay) -> Void
-    let onEnd: (UUID, TimeOfDay) -> Void
+    let onEditRange: (TimeRange) -> Void
     let onRemoveRange: (UUID) -> Void
 
     var body: some View {
@@ -94,6 +31,7 @@ struct WeekdayHoursRow: View {
                 }
                 .toggleStyle(.switch)
                 .tint(Theme.Color.primary600)
+                .disabled(disabled)
                 .accessibilityIdentifier("scheduling.weeklyHours.toggle.\(day.weekday)")
 
                 Spacer(minLength: Spacing.s2)
@@ -110,19 +48,28 @@ struct WeekdayHoursRow: View {
             if day.isEnabled {
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     ForEach(day.ranges) { range in
-                        TimeRangeRow(
-                            range: range,
-                            onStart: { onStart(range.id, $0) },
-                            onEnd: { onEnd(range.id, $0) },
+                        AvailabilityTimeRangeButton(
+                            label: range.display,
+                            isValid: range.isValid,
+                            disabled: disabled,
+                            onTap: { onEditRange(range) },
                             onRemove: day.ranges.count > 1 ? { onRemoveRange(range.id) } : nil
                         )
+                        if !range.isValid {
+                            Text("End must be after start")
+                                .pantopusTextStyle(.caption)
+                                .foregroundStyle(Theme.Color.error)
+                        }
                     }
-                    addBlockButton
+                    if !disabled {
+                        addBlockButton
+                    }
                 }
                 .padding(.leading, Spacing.s12)
             }
         }
         .padding(.vertical, Spacing.s1)
+        .opacity(disabled ? 0.7 : 1)
     }
 
     /// Icon-only copy affordance (JSX renders a `copy` glyph that opens a
@@ -247,6 +194,93 @@ struct CompositionGapCard: View {
         )
         .padding(.horizontal, Spacing.s4)
         .accessibilityIdentifier("scheduling.weeklyHours.compositionGap")
+    }
+}
+
+/// Empty / unset hero shown when the schedule has no hours set and the user
+/// has not yet seeded a default. Mirrors the design's `EmptyHero` inside a
+/// bordered `Card` (54pt icon tile + headline + body + quick-default button).
+struct WeeklyHoursEmptyHero: View {
+    let onUseDefault: () -> Void
+
+    var body: some View {
+        AvailabilityCard {
+            VStack(spacing: Spacing.s3) {
+                Icon(.calendarClock, size: 26, strokeWidth: 1.9, color: Theme.Color.primary600)
+                    .frame(width: 54, height: 54)
+                    .background(Theme.Color.primary50)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+                Text("Set your hours")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Tell people the days and times you're open to bookings. You can fine-tune any day after.")
+                    .font(.system(size: 12.5))
+                    .lineSpacing(3)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .frame(maxWidth: 226)
+                QuickDefaultButton(onTap: onUseDefault)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Spacing.s1)
+        }
+        .accessibilityIdentifier("scheduling.weeklyHours.emptyHero")
+    }
+}
+
+/// A time-range editor sheet with two wheel pickers (start / end). Presented
+/// when a `AvailabilityTimeRangeButton` is tapped, mirroring the design's
+/// "tap a labeled button to open a picker" idiom.
+struct TimeRangePickerSheet: View {
+    let title: String
+    @State private var start: Date
+    @State private var end: Date
+    let onCommit: (TimeOfDay, TimeOfDay) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    init(
+        range: TimeRange,
+        onCommit: @escaping (TimeOfDay, TimeOfDay) -> Void
+    ) {
+        title = "Edit time range"
+        _start = State(initialValue: range.start.referenceDate())
+        _end = State(initialValue: range.end.referenceDate())
+        self.onCommit = onCommit
+    }
+
+    var body: some View {
+        VStack(spacing: Spacing.s4) {
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(.top, Spacing.s4)
+            HStack(spacing: Spacing.s2) {
+                VStack(spacing: Spacing.s1) {
+                    AvailabilityFieldLabel(text: "Starts")
+                    DatePicker("Start time", selection: $start, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .datePickerStyle(.wheel)
+                        .accessibilityLabel("Start time")
+                }
+                VStack(spacing: Spacing.s1) {
+                    AvailabilityFieldLabel(text: "Ends")
+                    DatePicker("End time", selection: $end, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .datePickerStyle(.wheel)
+                        .accessibilityLabel("End time")
+                }
+            }
+            PrimaryButton(title: "Done") {
+                onCommit(TimeOfDay(from: start), TimeOfDay(from: end))
+                await MainActor.run { dismiss() }
+            }
+            .padding(.horizontal, Spacing.s4)
+            Spacer(minLength: 0)
+        }
+        .background(Theme.Color.appBg)
+        .presentationDetents([.height(360)])
+        .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("scheduling.weeklyHours.timeRangeSheet")
     }
 }
 

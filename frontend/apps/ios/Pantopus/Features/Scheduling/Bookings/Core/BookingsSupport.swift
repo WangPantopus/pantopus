@@ -283,6 +283,14 @@ enum BookingsAvatar {
         let initials = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
         return initials.isEmpty ? "·" : initials
     }
+
+    /// Two-character initials from an opaque id (the E4 reassign rail has only
+    /// host ids — no roster names — so it shows the first two id chars, like
+    /// Android's `MemberOption`).
+    static func initials(fromId id: String) -> String {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "·" : String(trimmed.prefix(2)).uppercased()
+    }
 }
 
 // MARK: - Decline / cancel reasons & refund presets

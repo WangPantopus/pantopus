@@ -87,6 +87,42 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     private var activeTypes: [EventTypeDTO] { eventTypes.filter { $0.isActive != false } }
     private var hiddenTypes: [EventTypeDTO] { eventTypes.filter { $0.isActive == false } }
 
+    // MARK: Bespoke-view projection
+    //
+    // The B1 screen is rendered bespoke (not through `ListOfRowsView`) so it can
+    // carry the design's per-row toggle, 6px colour dot, segmented Active/Hidden
+    // filter, pillar section overline, and template-chip empty state — chrome the
+    // generic shell can't express. `state` still drives loading/empty/error and
+    // stays the projection the unit tests assert on; these read-only accessors
+    // expose the row data the bespoke rows need (toggle/dot) without altering it.
+
+    /// Rows for the currently-selected tab, in wire order.
+    var visibleTypes: [EventTypeDTO] { tab == .active ? activeTypes : hiddenTypes }
+
+    var activeCount: Int { activeTypes.count }
+    var hiddenCount: Int { hiddenTypes.count }
+
+    /// Currently-selected filter tab (read-only; mutate via `selectedTab`).
+    var currentTab: EventTypeTab { tab }
+
+    /// Pillar-accented uppercase section overline above the rows.
+    var sectionOverline: String { isBusiness ? "Bookable services" : "Your event types" }
+
+    /// Centered top-bar title — "Services" for business catalogs, "Event types"
+    /// elsewhere (design `FrameBusiness` vs `FramePersonal`).
+    var screenTitle: String { isBusiness ? "Services" : "Event types" }
+
+    /// Per-row meta line ("30 min · Video · $120") reused by the bespoke row.
+    func rowMeta(for eventType: EventTypeDTO) -> String {
+        subtitle(for: eventType, location: EventLocationMode.from(eventType.locationMode))
+    }
+
+    /// True when the row is hidden (`is_active=false`).
+    func isHidden(_ eventType: EventTypeDTO) -> Bool { eventType.isActive == false }
+
+    /// True when the row is unlisted (`visibility=secret`) — drives the eye-off badge.
+    func isSecret(_ eventType: EventTypeDTO) -> Bool { eventType.visibility == "secret" }
+
     /// Business owners price their bookable services (design `FrameBusiness`);
     /// personal events have no price concept (design `FramePersonal`).
     var isBusiness: Bool {
@@ -143,6 +179,51 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     func showHiddenTab() {
         tab = .hidden
         rebuild()
+    }
+
+    /// Bespoke segmented-filter tap (design `FilterHeader`). Mirrors the
+    /// `selectedTab` setter the shell would otherwise drive.
+    func selectTab(_ target: EventTypeTab) {
+        tab = target
+        rebuild()
+    }
+
+    /// Open an event type in the editor (bespoke row tap).
+    func openEventType(_ eventType: EventTypeDTO) {
+        open(eventType)
+    }
+
+    /// Empty-state template chip (design `FrameEmpty`) — create a video event
+    /// type pre-set to `minutes`, then open it in the editor.
+    func createFromTemplate(minutes: Int) {
+        Task {
+            do {
+                let request = CreateEventTypeRequest(
+                    name: "\(minutes) minute meeting",
+                    slug: uniqueSlug(EventTypeFormat.slugify("\(minutes)-min-meeting")),
+                    durations: [minutes],
+                    defaultDuration: minutes,
+                    locationMode: "video"
+                )
+                let response = try await client.request(
+                    SchedulingEndpoints.createEventType(owner: owner, request),
+                    as: EventTypeResponse.self
+                )
+                push(.eventTypeEditor(owner: owner, eventTypeId: response.eventType.id))
+            } catch {
+                actionError = "Couldn't create event type."
+            }
+        }
+    }
+
+    /// Suffix `-2`, `-3`, … onto a base slug until it doesn't collide with an
+    /// existing event type's slug.
+    private func uniqueSlug(_ base: String) -> String {
+        let taken = Set(eventTypes.map(\.slug))
+        guard taken.contains(base) else { return base }
+        var n = 2
+        while taken.contains("\(base)-\(n)") { n += 1 }
+        return "\(base)-\(n)"
     }
 
     private func open(_ eventType: EventTypeDTO) {
