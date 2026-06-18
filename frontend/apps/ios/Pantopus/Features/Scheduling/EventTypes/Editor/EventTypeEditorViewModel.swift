@@ -18,6 +18,23 @@ enum DurationMode: String, Sendable {
     case multiple
 }
 
+/// What the booker pays up front — the design `PricingCard` "Collect" segmented
+/// (Full amount / Deposit). Deposit collects a partial amount at booking
+/// (defaulting to half the price) with the balance settled later.
+enum CollectMode: String, Sendable, CaseIterable, Identifiable {
+    case full
+    case deposit
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .full: "Full amount"
+        case .deposit: "Deposit"
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class EventTypeEditorViewModel {
@@ -55,6 +72,8 @@ final class EventTypeEditorViewModel {
     var chargeEnabled = false
     var priceDollars = ""
     var currency = "USD"
+    /// Design `PricingCard` "Collect" segmented — full amount vs. deposit.
+    var collectMode: CollectMode = .full
 
     // MARK: Transient
 
@@ -287,6 +306,7 @@ extension EventTypeEditorViewModel {
         chargeEnabled = (dto.priceCents ?? 0) > 0
         priceDollars = chargeEnabled ? Self.dollarString(dto.priceCents ?? 0) : ""
         currency = dto.currency ?? "USD"
+        collectMode = (dto.depositCents ?? 0) > 0 ? .deposit : .full
         scheduleId = dto.scheduleId
     }
 
@@ -297,8 +317,15 @@ extension EventTypeEditorViewModel {
             location.rawValue, locationDetail, assignment.rawValue, "\(seatCap)",
             "\(requiresApproval)", "\(visibilitySecret)", "\(isActiveField)",
             "\(bufferBeforeMin)", "\(bufferAfterMin)", "\(minNoticeHours)", "\(maxHorizonDays)",
-            "\(dailyCap)", "\(chargeEnabled)", priceDollars, currency
+            "\(dailyCap)", "\(chargeEnabled)", priceDollars, currency, collectMode.rawValue
         ].joined(separator: "|")
+    }
+
+    /// Deposit collected at booking when `collectMode == .deposit` — half the
+    /// price (rounded to the nearest cent). `nil` for the full-amount path.
+    var depositCents: Int? {
+        guard chargeEnabled, collectMode == .deposit, let cents = parsedPriceCents, cents > 0 else { return nil }
+        return max(1, cents / 2)
     }
 
     /// Returns `true` when the save succeeded so the caller can pop the editor.
@@ -384,7 +411,8 @@ extension EventTypeEditorViewModel {
             maxHorizonDays: maxHorizonDays,
             seatCap: seatCap,
             priceCents: chargeEnabled ? parsedPriceCents : 0,
-            currency: currency.uppercased()
+            currency: currency.uppercased(),
+            depositCents: depositCents
         )
     }
 
@@ -409,6 +437,7 @@ extension EventTypeEditorViewModel {
             seatCap: seatCap,
             priceCents: chargeEnabled ? parsedPriceCents : 0,
             currency: currency.uppercased(),
+            depositCents: depositCents,
             isActive: isActiveField
         )
     }

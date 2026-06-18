@@ -110,18 +110,33 @@ final class ManualBookingViewModel: WizardModel {
                 showsProgressBar: false
             )
         }
+        // The design replaces the generic N/4 readout + segmented bar with a
+        // named StepRail rendered in the wizard content (see ManualBookingView
+        // `stepRail`); suppress the shell's progress chrome so the rail is the
+        // sole step indicator.
         return WizardChrome(
             title: "Book someone in",
-            progressLabel: .stepOf(current: step.rawValue, total: 4),
-            progressFraction: Double(step.rawValue) / 4,
+            progressLabel: .hidden,
+            progressFraction: nil,
             leading: step == .eventType ? .close : .back,
             primaryCTALabel: primaryLabel,
             primaryCTAEnabled: primaryEnabled,
             primaryCTAIdentifier: "manualBooking.continue",
             isSubmitting: isCreating,
             dirty: selectedEventTypeId != nil,
-            showsProgressBar: true
+            showsProgressBar: false
         )
+    }
+
+    /// The named step-rail model (reschedule-frames StepRail: Event · Time ·
+    /// Details · Review). The active step is filled; completed steps show a
+    /// check; the active label is shown inline.
+    var stepRailSteps: [(index: Int, title: String, isCurrent: Bool, isDone: Bool)] {
+        let titles = ["Event", "Time", "Details", "Review"]
+        return titles.enumerated().map { offset, title in
+            let idx = offset + 1
+            return (index: idx, title: title, isCurrent: idx == step.rawValue, isDone: idx < step.rawValue)
+        }
     }
 
     private var primaryLabel: String {

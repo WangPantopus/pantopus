@@ -38,12 +38,60 @@ struct ManualBookingView: View {
     }
 
     @ViewBuilder private var stepContent: some View {
+        if viewModel.step != .created {
+            stepRail
+        }
         switch viewModel.step {
         case .eventType: eventTypeStep
         case .time: timeStep
         case .details: detailsStep
         case .review: reviewStep
         case .created: createdStep
+        }
+    }
+
+    // MARK: Step rail
+
+    /// JSX StepRail (onbehalf-frames): numbered/checked 22pt circles for
+    /// Event · Time · Details · Review with connector lines; the active step is
+    /// accent-filled and shows its label inline, completed steps show a check.
+    private var stepRail: some View {
+        HStack(spacing: Spacing.s2 - 2) {
+            let steps = viewModel.stepRailSteps
+            ForEach(Array(steps.enumerated()), id: \.element.index) { offset, entry in
+                HStack(spacing: Spacing.s2 - 2) {
+                    stepCircle(entry)
+                    if entry.isCurrent {
+                        Text(entry.title)
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(theme.accent)
+                            .fixedSize()
+                    }
+                }
+                if offset < steps.count - 1 {
+                    RoundedRectangle(cornerRadius: 1, style: .continuous)
+                        .fill(entry.isDone ? theme.accentBg : Theme.Color.appBorder)
+                        .frame(height: 2)
+                        .frame(minWidth: 6)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("manualBooking.stepRail")
+    }
+
+    private func stepCircle(_ entry: (index: Int, title: String, isCurrent: Bool, isDone: Bool)) -> some View {
+        ZStack {
+            Circle()
+                .fill(entry.isCurrent ? theme.accent : (entry.isDone ? theme.accentBg : Theme.Color.appSurfaceSunken))
+                .frame(width: 22, height: 22)
+            if entry.isDone {
+                Icon(.check, size: 12, strokeWidth: 3, color: theme.accent)
+            } else {
+                Text("\(entry.index)")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(entry.isCurrent ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
+            }
         }
     }
 
@@ -367,7 +415,7 @@ struct ManualBookingView: View {
     // MARK: Created
 
     private var createdStep: some View {
-        VStack(spacing: Spacing.s4) {
+        VStack(spacing: Spacing.s5 - 2) {
             ExtrasIconDisc(icon: .check, background: Theme.Color.successBg, foreground: Theme.Color.success, diameter: 78)
             VStack(spacing: Spacing.s2) {
                 Text("Booking created")
@@ -378,8 +426,22 @@ struct ManualBookingView: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .multilineTextAlignment(.center)
             }
+            // JSX FrameCreated: a centered View booking / Book another stack in
+            // the success body (mirroring the design's no-chrome success frame).
+            VStack(spacing: Spacing.s2 + 1) {
+                ExtrasSolidButton(title: "View booking", accent: theme.accent) {
+                    viewModel.primaryTapped()
+                }
+                .accessibilityIdentifier("manualBooking.viewBooking")
+                ExtrasGhostButton(title: "Book another") {
+                    viewModel.secondaryTapped()
+                }
+                .accessibilityIdentifier("manualBooking.bookAnother")
+            }
+            .padding(.top, Spacing.s2)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, Spacing.s5)
         .padding(.top, Spacing.s12)
     }
 

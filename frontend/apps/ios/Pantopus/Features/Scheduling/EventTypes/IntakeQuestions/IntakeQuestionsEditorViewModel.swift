@@ -71,8 +71,13 @@ final class IntakeQuestionsEditorViewModel {
     private(set) var phase: Phase = .loading
 
     var questions: [EditableQuestion] = []
-    /// Id of the question whose inline editor is expanded.
+    /// Id of the question whose inline editor is open. The design replaces that
+    /// row with the blue `EditGroup` field group rather than expanding an
+    /// accordion; one question edits at a time.
     var expandedId: UUID?
+    /// Parent event type's name — drives the sheet's pillar overline
+    /// ("Personal · Intro call") above the title. Empty until the detail loads.
+    private(set) var eventName: String = ""
     var saveError: String?
     private(set) var isSaving = false
 
@@ -109,6 +114,7 @@ final class IntakeQuestionsEditorViewModel {
             let response: EventTypeDetailResponse = try await client.request(
                 SchedulingEndpoints.getEventType(owner: owner, id: eventTypeId)
             )
+            eventName = response.eventType.name
             questions = (response.questions ?? [])
                 .sorted { ($0.sortOrder ?? 0) < ($1.sortOrder ?? 0) }
                 .map { dto in
@@ -172,6 +178,35 @@ final class IntakeQuestionsEditorViewModel {
         } else if questions[index].options.isEmpty {
             questions[index].options = [""]
         }
+    }
+
+    // MARK: Inline edit (design `EditGroup` replaces a row)
+
+    /// "Add a question" — append a blank question and open its inline editor
+    /// (the design renders it as the blue `EditGroup` field group below the
+    /// list). Alias of `addQuestion()` for the bespoke UI.
+    func startAdd() { addQuestion() }
+
+    /// Open the inline editor for an existing row (tapping the row).
+    func edit(_ id: UUID) { expandedId = id }
+
+    /// True when this question's row is replaced by the inline `EditGroup`.
+    func isEditing(_ id: UUID) -> Bool { expandedId == id }
+
+    /// "Save question" — close the inline editor, keeping the live-bound edits.
+    /// A blank/invalid question is dropped rather than persisted.
+    func saveEditing() {
+        if let id = expandedId,
+           let index = questions.firstIndex(where: { $0.id == id }),
+           !questions[index].isValid {
+            questions.remove(at: index)
+        }
+        expandedId = nil
+    }
+
+    /// Pillar overline shown above the sheet title ("Personal · Intro call").
+    var pillarOverline: String {
+        eventName.isEmpty ? owner.theme.title : "\(owner.theme.title) · \(eventName)"
     }
 }
 
