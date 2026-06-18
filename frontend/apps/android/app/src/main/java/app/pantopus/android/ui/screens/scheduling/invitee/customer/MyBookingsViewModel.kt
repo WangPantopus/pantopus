@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.ManageTokenStore
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling.bookings.initialsOf
 import app.pantopus.android.ui.screens.scheduling.invitee.edge.formatDate
 import app.pantopus.android.ui.screens.scheduling.invitee.edge.formatWhenRange
 import app.pantopus.android.ui.screens.scheduling.invitee.edge.parseInstant
@@ -202,6 +203,9 @@ class MyBookingsViewModel
                 subtitle = whenRange.substringAfter("· ", whenRange),
                 pillar = pillar,
                 pill = pillFor(status),
+                // Lean payload omits the host name; the avatar mirrors iOS by
+                // deriving initials from the booker's own name (falling back to "·").
+                initials = initialsOf(inviteeName),
                 dimmed = dimmed,
                 manageable = status?.lowercase() !in TERMINAL_STATUSES,
             )

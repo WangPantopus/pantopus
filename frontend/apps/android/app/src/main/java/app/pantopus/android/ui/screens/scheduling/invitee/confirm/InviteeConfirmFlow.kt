@@ -32,11 +32,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.pantopus.android.ui.components.Shimmer
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.screens.scheduling._shared.ConflictAlternativesSheet
@@ -118,6 +120,7 @@ fun InviteeConfirmFlow(
                             onAnswer = viewModel::setAnswer,
                             onEditSlot = onClose,
                             onChangeTz = { tzOpen = true },
+                            onClearPrefill = viewModel::clearPrefill,
                         )
                     ConfirmStep.Review, ConfirmStep.Payment ->
                         ReviewConfirmBody(
@@ -261,10 +264,14 @@ private fun ConfirmFooter(
     onAddToCalendar: () -> Unit,
     onDone: () -> Unit,
 ) {
+    // Spec sticky dock: an elevated translucent bar with a top hairline. Compose
+    // has no backdrop blur < API 31, so we approximate with a raised surface +
+    // shadow that lifts the dock above the scrolling body.
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .shadow(elevation = 12.dp, clip = false)
                 .background(PantopusColors.appSurface)
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -293,16 +300,15 @@ private fun ConfirmFooter(
             }
             else -> {
                 if (state.submitting) {
+                    // Spec frame 6 ShimmerCTA: a shimmer skeleton CTA with the in-flight label.
                     Box(
-                        modifier =
-                            Modifier.fillMaxWidth().height(
-                                48.dp,
-                            ).clip(RoundedCornerShape(Radii.lg)).background(PantopusColors.appSurfaceSunken),
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
                         contentAlignment = Alignment.Center,
                     ) {
+                        Shimmer(width = 320.dp, height = 46.dp, cornerRadius = Radii.lg)
                         Text(
                             text = if (state.step == ConfirmStep.Details) "Submitting your booking" else "Confirming your booking",
-                            style = PantopusTextStyle.small,
+                            style = PantopusTextStyle.caption,
                             fontWeight = FontWeight.SemiBold,
                             color = PantopusColors.appTextMuted,
                         )
@@ -344,7 +350,21 @@ private fun FilledCta(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
+                // Spec PrimaryCTA height is 46 (D1–D3 docks).
+                .heightIn(min = 46.dp)
+                // Spec CTA carries an accent-tinted drop shadow (0 6px 16px accent/0.28).
+                .then(
+                    if (enabled) {
+                        Modifier.shadow(
+                            elevation = 10.dp,
+                            shape = RoundedCornerShape(Radii.lg),
+                            ambientColor = accent,
+                            spotColor = accent,
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(if (enabled) accent else PantopusColors.appSurfaceSunken)
                 .clickableLabel(label) { if (enabled) onClick() },

@@ -16,6 +16,22 @@ enum class BookingPillKind {
     Pending,
     Past,
     Cancelled,
+    Balance,
+    Approve,
+}
+
+/**
+ * Optional footer affordance on a row (design frames: Past = "Book again",
+ * Action-needed = "Pay {balance}"). The lean /my-bookings payload doesn't carry
+ * the price/discovery data these need yet, so the VM leaves this null today —
+ * the renderer supports it for when the backend joins those fields.
+ */
+sealed interface BookingRowFooter {
+    /** Past-row "Book again" link (rotate-ccw + accent label). */
+    data object BookAgain : BookingRowFooter
+
+    /** Action-needed "Pay {balance}" affordance with a "{balance} due at confirm" caption. */
+    data class Pay(val balance: String) : BookingRowFooter
 }
 
 /** One booking the signed-in user made, projected for the list row. */
@@ -25,8 +41,10 @@ data class MyBookingRow(
     val subtitle: String,
     val pillar: SchedulingPillar,
     val pill: BookingPillKind,
+    val initials: String = "·",
     val dimmed: Boolean = false,
     val manageable: Boolean = true,
+    val footer: BookingRowFooter? = null,
 )
 
 /** A titled group of rows ("This week", "Needs attention", …). */

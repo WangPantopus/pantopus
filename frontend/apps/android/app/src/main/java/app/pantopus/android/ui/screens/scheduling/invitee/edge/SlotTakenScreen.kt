@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -23,10 +24,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.pantopus.android.data.api.models.scheduling.SlotDto
 import app.pantopus.android.ui.components.GhostButton
@@ -161,7 +169,7 @@ private fun FullyBookedBody(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.xl))
+                .dashedBorder(PantopusColors.appBorderStrong, Radii.xl)
                 .padding(vertical = Spacing.s6, horizontal = Spacing.s4),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -243,27 +251,47 @@ private fun RefreshingBody(onPickAnotherTime: () -> Unit) {
 
 @Composable
 private fun SavedNote() {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s4, vertical = Spacing.s4),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.ShieldCheck,
-            contentDescription = null,
-            size = 13.dp,
-            tint = PantopusColors.success,
-            modifier = Modifier.padding(end = Spacing.s1),
-        )
-        Text(
-            text = "Your details are saved.",
-            style = PantopusTextStyle.caption,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appTextSecondary,
-        )
+    Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
+        // Spec footer: a 1px top hairline above the saved-details note.
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 18.dp, start = Spacing.s4, end = Spacing.s4),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.ShieldCheck,
+                contentDescription = null,
+                size = 13.dp,
+                tint = PantopusColors.success,
+                modifier = Modifier.padding(end = Spacing.s1),
+            )
+            Text(
+                text = "Your details are saved.",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
     }
 }
+
+/** Rounded dashed outline (1dp) — the fully-booked empty card stroke (spec: `1px dashed`). */
+private fun Modifier.dashedBorder(
+    color: Color,
+    radius: Dp,
+): Modifier =
+    drawBehind {
+        val stroke = 1.dp.toPx()
+        val r = radius.toPx()
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(stroke / 2f, stroke / 2f),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = CornerRadius(r, r),
+            style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))),
+        )
+    }

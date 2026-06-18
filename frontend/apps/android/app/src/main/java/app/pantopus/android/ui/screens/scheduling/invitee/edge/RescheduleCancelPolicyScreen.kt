@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -68,7 +69,6 @@ fun RescheduleCancelPolicyScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val rescheduleState by viewModel.reschedule.collectAsStateWithLifecycle()
     val cancelState by viewModel.cancel.collectAsStateWithLifecycle()
-    var showAddToCalendar by remember { mutableStateOf(false) }
 
     androidx.compose.runtime.LaunchedEffect(manageToken) { viewModel.start(manageToken) }
 
@@ -93,7 +93,6 @@ fun RescheduleCancelPolicyScreen(
                             modifier = Modifier.weight(1f),
                             onReschedule = viewModel::openReschedule,
                             onCancel = viewModel::openCancel,
-                            onAddToCalendar = { showAddToCalendar = true },
                             onAccept = viewModel::acceptProposed,
                             onDecline = viewModel::declineProposed,
                             onKeep = onBack,
@@ -115,23 +114,6 @@ fun RescheduleCancelPolicyScreen(
     }
     if (cancelState !is CancelSheetState.Hidden) {
         CancelSheet(state = cancelState, onConfirm = viewModel::confirmCancel, onDismiss = viewModel::closeCancel)
-    }
-    if (showAddToCalendar && view != null) {
-        val sheet = rememberModalBottomSheetState()
-        AddToCalendarSheet(
-            event =
-                AddToCalendarEvent(
-                    title = view.eventName,
-                    startUtc = view.startUtc,
-                    endUtc = view.endUtc,
-                    location = view.location,
-                    manageToken = manageToken,
-                    timezone = view.timezone,
-                ),
-            onDismiss = { showAddToCalendar = false },
-            sheetState = sheet,
-            pillar = view.pillar,
-        )
     }
 }
 
@@ -164,68 +146,173 @@ fun ManageContent(
     mode: ManagePolicyMode,
     onReschedule: () -> Unit,
     onCancel: () -> Unit,
-    onAddToCalendar: () -> Unit,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
+    @Suppress("UNUSED_PARAMETER") onAddToCalendar: () -> Unit = {},
+    onMessageHost: () -> Unit = onKeep,
+) {
+    // Within-policy (baseline) shows the Manage rows inline with no dock; every
+    // blocked / proposed mode pins its CTAs in a fixed bottom dock (spec Dock).
+    val showDock = mode != ManagePolicyMode.FreeToChange
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            SchedulingStatusPill(status = view.status)
+            BookingSummaryCard(
+                eventName = view.eventName,
+                hostLabel = view.hostLabel,
+                pillar = view.pillar,
+                whenLabel = view.whenLabel,
+                tzLabel = view.tzLabel,
+            )
+            val note = policyNote(mode, view)
+            PolicyNoteCard(tone = note.tone, icon = note.icon, title = note.title, body = note.body, still = note.still)
+
+            // Spec FrameRescheduleClosed adds an inline "Cancel instead" link below the note.
+            if (mode == ManagePolicyMode.RescheduleClosed && view.canCancel) {
+                CancelInsteadLink(onClick = onCancel)
+            }
+
+            if (mode == ManagePolicyMode.FreeToChange) {
+                Text(
+                    text = "MANAGE",
+                    style = PantopusTextStyle.overline,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.padding(top = Spacing.s2),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    if (view.canReschedule) {
+                        ManageActionRow(
+                            icon = PantopusIcon.CalendarClock,
+                            label = "Reschedule",
+                            sub = "Pick a new time that works for you.",
+                            onClick = onReschedule,
+                        )
+                    }
+                    if (view.canCancel) {
+                        ManageActionRow(
+                            icon = PantopusIcon.XCircle,
+                            label = "Cancel booking",
+                            sub = view.refundEstimateLabel?.let { "Refund: $it" } ?: "Release this time.",
+                            destructive = true,
+                            onClick = onCancel,
+                        )
+                    }
+                }
+            }
+            if (showDock) {
+                // Leave clearance for the pinned dock so the scroll content isn't occluded.
+                Box(modifier = Modifier.height(Spacing.s16))
+            }
+        }
+        if (showDock) {
+            ManageDock(
+                mode = mode,
+                view = view,
+                onAccept = onAccept,
+                onDecline = onDecline,
+                onCancel = onCancel,
+                onKeep = onKeep,
+                onMessageHost = onMessageHost,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+    }
+}
+
+/** The fixed bottom dock the policy-blocked / proposed states pin their CTAs to (spec Dock). */
+@Composable
+private fun ManageDock(
+    mode: ManagePolicyMode,
+    view: ManageView,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+    onCancel: () -> Unit,
+    onKeep: () -> Unit,
+    onMessageHost: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s4),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(Radii.xs))
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        SchedulingStatusPill(status = view.status)
-        BookingSummaryCard(
-            eventName = view.eventName,
-            hostLabel = view.hostLabel,
-            pillar = view.pillar,
-            whenLabel = view.whenLabel,
-            tzLabel = view.tzLabel,
-        )
-        val note = policyNote(mode, view)
-        PolicyNoteCard(tone = note.tone, icon = note.icon, title = note.title, body = note.body, still = note.still)
-
-        if (mode == ManagePolicyMode.ProposedReschedule) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        when (mode) {
+            ManagePolicyMode.ProposedReschedule -> {
                 PrimaryButton(title = "Accept new time", onClick = onAccept)
                 GhostButton(title = "Keep my current time", onClick = onDecline)
             }
-        } else {
-            Text(
-                text = "MANAGE",
-                style = PantopusTextStyle.overline,
-                color = PantopusColors.appTextSecondary,
-                modifier = Modifier.padding(top = Spacing.s2),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                if (view.canReschedule) {
-                    ManageActionRow(
-                        icon = PantopusIcon.CalendarClock,
-                        label = "Reschedule",
-                        sub = "Pick a new time that works for you.",
-                        onClick = onReschedule,
-                    )
-                }
-                if (view.canCancel) {
-                    ManageActionRow(
-                        icon = PantopusIcon.XCircle,
-                        label = "Cancel booking",
-                        sub = view.refundEstimateLabel?.let { "Refund: $it" } ?: "Release this time.",
-                        destructive = true,
-                        onClick = onCancel,
-                    )
-                }
-                ManageActionRow(
-                    icon = PantopusIcon.CalendarPlus,
-                    label = "Add to calendar",
-                    sub = "Save the date with a reminder.",
-                    onClick = onAddToCalendar,
-                )
-                if (!view.canReschedule && !view.canCancel) {
-                    GhostButton(title = "Keep my booking", onClick = onKeep)
-                }
+            ManagePolicyMode.PartialRefund -> {
+                val label = view.refundEstimateLabel?.let { "Cancel and refund $it" } ?: "Cancel and refund"
+                DestructiveButton(title = label, onClick = onCancel)
+                GhostButton(title = "Keep my booking", onClick = onKeep)
+            }
+            ManagePolicyMode.NotOnline -> {
+                PrimaryButton(title = "Message host", onClick = onMessageHost)
+                GhostButton(title = "Keep my booking", onClick = onKeep)
+            }
+            else -> {
+                // Cancel/reschedule window closed: keep + message-host fallback.
+                GhostButton(title = "Keep my booking", onClick = onKeep)
+                HostGhostButton(title = "Message host", pillar = view.pillar, onClick = onMessageHost)
             }
         }
+    }
+}
+
+/** A pillar-tinted "host ghost" button (surface bg, pillar text, pillar-tint border) — spec hostGhost. */
+@Composable
+private fun HostGhostButton(
+    title: String,
+    pillar: SchedulingPillar,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, pillar.accent.copy(alpha = HOST_GHOST_BORDER_ALPHA), RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onClick)
+                .padding(vertical = Spacing.s3),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = title, style = PantopusTextStyle.body, color = pillar.accent)
+    }
+}
+
+private const val HOST_GHOST_BORDER_ALPHA = 0.4f
+
+/** The centered primary "Cancel instead" inline link (spec FrameRescheduleClosed). */
+@Composable
+private fun CancelInsteadLink(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(Spacing.s1),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.XCircle,
+            contentDescription = null,
+            size = 14.dp,
+            tint = SchedulingPillar.Personal.accent,
+            modifier = Modifier.padding(end = Spacing.s1),
+        )
+        Text(
+            text = "Cancel instead",
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.Bold,
+            color = SchedulingPillar.Personal.accent,
+        )
     }
 }
 
@@ -317,9 +404,12 @@ private fun policyNote(
             PolicyNote(
                 EdgeTone.Warn,
                 PantopusIcon.FileWarning,
-                "You'll get a ${view.refundEstimateLabel} refund",
-                "Cancelling now refunds ${view.refundEstimateLabel}.",
-                "Cancel earlier for a full refund.",
+                "You'll get a partial refund",
+                view.refundEstimateLabel
+                    ?.let { "Cancelling now, within 24 hours of your visit, refunds $it of what you paid." }
+                    ?: "Cancelling now, within 24 hours of your visit, refunds part of what you paid.",
+                view.freeCancelUntilLabel?.let { "Cancel before $it for a full refund." }
+                    ?: "Cancel earlier for a full refund.",
             )
         ManagePolicyMode.CancelClosedNoRefund ->
             PolicyNote(
