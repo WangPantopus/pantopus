@@ -186,7 +186,7 @@ struct BookResourceView: View {
             } label: {
                 HStack(spacing: Spacing.s2) {
                     if let member = viewModel.forWhom {
-                        HomeMemberAvatar(member: member, size: 28)
+                        ResourceHomeMemberAvatar(member: member, size: 28)
                         Text(member.name)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.Color.appText)

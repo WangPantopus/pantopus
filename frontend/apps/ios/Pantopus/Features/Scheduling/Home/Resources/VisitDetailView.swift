@@ -430,7 +430,7 @@ private struct VisitEditSheet: View {
                 ForEach(Array(viewModel.members.enumerated()), id: \.element.id) { index, member in
                     Button { viewModel.toggleEditHost(member.id) } label: {
                         HStack(spacing: Spacing.s2) {
-                            HomeMemberAvatar(member: member, size: 30)
+                            ResourceHomeMemberAvatar(member: member, size: 30)
                             Text(member.name)
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.Color.appText)

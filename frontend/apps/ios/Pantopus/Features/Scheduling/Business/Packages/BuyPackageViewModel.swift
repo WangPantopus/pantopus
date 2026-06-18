@@ -48,6 +48,7 @@ final class BuyPackageViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var totalLabel: String { SchedulingMoney.format(cents: package?.priceCents, currency: package?.currency) }
     var perSessionLabel: String {

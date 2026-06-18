@@ -14,7 +14,7 @@
 import Observation
 import SwiftUI
 
-enum BookingStatusFilter: String, CaseIterable, Identifiable, Sendable {
+enum BookingFilterStatus: String, CaseIterable, Identifiable, Sendable {
     case upcoming, pending, past, cancelled, noShow
     var id: String { rawValue }
     var label: String {
@@ -69,7 +69,7 @@ enum BookingScopeFilter: String, CaseIterable, Identifiable, Sendable {
 
 /// The applied filter set returned to the presenting inbox.
 struct BookingFilters: Sendable, Equatable {
-    var status: BookingStatusFilter?
+    var status: BookingFilterStatus?
     var eventTypeId: String?
     var dateRange: BookingDateRangeFilter?
     var customFrom: Date
@@ -91,7 +91,7 @@ final class BookingFilterViewModel {
     let eventTypeOptions: [EventTypeOption]
 
     var searchText: String = ""
-    var selectedStatus: BookingStatusFilter?
+    var selectedStatus: BookingFilterStatus?
     var selectedEventTypeId: String?
     var selectedDateRange: BookingDateRangeFilter?
     var customFrom = Date()
@@ -177,7 +177,7 @@ final class BookingFilterViewModel {
 
     enum ChipTint: Sendable, Equatable { case neutral, warning, error, personal, home, business }
 
-    func statusTint(_ status: BookingStatusFilter) -> ChipTint {
+    func statusTint(_ status: BookingFilterStatus) -> ChipTint {
         switch status {
         case .pending: .warning
         case .noShow, .cancelled: .error
@@ -196,7 +196,7 @@ final class BookingFilterViewModel {
 
     // MARK: Mutations
 
-    func toggleStatus(_ status: BookingStatusFilter) {
+    func toggleStatus(_ status: BookingFilterStatus) {
         selectedStatus = selectedStatus == status ? nil : status
     }
 

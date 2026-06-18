@@ -378,7 +378,7 @@ struct PhotoAddRow: View {
 
 /// F10 "Specific" picker row: avatar + name + trailing selection check.
 struct MemberSelectRow: View {
-    let member: HomeMember
+    let member: ResourceHomeMember
     let isOn: Bool
     var showsDivider: Bool = true
     let action: () -> Void
@@ -387,7 +387,7 @@ struct MemberSelectRow: View {
         VStack(spacing: Spacing.s0) {
             Button(action: action) {
                 HStack(spacing: Spacing.s3) {
-                    HomeMemberAvatar(member: member, size: 32)
+                    ResourceHomeMemberAvatar(member: member, size: 32)
                     Text(member.name)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)

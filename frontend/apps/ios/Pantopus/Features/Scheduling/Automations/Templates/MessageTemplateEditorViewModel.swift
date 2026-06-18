@@ -48,6 +48,7 @@ final class MessageTemplateEditorViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var showsSubject: Bool { channel == .email || channel == .sms }
     var subjectRequired: Bool { channel == .email }

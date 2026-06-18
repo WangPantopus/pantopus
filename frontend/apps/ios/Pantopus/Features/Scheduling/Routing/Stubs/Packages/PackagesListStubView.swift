@@ -36,7 +36,7 @@ struct PackagesListStubView: View {
     }
 
     var body: some View {
-        PackagesListView(owner: viewModel.owner, push: viewModel.push)
+        SchedulingPackagesListView(owner: viewModel.owner, push: viewModel.push)
     }
 }
 

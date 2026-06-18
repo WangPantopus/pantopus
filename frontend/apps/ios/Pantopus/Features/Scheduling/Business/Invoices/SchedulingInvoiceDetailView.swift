@@ -1,5 +1,5 @@
 //
-//  InvoiceDetailView.swift
+//  SchedulingInvoiceDetailView.swift
 //  Pantopus
 //
 //  G13 Invoice Detail (owner) — Stream I15. Mono reference header, total hero,
@@ -7,11 +7,15 @@
 //  Matches `invoicedetail-frames.jsx` within the InvoiceDTO's available fields.
 //  Tokens only.
 //
+//  NOTE: renamed from `InvoiceDetailView` to avoid a same-module filename/type
+//  collision with `Features/ContentDetail/InvoiceDetailView.swift` that broke
+//  the XcodeGen target build.
+//
 
 import SwiftUI
 
-struct InvoiceDetailView: View {
-    @State private var model: InvoiceDetailViewModel
+struct SchedulingInvoiceDetailView: View {
+    @State private var model: SchedulingInvoiceDetailViewModel
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -20,7 +24,7 @@ struct InvoiceDetailView: View {
         push: @escaping @MainActor (SchedulingRoute) -> Void,
         client: SchedulingClient = .shared
     ) {
-        _model = State(wrappedValue: InvoiceDetailViewModel(owner: owner, invoiceId: invoiceId, push: push, client: client))
+        _model = State(wrappedValue: SchedulingInvoiceDetailViewModel(owner: owner, invoiceId: invoiceId, push: push, client: client))
     }
 
     var body: some View {

@@ -34,7 +34,7 @@ final class ScheduleVisitViewModel {
     // MARK: State
 
     private(set) var loadState: LoadState = .loading
-    private(set) var members: [HomeMember] = []
+    private(set) var members: [ResourceHomeMember] = []
     private(set) var isSaving = false
     var saveError: String?
     /// Set true once the user attempts to commit, so inline errors appear.
@@ -67,7 +67,7 @@ final class ScheduleVisitViewModel {
             let response: OccupantsResponse = try await client.request(
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
-            members = HomeMember.from(occupants: response.occupants)
+            members = ResourceHomeMember.from(occupants: response.occupants)
             loadState = .ready
         } catch let error as SchedulingError {
             loadState = .error(message: error.userMessage ?? "Couldn't load your household.")

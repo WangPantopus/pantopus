@@ -1,5 +1,5 @@
 //
-//  PackagesListView.swift
+//  SchedulingPackagesListView.swift
 //  Pantopus
 //
 //  G8 Packages List (owner) — Stream I15. Active / Archived segmented list of
@@ -9,8 +9,8 @@
 
 import SwiftUI
 
-struct PackagesListView: View {
-    @State private var model: PackagesListViewModel
+struct SchedulingPackagesListView: View {
+    @State private var model: SchedulingPackagesListViewModel
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -18,7 +18,7 @@ struct PackagesListView: View {
         push: @escaping @MainActor (SchedulingRoute) -> Void,
         client: SchedulingClient = .shared
     ) {
-        _model = State(wrappedValue: PackagesListViewModel(owner: owner, push: push, client: client))
+        _model = State(wrappedValue: SchedulingPackagesListViewModel(owner: owner, push: push, client: client))
     }
 
     var body: some View {
@@ -105,7 +105,7 @@ struct PackagesListView: View {
             options: ["Active", "Archived"],
             selectedIndex: model.filter.rawValue,
             accent: model.accent,
-            onSelect: { idx in model.filter = PackagesListViewModel.Filter(rawValue: idx) ?? .active }
+            onSelect: { idx in model.filter = SchedulingPackagesListViewModel.Filter(rawValue: idx) ?? .active }
         )
     }
 
