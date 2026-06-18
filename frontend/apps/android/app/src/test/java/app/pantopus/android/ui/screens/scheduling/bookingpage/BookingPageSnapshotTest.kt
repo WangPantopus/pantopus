@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTheme
@@ -39,9 +40,9 @@ class BookingPageSnapshotTest {
                 ) {
                     BLCard(pillar = SchedulingPillar.Personal, overline = "Status") {
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                            StatusChip(PageStatus.Live)
-                            StatusChip(PageStatus.Paused)
-                            StatusChip(PageStatus.Draft)
+                            SchedulingStatusPill(PageStatus.Live.toPillStatus())
+                            SchedulingStatusPill(PageStatus.Paused.toPillStatus())
+                            SchedulingStatusPill(PageStatus.Draft.toPillStatus())
                         }
                     }
                     BLCard(pillar = SchedulingPillar.Personal, overline = "Services people can book") {

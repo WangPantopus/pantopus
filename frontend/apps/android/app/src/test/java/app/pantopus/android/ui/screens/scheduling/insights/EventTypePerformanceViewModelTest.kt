@@ -39,8 +39,8 @@ class EventTypePerformanceViewModelTest {
             NetworkResult.Success(
                 GetEventTypesResponse(
                     listOf(
-                        EventTypeDto(id = "e1", name = "Intro", defaultDuration = 30, priceCents = 0),
-                        EventTypeDto(id = "e2", name = "Deep dive", defaultDuration = 60, priceCents = 5000, currency = "USD"),
+                        EventTypeDto(id = "e1", slug = "e1", name = "Intro", defaultDuration = 30, priceCents = 0),
+                        EventTypeDto(id = "e2", slug = "e2", name = "Deep dive", defaultDuration = 60, priceCents = 5000, currency = "USD"),
                     ),
                 ),
             )

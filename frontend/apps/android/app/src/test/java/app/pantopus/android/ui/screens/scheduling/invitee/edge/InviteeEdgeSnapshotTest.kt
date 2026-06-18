@@ -56,7 +56,7 @@ class InviteeEdgeSnapshotTest {
         pillar = SchedulingPillar.Personal,
         whenLabel = "Wed, Jun 17 · 9:30–10:00 AM",
         tzLabel = "PDT",
-        statusLabel = "Confirmed",
+        status = "confirmed",
         canReschedule = canReschedule,
         canCancel = canCancel,
         rescheduleDeadlineLabel = "Jun 16",

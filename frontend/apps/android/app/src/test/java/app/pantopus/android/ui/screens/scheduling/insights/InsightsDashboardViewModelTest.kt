@@ -42,7 +42,7 @@ class InsightsDashboardViewModelTest {
     fun setup() {
         Dispatchers.setMain(dispatcher)
         coEvery { repo.getEventTypes(any()) } returns
-            NetworkResult.Success(GetEventTypesResponse(listOf(EventTypeDto(id = "e1", name = "Intro"))))
+            NetworkResult.Success(GetEventTypesResponse(listOf(EventTypeDto(id = "e1", slug = "e1", name = "Intro"))))
         coEvery { repo.getNoShowInsights(any(), any()) } returns NetworkResult.Success(report())
     }
 
