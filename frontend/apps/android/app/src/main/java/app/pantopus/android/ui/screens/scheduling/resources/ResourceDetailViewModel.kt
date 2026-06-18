@@ -67,7 +67,23 @@ sealed interface ResourceDetailUiState {
         val ruleChips: List<ResourceRuleChip>,
         val approvals: List<ResourceApproval>,
         val sections: List<ResourceDaySection>,
-    ) : ResourceDetailUiState
+        /** Count of pending approval requests — drives the header badge (F11 approval frame). */
+        val pendingApprovalCount: Int = 0,
+        /**
+         * View-only fully-booked variant (F11 frame 3): when non-null, the detail
+         * shows an amber "Fully booked through …" banner and the sticky CTA flips
+         * to "Book next opening · <nextOpeningLabel>". The detail bookings list does
+         * not expose forward availability, so both labels are populated only when a
+         * backend supplies them (deferred — see VM note).
+         */
+        val fullyBookedThroughLabel: String? = null,
+        val nextOpeningLabel: String? = null,
+    ) : ResourceDetailUiState {
+        val isFullyBooked: Boolean get() = nextOpeningLabel != null
+
+        /** "Upcoming bookings" normally; "Confirmed" when an approval queue is shown. */
+        val bookingsLabel: String get() = if (approvals.isEmpty()) "Upcoming bookings" else "Confirmed"
+    }
 }
 
 /**
@@ -210,6 +226,11 @@ class ResourceDetailViewModel
                 ruleChips = buildRuleChips(resource),
                 approvals = approvals,
                 sections = groupByDay(confirmed, whoOf, memberOf),
+                pendingApprovalCount = approvals.size,
+                // Forward availability (fully-booked / next-opening) is not exposed
+                // by the bookings list; left null until a backend provides it.
+                fullyBookedThroughLabel = null,
+                nextOpeningLabel = null,
             )
         }
 

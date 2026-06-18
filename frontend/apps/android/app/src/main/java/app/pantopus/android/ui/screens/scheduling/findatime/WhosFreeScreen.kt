@@ -31,10 +31,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
@@ -143,10 +146,12 @@ private fun Head(
             onSelect = { onSetView(if (it == 0) GridView.Day else GridView.Week) },
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PantopusIconImage(icon = PantopusIcon.Users, contentDescription = null, size = 11.dp, tint = HomeAccent)
+            // Spec uses a 'layers' glyph; the Android icon set has no layers mark, so the
+            // overlapping-grid glyph carries the same "composed from everyone" intent.
+            PantopusIconImage(icon = PantopusIcon.Grid3x3, contentDescription = null, size = 11.dp, tint = HomeAccent)
             Text(
                 text = "Composed from each member's personal availability.",
-                style = PantopusTextStyle.caption,
+                fontSize = 10.5.sp,
                 color = PantopusColors.appTextSecondary,
                 modifier = Modifier.padding(start = Spacing.s1),
             )
@@ -195,7 +200,7 @@ private fun LoadedGrid(
                 rows = state.visibleRows,
                 onTapFree = onTapFree,
             )
-            Legend()
+            Legend(hasUnknown = state.optedOutNames.isNotEmpty())
         }
 
         if (tapped != null) {
@@ -206,10 +211,11 @@ private fun LoadedGrid(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PantopusIconImage(icon = PantopusIcon.Plus, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextMuted)
+                // Spec uses 'hand-pointer'; the Android icon set's closest pointer glyph is 'hand'.
+                PantopusIconImage(icon = PantopusIcon.Hand, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextMuted)
                 Text(
                     text = "Tap a free block to plan something",
-                    style = PantopusTextStyle.caption,
+                    fontSize = 10.5.sp,
                     color = PantopusColors.appTextSecondary,
                     modifier = Modifier.padding(start = Spacing.s1),
                 )
@@ -267,7 +273,7 @@ private fun FilterChips(
 
 // ─── Heat grid ────────────────────────────────────────────────────────────────
 
-private val NAME_COL_WIDTH = 64.dp
+private val NAME_COL_WIDTH = 58.dp
 private val CELL_HEIGHT = 26.dp
 
 @Composable
@@ -282,7 +288,7 @@ private fun HeatGridView(
             columns.forEach { col ->
                 Text(
                     text = col.label,
-                    style = PantopusTextStyle.overline,
+                    fontSize = 9.sp,
                     color = PantopusColors.appTextMuted,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -330,14 +336,19 @@ private fun HeatCell(
         when (state) {
             CellState.Free -> HomeAccentBg
             CellState.Busy -> PantopusColors.appSurfaceSunken
-            CellState.Unknown -> PantopusColors.appSurfaceRaised
+            CellState.Tentative -> PantopusColors.warmAmberBg
+            CellState.OffHours -> PantopusColors.appSurfaceMuted
+            CellState.Unknown -> PantopusColors.appSurfaceMuted
         }
+    val shape = RoundedCornerShape(Radii.sm)
+    val hatched = state == CellState.OffHours || state == CellState.Unknown
     Box(
         modifier =
             modifier
                 .height(CELL_HEIGHT)
-                .clip(RoundedCornerShape(Radii.sm))
+                .clip(shape)
                 .background(bg)
+                .then(if (hatched) Modifier.diagonalHatch(PantopusColors.appBorder) else Modifier)
                 .then(if (onClick != null) Modifier.clickable(onClickLabel = "Free block", onClick = onClick) else Modifier),
         contentAlignment = Alignment.TopStart,
     ) {
@@ -352,22 +363,49 @@ private fun HeatCell(
                     color = PantopusColors.appTextMuted,
                     modifier = Modifier.align(Alignment.Center),
                 )
-            CellState.Busy -> Unit
+            else -> Unit
         }
     }
 }
 
+/**
+ * The 45° hatch texture the design draws on off-hours / unknown cells via a
+ * `repeating-linear-gradient(45deg, …)` — thin parallel strokes over the cell's
+ * base fill, mirroring iOS' DiagonalHatch.
+ */
+private fun Modifier.diagonalHatch(
+    line: Color,
+    spacingPx: Float = 12f,
+    strokeWidthPx: Float = 2f,
+): Modifier =
+    drawBehind {
+        var offset = -size.height
+        val extent = size.width + size.height
+        while (offset < extent) {
+            drawLine(
+                color = line,
+                start = Offset(offset, 0f),
+                end = Offset(offset + size.height, size.height),
+                strokeWidth = strokeWidthPx,
+            )
+            offset += spacingPx
+        }
+    }
+
 @Composable
-private fun Legend() {
+private fun Legend(hasUnknown: Boolean) {
+    // Design loaded legend is Free / Busy / Tentative / Off-hours; the opted-out
+    // frame swaps Off-hours → Unknown when a member hasn't shared availability.
     val items =
         listOf(
             CellState.Free to "Free",
             CellState.Busy to "Busy",
-            CellState.Unknown to "Unknown",
+            CellState.Tentative to "Tentative",
+            if (hasUnknown) CellState.Unknown to "Unknown" else CellState.OffHours to "Off-hours",
         )
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = Spacing.s3),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         items.forEach { (cell, label) ->
             Row(verticalAlignment = Alignment.CenterVertically) {

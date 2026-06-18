@@ -46,6 +46,13 @@ data class PollOptionUi(
     val dayLabel: String,
     val timeLabel: String,
     val vote: VoteValue?,
+    /**
+     * Spec's conflicts-detected frame: this slot collides with the signed-in
+     * member's personal calendar (renders a red "Conflicts" pill + a
+     * personal-calendar caption). The public poll read carries no per-voter
+     * conflict signal, so this stays false until that data is wired.
+     */
+    val conflict: Boolean = false,
 )
 
 /** F6 Find a Time — Member Poll Response (public). */
@@ -62,8 +69,16 @@ sealed interface PollResponseUiState {
         val submitted: Boolean = false,
         val error: String? = null,
     ) : PollResponseUiState {
+        /**
+         * Spec gates the footer on having voted (the member is signed-in, so the
+         * vote is bound to their account) — not on capturing an email.
+         */
         val canSubmit: Boolean
-            get() = !submitting && voterEmail.isNotBlank() && options.any { it.vote != null }
+            get() = !submitting && options.any { it.vote != null }
+
+        /** True once the member has cast at least one vote (spec's "answered" frame). */
+        val hasAnswered: Boolean
+            get() = options.any { it.vote != null }
     }
 
     /** Poll closed/finalized — read-only. */
