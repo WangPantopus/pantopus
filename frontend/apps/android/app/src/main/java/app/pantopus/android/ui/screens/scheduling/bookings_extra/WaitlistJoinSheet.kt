@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.GhostButton
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.theme.PantopusColors
@@ -84,13 +85,12 @@ internal fun WaitlistJoinSheet(
                             state.windowLabel.ifBlank {
                                 "This time is full"
                             },
-                        style = PantopusTextStyle.h3,
-                        fontWeight = FontWeight.Bold,
+                        style = ExtrasType.header,
                         color = PantopusColors.appText,
                     )
                     Text(
                         text = "Join the waitlist and we'll text you the moment a spot opens.",
-                        style = PantopusTextStyle.small,
+                        style = ExtrasType.body125,
                         color = PantopusColors.appTextSecondary,
                     )
                 }
@@ -164,7 +164,7 @@ private fun FullyBookedPill() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(icon = PantopusIcon.Users, contentDescription = null, size = 13.dp, tint = PantopusColors.warning)
+        PantopusIconImage(icon = PantopusIcon.UsersRound, contentDescription = null, size = 13.dp, tint = PantopusColors.warning)
         Text(text = "Fully booked", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.warning)
     }
 }
@@ -196,21 +196,25 @@ private fun JoinedConfirmation(
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = Modifier.size(64.dp).clip(CircleShape).background(PantopusColors.successBg),
+            modifier =
+                Modifier
+                    .size(74.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.successBg)
+                    .border(1.dp, PantopusColors.successLight, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 30.dp, tint = PantopusColors.success)
+            PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 34.dp, tint = PantopusColors.success)
         }
         Text(
             text = "You're on the waitlist",
-            style = PantopusTextStyle.h3,
-            fontWeight = FontWeight.Bold,
+            style = ExtrasType.header.copy(fontSize = 17.5.sp),
             color = PantopusColors.appText,
             textAlign = TextAlign.Center,
         )
         Text(
             text = "We'll text you the moment a spot frees up.",
-            style = PantopusTextStyle.small,
+            style = ExtrasType.body13,
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,
         )

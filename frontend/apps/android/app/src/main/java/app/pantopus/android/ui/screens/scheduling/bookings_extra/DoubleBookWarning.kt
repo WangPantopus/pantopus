@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -37,7 +36,6 @@ import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
@@ -83,10 +81,10 @@ internal fun DoubleBookWarning(
         Column(
             modifier =
                 modifier
-                    .widthIn(max = 320.dp)
+                    .widthIn(max = 300.dp)
                     .clip(RoundedCornerShape(Radii.xl2))
                     .background(PantopusColors.appSurface)
-                    .padding(Spacing.s5)
+                    .padding(start = 18.dp, end = 18.dp, top = Spacing.s5, bottom = Spacing.s4)
                     .testTag(DOUBLE_BOOK_TAG),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -98,15 +96,14 @@ internal fun DoubleBookWarning(
             )
             Text(
                 text = conflict.title,
-                style = PantopusTextStyle.h3,
-                fontWeight = FontWeight.Bold,
+                style = ExtrasType.header,
                 color = PantopusColors.appText,
                 textAlign = TextAlign.Center,
             )
             Text(
                 text = conflict.message,
-                style = PantopusTextStyle.small,
-                color = PantopusColors.appTextSecondary,
+                style = ExtrasType.body13,
+                color = PantopusColors.appTextStrong,
                 textAlign = TextAlign.Center,
             )
 
@@ -137,8 +134,7 @@ internal fun DoubleBookWarning(
                     )
                     Text(
                         text = "Can't book — member unavailable",
-                        style = PantopusTextStyle.small,
-                        fontWeight = FontWeight.SemiBold,
+                        style = ExtrasType.rowName,
                         color = PantopusColors.appTextMuted,
                     )
                 }
@@ -148,14 +144,20 @@ internal fun DoubleBookWarning(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     GhostButton(title = "Cancel", onClick = onCancel, modifier = Modifier.weight(1f))
-                    Box(
+                    Row(
                         modifier = Modifier.weight(1f).heightIn(min = 44.dp).clickable(onClick = onPickAnotherMember),
-                        contentAlignment = Alignment.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1, Alignment.CenterHorizontally),
                     ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Users,
+                            contentDescription = null,
+                            size = 15.dp,
+                            tint = PantopusColors.primary600,
+                        )
                         Text(
                             text = "Pick another member",
-                            style = PantopusTextStyle.small,
-                            fontWeight = FontWeight.SemiBold,
+                            style = ExtrasType.rowName,
                             color = PantopusColors.primary600,
                             textAlign = TextAlign.Center,
                         )
@@ -188,14 +190,14 @@ private fun ConflictCard(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.warningBg),
+            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(Radii.sm)).background(PantopusColors.warningBg),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.Wrench, contentDescription = null, size = 17.dp, tint = PantopusColors.warning)
+            PantopusIconImage(icon = PantopusIcon.Wrench, contentDescription = null, size = 18.dp, tint = PantopusColors.warning)
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = event.title, style = PantopusTextStyle.body, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
-            Text(text = event.detail, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            Text(text = event.title, style = ExtrasType.rowName, color = PantopusColors.appText)
+            Text(text = event.detail, style = ExtrasType.detail11, color = PantopusColors.appTextSecondary)
         }
         PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
     }
@@ -203,22 +205,24 @@ private fun ConflictCard(
 
 @Composable
 private fun MemberConflictNote(memberName: String) {
+    // HOME palette per the spec (bg #dcfce7, dot #16a34a, text #15803d) — the
+    // member-availability conflict is a home-pillar identity note, not a
+    // success state.
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.successBg)
+                .background(PantopusColors.homeBg)
                 .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Box(modifier = Modifier.size(7.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.success))
+        Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.home))
         Text(
             text = "Conflicts with $memberName's availability",
-            style = PantopusTextStyle.small,
-            fontWeight = FontWeight.Medium,
-            color = PantopusColors.success,
+            style = ExtrasType.note115,
+            color = PantopusColors.homeDark,
         )
     }
 }

@@ -32,6 +32,14 @@ data class WaitlistData(
     val pillar: SchedulingPillar,
     val seatTotal: Int,
     val entries: List<RosterPerson>,
+    // Seated-fill is not derivable here: the host waitlist endpoint is keyed on
+    // the event type (not a specific slot), so there is no single slot whose
+    // filled count we can read. We surface the seat total in the capacity strip
+    // and keep promote enabled; an accurate "N of M filled" + capacity-full
+    // (disabled promote) state needs a per-slot fill the API doesn't return.
+    val filled: Int = 0,
+    val isFull: Boolean = false,
+    val seatsOpen: Int = seatTotal,
 )
 
 /**

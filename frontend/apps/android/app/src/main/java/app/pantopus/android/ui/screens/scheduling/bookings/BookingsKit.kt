@@ -176,6 +176,17 @@ fun rangeLabel(
     return "${start.format(DATE_FMT)} · $time · ${tzAbbrev()}"
 }
 
+private val STAMP_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d · h:mm a", Locale.US)
+
+/** Timeline-node stamp: "Jun 12 · 9:04 AM" (null when the source is blank). */
+fun shortStamp(utc: String?): String? = parseUtc(utc)?.format(STAMP_FMT)
+
+/** Whether the booking's end time is in the past (drives "Met"/follow-up timeline + docks). */
+fun eventEnded(endUtc: String?): Boolean {
+    val end = parseUtc(endUtc) ?: return false
+    return end.toInstant().isBefore(Instant.now())
+}
+
 /** Compact slot range used inside the sheets: "Tue, Oct 22 · 2:00–2:30 PM". */
 fun slotRangeLabel(
     startUtc: String?,
