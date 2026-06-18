@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -27,12 +28,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.defaultTimezoneOptions
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -59,7 +63,7 @@ fun BusinessSchedulingSettingsScreen(
         BizTopBar(title = "Booking", onBack = onBack)
         when (val s = state) {
             BusinessSchedulingSettingsViewModel.UiState.Loading ->
-                SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth(), rows = 5)
+                BizSettingsSkeleton()
             is BusinessSchedulingSettingsViewModel.UiState.Error ->
                 ErrorState(message = s.message, modifier = Modifier.fillMaxSize(), onRetry = viewModel::refresh)
             is BusinessSchedulingSettingsViewModel.UiState.Loaded ->
@@ -107,12 +111,13 @@ private fun SettingsBody(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Text(
             text = "Defaults flow into each service — change them per service anytime.",
             style = PantopusTextStyle.caption,
+            fontSize = 11.5.sp,
             color = PantopusColors.appTextSecondary,
             modifier = Modifier.padding(horizontal = Spacing.s1),
         )
@@ -252,6 +257,7 @@ private fun ConfirmationCard(
                             "Auto-confirm sends the booking straight to your calendar."
                         },
                     style = PantopusTextStyle.caption,
+                    fontSize = 10.5.sp,
                     color = PantopusColors.appTextSecondary,
                 )
                 if (approve) {
@@ -300,7 +306,12 @@ private fun SettingsRow(
             SettingIcon(icon)
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = label, style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
-                Text(text = sub, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+                Text(
+                    text = sub,
+                    style = PantopusTextStyle.caption,
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
             }
             if (!gated) BizChevron()
         }
@@ -343,16 +354,20 @@ private fun PaymentsRow(
     sub: String,
     onOpen: () -> Unit,
 ) {
+    // Spec C.stripeBg / C.stripe are Stripe-brand swatches, not palette tokens —
+    // parsed at runtime (no Color(0x…)) so the disc reads as the Stripe mark.
+    val stripeBg = Color("#f5f4ff".toColorInt())
+    val stripeGlyph = Color("#635bff".toColorInt())
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = Modifier.size(SETTING_ICON_BOX).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.magicBg),
+            modifier = Modifier.size(SETTING_ICON_BOX).clip(RoundedCornerShape(Radii.md)).background(stripeBg),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.CreditCard, contentDescription = null, size = 16.dp, tint = PantopusColors.categoryTask)
+            PantopusIconImage(icon = PantopusIcon.CreditCard, contentDescription = null, size = 16.dp, tint = stripeGlyph)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -361,7 +376,12 @@ private fun PaymentsRow(
                 fontWeight = FontWeight.SemiBold,
                 color = PantopusColors.appText,
             )
-            Text(text = sub, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            Text(
+                text = sub,
+                style = PantopusTextStyle.caption,
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
         }
         if (connected) {
             BizChip(text = "Connected", tone = BizChipTone.Success, icon = PantopusIcon.Check)
@@ -370,14 +390,17 @@ private fun PaymentsRow(
             Box(
                 modifier =
                     Modifier
+                        .height(28.dp)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.primary600)
                         .clickable(onClick = onOpen)
-                        .padding(horizontal = Spacing.s3, vertical = 6.dp),
+                        .padding(horizontal = 13.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "Connect",
                     style = PantopusTextStyle.caption,
+                    fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = PantopusColors.appTextInverse,
                 )
@@ -393,5 +416,57 @@ private fun SettingIcon(icon: PantopusIcon) {
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextStrong)
+    }
+}
+
+/**
+ * Loading skeleton mirroring `bizsettings-frames.jsx` FrameLoading and iOS
+ * BizSettingsSkeleton: three [ShimGroup]s of 1 / 4 / 2 rows, each row a 32dp
+ * disc + two stacked text shimmers inside a card, with a 90x9 overline shimmer
+ * above each group.
+ */
+@Composable
+private fun BizSettingsSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        ShimGroup(rows = 1)
+        ShimGroup(rows = 4)
+        ShimGroup(rows = 2)
+    }
+}
+
+@Composable
+private fun ShimGroup(rows: Int) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Shimmer(width = 90.dp, height = 9.dp, cornerRadius = Radii.xs, modifier = Modifier.padding(horizontal = Spacing.s1))
+        BizCard {
+            Column {
+                repeat(rows) { i ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+                    ) {
+                        Shimmer(width = SETTING_ICON_BOX, height = SETTING_ICON_BOX, cornerRadius = Radii.md)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Shimmer(width = 130.dp, height = 11.dp, cornerRadius = Radii.xs)
+                            Shimmer(
+                                width = 170.dp,
+                                height = 8.dp,
+                                cornerRadius = Radii.xs,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                    }
+                    if (i != rows - 1) BizRowDivider()
+                }
+            }
+        }
     }
 }

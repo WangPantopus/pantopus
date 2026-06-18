@@ -111,7 +111,7 @@ internal fun MyPackagesContent(
         is MyPackagesUiState.Error -> ErrorState(message = state.message, onRetry = onRetry)
         is MyPackagesUiState.Empty ->
             EmptyState(
-                icon = PantopusIcon.Tag,
+                icon = PantopusIcon.Ticket,
                 headline = "No packages yet",
                 subcopy = "When you buy a package, your credits show up here.",
                 ctaTitle = "Browse services",
@@ -219,7 +219,7 @@ private fun CreditCard(
                 text = "$remaining of $total left",
                 color = if (spent) PantopusColors.appTextSecondary else PantopusColors.appText,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Black,
+                fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.weight(1f),
             )
             if (spent) {

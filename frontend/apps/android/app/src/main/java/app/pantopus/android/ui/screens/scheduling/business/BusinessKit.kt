@@ -39,7 +39,7 @@ import app.pantopus.android.ui.theme.Spacing
 val bizAccent: Color = PantopusColors.business
 val bizAccentBg: Color = PantopusColors.businessBg
 
-private val TOP_BAR_HEIGHT = 48.dp
+private val TOP_BAR_HEIGHT = 46.dp
 private val BACK_HIT = 34.dp
 private val ICON_SM = 16.dp
 private val ICON_MD = 18.dp
