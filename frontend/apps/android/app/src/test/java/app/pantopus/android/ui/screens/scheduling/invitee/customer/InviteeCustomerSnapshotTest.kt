@@ -104,7 +104,6 @@ class InviteeCustomerSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 RecurringBody(
-                    eventTypeName = "Intro call",
                     config = RecurringConfig(),
                     occurrences = occurrences,
                     submit = RecurringSubmitState.Idle,
@@ -130,7 +129,6 @@ class InviteeCustomerSnapshotTest {
                 val withFailures =
                     occurrences.mapIndexed { i, o -> if (i == 3 || i == 5) o.copy(status = OccurrenceStatus.Failed) else o }
                 RecurringBody(
-                    eventTypeName = "Intro call",
                     config = RecurringConfig(),
                     occurrences = withFailures,
                     submit =
