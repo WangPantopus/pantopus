@@ -21,6 +21,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** The three refund presets the E5 refund section offers (frames 2–4). */
+enum class RefundPreset(val label: String) {
+    Full("Full"),
+    Partial("Partial"),
+    PerPolicy("Per policy"),
+}
+
 /** The E5 cancel sheet state (null = hidden). */
 data class CancelSheetUiState(
     val pillar: SchedulingPillar,
@@ -31,11 +38,27 @@ data class CancelSheetUiState(
     val note: String = "",
     val notify: Boolean = true,
     val showRefund: Boolean = false,
-    val refundCopy: String = "",
+    val refundPreset: RefundPreset = RefundPreset.Full,
+    val creditRedeemed: Boolean = false,
+    val restoreCredit: Boolean = true,
     val submitting: Boolean = false,
     val errorMessage: String? = null,
     val refundFailed: Boolean = false,
-)
+    // Terminal frames (5 confirmation · 8 already-cancelled, read-only).
+    val succeeded: Boolean = false,
+    val alreadyCancelled: Boolean = false,
+    val refundOutcomeIssued: Boolean = false,
+) {
+    /** Per-preset policy explainer under the refund money rows (frames 2–4). Mirrors iOS. */
+    val refundPolicyCopy: String
+        get() =
+            when (refundPreset) {
+                RefundPreset.Full -> "You're within the free-cancellation window — full refund"
+                RefundPreset.Partial -> "A partial refund applies per your cancellation policy"
+                RefundPreset.PerPolicy ->
+                    "Within 24h of start — 50% refund per your cancellation policy"
+            }
+}
 
 /** Cancel reasons offered by the E5 sheet (last is free-text "Other"). */
 val CANCEL_REASONS: List<String> =
@@ -76,21 +99,25 @@ class CancelRefundViewModel
             pillar: SchedulingPillar,
             summary: String,
             hasPayment: Boolean,
+            creditRedeemed: Boolean = false,
+            alreadyCancelled: Boolean = false,
+            refundIssued: Boolean = false,
         ) {
             this.owner = owner
-            val showRefund = hasPayment && flags.paidSchedulingEnabled
+            val paid = hasPayment && flags.paidSchedulingEnabled
+            val credit = creditRedeemed && flags.paidSchedulingEnabled
             _state.value =
                 CancelSheetUiState(
                     pillar = pillar,
                     summary = summary,
                     reasons = CANCEL_REASONS,
-                    showRefund = showRefund,
-                    refundCopy =
-                        if (showRefund) {
-                            "A refund will be issued to the original payment method per your cancellation policy."
-                        } else {
-                            ""
-                        },
+                    // The money refund section (frames 2–4) and the credit-restore
+                    // switch (frame 5) are mutually exclusive — a credit booking
+                    // takes the switch instead.
+                    showRefund = paid && !credit,
+                    creditRedeemed = credit,
+                    alreadyCancelled = alreadyCancelled,
+                    refundOutcomeIssued = paid && refundIssued,
                 )
         }
 
@@ -118,16 +145,38 @@ class CancelRefundViewModel
             _state.update { it?.copy(notify = !it.notify) }
         }
 
+        fun selectPreset(preset: RefundPreset) {
+            _state.update { it?.copy(refundPreset = preset) }
+        }
+
+        fun toggleRestoreCredit() {
+            _state.update { it?.copy(restoreCredit = !it.restoreCredit) }
+        }
+
+        /** Frame 5/8 terminal "Done" — close the sheet and let the detail refetch. */
+        fun done() {
+            _state.value = null
+            _committed.value = true
+        }
+
         fun confirm() {
             val current = _state.value ?: return
             _state.update { it?.copy(submitting = true, errorMessage = null) }
             val reason = composeReason(current)
             viewModelScope.launch {
                 when (val r = repo.cancelBooking(owner, bookingId, reason)) {
-                    is NetworkResult.Success -> {
-                        _state.value = null
-                        _committed.value = true
-                    }
+                    is NetworkResult.Success ->
+                        // Design frame 5/8: re-render to the read-only confirmation
+                        // (circle-slash + outcome copy + ghost Done) rather than
+                        // dismiss immediately; Done then commits the refetch.
+                        _state.update {
+                            it?.copy(
+                                submitting = false,
+                                succeeded = true,
+                                errorMessage = null,
+                                refundOutcomeIssued = it.showRefund,
+                            )
+                        }
                     is NetworkResult.Failure -> applyError(r.error)
                 }
             }
@@ -169,10 +218,16 @@ class CancelRefundViewModel
                                     errorMessage = "Refund couldn't be processed — try again or contact support.",
                                 )
                             }
-                        "ALREADY_CANCELLED" -> {
-                            _state.value = null
-                            _committed.value = true
-                        }
+                        "ALREADY_CANCELLED" ->
+                            // Design frame 8: flip to the read-only already-cancelled
+                            // terminal instead of silently dismissing.
+                            _state.update {
+                                it?.copy(
+                                    submitting = false,
+                                    alreadyCancelled = true,
+                                    errorMessage = null,
+                                )
+                            }
                         else ->
                             _state.update {
                                 it?.copy(

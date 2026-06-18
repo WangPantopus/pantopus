@@ -53,7 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.pantopus.android.ui.components.ErrorState
+import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.ConflictAlternativesSheet
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
@@ -70,6 +70,11 @@ object BookingDetailTags {
     const val DECLINE = "bookingDetailDecline"
     const val CANCEL = "bookingDetailCancel"
     const val REASSIGN = "bookingDetailReassign"
+    const val MESSAGE = "bookingDetailMessage"
+    const val FOLLOW_UP = "bookingDetailFollowUp"
+    const val REBOOK = "bookingDetailRebook"
+    const val SEND_REBOOK = "bookingDetailSendRebook"
+    const val CONFLICT_BANNER = "bookingDetailConflictBanner"
 }
 
 @Composable
@@ -145,7 +150,12 @@ fun BookingDetailScreen(
                         d.owner,
                         d.pillar,
                         "${d.eventName} · ${d.requesterName} · ${d.whenRange}",
-                        d.hasPayment,
+                        hasPayment = d.hasPayment,
+                        creditRedeemed = d.creditRedeemed,
+                        alreadyCancelled =
+                            d.status == BookingStatus.Cancelled ||
+                                d.status == BookingStatus.Declined,
+                        refundIssued = d.refundIssued,
                     )
                 },
                 onDecline = viewModel::openDecline,
@@ -154,14 +164,24 @@ fun BookingDetailScreen(
                 when (val s = state) {
                     BookingDetailUiState.Loading -> DetailSkeleton()
                     is BookingDetailUiState.Error ->
-                        ErrorState(
-                            message = s.message,
-                            onRetry = viewModel::load,
+                        // Design frame 10: cloud-off glyph on an error-red hero +
+                        // "Couldn't load this booking" (mirrors iOS errorView).
+                        EmptyState(
+                            icon = PantopusIcon.CloudOff,
+                            headline = "Couldn't load this booking",
+                            subcopy = s.message,
+                            ctaTitle = "Try again",
+                            onCta = viewModel::load,
+                            tint = PantopusColors.errorBg,
+                            accent = PantopusColors.error,
                         )
                     is BookingDetailUiState.Loaded -> DetailContent(s.data)
                 }
             }
-            if (data != null && data.isActive) {
+            if (data != null) {
+                if (data.hasConflict) {
+                    ConflictBanner()
+                }
                 DetailDock(
                     data = data,
                     onApprove = viewModel::openApprove,
@@ -236,7 +256,10 @@ fun BookingDetailScreen(
             onSetOther = cancelViewModel::setOther,
             onSetNote = cancelViewModel::setNote,
             onToggleNotify = cancelViewModel::toggleNotify,
+            onSelectPreset = cancelViewModel::selectPreset,
+            onToggleRestoreCredit = cancelViewModel::toggleRestoreCredit,
             onConfirm = cancelViewModel::confirm,
+            onDone = cancelViewModel::done,
         )
     }
 }
@@ -368,38 +391,129 @@ private fun DetailContent(data: BookingDetailData) {
             ).padding(bottom = Spacing.s12),
     ) {
         Header(data)
-        when {
-            data.cancelledNote != null ->
-                Banner(
-                    icon = PantopusIcon.CircleSlash,
-                    tint = PantopusColors.appTextSecondary,
-                    bg = PantopusColors.appSurfaceSunken,
-                    text = "Cancelled · ${data.cancelledNote}",
-                )
-            data.status == BookingStatus.NoShow ->
-                Banner(
-                    icon = PantopusIcon.UserMinus,
-                    tint = PantopusColors.error,
-                    bg = PantopusColors.errorBg,
-                    text = "Marked no-show · the invitee didn't attend",
-                )
-            data.rescheduled ->
-                Banner(
-                    icon = PantopusIcon.CalendarClock,
-                    tint = PantopusColors.primary600,
-                    bg = PantopusColors.primary50,
-                    text = "This booking was rescheduled",
-                )
-        }
+        StatusBanner(data)
         RequesterCard(data)
+        data.location?.let { LocationCard(it, data.pillar.accent) }
         if (data.assignedHostInitials != null) {
             AssignedMemberCard(data)
         }
-        data.location?.let { LocationCard(it, data.pillar.accent) }
         if (data.intakeAnswers.isNotEmpty()) {
             IntakeCard(data.intakeAnswers)
         }
+        if (data.timeline.isNotEmpty()) {
+            TimelineCard(data.timeline, data.pillar.accent)
+        }
         Spacer(Modifier.height(Spacing.s4))
+    }
+}
+
+/**
+ * The status-contextual banner above the cards (design frames 3/4/5).
+ * Cancelled/declined → neutral circle-slash + optional refund line; no-show →
+ * error user-x with the requester's first name; completed/past → blue sparkles
+ * follow-up promo. Mirrors iOS `statusBanner`.
+ */
+@Composable
+private fun StatusBanner(data: BookingDetailData) {
+    when {
+        data.status == BookingStatus.Cancelled || data.status == BookingStatus.Declined -> {
+            val verb = if (data.status == BookingStatus.Declined) "Declined" else "Cancelled"
+            val note = data.cancelledNote
+            Banner(
+                icon = PantopusIcon.CircleSlash,
+                tint = PantopusColors.appTextSecondary,
+                bg = PantopusColors.appSurfaceSunken,
+                text = if (note != null) "$verb by host · “$note”" else "$verb by host",
+            )
+            if (data.hasPayment) {
+                RefundLine()
+            }
+        }
+        data.status == BookingStatus.NoShow ->
+            Banner(
+                // The icon set carries no lucide `user-x`; `UserMinus` is the
+                // nearest available no-show glyph (deferred: exact user-x).
+                icon = PantopusIcon.UserMinus,
+                tint = PantopusColors.error,
+                bg = PantopusColors.errorBg,
+                text = "Marked no-show · ${data.requesterFirstName} didn't attend",
+            )
+        data.status == BookingStatus.Completed ->
+            FollowUpPromo(data.requesterFirstName)
+        data.rescheduled ->
+            Banner(
+                icon = PantopusIcon.CalendarClock,
+                tint = PantopusColors.primary600,
+                bg = PantopusColors.primary50,
+                text = "This booking was rescheduled",
+            )
+    }
+}
+
+/** Design frame 3 · blue sparkles "Send a follow-up" promo (completed/past). */
+@Composable
+private fun FollowUpPromo(firstName: String) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .padding(bottom = Spacing.s3)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Sparkles,
+            contentDescription = null,
+            size = 16.dp,
+            tint = PantopusColors.primary600,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Send a follow-up",
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Thank $firstName and offer a time to book again.",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Design frame 4 · "Refund" card under the cancelled banner. The owner-side
+ * BookingDto carries no price/amount, so the figure is deferred; mirrors iOS
+ * refundLine ("Refunded to card · Issued" in the success tone).
+ */
+@Composable
+private fun RefundLine() {
+    DetailCard {
+        CardOverline(PantopusIcon.Receipt, "Refund", PantopusColors.appTextSecondary)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Refunded to card",
+                fontSize = 13.sp,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "Issued",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.success,
+            )
+        }
     }
 }
 
@@ -496,6 +610,7 @@ private fun CardOverline(
             text = text.uppercase(),
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
             color = PantopusColors.appTextSecondary,
         )
     }
@@ -503,8 +618,15 @@ private fun CardOverline(
 
 @Composable
 private fun RequesterCard(data: BookingDetailData) {
+    // The design uses "Attendee" once the booking is terminal/past, "Requester"
+    // while it's live — mirrors iOS requesterOverline.
+    val overline =
+        when (data.status) {
+            BookingStatus.Pending, BookingStatus.Confirmed -> "Requester"
+            else -> "Attendee"
+        }
     DetailCard {
-        CardOverline(PantopusIcon.User, "Requester", data.pillar.accent)
+        CardOverline(PantopusIcon.User, overline, data.pillar.accent)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -524,7 +646,163 @@ private fun RequesterCard(data: BookingDetailData) {
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+            // Design AttendeeRow trailing 36x36 outlined message-circle button
+            // (brand blue). Messaging has no route yet, so it's a no-op affordance.
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                        .clickable(onClickLabel = "Message") {}
+                        .testTag(BookingDetailTags.MESSAGE),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.MessageCircle,
+                    contentDescription = "Message",
+                    size = 17.dp,
+                    tint = PantopusColors.primary600,
+                )
+            }
         }
+    }
+}
+
+/** Design frames 1/3/5 · vertical status timeline with done/not-done nodes. */
+@Composable
+private fun TimelineCard(
+    steps: List<TimelineStep>,
+    accent: Color,
+) {
+    DetailCard {
+        CardOverline(PantopusIcon.Activity, "Status", accent)
+        Column {
+            steps.forEachIndexed { index, step ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(18.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (step.done) {
+                                            PantopusColors.success
+                                        } else {
+                                            PantopusColors.appSurface
+                                        },
+                                    )
+                                    .then(
+                                        if (step.done) {
+                                            Modifier
+                                        } else {
+                                            Modifier.border(
+                                                2.dp,
+                                                PantopusColors.appBorderStrong,
+                                                CircleShape,
+                                            )
+                                        },
+                                    ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (step.done) {
+                                PantopusIconImage(
+                                    icon = PantopusIcon.Check,
+                                    contentDescription = null,
+                                    size = 11.dp,
+                                    strokeWidth = 3f,
+                                    tint = PantopusColors.appTextInverse,
+                                )
+                            }
+                        }
+                        if (index < steps.size - 1) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .padding(vertical = 2.dp)
+                                        .size(width = 2.dp, height = 22.dp)
+                                        .background(
+                                            if (step.done) {
+                                                PantopusColors.successLight
+                                            } else {
+                                                PantopusColors.appBorder
+                                            },
+                                        ),
+                            )
+                        }
+                    }
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                bottom = if (index < steps.size - 1) Spacing.s2 else 0.dp,
+                            ),
+                    ) {
+                        Text(
+                            text = step.label,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color =
+                                if (step.done) {
+                                    PantopusColors.appText
+                                } else {
+                                    PantopusColors.appTextMuted
+                                },
+                        )
+                        step.time?.let {
+                            Text(
+                                text = it,
+                                fontSize = 10.5.sp,
+                                color = PantopusColors.appTextMuted,
+                                modifier = Modifier.padding(top = 1.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Design frame 6 · amber conflict banner above the dock ("This overlaps another booking"). */
+@Composable
+private fun ConflictBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = Spacing.s4)
+                .padding(bottom = Spacing.s3)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag(BookingDetailTags.CONFLICT_BANNER),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.TriangleAlert,
+            contentDescription = null,
+            size = 17.dp,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            text = "This overlaps another booking",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.warning,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "View",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.warning,
+            modifier = Modifier.clickable(onClickLabel = "View conflict") {},
+        )
     }
 }
 
@@ -679,6 +957,9 @@ private fun DetailDock(
     onDecline: () -> Unit,
     onReschedule: () -> Unit,
 ) {
+    // Deferred dock CTAs (Message / Follow up / Rebook / Send rebook link) have no
+    // route or endpoint yet, so they render faithfully as no-op affordances —
+    // mirrors iOS's intentionally-stubbed dock handlers.
     Column(
         modifier =
             Modifier
@@ -691,30 +972,151 @@ private fun DetailDock(
             color = PantopusColors.appBorder,
             modifier = Modifier.padding(bottom = Spacing.s3),
         )
-        if (data.status == BookingStatus.Pending) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                PillarOutlineButton(
-                    label = "Decline",
-                    leadingIcon = PantopusIcon.X,
-                    danger = true,
-                    onClick = onDecline,
-                    modifier = Modifier.weight(1f).testTag(BookingDetailTags.DECLINE),
+        when (data.status) {
+            BookingStatus.Pending ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    DockGhostButton(
+                        label = "Decline",
+                        leadingIcon = PantopusIcon.X,
+                        danger = true,
+                        onClick = onDecline,
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.DECLINE),
+                    )
+                    DockPrimaryButton(
+                        label = "Approve",
+                        leadingIcon = PantopusIcon.Check,
+                        onClick = onApprove,
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.APPROVE),
+                    )
+                }
+            BookingStatus.Confirmed ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    DockGhostButton(
+                        label = "Reschedule",
+                        leadingIcon = PantopusIcon.CalendarClock,
+                        onClick = onReschedule,
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.RESCHEDULE),
+                    )
+                    DockPrimaryButton(
+                        label = "Message",
+                        leadingIcon = PantopusIcon.MessageCircle,
+                        onClick = {},
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.MESSAGE),
+                    )
+                }
+            BookingStatus.Completed ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    DockGhostButton(
+                        label = "Rebook",
+                        leadingIcon = PantopusIcon.RefreshCw,
+                        onClick = {},
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.REBOOK),
+                    )
+                    DockPrimaryButton(
+                        label = "Follow up",
+                        leadingIcon = PantopusIcon.Send,
+                        onClick = {},
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.FOLLOW_UP),
+                    )
+                }
+            BookingStatus.NoShow ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    DockGhostButton(
+                        label = "Message",
+                        leadingIcon = PantopusIcon.MessageCircle,
+                        onClick = {},
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.MESSAGE),
+                    )
+                    DockPrimaryButton(
+                        label = "Send rebook link",
+                        leadingIcon = PantopusIcon.Link,
+                        onClick = {},
+                        modifier = Modifier.weight(1f).testTag(BookingDetailTags.SEND_REBOOK),
+                    )
+                }
+            BookingStatus.Cancelled, BookingStatus.Declined ->
+                DockPrimaryButton(
+                    label = "Rebook this time",
+                    leadingIcon = PantopusIcon.RefreshCw,
+                    onClick = {},
+                    modifier = Modifier.testTag(BookingDetailTags.REBOOK),
                 )
-                PillarFilledButton(
-                    label = "Approve",
-                    accent = data.pillar.accent,
-                    leadingIcon = PantopusIcon.Check,
-                    onClick = onApprove,
-                    modifier = Modifier.weight(1f).testTag(BookingDetailTags.APPROVE),
+        }
+    }
+}
+
+/**
+ * Neutral / danger ghost dock button (design `BtnGhost`): outlined, surface
+ * fill, `fg2`/error text. Always 46dp tall · Radii.lg.
+ */
+@Composable
+private fun DockGhostButton(
+    label: String,
+    leadingIcon: PantopusIcon,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    danger: Boolean = false,
+) {
+    val fg = if (danger) PantopusColors.error else PantopusColors.appTextStrong
+    Box(
+        modifier =
+            modifier
+                .height(46.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(
+                    1.dp,
+                    if (danger) PantopusColors.errorLight else PantopusColors.appBorderStrong,
+                    RoundedCornerShape(Radii.lg),
                 )
-            }
-        } else {
-            PillarFilledButton(
-                label = "Reschedule",
-                accent = data.pillar.accent,
-                leadingIcon = PantopusIcon.CalendarClock,
-                onClick = onReschedule,
-                modifier = Modifier.testTag(BookingDetailTags.RESCHEDULE),
+                .clickable(onClickLabel = label, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            PantopusIconImage(icon = leadingIcon, contentDescription = null, size = 16.dp, tint = fg)
+            Text(text = label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = fg)
+        }
+    }
+}
+
+/**
+ * Filled primary dock button (design `BtnPrimary`): always the brand blue
+ * `primary600`, never the owner accent. 46dp tall · Radii.lg.
+ */
+@Composable
+private fun DockPrimaryButton(
+    label: String,
+    leadingIcon: PantopusIcon,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .height(46.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.primary600)
+                .clickable(onClickLabel = label, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            PantopusIconImage(
+                icon = leadingIcon,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
             )
         }
     }

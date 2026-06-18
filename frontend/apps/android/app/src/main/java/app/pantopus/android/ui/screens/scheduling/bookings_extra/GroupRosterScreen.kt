@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -47,12 +48,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.pantopus.android.ui.components.EmptyState
-import app.pantopus.android.ui.components.ErrorState
-import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
@@ -64,6 +63,7 @@ import app.pantopus.android.ui.theme.Spacing
 
 const val ROSTER_TAG = "scheduling.roster"
 const val ROSTER_MESSAGE_ALL_TAG = "scheduling.roster.messageAll"
+private const val NUDGE_SUCCESS_DISMISS_MS = 1300L
 
 @Composable
 fun GroupRosterScreen(
@@ -114,7 +114,7 @@ fun GroupRosterScreen(
                     }
                 },
                 actions = {
-                    if (loaded != null) {
+                    if (loaded != null && loaded.data.canMarkNoShow) {
                         Box {
                             IconButton(onClick = { menuOpen = true }) {
                                 PantopusIconImage(
@@ -124,14 +124,9 @@ fun GroupRosterScreen(
                                     tint = PantopusColors.appText,
                                 )
                             }
+                            // Add-or-invite lives in the host-controls row (design); the
+                            // overflow is reserved for message-all (the FAB) / no-show.
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Add or invite attendee") },
-                                    onClick = {
-                                        menuOpen = false
-                                        viewModel.openAddAttendee()
-                                    },
-                                )
                                 if (loaded.data.canMarkNoShow) {
                                     DropdownMenuItem(
                                         text = { Text("Mark no-show") },
@@ -171,15 +166,8 @@ fun GroupRosterScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
                 is GroupRosterUiState.Loading -> SchedulingLoadingSkeleton(rows = 4)
-                is GroupRosterUiState.Error -> ErrorState(message = s.message, onRetry = viewModel::load)
-                is GroupRosterUiState.Empty ->
-                    EmptyState(
-                        icon = PantopusIcon.Users,
-                        headline = "No signups yet",
-                        subcopy = "Share the booking link to fill seats.",
-                        ctaTitle = "Share booking link",
-                        onCta = s.onShareLink,
-                    )
+                is GroupRosterUiState.Error -> SchedulingExtrasError(headline = "Couldn't load the roster", onRetry = viewModel::load)
+                is GroupRosterUiState.Empty -> RosterEmpty(data = s)
                 is GroupRosterUiState.Loaded ->
                     RosterContent(
                         data = s.data,
@@ -203,6 +191,12 @@ fun GroupRosterScreen(
     }
     nudge?.let { sheet ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        LaunchedEffect(sheet.didSend) {
+            if (sheet.didSend) {
+                kotlinx.coroutines.delay(NUDGE_SUCCESS_DISMISS_MS)
+                viewModel.dismissNudge()
+            }
+        }
         NudgeSheet(
             state = sheet,
             sheetState = sheetState,
@@ -250,7 +244,7 @@ internal fun RosterContent(
             ExtrasOverline("Seated · ${data.seated.size}")
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 data.seated.forEach { person ->
-                    RosterRow(person = person, verified = true) {
+                    RosterRow(person = person, verified = true, accent = data.pillar.accent) {
                         SchedulingStatusPill(status = person.status.orEmpty())
                         SeatedKebab(person = person, onRowNoShow = onRowNoShow)
                     }
@@ -269,19 +263,69 @@ internal fun RosterContent(
             ExtrasOverline(sectionLabel)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 data.waitlist.forEach { person ->
-                    RosterRow(person = person) {
-                        PromoteSeatButton(enabled = data.seatsOpen > 0, accent = data.pillar.accent, onClick = { onPromote(person.id) })
-                    }
+                    WaitlistRosterRow(
+                        person = person,
+                        promoteEnabled = data.seatsOpen > 0,
+                        accent = data.pillar.accent,
+                        onPromote = { onPromote(person.id) },
+                    )
                 }
-            }
-            if (data.seatsOpen == 0) {
-                Text(text = "Open a seat to promote", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             }
         }
 
         CapacityControls(seatTotal = data.seatTotal, onAdjustCapacity = onAdjustCapacity, onAddAttendee = onAddAttendee)
     }
 }
+
+/**
+ * Empty roster: the capacity strip (0 of N) stays pinned at the top, then a
+ * centered users disc + "No signups yet" + Share-link CTA below it — matching
+ * the design's FrameEmpty (header pinned, empty block beneath).
+ */
+@Composable
+private fun RosterEmpty(data: GroupRosterUiState.Empty) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        CapacityHeaderCard(
+            filled = 0,
+            total = data.seatTotal,
+            waiting = 0,
+            accent = data.pillar.accent,
+            confirmed = 0,
+            pending = 0,
+        )
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.s6),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            Box(
+                modifier = Modifier.size(72.dp).clip(CircleShape).background(data.pillar.accent.copy(alpha = EMPTY_DISC_ALPHA)),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Users, contentDescription = null, size = 32.dp, tint = data.pillar.accent)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Text(text = "No signups yet", style = ExtrasType.header, color = PantopusColors.appText, textAlign = TextAlign.Center)
+                Text(
+                    text = "Share the booking link to fill seats.",
+                    style = ExtrasType.body125,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            ExtrasIconLabelButton(icon = PantopusIcon.Link, label = "Share booking link", onClick = data.onShareLink)
+        }
+    }
+}
+
+private const val EMPTY_DISC_ALPHA = 0.12f
 
 @Composable
 private fun SeatedKebab(
@@ -320,7 +364,9 @@ private fun CapacityControls(
     onAdjustCapacity: (Int) -> Unit,
     onAddAttendee: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+    // Design HostControls order: Add/invite attendee FIRST, then Capacity.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2 + 1.dp)) {
+        AddAttendeeRow(onClick = onAddAttendee)
         Row(
             modifier =
                 Modifier
@@ -330,25 +376,64 @@ private fun CapacityControls(
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                     .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
+            Box(
+                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(Radii.sm)).background(PantopusColors.appSurfaceSunken),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Users, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextStrong)
+            }
             Text(
                 text = "Capacity",
-                style = PantopusTextStyle.body,
-                fontWeight = FontWeight.Medium,
+                style = ExtrasType.rowName.copy(fontWeight = FontWeight.SemiBold),
                 color = PantopusColors.appText,
                 modifier = Modifier.weight(1f),
             )
             StepperButton(icon = PantopusIcon.Minus, contentDescription = "Decrease capacity", onClick = { onAdjustCapacity(-1) })
             Text(
                 text = seatTotal.toString(),
-                style = PantopusTextStyle.body,
-                fontWeight = FontWeight.Bold,
+                style = ExtrasType.body14Bold,
                 color = PantopusColors.appText,
                 modifier = Modifier.padding(horizontal = Spacing.s3),
             )
             StepperButton(icon = PantopusIcon.Plus, contentDescription = "Increase capacity", onClick = { onAdjustCapacity(1) })
         }
-        PrimaryButton(title = "Add or invite attendee", onClick = onAddAttendee, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/**
+ * Design HostControls add-attendee row: a white bordered card with a 32dp
+ * primary50 icon tile (user-plus, blue600), the label, and a trailing chevron.
+ * Mirrors iOS `GroupRosterView.hostControls`.
+ */
+@Composable
+private fun AddAttendeeRow(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClickLabel = "Add or invite attendee", onClick = onClick)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier = Modifier.size(32.dp).clip(RoundedCornerShape(Radii.sm)).background(PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = PantopusIcon.UserPlus, contentDescription = null, size = 16.dp, tint = PantopusColors.primary600)
+        }
+        Text(
+            text = "Add or invite attendee",
+            style = ExtrasType.rowName.copy(fontWeight = FontWeight.SemiBold),
+            color = PantopusColors.appText,
+            modifier = Modifier.weight(1f),
+        )
+        PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
     }
 }
 
