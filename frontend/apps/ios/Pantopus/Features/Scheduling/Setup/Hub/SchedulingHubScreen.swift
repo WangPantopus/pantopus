@@ -19,8 +19,6 @@ struct SchedulingHubScreen: View {
     @State private var showCopyToast = false
     @State private var shareURL: ShareURLItem?
 
-    @Environment(\.dismiss) private var dismiss
-
     init(owner: SchedulingOwner, push: @escaping @MainActor (SchedulingRoute) -> Void) {
         _model = State(wrappedValue: SchedulingHubModel(owner: owner, push: push))
     }
@@ -29,9 +27,9 @@ struct SchedulingHubScreen: View {
         VStack(spacing: Spacing.s0) {
             SetupTopBar(
                 title: "Scheduling",
-                leading: .back,
-                onLeading: { dismiss() },
-                trailingIcon: model.canEdit ? nil : .info
+                leading: .none,
+                trailingIcon: model.canEdit ? .moreHorizontal : .info,
+                onTrailing: { model.openSettings() }
             )
             SetupIdentityPills(active: model.owner) { choice in
                 Task { await model.selectPillar(choice) }
