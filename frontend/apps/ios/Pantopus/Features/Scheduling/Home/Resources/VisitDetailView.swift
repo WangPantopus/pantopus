@@ -94,6 +94,13 @@ struct VisitDetailView: View {
         SectionCard {
             HStack(spacing: Spacing.s3) {
                 ZStack {
+                    // Design avatar gradient runs teal-400 #2dd4bf → teal-600
+                    // #0d9488. No teal-400/visit-teal token exists in the theme,
+                    // so the deep teal-600 `categoryUnboxing` seeds the top stop
+                    // into teal-700 `categoryUnboxingDark`; white "PV" initials
+                    // stay legible on this pairing. The exact teal-400 top stop
+                    // needs a dedicated visit-teal colorset (out of this file's
+                    // scope) — tracked as deferred.
                     Circle().fill(
                         LinearGradient(
                             colors: [Theme.Color.categoryUnboxing, Theme.Color.categoryUnboxingDark],

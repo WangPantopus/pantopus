@@ -148,16 +148,22 @@ public struct SlotPicker: View {
     }
 
     private func infoCaption(_ text: String) -> some View {
+        // Spec tz/DST banner: INFO text + body on an INFO_BG fill, with a 1px
+        // INFO_BORDER (infoLight) hairline and ~11px (Radii.lg) corners.
         HStack(spacing: Spacing.s2) {
             Icon(.info, size: 14, color: Theme.Color.info)
             Text(text)
                 .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .foregroundStyle(Theme.Color.info)
         }
         .padding(Spacing.s2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.infoBg)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.infoLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     // MARK: - Slot column
@@ -204,27 +210,56 @@ public struct SlotPicker: View {
         }
     }
 
+    /// Day-full: the selected day has no open times but the month still does.
+    /// Calm framing — the same dashed card + circle halo as the empty card, with
+    /// a 44pt halo and the `See next available` jump link. `calendar-x` stays
+    /// reserved for the composed-empty frame; day-full uses the calmer clock glyph.
     private var dayFullCard: some View {
         VStack(spacing: Spacing.s2) {
-            Icon(.calendar, size: 24, color: Theme.Color.appTextMuted)
-            Text("No times left this day")
-                .pantopusTextStyle(.small)
+            ZStack {
+                Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 44, height: 44)
+                Icon(.calendarClock, size: 20, strokeWidth: 1.85, color: Theme.Color.appTextSecondary)
+            }
+            Text("No open times this day")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .multilineTextAlignment(.center)
+            Text("Try another highlighted day, or jump to the next open time.")
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             if let onJumpNextAvailable {
-                Button("See next available", action: onJumpNextAvailable)
-                    .font(Theme.Font.small)
+                Button(action: onJumpNextAvailable) {
+                    HStack(spacing: Spacing.s1) {
+                        Text("See next available")
+                            .font(.system(size: 13, weight: .bold))
+                        Icon(.arrowRight, size: 13, color: accent)
+                    }
                     .foregroundStyle(accent)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, Spacing.s1)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.s8)
+        .padding(.horizontal, Spacing.s5)
+        .padding(.vertical, Spacing.s5)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .strokeBorder(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
     private var noAvailabilityCard: some View {
         SlotPickerEmptyCard(
-            // lucide `calendar-search` — see sharedChangesNeeded; `.calendarClock`
-            // is the closest existing glyph until the icon enum gains the case.
-            icon: .calendarClock,
+            // Spec frame 3 (no-times-in-range) uses lucide `calendar-search`.
+            // NOTE: PantopusIcon.calendarSearch currently maps to a bare
+            // `magnifyingglass` SF symbol in Icons.swift (out of this task's
+            // file scope); the calendar-glyph intent is recorded as deferred.
+            icon: .calendarSearch,
             title: "No open times in \(monthName)",
             message: "Availability changes often. Try a later month.",
             accent: accent,
@@ -470,13 +505,18 @@ private struct SlotPickerEmptyCard: View {
             }
             Text(title)
                 .font(.system(size: 15, weight: .bold))
+                // Spec title: 15px/700, 20px line-height — at a 15pt font the
+                // default leading is ~18pt, so ~2.5pt extra hits the 20pt line box.
+                .lineSpacing(2.5)
                 .foregroundStyle(Theme.Color.appText)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 230)
                 .fixedSize(horizontal: false, vertical: true)
             Text(message)
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 225)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: Spacing.s2) {
                 if let primary {

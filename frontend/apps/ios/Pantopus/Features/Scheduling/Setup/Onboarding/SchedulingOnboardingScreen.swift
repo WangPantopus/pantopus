@@ -116,17 +116,23 @@ struct SchedulingOnboardingScreen: View {
     // MARK: Success
 
     private var successBody: some View {
-        WizardSuccessHero(
-            accent: model.accent,
-            accentBg: model.accentBg,
-            shadow: model.identity.ctaShadow,
-            title: model.flow == .home ? "Your family link is live" : "Your business is taking bookings",
-            sub: model.flow == .home
-                ? "Share it and people can book any free member during their own hours. Bookings show up on the family schedule."
-                : "Your link is live with your first service and seated team. \(model.confirmMode == "approve" ? "You approve each booking before it's confirmed." : "Bookings confirm automatically.")",
-            link: model.shareLink,
-            onCopy: { UIPasteboard.general.string = "https://\(model.shareLink)" }
-        )
+        // Design BizSuccess (and the Home success frame) keep the StepRail —
+        // all steps progressed — above the success hero. displayStep == the
+        // final step on success, so the rail reads fully advanced.
+        VStack(spacing: Spacing.s5) {
+            WizardStepRail(steps: model.steps, current: model.displayStep, accent: model.accent, accentBg: model.accentBg)
+            WizardSuccessHero(
+                accent: model.accent,
+                accentBg: model.accentBg,
+                shadow: model.identity.ctaShadow,
+                title: model.flow == .home ? "Your family link is live" : "Your business is taking bookings",
+                sub: model.flow == .home
+                    ? "Share it and people can book any free member during their own hours. Bookings show up on the family schedule."
+                    : "Your link is live with your first service and seated team. \(model.confirmMode == "approve" ? "You approve each booking before it's confirmed." : "Bookings confirm automatically.")",
+                link: model.shareLink,
+                onCopy: { UIPasteboard.general.string = "https://\(model.shareLink)" }
+            )
+        }
     }
 }
 
@@ -395,9 +401,12 @@ private struct OnboardingServicePicker: View {
                     }
                 }
             }
+            // Design Field shows Price ($120) beside Duration unconditionally.
+            // The price input is always visible; the VM still gates whether the
+            // entered amount is submitted as priceCents on `paidEnabled`.
             HStack(spacing: 10) {
                 durationField
-                if model.paidEnabled { priceField }
+                priceField
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -473,10 +482,14 @@ private struct OnboardingTeamList: View {
     @Bindable var model: SchedulingOnboardingModel
 
     private struct Teammate: Identifiable { let id: String; let name: String; let role: String }
+    // Design TeamList (onboarding-business-frames.jsx) seats 4 teammates — the
+    // 4th, Dana W. (Front desk · not seated), demonstrates the front-desk role
+    // the step subcopy references.
     private let team: [Teammate] = [
         Teammate(id: "owner", name: "You", role: "Owner"),
         Teammate(id: "t2", name: "Priya N.", role: "Stylist"),
-        Teammate(id: "t3", name: "Marcus L.", role: "Stylist")
+        Teammate(id: "t3", name: "Marcus L.", role: "Stylist"),
+        Teammate(id: "t4", name: "Dana W.", role: "Front desk")
     ]
 
     var body: some View {
@@ -484,7 +497,9 @@ private struct OnboardingTeamList: View {
             HStack(alignment: .firstTextBaseline) {
                 WizardOverline(text: "Team seats")
                 Spacer()
-                Text("\(model.seatedTeam.count) seated").font(.system(size: 11, weight: .bold)).foregroundStyle(model.accent).monospacedDigit()
+                // Design counter reads "3 of 5 seats used" — surface the plan
+                // capacity, not just the live seated count.
+                Text("\(model.seatedTeam.count) of 5 seats used").font(.system(size: 11, weight: .bold)).foregroundStyle(model.accent).monospacedDigit()
             }
             VStack(spacing: Spacing.s0) {
                 ForEach(Array(team.enumerated()), id: \.element.id) { idx, m in
@@ -534,7 +549,7 @@ private struct OnboardingTeamList: View {
                 .overlay(Circle().stroke(style: StrokeStyle(lineWidth: 1.5, dash: [3, 2])).foregroundStyle(model.accentBg))
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Invite teammate").font(.system(size: 14, weight: .bold)).foregroundStyle(model.accent)
-                    Text("Add by phone or email").font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                    Text("2 seats left on your plan").font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer(minLength: Spacing.s2)
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
