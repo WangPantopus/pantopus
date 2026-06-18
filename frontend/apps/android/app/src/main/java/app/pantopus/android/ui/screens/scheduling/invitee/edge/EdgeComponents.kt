@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -20,10 +21,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.pantopus.android.data.api.models.scheduling.SlotDto
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
@@ -123,11 +126,19 @@ fun EdgeHalo(
                 PantopusIconImage(icon = icon, contentDescription = null, size = HALO_ICON, tint = tone.fg)
             }
         }
-        Text(text = title, style = PantopusTextStyle.h3, color = PantopusColors.appText, textAlign = TextAlign.Center)
+        Text(
+            text = title,
+            fontSize = 17.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+        )
         Text(
             text = body,
-            style = PantopusTextStyle.small,
-            color = PantopusColors.appTextSecondary,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            color = PantopusColors.appTextStrong,
             textAlign = TextAlign.Center,
             modifier = Modifier.widthIn(max = BODY_MAX_WIDTH),
         )
@@ -180,7 +191,7 @@ fun AlternativeSlotRow(
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onClick)
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+                .padding(horizontal = 11.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PantopusIconImage(
@@ -270,13 +281,22 @@ fun PolicyNoteCard(
             PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = tone.fg)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-            Text(text = title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            Text(text = title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = tone.fg)
             Text(text = body, style = PantopusTextStyle.caption, color = tone.fg)
             if (still != null) {
+                // Spec PolicyCard draws a 1px tone hairline above the "still" note.
+                Box(
+                    modifier =
+                        Modifier
+                            .padding(top = Spacing.s2)
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(tone.ring),
+                )
                 Row(
                     modifier =
                         Modifier
-                            .padding(top = Spacing.s1)
+                            .padding(top = Spacing.s2)
                             .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
@@ -287,7 +307,7 @@ fun PolicyNoteCard(
                         tint = tone.fg,
                         modifier = Modifier.padding(top = 2.dp),
                     )
-                    Text(text = still, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                    Text(text = still, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = tone.fg)
                 }
             }
         }
@@ -321,12 +341,7 @@ fun BookingSummaryCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape).background(pillar.accentBg),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(icon = PantopusIcon.User, contentDescription = null, size = 16.dp, tint = pillar.accent)
-            }
+            EdgeHostAvatar(name = hostLabel, pillar = pillar, size = 34.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = eventName, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -371,6 +386,126 @@ val SchedulingPillar.label: String
             SchedulingPillar.Home -> "Home"
             SchedulingPillar.Business -> "Business"
         }
+
+/** Two-tone pillar avatar gradient (the design's 135° HOST_AV sky disc). Tokens only. */
+fun SchedulingPillar.avatarBrush(): Brush =
+    when (this) {
+        SchedulingPillar.Personal -> Brush.linearGradient(listOf(PantopusColors.primary400, PantopusColors.primary700))
+        SchedulingPillar.Home -> Brush.linearGradient(listOf(PantopusColors.home, PantopusColors.homeDark))
+        SchedulingPillar.Business -> Brush.linearGradient(listOf(PantopusColors.business, PantopusColors.businessDark))
+    }
+
+/** First-two-letters initials for a host/event name ("Maria Kessler" → "MK"). */
+fun edgeInitials(name: String?): String {
+    val parts = name?.trim()?.split(Regex("\\s+")).orEmpty().filter { it.isNotBlank() }
+    return when {
+        parts.isEmpty() -> "?"
+        parts.size == 1 -> parts[0].take(2).uppercase()
+        else -> (parts[0].take(1) + parts[1].take(1)).uppercase()
+    }
+}
+
+/**
+ * The design's gradient host avatar — a sky-gradient disc carrying the host's
+ * initials (mirrors iOS `EdgePillarAvatar` / the design `HOST_AV` disc).
+ */
+@Composable
+fun EdgeHostAvatar(
+    name: String?,
+    pillar: SchedulingPillar,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 34.dp,
+) {
+    Box(
+        modifier = modifier.size(size).clip(CircleShape).background(pillar.avatarBrush()),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = edgeInitials(name),
+            color = PantopusColors.appTextInverse,
+            fontSize = (size.value * 0.34f).sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+/** Card brand for the saved-card row (D6 declined). */
+enum class CardBrand(val label: String) {
+    Visa("VISA"),
+    Mastercard("MC"),
+    Generic("CARD"),
+    ;
+
+    val badgeBg: Color
+        get() =
+            when (this) {
+                Visa -> PantopusColors.primary900
+                Mastercard -> PantopusColors.warningBg
+                Generic -> PantopusColors.appSurfaceSunken
+            }
+
+    val badgeFg: Color
+        get() =
+            when (this) {
+                Visa -> PantopusColors.appTextInverse
+                Mastercard -> PantopusColors.warning
+                Generic -> PantopusColors.appTextSecondary
+            }
+}
+
+/**
+ * The A14.6 saved-card row (D6 declined): a brand badge, the masked PAN label,
+ * a status sub-line, and an optional "Declined" pill.
+ */
+@Composable
+fun EdgeSavedCardRow(
+    brand: CardBrand,
+    label: String,
+    sub: String,
+    modifier: Modifier = Modifier,
+    declined: Boolean = false,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, if (declined) PantopusColors.errorLight else PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier = Modifier.size(width = 38.dp, height = 26.dp).clip(RoundedCornerShape(Radii.sm)).background(brand.badgeBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = brand.label, color = brand.badgeFg, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+            Text(
+                text = sub,
+                style = PantopusTextStyle.overline,
+                fontWeight = if (declined) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (declined) PantopusColors.error else PantopusColors.appTextSecondary,
+            )
+        }
+        if (declined) {
+            Text(
+                text = "Declined",
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.error,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.errorBg)
+                        .border(1.dp, PantopusColors.errorLight, RoundedCornerShape(Radii.pill))
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s0),
+            )
+        }
+    }
+}
 
 // ─── Date / time helpers (render local, store UTC) ──────────────────────────
 

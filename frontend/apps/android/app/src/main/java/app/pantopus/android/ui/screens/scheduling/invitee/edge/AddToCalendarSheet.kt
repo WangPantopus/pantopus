@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,8 +68,9 @@ data class AddToCalendarEvent(
  * manage. The native "Add to calendar" path opens the device calendar's event
  * editor (CalendarContract `ACTION_INSERT`) with the join link + a reminder;
  * Google / Outlook open the provider's web template; "Download .ics" pulls the
- * RFC-5545 invite and shares it through the FileProvider. Context-neutral chrome,
- * pillar accent on the native primary.
+ * RFC-5545 invite and shares it through the FileProvider. Per the design this
+ * sheet is context-neutral: the recap chip and the primary CTA are fixed sky
+ * (blue50/blue700, blue600), never tinted by the opening surface's pillar.
  */
 @Composable
 fun AddToCalendarSheet(
@@ -76,7 +78,7 @@ fun AddToCalendarSheet(
     onDismiss: () -> Unit,
     sheetState: SheetState,
     modifier: Modifier = Modifier,
-    pillar: SchedulingPillar = SchedulingPillar.Personal,
+    @Suppress("UNUSED_PARAMETER") pillar: SchedulingPillar = SchedulingPillar.Personal,
     viewModel: AddToCalendarViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -108,16 +110,16 @@ fun AddToCalendarSheet(
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s6)) {
             Text(
                 text = "Add to your calendar",
-                style = PantopusTextStyle.h3,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
                 color = PantopusColors.appText,
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             )
-            RecapChip(event = event, pillar = pillar)
+            RecapChip(event = event)
 
             Box(modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s3)) {
                 NativeAddButton(
                     added = added,
-                    accent = pillar.accent,
                     onClick = {
                         added = runCatching { context.startActivity(buildInsertIntent(event)) }.isSuccess
                     },
@@ -134,8 +136,8 @@ fun AddToCalendarSheet(
                 modifier =
                     Modifier
                         .padding(horizontal = Spacing.s4)
-                        .clip(RoundedCornerShape(Radii.xl))
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)),
+                        .clip(RoundedCornerShape(CARD_RADIUS))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(CARD_RADIUS)),
             ) {
                 ProviderRow(
                     icon = PantopusIcon.CalendarPlus,
@@ -186,33 +188,98 @@ fun AddToCalendarSheet(
                     modifier = Modifier.padding(horizontal = Spacing.s4),
                 )
             }
+
+            // FrameAdded: a centered success status line that auto-dismisses the sheet.
+            if (added) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.CheckCircle,
+                        contentDescription = null,
+                        size = 13.dp,
+                        tint = PantopusColors.success,
+                        modifier = Modifier.padding(end = Spacing.s1),
+                    )
+                    Text(
+                        text = "Added — closing in a moment",
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+
+            // Spec DoneBar: a top-bordered, full-width bordered ghost "Done" button.
+            DoneBar(onClick = onDismiss)
+        }
+    }
+
+    // Auto-dismiss shortly after a successful native write (FrameAdded morph).
+    LaunchedEffect(added) {
+        if (added) {
+            kotlinx.coroutines.delay(ADDED_DISMISS_MS)
+            onDismiss()
+        }
+    }
+}
+
+private const val ADDED_DISMISS_MS = 1400L
+private val CARD_RADIUS = 14.dp
+private val DISC_RADIUS = 10.dp
+
+@Composable
+private fun DoneBar(onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.s2),
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+        Box(modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s3)) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                        .clickable(onClick = onClick),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "Done", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            }
         }
     }
 }
 
 @Composable
-private fun RecapChip(
-    event: AddToCalendarEvent,
-    pillar: SchedulingPillar,
-) {
+private fun RecapChip(event: AddToCalendarEvent) {
     val zone = zoneOf(event.timezone)
+    // Spec recap is fixed sky (blue700-on-blue50 / blue100 border), context-neutral.
     Row(
         modifier =
             Modifier
                 .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
-                .background(pillar.accentBg)
+                .clip(RoundedCornerShape(DISC_RADIUS))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(DISC_RADIUS))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(icon = PantopusIcon.Calendar, contentDescription = null, size = 14.dp, tint = pillar.accent)
+        PantopusIconImage(icon = PantopusIcon.Calendar, contentDescription = null, size = 14.dp, tint = PantopusColors.primary700)
         Text(
             text = "${event.title} · ${formatWhenRange(event.startUtc, event.endUtc, zone)}",
             style = PantopusTextStyle.caption,
             fontWeight = FontWeight.SemiBold,
-            color = pillar.accent,
+            color = PantopusColors.primary700,
         )
     }
 }
@@ -220,16 +287,16 @@ private fun RecapChip(
 @Composable
 private fun NativeAddButton(
     added: Boolean,
-    accent: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
 ) {
+    // Spec primary CTA is the fixed sky ACCENT (blue600), context-neutral.
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .height(48.dp)
                 .clip(RoundedCornerShape(Radii.lg))
-                .background(if (added) PantopusColors.successBg else accent)
+                .background(if (added) PantopusColors.successBg else PantopusColors.primary600)
                 .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -262,14 +329,15 @@ private fun ProviderRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .height(56.dp)
                 .background(PantopusColors.appSurface)
                 .clickable(enabled = enabled && !loading, onClick = onClick)
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+                .padding(horizontal = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.appSurfaceSunken),
+            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(DISC_RADIUS)).background(PantopusColors.appSurfaceSunken),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(icon = icon, contentDescription = null, size = 18.dp, tint = PantopusColors.appTextSecondary)

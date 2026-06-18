@@ -64,11 +64,31 @@ class InviteeConfirmViewModel
             _state.value =
                 ConfirmFlowState(
                     step = ConfirmStep.Details,
+                    values = prefillValues(newArgs.prefill),
                     slotStartUtc = newArgs.startAtUtc,
                     slotEndUtc = newArgs.endAtUtc,
                     tz = newArgs.tz.ifBlank { ConfirmUtils.deviceTimezone() },
                 )
             startHoldCountdown()
+        }
+
+        /** Collapse a signed-in identity into the prefilled name/email values. */
+        private fun prefillValues(prefill: InviteePrefill?): IntakeValues {
+            if (prefill == null) return IntakeValues()
+            val parts = prefill.name.trim().split(Regex("\\s+"), limit = 2)
+            return IntakeValues(
+                firstName = parts.firstOrNull().orEmpty(),
+                lastName = if (parts.size > 1) parts[1] else "",
+                email = prefill.email,
+                isPrefilled = true,
+            )
+        }
+
+        /** "Not you?" — drop the prefilled identity and reveal the editable fields. */
+        fun clearPrefill() {
+            _state.update {
+                it.copy(values = it.values.copy(firstName = "", lastName = "", email = "", isPrefilled = false))
+            }
         }
 
         private fun startHoldCountdown() {
@@ -256,12 +276,13 @@ class InviteeConfirmViewModel
             val et = a.eventType
             val mode = ConfirmUtils.priceMode(et.priceCents, et.depositCents)
             _state.update {
+                val bookingId = it.confirmed?.bookingId ?: ""
                 it.copy(
                     step = ConfirmStep.Confirmed,
                     submitting = false,
                     confirmed =
                         ConfirmedData(
-                            bookingId = it.confirmed?.bookingId ?: "",
+                            bookingId = bookingId,
                             manageToken = token,
                             sentToEmail = it.values.email.trim(),
                             requiresApproval = et.requiresApproval ?: false,
@@ -272,6 +293,7 @@ class InviteeConfirmViewModel
                                     amountPaidCents = ConfirmUtils.dueNowCents(et.priceCents, et.depositCents),
                                     balanceCents = ConfirmUtils.balanceCents(et.priceCents, et.depositCents),
                                     currency = et.currency,
+                                    txnLine = ConfirmUtils.receiptTxnLine(bookingId = bookingId, tz = it.tz),
                                 ),
                         ),
                 )

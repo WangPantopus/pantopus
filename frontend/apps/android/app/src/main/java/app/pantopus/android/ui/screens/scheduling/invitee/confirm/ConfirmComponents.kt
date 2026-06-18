@@ -175,12 +175,16 @@ fun ConfirmHalo(
             HaloKind.Info -> Triple(PantopusColors.infoBg, PantopusColors.infoLight, PantopusColors.info)
             HaloKind.Warning -> Triple(PantopusColors.warningBg, PantopusColors.warningLight, PantopusColors.warning)
         }
-    Box(modifier = modifier.size(96.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
+    // Spec Halo (booking-confirmed-frames.jsx): 104dp outer soft pulse ring +
+    // a 84dp inset fill + the 80dp bordered disc holding a 38dp glyph.
+    Box(modifier = modifier.size(104.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(104.dp).clip(CircleShape).background(bg.copy(alpha = 0.55f)))
+        Box(modifier = Modifier.size(84.dp).clip(CircleShape).background(bg))
         Box(
-            modifier = Modifier.size(74.dp).clip(CircleShape).background(bg).border(2.dp, ring, CircleShape),
+            modifier = Modifier.size(80.dp).clip(CircleShape).background(bg).border(2.dp, ring, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 34.dp, tint = tint)
+            PantopusIconImage(icon = icon, contentDescription = null, size = 38.dp, tint = tint)
         }
     }
 }

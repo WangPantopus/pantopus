@@ -3,10 +3,23 @@
 
 package app.pantopus.android.ui.screens.scheduling.invitee.edge
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
@@ -14,8 +27,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -29,7 +45,9 @@ import app.pantopus.android.ui.screens.scheduling.invitee.edge.PaymentRetryViewM
 import app.pantopus.android.ui.screens.settings.payments.StripePaymentSheets
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import com.stripe.android.paymentsheet.rememberPaymentSheet
 
@@ -129,6 +147,15 @@ private fun DeclinedBody(
         body = "${state.message} Nothing was charged.",
     )
     CenteredChip(tone = EdgeTone.Warn, icon = PantopusIcon.Timer, label = "Your time is still held")
+    // Spec frame 1 surfaces the declined saved card between the halo and the CTAs.
+    // The owner-side payment block carries no brand/PAN, so we show a neutral
+    // card row with a Declined pill rather than fabricate a masked number.
+    EdgeSavedCardRow(
+        brand = CardBrand.Generic,
+        label = "Your card",
+        sub = "Declined · ${state.message}",
+        declined = true,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         PrimaryButton(title = "Try another card", onClick = onRetry)
         GhostButton(title = "Use a different time", onClick = onPickAnotherTime)
@@ -148,7 +175,7 @@ private fun TimeoutBody(
         title = "We're not sure that went through",
         body = "The connection dropped before we heard back. We won't double-charge you — check again to see where it landed.",
     )
-    CenteredChip(tone = EdgeTone.Info, icon = PantopusIcon.ShieldCheck, label = "Checking again won't charge you twice")
+    InfoCalloutCard(text = "If the first try did go through, checking again won't charge you a second time.")
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         PrimaryButton(title = "Check again", onClick = onRecheck)
         GhostButton(title = "Use a different time", onClick = onPickAnotherTime)
@@ -194,9 +221,10 @@ private fun SucceededBody(
     CenteredChip(
         tone = EdgeTone.Success,
         icon = PantopusIcon.BadgeCheck,
-        label = if (state.processing) "${state.amountLabel} · processing" else "Paid ${state.amountLabel}",
+        label = if (state.processing) "${state.amountLabel} · processing" else "Paid ${state.amountLabel} · receipt on its way",
     )
-    PrimaryButton(title = "Done", onClick = onDone)
+    SuccessAutoAdvance()
+    GhostButton(title = "Done", onClick = onDone)
     ReassureNote(icon = PantopusIcon.Lock, text = "Payments secured by Stripe")
 }
 
@@ -214,12 +242,12 @@ private fun ReassureNote(
     icon: PantopusIcon,
     text: String,
 ) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        app.pantopus.android.ui.theme.PantopusIconImage(
+        PantopusIconImage(
             icon = icon,
             contentDescription = null,
             size = 13.dp,
@@ -236,10 +264,91 @@ private fun CenteredChip(
     icon: PantopusIcon,
     label: String,
 ) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
     ) {
         EdgeStatusChip(tone = tone, icon = icon, label = label)
+    }
+}
+
+/**
+ * The timeout info callout (spec frame 3): a framed info-tone block with a
+ * shield-check disc and the full reassurance sentence — not a compact chip.
+ */
+@Composable
+private fun InfoCalloutCard(text: String) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.infoBg)
+                .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(Radii.md))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ShieldCheck,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.info,
+            modifier = Modifier.padding(top = 1.dp),
+        )
+        Text(text = text, style = PantopusTextStyle.caption, color = PantopusColors.info)
+    }
+}
+
+/**
+ * The success auto-advance morph (spec frame 4): a success-tone progress bar
+ * above a pulsing "Confirming your booking" indicator.
+ */
+@Composable
+private fun SuccessAutoAdvance() {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.appSurfaceSunken),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth(0.62f)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.success),
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            val transition = rememberInfiniteTransition(label = "payPulse")
+            val pulseAlpha by transition.animateFloat(
+                initialValue = 1f,
+                targetValue = 0.3f,
+                animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+                label = "payPulseAlpha",
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .size(6.dp)
+                        .alpha(pulseAlpha)
+                        .clip(CircleShape)
+                        .background(PantopusColors.success),
+            )
+            Text(
+                text = "Confirming your booking",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
     }
 }

@@ -269,6 +269,10 @@ object ConfirmUtils {
         return parts.take(2).joinToString("") { it.first().uppercase() }
     }
 
+    /** First word of a name ("Maria Kessler" → "Maria"); blank-safe. */
+    fun firstName(value: String?): String =
+        value.orEmpty().trim().split(Regex("\\s+")).firstOrNull()?.takeIf { it.isNotBlank() } ?: value.orEmpty().trim()
+
     /** True for booking statuses that have already concluded (read-only manage). */
     fun isPastBooking(
         status: String?,
@@ -283,15 +287,36 @@ object ConfirmUtils {
     /** Resolve the device IANA zone, falling back to UTC. */
     fun deviceTimezone(): String = runCatching { ZonedDateTime.now().zone.id }.getOrDefault("UTC")
 
+    /**
+     * The receipt's monospace transaction line ("TXN_4F9C20A1 · Jun 13, 2026 ·
+     * 9:41 AM"). The booking id is the real transaction reference; [paidAtUtc]
+     * (or now, for the represented checkout) supplies the timestamp.
+     */
+    fun receiptTxnLine(
+        bookingId: String,
+        paidAtUtc: String? = null,
+        tz: String = deviceTimezone(),
+    ): String {
+        val ref =
+            bookingId.filter { it.isLetterOrDigit() }.takeLast(TXN_REF_LEN).uppercase().ifBlank { "RECEIPT" }
+        val at = (safeInstant(paidAtUtc) ?: Instant.now()).atZone(zone(tz))
+        val date = at.format(TXN_DATE_FMT)
+        val time = at.format(TXN_TIME_FMT)
+        return "TXN_$ref · $date · $time"
+    }
+
     private const val MIN_PHONE_DIGITS = 7
     private const val MINUTES_PER_HOUR = 60
     private const val ABBR_MAX = 5
+    private const val TXN_REF_LEN = 8
     private const val DEFAULT_CURRENCY = "USD"
     private const val CENTS_PER_UNIT = 100.0
     private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)
     private val TIME_NO_MERIDIEM: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm", Locale.US)
     private val MERIDIEM_ONLY: DateTimeFormatter = DateTimeFormatter.ofPattern("a", Locale.US)
     private val ABBR_ONLY: DateTimeFormatter = DateTimeFormatter.ofPattern("zzz", Locale.US)
+    private val TXN_DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+    private val TXN_TIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
 }
 
 enum class PriceMode { Free, Full, Deposit }

@@ -53,6 +53,8 @@ class OpenInAppViewModel
 
         private var started = false
 
+        private var lastRaw: String? = null
+
         /** Resolve the inbound link. [rawOverride] lets the host inject the captured link. */
         fun start(rawOverride: String? = null) {
             if (started) return
@@ -61,7 +63,13 @@ class OpenInAppViewModel
             resolve(raw)
         }
 
+        /** "Try the app again" — re-runs the link resolution from the failed state. */
+        fun retry() {
+            resolve(lastRaw ?: (DeepLinkRouter.pending.value as? DeepLinkRouter.Destination.Unknown)?.uri)
+        }
+
         fun resolve(raw: String?) {
+            lastRaw = raw
             val link = raw?.let(::parseBookingLink)
             if (link == null) {
                 _state.value = OpenInAppUiState.Failed(webUrl = raw?.takeIf { it.startsWith("http") })
