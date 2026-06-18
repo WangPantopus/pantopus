@@ -166,7 +166,7 @@ fun AddToCalendarSheet(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.BellRing,
+                    icon = PantopusIcon.Bell,
                     contentDescription = null,
                     size = 13.dp,
                     tint = PantopusColors.appTextMuted,

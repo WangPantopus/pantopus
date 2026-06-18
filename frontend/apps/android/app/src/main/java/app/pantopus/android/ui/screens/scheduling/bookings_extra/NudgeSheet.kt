@@ -1,27 +1,45 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 const val NUDGE_TAG = "scheduling.sendNudge"
@@ -147,23 +165,54 @@ internal fun NudgeSheet(
                     }
                 }
                 if (state.recipientCount == 0) {
-                    Text(
-                        text = "No one to message in this group",
-                        style = PantopusTextStyle.caption,
-                        color = PantopusColors.appTextSecondary,
-                    )
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(Radii.lg))
+                                .background(PantopusColors.appSurfaceSunken)
+                                .border(BorderStroke(1.dp, PantopusColors.appBorder), RoundedCornerShape(Radii.lg))
+                                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.UsersRound,
+                            contentDescription = null,
+                            size = 15.dp,
+                            tint = PantopusColors.appTextMuted,
+                        )
+                        Text(
+                            text = "No one to message in this group",
+                            style = PantopusTextStyle.caption,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                    }
                 }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                ExtrasChannelRow(icon = PantopusIcon.Bell, label = "Push", checked = state.pushOn, onCheckedChange = onPushChange, accent = accent)
-                ExtrasChannelRow(icon = PantopusIcon.Mail, label = "Email", checked = state.emailOn, onCheckedChange = onEmailChange, accent = accent)
+                ExtrasChannelRow(
+                    icon = PantopusIcon.Bell,
+                    label = "Push",
+                    checked = state.pushOn,
+                    onCheckedChange = onPushChange,
+                    accent = accent,
+                )
+                ExtrasChannelRow(
+                    icon = PantopusIcon.Mail,
+                    label = "Email",
+                    checked = state.emailOn,
+                    onCheckedChange = onEmailChange,
+                    accent = accent,
+                )
             }
 
             state.error?.let { ExtrasInlineError(message = it) }
 
             PrimaryButton(
-                title = if (state.recipientCount > 0) "Send to ${state.recipientCount}" else "No recipients",
+                title = if (state.recipientCount > 0) "Send to ${state.recipientCount}" else "Send",
                 onClick = onSend,
                 modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s4),
                 isLoading = state.sending,

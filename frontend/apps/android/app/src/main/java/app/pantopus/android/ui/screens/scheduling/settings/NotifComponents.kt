@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,11 +23,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -65,17 +74,29 @@ internal fun NotifChannelChip(
         } else {
             PantopusColors.appBorder
         }
-    Box(
-        modifier =
-            Modifier.size(
-                22.dp,
-            ).clip(RoundedCornerShape(Radii.sm)).background(bg).border(1.dp, border, RoundedCornerShape(Radii.sm)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(letter, color = fg, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier =
+                Modifier.size(
+                    22.dp,
+                ).clip(RoundedCornerShape(Radii.sm)).background(bg).border(1.dp, border, RoundedCornerShape(Radii.sm)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(letter, color = fg, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
         if (chipState == NotifChipState.Locked) {
-            Box(modifier = Modifier.align(Alignment.BottomEnd).size(8.dp), contentAlignment = Alignment.Center) {
-                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 7.dp, tint = PantopusColors.appTextInverse)
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 3.dp, y = 3.dp)
+                        .size(11.dp)
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, ACCENT, RoundedCornerShape(Radii.pill)),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 6.5.dp, tint = ACCENT)
             }
         }
     }
@@ -103,7 +124,7 @@ internal fun NotifCategoryCard(
                     Modifier
                         .fillMaxWidth()
                         .background(ACCENT_BG)
-                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -111,6 +132,7 @@ internal fun NotifCategoryCard(
                     color = ACCENT,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.5.sp,
+                    letterSpacing = 0.06.em,
                     modifier = Modifier.weight(1f),
                 )
                 ColumnLetter("P")
@@ -127,8 +149,10 @@ internal fun NotifCategoryCard(
                         fontWeight = FontWeight.Bold,
                         fontSize = 10.sp,
                     )
+                    PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 8.dp, tint = PantopusColors.appTextMuted)
                 }
             }
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
             content()
         }
         Text(
@@ -179,8 +203,8 @@ internal fun NotifMatrixRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(row.label, color = PantopusColors.appText, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-            row.sub?.let { Text(it, color = PantopusColors.appTextSecondary, fontSize = 11.5.sp, modifier = Modifier.padding(top = 1.dp)) }
+            Text(row.label, color = PantopusColors.appText, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+            row.sub?.let { Text(it, color = PantopusColors.appTextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp)) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             NotifChannelChip("P", pState)
@@ -239,8 +263,8 @@ internal fun ReminderLeadTime(
                 modifier =
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
-                        .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.pill))
-                        .alpha(0.6f)
+                        .background(PantopusColors.appSurface)
+                        .dashedBorder(PantopusColors.appBorderStrong, Radii.pill)
                         .padding(horizontal = 13.dp, vertical = 7.dp)
                         .testTag("reminderChipAdd"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -257,7 +281,8 @@ internal fun ReminderLeadTime(
 internal fun NotifLegend() {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         listOf("P · Push", "E · Email").forEach {
             Text(it, color = PantopusColors.appTextMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
@@ -284,10 +309,25 @@ internal fun NotifPauseBanner() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        PantopusIconImage(icon = PantopusIcon.BellOff, contentDescription = null, size = 18.dp, tint = PantopusColors.warning)
+        Box(
+            modifier = Modifier.size(32.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.warningLight),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = PantopusIcon.BellOff, contentDescription = null, size = 16.dp, tint = PantopusColors.warning)
+        }
         Column(Modifier.weight(1f)) {
-            Text("Notifications paused", color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
-            Text("Emergency alerts still come through", color = PantopusColors.appTextSecondary, fontSize = 11.5.sp)
+            Text("Notifications paused", color = PantopusColors.warning, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
+            Text("Emergency alerts still come through", color = PantopusColors.warning, fontSize = 11.5.sp)
+        }
+        Box(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.pill))
+                    .padding(horizontal = 11.dp, vertical = 5.dp),
+        ) {
+            Text("Resume", color = PantopusColors.warning, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
         }
     }
 }
@@ -330,13 +370,31 @@ internal fun NotifPushOffNotice(onOpenSettings: () -> Unit) {
 @Composable
 internal fun NotifOverline(
     text: String,
-    color: Color = ACCENT,
+    color: Color = PantopusColors.appTextSecondary,
 ) {
     Text(
         text.uppercase(java.util.Locale.US),
         color = color,
         fontWeight = FontWeight.Bold,
         fontSize = 11.sp,
+        letterSpacing = 0.08.em,
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = Spacing.s2),
     )
 }
+
+/** Rounded dashed outline (1dp) — the "add new" lead-time chip affordance. */
+private fun Modifier.dashedBorder(
+    color: Color,
+    radius: Dp,
+): Modifier =
+    drawBehind {
+        val stroke = 1.dp.toPx()
+        val r = radius.toPx()
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(stroke / 2f, stroke / 2f),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = CornerRadius(r, r),
+            style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))),
+        )
+    }

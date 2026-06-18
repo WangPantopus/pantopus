@@ -113,19 +113,19 @@ private fun RemindersBody(
                         AutoErrorView(message = s.message, onRetry = viewModel::load, headline = "Couldn't load reminders")
                     is RemindersUiState.Loaded ->
                         RemindersLoaded(
-                        state = s,
-                        accent = viewModel.pillar.accent,
-                        accentBg = viewModel.pillar.accentBg,
-                        pushOff = pushOff,
-                        onToggle = viewModel::toggle,
-                        onShowCustom = viewModel::showCustom,
-                        onHideCustom = viewModel::hideCustom,
-                        onStep = viewModel::stepCustom,
-                        onUnit = viewModel::setCustomUnit,
-                        onAddCustom = viewModel::addCustom,
-                        onSave = viewModel::save,
-                        onEnablePush = { context.openNotificationSettings() },
-                    )
+                            state = s,
+                            accent = viewModel.pillar.accent,
+                            accentBg = viewModel.pillar.accentBg,
+                            pushOff = pushOff,
+                            onToggle = viewModel::toggle,
+                            onShowCustom = viewModel::showCustom,
+                            onHideCustom = viewModel::hideCustom,
+                            onStep = viewModel::stepCustom,
+                            onUnit = viewModel::setCustomUnit,
+                            onAddCustom = viewModel::addCustom,
+                            onSave = viewModel::save,
+                            onEnablePush = { context.openNotificationSettings() },
+                        )
                 }
             }
         }
@@ -237,7 +237,7 @@ private fun ReminderCard(
     val rows =
         ReminderPreset.all.map { it.first to it.second } +
             state.customMinutes.map { it to AutomationsFormat.reminderRowLabel(it) }
-    AutoCard(horizontal = 14.dp, vertical = Spacing.s0) {
+    AutoCard(horizontal = 13.dp, vertical = 4.dp) {
         rows.forEachIndexed { idx, (minutes, label) ->
             ReminderRow(
                 minutes = minutes,

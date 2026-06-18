@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -84,8 +83,18 @@ fun IntakeFormBody(
         )
 
         if (!state.holdExpired) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                PantopusIconImage(icon = PantopusIcon.Clock, contentDescription = null, size = 13.dp, tint = PantopusColors.appTextSecondary, modifier = Modifier.padding(end = Spacing.s1))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Clock,
+                    contentDescription = null,
+                    size = 13.dp,
+                    tint = PantopusColors.appTextSecondary,
+                    modifier = Modifier.padding(end = Spacing.s1),
+                )
                 Text(
                     text = "We're holding this time for ${holdLabel(state.holdSecondsLeft)}",
                     style = PantopusTextStyle.caption,
@@ -192,7 +201,12 @@ private fun IntakeSummaryHeader(
         Row(verticalAlignment = Alignment.Top) {
             HostAvatar(pillar = pillar, initials = ConfirmUtils.initials(args.hostName))
             Column(modifier = Modifier.weight(1f).padding(start = Spacing.s2)) {
-                Text(text = args.eventType.name ?: "Booking", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+                Text(
+                    text = args.eventType.name ?: "Booking",
+                    style = PantopusTextStyle.small,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
                 Text(text = durationLine, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             }
             Text(
@@ -205,7 +219,13 @@ private fun IntakeSummaryHeader(
         }
         HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(vertical = Spacing.s3))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PantopusIconImage(icon = PantopusIcon.Calendar, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextSecondary, modifier = Modifier.padding(end = Spacing.s2))
+            PantopusIconImage(
+                icon = PantopusIcon.Calendar,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.appTextSecondary,
+                modifier = Modifier.padding(end = Spacing.s2),
+            )
             Text(text = whenLabel, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
         }
         TimezoneChip(label = tzLabel, accent = pillar.accent, onChange = onChangeTz, modifier = Modifier.padding(top = Spacing.s2))
@@ -239,7 +259,12 @@ private fun AddGuests(
                 PantopusIconImage(icon = PantopusIcon.UserPlus, contentDescription = null, size = 15.dp, tint = pillar.accent)
             }
             Column(modifier = Modifier.weight(1f).padding(start = Spacing.s2)) {
-                Text(text = "Add guests", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                Text(
+                    text = "Add guests",
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                )
                 Text(text = "Add up to $MAX_GUESTS guests.", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             }
             PantopusIconImage(icon = PantopusIcon.Plus, contentDescription = null, size = 17.dp, tint = pillar.accent)
@@ -247,7 +272,12 @@ private fun AddGuests(
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                PantopusIconImage(icon = PantopusIcon.Users, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextSecondary)
+                PantopusIconImage(
+                    icon = PantopusIcon.Users,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
                 Text(text = "Guests", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
             }
             values.guests.forEachIndexed { index, guest ->
@@ -267,20 +297,44 @@ private fun AddGuests(
                     Box(
                         modifier =
                             Modifier
-                                .size(44.dp)
+                                .size(32.dp)
                                 .clip(RoundedCornerShape(Radii.md))
                                 .background(PantopusColors.appSurface)
                                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                                .clickable(enabled = enabled) { onPatch(values.copy(guests = values.guests.filterIndexed { i, _ -> i != index })) },
+                                .clickable(enabled = enabled) {
+                                    onPatch(
+                                        values.copy(
+                                            guests =
+                                                values.guests.filterIndexed {
+                                                        i,
+                                                        _,
+                                                    ->
+                                                    i != index
+                                                },
+                                        ),
+                                    )
+                                },
                         contentAlignment = Alignment.Center,
                     ) {
-                        PantopusIconImage(icon = PantopusIcon.X, contentDescription = "Remove guest", size = 15.dp, tint = PantopusColors.appTextSecondary)
+                        PantopusIconImage(
+                            icon = PantopusIcon.X,
+                            contentDescription = "Remove guest",
+                            size = 15.dp,
+                            tint = PantopusColors.appTextSecondary,
+                        )
                     }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Row(
-                    modifier = Modifier.clickable(enabled = enabled && values.guests.size < MAX_GUESTS) { onPatch(values.copy(guests = values.guests + "")) },
+                    modifier =
+                        Modifier.clickable(
+                            enabled = enabled && values.guests.size < MAX_GUESTS,
+                        ) { onPatch(values.copy(guests = values.guests + "")) },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
@@ -392,7 +446,12 @@ fun ConfirmTextInput(
             verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
         ) {
             if (leading != null) {
-                Text(text = leading, style = PantopusTextStyle.small, color = PantopusColors.appTextMuted, modifier = Modifier.padding(end = Spacing.s1))
+                Text(
+                    text = leading,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appTextMuted,
+                    modifier = Modifier.padding(end = Spacing.s1),
+                )
             }
             Box(modifier = Modifier.weight(1f)) {
                 BasicTextField(
@@ -410,17 +469,39 @@ fun ConfirmTextInput(
                 }
             }
             when {
-                error != null -> PantopusIconImage(icon = PantopusIcon.AlertCircle, contentDescription = null, size = 17.dp, tint = PantopusColors.error)
-                valid -> PantopusIconImage(icon = PantopusIcon.CheckCircle, contentDescription = null, size = 17.dp, tint = PantopusColors.success)
+                error != null ->
+                    PantopusIconImage(
+                        icon = PantopusIcon.AlertCircle,
+                        contentDescription = null,
+                        size = 17.dp,
+                        tint = PantopusColors.error,
+                    )
+                valid ->
+                    PantopusIconImage(
+                        icon = PantopusIcon.CheckCircle,
+                        contentDescription = null,
+                        size = 17.dp,
+                        tint = PantopusColors.success,
+                    )
             }
         }
         if (error != null) {
-            Row(modifier = Modifier.padding(top = Spacing.s1), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Row(
+                modifier = Modifier.padding(top = Spacing.s1),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
                 PantopusIconImage(icon = PantopusIcon.AlertCircle, contentDescription = null, size = 11.dp, tint = PantopusColors.error)
                 Text(text = error, style = PantopusTextStyle.caption, color = PantopusColors.error)
             }
         } else if (helper != null) {
-            Text(text = helper, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary, fontStyle = FontStyle.Italic, modifier = Modifier.padding(top = Spacing.s1))
+            Text(
+                text = helper,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                fontStyle = FontStyle.Italic,
+                modifier = Modifier.padding(top = Spacing.s1),
+            )
         }
     }
 }

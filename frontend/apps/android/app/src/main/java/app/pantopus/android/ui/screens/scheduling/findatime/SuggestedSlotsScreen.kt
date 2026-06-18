@@ -81,8 +81,9 @@ fun SuggestedSlotsScreen(
     )
 
     if (showTz) {
-        val tzId = (state as? SuggestedSlotsUiState.Loaded)?.header?.tzId
-            ?: (state as? SuggestedSlotsUiState.Empty)?.header?.tzId
+        val tzId =
+            (state as? SuggestedSlotsUiState.Loaded)?.header?.tzId
+                ?: (state as? SuggestedSlotsUiState.Empty)?.header?.tzId
         TimezonePickerSheet(
             options = defaultTimezoneOptions(),
             selectedId = tzId,
@@ -184,7 +185,12 @@ private fun SubHead(
                         .testTag("suggestedSlotsTzPill"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PantopusIconImage(icon = PantopusIcon.Clock, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextSecondary)
+                PantopusIconImage(
+                    icon = PantopusIcon.Clock,
+                    contentDescription = null,
+                    size = 12.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
                 Text(
                     text = header.tzLabel,
                     style = PantopusTextStyle.caption,
@@ -192,7 +198,12 @@ private fun SubHead(
                     color = PantopusColors.appTextStrong,
                     modifier = Modifier.padding(horizontal = Spacing.s1),
                 )
-                PantopusIconImage(icon = PantopusIcon.ChevronDown, contentDescription = null, size = 11.dp, tint = PantopusColors.appTextSecondary)
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronDown,
+                    contentDescription = null,
+                    size = 11.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
             }
         }
         Row(modifier = Modifier.padding(top = Spacing.s1), verticalAlignment = Alignment.CenterVertically) {
@@ -210,7 +221,9 @@ private fun SubHead(
 
 @Composable
 private fun SubHeadPlaceholder() {
-    Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(horizontal = Spacing.s4, vertical = Spacing.s3)) {
+    Column(
+        modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+    ) {
         Shimmer(width = 180.dp, height = 12.dp, cornerRadius = Radii.xs)
     }
 }
@@ -237,11 +250,14 @@ private fun LoadedBody(
                     color = PantopusColors.appTextSecondary,
                     modifier = Modifier.padding(bottom = Spacing.s1),
                 )
-                SingleBestCard(slot = state.slots.first(), busy = state.busy, onBook = onBook)
+                SingleBestCard(slot = state.slots.first(), durationLabel = state.header.durationLabel, busy = state.busy, onBook = {
+                    onBook(state.slots.first().start)
+                })
             } else {
                 state.slots.forEach { slot ->
                     SlotCard(
                         slot = slot,
+                        durationLabel = state.header.durationLabel,
                         expanded = state.expandedStart == slot.start,
                         busy = state.busy,
                         onToggle = { onToggleExpand(slot.start) },
@@ -267,6 +283,7 @@ private fun LoadedBody(
 @Composable
 private fun SlotCard(
     slot: SlotRowUi,
+    durationLabel: String,
     expanded: Boolean,
     busy: Boolean,
     onToggle: () -> Unit,
@@ -297,7 +314,7 @@ private fun SlotCard(
                         color = PantopusColors.appText,
                     )
                     if (slot.isBest) {
-                        FtChip(label = "Best", icon = PantopusIcon.Star, modifier = Modifier.padding(start = Spacing.s2))
+                        FtChip(label = "BEST", icon = PantopusIcon.Star, modifier = Modifier.padding(start = Spacing.s2))
                     }
                 }
                 Row(modifier = Modifier.padding(top = Spacing.s2), verticalAlignment = Alignment.CenterVertically) {
@@ -333,13 +350,19 @@ private fun SlotCard(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.s2)) {
                     PantopusIconImage(icon = PantopusIcon.CalendarCheck, contentDescription = null, size = 14.dp, tint = HomeAccent)
                     Text(
-                        text = "Book ${slot.dayLabel} · ${slot.timeLabel}",
+                        text = "Book ${slot.dayLabel} · ${slot.timeLabel} · $durationLabel",
                         style = PantopusTextStyle.caption,
                         color = PantopusColors.appTextStrong,
                         modifier = Modifier.padding(start = Spacing.s1),
                     )
                 }
-                FtPrimaryButton(label = "Book it", icon = PantopusIcon.Check, enabled = !busy, onClick = onBook, modifier = Modifier.testTag("bookSlotButton"))
+                FtPrimaryButton(
+                    label = "Book it",
+                    icon = PantopusIcon.Check,
+                    enabled = !busy,
+                    onClick = onBook,
+                    modifier = Modifier.testTag("bookSlotButton"),
+                )
             }
         }
     }
@@ -348,6 +371,7 @@ private fun SlotCard(
 @Composable
 private fun SingleBestCard(
     slot: SlotRowUi,
+    durationLabel: String,
     busy: Boolean,
     onBook: () -> Unit,
 ) {
@@ -361,16 +385,16 @@ private fun SingleBestCard(
                 .padding(Spacing.s4),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        FtChip(label = "Best match", icon = PantopusIcon.Star)
+        FtChip(label = "BEST MATCH", icon = PantopusIcon.Star)
         Text(
             text = slot.dayLabel,
-            style = PantopusTextStyle.h2,
+            style = PantopusTextStyle.h3,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
             modifier = Modifier.padding(top = Spacing.s3),
         )
         Text(
-            text = slot.timeLabel,
+            text = "${slot.timeLabel} · $durationLabel",
             style = PantopusTextStyle.body,
             fontWeight = FontWeight.SemiBold,
             color = HomeAccentDark,
@@ -378,10 +402,22 @@ private fun SingleBestCard(
         )
         Row(modifier = Modifier.padding(top = Spacing.s3), verticalAlignment = Alignment.CenterVertically) {
             FtMemberStack(members = slot.members)
-            Text(text = slot.freeLabel, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = HomeAccentDark, modifier = Modifier.padding(start = Spacing.s2))
+            Text(
+                text = slot.freeLabel,
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = HomeAccentDark,
+                modifier = Modifier.padding(start = Spacing.s2),
+            )
         }
         Box(modifier = Modifier.padding(top = Spacing.s4)) {
-            FtPrimaryButton(label = "Book it", icon = PantopusIcon.Check, enabled = !busy, onClick = onBook, modifier = Modifier.testTag("bookSlotButton"))
+            FtPrimaryButton(
+                label = "Book it",
+                icon = PantopusIcon.Check,
+                enabled = !busy,
+                onClick = onBook,
+                modifier = Modifier.testTag("bookSlotButton"),
+            )
         }
     }
 }
@@ -392,8 +428,18 @@ private fun SingleBestCard(
 private fun ComposingBody() {
     Column(modifier = Modifier.fillMaxSize().padding(Spacing.s4), verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Finding times that work for everyone", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-            Text(text = "Overlaying everyone's availability", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary, modifier = Modifier.padding(top = Spacing.s1))
+            Text(
+                text = "Finding times that work for everyone",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Overlaying everyone's availability",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.padding(top = Spacing.s1),
+            )
         }
         repeat(4) {
             Column(

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -250,9 +252,9 @@ private fun CustomRows(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)),
     ) {
         CustomRow(icon = PantopusIcon.Clock, label = "Free-cancellation cutoff", divider = true) {
             PolicyStepper(
@@ -376,11 +378,8 @@ private fun PolicyStepper(
     onIncrement: () -> Unit,
 ) {
     Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.md))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md)),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         StepperButton(icon = PantopusIcon.Minus, enabled = canDecrement, onClick = onDecrement)
         Text(
@@ -388,7 +387,8 @@ private fun PolicyStepper(
             color = PantopusColors.appText,
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = Spacing.s2),
+            modifier = Modifier.widthIn(min = 28.dp),
+            textAlign = TextAlign.Center,
         )
         StepperButton(icon = PantopusIcon.Plus, enabled = canIncrement, onClick = onIncrement)
     }
@@ -403,14 +403,17 @@ private fun StepperButton(
     Box(
         modifier =
             Modifier
-                .size(30.dp)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, CircleShape)
                 .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 15.dp,
+            size = 11.dp,
             tint = if (enabled) PILLAR.accent else PantopusColors.appBorderStrong,
         )
     }

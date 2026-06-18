@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -290,11 +291,16 @@ private fun CategoryPill(category: CalendarEventCategory) {
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
-                .background(category.background)
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
     ) {
-        PantopusIconImage(icon = category.icon, contentDescription = null, size = 10.dp, tint = category.foreground)
-        Text(text = category.label, style = PantopusTextStyle.caption, color = category.foreground)
+        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(category.dotColor))
+        Text(
+            text = category.label,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextStrong,
+        )
     }
 }
 
@@ -344,13 +350,15 @@ private fun DetailRow(
         ) {
             PantopusIconImage(icon = icon, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextStrong)
         }
-        Text(
-            text = label,
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-            modifier = Modifier.weight(1f),
-        )
-        Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = label.uppercase(Locale.ROOT),
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextMuted,
+            )
+            Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+        }
     }
 }
 
@@ -437,7 +445,12 @@ private fun YourRsvpCard(
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     PantopusIconImage(icon = PantopusIcon.Hand, contentDescription = null, size = 12.dp, tint = PantopusColors.homeDark)
-                    Text(text = "Tap to let everyone know", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.homeDark)
+                    Text(
+                        text = "Tap to let everyone know",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.homeDark,
+                    )
                 }
             }
         }
@@ -591,7 +604,7 @@ private fun formattedTimeRange(event: CalendarEventDto): String {
 
 private fun isMidnight(date: ZonedDateTime): Boolean = date.hour == 0 && date.minute == 0 && date.second == 0
 
-private fun longDateLabel(date: ZonedDateTime): String = DateTimeFormatter.ofPattern("EEEE MMM d", Locale.US).format(date)
+private fun longDateLabel(date: ZonedDateTime): String = DateTimeFormatter.ofPattern("EEE MMM d", Locale.US).format(date)
 
 private fun formattedTime(
     start: ZonedDateTime,

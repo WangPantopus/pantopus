@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
@@ -96,14 +104,24 @@ fun GroupRosterScreen(
                 title = { Text("Roster", style = PantopusTextStyle.h3, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        PantopusIconImage(icon = PantopusIcon.ChevronLeft, contentDescription = "Back", size = 22.dp, tint = PantopusColors.appText)
+                        PantopusIconImage(
+                            icon = PantopusIcon.ChevronLeft,
+                            contentDescription = "Back",
+                            size = 22.dp,
+                            tint = PantopusColors.appText,
+                        )
                     }
                 },
                 actions = {
                     if (loaded != null) {
                         Box {
                             IconButton(onClick = { menuOpen = true }) {
-                                PantopusIconImage(icon = PantopusIcon.MoreVertical, contentDescription = "More", size = 20.dp, tint = PantopusColors.appText)
+                                PantopusIconImage(
+                                    icon = PantopusIcon.MoreVertical,
+                                    contentDescription = "More",
+                                    size = 20.dp,
+                                    tint = PantopusColors.appText,
+                                )
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(
@@ -136,7 +154,14 @@ fun GroupRosterScreen(
                     containerColor = loaded.data.pillar.accent,
                     contentColor = PantopusColors.appTextInverse,
                     modifier = Modifier.testTag(ROSTER_MESSAGE_ALL_TAG),
-                    icon = { PantopusIconImage(icon = PantopusIcon.MessageSquare, contentDescription = null, size = 18.dp, tint = PantopusColors.appTextInverse) },
+                    icon = {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Megaphone,
+                            contentDescription = null,
+                            size = 18.dp,
+                            tint = PantopusColors.appTextInverse,
+                        )
+                    },
                     text = { Text("Message all") },
                 )
             }
@@ -234,7 +259,12 @@ internal fun RosterContent(
 
         if (data.waitlist.isNotEmpty()) {
             val openLabel = if (data.seatsOpen == 1) "1 seat open" else "${data.seatsOpen} seats open"
-            val sectionLabel = if (data.seatsOpen > 0) "Waitlist · ${data.waitlist.size} · $openLabel" else "Waitlist · ${data.waitlist.size}"
+            val sectionLabel =
+                if (data.seatsOpen > 0) {
+                    "Waitlist · ${data.waitlist.size} · $openLabel"
+                } else {
+                    "Waitlist · ${data.waitlist.size}"
+                }
             ExtrasOverline(sectionLabel)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 data.waitlist.forEach { person ->
@@ -260,7 +290,12 @@ private fun SeatedKebab(
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.size(28.dp)) {
-            PantopusIconImage(icon = PantopusIcon.MoreVertical, contentDescription = "Row actions", size = 18.dp, tint = PantopusColors.appTextMuted)
+            PantopusIconImage(
+                icon = PantopusIcon.MoreVertical,
+                contentDescription = "Row actions",
+                size = 18.dp,
+                tint = PantopusColors.appTextMuted,
+            )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (person.status == "confirmed") {
@@ -295,9 +330,21 @@ private fun CapacityControls(
                     .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = "Capacity", style = PantopusTextStyle.body, fontWeight = FontWeight.Medium, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+            Text(
+                text = "Capacity",
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.Medium,
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
             StepperButton(icon = PantopusIcon.Minus, contentDescription = "Decrease capacity", onClick = { onAdjustCapacity(-1) })
-            Text(text = seatTotal.toString(), style = PantopusTextStyle.body, fontWeight = FontWeight.Bold, color = PantopusColors.appText, modifier = Modifier.padding(horizontal = Spacing.s3))
+            Text(
+                text = seatTotal.toString(),
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                modifier = Modifier.padding(horizontal = Spacing.s3),
+            )
             StepperButton(icon = PantopusIcon.Plus, contentDescription = "Increase capacity", onClick = { onAdjustCapacity(1) })
         }
         PrimaryButton(title = "Add or invite attendee", onClick = onAddAttendee, modifier = Modifier.fillMaxWidth())

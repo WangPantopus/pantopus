@@ -55,7 +55,7 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import java.time.ZoneId
 
-private val DAY_LABEL_W = 32.dp
+private val DAY_LABEL_W = 30.dp
 private val ADD_BTN = 26.dp
 
 private data class EditTarget(val weekday: Int, val index: Int, val range: HoursRange)
@@ -121,7 +121,10 @@ private fun MemberHoursBody(
             form.upcomingException?.let { DatedExceptionCard(it) }
 
             if (form.isReadOnly) {
-                InheritsNote(memberName = form.memberName)
+                InheritsNote(
+                    memberName = form.memberName,
+                    onViewPersonal = { onNavigate(SchedulingRoutes.AVAILABILITY_LIST) },
+                )
                 Box(modifier = Modifier.alpha(0.6f)) {
                     WeekGrid(days = form.days, readOnly = true, onAdd = {}, onRemoveRange = { _, _ -> }, onEditRange = {})
                 }
@@ -398,7 +401,10 @@ private fun OverrideRow(
 }
 
 @Composable
-private fun InheritsNote(memberName: String) {
+private fun InheritsNote(
+    memberName: String,
+    onViewPersonal: () -> Unit,
+) {
     Row(
         modifier =
             Modifier.fillMaxWidth().clip(
@@ -414,6 +420,13 @@ private fun InheritsNote(memberName: String) {
             fontWeight = FontWeight.Medium,
             color = PantopusColors.appTextStrong,
             modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "View personal",
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.primary600,
+            modifier = Modifier.clickable(onClick = onViewPersonal),
         )
     }
 }

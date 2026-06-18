@@ -173,7 +173,7 @@ private fun SetupFormBody(
                     if (form.mode == FindMode.Collective) {
                         "Finds times when everyone required is free at once."
                     } else {
-                        "Whoever's free gets it — Pantopus suggests who can cover."
+                        "Whoever's free gets it. Pick a rule for who covers."
                     },
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextSecondary,
@@ -236,10 +236,18 @@ private fun Explainer(
                 .padding(Spacing.s3),
     ) {
         Row {
-            PantopusIconImage(icon = PantopusIcon.Info, contentDescription = null, size = 15.dp, tint = PantopusColors.info, modifier = Modifier.padding(end = Spacing.s2, top = 1.dp))
+            PantopusIconImage(
+                icon = PantopusIcon.Info,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.info,
+                modifier = Modifier.padding(end = Spacing.s2, top = 1.dp),
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Times come from each member's personal availability. Pantopus finds the overlap — it never changes anyone's calendar.",
+                    text =
+                        "Times come from each member's personal availability. " +
+                            "Pantopus finds the overlap — it never changes anyone's calendar.",
                     style = PantopusTextStyle.caption,
                     color = PantopusColors.info,
                     fontWeight = FontWeight.Medium,
@@ -248,7 +256,13 @@ private fun Explainer(
                     Column(modifier = Modifier.padding(top = Spacing.s2), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                         bullets.forEach { (ic, tx) ->
                             Row {
-                                PantopusIconImage(icon = ic, contentDescription = null, size = 13.dp, tint = PantopusColors.info, modifier = Modifier.padding(end = Spacing.s2, top = 1.dp))
+                                PantopusIconImage(
+                                    icon = ic,
+                                    contentDescription = null,
+                                    size = 13.dp,
+                                    tint = PantopusColors.info,
+                                    modifier = Modifier.padding(end = Spacing.s2, top = 1.dp),
+                                )
                                 Text(text = tx, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
                             }
                         }
@@ -343,7 +357,12 @@ private fun ReqOptToggle(
                         .clickable(onClickLabel = label) { onToggle(isReq) }
                         .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
             ) {
-                Text(text = label, style = PantopusTextStyle.caption, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, color = fg)
+                Text(
+                    text = label,
+                    style = PantopusTextStyle.caption,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
+                    color = fg,
+                )
             }
         }
     }
@@ -367,7 +386,7 @@ private fun ModeTiles(
         )
         ModeTile(
             modifier = Modifier.weight(1f),
-            icon = PantopusIcon.UsersRound,
+            icon = PantopusIcon.ArrowsRepeat,
             title = "Round-robin",
             line = "One covers",
             selected = mode == FindMode.RoundRobin,
@@ -390,19 +409,33 @@ private fun ModeTile(
             modifier
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(if (selected) HomeAccentBg else PantopusColors.appSurface)
-                .border(if (selected) 1.5.dp else 1.dp, if (selected) HomeAccent else PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .border(
+                    if (selected) 1.5.dp else 1.dp,
+                    if (selected) HomeAccent else PantopusColors.appBorder,
+                    RoundedCornerShape(Radii.lg),
+                )
                 .clickable(onClickLabel = title, onClick = onClick)
                 .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 18.dp, tint = if (selected) HomeAccent else PantopusColors.appTextSecondary)
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 18.dp,
+                tint = if (selected) HomeAccent else PantopusColors.appTextSecondary,
+            )
             if (selected) {
                 PantopusIconImage(icon = PantopusIcon.CheckCircle, contentDescription = null, size = 16.dp, tint = HomeAccent)
             }
         }
         Column {
-            Text(text = title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = if (selected) HomeAccentDark else PantopusColors.appText)
+            Text(
+                text = title,
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) HomeAccentDark else PantopusColors.appText,
+            )
             Text(text = line, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
         }
     }
@@ -429,7 +462,12 @@ private fun DateWindow(
                     .padding(Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PantopusIconImage(icon = PantopusIcon.Calendar, contentDescription = null, size = 16.dp, tint = if (form.rangeValid) HomeAccent else PantopusColors.error)
+            PantopusIconImage(
+                icon = PantopusIcon.Calendar,
+                contentDescription = null,
+                size = 16.dp,
+                tint = if (form.rangeValid) HomeAccent else PantopusColors.error,
+            )
             Text(
                 text = FindATimeFormat.rangeLabel(from, to),
                 style = PantopusTextStyle.small,

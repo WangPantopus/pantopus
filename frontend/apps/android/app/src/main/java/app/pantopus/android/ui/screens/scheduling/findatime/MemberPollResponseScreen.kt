@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -83,7 +84,14 @@ fun MemberPollResponseContent(
         when (state) {
             is PollResponseUiState.Loading -> PollSkeleton()
             is PollResponseUiState.Error -> ErrorState(message = state.message, onRetry = onRetry)
-            is PollResponseUiState.Loaded -> LoadedPoll(state = state, onVote = onVote, onName = onName, onEmail = onEmail, onSubmit = onSubmit)
+            is PollResponseUiState.Loaded ->
+                LoadedPoll(
+                    state = state,
+                    onVote = onVote,
+                    onName = onName,
+                    onEmail = onEmail,
+                    onSubmit = onSubmit,
+                )
             is PollResponseUiState.Closed -> ClosedPoll(state = state)
         }
     }
@@ -109,9 +117,14 @@ private fun OrganizerHeader(header: PollHeader) {
         }
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s3)) {
             Text(text = header.title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-            Text(text = header.subtitle, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary, modifier = Modifier.padding(top = 2.dp))
+            Text(
+                text = header.subtitle,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
-        FtChip(label = "Poll", icon = PantopusIcon.Vote)
+        FtChip(label = "POLL", icon = PantopusIcon.Vote)
     }
 }
 
@@ -130,7 +143,12 @@ private fun LoadedPoll(
         ) {
             OrganizerHeader(state.header)
             if (state.submitted) {
-                FtBanner(tone = FtBannerTone.Home, icon = PantopusIcon.CheckCircle, title = "Response submitted", body = "Thanks — we'll book the most-picked time.")
+                FtBanner(
+                    tone = FtBannerTone.Home,
+                    icon = PantopusIcon.CheckCircle,
+                    title = "Response submitted",
+                    body = "Thanks — we'll book the most-picked time.",
+                )
             }
             FtOverline("Mark which times work", color = PantopusColors.appTextSecondary)
             state.options.forEach { option ->
@@ -149,7 +167,12 @@ private fun LoadedPoll(
                 ) {
                     FtOverline("Your details", color = PantopusColors.appTextSecondary)
                     FtInputField(value = state.voterName, placeholder = "Your name (optional)", onValueChange = onName)
-                    FtInputField(value = state.voterEmail, placeholder = "Email to record your vote", onValueChange = onEmail, keyboardType = KeyboardType.Email)
+                    FtInputField(
+                        value = state.voterEmail,
+                        placeholder = "Email to record your vote",
+                        onValueChange = onEmail,
+                        keyboardType = KeyboardType.Email,
+                    )
                 }
             }
             if (state.error != null) {
@@ -182,7 +205,10 @@ private fun ClosedPoll(state: PollResponseUiState.Closed) {
             body = state.finalizedLabel?.let { "Booked $it. It's on the family calendar." } ?: "Voting has ended for this poll.",
         )
         FtOverline("Proposed times", color = PantopusColors.appTextMuted)
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        Column(
+            modifier = Modifier.alpha(0.55f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
             state.options.forEach { option ->
                 PollOptionCard(option = option, locked = true, onVote = {})
             }

@@ -35,8 +35,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.MailDraft
 import app.pantopus.android.ui.components.composeMail
@@ -116,8 +116,14 @@ fun BookingPageManageScreen(
                             clipboard.setText(AnnotatedString(BookingLinkUrls.shareable(s.form.slug)))
                             viewModel.flashToast("Link copied")
                         },
-                        onShare = { showShare = true; shareStartQr = false },
-                        onViewQr = { showShare = true; shareStartQr = true },
+                        onShare = {
+                            showShare = true
+                            shareStartQr = false
+                        },
+                        onViewQr = {
+                            showShare = true
+                            shareStartQr = true
+                        },
                     )
             }
         }
@@ -145,8 +151,14 @@ fun BookingPageManageScreen(
                         ),
                     )
                 },
-                onRegenerate = { showShare = false; viewModel.regenerateLink() },
-                onTurnOn = { showShare = false; viewModel.toggleStatus() },
+                onRegenerate = {
+                    showShare = false
+                    viewModel.regenerateLink()
+                },
+                onTurnOn = {
+                    showShare = false
+                    viewModel.toggleStatus()
+                },
                 onDismiss = { showShare = false },
             )
         }
@@ -198,7 +210,12 @@ private fun LoadedBody(
 }
 
 @Composable
-private fun StatusCard(status: PageStatus, enabled: Boolean, pillar: SchedulingPillar, onToggle: () -> Unit) {
+private fun StatusCard(
+    status: PageStatus,
+    enabled: Boolean,
+    pillar: SchedulingPillar,
+    onToggle: () -> Unit,
+) {
     val copy =
         when (status) {
             PageStatus.Live -> "Anyone with this link can book you."
@@ -300,7 +317,11 @@ private fun SlugCard(
 }
 
 @Composable
-private fun SlugHint(icon: PantopusIcon, text: String, color: androidx.compose.ui.graphics.Color) {
+private fun SlugHint(
+    icon: PantopusIcon,
+    text: String,
+    color: androidx.compose.ui.graphics.Color,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = color)
         Text(text, color = color, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp)
@@ -331,7 +352,11 @@ private fun HeaderCard(
 }
 
 @Composable
-private fun ServicesCard(services: List<ServiceToggleItem>, pillar: SchedulingPillar, onToggle: (String) -> Unit) {
+private fun ServicesCard(
+    services: List<ServiceToggleItem>,
+    pillar: SchedulingPillar,
+    onToggle: (String) -> Unit,
+) {
     BLCard(pillar = pillar, overline = "Services people can book") {
         if (services.isNotEmpty() && services.none { it.visible }) {
             WarningNote("Turn on at least one service so people can book")
@@ -378,7 +403,11 @@ private fun CopyCard(
 }
 
 @Composable
-private fun VisibilityCard(listed: Boolean, pillar: SchedulingPillar, onSet: (Boolean) -> Unit) {
+private fun VisibilityCard(
+    listed: Boolean,
+    pillar: SchedulingPillar,
+    onSet: (Boolean) -> Unit,
+) {
     BLCard(pillar = pillar, overline = "Visibility") {
         BLSegmented(
             options = listOf("Listed", "Link-only"),
@@ -396,7 +425,11 @@ private fun VisibilityCard(listed: Boolean, pillar: SchedulingPillar, onSet: (Bo
 }
 
 @Composable
-private fun LinksCard(form: BookingPageForm, pillar: SchedulingPillar, onNavigate: (String) -> Unit) {
+private fun LinksCard(
+    form: BookingPageForm,
+    pillar: SchedulingPillar,
+    onNavigate: (String) -> Unit,
+) {
     BLCard(pillar = pillar) {
         LinkRowItem(
             icon = PantopusIcon.Eye,
@@ -422,10 +455,15 @@ private fun LinksCard(form: BookingPageForm, pillar: SchedulingPillar, onNavigat
 }
 
 @Composable
-private fun FooterRow(enabled: Boolean, onCopy: () -> Unit, onShare: () -> Unit, onViewQr: () -> Unit) {
+private fun FooterRow(
+    enabled: Boolean,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onViewQr: () -> Unit,
+) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         RowScopeFooterAction(PantopusIcon.Copy, "Copy link", enabled, onCopy, Modifier.weight(1f))
         RowScopeFooterAction(PantopusIcon.Share, "Share", enabled, onShare, Modifier.weight(1f))
-        RowScopeFooterAction(PantopusIcon.Grid3x3, "View QR", enabled, onViewQr, Modifier.weight(1f))
+        RowScopeFooterAction(PantopusIcon.QrCode, "View QR", enabled, onViewQr, Modifier.weight(1f))
     }
 }

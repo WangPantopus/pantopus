@@ -141,7 +141,7 @@ fun MyBookingsContent(
             is MyBookingsUiState.Loading -> LoadingSkeleton()
             is MyBookingsUiState.Empty -> EmptyBody()
             is MyBookingsUiState.Error -> ErrorState(message = state.message, modifier = Modifier.fillMaxSize(), onRetry = onRetry)
-            is MyBookingsUiState.Loaded -> Groups(state.groups, onRow = onRow)
+            is MyBookingsUiState.Loaded -> Groups(state.groups, showTagline = tab == MyBookingsTab.Upcoming, onRow = onRow)
         }
     }
 }
@@ -214,18 +214,21 @@ private fun SegmentedTabs(
 private fun Groups(
     groups: List<MyBookingGroup>,
     onRow: (String) -> Unit,
+    showTagline: Boolean = true,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Text(
-            text = "Everything you've booked, in one place.",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s2),
-        )
+        if (showTagline) {
+            Text(
+                text = "Everything you've booked, in one place.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s2),
+            )
+        }
         groups.forEach { group ->
             GroupOverline(group)
             group.rows.forEach { row -> BookingRow(row = row, onClick = { onRow(row.id) }) }

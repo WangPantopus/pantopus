@@ -173,16 +173,20 @@ private fun InvoicesLoadedBody(
     ) {
         SummaryCard(count = state.countLabel, total = state.totalLabel)
         FilterChips(selected = filter, accent = state.pillar.accent, onSelect = onSelectFilter)
-        state.sections.forEach { section ->
-            Text(
-                text = section.day.uppercase(),
-                color = PantopusColors.appTextMuted,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp,
-                modifier = Modifier.padding(horizontal = Spacing.s1, vertical = Spacing.s1),
-            )
-            PkgRowCard {
+        PkgRowCard {
+            val lastSection = state.sections.lastIndex
+            state.sections.forEachIndexed { sectionIndex, section ->
+                if (sectionIndex > 0) {
+                    HorizontalDivider(color = PantopusColors.appBorder)
+                }
+                Text(
+                    text = section.day.uppercase(),
+                    color = PantopusColors.appTextMuted,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    modifier = Modifier.padding(top = Spacing.s2, bottom = Spacing.s1),
+                )
                 section.invoices.forEachIndexed { index, invoice ->
                     InvoiceRow(
                         initials = initials(invoice),
@@ -192,10 +196,10 @@ private fun InvoicesLoadedBody(
                         pillar = state.pillar,
                         onClick = { onOpen(invoice.id) },
                     )
-                    if (index < section.invoices.lastIndex) {
-                        HorizontalDivider(
-                            color = PantopusColors.appBorder,
-                        )
+                    val lastRowOverall =
+                        sectionIndex == lastSection && index == section.invoices.lastIndex
+                    if (!lastRowOverall && index < section.invoices.lastIndex) {
+                        HorizontalDivider(color = PantopusColors.appBorder)
                     }
                 }
             }

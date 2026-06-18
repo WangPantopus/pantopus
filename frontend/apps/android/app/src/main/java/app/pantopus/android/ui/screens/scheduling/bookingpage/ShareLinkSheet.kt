@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -93,33 +92,41 @@ fun ShareLinkSheet(
         containerColor = PantopusColors.appSurface,
         modifier = modifier.testTag("shareLinkSheet"),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).padding(bottom = Spacing.s5),
-            verticalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            if (isDraft) DraftBanner(onTurnOn = onTurnOn)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).padding(bottom = Spacing.s5),
+                verticalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                if (isDraft) DraftBanner(onTurnOn = onTurnOn)
 
-            ContextLabel(pillar)
-            UrlCard(url = url, copied = copied, onCopy = {
-                onCopy()
-                copied = true
-            })
-            Text("Anyone with this link can book you.", color = PantopusColors.appTextSecondary, fontSize = 11.sp)
+                ContextLabel(pillar)
+                UrlCard(url = url, copied = copied, onCopy = {
+                    onCopy()
+                    copied = true
+                })
+                Text("Anyone with this link can book you.", color = PantopusColors.appTextSecondary, fontSize = 11.sp)
 
-            ShareTargetsRow(
-                onShare = onShare,
-                onQr = { showQr = true },
-                onMessages = onMessages,
-                onEmail = onEmail,
-            )
-            QrThumbCard(onShow = { showQr = true })
-            ShareSettingsCard(
-                showOnProfile = showOnProfile,
-                addToSignature = addToSignature,
-                onToggleProfile = { showOnProfile = !showOnProfile },
-                onToggleSignature = { addToSignature = !addToSignature },
-            )
-            RegenerateButton(onClick = { showRegenConfirm = true })
+                ShareTargetsRow(
+                    onShare = onShare,
+                    onQr = { showQr = true },
+                    onMessages = onMessages,
+                    onEmail = onEmail,
+                )
+                QrThumbCard(onShow = { showQr = true })
+                ShareSettingsCard(
+                    showOnProfile = showOnProfile,
+                    addToSignature = addToSignature,
+                    onToggleProfile = { showOnProfile = !showOnProfile },
+                    onToggleSignature = { addToSignature = !addToSignature },
+                )
+                RegenerateButton(onClick = { showRegenConfirm = true })
+            }
+            if (copied) {
+                CopiedToast(
+                    message = "Link copied",
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.s12),
+                )
+            }
         }
     }
 
@@ -152,7 +159,11 @@ internal fun ContextLabel(pillar: SchedulingPillar) {
 }
 
 @Composable
-private fun UrlCard(url: String, copied: Boolean, onCopy: () -> Unit) {
+private fun UrlCard(
+    url: String,
+    copied: Boolean,
+    onCopy: () -> Unit,
+) {
     Row(
         modifier =
             Modifier
@@ -195,10 +206,10 @@ private fun ShareTargetsRow(
     onEmail: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        ShareTargetButton(PantopusIcon.Share, "Share", Modifier.weight(1f), onShare)
-        ShareTargetButton(PantopusIcon.Grid3x3, "QR code", Modifier.weight(1f), onQr)
-        ShareTargetButton(PantopusIcon.MessageCircle, "Messages", Modifier.weight(1f), onMessages)
-        ShareTargetButton(PantopusIcon.Mail, "Email", Modifier.weight(1f), onEmail)
+        ShareTargetButton(PantopusIcon.Share, "Share", Modifier.weight(1f), onClick = onShare)
+        ShareTargetButton(PantopusIcon.QrCode, "QR code", Modifier.weight(1f), onClick = onQr)
+        ShareTargetButton(PantopusIcon.MessageCircle, "Messages", Modifier.weight(1f), onClick = onMessages)
+        ShareTargetButton(PantopusIcon.Mail, "Email", Modifier.weight(1f), onClick = onEmail)
     }
 }
 
@@ -207,17 +218,19 @@ internal fun ShareTargetButton(
     icon: PantopusIcon,
     label: String,
     modifier: Modifier = Modifier,
+    maxTile: androidx.compose.ui.unit.Dp = 52.dp,
     onClick: () -> Unit,
 ) {
     Column(
         modifier = modifier.clickable(onClick = onClick).testTag("shareTarget_$label"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // Spec: tile is width:100% capped at maxWidth (52/54) with aspectRatio 1/1,
+        // centered in the column. Cap the square so it reads as a compact button.
         Box(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
+                    .size(maxTile)
                     .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
@@ -277,6 +290,7 @@ private fun QrThumbCard(onShow: () -> Unit) {
                 Modifier
                     .clip(RoundedCornerShape(Radii.md))
                     .background(PantopusColors.primary50)
+                    .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.md))
                     .clickable(onClick = onShow)
                     .padding(horizontal = Spacing.s3, vertical = 7.dp)
                     .testTag("shareShowQr"),
@@ -378,6 +392,7 @@ private fun QrFullscreenDialog(
     pillar: SchedulingPillar,
     onDone: () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Dialog(onDismissRequest = onDone) {
         Column(
             modifier =
@@ -431,14 +446,72 @@ private fun QrFullscreenDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = Spacing.s3),
             )
+            SaveToPhotosButton(onSave = { saveQrToPhotos(context) })
         }
+    }
+}
+
+@Composable
+private fun SaveToPhotosButton(onSave: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .padding(top = Spacing.s5)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onSave)
+                .padding(horizontal = Spacing.s4, vertical = 10.dp)
+                .testTag("qrSaveToPhotos"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Download, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextStrong)
+        Text("Save to Photos", color = PantopusColors.appTextStrong, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+    }
+}
+
+/** Renders the decorative QR plate to a bitmap and writes it to the device gallery. */
+private fun saveQrToPhotos(context: android.content.Context) {
+    val px = 720
+    val bitmap = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    canvas.drawColor(android.graphics.Color.WHITE)
+    val cells = qrCells()
+    val cell = px.toFloat() / QR_N
+    val paint = android.graphics.Paint().apply { color = android.graphics.Color.parseColor("#111827") }
+    for (r in 0 until QR_N) {
+        for (c in 0 until QR_N) {
+            if (cells[r * QR_N + c]) {
+                canvas.drawRect(c * cell, r * cell, (c + 1) * cell, (r + 1) * cell, paint)
+            }
+        }
+    }
+    val name = "pantopus-booking-qr-${System.currentTimeMillis()}.png"
+    val values =
+        android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+        }
+    val resolver = context.contentResolver
+    val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+    if (uri != null) {
+        resolver.openOutputStream(uri)?.use { out ->
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+        }
+        android.widget.Toast.makeText(context, "Saved to Photos", android.widget.Toast.LENGTH_SHORT).show()
+    } else {
+        android.widget.Toast.makeText(context, "Couldn't save the QR code", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
 
 // ─── Regenerate confirm ─────────────────────────────────────────────────────
 
 @Composable
-private fun RegenerateConfirmDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
+private fun RegenerateConfirmDialog(
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
     Dialog(onDismissRequest = onCancel) {
         Column(
             modifier =
@@ -479,7 +552,12 @@ private fun RegenerateConfirmDialog(onCancel: () -> Unit, onConfirm: () -> Unit)
 }
 
 @Composable
-private fun ConfirmButton(label: String, filled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ConfirmButton(
+    label: String,
+    filled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     Box(
         modifier =
             modifier
@@ -506,7 +584,10 @@ private const val QR_N = 25
 
 /** A deterministic, decorative QR grid (not scannable) — mirrors the design mock. */
 @Composable
-internal fun QrCanvas(modifier: Modifier = Modifier, foreground: Color = PantopusColors.appText) {
+internal fun QrCanvas(
+    modifier: Modifier = Modifier,
+    foreground: Color = PantopusColors.appText,
+) {
     val cells = remember { qrCells() }
     Canvas(modifier = modifier) {
         val cell = size.minDimension / QR_N
@@ -531,7 +612,11 @@ private fun qrCells(): BooleanArray {
         seed = (seed * 9301 + 49297) % 233280
         out[i] = seed.toDouble() / 233280.0 > 0.5
     }
-    fun finder(r0: Int, c0: Int) {
+
+    fun finder(
+        r0: Int,
+        c0: Int,
+    ) {
         for (r in 0 until 7) {
             for (c in 0 until 7) {
                 val on = r == 0 || r == 6 || c == 0 || c == 6 || (r in 2..4 && c in 2..4)

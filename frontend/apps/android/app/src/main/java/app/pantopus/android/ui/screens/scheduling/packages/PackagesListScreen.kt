@@ -174,7 +174,7 @@ private fun PackagesLoadedBody(
             accent = state.pillar.accent,
             modifier = Modifier.testTag(PackagesListTags.FILTER_PREFIX + filter.name),
         )
-        if (filter == PackageFilter.Active) {
+        if (filter == PackageFilter.Active && visible.isNotEmpty()) {
             Text(
                 text = "Sell a bundle of sessions at a better rate. Buyers keep their price if you change it later.",
                 color = PantopusColors.appTextSecondary,

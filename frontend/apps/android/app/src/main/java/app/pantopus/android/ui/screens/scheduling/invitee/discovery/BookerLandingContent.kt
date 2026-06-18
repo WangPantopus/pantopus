@@ -18,6 +18,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -193,6 +197,8 @@ fun OpenInAppBanner(
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var dismissed by remember { mutableStateOf(false) }
+    if (dismissed) return
     Row(
         modifier =
             modifier
@@ -226,6 +232,16 @@ fun OpenInAppBanner(
                     .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         ) {
             Text(text = "Open", style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .clickable(onClickLabel = "Dismiss", onClick = { dismissed = true }),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = PantopusIcon.X, contentDescription = "Dismiss", size = 14.dp, tint = PantopusColors.appTextMuted)
         }
     }
 }

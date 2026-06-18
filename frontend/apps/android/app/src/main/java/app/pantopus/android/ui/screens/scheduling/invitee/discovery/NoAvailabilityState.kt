@@ -3,7 +3,6 @@
 package app.pantopus.android.ui.screens.scheduling.invitee.discovery
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +19,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,7 +66,7 @@ fun NoAvailabilityState(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.xl))
+                .dashedBorder(PantopusColors.appBorderStrong, Radii.xl)
                 .padding(horizontal = Spacing.s5, vertical = Spacing.s6),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -115,7 +120,7 @@ fun DayFullyBookedNotice(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.xl))
+                .dashedBorder(PantopusColors.appBorderStrong, Radii.xl)
                 .padding(horizontal = Spacing.s5, vertical = Spacing.s5),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -139,7 +144,7 @@ fun DayFullyBookedNotice(
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Every slot on this day is taken.",
+            text = "Every slot on this day is booked.",
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,
@@ -154,3 +159,20 @@ fun DayFullyBookedNotice(
         }
     }
 }
+
+/** Rounded dashed outline (1dp) — the calm no-availability card stroke (spec: `1px dashed`). */
+private fun Modifier.dashedBorder(
+    color: Color,
+    radius: androidx.compose.ui.unit.Dp,
+): Modifier =
+    drawBehind {
+        val stroke = 1.dp.toPx()
+        val r = radius.toPx()
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(stroke / 2f, stroke / 2f),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = CornerRadius(r, r),
+            style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))),
+        )
+    }

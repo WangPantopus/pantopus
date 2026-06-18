@@ -1,9 +1,18 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,21 +79,52 @@ internal fun WaitlistJoinSheet(
             ) {
                 FullyBookedPill()
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                    Text(text = state.windowLabel.ifBlank { "This time is full" }, style = PantopusTextStyle.h3, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-                    Text(text = "Join the waitlist and we'll text you the moment a spot opens.", style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
+                    Text(
+                        text =
+                            state.windowLabel.ifBlank {
+                                "This time is full"
+                            },
+                        style = PantopusTextStyle.h3,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                    )
+                    Text(
+                        text = "Join the waitlist and we'll text you the moment a spot opens.",
+                        style = PantopusTextStyle.small,
+                        color = PantopusColors.appTextSecondary,
+                    )
                 }
                 if (state.timezoneLabel.isNotBlank()) {
                     TimezoneChip(label = state.timezoneLabel)
                 }
 
                 LabeledField("Your name") {
-                    ExtrasInputField(value = state.name, onValueChange = onName, placeholder = "Full name", leadingIcon = PantopusIcon.User, accent = accent)
+                    ExtrasInputField(
+                        value = state.name,
+                        onValueChange = onName,
+                        placeholder = "Full name",
+                        leadingIcon = PantopusIcon.User,
+                        accent = accent,
+                    )
                 }
                 LabeledField("Email") {
-                    ExtrasInputField(value = state.email, onValueChange = onEmail, placeholder = "For an alert when a spot opens", leadingIcon = PantopusIcon.Mail, accent = accent, keyboardType = KeyboardType.Email)
+                    ExtrasInputField(
+                        value = state.email,
+                        onValueChange = onEmail,
+                        placeholder = "For an alert when a spot opens",
+                        leadingIcon = PantopusIcon.Mail,
+                        accent = accent,
+                        keyboardType = KeyboardType.Email,
+                    )
                 }
                 LabeledField("Preferred time") {
-                    ExtrasInputField(value = state.preferredTime, onValueChange = onPreferredTime, placeholder = "Any morning works (optional)", leadingIcon = PantopusIcon.Clock, accent = accent)
+                    ExtrasInputField(
+                        value = state.preferredTime,
+                        onValueChange = onPreferredTime,
+                        placeholder = "Any morning works (optional)",
+                        leadingIcon = PantopusIcon.Clock,
+                        accent = accent,
+                    )
                 }
 
                 state.error?.let { ExtrasInlineError(message = it) }
@@ -119,6 +159,7 @@ private fun FullyBookedPill() {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.pill))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -160,7 +201,13 @@ private fun JoinedConfirmation(
         ) {
             PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 30.dp, tint = PantopusColors.success)
         }
-        Text(text = "You're on the waitlist", style = PantopusTextStyle.h3, fontWeight = FontWeight.Bold, color = PantopusColors.appText, textAlign = TextAlign.Center)
+        Text(
+            text = "You're on the waitlist",
+            style = PantopusTextStyle.h3,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+        )
         Text(
             text = "We'll text you the moment a spot frees up.",
             style = PantopusTextStyle.small,
