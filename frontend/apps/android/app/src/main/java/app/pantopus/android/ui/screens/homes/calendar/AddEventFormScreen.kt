@@ -49,10 +49,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -62,7 +64,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
-import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormShell
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -216,6 +217,106 @@ private fun OfflineFormBanner() {
     }
 }
 
+// MARK: - Section (green-overline card)
+
+/**
+ * Bespoke section card matching the design's `Section`
+ * (add-event-frames.jsx:11) and iOS `EventSection` — a white card with a
+ * Home-green (`homeDark`) uppercase overline, 1px appBorder, [Radii.xl]
+ * radius and a subtle shadow. The shared `FormFieldGroup` hardcodes a neutral
+ * grey overline + 12dp/no-border card, so the F3 sheet renders its own to
+ * carry the Home pillar accent and the design card geometry.
+ *
+ * @param overline Optional uppercase header in Home-green; `null` for the
+ *     overline-less RSVP section (add-event-frames.jsx:88).
+ */
+@Composable
+private fun EventSection(
+    overline: String? = null,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        if (overline != null) {
+            Text(
+                text = overline.uppercase(Locale.ROOT),
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.homeDark,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .shadow(1.dp, RoundedCornerShape(Radii.xl), clip = false)
+                    .clip(RoundedCornerShape(Radii.xl))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                    .padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            content()
+        }
+    }
+}
+
+/** Inline "label left · control right" row matching the design's `ValueRow`. */
+@Composable
+private fun ValueRow(
+    label: String,
+    isError: Boolean = false,
+    trailing: @Composable () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (isError) PantopusColors.error else PantopusColors.appTextStrong,
+            modifier = Modifier.weight(1f),
+        )
+        trailing()
+    }
+}
+
+/** Static sunken value pill — the design's `ValueRow` trailing value chip. */
+@Composable
+private fun ValuePill(
+    label: String,
+    isError: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.md))
+                .background(if (isError) PantopusColors.errorBg else PantopusColors.appSurfaceSunken)
+                .then(
+                    if (isError) {
+                        Modifier.border(1.dp, PantopusColors.errorLight, RoundedCornerShape(Radii.md))
+                    } else {
+                        Modifier
+                    },
+                ).clickable(onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (isError) PantopusColors.error else PantopusColors.appText,
+        )
+    }
+}
+
 // MARK: - Title
 
 @Composable
@@ -223,7 +324,7 @@ private fun TitleGroup(
     state: AddEventUiState,
     onUpdate: (AddEventField, String) -> Unit,
 ) {
-    FormFieldGroup(title = "Title") {
+    EventSection {
         val snapshot = state.fields[AddEventField.Title]
         val fieldState =
             when {
@@ -250,7 +351,7 @@ private fun CategoryGroup(
     state: AddEventUiState,
     onSelect: (CalendarEventCategory) -> Unit,
 ) {
-    FormFieldGroup(title = "Category") {
+    EventSection(overline = "Category") {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             DESIGNED_CATEGORIES.forEach { category ->
                 CategoryChip(category = category, isSelected = state.category == category, onClick = { onSelect(category) })
@@ -265,20 +366,22 @@ private fun CategoryChip(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
+    // JSX `CatPick` (add-event-frames.jsx) is a full pill (borderRadius 9999);
+    // iOS uses a Capsule. Clip with [Radii.pill] to match.
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         modifier =
             Modifier
                 .heightIn(min = 36.dp)
-                .clip(RoundedCornerShape(Radii.md))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(if (isSelected) PantopusColors.homeBg else PantopusColors.appSurface)
                 .border(
                     width = 1.dp,
                     color = if (isSelected) PantopusColors.homeBg else PantopusColors.appBorder,
-                    shape = RoundedCornerShape(Radii.md),
+                    shape = RoundedCornerShape(Radii.pill),
                 ).clickable(onClick = onClick)
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .padding(horizontal = Spacing.s3, vertical = 7.dp)
                 .testTag("addEvent_category_${category.rawValue}")
                 .semantics { contentDescription = category.pickerLabel },
     ) {
@@ -301,9 +404,11 @@ private fun ScheduleGroup(
     onSetStart: (java.time.ZonedDateTime) -> Unit,
     onSetEnd: (java.time.ZonedDateTime) -> Unit,
 ) {
-    FormFieldGroup(title = "When") {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
-            Text(text = "All-day", style = PantopusTextStyle.body, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+    EventSection(overline = "When") {
+        // JSX `ScheduleGroup` (add-event-frames.jsx:32): a stack of `ValueRow`s —
+        // label left, control/value pill right inline. All-day toggle, then a
+        // single combined "date · time" value pill per Starts / Ends.
+        ValueRow(label = "All-day") {
             Switch(
                 checked = state.allDay,
                 onCheckedChange = onAllDay,
@@ -315,9 +420,11 @@ private fun ScheduleGroup(
                 modifier = Modifier.testTag("addEvent_allDayToggle"),
             )
         }
-        DateTimeRow(label = "Starts", value = state.startDate, allDay = state.allDay, testTagPrefix = "addEvent_startDate", onChange = onSetStart)
+        HorizontalDivider(color = PantopusColors.appBorder, thickness = 1.dp)
+        DateTimeValueRow(label = "Starts", value = state.startDate, allDay = state.allDay, testTagPrefix = "addEvent_startDate", isError = false, onChange = onSetStart)
         if (!state.allDay && state.endDate != null) {
-            DateTimeRow(label = "Ends", value = state.endDate, allDay = false, testTagPrefix = "addEvent_endDate", onChange = onSetEnd)
+            HorizontalDivider(color = PantopusColors.appBorder, thickness = 1.dp)
+            DateTimeValueRow(label = "Ends", value = state.endDate, allDay = false, testTagPrefix = "addEvent_endDate", isError = state.endError != null, onChange = onSetEnd)
             state.endError?.let { error ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -333,24 +440,38 @@ private fun ScheduleGroup(
 }
 
 @Composable
-private fun DateTimeRow(
+private fun DateTimeValueRow(
     label: String,
     value: java.time.ZonedDateTime,
     allDay: Boolean,
     testTagPrefix: String,
+    isError: Boolean,
     onChange: (java.time.ZonedDateTime) -> Unit,
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
-    val dateFmt = remember { DateTimeFormatter.ofPattern("EEE MMM d, yyyy", Locale.US) }
+    val dateFmt = remember { DateTimeFormatter.ofPattern("EEE MMM d", Locale.US) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("h:mm a", Locale.US) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        Text(text = label, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            PickerChip(label = dateFmt.format(value), onClick = { showDatePicker = true }, modifier = Modifier.weight(1f).testTag("${testTagPrefix}_date"))
+    // The design renders one combined "Mon Jun 16 · 6:30 PM" value pill. Tapping
+    // the pill opens the date picker; on a timed event a second tap target keeps
+    // the time editable. We expose two stacked pills sharing the row's right
+    // edge so both pieces stay tappable while reading as a single inline value.
+    ValueRow(label = label, isError = isError) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), verticalAlignment = Alignment.CenterVertically) {
+            ValuePill(
+                label = dateFmt.format(value),
+                isError = isError,
+                onClick = { showDatePicker = true },
+                modifier = Modifier.testTag("${testTagPrefix}_date"),
+            )
             if (!allDay) {
-                PickerChip(label = timeFmt.format(value), onClick = { showTimePicker = true }, modifier = Modifier.weight(1f).testTag("${testTagPrefix}_time"))
+                ValuePill(
+                    label = timeFmt.format(value),
+                    isError = isError,
+                    onClick = { showTimePicker = true },
+                    modifier = Modifier.testTag("${testTagPrefix}_time"),
+                )
             }
         }
     }
@@ -377,28 +498,6 @@ private fun DateTimeRow(
     }
 }
 
-@Composable
-private fun PickerChip(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            modifier
-                .heightIn(min = 44.dp)
-                .clip(RoundedCornerShape(Radii.md))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appSurfaceSunken)
-                .clickable(onClick = onClick)
-                .padding(horizontal = Spacing.s3),
-    ) {
-        Text(text = label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, modifier = Modifier.weight(1f))
-        PantopusIconImage(icon = PantopusIcon.ChevronDown, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextSecondary)
-    }
-}
-
 // MARK: - Recurrence
 
 @Composable
@@ -406,7 +505,7 @@ private fun RecurrenceGroup(
     state: AddEventUiState,
     onSelect: (AddEventRecurrence) -> Unit,
 ) {
-    FormFieldGroup(title = "Repeats") {
+    EventSection(overline = "Repeats") {
         Row(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.md)).background(PantopusColors.appSurfaceSunken).padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -443,7 +542,7 @@ private fun AttendeesGroup(
     state: AddEventUiState,
     onToggle: (String) -> Unit,
 ) {
-    FormFieldGroup(title = "Assign to") {
+    EventSection(overline = "Assign to") {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(text = "Assign to", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong, modifier = Modifier.weight(1f))
             Text(
@@ -506,21 +605,23 @@ private fun AttendeeRow(
 
 @Composable
 private fun CheckMark(isSelected: Boolean) {
+    // JSX `Check` (home-shell.jsx:402) is a round 20px circle — green fill +
+    // white tick when on, grey ring when off. iOS `RoundCheck` matches.
     Box(
         modifier =
             Modifier
-                .size(22.dp)
-                .clip(RoundedCornerShape(Radii.xs))
+                .size(20.dp)
+                .clip(CircleShape)
                 .background(if (isSelected) PantopusColors.home else PantopusColors.appSurface)
                 .border(
-                    width = if (isSelected) 0.dp else 1.5.dp,
+                    width = 1.5.dp,
                     color = if (isSelected) PantopusColors.home else PantopusColors.appBorderStrong,
-                    shape = RoundedCornerShape(Radii.xs),
+                    shape = CircleShape,
                 ),
         contentAlignment = Alignment.Center,
     ) {
         if (isSelected) {
-            PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextInverse)
+            PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextInverse)
         }
     }
 }
@@ -532,7 +633,7 @@ private fun ReminderGroup(
     state: AddEventUiState,
     onToggle: (AddEventReminderOffset) -> Unit,
 ) {
-    FormFieldGroup(title = "Reminder") {
+    EventSection(overline = "Reminder") {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             AddEventReminderOffset.entries.forEach { offset ->
                 val on = offset in state.reminderOffsets
@@ -571,9 +672,10 @@ private fun RequestRsvpGroup(
     state: AddEventUiState,
     onToggle: (Boolean) -> Unit,
 ) {
-    FormFieldGroup(title = "RSVP") {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
-            Text(text = "Request RSVP from attendees", style = PantopusTextStyle.body, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+    // JSX RSVP `Section` (add-event-frames.jsx:88) has no overline — render the
+    // toggle in a borderless, overline-less section.
+    EventSection {
+        ValueRow(label = "Request RSVP from attendees") {
             Switch(
                 checked = state.requestRsvp,
                 onCheckedChange = onToggle,
@@ -596,7 +698,7 @@ private fun NotesGroup(
     state: AddEventUiState,
     onUpdate: (AddEventField, String) -> Unit,
 ) {
-    FormFieldGroup(title = "Notes") {
+    EventSection(overline = "Notes") {
         val snapshot = state.fields[AddEventField.Notes]
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Box(
