@@ -68,7 +68,7 @@ fun HomePrimaryButton(
             modifier
                 .fillMaxWidth()
                 .heightIn(min = 46.dp)
-                .clip(RoundedCornerShape(Radii.md))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(background)
                 .clickable(
                     enabled = isEnabled && !isLoading,
@@ -155,7 +155,7 @@ fun InlineHomeButton(
         modifier =
             modifier
                 .heightIn(min = 34.dp)
-                .clip(RoundedCornerShape(Radii.sm))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(if (filled) PantopusColors.home else PantopusColors.appSurface)
                 .then(
                     if (filled) {
@@ -164,7 +164,7 @@ fun InlineHomeButton(
                         Modifier.border(
                             1.dp,
                             PantopusColors.appBorderStrong,
-                            RoundedCornerShape(Radii.sm),
+                            RoundedCornerShape(Radii.md),
                         )
                     },
                 ).clickable(onClickLabel = title, role = Role.Button, onClick = onClick)
@@ -312,7 +312,7 @@ fun SectionCard(
                 if (overline != null) {
                     Text(
                         text = overline.uppercase(),
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.6.sp,
                         color = overlineColor,
@@ -608,6 +608,46 @@ fun PickerValueRow(
     }
 }
 
+/**
+ * "Available hours" row showing the start–end range as a sunken pill (F10
+ * HoursWindow). Tapping opens a combined start/end picker via [onClick].
+ */
+@Composable
+fun HoursValueRow(
+    rangeLabel: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .clickable(onClickLabel = "Available hours", role = Role.Button, onClick = onClick)
+                .padding(vertical = Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Available hours",
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            rangeLabel,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceSunken)
+                    .padding(horizontal = Spacing.s2, vertical = 6.dp),
+        )
+    }
+}
+
 // ─── Date / time picker dialogs (Material3) ───────────────────────────────────
 
 /** Date-only picker dialog, today onward, returning a [LocalDate]. */
@@ -660,6 +700,270 @@ fun ResourceTimePickerDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     ) {
         Box(modifier = Modifier.padding(Spacing.s4)) { TimePicker(state = state) }
+    }
+}
+
+/** Dashed "Add a photo · Optional" affordance (F10 Photo section). */
+@Composable
+fun PhotoAddRow(
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .border(
+                    1.5.dp,
+                    PantopusColors.appBorderStrong,
+                    RoundedCornerShape(Radii.md),
+                ).clickable(onClickLabel = "Add a photo, optional", role = Role.Button, onClick = onClick)
+                .padding(horizontal = Spacing.s3, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(Radii.sm))
+                    .background(PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Image,
+                contentDescription = null,
+                size = 17.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            "Add a photo",
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "Optional",
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextMuted,
+        )
+    }
+}
+
+/** Small/full segmented control with a home-green selected pill (F10 Who-can-book). */
+@Composable
+fun <T> SegmentedControl(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.sm))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        options.forEach { option ->
+            val isOn = option == selected
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(Radii.xs))
+                        .background(if (isOn) PantopusColors.appSurface else Color.Transparent)
+                        .clickable(onClickLabel = label(option), role = Role.Button) {
+                            onSelect(option)
+                        }.padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label(option),
+                    fontSize = 12.sp,
+                    fontWeight = if (isOn) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (isOn) PantopusColors.homeDark else PantopusColors.appTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Collapsible "Booking rules" disclosure (F10). Header shows the home-green
+ * overline + chevron; collapsed surfaces [helper], expanded shows [content].
+ */
+@Composable
+fun RulesDisclosure(
+    expanded: Boolean,
+    helper: String,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        onClickLabel = "Booking rules",
+                        role = Role.Button,
+                        onClick = onToggle,
+                    ),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Booking rules".uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.6.sp,
+                    color = PantopusColors.homeDark,
+                )
+                if (!expanded) {
+                    Text(
+                        text = helper,
+                        fontSize = 10.5.sp,
+                        color = PantopusColors.appTextSecondary,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            PantopusIconImage(
+                icon = if (expanded) PantopusIcon.ChevronUp else PantopusIcon.ChevronDown,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+        }
+        if (expanded) {
+            content()
+        }
+    }
+}
+
+/** Dimmed-form overlay with a centered white card + spinner (F10/F12 saving). */
+@Composable
+fun SavingOverlay(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.xl))
+                    .background(PantopusColors.appSurface)
+                    .padding(horizontal = Spacing.s5, vertical = Spacing.s4),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            CircularProgressIndicator(
+                color = PantopusColors.home,
+                strokeWidth = 2.6.dp,
+                modifier = Modifier.size(26.dp),
+            )
+            Text(
+                label,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+        }
+    }
+}
+
+/** Home-green note pill (F12 success) — calendar-check icon + caption. */
+@Composable
+fun SuccessNotePill(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.homeBg)
+                .padding(horizontal = Spacing.s3, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.CalendarCheck,
+            contentDescription = null,
+            size = 13.dp,
+            tint = PantopusColors.homeDark,
+        )
+        Text(
+            text,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.homeDark,
+        )
+    }
+}
+
+/** Amber "Pending approval (N)" header button (F11 approval-pending frame). */
+@Composable
+fun PendingApprovalBadge(
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.md))
+                .clickable(onClickLabel = "Pending approval", role = Role.Button, onClick = onClick)
+                .padding(horizontal = Spacing.s3, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Clock,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            "Pending approval ($count)",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.warmAmber,
+            modifier = Modifier.weight(1f),
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.warning,
+        )
     }
 }
 

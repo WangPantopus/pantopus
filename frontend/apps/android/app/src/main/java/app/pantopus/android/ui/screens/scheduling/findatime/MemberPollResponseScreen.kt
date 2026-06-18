@@ -28,7 +28,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,10 +73,12 @@ fun MemberPollResponseContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onVote: (String, VoteValue) -> Unit,
-    onName: (String) -> Unit,
-    onEmail: (String) -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
+    // Retained (defaulted) for the signed-in voter's name/email recorded on submit;
+    // the design has no in-flow capture UI, so these are no longer rendered.
+    onName: (String) -> Unit = {},
+    onEmail: (String) -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxSize().background(PantopusColors.appBg).testTag(MEMBER_POLL_RESPONSE_TAG)) {
         FtTopBar(title = "Respond", onBack = onBack, backIcon = PantopusIcon.X)
@@ -88,8 +89,6 @@ fun MemberPollResponseContent(
                 LoadedPoll(
                     state = state,
                     onVote = onVote,
-                    onName = onName,
-                    onEmail = onEmail,
                     onSubmit = onSubmit,
                 )
             is PollResponseUiState.Closed -> ClosedPoll(state = state)
@@ -109,11 +108,13 @@ private fun OrganizerHeader(header: PollHeader) {
                 .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Spec shows the organizer's person photo here; the public poll read carries no
+        // organizer avatar, so a 38dp person disc stands in (mirrors iOS' organizer disc).
         Box(
             modifier = Modifier.size(38.dp).clip(CircleShape).background(HomeAccentBg),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.Vote, contentDescription = null, size = 18.dp, tint = HomeAccentDark)
+            PantopusIconImage(icon = PantopusIcon.UserRound, contentDescription = null, size = 20.dp, tint = HomeAccentDark)
         }
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s3)) {
             Text(text = header.title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
@@ -132,8 +133,6 @@ private fun OrganizerHeader(header: PollHeader) {
 private fun LoadedPoll(
     state: PollResponseUiState.Loaded,
     onVote: (String, VoteValue) -> Unit,
-    onName: (String) -> Unit,
-    onEmail: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -142,38 +141,18 @@ private fun LoadedPoll(
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             OrganizerHeader(state.header)
-            if (state.submitted) {
+            // Spec's conflicts-detected frame: an info banner above the slots when any
+            // slot collides with the member's personal calendar.
+            if (state.options.any { it.conflict }) {
                 FtBanner(
-                    tone = FtBannerTone.Home,
-                    icon = PantopusIcon.CheckCircle,
-                    title = "Response submitted",
-                    body = "Thanks — we'll book the most-picked time.",
+                    tone = FtBannerTone.Info,
+                    icon = PantopusIcon.Info,
+                    body = "We pre-filled a \"Can't\" where you're already busy. Change any you can still make.",
                 )
             }
             FtOverline("Mark which times work", color = PantopusColors.appTextSecondary)
             state.options.forEach { option ->
                 PollOptionCard(option = option, locked = false, onVote = { onVote(option.id, it) })
-            }
-            if (state.needsEmail) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radii.xl))
-                            .background(PantopusColors.appSurface)
-                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                            .padding(Spacing.s3),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-                ) {
-                    FtOverline("Your details", color = PantopusColors.appTextSecondary)
-                    FtInputField(value = state.voterName, placeholder = "Your name (optional)", onValueChange = onName)
-                    FtInputField(
-                        value = state.voterEmail,
-                        placeholder = "Email to record your vote",
-                        onValueChange = onEmail,
-                        keyboardType = KeyboardType.Email,
-                    )
-                }
             }
             if (state.error != null) {
                 FtBanner(tone = FtBannerTone.Error, icon = PantopusIcon.AlertCircle, body = state.error)
@@ -181,7 +160,7 @@ private fun LoadedPoll(
         }
         Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(Spacing.s4)) {
             FtPrimaryButton(
-                label = if (state.submitted) "Update response" else "Submit response",
+                label = "Submit response",
                 icon = PantopusIcon.Send,
                 enabled = state.canSubmit,
                 onClick = onSubmit,
@@ -231,14 +210,41 @@ private fun PollOptionCard(
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .padding(Spacing.s3),
     ) {
-        Text(
-            text = "${option.dayLabel} · ${option.timeLabel}",
-            style = PantopusTextStyle.small,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appText,
-            modifier = Modifier.padding(bottom = Spacing.s2),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${option.dayLabel} · ${option.timeLabel}",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
+            if (option.conflict) {
+                FtChip(
+                    label = "Conflicts",
+                    icon = PantopusIcon.AlertTriangle,
+                    bg = PantopusColors.errorBg,
+                    fg = PantopusColors.error,
+                )
+            }
+        }
         VoteControl(optionId = option.id, selected = option.vote, locked = locked, onVote = onVote)
+        if (option.conflict) {
+            Row(
+                modifier = Modifier.padding(top = Spacing.s2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Calendar, contentDescription = null, size = 11.dp, tint = PantopusColors.appTextSecondary)
+                Text(
+                    text = "From your personal calendar",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.padding(start = Spacing.s1),
+                )
+            }
+        }
     }
 }
 

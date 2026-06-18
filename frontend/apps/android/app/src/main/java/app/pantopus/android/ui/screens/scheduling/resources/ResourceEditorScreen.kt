@@ -13,6 +13,8 @@
 
 package app.pantopus.android.ui.screens.scheduling.resources
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +46,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -145,32 +150,35 @@ fun ResourceEditorScreen(
                         onRetry = viewModel::load,
                     )
                 ResourceEditorLoadState.Ready ->
-                    EditorBody(
-                        form = form,
-                        viewModel = viewModel,
-                        showNameError = nameTouched && form.name.isBlank(),
-                        onNameChange = {
-                            nameTouched = true
-                            viewModel.setName(it)
-                        },
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        EditorBody(
+                            form = form,
+                            viewModel = viewModel,
+                            showNameError = nameTouched && form.name.isBlank(),
+                            isDimmed = isSaving,
+                            onNameChange = {
+                                nameTouched = true
+                                viewModel.setName(it)
+                            },
+                        )
+                        if (isSaving) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                SavingOverlay(label = "Saving resource")
+                            }
+                        }
+                    }
             }
         }
     }
 
     if (showDelete) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissDelete,
-            confirmButton = {
-                TextButton(onClick = { scope.launch { if (viewModel.confirmDelete()) onBack() } }) {
-                    Text("Delete", color = PantopusColors.error, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = { TextButton(onClick = viewModel::dismissDelete) { Text("Keep") } },
-            title = { Text("Delete ${form.name.ifBlank { "resource" }}?") },
-            text = {
-                Text("Existing bookings stay on the calendar. New bookings will be turned off.")
-            },
+        ResourceDeleteDialog(
+            resourceName = form.name.ifBlank { "resource" },
+            onDelete = { scope.launch { if (viewModel.confirmDelete()) onBack() } },
+            onKeep = viewModel::dismissDelete,
         )
     }
 
@@ -194,13 +202,20 @@ private fun EditorBody(
     form: ResourceEditorForm,
     viewModel: ResourceEditorViewModel,
     showNameError: Boolean,
+    isDimmed: Boolean,
     onNameChange: (String) -> Unit,
 ) {
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
+    var rulesExpanded by remember { mutableStateOf(!viewModel.isCreate) }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .alpha(if (isDimmed) 0.45f else 1f)
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         // Name + type
@@ -239,21 +254,19 @@ private fun EditorBody(
             }
         }
 
+        // Photo
+        SectionCard(overline = "Photo") {
+            PhotoAddRow()
+        }
+
         // Who can book
         SectionCard(overline = "Who can book") {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                WhoCanBook.entries.forEach { option ->
-                    SelectChip(
-                        label = option.label,
-                        isOn = option == form.whoCanBook,
-                        onClick = { viewModel.setWhoCanBook(option) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+            SegmentedControl(
+                options = WhoCanBook.entries,
+                selected = form.whoCanBook,
+                label = { it.label },
+                onSelect = viewModel::setWhoCanBook,
+            )
             if (form.whoCanBook != WhoCanBook.Members) {
                 Text(
                     "In this version, all active home members can book. Per-member access is coming soon.",
@@ -263,8 +276,12 @@ private fun EditorBody(
             }
         }
 
-        // Booking rules
-        SectionCard(overline = "Booking rules") {
+        // Booking rules (collapsible disclosure with smart-defaults helper)
+        RulesDisclosure(
+            expanded = rulesExpanded,
+            helper = viewModel.ruleHelper,
+            onToggle = { rulesExpanded = !rulesExpanded },
+        ) {
             CounterRow(
                 label = "Max duration",
                 value = form.maxDurationHours,
@@ -310,27 +327,9 @@ private fun EditorBody(
         SectionCard(overline = "Available hours") {
             WeekdayPicker(selected = form.hoursDays, onToggle = viewModel::toggleDay)
             HorizontalDivider(color = PantopusColors.appBorderSubtle)
-            PickerValueRow(
-                label = "Available from",
-                value =
-                    form.hoursStart.format(
-                        CLOCK_FORMAT,
-                    ),
-                onClick = {
-                    showStartPicker =
-                        true
-                },
-            )
-            PickerValueRow(
-                label = "Available until",
-                value =
-                    form.hoursEnd.format(
-                        CLOCK_FORMAT,
-                    ),
-                onClick = {
-                    showEndPicker =
-                        true
-                },
+            HoursValueRow(
+                rangeLabel = "${form.hoursStart.format(CLOCK_FORMAT)} – ${form.hoursEnd.format(CLOCK_FORMAT)}",
+                onClick = { showStartPicker = true },
             )
         }
 
@@ -357,12 +356,15 @@ private fun EditorBody(
         }
     }
 
+    // The single "Available hours" row opens a combined start→end flow:
+    // picking the start time chains directly into the end-time picker.
     if (showStartPicker) {
         ResourceTimePickerDialog(
             initial = form.hoursStart,
             onSelect = {
                 viewModel.setHoursStart(it)
                 showStartPicker = false
+                showEndPicker = true
             },
             onDismiss = { showStartPicker = false },
         )
@@ -376,6 +378,87 @@ private fun EditorBody(
             },
             onDismiss = { showEndPicker = false },
         )
+    }
+}
+
+/**
+ * Custom delete-confirm dialog (F10 delete frame): trash-2 error glyph + two
+ * stacked full-width 44dp buttons (red Delete, bordered Keep).
+ */
+@Composable
+private fun ResourceDeleteDialog(
+    resourceName: String,
+    onDelete: () -> Unit,
+    onKeep: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onKeep,
+        icon = {
+            Box(
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(PantopusColors.errorBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Trash2,
+                    contentDescription = null,
+                    size = 22.dp,
+                    tint = PantopusColors.error,
+                )
+            }
+        },
+        title = {
+            Text(
+                "Delete $resourceName?",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+        },
+        text = {
+            Text(
+                "Existing bookings stay on the calendar. New bookings will be turned off.",
+                fontSize = 13.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        },
+        confirmButton = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                HomePrimaryButtonStub(label = "Delete", onClick = onDelete)
+                HomeSecondaryButton(title = "Keep", onClick = onKeep)
+            }
+        },
+        containerColor = PantopusColors.appSurface,
+    )
+}
+
+/** Full-width 44dp red destructive button used inside the delete dialog. */
+@Composable
+private fun HomePrimaryButtonStub(
+    label: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(app.pantopus.android.ui.theme.Radii.lg))
+                .background(PantopusColors.error)
+                .clickable(
+                    onClickLabel = label,
+                    role = androidx.compose.ui.semantics.Role.Button,
+                    onClick = onClick,
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
     }
 }
 

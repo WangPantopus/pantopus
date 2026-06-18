@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -133,6 +134,9 @@ private fun SetupFormBody(
     onWindow: (WindowPreset) -> Unit,
     onToggleExplainer: () -> Unit,
 ) {
+    // Round-robin rule is a display-only choice (mirrors iOS — not sent to the
+    // backend), so it lives as screen-local UI state rather than on the VM form.
+    var roundRobinRule by remember { mutableStateOf(0) }
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -181,6 +185,19 @@ private fun SetupFormBody(
             )
         }
 
+        if (form.mode == FindMode.RoundRobin) {
+            FtCard {
+                FtOverline("Round-robin rule")
+                Box(modifier = Modifier.padding(top = Spacing.s2)) {
+                    FtSegmented(
+                        options = listOf("Fair rotation", "By role"),
+                        selectedIndex = roundRobinRule,
+                        onSelect = { roundRobinRule = it },
+                    )
+                }
+            }
+        }
+
         FtCard {
             FtOverline("Duration")
             Box(modifier = Modifier.padding(top = Spacing.s2)) {
@@ -191,7 +208,17 @@ private fun SetupFormBody(
                 )
             }
             if (form.durationChoice == DurationChoice.Custom) {
-                Box(modifier = Modifier.padding(top = Spacing.s3)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.s3),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Length",
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextStrong,
+                        modifier = Modifier.weight(1f),
+                    )
                     Stepper(
                         valueLabel = FindATimeFormat.durationLabel(form.customDurationMin),
                         onMinus = { onAdjustCustom(-15) },
@@ -222,8 +249,11 @@ private fun Explainer(
 ) {
     val bullets =
         listOf(
+            // Spec/iOS use a 'layers' glyph for the overlay step; the Android icon set has no
+            // dedicated layers mark, so the overlapping-grid glyph carries the same "compose
+            // everyone's grids" intent.
             PantopusIcon.UserCheck to "Each member sets their own free/busy hours in Personal.",
-            PantopusIcon.Users to "Pantopus overlays everyone you pick and keeps only the shared free time.",
+            PantopusIcon.Grid3x3 to "Pantopus overlays everyone you pick and keeps only the shared free time.",
             PantopusIcon.Lock to "No one's calendar is edited. Booking a slot adds one new event.",
         )
     Column(
@@ -249,7 +279,8 @@ private fun Explainer(
                         "Times come from each member's personal availability. " +
                             "Pantopus finds the overlap — it never changes anyone's calendar.",
                     style = PantopusTextStyle.caption,
-                    color = PantopusColors.info,
+                    // Spec colours the primary explainer line primary-800 at weight 500.
+                    color = PantopusColors.primary800,
                     fontWeight = FontWeight.Medium,
                 )
                 if (expanded) {
@@ -545,6 +576,10 @@ private fun ValidationLine(text: String) {
     }
 }
 
+/**
+ * Compact inline `−  value  +` control bordered as a single unit (spec/iOS
+ * geometry). Minus tints neutral, plus tints home-green; the value sits between.
+ */
 @Composable
 private fun Stepper(
     valueLabel: String,
@@ -552,19 +587,22 @@ private fun Stepper(
     onPlus: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.md))
+                .border(1.5.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md)),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        StepperButton(icon = PantopusIcon.X, label = "Decrease", onClick = onMinus)
+        StepperButton(icon = PantopusIcon.Minus, label = "Decrease", tint = PantopusColors.appTextStrong, onClick = onMinus)
         Text(
             text = valueLabel,
-            style = PantopusTextStyle.body,
+            style = PantopusTextStyle.small,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(min = 56.dp),
         )
-        StepperButton(icon = PantopusIcon.Plus, label = "Increase", onClick = onPlus)
+        StepperButton(icon = PantopusIcon.Plus, label = "Increase", tint = HomeAccent, onClick = onPlus)
     }
 }
 
@@ -572,18 +610,17 @@ private fun Stepper(
 private fun StepperButton(
     icon: PantopusIcon,
     label: String,
+    tint: Color,
     onClick: () -> Unit,
 ) {
     Box(
         modifier =
             Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(PantopusColors.appSurfaceSunken)
+                .size(width = 30.dp, height = 32.dp)
                 .clickable(onClickLabel = label, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        PantopusIconImage(icon = icon, contentDescription = label, size = 14.dp, tint = PantopusColors.appTextStrong)
+        PantopusIconImage(icon = icon, contentDescription = label, size = 14.dp, tint = tint)
     }
 }
 
