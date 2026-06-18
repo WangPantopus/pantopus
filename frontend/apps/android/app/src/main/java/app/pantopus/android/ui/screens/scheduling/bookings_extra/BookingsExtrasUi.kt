@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
@@ -33,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -178,7 +187,10 @@ internal fun ExtrasChipButton(
             modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurface)
-                .border(BorderStroke(1.dp, if (enabled) accent.copy(alpha = CHIP_BORDER_ALPHA) else PantopusColors.appBorder), RoundedCornerShape(Radii.pill))
+                .border(
+                    BorderStroke(1.dp, if (enabled) accent.copy(alpha = CHIP_BORDER_ALPHA) else PantopusColors.appBorder),
+                    RoundedCornerShape(Radii.pill),
+                )
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
@@ -372,36 +384,26 @@ internal fun InitialsAvatar(
 
 // ─── Status chip (Confirmed / Pending / …) ─────────────────────────────────
 
-internal data class StatusChipStyle(val label: String, val fg: Color, val bg: Color)
-
-@Composable
-internal fun bookingStatusChipStyle(status: String?): StatusChipStyle =
-    when (status) {
-        "confirmed", "going" -> StatusChipStyle("Confirmed", PantopusColors.success, PantopusColors.successBg)
-        "pending" -> StatusChipStyle("Pending", PantopusColors.warning, PantopusColors.warningBg)
-        "no_show" -> StatusChipStyle("No-show", PantopusColors.error, PantopusColors.errorBg)
-        "cancelled" -> StatusChipStyle("Cancelled", PantopusColors.appTextSecondary, PantopusColors.appSurfaceSunken)
-        "declined" -> StatusChipStyle("Declined", PantopusColors.appTextSecondary, PantopusColors.appSurfaceSunken)
-        "completed" -> StatusChipStyle("Completed", PantopusColors.success, PantopusColors.successBg)
-        "waiting" -> StatusChipStyle("Waitlisted", PantopusColors.appTextSecondary, PantopusColors.appSurfaceSunken)
-        else -> StatusChipStyle(status?.replaceFirstChar { it.uppercase() } ?: "—", PantopusColors.appTextSecondary, PantopusColors.appSurfaceSunken)
-    }
-
+/**
+ * Booking status chip — delegates to the shared [SchedulingStatusPill] primitive.
+ * Kept as a thin wrapper so call sites in this package keep the same signature.
+ * Normalises the two legacy wire aliases ("going" → confirmed, "waiting" →
+ * waitlisted) the primitive does not yet alias, then hands off to the
+ * tolerant string overload. A null/blank status falls through to the
+ * primitive's neutral "Status" fallback.
+ */
 @Composable
 internal fun StatusChip(
     status: String?,
     modifier: Modifier = Modifier,
 ) {
-    val style = bookingStatusChipStyle(status)
-    Box(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(style.bg)
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
-    ) {
-        Text(text = style.label, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = style.fg)
-    }
+    val wire =
+        when (status) {
+            "going" -> "confirmed"
+            "waiting" -> "waitlisted"
+            else -> status.orEmpty()
+        }
+    SchedulingStatusPill(status = wire, modifier = modifier)
 }
 
 // ─── A wrapping row of chips ────────────────────────────────────────────────

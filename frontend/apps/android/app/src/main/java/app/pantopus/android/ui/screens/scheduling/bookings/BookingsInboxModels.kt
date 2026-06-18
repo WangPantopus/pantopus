@@ -4,7 +4,7 @@ package app.pantopus.android.ui.screens.scheduling.bookings
 
 import androidx.compose.ui.graphics.Color
 import app.pantopus.android.data.scheduling.SchedulingOwner
-import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -45,8 +45,7 @@ data class BookingRowUi(
     val inviteeName: String,
     val eventName: String,
     val whenLabel: String,
-    val statusLabel: String,
-    val statusVariant: StatusChipVariant,
+    val pillStatus: SchedulingPillStatus,
     val showOwnerGlyph: Boolean,
     val assigned: Boolean,
     val unread: Boolean,

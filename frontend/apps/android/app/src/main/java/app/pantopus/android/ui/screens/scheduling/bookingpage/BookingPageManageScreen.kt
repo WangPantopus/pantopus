@@ -44,6 +44,7 @@ import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -225,7 +226,7 @@ private fun StatusCard(
     BLCard(pillar = pillar, overline = "Status") {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             Column(Modifier.weight(1f)) {
-                StatusChip(status)
+                SchedulingStatusPill(status = status.toPillStatus())
                 Text(
                     copy,
                     color = PantopusColors.appTextSecondary,

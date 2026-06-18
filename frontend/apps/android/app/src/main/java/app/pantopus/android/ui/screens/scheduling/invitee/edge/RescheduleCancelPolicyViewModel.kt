@@ -227,7 +227,7 @@ class RescheduleCancelPolicyViewModel
                 pillar = pillarFor(page?.ownerType ?: booking.policySnapshot?.get("owner_type") as? String),
                 whenLabel = formatWhenRange(booking.startAt, booking.endAt, zone),
                 tzLabel = tzShortLabel(zone, parseInstant(booking.startAt) ?: Instant.now()),
-                statusLabel = statusLabelFor(booking.status),
+                status = booking.status ?: "confirmed",
                 canReschedule = actions?.canReschedule == true,
                 canCancel = actions?.canCancel == true,
                 rescheduleDeadlineLabel = formatDeadline(actions?.rescheduleDeadline, zone),
@@ -249,13 +249,6 @@ class RescheduleCancelPolicyViewModel
                 "business" -> SchedulingPillar.Business
                 "home" -> SchedulingPillar.Home
                 else -> SchedulingPillar.Personal
-            }
-
-        private fun statusLabelFor(status: String?): String =
-            when (status?.lowercase()) {
-                "pending" -> "Pending"
-                "confirmed" -> "Confirmed"
-                else -> status?.replaceFirstChar { it.uppercase() } ?: "Confirmed"
             }
 
         private fun formatDeadline(
@@ -287,7 +280,7 @@ data class ManageView(
     val pillar: SchedulingPillar,
     val whenLabel: String,
     val tzLabel: String?,
-    val statusLabel: String,
+    val status: String,
     val canReschedule: Boolean,
     val canCancel: Boolean,
     val rescheduleDeadlineLabel: String?,

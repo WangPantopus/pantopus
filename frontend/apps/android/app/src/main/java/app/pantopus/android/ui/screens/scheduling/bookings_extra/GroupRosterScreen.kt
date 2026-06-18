@@ -54,6 +54,7 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -250,7 +251,7 @@ internal fun RosterContent(
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 data.seated.forEach { person ->
                     RosterRow(person = person, verified = true) {
-                        StatusChip(status = person.status)
+                        SchedulingStatusPill(status = person.status.orEmpty())
                         SeatedKebab(person = person, onRowNoShow = onRowNoShow)
                     }
                 }

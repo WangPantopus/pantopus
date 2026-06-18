@@ -55,8 +55,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
-import app.pantopus.android.ui.components.StatusChip
 import app.pantopus.android.ui.screens.scheduling._shared.ConflictAlternativesSheet
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -278,9 +278,7 @@ private fun DetailTopBar(
         }
         Spacer(Modifier.weight(1f))
         if (data != null) {
-            val statusLabel =
-                if (data.status == BookingStatus.Pending) "Pending approval" else data.statusLabel
-            StatusChip(text = statusLabel, variant = data.statusVariant)
+            SchedulingStatusPill(status = data.pillStatus)
         }
         if (data != null && data.isActive) {
             Box {

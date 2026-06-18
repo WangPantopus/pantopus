@@ -42,7 +42,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling.invitee.edge.RescheduleCancelPolicyScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -323,39 +325,15 @@ private fun HostAvatar(
 
 @Composable
 private fun StatusPill(kind: BookingPillKind) {
-    val (bg, fg, border, label) =
+    val status =
         when (kind) {
-            BookingPillKind.Confirmed ->
-                PillStyle(
-                    PantopusColors.successBg,
-                    PantopusColors.success,
-                    PantopusColors.successLight,
-                    "Confirmed",
-                )
-            BookingPillKind.Pending -> PillStyle(PantopusColors.infoBg, PantopusColors.info, PantopusColors.infoLight, "Pending")
-            BookingPillKind.Past ->
-                PillStyle(
-                    PantopusColors.appSurfaceSunken,
-                    PantopusColors.appTextSecondary,
-                    PantopusColors.appBorder,
-                    "Past",
-                )
-            BookingPillKind.Cancelled -> PillStyle(PantopusColors.errorBg, PantopusColors.error, PantopusColors.errorLight, "Cancelled")
+            BookingPillKind.Confirmed -> SchedulingPillStatus.Confirmed
+            BookingPillKind.Pending -> SchedulingPillStatus.Pending
+            BookingPillKind.Past -> SchedulingPillStatus.Past
+            BookingPillKind.Cancelled -> SchedulingPillStatus.Cancelled
         }
-    Text(
-        text = label,
-        style = PantopusTextStyle.overline,
-        color = fg,
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(Radii.pill))
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
-    )
+    SchedulingStatusPill(status = status)
 }
-
-private data class PillStyle(val bg: Color, val fg: Color, val border: Color, val label: String)
 
 @Composable
 private fun EmptyBody() {

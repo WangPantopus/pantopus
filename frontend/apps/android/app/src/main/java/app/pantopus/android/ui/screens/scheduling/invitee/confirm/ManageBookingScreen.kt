@@ -47,8 +47,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.scheduling._shared.ConflictAlternativesSheet
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling._shared.SlotTimeList
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -163,7 +165,7 @@ fun ManageBookingContent(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        StatusBadge(status = data.status)
+        SchedulingStatusPill(status = data.status.toPillStatus())
         ManageSummaryCard(data = data, pillar = pillar, dimmed = dimmed, struck = data.status == ManageStatus.Cancelled)
 
         when (data.status) {
@@ -307,63 +309,14 @@ private fun ManageSummaryCard(
     }
 }
 
-@Composable
-private fun StatusBadge(status: ManageStatus) {
-    val (label, icon, bg, border, fg) =
-        when (status) {
-            ManageStatus.Confirmed ->
-                StatusStyle(
-                    "Confirmed",
-                    PantopusIcon.CheckCircle,
-                    PantopusColors.successBg,
-                    PantopusColors.successLight,
-                    PantopusColors.success,
-                )
-            ManageStatus.Pending ->
-                StatusStyle(
-                    "Pending",
-                    PantopusIcon.Hourglass,
-                    PantopusColors.infoBg,
-                    PantopusColors.infoLight,
-                    PantopusColors.info,
-                )
-            ManageStatus.Past ->
-                StatusStyle(
-                    "Past",
-                    PantopusIcon.History,
-                    PantopusColors.appSurfaceSunken,
-                    PantopusColors.appBorder,
-                    PantopusColors.appTextSecondary,
-                )
-            ManageStatus.Cancelled ->
-                StatusStyle(
-                    "Cancelled",
-                    PantopusIcon.XCircle,
-                    PantopusColors.errorBg,
-                    PantopusColors.errorLight,
-                    PantopusColors.error,
-                )
-        }
-    Row(
-        modifier =
-            Modifier.clip(
-                RoundedCornerShape(Radii.pill),
-            ).background(bg).border(1.dp, border, RoundedCornerShape(Radii.pill)).padding(horizontal = Spacing.s3, vertical = Spacing.s1),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = fg)
-        Text(text = label, style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = fg)
+/** Maps the local D4 booking status onto the shared scheduling pill vocabulary. */
+private fun ManageStatus.toPillStatus(): SchedulingPillStatus =
+    when (this) {
+        ManageStatus.Confirmed -> SchedulingPillStatus.Confirmed
+        ManageStatus.Pending -> SchedulingPillStatus.Pending
+        ManageStatus.Past -> SchedulingPillStatus.Past
+        ManageStatus.Cancelled -> SchedulingPillStatus.Cancelled
     }
-}
-
-private data class StatusStyle(
-    val label: String,
-    val icon: PantopusIcon,
-    val bg: Color,
-    val border: Color,
-    val fg: Color,
-)
 
 private enum class ActionTone { Neutral, Error }
 

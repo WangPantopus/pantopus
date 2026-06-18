@@ -41,6 +41,7 @@ import app.pantopus.android.ui.components.GhostButton
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling._shared.SlotTimeList
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -173,7 +174,7 @@ fun ManageContent(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        StatusBadge(label = view.statusLabel)
+        SchedulingStatusPill(status = view.status)
         BookingSummaryCard(
             eventName = view.eventName,
             hostLabel = view.hostLabel,
@@ -225,23 +226,6 @@ fun ManageContent(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun StatusBadge(label: String) {
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(PantopusColors.successBg)
-                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(Radii.pill))
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        PantopusIconImage(icon = PantopusIcon.CheckCircle, contentDescription = null, size = 13.dp, tint = PantopusColors.success)
-        Text(text = label, style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.success)
     }
 }
 
