@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
@@ -106,6 +107,9 @@ fun EventDetailScreen(
 
 @Composable
 private fun LoadingShell(onBack: () -> Unit) {
+    // JSX `FrameLoading` (event-detail-frames.jsx:121-131): a title + subtitle
+    // shimmer, then a detail-grid card of icon-tile rows and an attendees card
+    // of avatar rows — mirrors the loaded geometry. Matches iOS LoadingShell.
     ContentDetailShell(
         title = "Event",
         onBack = onBack,
@@ -123,11 +127,59 @@ private fun LoadingShell(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(Spacing.s3),
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             ) {
-                Shimmer(width = 320.dp, height = 120.dp, cornerRadius = Radii.xl)
-                Shimmer(width = 320.dp, height = 120.dp, cornerRadius = Radii.xl)
+                SkeletonCard(rows = 4) { SkeletonIconRow() }
+                SkeletonCard(rows = 3) { SkeletonAvatarRow() }
             }
         },
     )
+}
+
+@Composable
+private fun SkeletonCard(
+    rows: Int,
+    row: @Composable () -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.xl))
+                .padding(Spacing.s3),
+    ) {
+        repeat(rows) { row() }
+    }
+}
+
+@Composable
+private fun SkeletonIconRow() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Shimmer(width = 30.dp, height = 30.dp, cornerRadius = Radii.md)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+            Shimmer(width = 60.dp, height = 8.dp, cornerRadius = Radii.sm)
+            Shimmer(width = 110.dp, height = 11.dp, cornerRadius = Radii.sm)
+        }
+    }
+}
+
+@Composable
+private fun SkeletonAvatarRow() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Shimmer(width = 30.dp, height = 30.dp, cornerRadius = Radii.pill)
+        Shimmer(width = 90.dp, height = 11.dp, cornerRadius = Radii.sm)
+        Box(modifier = Modifier.weight(1f))
+        Shimmer(width = 54.dp, height = 18.dp, cornerRadius = Radii.lg)
+    }
 }
 
 @Composable
@@ -313,9 +365,10 @@ private fun DetailGrid(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .shadow(1.dp, RoundedCornerShape(Radii.xl), clip = false)
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg)),
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.xl)),
     ) {
         val rows =
             buildList {
@@ -412,17 +465,29 @@ private fun YourRsvpCard(
 ) {
     val recorded = snapshot.myRsvp
     val pending = recorded == null
+    // JSX `FramePending` (event-detail-frames.jsx:200-204): the pending card gets
+    // a green border + a 4px home-bg glow ring (boxShadow 0 0 0 4px H.bg50). The
+    // glow is drawn as an outer home-bg ring behind the card.
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .then(
+                    if (pending) {
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.xl2))
+                            .background(PantopusColors.homeBg)
+                            .padding(4.dp)
+                    } else {
+                        Modifier.shadow(1.dp, RoundedCornerShape(Radii.xl), clip = false)
+                    },
+                ).clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(
                     width = if (pending) 1.5.dp else 1.dp,
                     color = if (pending) PantopusColors.home else PantopusColors.appBorderSubtle,
-                    shape = RoundedCornerShape(Radii.lg),
+                    shape = RoundedCornerShape(Radii.xl),
                 ).padding(Spacing.s3)
                 .testTag("eventDetail_yourRsvp"),
     ) {
@@ -532,11 +597,15 @@ private fun RsvpSegmented(
 @Composable
 private fun NotesSection(text: String) {
     SectionCard(overline = "Notes") {
+        // JSX `NotesCard` (event-detail-frames.jsx:84-91): body 12.5/fg2,
+        // line-height 18, directly under the overline with no extra vertical
+        // padding (the card already pads ~13). Match the 18sp line height.
         Text(
             text = text,
             fontSize = 12.5.sp,
+            lineHeight = 18.sp,
             color = PantopusColors.appTextStrong,
-            modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+            modifier = Modifier.padding(horizontal = Spacing.s3),
         )
     }
 }
@@ -550,9 +619,10 @@ private fun SectionCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .shadow(1.dp, RoundedCornerShape(Radii.xl), clip = false)
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.xl))
                 .padding(vertical = Spacing.s2),
     ) {
         Text(
@@ -619,10 +689,31 @@ private fun recurrenceLabel(rrule: String?): String? {
     if (rrule.isNullOrEmpty()) return null
     val upper = rrule.uppercase(Locale.ROOT)
     return when {
-        "FREQ=WEEKLY" in upper -> "Weekly"
+        // JSX `DetailGrid` shows "Every Monday" — resolve BYDAY to the weekday
+        // like the iOS weeklyDay mapping, falling back to "Weekly".
+        "FREQ=WEEKLY" in upper -> weeklyDayLabel(upper)?.let { "Every $it" } ?: "Weekly"
         "FREQ=YEARLY" in upper -> "Yearly"
         "FREQ=MONTHLY" in upper -> "Monthly"
         "FREQ=DAILY" in upper -> "Daily"
         else -> "Yes"
     }
+}
+
+/** "FREQ=WEEKLY;BYDAY=MO" → "Monday". Mirrors iOS `weeklyDay`. */
+private fun weeklyDayLabel(upper: String): String? {
+    val map =
+        mapOf(
+            "MO" to "Monday",
+            "TU" to "Tuesday",
+            "WE" to "Wednesday",
+            "TH" to "Thursday",
+            "FR" to "Friday",
+            "SA" to "Saturday",
+            "SU" to "Sunday",
+        )
+    val marker = "BYDAY="
+    val index = upper.indexOf(marker)
+    if (index < 0) return null
+    val code = upper.substring(index + marker.length).take(2)
+    return map[code]
 }
