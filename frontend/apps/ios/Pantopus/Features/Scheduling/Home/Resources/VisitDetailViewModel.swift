@@ -50,7 +50,7 @@ final class VisitDetailViewModel {
     private(set) var kind: VisitKind = .vendor
     private(set) var lifecycle: Lifecycle = .confirmed
     private(set) var timeText = ""
-    private(set) var hostMembers: [HomeMember] = []
+    private(set) var hostMembers: [ResourceHomeMember] = []
     private(set) var hostSummary = ""
     private(set) var entryNote: String?
     var actionError: String?
@@ -67,7 +67,7 @@ final class VisitDetailViewModel {
     var editStart = Date()
     var editDuration = 1
     var editNote = ""
-    private(set) var members: [HomeMember] = []
+    private(set) var members: [ResourceHomeMember] = []
     private(set) var isSavingEdit = false
 
     // MARK: Dependencies
@@ -119,18 +119,18 @@ final class VisitDetailViewModel {
         }
     }
 
-    private func fetchMembers() async -> [HomeMember] {
+    private func fetchMembers() async -> [ResourceHomeMember] {
         do {
             let response: OccupantsResponse = try await client.request(
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
-            return HomeMember.from(occupants: response.occupants)
+            return ResourceHomeMember.from(occupants: response.occupants)
         } catch {
             return []
         }
     }
 
-    private func apply(event: CalendarEventDTO, members roster: [HomeMember]) {
+    private func apply(event: CalendarEventDTO, members roster: [ResourceHomeMember]) {
         members = roster
         title = event.title
         kind = VisitKind(wire: event.eventType)
@@ -165,7 +165,7 @@ final class VisitDetailViewModel {
         editNote = event.locationNotes ?? ""
     }
 
-    private static func hostSummary(members: [HomeMember], ids: [String]) -> String {
+    private static func hostSummary(members: [ResourceHomeMember], ids: [String]) -> String {
         if !members.isEmpty {
             let names = members.map(\.name)
             switch names.count {

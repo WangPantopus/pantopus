@@ -55,6 +55,7 @@ final class WorkflowEditorViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var navTitle: String { isNew ? "New workflow" : "Edit workflow" }
 

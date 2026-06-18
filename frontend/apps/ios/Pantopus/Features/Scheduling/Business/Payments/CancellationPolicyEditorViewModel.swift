@@ -16,6 +16,7 @@
 
 import Foundation
 import Observation
+import SwiftUI
 
 @Observable
 @MainActor
@@ -81,6 +82,7 @@ final class CancellationPolicyEditorViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var isCustom: Bool { selectedPreset == .custom }
 

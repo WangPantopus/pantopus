@@ -51,6 +51,7 @@ final class InvoicesListViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     /// The two-stat summary structure (`invoiceslist-frames.jsx` `Summary`).
     /// The design's KPIs are Outstanding (amber when any invoice is overdue) /

@@ -1,5 +1,5 @@
 //
-//  PackagesListViewModel.swift
+//  SchedulingPackagesListViewModel.swift
 //  Pantopus
 //
 //  G8 Packages List (owner) — Stream I15. Lists the owner's session packages
@@ -15,7 +15,7 @@ import SwiftUI
 
 @Observable
 @MainActor
-final class PackagesListViewModel {
+final class SchedulingPackagesListViewModel {
     enum Phase: Equatable { case loading, loaded, error(String), comingSoon }
     enum Filter: Int { case active, archived }
 
@@ -38,6 +38,7 @@ final class PackagesListViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var activePackages: [SchedulingPackageDTO] { packages.filter { $0.isActive != false } }
     var archivedPackages: [SchedulingPackageDTO] { packages.filter { $0.isActive == false } }

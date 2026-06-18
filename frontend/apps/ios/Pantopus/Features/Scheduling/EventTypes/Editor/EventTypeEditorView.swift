@@ -66,23 +66,25 @@ struct EventTypeEditorView: View {
             onCommit: { Task { if await viewModel.save() { dismiss() } } },
             content: {
                 Group {
-                    identityPill
-                    basicsGroup
-                    durationGroup
-                    locationGroup
-                    if viewModel.isEditing {
-                        availabilityGroup
+                    Group {
+                        identityPill
+                        basicsGroup
+                        durationGroup
+                        locationGroup
+                        if viewModel.isEditing {
+                            availabilityGroup
+                        }
                     }
+                    if viewModel.showsAssignment { assignmentGroup }
+                    if viewModel.isEditing {
+                        advancedGroup
+                        visibilityGroup
+                    }
+                    pricingGroup
+                    if viewModel.isEditing { moreGroup }
                 }
-                if viewModel.showsAssignment { assignmentGroup }
-                if viewModel.isEditing {
-                    advancedGroup
-                    visibilityGroup
-                }
-                pricingGroup
-                if viewModel.isEditing { moreGroup }
-            }
-            .disabled(viewModel.isSaving),
+                .disabled(viewModel.isSaving)
+            },
             stickyBottom: {
                 AnyView(
                     EventTypeSaveBar(

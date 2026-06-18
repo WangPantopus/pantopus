@@ -52,6 +52,7 @@ final class TeamPerformanceViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     private var businessId: String? {
         if case let .business(id) = owner { return id }

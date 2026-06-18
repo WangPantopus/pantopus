@@ -41,6 +41,7 @@ final class MessageTemplateLibraryViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     private var needle: String { query.trimmingCharacters(in: .whitespaces).lowercased() }
 

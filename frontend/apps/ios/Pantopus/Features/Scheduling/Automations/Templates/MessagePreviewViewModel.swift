@@ -45,6 +45,7 @@ final class MessagePreviewViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     init(owner: SchedulingOwner, source: Source, client: SchedulingClient) {
         self.owner = owner

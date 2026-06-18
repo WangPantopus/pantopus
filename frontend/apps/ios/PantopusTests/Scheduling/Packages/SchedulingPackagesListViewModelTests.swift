@@ -1,5 +1,5 @@
 //
-//  PackagesListViewModelTests.swift
+//  SchedulingPackagesListViewModelTests.swift
 //  PantopusTests
 //
 //  G8 · Stream I15. Drives the packages-list view-model against stubbed
@@ -10,12 +10,12 @@ import XCTest
 @testable import Pantopus
 
 @MainActor
-final class PackagesListViewModelTests: XCTestCase {
+final class SchedulingPackagesListViewModelTests: XCTestCase {
     override func setUp() { super.setUp(); SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = true }
     override func tearDown() { SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = false; super.tearDown() }
 
-    private func vm(_ routes: [String: [SequencedURLProtocol.Response]]) -> PackagesListViewModel {
-        PackagesListViewModel(
+    private func vm(_ routes: [String: [SequencedURLProtocol.Response]]) -> SchedulingPackagesListViewModel {
+        SchedulingPackagesListViewModel(
             owner: .business(id: "biz1"),
             push: { _ in },
             client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))

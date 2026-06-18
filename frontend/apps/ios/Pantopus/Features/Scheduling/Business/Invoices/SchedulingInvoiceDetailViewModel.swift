@@ -1,5 +1,5 @@
 //
-//  InvoiceDetailViewModel.swift
+//  SchedulingInvoiceDetailViewModel.swift
 //  Pantopus
 //
 //  G13 Invoice Detail (owner) — Stream I15. Renders `GET /invoices/:id` and the
@@ -15,7 +15,7 @@ import SwiftUI
 
 @Observable
 @MainActor
-final class InvoiceDetailViewModel {
+final class SchedulingInvoiceDetailViewModel {
     enum Phase: Equatable { case loading, loaded, error(String), comingSoon }
 
     // MARK: Inputs
@@ -35,6 +35,7 @@ final class InvoiceDetailViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var totalLabel: String { SchedulingMoney.format(cents: invoice?.totalCents, currency: invoice?.currency) }
     var currencyCode: String { (invoice?.currency ?? "USD").uppercased() }

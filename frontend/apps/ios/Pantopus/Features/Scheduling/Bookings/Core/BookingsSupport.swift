@@ -137,7 +137,7 @@ enum BookingsTime {
             return timeString(start, tz: tz)
         }
         let cal = calendar(tz)
-        let sameMeridiem = cal.component(.hour, from: start) < 12 == (cal.component(.hour, from: end) < 12)
+        let sameMeridiem = (cal.component(.hour, from: start) < 12) == (cal.component(.hour, from: end) < 12)
         let startStr = sameMeridiem ? timeStringNoMeridiem(start, tz: tz) : timeString(start, tz: tz)
         let endStr = timeString(end, tz: tz)
         return "\(startStr)–\(endStr)"

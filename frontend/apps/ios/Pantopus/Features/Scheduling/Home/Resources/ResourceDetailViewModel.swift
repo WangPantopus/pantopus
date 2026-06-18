@@ -33,7 +33,7 @@ final class ResourceDetailViewModel {
         let id: String
         let timeRange: String
         let who: String
-        let member: HomeMember?
+        let member: ResourceHomeMember?
         let isPending: Bool
     }
 
@@ -47,7 +47,7 @@ final class ResourceDetailViewModel {
         let id: String
         let who: String
         let when: String
-        let member: HomeMember?
+        let member: ResourceHomeMember?
     }
 
     // MARK: State
@@ -133,13 +133,13 @@ final class ResourceDetailViewModel {
         }
     }
 
-    private func fetchMembers() async -> [String: HomeMember] {
+    private func fetchMembers() async -> [String: ResourceHomeMember] {
         do {
             let response: OccupantsResponse = try await client.request(
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
             return Dictionary(
-                HomeMember.from(occupants: response.occupants).map { ($0.id, $0) },
+                ResourceHomeMember.from(occupants: response.occupants).map { ($0.id, $0) },
                 uniquingKeysWith: { first, _ in first }
             )
         } catch {
@@ -147,7 +147,7 @@ final class ResourceDetailViewModel {
         }
     }
 
-    private func apply(resource: ResourceDTO, bookings: [ResourceBooking], members: [String: HomeMember]) {
+    private func apply(resource: ResourceDTO, bookings: [ResourceBooking], members: [String: ResourceHomeMember]) {
         resourceName = resource.name
         kind = ResourceKind(wire: resource.resourceType)
         requiresApproval = resource.requiresApproval ?? false
@@ -163,7 +163,7 @@ final class ResourceDetailViewModel {
             }
             .sorted { ($0.startAt ?? "") < ($1.startAt ?? "") }
 
-        let member: (ResourceBooking) -> HomeMember? = { booking in
+        let member: (ResourceBooking) -> ResourceHomeMember? = { booking in
             members[booking.createdBy ?? ""] ?? members[booking.hostUserId ?? ""]
         }
         let who: (ResourceBooking) -> String = { booking in
@@ -202,7 +202,7 @@ final class ResourceDetailViewModel {
     private static func groupByDay(
         _ bookings: [ResourceBooking],
         who: (ResourceBooking) -> String,
-        member: (ResourceBooking) -> HomeMember?
+        member: (ResourceBooking) -> ResourceHomeMember?
     ) -> [DaySection] {
         var order: [Date] = []
         var grouped: [Date: [BookingRowModel]] = [:]

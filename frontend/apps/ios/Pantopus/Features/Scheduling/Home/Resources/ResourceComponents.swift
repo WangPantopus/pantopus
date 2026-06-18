@@ -12,8 +12,8 @@ import SwiftUI
 
 /// Initials disc tinted from the member's stable palette tone. Falls back to
 /// a remote avatar image when present.
-struct HomeMemberAvatar: View {
-    let member: HomeMember
+struct ResourceHomeMemberAvatar: View {
+    let member: ResourceHomeMember
     var size: CGFloat = 28
 
     var body: some View {
@@ -55,13 +55,13 @@ struct HomeMemberAvatar: View {
 
 /// Overlapping avatar stack for the visit host-members card.
 struct HomeMemberStack: View {
-    let members: [HomeMember]
+    let members: [ResourceHomeMember]
     var size: CGFloat = 30
 
     var body: some View {
         HStack(spacing: -9) {
             ForEach(members) { member in
-                HomeMemberAvatar(member: member, size: size)
+                ResourceHomeMemberAvatar(member: member, size: size)
             }
         }
     }
