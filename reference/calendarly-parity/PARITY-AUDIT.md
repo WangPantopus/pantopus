@@ -31,6 +31,14 @@ Branch `claude/calendarly-parity-fixes` (off `feature/calendarly`).
 
 **Build notes (critical):** use `JAVA_HOME=…/temurin-17`, kill stray Gradle/Kotlin daemons before each build, set `-Pkotlin.daemon.jvmargs="-Xmx10240m …"` (the project's 4g OOMs on full compile), and never let fan-out agents run their own `./gradlew` (single-worker deadlock). See memory `calendarly-android-parity`. ktlint/detekt/token gates are pre-RED on untouched files (out of scope).
 
+## Remaining work & verification notes
+
+- **Resolved — Embed widget (was "notfound both"):** the design itself states it is **web-only** ("Embed / inline booking widget settings (web)" — surfaces /book onto external sites). Correctly absent on iOS/Android; not a gap.
+- **Needs emulator verification (deferred from compile-only pass):** the Android **top-bar 56dp chrome** — ~10 screens use Material3 `CenterAlignedTopAppBar` (64dp). `SchedulingTopBar` (56dp) exists, but migrating requires per-screen status-bar-inset handling (Scaffold-topBar-slot vs in-content) + a trailing slot for the screens with text "Save"/progress actions; compile can't catch under-status-bar rendering, so this should be done with an emulator. Screens: visits/VisitDetail+VisitSetup, resources/Book+Detail+Editor, bookings_extra/Waitlist+ManualBooking+BookingSearchFilter+PostMeetingFollowup+GroupRoster.
+- **Polish (low value):** numbered `WizardStepRail` (Android wizards use a segmented bar; needs shared-WizardShell coordination); icon-glyph nits (Android Material has no exact lucide calendar-range/git-commit/etc.; iOS calendarSearch SF remap is 1 line).
+- **Data-blocked (no DTO/VM/backend fields — never faked):** group/team/composed-availability frames, itemized fees/tax + saved-card/3DS payment frames, visit offer/reserve/booking-link lifecycle, per-member Free/Busy, live calendar-conflict detection, masked bank/tax-rate literals. Documented per-screen above.
+- **Product decision:** the A5 "THIS MONTH" summary card is injected on the hub by BOTH platforms but the A1 design doesn't show it — confirm whether to keep (consistent across platforms) or remove.
+
 ## Status table
 
 | Section | Screen | iOS | Android | Better | iOS h/m/l | And h/m/l |
