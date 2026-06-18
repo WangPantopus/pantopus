@@ -210,6 +210,7 @@ internal fun OnboardingMemberList(
                         )
                     },
                     divider = index < HOME_MEMBERS.lastIndex,
+                    verified = true,
                 )
             }
             InviteRow("Invite someone", "Add a family member by phone or email", pillar, "onboardingInviteMember")
@@ -227,7 +228,7 @@ internal fun OnboardingTeamList(
         Row(verticalAlignment = Alignment.CenterVertically) {
             SetupOverline("Team seats")
             Spacer(Modifier.weight(1f))
-            Text("${seated.size} seated", color = pillar.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Text("${seated.size} of 5 seats used", color = pillar.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
         SeededListCard {
             BUSINESS_TEAM.forEachIndexed { index, (person, role, _) ->
@@ -248,7 +249,7 @@ internal fun OnboardingTeamList(
                     divider = index < BUSINESS_TEAM.lastIndex,
                 )
             }
-            InviteRow("Invite teammate", "Add by phone or email", pillar, "onboardingInviteTeammate")
+            InviteRow("Invite teammate", "2 seats left on your plan", pillar, "onboardingInviteTeammate")
         }
     }
 }
@@ -273,29 +274,59 @@ private fun SeededPersonRow(
     roleChip: String? = null,
     rolePillar: SchedulingPillar? = null,
     statusSub: String? = null,
+    verified: Boolean = false,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier.size(40.dp).clip(CircleShape).background(PantopusColors.appSurfaceSunken),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(person.initials, color = PantopusColors.appTextStrong, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(PantopusColors.appSurfaceSunken),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(person.initials, color = PantopusColors.appTextStrong, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            if (verified) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.appSurface)
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.success),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Check,
+                        contentDescription = null,
+                        size = 9.dp,
+                        tint = PantopusColors.appTextInverse,
+                    )
+                }
+            }
         }
         Spacer(Modifier.width(Spacing.s3))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 Text(person.name, color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 if (roleChip != null && rolePillar != null) {
+                    val isOwner = roleChip.equals("Owner", ignoreCase = true)
                     Box(
                         modifier =
                             Modifier.clip(
                                 RoundedCornerShape(Radii.pill),
-                            ).background(rolePillar.accentBg).padding(horizontal = 7.dp, vertical = 2.dp),
+                            ).background(if (isOwner) rolePillar.accentBg else PantopusColors.appSurfaceSunken)
+                                .padding(horizontal = 7.dp, vertical = 2.dp),
                     ) {
-                        Text(roleChip, color = rolePillar.accent, fontWeight = FontWeight.Bold, fontSize = 9.5.sp)
+                        Text(
+                            roleChip,
+                            color = if (isOwner) rolePillar.accent else PantopusColors.appTextSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.5.sp,
+                        )
                     }
                 }
             }
@@ -390,12 +421,36 @@ private fun ModeTile(
                 .testTag("onboardingMode_$id"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(
-            icon = icon,
-            contentDescription = null,
-            size = 20.dp,
-            tint = if (selected) pillar.accent else PantopusColors.appTextStrong,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 20.dp,
+                tint = if (selected) pillar.accent else PantopusColors.appTextStrong,
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(if (selected) pillar.accent else PantopusColors.appSurface)
+                        .border(1.5.dp, if (selected) pillar.accent else PantopusColors.appBorderStrong, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Check,
+                        contentDescription = null,
+                        size = 11.dp,
+                        tint = PantopusColors.appTextInverse,
+                    )
+                }
+            }
+        }
         Text(title, color = if (selected) pillar.accent else PantopusColors.appText, fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
         Text(body, color = PantopusColors.appTextSecondary, fontSize = 11.5.sp)
     }

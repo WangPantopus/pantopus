@@ -35,7 +35,7 @@ internal fun openStripeHostedUrl(
 }
 
 /** One-shot effect emitted by the payment view-models to open a Stripe URL. */
-internal data class OpenStripeUrl(
+data class OpenStripeUrl(
     val url: String,
     /** Re-read status when the user returns from the Stripe-hosted flow. */
     val refreshOnReturn: Boolean,

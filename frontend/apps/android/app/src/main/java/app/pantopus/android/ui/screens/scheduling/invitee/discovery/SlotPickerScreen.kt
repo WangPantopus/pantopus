@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,16 +27,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.scheduling.SlotDto
 import app.pantopus.android.ui.components.ErrorState
-import app.pantopus.android.ui.screens.scheduling._shared.MonthCalendar
 import app.pantopus.android.ui.screens.scheduling._shared.SlotTimeList
 import app.pantopus.android.ui.screens.scheduling._shared.slotTimeLabel
 import app.pantopus.android.ui.theme.PantopusColors
@@ -45,6 +49,9 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 const val SLOT_PICKER_CONTINUE_TAG = "slotPickerContinueBar"
+
+/** Bottom-divider color for the picker's top bar (spec: bottom border only). */
+private val pickerDividerColor = PantopusColors.appBorder
 
 /**
  * C6 Date + time slot picker (stateful). Owns a [SlotPickerViewModel] scoped to
@@ -173,15 +180,7 @@ private fun SlotPickerLoaded(
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             SummaryHeader(state = state, onTimezoneClick = onTimezoneClick)
-            MonthNavRow(
-                monthHasAvailability = state.monthHasAvailability,
-                canGoPrevious = state.canGoPreviousMonth,
-                accent = accent,
-                onPrev = onPrevMonth,
-                onNext = onNextMonth,
-                onSeeNextAvailable = onSeeNextAvailable,
-            )
-            MonthCalendar(
+            MonthCalendarCard(
                 monthLabel = state.monthLabel,
                 daysInMonth = state.daysInMonth,
                 firstWeekdayIndex = state.firstWeekdayIndex,
@@ -190,6 +189,11 @@ private fun SlotPickerLoaded(
                 onSelectDay = onSelectDay,
                 today = state.today,
                 accent = accent,
+                monthHasAvailability = state.monthHasAvailability,
+                canGoPrevious = state.canGoPreviousMonth,
+                onPrevMonth = onPrevMonth,
+                onNextMonth = onNextMonth,
+                onSeeNextAvailable = onSeeNextAvailable,
             )
             SlotRegion(state = state, accent = accent, onSelectSlot = onSelectSlot, onSeeNextAvailable = onSeeNextAvailable)
             // bottom spacer so the docked Continue bar never covers the last row
@@ -245,34 +249,158 @@ private fun SummaryHeader(
     }
 }
 
-/** Right-aligned month controls (next-available link + prev/next), above the calendar card. */
+/**
+ * Local calendar card matching the spec's [MonthCalendar] header: the month
+ * label sits on the left and the "Next available" link + prev/next chevrons sit
+ * on the right — all in a single header Row INSIDE the card. The shared
+ * [MonthCalendar] keeps a label-only header, so this screen reproduces the card
+ * locally rather than mutating the shared component.
+ */
 @Composable
-private fun MonthNavRow(
+private fun MonthCalendarCard(
+    monthLabel: String,
+    daysInMonth: Int,
+    firstWeekdayIndex: Int,
+    availableDays: Set<Int>,
+    selectedDay: Int?,
+    onSelectDay: (Int) -> Unit,
+    today: Int?,
+    accent: Color,
     monthHasAvailability: Boolean,
     canGoPrevious: Boolean,
-    accent: Color,
-    onPrev: () -> Unit,
-    onNext: () -> Unit,
+    onPrevMonth: () -> Unit,
+    onNextMonth: () -> Unit,
     onSeeNextAvailable: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End,
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(Spacing.s3),
     ) {
-        if (monthHasAvailability) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = "Next available",
-                style = PantopusTextStyle.caption,
+                text = monthLabel,
+                style = PantopusTextStyle.small,
                 fontWeight = FontWeight.Bold,
-                color = accent,
-                modifier = Modifier.clickable(onClick = onSeeNextAvailable).padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f).padding(start = Spacing.s1),
             )
+            if (monthHasAvailability) {
+                Text(
+                    text = "Next available",
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                    modifier =
+                        Modifier
+                            .clickable(onClick = onSeeNextAvailable)
+                            .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+                )
+            }
+            NavChevron(icon = PantopusIcon.ChevronLeft, label = "Previous month", enabled = canGoPrevious, onClick = onPrevMonth)
+            NavChevron(icon = PantopusIcon.ChevronRight, label = "Next month", enabled = true, onClick = onNextMonth)
         }
-        NavChevron(icon = PantopusIcon.ChevronLeft, label = "Previous month", enabled = canGoPrevious, onClick = onPrev)
-        NavChevron(icon = PantopusIcon.ChevronRight, label = "Next month", enabled = true, onClick = onNext)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            WEEKDAY_INITIALS.forEach { initial ->
+                Text(
+                    text = initial,
+                    style = PantopusTextStyle.overline,
+                    color = PantopusColors.appTextMuted,
+                    modifier = Modifier.weight(1f),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        val cells =
+            buildList {
+                repeat(firstWeekdayIndex) { add(null) }
+                for (d in 1..daysInMonth) add(d)
+            }
+        cells.chunked(WEEKDAY_INITIALS.size).forEach { week ->
+            Row(modifier = Modifier.fillMaxWidth().padding(top = Spacing.s1)) {
+                week.forEach { day ->
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (day != null) {
+                            LocalDayCell(
+                                day = day,
+                                available = day in availableDays,
+                                isToday = day == today,
+                                selected = day == selectedDay,
+                                accent = accent,
+                                onClick = { onSelectDay(day) },
+                            )
+                        }
+                    }
+                }
+                repeat(WEEKDAY_INITIALS.size - week.size) { Box(modifier = Modifier.weight(1f)) {} }
+            }
+        }
     }
 }
+
+@Composable
+private fun LocalDayCell(
+    day: Int,
+    available: Boolean,
+    isToday: Boolean,
+    selected: Boolean,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    val clickable = available || selected
+    Box(
+        modifier =
+            Modifier
+                .size(DAY_CELL)
+                .then(if (selected) Modifier.size(DAY_DISC).clip(CircleShape).background(accent) else Modifier)
+                .then(
+                    if (isToday && !selected) {
+                        Modifier.size(DAY_DISC).clip(CircleShape).border(1.5.dp, accent, CircleShape)
+                    } else {
+                        Modifier
+                    },
+                )
+                .clickable(enabled = clickable, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = day.toString(),
+                fontSize = 13.sp,
+                fontWeight =
+                    if (selected || isToday) {
+                        FontWeight.Bold
+                    } else if (available) {
+                        FontWeight.SemiBold
+                    } else {
+                        FontWeight.Normal
+                    },
+                color =
+                    when {
+                        selected -> PantopusColors.appTextInverse
+                        isToday -> accent
+                        available -> PantopusColors.appText
+                        else -> PantopusColors.appTextMuted
+                    },
+            )
+            if (available && !selected) {
+                Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(accent))
+            }
+        }
+    }
+}
+
+private val WEEKDAY_INITIALS = listOf("S", "M", "T", "W", "T", "F", "S")
+private val DAY_CELL = 36.dp
+private val DAY_DISC = 34.dp
 
 @Composable
 private fun NavChevron(
@@ -395,7 +523,15 @@ private fun PickerTopBar(onBack: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(0.dp))
+                .drawBehind {
+                    val stroke = 1.dp.toPx()
+                    drawLine(
+                        color = pickerDividerColor,
+                        start = Offset(0f, size.height - stroke / 2f),
+                        end = Offset(size.width, size.height - stroke / 2f),
+                        strokeWidth = stroke,
+                    )
+                }
                 .padding(horizontal = Spacing.s2, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {

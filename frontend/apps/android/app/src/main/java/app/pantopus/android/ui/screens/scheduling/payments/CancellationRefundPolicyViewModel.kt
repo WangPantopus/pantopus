@@ -96,7 +96,7 @@ class CancellationRefundPolicyViewModel
         private val policyAdapter: JsonAdapter<Map<String, Any?>> =
             Moshi.Builder().build().adapter(
                 Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java),
-            ) as JsonAdapter<Map<String, Any?>>
+            )
 
         fun load() {
             if (!flags.paidSchedulingEnabled) {

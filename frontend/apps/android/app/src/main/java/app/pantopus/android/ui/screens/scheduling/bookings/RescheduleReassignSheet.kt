@@ -89,7 +89,12 @@ fun RescheduleReassignSheet(
                 ).padding(horizontal = Spacing.s4, vertical = Spacing.s2),
         ) {
             Text(
-                text = if (state.reassignOnly) "Reassign" else "Pick a new time",
+                text =
+                    when {
+                        state.reassignOnly -> "Reassign"
+                        state.allowReassign && state.members.isNotEmpty() -> "Reschedule & reassign"
+                        else -> "Pick a new time"
+                    },
                 fontSize = 16.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appText,
@@ -108,10 +113,10 @@ fun RescheduleReassignSheet(
             if (state.loading) {
                 LoadingSkeleton()
             } else if (state.reassignOnly) {
-                MemberList(state = state, onSelectMember = onSelectMember)
+                MemberList(state = state, accent = accent, onSelectMember = onSelectMember)
             } else {
                 if (state.allowReassign && state.members.isNotEmpty()) {
-                    MemberRail(state = state, onSelectMember = onSelectMember)
+                    MemberRail(state = state, accent = accent, onSelectMember = onSelectMember)
                     Spacer(Modifier.height(Spacing.s3))
                 }
                 TzChip(tz = state.tz)
@@ -356,8 +361,10 @@ private fun DayStripAndSlots(
 @Composable
 private fun MemberRail(
     state: RescheduleSheetUiState,
+    accent: Color,
     onSelectMember: (String) -> Unit,
 ) {
+    val accentBg = state.pillar.accentBg
     Column {
         Text(
             text = "ASSIGN TO",
@@ -381,12 +388,12 @@ private fun MemberRail(
                             Modifier
                                 .size(46.dp)
                                 .clip(CircleShape)
-                                .background(PantopusColors.businessBg)
+                                .background(accentBg)
                                 .then(
                                     if (on) {
                                         Modifier.border(
                                             2.5.dp,
-                                            PantopusColors.business,
+                                            accent,
                                             CircleShape,
                                         )
                                     } else {
@@ -400,14 +407,14 @@ private fun MemberRail(
                             text = member.initials,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = PantopusColors.business,
+                            color = accent,
                         )
                     }
                     Text(
                         text = member.label,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (on) PantopusColors.business else PantopusColors.appTextSecondary,
+                        color = if (on) accent else PantopusColors.appTextSecondary,
                     )
                 }
             }
@@ -418,8 +425,10 @@ private fun MemberRail(
 @Composable
 private fun MemberList(
     state: RescheduleSheetUiState,
+    accent: Color,
     onSelectMember: (String) -> Unit,
 ) {
+    val accentBg = state.pillar.accentBg
     if (state.members.isEmpty()) {
         EmptyHint(
             icon = PantopusIcon.Users,
@@ -443,11 +452,11 @@ private fun MemberList(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Radii.lg))
                         .background(
-                            if (on) PantopusColors.businessBg else PantopusColors.appSurface,
+                            if (on) accentBg else PantopusColors.appSurface,
                         )
                         .border(
                             1.5.dp,
-                            if (on) PantopusColors.business else PantopusColors.appBorder,
+                            if (on) accent else PantopusColors.appBorder,
                             RoundedCornerShape(Radii.lg),
                         )
                         .clickable { onSelectMember(member.id) }
@@ -459,14 +468,14 @@ private fun MemberList(
                     modifier =
                         Modifier.size(
                             30.dp,
-                        ).clip(CircleShape).background(PantopusColors.businessBg),
+                        ).clip(CircleShape).background(accentBg),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = member.initials,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PantopusColors.business,
+                        color = accent,
                     )
                 }
                 Text(
@@ -481,7 +490,7 @@ private fun MemberList(
                         icon = PantopusIcon.CheckCircle,
                         contentDescription = null,
                         size = 18.dp,
-                        tint = PantopusColors.business,
+                        tint = accent,
                     )
                 }
             }

@@ -332,7 +332,7 @@ private fun policyNote(
         ManagePolicyMode.PartialRefund ->
             PolicyNote(
                 EdgeTone.Warn,
-                PantopusIcon.AlertTriangle,
+                PantopusIcon.FileWarning,
                 "You'll get a ${view.refundEstimateLabel} refund",
                 "Cancelling now refunds ${view.refundEstimateLabel}.",
                 "Cancel earlier for a full refund.",
@@ -340,7 +340,7 @@ private fun policyNote(
         ManagePolicyMode.CancelClosedNoRefund ->
             PolicyNote(
                 EdgeTone.Warn,
-                PantopusIcon.AlertTriangle,
+                PantopusIcon.FileWarning,
                 "It's too late to cancel for a refund",
                 "Free cancellation$rescheduleBy.",
                 "You can still cancel without a refund, or message your host.",
@@ -348,7 +348,7 @@ private fun policyNote(
         ManagePolicyMode.NotOnline ->
             PolicyNote(
                 EdgeTone.Warn,
-                PantopusIcon.AlertTriangle,
+                PantopusIcon.FileWarning,
                 "This booking can't be changed online",
                 "Your host handles reschedules and cancellations directly.",
                 "Message your host and they'll sort out any change with you.",

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -125,7 +124,10 @@ fun ManageBookingScreen(
 @Composable
 private fun ManageTopBar(onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
-        Row(modifier = Modifier.fillMaxWidth().height(46.dp).padding(horizontal = Spacing.s2), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(46.dp).padding(horizontal = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Box(
                 modifier = Modifier.size(34.dp).clip(RoundedCornerShape(Radii.md)).clickable(onClickLabel = "Back", onClick = onBack),
                 contentAlignment = Alignment.Center,
@@ -176,8 +178,17 @@ fun ManageBookingContent(
                 )
             ManageStatus.Past ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                    PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextSecondary)
-                    Text(text = "This booking has already happened.", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+                    PantopusIconImage(
+                        icon = PantopusIcon.Check,
+                        contentDescription = null,
+                        size = 14.dp,
+                        tint = PantopusColors.appTextSecondary,
+                    )
+                    Text(
+                        text = "This booking has already happened.",
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appTextSecondary,
+                    )
                 }
             else -> {
                 Column {
@@ -203,7 +214,12 @@ fun ManageBookingContent(
                         )
                         if (data.windowClosed) {
                             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 13.dp, tint = PantopusColors.warning)
+                                PantopusIconImage(
+                                    icon = PantopusIcon.Lock,
+                                    contentDescription = null,
+                                    size = 13.dp,
+                                    tint = PantopusColors.warning,
+                                )
                                 Text(
                                     text = "Too late to change online — contact ${data.hostName} to reschedule or cancel.",
                                     style = PantopusTextStyle.caption,
@@ -239,7 +255,13 @@ private fun ManageSummaryCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HostAvatar(pillar = pillar, initials = ConfirmUtils.initials(data.hostName), diameter = 30.dp)
                 Column(modifier = Modifier.padding(start = Spacing.s2)) {
-                    Text(text = data.eventName, style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.appText, textDecoration = strike)
+                    Text(
+                        text = data.eventName,
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                        textDecoration = strike,
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                         Text(text = data.hostName, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
                         PillarTag(pillar = pillar)
@@ -248,16 +270,38 @@ private fun ManageSummaryCard(
             }
         }
         SummaryDetailRow(icon = PantopusIcon.Calendar) {
-            Text(text = data.whenLabel, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, textDecoration = strike)
+            Text(
+                text = data.whenLabel,
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                textDecoration = strike,
+            )
             TimezoneChip(label = data.tzLabel, accent = pillar.accent, modifier = Modifier.padding(top = Spacing.s1))
         }
         SummaryDetailRow(icon = PantopusIcon.Video, divider = data.inviteeName != null) {
-            Text(text = data.locationLabel, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
-            if (data.locationSub != null) Text(text = data.locationSub, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            Text(
+                text = data.locationLabel,
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            if (data.locationSub != null) {
+                Text(
+                    text = data.locationSub,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
         }
         if (data.inviteeName != null) {
             SummaryDetailRow(icon = PantopusIcon.Users, divider = false) {
-                Text(text = data.inviteeName, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                Text(
+                    text = data.inviteeName,
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                )
             }
         }
     }
@@ -267,13 +311,44 @@ private fun ManageSummaryCard(
 private fun StatusBadge(status: ManageStatus) {
     val (label, icon, bg, border, fg) =
         when (status) {
-            ManageStatus.Confirmed -> StatusStyle("Confirmed", PantopusIcon.CheckCircle, PantopusColors.successBg, PantopusColors.successLight, PantopusColors.success)
-            ManageStatus.Pending -> StatusStyle("Pending", PantopusIcon.Hourglass, PantopusColors.infoBg, PantopusColors.infoLight, PantopusColors.info)
-            ManageStatus.Past -> StatusStyle("Past", PantopusIcon.History, PantopusColors.appSurfaceSunken, PantopusColors.appBorder, PantopusColors.appTextSecondary)
-            ManageStatus.Cancelled -> StatusStyle("Cancelled", PantopusIcon.XCircle, PantopusColors.errorBg, PantopusColors.errorLight, PantopusColors.error)
+            ManageStatus.Confirmed ->
+                StatusStyle(
+                    "Confirmed",
+                    PantopusIcon.CheckCircle,
+                    PantopusColors.successBg,
+                    PantopusColors.successLight,
+                    PantopusColors.success,
+                )
+            ManageStatus.Pending ->
+                StatusStyle(
+                    "Pending",
+                    PantopusIcon.Hourglass,
+                    PantopusColors.infoBg,
+                    PantopusColors.infoLight,
+                    PantopusColors.info,
+                )
+            ManageStatus.Past ->
+                StatusStyle(
+                    "Past",
+                    PantopusIcon.History,
+                    PantopusColors.appSurfaceSunken,
+                    PantopusColors.appBorder,
+                    PantopusColors.appTextSecondary,
+                )
+            ManageStatus.Cancelled ->
+                StatusStyle(
+                    "Cancelled",
+                    PantopusIcon.XCircle,
+                    PantopusColors.errorBg,
+                    PantopusColors.errorLight,
+                    PantopusColors.error,
+                )
         }
     Row(
-        modifier = Modifier.clip(RoundedCornerShape(Radii.pill)).background(bg).border(1.dp, border, RoundedCornerShape(Radii.pill)).padding(horizontal = Spacing.s3, vertical = Spacing.s1),
+        modifier =
+            Modifier.clip(
+                RoundedCornerShape(Radii.pill),
+            ).background(bg).border(1.dp, border, RoundedCornerShape(Radii.pill)).padding(horizontal = Spacing.s3, vertical = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
@@ -303,17 +378,45 @@ private fun ActionRow(
     onClick: () -> Unit,
 ) {
     val isErr = tone == ActionTone.Error
-    val border = if (!enabled) PantopusColors.appBorder else if (isErr) PantopusColors.errorLight else PantopusColors.appBorderStrong
-    val tileBg = if (!enabled) PantopusColors.appSurfaceSunken else if (isErr) PantopusColors.errorBg else accent.copy(alpha = TILE_ALPHA)
-    val tileFg = if (!enabled) PantopusColors.appTextMuted else if (isErr) PantopusColors.error else accent
-    val labelColor = if (!enabled) PantopusColors.appTextMuted else if (isErr) PantopusColors.error else PantopusColors.appText
+    val border =
+        if (!enabled) {
+            PantopusColors.appBorder
+        } else if (isErr) {
+            PantopusColors.errorLight
+        } else {
+            PantopusColors.appBorderStrong
+        }
+    val tileBg =
+        if (!enabled) {
+            PantopusColors.appSurfaceSunken
+        } else if (isErr) {
+            PantopusColors.errorBg
+        } else {
+            accent.copy(alpha = TILE_ALPHA)
+        }
+    val tileFg =
+        if (!enabled) {
+            PantopusColors.appTextMuted
+        } else if (isErr) {
+            PantopusColors.error
+        } else {
+            accent
+        }
+    val labelColor =
+        if (!enabled) {
+            PantopusColors.appTextMuted
+        } else if (isErr) {
+            PantopusColors.error
+        } else {
+            PantopusColors.appText
+        }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, border, RoundedCornerShape(Radii.lg))
+                .border(1.5.dp, border, RoundedCornerShape(Radii.lg))
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
@@ -325,7 +428,14 @@ private fun ActionRow(
             Text(text = label, style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = labelColor)
             Text(text = sub, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
         }
-        if (enabled) PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextMuted)
+        if (enabled) {
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+        }
     }
 }
 
@@ -344,7 +454,13 @@ private fun PolicyCard(
                 .padding(Spacing.s3),
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            PantopusIconImage(icon = PantopusIcon.Info, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextSecondary, modifier = Modifier.padding(end = Spacing.s2))
+            PantopusIconImage(
+                icon = PantopusIcon.Info,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextSecondary,
+                modifier = Modifier.padding(end = Spacing.s2),
+            )
             Text(text = policy, style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
         }
     }
@@ -358,7 +474,13 @@ private fun ManageExpired(onBack: () -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         ConfirmHalo(kind = HaloKind.Warning, icon = PantopusIcon.Link)
-        Text(text = "This link has expired", style = PantopusTextStyle.h3, color = PantopusColors.appText, textAlign = TextAlign.Center, modifier = Modifier.padding(top = Spacing.s4))
+        Text(
+            text = "This link has expired",
+            style = PantopusTextStyle.h3,
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = Spacing.s4),
+        )
         Text(
             text = "For your security, manage links expire after a while. Check your latest confirmation email for a fresh link.",
             style = PantopusTextStyle.small,
@@ -380,12 +502,19 @@ private fun RescheduleSheet(
 ) {
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = PantopusColors.appSurface) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).padding(bottom = Spacing.s6), verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).padding(bottom = Spacing.s6),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
             Text(text = "Pick a new time", style = PantopusTextStyle.h3, color = PantopusColors.appText)
             when {
                 sheet.loading -> SchedulingLoadingSkeleton(rows = 2)
                 sheet.slots.isEmpty() ->
-                    Text(text = "No open times in the next few weeks. Contact your host for a custom time.", style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
+                    Text(
+                        text = "No open times in the next few weeks. Contact your host for a custom time.",
+                        style = PantopusTextStyle.small,
+                        color = PantopusColors.appTextSecondary,
+                    )
                 else ->
                     SlotTimeList(
                         slots = sheet.slots,
@@ -397,7 +526,12 @@ private fun RescheduleSheet(
                 ConfirmBanner(tone = BannerTone.Error, icon = PantopusIcon.AlertCircle, title = it)
             }
             if (sheet.submitting) {
-                Text(text = "Rescheduling…", style = PantopusTextStyle.small, color = PantopusColors.appTextMuted, modifier = Modifier.padding(top = Spacing.s1))
+                Text(
+                    text = "Rescheduling…",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appTextMuted,
+                    modifier = Modifier.padding(top = Spacing.s1),
+                )
             }
         }
     }
@@ -412,9 +546,16 @@ private fun CancelSheet(
     val sheetState = rememberModalBottomSheetState()
     var reason by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = PantopusColors.appSurface) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).padding(bottom = Spacing.s6), verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).padding(bottom = Spacing.s6),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
             Text(text = "Cancel this booking?", style = PantopusTextStyle.h3, color = PantopusColors.appText)
-            Text(text = "Cancelling frees the slot for someone else. We'll let your host know.", style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
+            Text(
+                text = "Cancelling frees the slot for someone else. We'll let your host know.",
+                style = PantopusTextStyle.small,
+                color = PantopusColors.appTextSecondary,
+            )
             ConfirmTextInput(
                 value = reason,
                 onValueChange = { reason = it },

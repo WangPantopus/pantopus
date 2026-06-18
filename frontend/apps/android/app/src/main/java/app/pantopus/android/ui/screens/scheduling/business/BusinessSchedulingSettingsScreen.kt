@@ -121,6 +121,7 @@ private fun SettingsBody(
             approve = content.confirmationApprove,
             gated = gated,
             onSelect = { viewModel.setConfirmation(it) },
+            onOpenApprovalWindow = { if (!gated) onNavigate(viewModel.schedulingDefaultsRoute()) },
         )
 
         SettingsGroup(title = "Scheduling", dim = gated) {
@@ -215,6 +216,7 @@ private fun ConfirmationCard(
     approve: Boolean,
     gated: Boolean,
     onSelect: (Boolean) -> Unit,
+    onOpenApprovalWindow: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         BizOverline("Confirmation")
@@ -252,6 +254,17 @@ private fun ConfirmationCard(
                     style = PantopusTextStyle.caption,
                     color = PantopusColors.appTextSecondary,
                 )
+                if (approve) {
+                    BizRowDivider()
+                    SettingsRow(
+                        icon = PantopusIcon.Hourglass,
+                        label = "Approval window",
+                        sub = "24h to respond",
+                        showDivider = false,
+                        gated = gated,
+                        onClick = onOpenApprovalWindow,
+                    )
+                }
             }
         }
     }

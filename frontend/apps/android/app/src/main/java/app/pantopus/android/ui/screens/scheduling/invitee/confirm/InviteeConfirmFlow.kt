@@ -6,6 +6,7 @@ package app.pantopus.android.ui.screens.scheduling.invitee.confirm
 import android.content.Intent
 import android.provider.CalendarContract
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -228,7 +229,12 @@ private fun ConfirmTopBar(
                         .clickableLabel(if (icon == PantopusIcon.X) "Close" else "Back", onBack),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = icon, contentDescription = if (icon == PantopusIcon.X) "Close" else "Back", size = 20.dp, tint = PantopusColors.appText)
+                PantopusIconImage(
+                    icon = icon,
+                    contentDescription = if (icon == PantopusIcon.X) "Close" else "Back",
+                    size = 20.dp,
+                    tint = PantopusColors.appText,
+                )
             }
             Text(
                 text = title,
@@ -266,18 +272,32 @@ private fun ConfirmFooter(
         HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(bottom = Spacing.s1))
         when (state.step) {
             ConfirmStep.Confirmed -> {
-                FilledCta(label = "Add to calendar", icon = PantopusIcon.CalendarPlus, accent = pillar.accent, enabled = true, onClick = onAddToCalendar)
+                FilledCta(
+                    label = "Add to calendar",
+                    icon = PantopusIcon.CalendarPlus,
+                    accent = pillar.accent,
+                    enabled = true,
+                    onClick = onAddToCalendar,
+                )
                 Box(
                     modifier = Modifier.fillMaxWidth().height(38.dp).clickableLabel("Done", onDone),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(text = "Done", style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
+                    Text(
+                        text = "Done",
+                        style = PantopusTextStyle.small,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextStrong,
+                    )
                 }
             }
             else -> {
                 if (state.submitting) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(Radii.lg)).background(PantopusColors.appSurfaceSunken),
+                        modifier =
+                            Modifier.fillMaxWidth().height(
+                                48.dp,
+                            ).clip(RoundedCornerShape(Radii.lg)).background(PantopusColors.appSurfaceSunken),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -300,7 +320,11 @@ private fun ConfirmFooter(
                 }
                 if (paidEnabled && state.step == ConfirmStep.Review) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        Text(text = "We'll confirm once payment clears.", style = PantopusTextStyle.caption, color = PantopusColors.appTextMuted)
+                        Text(
+                            text = "We'll confirm once payment clears.",
+                            style = PantopusTextStyle.caption,
+                            color = PantopusColors.appTextMuted,
+                        )
                     }
                 }
             }
@@ -348,7 +372,7 @@ private fun FilledCta(
 private fun Modifier.clickableLabel(
     label: String,
     onClick: () -> Unit,
-): Modifier = this.then(androidx.compose.foundation.clickable(onClickLabel = label, onClick = onClick))
+): Modifier = this.then(Modifier.clickable(onClickLabel = label, onClick = onClick))
 
 private fun filterTimezones(
     options: List<TimezoneOption>,

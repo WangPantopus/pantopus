@@ -84,6 +84,13 @@ fun AvailabilityListScreen(
                     TopBarAddAction(contentDescription = "Add schedule", onClick = viewModel::addSchedule)
                 },
             )
+            PersonalHeaderPill()
+            // Spec: HelperLine is a fixed (non-scrolling) band beneath the identity pill,
+            // present in the Loading, Single and Multiple frames (omitted only on Empty).
+            when (state) {
+                AvailabilityListUiState.Empty, is AvailabilityListUiState.Error -> Unit
+                else -> AvailabilityHelperLine()
+            }
             when (val s = state) {
                 AvailabilityListUiState.Loading ->
                     Column(
@@ -150,6 +157,21 @@ fun AvailabilityListScreen(
 }
 
 @Composable
+private fun AvailabilityHelperLine() {
+    // Spec HelperLine: fixed band, padding '8px 14px 4px', fg3, 11.5/16.
+    Text(
+        text = "Times here are the source your home and business pages build from.",
+        color = PantopusColors.appTextSecondary,
+        fontSize = 11.5.sp,
+        lineHeight = 16.sp,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 14.dp, top = Spacing.s2, end = 14.dp, bottom = Spacing.s1),
+    )
+}
+
+@Composable
 private fun LoadedList(
     schedules: List<ScheduleRowUi>,
     onOpen: (String) -> Unit,
@@ -166,12 +188,6 @@ private fun LoadedList(
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Text(
-            text = "Times here are the source your home and business pages build from.",
-            color = PantopusColors.appTextSecondary,
-            fontSize = 11.5.sp,
-            modifier = Modifier.padding(horizontal = Spacing.s1, vertical = Spacing.s1),
-        )
         schedules.forEach { row ->
             ScheduleCard(
                 row = row,

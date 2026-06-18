@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,6 +47,14 @@ private val PROVIDER_ICONS =
         "google" to PantopusIcon.CalendarDays,
         "apple" to PantopusIcon.Calendar,
         "outlook" to PantopusIcon.CalendarClock,
+    )
+
+// Friendly provider names per design `connected-calendars-frames.jsx` PROVIDERS.
+private val PROVIDER_NAMES =
+    mapOf(
+        "google" to "Google Calendar",
+        "apple" to "Apple Calendar",
+        "outlook" to "Outlook",
     )
 
 @Composable
@@ -144,12 +153,19 @@ internal fun ComingSoon() {
                 )
             }
             Spacer(Modifier.height(Spacing.s3))
-            Text("Calendar sync is coming soon", fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            Text(
+                "Calendar sync is coming soon",
+                fontSize = 15.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                textAlign = TextAlign.Center,
+            )
             Spacer(Modifier.height(Spacing.s2))
             Text(
                 "We'll let you know when you can connect Google, Apple, and Outlook to check for conflicts.",
                 fontSize = 12.5.sp,
                 color = PantopusColors.appTextSecondary,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = Spacing.s2),
             )
             Spacer(Modifier.height(Spacing.s5))
@@ -180,10 +196,11 @@ private fun ConnectedList(calendars: List<ConnectedCalendarDto>) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(11.dp),
             ) {
-                ProviderTile(provider = calendar.provider ?: "google", muted = false)
+                val provider = calendar.provider ?: "google"
+                ProviderTile(provider = provider, muted = false)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = (calendar.provider ?: "Calendar").replaceFirstChar { it.uppercase() },
+                        text = PROVIDER_NAMES[provider] ?: provider.replaceFirstChar { it.uppercase() },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = PantopusColors.appText,

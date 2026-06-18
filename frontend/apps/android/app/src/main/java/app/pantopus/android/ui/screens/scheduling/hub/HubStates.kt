@@ -22,6 +22,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -96,7 +103,7 @@ internal fun HubEmptyState(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(PantopusColors.warningBg),
+                    modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(PantopusColors.warmAmberBg),
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
@@ -148,7 +155,7 @@ internal fun HubEmptyState(
                         .padding(bottom = Spacing.s2)
                         .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
+                        .dashedBorder(PantopusColors.appBorderStrong, Radii.lg)
                         .padding(horizontal = 14.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -211,3 +218,20 @@ internal fun HubSkeleton() {
         rows = 4,
     )
 }
+
+/** Rounded dashed outline (1dp) — the "not set up" destination preview stroke. */
+private fun Modifier.dashedBorder(
+    color: Color,
+    radius: androidx.compose.ui.unit.Dp,
+): Modifier =
+    drawBehind {
+        val stroke = 1.dp.toPx()
+        val r = radius.toPx()
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(stroke / 2f, stroke / 2f),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = CornerRadius(r, r),
+            style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))),
+        )
+    }

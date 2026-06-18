@@ -227,7 +227,7 @@ private fun HeaderCard(loaded: ResourceDetailUiState.Loaded) {
                     Modifier
                         .size(
                             46.dp,
-                        ).clip(RoundedCornerShape(Radii.md))
+                        ).clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.homeBg),
                 contentAlignment = Alignment.Center,
             ) {
@@ -270,7 +270,7 @@ private fun ApprovalQueueCard(
     onApprove: (String) -> Unit,
     onDecline: (String) -> Unit,
 ) {
-    SectionCard(overline = "Approval queue · ${approvals.size}") {
+    SectionCard(overline = "Approval queue · ${approvals.size}", overlineColor = PantopusColors.warning) {
         approvals.forEachIndexed { index, approval ->
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 Row(

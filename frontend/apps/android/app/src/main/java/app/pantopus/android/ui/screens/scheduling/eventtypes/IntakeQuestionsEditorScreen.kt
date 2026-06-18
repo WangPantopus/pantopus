@@ -8,8 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -139,6 +138,7 @@ private fun IntakeContent(
                 "YOUR QUESTIONS",
                 fontSize = 9.5.sp,
                 fontWeight = FontWeight.Bold,
+                letterSpacing = 0.08.em,
                 color = PantopusColors.appTextMuted,
                 modifier = Modifier.padding(top = Spacing.s2),
             )
@@ -249,11 +249,10 @@ private fun RequiredPill() {
                 RoundedCornerShape(Radii.pill),
             ).background(PantopusColors.primary50).padding(horizontal = 7.dp, vertical = 2.dp),
     ) {
-        Text("REQUIRED", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.primary700)
+        Text("REQUIRED", fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.04.em, color = PantopusColors.primary700)
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EditGroup(
     editing: EditingQuestion,
@@ -266,18 +265,14 @@ private fun EditGroup(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.primary50)
-                .border(1.5.dp, PantopusColors.primary600, RoundedCornerShape(Radii.lg))
+                .border(1.5.dp, PantopusColors.primary200, RoundedCornerShape(Radii.lg))
                 .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         EtTextField(value = draft.label, onValueChange = viewModel::onEditLabel, label = "Question", placeholder = "What should we cover?")
         Column {
             EtFieldLabel(text = "Answer type")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                QuestionType.entries.forEach { type ->
-                    TypeChip(label = type.label, selected = type == draft.type, onClick = { viewModel.onEditType(type) })
-                }
-            }
+            TypeSelector(selected = draft.type, onSelect = viewModel::onEditType)
         }
         if (draft.type.hasOptions) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -350,26 +345,57 @@ private fun EditGroup(
     }
 }
 
+// Answer-type picker — 3-column grid inside one sunken track (design
+// `intake-frames.jsx` TypeSelector); selected cell = surface + product blue.
 @Composable
-private fun TypeChip(
+private fun TypeSelector(
+    selected: QuestionType,
+    onSelect: (QuestionType) -> Unit,
+) {
+    val types = QuestionType.entries
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        types.chunked(3).forEach { rowTypes ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                rowTypes.forEach { type ->
+                    TypeCell(label = type.label, selected = type == selected, onClick = { onSelect(type) }, modifier = Modifier.weight(1f))
+                }
+                // pad the trailing partial row so cells keep an equal third-width.
+                repeat(3 - rowTypes.size) { Box(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypeCell(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier =
-            Modifier
+            modifier
+                .height(30.dp)
                 .clip(RoundedCornerShape(7.dp))
                 .background(if (selected) PantopusColors.appSurface else PantopusColors.appSurfaceSunken)
-                .border(1.dp, if (selected) PantopusColors.primary600 else PantopusColors.appBorder, RoundedCornerShape(7.dp))
-                .clickable(onClick = onClick)
-                .padding(horizontal = 11.dp, vertical = 7.dp),
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
             fontSize = 11.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             color = if (selected) PantopusColors.primary700 else PantopusColors.appTextSecondary,
+            maxLines = 1,
         )
     }
 }

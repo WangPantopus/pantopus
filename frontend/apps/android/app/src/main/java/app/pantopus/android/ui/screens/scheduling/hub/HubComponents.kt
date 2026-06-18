@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -145,10 +146,17 @@ internal fun HubComposedNote(
             color = PantopusColors.appTextStrong,
             modifier = Modifier.weight(1f),
         )
-        Row {
+        Row(horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
             initials.forEachIndexed { i, label ->
-                Box(modifier = Modifier.padding(start = if (i == 0) 0.dp else 0.dp)) {
-                    HubAvatar(initials = label, tone = HubAvatarTone.entries[i % HubAvatarTone.entries.size], size = 22.dp)
+                Box(
+                    modifier =
+                        Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.appSurface)
+                            .padding(2.dp),
+                ) {
+                    HubAvatar(initials = label, tone = HubAvatarTone.entries[i % HubAvatarTone.entries.size], size = 18.dp)
                 }
             }
         }
@@ -210,7 +218,7 @@ internal fun BookingLinkCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
-                        icon = PantopusIcon.ScanLine,
+                        icon = PantopusIcon.QrCode,
                         contentDescription = null,
                         size = 15.dp,
                         tint = PantopusColors.appTextStrong,
@@ -261,6 +269,14 @@ private fun GhostLinkButton(
     }
 }
 
+/** Up-to-two leading-letter initials from a display name (matches the design's preview avatar). */
+private fun previewInitials(name: String): String =
+    name.split(' ')
+        .filter { it.isNotBlank() }
+        .map { it.first().uppercaseChar() }
+        .joinToString("")
+        .take(2)
+
 @Composable
 private fun LinkPreview(
     pillar: SchedulingPillar,
@@ -308,7 +324,30 @@ private fun LinkPreview(
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp)),
         ) {
-            Box(modifier = Modifier.fillMaxWidth().height(30.dp).background(pillar.accent))
+            Box(modifier = Modifier.fillMaxWidth().height(30.dp).background(pillar.accent)) {
+                // 26dp avatar disc straddling the header/body seam, white-bordered.
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = Spacing.s3)
+                            .offset(y = 12.dp)
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.appSurface)
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                            .background(pillar.accent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = previewInitials(displayName),
+                        color = PantopusColors.appTextInverse,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                    )
+                }
+            }
             Column(modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s2)) {
                 Text(displayName, color = PantopusColors.appText, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                 Text(displayRole, color = PantopusColors.appTextSecondary, fontSize = 8.sp)
@@ -336,6 +375,8 @@ private fun LinkPreview(
             }
         }
         if (isPaused) {
+            // Translucent scrim dimming the whole preview behind the centered pill.
+            Box(modifier = Modifier.matchParentSize().background(PantopusColors.appBg.copy(alpha = 0.55f)))
             Row(
                 modifier =
                     Modifier
@@ -387,7 +428,7 @@ internal fun HubPauseRow(
 @Composable
 internal fun HubPausedBanner(onResume: () -> Unit) {
     StatusCard(bg = PantopusColors.warningBg, border = PantopusColors.warningLight) {
-        IconTile(icon = PantopusIcon.Pause, bg = PantopusColors.warningBg, fg = PantopusColors.warning)
+        IconTile(icon = PantopusIcon.Pause, bg = PantopusColors.warmAmberBg, fg = PantopusColors.warning)
         Spacer(Modifier.width(Spacing.s3))
         Column(Modifier.weight(1f)) {
             Text("Bookings are paused", color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
@@ -591,7 +632,7 @@ internal fun HubManageGroup(
                 }
             }
             if (index < rows.lastIndex) {
-                Box(modifier = Modifier.fillMaxWidth().height(1.dp).padding(start = 14.dp).background(PantopusColors.appBorderSubtle))
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
             }
         }
     }
@@ -643,7 +684,7 @@ internal fun HubFooterCta(
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+                .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s3, bottom = Spacing.s6),
     ) {
         Row(
             modifier =

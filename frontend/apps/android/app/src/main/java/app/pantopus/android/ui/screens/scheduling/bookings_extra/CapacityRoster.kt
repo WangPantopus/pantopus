@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
@@ -68,7 +76,7 @@ internal fun CapacityHeaderCard(
     ) {
         Row(verticalAlignment = Alignment.Top) {
             Text(
-                text = "$filled of $total seats filled · $waiting waiting",
+                text = if (waiting > 0) "$filled of $total seats filled · $waiting waiting" else "$filled of $total seats filled",
                 style = PantopusTextStyle.body,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appText,
@@ -104,7 +112,12 @@ internal fun CapacityHeaderCard(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 StatCell(value = confirmed, label = "Confirmed", valueColor = PantopusColors.appText, modifier = Modifier.weight(1f))
                 StatCell(value = pending, label = "Pending", valueColor = PantopusColors.warning, modifier = Modifier.weight(1f))
-                StatCell(value = waiting, label = "Waitlisted", valueColor = PantopusColors.appTextSecondary, modifier = Modifier.weight(1f))
+                StatCell(
+                    value = waiting,
+                    label = "Waitlisted",
+                    valueColor = PantopusColors.appTextSecondary,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -135,6 +148,7 @@ private fun StatCell(
  * A roster list row: avatar + name + meta caption, with a caller-supplied
  * trailing slot (status chip + kebab, a Promote button, or a checkbox).
  */
+
 /** The pill-shaped "Promote to seat" action, disabled (gray) when no seat is open. */
 @Composable
 internal fun PromoteSeatButton(
@@ -160,7 +174,7 @@ internal fun PromoteSeatButton(
             size = 14.dp,
             tint = tint,
         )
-        Text(text = "Promote", style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = tint)
+        Text(text = "Promote to seat", style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = tint)
     }
 }
 

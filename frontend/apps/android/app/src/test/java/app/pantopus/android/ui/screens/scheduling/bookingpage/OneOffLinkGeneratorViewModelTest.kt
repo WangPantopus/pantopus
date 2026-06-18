@@ -137,7 +137,8 @@ class OneOffLinkGeneratorViewModelTest {
             advanceUntilIdle()
             val result = (vm.state.value as OneOffUiState.Generated).result
             assertTrue(result.url.endsWith("/book/o/tok"))
-            assertTrue(result.metaLabel.contains("single use"))
+            assertTrue(result.singleUse)
+            assertTrue(result.expiryLabel.startsWith("Expires"))
             val body = slot<app.pantopus.android.data.api.models.scheduling.OneOffLinkRequest>()
             coVerify { repo.createOneOffLink(eq(SchedulingOwner.Personal), capture(body)) }
             assertEquals("e1", body.captured.eventTypeId)

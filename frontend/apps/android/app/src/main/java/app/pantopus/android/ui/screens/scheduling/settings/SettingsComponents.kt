@@ -24,8 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -91,7 +94,8 @@ internal fun SettingsGroup(
             color = accent,
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
-            modifier = Modifier.padding(top = 18.dp, bottom = Spacing.s2),
+            letterSpacing = 0.08.em,
+            modifier = Modifier.padding(start = Spacing.s1, top = 18.dp, bottom = Spacing.s2),
         )
         Column(
             modifier =
@@ -140,6 +144,37 @@ internal fun SettingsRow(
     }
     if (showDivider) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).padding(start = 16.dp).background(PantopusColors.appBorderSubtle))
+    }
+}
+
+/** Right cluster for the timezone row: a 30dp lock-affordance tile + chevron. */
+@Composable
+internal fun SettingsTzRight(
+    accent: Color,
+    locked: Boolean,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(if (locked) PantopusColors.primary50 else PantopusColors.appSurfaceSunken)
+                    .border(
+                        1.dp,
+                        if (locked) accent.copy(alpha = 0.2f) else PantopusColors.appBorder,
+                        RoundedCornerShape(Radii.md),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Lock,
+                contentDescription = null,
+                size = 14.dp,
+                tint = if (locked) accent else PantopusColors.appTextMuted,
+            )
+        }
+        SettingsChevron()
     }
 }
 
@@ -200,7 +235,8 @@ internal fun SettingsDangerGroup(content: @Composable () -> Unit) {
             color = PantopusColors.error,
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
-            modifier = Modifier.padding(top = 18.dp, bottom = Spacing.s2),
+            letterSpacing = 0.08.em,
+            modifier = Modifier.padding(start = Spacing.s1, top = 18.dp, bottom = Spacing.s2),
         )
         Column(
             modifier =
@@ -297,7 +333,9 @@ internal fun SettingsMonoFooter(text: String) {
     Text(
         text,
         color = PantopusColors.appTextMuted,
+        fontFamily = FontFamily.Monospace,
         fontSize = 11.sp,
+        textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().padding(start = Spacing.s4, end = Spacing.s4, top = 18.dp, bottom = Spacing.s1),
     )
 }

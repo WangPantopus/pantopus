@@ -75,7 +75,13 @@ private fun HomeStep(
         }
         2 -> {
             HeadlineBlock("How should times combine?")
-            SubcopyBlock("Choose how members' availability turns into one set of bookable times.")
+            SubcopyBlock(
+                if (state.combineMode == "round_robin") {
+                    "Whoever's free gets the booking. Pick a rule for who hosts when more than one person is open."
+                } else {
+                    "Three members are scheduled. Choose how their availability turns into one set of bookable times."
+                },
+            )
             OnboardingModePicker(mode = state.combineMode, pillar = pillar, onSelect = vm::setCombineMode)
             if (state.combineMode == "round_robin") {
                 OnboardingRoundRobinRule(rule = state.roundRobinRule, pillar = pillar, onSelect = vm::setRoundRobinRule)

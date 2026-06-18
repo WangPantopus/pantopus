@@ -148,7 +148,7 @@ private fun ResolvedBody(state: OpenInAppUiState.Resolved) {
     }
     Text(
         text = "Pick up where you left off",
-        style = PantopusTextStyle.h2,
+        style = PantopusTextStyle.h3,
         color = PantopusColors.appText,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = Spacing.s5),
@@ -202,7 +202,7 @@ private fun FailedBody() {
     }
     Text(
         text = "We couldn't open this in the app",
-        style = PantopusTextStyle.h2,
+        style = PantopusTextStyle.h3,
         color = PantopusColors.appText,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = Spacing.s5),

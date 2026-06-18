@@ -592,7 +592,7 @@ fun AutoSheetFooter(
 ) {
     Column(modifier = modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
-        Box(modifier = Modifier.padding(horizontal = Spacing.s4, top = Spacing.s3, bottom = Spacing.s5)) {
+        Box(modifier = Modifier.padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s3, bottom = Spacing.s5)) {
             content()
         }
     }
@@ -763,7 +763,7 @@ fun AutoInlineEmpty(
             modifier = Modifier.widthIn(max = 230.dp),
         )
         if (ctaTitle != null && onCta != null) {
-            AutoGhostButton(title = ctaTitle, icon = PantopusIcon.Plus, onClick = onCta, modifier = Modifier.padding(top = 2.dp))
+            AutoGhostButton(title = ctaTitle, onClick = onCta, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

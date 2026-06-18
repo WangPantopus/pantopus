@@ -252,9 +252,9 @@ fun RuleChipView(
     text: String,
     modifier: Modifier = Modifier,
     home: Boolean = true,
+    foreground: Color = if (home) PantopusColors.home else PantopusColors.appTextSecondary,
+    background: Color = if (home) PantopusColors.homeBg else PantopusColors.appSurfaceSunken,
 ) {
-    val foreground = if (home) PantopusColors.home else PantopusColors.appTextSecondary
-    val background = if (home) PantopusColors.homeBg else PantopusColors.appSurfaceSunken
     Row(
         modifier =
             modifier
@@ -293,6 +293,7 @@ fun TypeBadge(
 fun SectionCard(
     modifier: Modifier = Modifier,
     overline: String? = null,
+    overlineColor: Color = PantopusColors.home,
     trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
@@ -314,7 +315,7 @@ fun SectionCard(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.6.sp,
-                        color = PantopusColors.home,
+                        color = overlineColor,
                         modifier = Modifier.weight(1f),
                     )
                 } else {

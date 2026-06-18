@@ -5,13 +5,11 @@ package app.pantopus.android.ui.screens.scheduling.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -107,7 +105,7 @@ private fun SettingsBody(
             SettingsGroup(title = "Team", accent = PantopusColors.business) {
                 SettingsRow(
                     label = "Team & seats",
-                    sublabel = "Manage members & booking seats",
+                    sublabel = "4 members · 2 booking seats",
                     showDivider = true,
                     onClick = { onNavigate(vm.teamRoute()) },
                 )
@@ -155,20 +153,7 @@ private fun SettingsBody(
                 label = "Default timezone",
                 sublabel = data.timezoneValue,
                 onClick = { onNavigate(vm.availabilityRoute()) },
-                trailing = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (!data.isFresh) {
-                            PantopusIconImage(
-                                icon = PantopusIcon.Lock,
-                                contentDescription = null,
-                                size = 14.dp,
-                                tint = PantopusColors.primary600,
-                            )
-                            Spacer(Modifier.width(Spacing.s1))
-                        }
-                        SettingsChevron()
-                    }
-                },
+                trailing = { SettingsTzRight(accent = PantopusColors.primary600, locked = !data.isFresh) },
             )
             SettingsRow(label = "Default availability", sublabel = "Mon–Fri, 9–5", onClick = { onNavigate(vm.availabilityRoute()) })
             SettingsRow(

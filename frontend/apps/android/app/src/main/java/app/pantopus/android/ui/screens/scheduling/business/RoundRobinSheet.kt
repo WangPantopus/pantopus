@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -75,18 +77,23 @@ fun RoundRobinSheet(
         containerColor = PantopusColors.appSurface,
         modifier = Modifier.testTag("roundRobinSheet"),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4)) {
-            Text(text = "Assign bookings", style = PantopusTextStyle.h3, color = PantopusColors.appText)
-            Text(
-                text = "New bookings rotate across the members you pick.",
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
-                modifier = Modifier.padding(top = Spacing.s1, bottom = Spacing.s3),
-            )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4)) {
+                Text(text = "Assign bookings", style = PantopusTextStyle.h3, color = PantopusColors.appText)
+                Text(
+                    text = "New bookings rotate across the members you pick.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.padding(top = Spacing.s1, bottom = Spacing.s3),
+                )
+            }
             when (val s = state) {
-                RoundRobinAssignmentViewModel.UiState.Loading -> RoundRobinLoading()
+                RoundRobinAssignmentViewModel.UiState.Loading ->
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4)) { RoundRobinLoading() }
                 is RoundRobinAssignmentViewModel.UiState.Error ->
-                    BizNote(text = s.message, tone = BizNoteTone.Error, icon = PantopusIcon.AlertCircle)
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4)) {
+                        BizNote(text = s.message, tone = BizNoteTone.Error, icon = PantopusIcon.AlertCircle)
+                    }
                 is RoundRobinAssignmentViewModel.UiState.Content ->
                     RoundRobinBody(content = s, viewModel = viewModel, toast = toast, onDone = viewModel::save)
             }
@@ -101,65 +108,82 @@ private fun RoundRobinBody(
     toast: String?,
     onDone: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        RuleCard(
-            name = "Balanced",
-            desc = "Spread bookings by weight",
-            icon = PantopusIcon.Gauge,
-            selected = content.rule == RoundRobinAssignmentViewModel.Rule.Balanced,
-            onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Balanced) },
-        )
-        RuleCard(
-            name = "Priority order",
-            desc = "Fill the top of the list first",
-            icon = PantopusIcon.List,
-            selected = content.rule == RoundRobinAssignmentViewModel.Rule.Priority,
-            onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Priority) },
-        )
-        RuleCard(
-            name = "Strict round-robin",
-            desc = "One each, strictly in turn",
-            icon = PantopusIcon.ArrowsRepeat,
-            selected = content.rule == RoundRobinAssignmentViewModel.Rule.Strict,
-            onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Strict) },
-        )
-        BizOverline("Bookable members", modifier = Modifier.padding(top = Spacing.s2))
-        if (content.checkedCount == 0) {
-            BizNote(
-                text = "Pick at least one member to take bookings.",
-                tone = BizNoteTone.Warning,
-                icon = PantopusIcon.AlertTriangle,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f, fill = false)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            RuleCard(
+                name = "Balanced",
+                desc = "Spread bookings by weight",
+                icon = PantopusIcon.Gauge,
+                selected = content.rule == RoundRobinAssignmentViewModel.Rule.Balanced,
+                onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Balanced) },
             )
-        }
-        BizCard {
-            content.picks.forEachIndexed { index, pick ->
-                RoundRobinMemberRow(
-                    pick = pick,
-                    rule = content.rule,
-                    showDivider = index != content.picks.lastIndex,
-                    onToggle = { viewModel.toggle(pick.id) },
-                    onWeightMinus = { viewModel.decrementWeight(pick.id) },
-                    onWeightPlus = { viewModel.incrementWeight(pick.id) },
-                    onUp = { viewModel.moveUp(pick.id) },
-                    onDown = { viewModel.moveDown(pick.id) },
+            RuleCard(
+                name = "Priority order",
+                desc = "Fill the top of the list first",
+                icon = PantopusIcon.List,
+                selected = content.rule == RoundRobinAssignmentViewModel.Rule.Priority,
+                onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Priority) },
+            )
+            RuleCard(
+                name = "Strict round-robin",
+                desc = "One each, strictly in turn",
+                icon = PantopusIcon.ArrowsRepeat,
+                selected = content.rule == RoundRobinAssignmentViewModel.Rule.Strict,
+                onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Strict) },
+            )
+            BizOverline("Bookable members", modifier = Modifier.padding(top = Spacing.s2))
+            if (content.checkedCount == 0) {
+                BizNote(
+                    text = "Pick at least one member to take bookings.",
+                    tone = BizNoteTone.Warning,
+                    icon = PantopusIcon.AlertTriangle,
                 )
             }
+            BizCard {
+                content.picks.forEachIndexed { index, pick ->
+                    RoundRobinMemberRow(
+                        pick = pick,
+                        rule = content.rule,
+                        showDivider = index != content.picks.lastIndex,
+                        onToggle = { viewModel.toggle(pick.id) },
+                        onWeightMinus = { viewModel.decrementWeight(pick.id) },
+                        onWeightPlus = { viewModel.incrementWeight(pick.id) },
+                    )
+                }
+            }
+            if (content.isSingleMember) {
+                BizNote(
+                    text = "Rotation needs two or more members. Bookings go to ${content.firstCheckedName ?: "this member"} for now.",
+                    tone = BizNoteTone.Info,
+                    icon = PantopusIcon.Info,
+                )
+            }
+            toast?.let { BizNote(text = it, tone = BizNoteTone.Error, icon = PantopusIcon.AlertCircle) }
         }
-        if (content.isSingleMember) {
-            BizNote(
-                text = "Rotation needs two or more members. Bookings go to ${content.firstCheckedName ?: "this member"} for now.",
-                tone = BizNoteTone.Info,
-                icon = PantopusIcon.Info,
+        // Pinned footer: hairline top divider + surface background, mirroring CollectiveBody/MemberHoursBody.
+        BizRowDivider()
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.appSurface)
+                    .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s2, bottom = Spacing.s5),
+        ) {
+            BizPrimaryButton(
+                text = "Done",
+                onClick = onDone,
+                enabled = !content.doneDisabled,
+                saving = content.saving,
             )
         }
-        toast?.let { BizNote(text = it, tone = BizNoteTone.Error, icon = PantopusIcon.AlertCircle) }
-        BizPrimaryButton(
-            text = "Done",
-            onClick = onDone,
-            enabled = !content.doneDisabled,
-            saving = content.saving,
-            modifier = Modifier.padding(top = Spacing.s2, bottom = Spacing.s5),
-        )
     }
 }
 
@@ -236,8 +260,6 @@ private fun RoundRobinMemberRow(
     onToggle: () -> Unit,
     onWeightMinus: () -> Unit,
     onWeightPlus: () -> Unit,
-    onUp: () -> Unit,
-    onDown: () -> Unit,
 ) {
     Column {
         Row(
@@ -261,13 +283,16 @@ private fun RoundRobinMemberRow(
             if (pick.checked) {
                 when (rule) {
                     RoundRobinAssignmentViewModel.Rule.Balanced ->
-                        BizStepper(value = "×${pick.weight}", onMinus = onWeightMinus, onPlus = onWeightPlus)
-                    RoundRobinAssignmentViewModel.Rule.Priority ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                            ReorderButton(icon = PantopusIcon.ChevronUp, onClick = onUp)
-                            ReorderButton(icon = PantopusIcon.ChevronDown, onClick = onDown)
-                        }
-                    RoundRobinAssignmentViewModel.Rule.Strict -> Unit
+                        WeightStepper(weight = pick.weight, onMinus = onWeightMinus, onPlus = onWeightPlus)
+                    RoundRobinAssignmentViewModel.Rule.Priority,
+                    RoundRobinAssignmentViewModel.Rule.Strict,
+                    ->
+                        PantopusIconImage(
+                            icon = PantopusIcon.GripVertical,
+                            contentDescription = "Reorder",
+                            size = 20.dp,
+                            tint = PantopusColors.appTextMuted,
+                        )
                 }
             }
         }
@@ -275,16 +300,53 @@ private fun RoundRobinMemberRow(
     }
 }
 
+/**
+ * Round-robin weight stepper (`WeightStepper` in `roundrobin-frames.jsx`): a
+ * circular − / + flanking an `×N` value rendered as a violet-tinted pill.
+ */
 @Composable
-private fun ReorderButton(
+private fun WeightStepper(
+    weight: Int,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        StepperButton(icon = PantopusIcon.Minus, tint = PantopusColors.appTextSecondary, onClick = onMinus)
+        Text(
+            text = "×$weight",
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.Bold,
+            color = bizAccent,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(bizAccentBg)
+                    .padding(horizontal = Spacing.s2, vertical = 3.dp),
+        )
+        StepperButton(icon = PantopusIcon.Plus, tint = bizAccent, onClick = onPlus)
+    }
+}
+
+@Composable
+private fun StepperButton(
     icon: PantopusIcon,
+    tint: Color,
     onClick: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.size(26.dp).clip(CircleShape).border(1.dp, PantopusColors.appBorder, CircleShape).clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .border(1.dp, PantopusColors.appBorder, CircleShape)
+                .background(PantopusColors.appSurface)
+                .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = PantopusColors.appTextSecondary)
+        PantopusIconImage(icon = icon, contentDescription = null, size = 11.dp, tint = tint)
     }
 }
 

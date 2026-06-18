@@ -199,7 +199,15 @@ fun ConfirmHero(
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         ConfirmHalo(kind = kind, icon = icon)
-        Text(text = title, style = PantopusTextStyle.h2, color = PantopusColors.appText, textAlign = TextAlign.Center)
+        // Spec hero headline: 21sp / 700 (booking-confirmed-frames.jsx Hero line 138), not h2 (24sp SemiBold).
+        Text(
+            text = title,
+            style = PantopusTextStyle.h3,
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+        )
         Text(
             text = body,
             style = PantopusTextStyle.small,
@@ -290,7 +298,12 @@ fun CalendarCluster(
                         tint = accent,
                         modifier = Modifier.padding(end = Spacing.s1),
                     )
-                    Text(text = target.label, style = PantopusTextStyle.caption, color = PantopusColors.appText, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = target.label,
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appText,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
         }
@@ -300,7 +313,12 @@ fun CalendarCluster(
             horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             PantopusIconImage(icon = PantopusIcon.Download, contentDescription = null, size = 13.dp, tint = PantopusColors.appTextSecondary)
-            Text(text = "Download .ics", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = "Download .ics",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }

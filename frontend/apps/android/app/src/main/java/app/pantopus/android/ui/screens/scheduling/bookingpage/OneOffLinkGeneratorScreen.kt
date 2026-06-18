@@ -119,7 +119,10 @@ private fun SheetTitle() {
 }
 
 @Composable
-private fun ConfigBody(cfg: OneOffConfig, viewModel: OneOffLinkGeneratorViewModel) {
+private fun ConfigBody(
+    cfg: OneOffConfig,
+    viewModel: OneOffLinkGeneratorViewModel,
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier =
@@ -150,6 +153,21 @@ private fun ConfigBody(cfg: OneOffConfig, viewModel: OneOffLinkGeneratorViewMode
     }
 }
 
+/** "30 min · video" — duration plus the booking mode, mirroring the design. */
+private fun eventTypeSubLabel(
+    duration: Int,
+    locationMode: String?,
+): String {
+    val mode =
+        when (locationMode) {
+            "video" -> "video"
+            "phone" -> "phone"
+            "in_person" -> "in person"
+            else -> null
+        }
+    return if (mode != null) "$duration min · $mode" else "$duration min"
+}
+
 @Composable
 private fun SectionLabel(text: String) {
     Text(
@@ -162,7 +180,11 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun EventTypePicker(cfg: OneOffConfig, onSelect: (String) -> Unit, onDuration: (Int) -> Unit) {
+private fun EventTypePicker(
+    cfg: OneOffConfig,
+    onSelect: (String) -> Unit,
+    onDuration: (Int) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     val selected = cfg.selected
     Column(
@@ -197,7 +219,7 @@ private fun EventTypePicker(cfg: OneOffConfig, onSelect: (String) -> Unit, onDur
             Column(Modifier.weight(1f)) {
                 Text(selected?.name.orEmpty(), color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 Text(
-                    "${cfg.selectedDuration} min",
+                    eventTypeSubLabel(cfg.selectedDuration, selected?.locationMode),
                     color = PantopusColors.appTextSecondary,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 1.dp),
@@ -222,7 +244,10 @@ private fun EventTypePicker(cfg: OneOffConfig, onSelect: (String) -> Unit, onDur
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(opt.id); expanded = false }
+                            .clickable {
+                                onSelect(opt.id)
+                                expanded = false
+                            }
                             .padding(11.dp)
                             .testTag("oneOffOption_${opt.id}"),
                 )
@@ -230,13 +255,19 @@ private fun EventTypePicker(cfg: OneOffConfig, onSelect: (String) -> Unit, onDur
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
         Column(modifier = Modifier.padding(11.dp)) {
-            Text(
-                "Custom duration",
-                color = PantopusColors.appTextStrong,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(bottom = Spacing.s2),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s2),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "Custom duration",
+                    color = PantopusColors.appTextStrong,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                )
+                Text("minutes", color = PantopusColors.appTextMuted, fontSize = 10.sp)
+            }
             ChipScrollRow(
                 cfg.selected?.durations.orEmpty().map { it.toString() },
                 cfg.selectedDuration.toString(),
@@ -246,7 +277,12 @@ private fun EventTypePicker(cfg: OneOffConfig, onSelect: (String) -> Unit, onDur
 }
 
 @Composable
-private fun OfferTimesCard(cfg: OneOffConfig, onToggle: () -> Unit, onAdd: () -> Unit, onRemove: (Int) -> Unit) {
+private fun OfferTimesCard(
+    cfg: OneOffConfig,
+    onToggle: () -> Unit,
+    onAdd: () -> Unit,
+    onRemove: (Int) -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -321,7 +357,10 @@ private fun OfferTimesCard(cfg: OneOffConfig, onToggle: () -> Unit, onAdd: () ->
 }
 
 @Composable
-private fun ExpiryChips(selected: ExpiryOption, onSelect: (ExpiryOption) -> Unit) {
+private fun ExpiryChips(
+    selected: ExpiryOption,
+    onSelect: (ExpiryOption) -> Unit,
+) {
     Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         ExpiryOption.entries.forEach { option ->
             val on = option == selected
@@ -344,7 +383,11 @@ private fun ExpiryChips(selected: ExpiryOption, onSelect: (ExpiryOption) -> Unit
 }
 
 @Composable
-private fun ChipScrollRow(options: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun ChipScrollRow(
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
     Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         options.forEach { option ->
             val on = option == selected
@@ -367,7 +410,11 @@ private fun ChipScrollRow(options: List<String>, selected: String, onSelect: (St
 }
 
 @Composable
-private fun OptionsCard(cfg: OneOffConfig, onSingleUse: () -> Unit, onAskIntake: () -> Unit) {
+private fun OptionsCard(
+    cfg: OneOffConfig,
+    onSingleUse: () -> Unit,
+    onAskIntake: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -396,7 +443,10 @@ private fun OptionsCard(cfg: OneOffConfig, onSingleUse: () -> Unit, onAskIntake:
 }
 
 @Composable
-private fun ErrorNote(message: String, onRetry: () -> Unit) {
+private fun ErrorNote(
+    message: String,
+    onRetry: () -> Unit,
+) {
     Row(
         modifier =
             Modifier
@@ -429,7 +479,10 @@ private fun ErrorNote(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun GenerateBar(creating: Boolean, onGenerate: () -> Unit) {
+private fun GenerateBar(
+    creating: Boolean,
+    onGenerate: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -472,7 +525,11 @@ private fun GenerateBar(creating: Boolean, onGenerate: () -> Unit) {
 }
 
 @Composable
-private fun GeneratedBody(result: OneOffResult, viewModel: OneOffLinkGeneratorViewModel, onCreateAnother: () -> Unit) {
+private fun GeneratedBody(
+    result: OneOffResult,
+    viewModel: OneOffLinkGeneratorViewModel,
+    onCreateAnother: () -> Unit,
+) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     var copied by remember { mutableStateOf(false) }
@@ -517,12 +574,14 @@ private fun GeneratedBody(result: OneOffResult, viewModel: OneOffLinkGeneratorVi
                 clipboard.setText(AnnotatedString(result.url))
                 copied = true
             }
-            MetaChip(result.metaLabel)
+            MetaChip(result.expiryLabel, result.singleUse)
             SectionLabel("Send via")
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-                ShareTargetButton(PantopusIcon.Share, "Share", Modifier.weight(1f)) { context.shareText(result.url) }
-                ShareTargetButton(PantopusIcon.MessageCircle, "Messages", Modifier.weight(1f)) { context.shareText(result.url) }
-                ShareTargetButton(PantopusIcon.Mail, "Email", Modifier.weight(1f)) {
+                ShareTargetButton(PantopusIcon.Share, "Share", Modifier.weight(1f), maxTile = 54.dp) { context.shareText(result.url) }
+                ShareTargetButton(PantopusIcon.MessageCircle, "Messages", Modifier.weight(1f), maxTile = 54.dp) {
+                    context.shareText(result.url)
+                }
+                ShareTargetButton(PantopusIcon.Mail, "Email", Modifier.weight(1f), maxTile = 54.dp) {
                     context.composeMail(MailDraft(subject = "Book a time with me", body = "Here's a private link: ${result.url}"))
                 }
             }
@@ -538,13 +597,17 @@ private fun GeneratedBody(result: OneOffResult, viewModel: OneOffLinkGeneratorVi
             }
         }
         if (copied) {
-            BLSavedToast(message = "Link copied", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.s10))
+            CopiedToast(message = "Link copied", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.s10))
         }
     }
 }
 
 @Composable
-private fun ResultUrlCard(url: String, copied: Boolean, onCopy: () -> Unit) {
+private fun ResultUrlCard(
+    url: String,
+    copied: Boolean,
+    onCopy: () -> Unit,
+) {
     Row(
         modifier =
             Modifier
@@ -580,7 +643,11 @@ private fun ResultUrlCard(url: String, copied: Boolean, onCopy: () -> Unit) {
 }
 
 @Composable
-private fun MetaChip(label: String) {
+private fun MetaChip(
+    expiryLabel: String,
+    singleUse: Boolean,
+) {
+    // Spec: two inline segments (calendar-clock + expiry · ticket + usage) with a dot separator.
     Row(
         modifier =
             Modifier
@@ -590,7 +657,22 @@ private fun MetaChip(label: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(icon = PantopusIcon.CalendarClock, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextStrong)
-        Text(label, color = PantopusColors.appTextStrong, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+        MetaSegment(icon = PantopusIcon.CalendarClock, text = expiryLabel)
+        Box(modifier = Modifier.size(3.dp).clip(CircleShape).background(PantopusColors.appTextMuted))
+        MetaSegment(icon = PantopusIcon.Ticket, text = if (singleUse) "Single use" else "Multi-use")
+    }
+}
+
+@Composable
+private fun MetaSegment(
+    icon: PantopusIcon,
+    text: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(icon = icon, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextStrong)
+        Text(text, color = PantopusColors.appTextStrong, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
     }
 }

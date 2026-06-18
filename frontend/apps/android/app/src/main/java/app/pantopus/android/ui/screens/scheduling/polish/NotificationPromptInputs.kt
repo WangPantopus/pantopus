@@ -87,7 +87,7 @@ fun CodeBoxField(
                     .testTag("scheduling.notificationPrompt.code")
                     .semantics { contentDescription = "Verification code" },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPad),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             cursorBrush = SolidColor(Color.Transparent),
             textStyle = PantopusTextStyle.h3.copy(color = Color.Transparent),
         )

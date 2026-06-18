@@ -48,7 +48,7 @@ import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
 private val LOCATION_OPTIONS = listOf("In person" to "in_person", "Phone" to "phone", "Video" to "video", "Custom" to "custom")
-private val ASSIGNMENT_OPTIONS = listOf("Anyone" to "round_robin", "Collective" to "collective", "Solo" to "one_on_one")
+private val ASSIGNMENT_OPTIONS = listOf("Anyone" to "round_robin", "Specific" to "one_on_one", "Collective" to "collective")
 
 @Composable
 fun EventTypeEditorScreen(
@@ -232,7 +232,7 @@ private fun EditorContent(
                 EtCard(overline = "Assignment", accent = accent) {
                     EtSegmented(
                         options = ASSIGNMENT_OPTIONS.map { it.first },
-                        selected = ASSIGNMENT_OPTIONS.firstOrNull { it.second == form.assignmentMode }?.first ?: "Solo",
+                        selected = ASSIGNMENT_OPTIONS.firstOrNull { it.second == form.assignmentMode }?.first ?: "Anyone",
                         onSelect = {
                                 label ->
                             ASSIGNMENT_OPTIONS.firstOrNull { it.first == label }?.let { viewModel.onAssignmentMode(it.second) }
@@ -419,21 +419,42 @@ private fun StripeConnectCard(onConnect: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.businessBg)
-                .padding(12.dp),
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.primary50)
+                .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Text("Connect payments to charge for bookings", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-        Text(
-            "Pantopus uses Stripe to collect payments and deposits. It takes about a minute.",
-            fontSize = 11.sp,
-            color = PantopusColors.appTextSecondary,
-        )
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Box(
+                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.primary600),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.CreditCard,
+                    contentDescription = null,
+                    size = 15.dp,
+                    tint = PantopusColors.appTextInverse,
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "Connect payments to charge for bookings",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
+                Text(
+                    "Pantopus uses Stripe to collect payments and deposits. It takes about a minute.",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextStrong,
+                )
+            }
+        }
         EtPrimaryButton(label = "Connect Stripe", onClick = onConnect, leadingIcon = PantopusIcon.ExternalLink)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorSwatches(
     selected: String,
@@ -441,18 +462,33 @@ private fun ColorSwatches(
 ) {
     Column {
         EtFieldLabel(text = "Color")
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             EVENT_TYPE_SWATCHES.forEach { hex ->
                 val on = hex.equals(selected, ignoreCase = true)
+                val swatch = Color(hex.toColorInt())
+                // Selected ring mirrors design `0 0 0 2px #fff, 0 0 0 4px {color}`:
+                // a colored outer ring with a white gap, drawn as nested boxes.
                 Box(
                     modifier =
                         Modifier
-                            .size(24.dp)
+                            .size(28.dp)
                             .clip(RoundedCornerShape(Radii.pill))
-                            .background(Color(hex.toColorInt()))
-                            .then(if (on) Modifier.border(2.dp, PantopusColors.appText, RoundedCornerShape(Radii.pill)) else Modifier)
+                            .then(if (on) Modifier.background(swatch) else Modifier)
+                            .padding(if (on) 2.dp else 0.dp)
                             .clickable { onSelect(hex) },
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .then(
+                                    if (on) Modifier.border(2.dp, PantopusColors.appSurface, RoundedCornerShape(Radii.pill)) else Modifier,
+                                )
+                                .background(swatch),
+                    )
+                }
             }
         }
     }

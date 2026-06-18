@@ -222,7 +222,7 @@ private fun OfflineCalendarBanner() {
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s3, top = Spacing.s2),
+                .padding(start = Spacing.s3, end = Spacing.s3, top = Spacing.s2),
         horizontalArrangement = Arrangement.Start,
     ) {
         Row(

@@ -100,7 +100,12 @@ private fun ReviewSummaryCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             HostAvatar(pillar = pillar, initials = ConfirmUtils.initials(args.hostName), diameter = 38.dp)
             Column(modifier = Modifier.weight(1f).padding(start = Spacing.s2)) {
-                Text(text = args.eventType.name ?: "Booking", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+                Text(
+                    text = args.eventType.name ?: "Booking",
+                    style = PantopusTextStyle.small,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                     Text(text = "with ${args.hostName}", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
                     PillarTag(pillar = pillar)
@@ -119,11 +124,23 @@ private fun ReviewSummaryCard(
         }
         SummaryDetailRow(icon = PantopusIcon.Users, divider = answers.isNotEmpty()) {
             Row {
-                Text(text = inviteeName.ifEmpty { "You" }, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                Text(
+                    text =
+                        inviteeName.ifEmpty {
+                            "You"
+                        },
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                )
                 Text(text = " (you)", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             }
             if (guests.isNotEmpty()) {
-                Text(text = "+ ${guests.size} guest${if (guests.size == 1) "" else "s"}", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+                Text(
+                    text = "+ ${guests.size} guest${if (guests.size == 1) "" else "s"}",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
             }
         }
 
@@ -132,21 +149,46 @@ private fun ReviewSummaryCard(
                 modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleAnswers).padding(top = Spacing.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PantopusIconImage(icon = PantopusIcon.MessageSquare, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextSecondary, modifier = Modifier.padding(end = Spacing.s2))
-                Text(text = "Your answers", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, modifier = Modifier.weight(1f))
-                Text(text = "${answers.size}", style = PantopusTextStyle.caption, color = PantopusColors.appTextMuted, modifier = Modifier.padding(end = Spacing.s1))
                 PantopusIconImage(
-                    icon = if (answersExpanded) PantopusIcon.ChevronDown else PantopusIcon.ChevronRight,
+                    icon = PantopusIcon.MessageSquare,
+                    contentDescription = null,
+                    size = 15.dp,
+                    tint = PantopusColors.appTextSecondary,
+                    modifier = Modifier.padding(end = Spacing.s2),
+                )
+                Text(
+                    text = "Your answers",
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${answers.size}",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextMuted,
+                    modifier = Modifier.padding(end = Spacing.s1),
+                )
+                PantopusIconImage(
+                    icon = if (answersExpanded) PantopusIcon.ChevronUp else PantopusIcon.ChevronDown,
                     contentDescription = null,
                     size = 15.dp,
                     tint = PantopusColors.appTextMuted,
                 )
             }
             if (answersExpanded) {
-                Column(modifier = Modifier.padding(top = Spacing.s2, start = Spacing.s5), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Column(
+                    modifier = Modifier.padding(top = Spacing.s2, start = Spacing.s5),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
                     answers.forEach { (q, a) ->
                         Column {
-                            Text(text = q, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextSecondary)
+                            Text(
+                                text = q,
+                                style = PantopusTextStyle.caption,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PantopusColors.appTextSecondary,
+                            )
                             Text(text = a, style = PantopusTextStyle.caption, color = PantopusColors.appText)
                         }
                     }
@@ -175,7 +217,10 @@ private fun PriceBreakdown(et: PublicEventTypeView) {
         HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(vertical = Spacing.s1))
         when (mode) {
             PriceMode.Deposit -> {
-                TotalRow(label = "Due now", value = ConfirmUtils.formatCents(ConfirmUtils.dueNowCents(et.priceCents, et.depositCents), currency))
+                TotalRow(
+                    label = "Due now",
+                    value = ConfirmUtils.formatCents(ConfirmUtils.dueNowCents(et.priceCents, et.depositCents), currency),
+                )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "Balance at your visit", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
                     Text(
@@ -198,7 +243,12 @@ private fun LineRow(
     strong: Boolean = false,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(text = label, style = PantopusTextStyle.caption, fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal, color = if (strong) PantopusColors.appText else PantopusColors.appTextStrong)
+        Text(
+            text = label,
+            style = PantopusTextStyle.caption,
+            fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (strong) PantopusColors.appText else PantopusColors.appTextStrong,
+        )
         Text(text = value, style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
     }
 }
@@ -208,7 +258,11 @@ private fun TotalRow(
     label: String,
     value: String,
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
         Text(text = label, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(text = value, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = PantopusColors.primary600)
     }
@@ -246,7 +300,12 @@ private fun PaymentMethodButton(accent: androidx.compose.ui.graphics.Color) {
             PantopusIconImage(icon = PantopusIcon.CreditCard, contentDescription = null, size = 16.dp, tint = accent)
         }
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s2)) {
-            Text(text = "Payment method", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+            Text(
+                text = "Payment method",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
             Text(text = "Choose a card or Apple Pay", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
         }
         PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextMuted)
@@ -255,8 +314,18 @@ private fun PaymentMethodButton(accent: androidx.compose.ui.graphics.Color) {
 
 @Composable
 private fun TrustRow() {
-    Row(modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextMuted, modifier = Modifier.padding(end = Spacing.s1))
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Lock,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.appTextMuted,
+            modifier = Modifier.padding(end = Spacing.s1),
+        )
         Text(text = "Payments secured by Stripe", style = PantopusTextStyle.caption, color = PantopusColors.appTextMuted)
     }
 }

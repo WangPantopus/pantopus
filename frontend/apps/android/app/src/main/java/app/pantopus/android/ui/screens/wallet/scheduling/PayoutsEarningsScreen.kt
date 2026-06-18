@@ -42,7 +42,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
@@ -202,7 +208,16 @@ internal fun PayoutsEarningsContent(
                 holdBody = if (onHold) "Funds are safe while we re-verify your bank." else null,
             )
             FilterRow(active = source, onSelect = onSetSource)
-            SectionOverline(if (source == EarningsSource.All) "Recent activity" else source.label)
+            SectionOverline(
+                text = if (source == EarningsSource.All) "Recent activity" else source.label,
+                actionLabel = if (source == EarningsSource.All) null else "See all",
+                onAction =
+                    if (source == EarningsSource.All) {
+                        null
+                    } else {
+                        { onSetSource(EarningsSource.All) }
+                    },
+            )
             if (rows.isEmpty()) {
                 EmptyEarnings(source = source)
             } else {
@@ -311,15 +326,33 @@ private fun FilterRow(
 }
 
 @Composable
-private fun SectionOverline(text: String) {
-    Text(
-        text = text.uppercase(),
-        color = PantopusColors.appTextSecondary,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 0.8.sp,
-        modifier = Modifier.padding(top = Spacing.s1),
-    )
+private fun SectionOverline(
+    text: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = text.uppercase(),
+            color = PantopusColors.appTextSecondary,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+        )
+        if (actionLabel != null && onAction != null) {
+            Text(
+                text = actionLabel,
+                color = PantopusColors.primary600,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable(onClick = onAction).testTag("scheduling.payoutsEarnings.seeAll"),
+            )
+        }
+    }
 }
 
 @Composable
@@ -436,7 +469,7 @@ private fun EmptyEarnings(source: EarningsSource) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(14.dp))
+                .dashedBorder(PantopusColors.appBorderStrong, 14.dp)
                 .padding(horizontal = 20.dp, vertical = 28.dp)
                 .testTag("scheduling.payoutsEarnings.empty"),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -471,7 +504,7 @@ private fun PayoutMethodSection(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(14.dp))
+                        .dashedBorder(PantopusColors.appBorderStrong, 14.dp)
                         .clickable(onClick = onSetupPayouts)
                         .padding(horizontal = 13.dp, vertical = 12.dp)
                         .testTag("scheduling.payoutsEarnings.connectTile"),
@@ -648,3 +681,20 @@ private fun EarningsToast(
         )
     }
 }
+
+/** Rounded dashed outline (1dp) — placeholder/drop-zone stroke (spec: `1px dashed borderStrong`). */
+private fun Modifier.dashedBorder(
+    color: Color,
+    radius: androidx.compose.ui.unit.Dp,
+): Modifier =
+    drawBehind {
+        val stroke = 1.dp.toPx()
+        val r = radius.toPx()
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(stroke / 2f, stroke / 2f),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = CornerRadius(r, r),
+            style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))),
+        )
+    }
