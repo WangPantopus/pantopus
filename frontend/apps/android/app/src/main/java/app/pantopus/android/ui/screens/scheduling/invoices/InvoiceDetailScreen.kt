@@ -142,17 +142,20 @@ private fun LoadedBody(
                 color = PantopusColors.appTextSecondary,
                 fontSize = 10.5.sp,
                 fontFamily = FontFamily.Monospace,
+                letterSpacing = 0.04.sp,
             )
-            // Hero
+            // Hero — design `HeroNum` default variant: alignItems:center, gap 8,
+            // total fontSize 30 weight 800 letterSpacing -1.1, label 11.5 fg3 medium.
             Row(
                 modifier = Modifier.padding(top = Spacing.s4),
-                verticalAlignment = Alignment.Bottom,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = state.totalLabel,
                     color = PantopusColors.appText,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Black,
+                    letterSpacing = (-1.1).sp,
                 )
                 Box(modifier = Modifier.size(Spacing.s2))
                 Text(
@@ -160,7 +163,6 @@ private fun LoadedBody(
                     color = PantopusColors.appTextSecondary,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
             // Payer → payee
