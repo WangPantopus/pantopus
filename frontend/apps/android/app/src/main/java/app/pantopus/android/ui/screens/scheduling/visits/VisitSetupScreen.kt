@@ -28,14 +28,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,6 +53,8 @@ import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.screens.scheduling.resources.CounterRow
 import app.pantopus.android.ui.screens.scheduling.resources.HomeMember
 import app.pantopus.android.ui.screens.scheduling.resources.HomeMemberAvatar
@@ -105,25 +104,12 @@ fun VisitSetupScreen(
         modifier = Modifier.fillMaxSize().testTag(VISIT_SETUP_TAG),
         containerColor = PantopusColors.appBg,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        "Schedule a visit",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PantopusColors.appText,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.X,
-                            contentDescription = "Close",
-                            tint = PantopusColors.appText,
-                        )
-                    }
-                },
-                actions = {
+            SchedulingTopBar(
+                title = "Schedule a visit",
+                leading = SchedulingTopBarLeading.Close,
+                onLeading = onBack,
+                applyStatusBarInset = true,
+                trailing = {
                     if (isSaving) {
                         CircularProgressIndicator(
                             color = PantopusColors.home,
@@ -150,10 +136,6 @@ fun VisitSetupScreen(
                         }
                     }
                 },
-                colors =
-                    TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = PantopusColors.appSurface,
-                    ),
             )
         },
     ) { padding ->

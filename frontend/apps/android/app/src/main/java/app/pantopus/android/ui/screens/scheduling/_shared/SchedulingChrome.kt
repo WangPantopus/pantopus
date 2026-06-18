@@ -6,12 +6,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -22,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,85 +70,100 @@ fun SchedulingTopBar(
     onLeading: (() -> Unit)? = null,
     trailingIcon: PantopusIcon? = null,
     onTrailing: (() -> Unit)? = null,
+    applyStatusBarInset: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .height(TOP_BAR_HEIGHT)
-                .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s3),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Leading
-        Box(modifier = Modifier.size(TOP_BAR_HIT), contentAlignment = Alignment.Center) {
-            if (leading != SchedulingTopBarLeading.None) {
-                val isBack = leading == SchedulingTopBarLeading.Back
-                Box(
-                    modifier =
-                        Modifier
-                            .size(TOP_BAR_HIT)
-                            .testTag(if (isBack) "schedulingTopBarBack" else "schedulingTopBarClose")
-                            .clip(CircleShape)
-                            .clickable(
-                                enabled = onLeading != null,
-                                onClickLabel = if (isBack) "Back" else "Close",
-                                onClick = { onLeading?.invoke() },
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PantopusIconImage(
-                        icon = if (isBack) PantopusIcon.ChevronLeft else PantopusIcon.X,
-                        contentDescription = if (isBack) "Back" else "Close",
-                        size = TOP_BAR_ICON,
-                        tint = PantopusColors.appText,
-                    )
-                }
-            }
+    Column(modifier = modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
+        // When used in a Scaffold `topBar` slot (replacing a Material top bar),
+        // reserve the status-bar height above the 56dp bar so content never
+        // draws under the system status bar. Off by default for in-content use.
+        if (applyStatusBarInset) {
+            Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
         }
-        // Title
-        Text(
-            text = title,
-            color = PantopusColors.appText,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
             modifier =
                 Modifier
-                    .weight(1f)
-                    .padding(horizontal = Spacing.s1),
-        )
-        // Trailing
-        Box(modifier = Modifier.size(TOP_BAR_HIT), contentAlignment = Alignment.Center) {
-            if (trailingIcon != null) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(TOP_BAR_HIT)
-                            .testTag("schedulingTopBarTrailing")
-                            .clip(CircleShape)
-                            .clickable(enabled = onTrailing != null, onClick = { onTrailing?.invoke() }),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PantopusIconImage(
-                        icon = trailingIcon,
-                        contentDescription = null,
-                        size = TOP_BAR_ICON,
-                        tint = PantopusColors.appText,
-                    )
+                    .fillMaxWidth()
+                    .height(TOP_BAR_HEIGHT)
+                    .padding(horizontal = Spacing.s3),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Leading
+            Box(modifier = Modifier.size(TOP_BAR_HIT), contentAlignment = Alignment.Center) {
+                if (leading != SchedulingTopBarLeading.None) {
+                    val isBack = leading == SchedulingTopBarLeading.Back
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(TOP_BAR_HIT)
+                                .testTag(if (isBack) "schedulingTopBarBack" else "schedulingTopBarClose")
+                                .clip(CircleShape)
+                                .clickable(
+                                    enabled = onLeading != null,
+                                    onClickLabel = if (isBack) "Back" else "Close",
+                                    onClick = { onLeading?.invoke() },
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        PantopusIconImage(
+                            icon = if (isBack) PantopusIcon.ChevronLeft else PantopusIcon.X,
+                            contentDescription = if (isBack) "Back" else "Close",
+                            size = TOP_BAR_ICON,
+                            tint = PantopusColors.appText,
+                        )
+                    }
+                }
+            }
+            // Title (centered in the remaining space)
+            Text(
+                text = title,
+                color = PantopusColors.appText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(horizontal = Spacing.s1),
+            )
+            // Trailing — a custom slot (text action / progress) takes priority,
+            // else an icon button, else a 36dp spacer that keeps the title centered.
+            if (trailing != null) {
+                trailing()
+            } else {
+                Box(modifier = Modifier.size(TOP_BAR_HIT), contentAlignment = Alignment.Center) {
+                    if (trailingIcon != null) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(TOP_BAR_HIT)
+                                    .testTag("schedulingTopBarTrailing")
+                                    .clip(CircleShape)
+                                    .clickable(enabled = onTrailing != null, onClick = { onTrailing?.invoke() }),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            PantopusIconImage(
+                                icon = trailingIcon,
+                                contentDescription = null,
+                                size = TOP_BAR_ICON,
+                                tint = PantopusColors.appText,
+                            )
+                        }
+                    }
                 }
             }
         }
+        // 1dp bottom hairline
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(PantopusColors.appBorder),
+        )
     }
-    // 1dp bottom hairline
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(PantopusColors.appBorder),
-    )
 }
 
 /**

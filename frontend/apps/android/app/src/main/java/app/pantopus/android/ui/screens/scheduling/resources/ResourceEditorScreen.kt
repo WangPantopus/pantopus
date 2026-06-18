@@ -28,16 +28,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -96,25 +95,12 @@ fun ResourceEditorScreen(
         modifier = Modifier.fillMaxSize().testTag(RESOURCE_EDITOR_TAG),
         containerColor = PantopusColors.appBg,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        viewModel.screenTitle,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PantopusColors.appText,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.X,
-                            contentDescription = "Close",
-                            tint = PantopusColors.appText,
-                        )
-                    }
-                },
-                actions = {
+            SchedulingTopBar(
+                title = viewModel.screenTitle,
+                leading = SchedulingTopBarLeading.Close,
+                onLeading = onBack,
+                applyStatusBarInset = true,
+                trailing = {
                     if (isSaving) {
                         CircularProgressIndicator(
                             color = PantopusColors.home,
@@ -134,10 +120,6 @@ fun ResourceEditorScreen(
                         }
                     }
                 },
-                colors =
-                    TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = PantopusColors.appSurface,
-                    ),
             )
         },
     ) { padding ->
