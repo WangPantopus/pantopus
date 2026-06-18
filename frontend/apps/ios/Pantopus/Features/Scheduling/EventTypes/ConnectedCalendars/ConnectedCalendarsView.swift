@@ -12,9 +12,11 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ConnectedCalendarsView: View {
     @State private var viewModel: ConnectedCalendarsViewModel
+    @Environment(\.openURL) private var openURL
 
     init(viewModel: ConnectedCalendarsViewModel) {
         _viewModel = State(wrappedValue: viewModel)
@@ -70,9 +72,10 @@ struct ConnectedCalendarsView: View {
     // MARK: Pillar overline (design sheet subtitle "Personal · Scheduling")
 
     private var pillarOverline: some View {
+        // Design overline: 9.5px / 0.08em letter-spacing (~0.76pt at 9.5).
         Text("PERSONAL · SCHEDULING")
-            .font(.system(size: 10, weight: .bold))
-            .tracking(0.8)
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(1.0)
             .foregroundStyle(Theme.Color.personal)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Spacing.s4)
@@ -220,7 +223,9 @@ struct ConnectedCalendarsView: View {
         if !viewModel.calendars.isEmpty {
             VStack(spacing: Spacing.s2) {
                 ForEach(viewModel.calendars) { calendar in
-                    if viewModel.needsReauth(calendar) {
+                    if viewModel.isDenied(calendar) {
+                        deniedCard(calendar)
+                    } else if viewModel.needsReauth(calendar) {
                         reauthCard(calendar)
                     } else {
                         connectedCard(calendar)
@@ -376,6 +381,78 @@ struct ConnectedCalendarsView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.warningLight, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+        .padding(.vertical, Spacing.s3)
+        .padding(.horizontal, Spacing.s3)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+    }
+
+    // MARK: Permission-denied row (lock banner + Open Settings)
+
+    private func deniedCard(_ calendar: ConnectedCalendarDTO) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(spacing: Spacing.s3) {
+                if let provider = viewModel.provider(for: calendar) {
+                    providerTile(provider)
+                } else {
+                    Icon(.calendar, size: 19, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                        .frame(width: 38, height: 38)
+                        .background(Theme.Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                                .stroke(Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(viewModel.provider(for: calendar)?.name ?? calendar.provider ?? "Calendar")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appText)
+                        .lineLimit(1)
+                    Text("Not connected")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer()
+            }
+            HStack(alignment: .top, spacing: Spacing.s2) {
+                Icon(.lock, size: 14, strokeWidth: 2, color: Theme.Color.appTextMuted)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    Text("Calendar access was declined. Allow it in Settings to connect.")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(url)
+                        }
+                    } label: {
+                        HStack(spacing: Spacing.s1) {
+                            Icon(.settings, size: 13, color: Theme.Color.primary600)
+                            Text("Open Settings")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.Color.primary600)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("scheduling.connectedCalendars.openSettings.\(calendar.id)")
+                }
+                Spacer(minLength: Spacing.s0)
+            }
+            .padding(Spacing.s3)
+            .background(Theme.Color.appSurfaceRaised)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
