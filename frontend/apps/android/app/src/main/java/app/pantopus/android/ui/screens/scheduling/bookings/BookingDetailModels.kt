@@ -4,7 +4,7 @@ package app.pantopus.android.ui.screens.scheduling.bookings
 
 import app.pantopus.android.data.api.models.scheduling.BookingDetailResponse
 import app.pantopus.android.data.scheduling.SchedulingOwner
-import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -21,8 +21,7 @@ data class BookingDetailData(
     val pillar: SchedulingPillar,
     val ownerLabel: String,
     val status: BookingStatus,
-    val statusLabel: String,
-    val statusVariant: StatusChipVariant,
+    val pillStatus: SchedulingPillStatus,
     val eventName: String,
     val whenRange: String,
     val startUtc: String?,
@@ -94,7 +93,6 @@ fun locationInfoFor(mode: String?): LocationInfo? =
 /** Build the mapped detail data from the host detail response + resolved owner. */
 fun BookingDetailResponse.toDetailData(owner: SchedulingOwner): BookingDetailData {
     val status = BookingStatus.fromRaw(booking.status)
-    val chip = bookingStatusChip(status)
     val pillar = owner.toPillar()
     val isActive = status == BookingStatus.Pending || status == BookingStatus.Confirmed
     val name = booking.inviteeName?.takeIf { it.isNotBlank() } ?: "Guest"
@@ -117,8 +115,7 @@ fun BookingDetailResponse.toDetailData(owner: SchedulingOwner): BookingDetailDat
         pillar = pillar,
         ownerLabel = ownerLabelFor(pillar),
         status = status,
-        statusLabel = chip.label,
-        statusVariant = chip.variant,
+        pillStatus = status.toPillStatus(),
         eventName = eventType?.name?.takeIf { it.isNotBlank() } ?: "Booking",
         whenRange = rangeLabel(booking.startAt, booking.endAt),
         startUtc = booking.startAt,

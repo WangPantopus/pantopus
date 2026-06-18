@@ -60,9 +60,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
-import app.pantopus.android.ui.components.StatusChip
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -567,7 +567,7 @@ private fun BookingRowCard(
                     }
                 }
             }
-            StatusChip(text = row.statusLabel, variant = row.statusVariant)
+            SchedulingStatusPill(status = row.pillStatus)
         }
         if (row.quickApprove) {
             Spacer(Modifier.height(10.dp))

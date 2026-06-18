@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -336,25 +337,20 @@ internal fun BLSegmented(
     }
 }
 
-// ─── Status chip ─────────────────────────────────────────────────────────────
+// ─── Booking-page status → shared status pill ────────────────────────────────
 
-@Composable
-internal fun StatusChip(status: PageStatus) {
-    val (bg, fg, label) =
-        when (status) {
-            PageStatus.Live -> Triple(PantopusColors.successLight, PantopusColors.success, "Live")
-            PageStatus.Paused -> Triple(PantopusColors.appSurfaceSunken, PantopusColors.appTextStrong, "Paused")
-            PageStatus.Draft -> Triple(PantopusColors.warningBg, PantopusColors.warning, "Draft")
-        }
-    Row(
-        modifier = Modifier.clip(RoundedCornerShape(Radii.pill)).background(bg).padding(horizontal = 9.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(fg))
-        Text(label.uppercase(Locale.US), color = fg, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+/**
+ * Maps the local [PageStatus] (Draft / Live / Paused) onto the canonical
+ * [SchedulingPillStatus] so booking-page status renders through the shared
+ * [SchedulingStatusPill] primitive. `Live` is the page's "active/published"
+ * state, so it maps to [SchedulingPillStatus.Active].
+ */
+internal fun PageStatus.toPillStatus(): SchedulingPillStatus =
+    when (this) {
+        PageStatus.Live -> SchedulingPillStatus.Active
+        PageStatus.Paused -> SchedulingPillStatus.Paused
+        PageStatus.Draft -> SchedulingPillStatus.Draft
     }
-}
 
 // ─── Amber inline warning note ──────────────────────────────────────────────
 
